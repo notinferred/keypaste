@@ -4,11 +4,11 @@
 #
 # PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md §§1.4, 3.4 and law 4.6, for E.1a.
 #
-# KeePassXC makes the vault: an env set holding a usable entry, an expired one, one whose name
-# cannot be exported and one KeePassXC then deletes into its recycle bin. `keypaste run` must refuse
-# the set whole, naming the expired entry and the bad name with their reasons, start no child and
-# print no value. The deleted entry is not part of the set (D-0248) and is never named or injected.
-# Once KeePassXC removes the two unusable entries, the next run injects exactly what is left.
+# KeePassXC makes the vault: entries tagged env:gate holding a usable variable, an expired one, a
+# field no variable could be named and one KeePassXC then deletes into its recycle bin. `keypaste run`
+# must refuse the set whole, naming the expired entry with its expiry, start no child and print no
+# value. Neither the deleted entry (D-0248) nor the field is part of the set, and neither is named or
+# injected. Once KeePassXC removes the expired entry, the next run injects exactly what is left.
 #
 # Expiry can only be written by KeePassXC, and keepassxc-cli has no option for it, so the vault is
 # made by `keepassxc-cli import` from KeePass XML.
@@ -45,31 +45,30 @@ recycled='recycled-value-4d2a'
 # The child prints every variable the set could hold, so a value arriving where it should not is seen.
 probe='printf "VALID=%s EXPIRED=%s RECYCLED=%s" "${VALID-unset}" "${EXPIRED-unset}" "${RECYCLED-unset}"'
 
-step "KeePassXC makes the vault: one usable, one expired, one bad name, one deleted"
-entry() { # uuid title value expires expiry-time
-  printf '<Entry><UUID>%s</UUID><Times><Expires>%s</Expires><ExpiryTime>%s</ExpiryTime></Times>' "$1" "$4" "$5"
+step "KeePassXC makes the vault: one usable, one expired, one field no variable could be named, one deleted"
+entry() { # uuid title field value expires expiry-time
+  printf '<Entry><UUID>%s</UUID><Tags>env:gate</Tags><Times><Expires>%s</Expires><ExpiryTime>%s</ExpiryTime></Times>' "$1" "$5" "$6"
   printf '<String><Key>Title</Key><Value>%s</Value></String>' "$2"
-  printf '<String><Key>Password</Key><Value ProtectInMemory="True">%s</Value></String></Entry>\n' "$3"
+  printf '<String><Key>%s</Key><Value ProtectInMemory="True">%s</Value></String></Entry>\n' "$3" "$4"
 }
 {
   printf '<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n<KeePassFile><Meta><Generator>keypaste-run-gate</Generator><RecycleBinEnabled>True</RecycleBinEnabled></Meta><Root>\n'
   printf '<Group><UUID>AAAAAAAAAAAAAAAAAAAAAQ==</UUID><Name>Root</Name>\n'
-  printf '<Group><UUID>AAAAAAAAAAAAAAAAAAAAAg==</UUID><Name>env</Name>\n'
   printf '<Group><UUID>AAAAAAAAAAAAAAAAAAAAAw==</UUID><Name>gate</Name>\n'
-  entry AAAAAAAAAAAAAAAAAAAAEA== VALID "$valid" True 2999-01-01T00:00:00Z
-  entry AAAAAAAAAAAAAAAAAAAAEQ== EXPIRED "$expired" True 2020-01-02T03:04:05Z
-  entry AAAAAAAAAAAAAAAAAAAAEg== BAD-NAME "$badname" False 2999-01-01T00:00:00Z
-  entry AAAAAAAAAAAAAAAAAAAAEw== RECYCLED "$recycled" False 2999-01-01T00:00:00Z
-  printf '</Group></Group></Group></Root></KeePassFile>\n'
+  entry AAAAAAAAAAAAAAAAAAAAEA== Valid VALID "$valid" True 2999-01-01T00:00:00Z
+  entry AAAAAAAAAAAAAAAAAAAAEQ== Expired EXPIRED "$expired" True 2020-01-02T03:04:05Z
+  entry AAAAAAAAAAAAAAAAAAAAEg== Odd bad-name "$badname" False 2999-01-01T00:00:00Z
+  entry AAAAAAAAAAAAAAAAAAAAEw== Recycled RECYCLED "$recycled" False 2999-01-01T00:00:00Z
+  printf '</Group></Group></Root></KeePassFile>\n'
 } > "$xml"
 
 printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$xml")" "$(native "$db")" >/dev/null \
   || die "keepassxc-cli could not import the fixture XML"
-kpxc rm "$(native "$db")" env/gate/RECYCLED >/dev/null || die "keepassxc-cli rm failed on RECYCLED"
+kpxc rm "$(native "$db")" gate/Recycled >/dev/null || die "keepassxc-cli rm failed on Recycled"
 
 tree=$(kpxc ls -R -f "$(native "$db")") || die "keepassxc-cli cannot list the vault it made"
-grep -qx 'env/gate/EXPIRED' <<<"$tree" || die "KeePassXC did not keep EXPIRED in env/gate. Tree: ${tree}"
-grep -qx 'Recycle Bin/RECYCLED' <<<"$tree" || die "KeePassXC did not recycle RECYCLED. Tree: ${tree}"
+grep -qx 'gate/Expired' <<<"$tree" || die "KeePassXC did not keep Expired in gate. Tree: ${tree}"
+grep -qx 'Recycle Bin/Recycled' <<<"$tree" || die "KeePassXC did not recycle Recycled. Tree: ${tree}"
 exported=$(kpxc export -f xml "$(native "$db")") || die "keepassxc-cli cannot export the vault it made"
 # Matched whole: grep -q on the end of a pipe exits at the first match, and pipefail then fails on the writer it cut off.
 grep -q '<Expires>True</Expires>' <<<"$exported" || die "the vault KeePassXC made carries no expiry"
@@ -84,17 +83,16 @@ out=$(tr -d '\r' <<<"$out")
 
 [ "$status" = "2" ] || die "expected exit 2 for an unusable set, got ${status}. stderr: ${err}"
 [ -z "$out" ] || die "a child started, or keypaste printed to stdout: ${out}"
-grep -qF 'EXPIRED expired 2020-01-02 03:04:05Z' <<<"$err" || die "the expired entry was not named with its expiry. stderr: ${err}"
-grep -qF 'BAD-NAME is not a valid environment variable name' <<<"$err" || die "the bad name was not named with its reason. stderr: ${err}"
-grep -qF 'RECYCLED' <<<"$err" && die "the recycled entry was named, but it is not part of the set. stderr: ${err}"
+grep -qF 'EXPIRED expired 2020-01-02 03:04:05Z (gate/Expired)' <<<"$err" || die "the expired entry was not named with its expiry. stderr: ${err}"
+grep -qE 'bad-name|gate/Odd' <<<"$err" && die "a field no variable could be named was named, but it is not part of the set. stderr: ${err}"
+grep -qE 'RECYCLED|Recycled' <<<"$err" && die "the recycled entry was named, but it is not part of the set. stderr: ${err}"
 for value in "$valid" "$expired" "$badname" "$recycled"; do
   grep -qF "$value" <<<"$err$out" && die "a value was printed: ${value}"
 done
-echo "ok: exit 2, both unusable entries named, no child, no value"
+echo "ok: exit 2, the expired entry named, no child, no value"
 
-step "once KeePassXC removes them, the next run injects exactly what is left"
-kpxc rm "$(native "$db")" env/gate/EXPIRED >/dev/null || die "keepassxc-cli rm failed on EXPIRED"
-kpxc rm "$(native "$db")" env/gate/BAD-NAME >/dev/null || die "keepassxc-cli rm failed on BAD-NAME"
+step "once KeePassXC removes the expired entry, the next run injects exactly what is left"
+kpxc rm "$(native "$db")" gate/Expired >/dev/null || die "keepassxc-cli rm failed on Expired"
 
 out=$(printf '%s\n' "$pw" | "$kp" run gate --vault "$db" -- "$child" -c "$probe" | tr -d '\r') \
   || die "keypaste run failed on the repaired set"
@@ -110,7 +108,7 @@ step "NEGATIVE CONTROL: the comparisons must be able to fail"
 [ "$out" = "VALID=${valid}-CORRUPTED EXPIRED=unset RECYCLED=unset" ] \
   && die "a deliberately corrupted expectation still matched — this gate is not gating"
 valid_expires=$(kpxc export -f xml "$(native "$db")" | tr -d '\t' \
-  | awk '/<Expires>/{last=$0} /<Value>VALID<\/Value>/{print last}')
+  | awk '/<Expires>/{last=$0} /<Value>Valid<\/Value>/{print last}')
 [ "$valid_expires" = '<Expires>True</Expires>' ] \
   || die "VALID does not carry the future expiry its run just ignored (got '${valid_expires}')"
 

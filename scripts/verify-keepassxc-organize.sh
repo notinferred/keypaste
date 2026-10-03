@@ -61,10 +61,8 @@ driver=$(vault_restorer)
 
 export KEYPASTE_RESTORER_PASSWORD=$pw
 
-kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" env set "$1" "$3" --vault "$db"; }
-# A new variable is written in the env/<project> layout these checks address, which only `add` still
-# creates (D-0413); kpset then updates it in place.
-kpnew() { legacy_var "$kp" "$db" "$pw" "$1" "$3" "$2"; }
+kpnew() { printf '%s\n%s\n' "$pw" "$2" | "$kp" add "$1" --vault "$db" >/dev/null; }
+kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" set "$1" --vault "$db"; }
 
 # The KDBX container: signature, major version, and the minor version this gate exists for.
 assert_kdbx_40() {
@@ -100,14 +98,14 @@ rm -f "$db"          # re-runnable locally, not only on a fresh CI checkout
 # ---------------------------------------------------------------------------------------
 # Seeded by the shipped binary.
 # ---------------------------------------------------------------------------------------
-step "seed: the shipped binary writes an env project with history, a second project and a plain entry"
+step "seed: the shipped binary writes an entry with history and two more under env, and one outside it"
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$db"
-kpnew "$project" v1-first TOKEN
+kpnew "env/${project}/TOKEN" v1-first
 for value in v2-second v3-third v4-current; do
-  kpset "$project" "$value" TOKEN
+  kpset "env/${project}/TOKEN" "$value"
 done
-kpnew "$project" kept-value KEPT
-kpnew "$other" other-value OTHER
+kpnew "env/${project}/KEPT" kept-value
+kpnew "env/${other}/OTHER" other-value
 printf '%s\n%s\n' "$pw" 'plain-pass' | "$kp" add "keys/spare" --vault "$db" >/dev/null
 
 uuid_before=$(entry_uuid "$db")
@@ -116,7 +114,7 @@ uuid_before=$(entry_uuid "$db")
 assert_kdbx_40 "the seed"
 
 # ---------------------------------------------------------------------------------------
-# Renaming a group, which is how an env project is renamed.
+# Renaming a group.
 # ---------------------------------------------------------------------------------------
 step "keypaste renames the group, and the file is still KDBX 4.0"
 said=$("$driver" group-rename "$db" "env/${project}" invoicing) || die "group-rename failed: ${said}"
@@ -138,17 +136,16 @@ grep -qF 'env/invoicing/KEPT' <<<"$tree" \
 grep -qF "env/${project}/" <<<"$tree" \
   && die "KeePassXC still sees the group under its old name, so nothing was renamed"
 grep -qF "env/${other}/OTHER" <<<"$tree" \
-  || die "the project that was not renamed is missing"
+  || die "the entry in the group that was not renamed is missing"
 
 step "KeePassXC reads the entry's value at the new path"
 current=$(kpxc show -a Password "$db" 'env/invoicing/TOKEN') || die "keepassxc-cli show failed at the new path"
 diff -u <(printf '%s\n' 'v4-current') <(printf '%s\n' "$current") \
   || die "KeePassXC does not read the entry's value at the renamed path"
 
-step "the shipped binary resolves the project by its new name and not its old one"
+step "the shipped binary reads the entry at the new path, and lists no project for either name (D-0416)"
 listed=$(printf '%s\n' "$pw" | "$kp" env ls --vault "$db") || die "keypaste env ls failed"
-grep -qF 'invoicing' <<<"$listed" || die "keypaste does not list the renamed project. It said: ${listed}"
-grep -qF "$project" <<<"$listed" && die "keypaste still lists the project under its old name"
+grep -qE "invoicing|${project}" <<<"$listed" && die "keypaste lists an untagged group under env as a project. It said: ${listed}"
 
 got=$(printf '%s\n' "$pw" | "$kp" get env/invoicing/TOKEN --show --vault "$db") \
   || die "keypaste get failed at the renamed path"
@@ -264,7 +261,7 @@ grep -Eqi '^[[:space:]]*KDF:[[:space:]]*Argon2' <<<"$info" || die "KDF changed a
 # 4.0 must still raise a recycled one to 4.1, or those assertions are checking nothing.
 # ---------------------------------------------------------------------------------------
 step "recycling raises the same file to KDBX 4.1, which is what makes the 4.0 assertions mean something"
-kpnew invoicing doomed-value DOOMED
+kpnew env/invoicing/DOOMED doomed-value
 printf '%s\n' "$pw" | "$kp" rm env/invoicing/DOOMED --vault "$db" --yes >/dev/null
 
 hdr=$(header "$db")
@@ -277,7 +274,7 @@ hdr=$(header "$db")
 # collapsed into one.
 # ---------------------------------------------------------------------------------------
 step "a name something else already answers to is refused, and writes nothing"
-kpnew invoicing second-value TOKEN_TAKEN
+kpnew env/invoicing/TOKEN_TAKEN second-value
 refuses DestinationOccupied entry-rename "$db" env/invoicing KEPT TOKEN_TAKEN
 
 step "a destination that does not exist is refused, and creates nothing on the way"
@@ -296,16 +293,16 @@ refuses NameReserved group-create "$db" "" env
 refuses NameReserved group-create "$db" "" "Recycle Bin"
 refuses NameReserved group-rename "$db" archive env
 
-step "a variable name nothing could export is refused"
-refuses EnvNameRefused entry-rename "$db" env/invoicing KEPT lower-case
-
-step "two variables differing only in case are refused where they would be created"
-refuses EnvNameCollides entry-rename "$db" env/invoicing TOKEN_TAKEN Kept
-
 step "the entries the refusals named are exactly as they were"
 value=$(kpxc show -a Password "$db" 'env/invoicing/KEPT')
 diff -u <(printf '%s\n' 'kept-value') <(printf '%s\n' "$value") \
   || die "the refusals disturbed the entry they named"
+
+step "a title under env follows the ordinary rules: one no variable could be named is accepted (D-0416)"
+said=$("$driver" entry-rename "$db" env/invoicing TOKEN_TAKEN lower-case) \
+  || die "a rename under env was refused by a rule for variable names. It said: ${said}"
+kpxc show -a Password "$db" 'env/invoicing/lower-case' >/dev/null \
+  || die "KeePassXC cannot read the entry renamed under env"
 
 # ---------------------------------------------------------------------------------------
 # NEGATIVE CONTROL.
@@ -325,7 +322,7 @@ fi
 
 # The byte comparison every refusal above rests on must be able to see a change.
 before_control=$(bytes "$db")
-kpnew invoicing control-value CONTROL
+kpnew env/invoicing/CONTROL control-value
 [ "$(bytes "$db")" != "$before_control" ] \
   || die "the vault file did not change after a write — the byte comparison cannot detect one, so every refusal above proved nothing"
 

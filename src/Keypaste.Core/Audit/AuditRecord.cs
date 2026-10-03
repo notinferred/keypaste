@@ -184,7 +184,7 @@ public sealed record AuditArgs
     public string? ReasonSha256 { get; init; }
 
     /// <summary>Reduces a run request to what the log keeps: the set's group, when it named one, and the reason.</summary>
-    /// <param name="group">The env group of a set, or null for references, whose entries the line lists instead.</param>
+    /// <param name="group">The set's name (<see cref="EnvProfileNames.SetName"/>), or null for references, whose entries the line lists instead.</param>
     /// <param name="reason">The agent's stated reason, verbatim.</param>
     /// <returns>The arguments, holding no value.</returns>
     public static AuditArgs ForRun(string? group, string reason)
@@ -244,8 +244,8 @@ public sealed record AuditRecord
     /// <summary>The schema version, written on every line from the first.</summary>
     /// <remarks>
     /// Version 2 adds <c>prev</c> and <c>hash</c> and redefines <c>seq</c> as a line's position in the
-    /// chain rather than a count of what one process wrote. Older lines are reported as "predates the
-    /// chain" rather than as "tampered with", which is what keeps <c>log verify</c> from crying wolf.
+    /// chain rather than a count of what one process wrote. Every release of keypaste wrote version 2,
+    /// so a version 1 line is reported as written by something else (D-0416).
     /// </remarks>
     public const int SchemaVersion = 2;
 

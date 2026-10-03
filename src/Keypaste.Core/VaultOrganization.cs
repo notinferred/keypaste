@@ -43,19 +43,6 @@ public enum OrganizeOutcome
     /// <summary>The path this would produce would name two entries rather than one.</summary>
     DestinationAmbiguous = 7,
 
-    /// <summary>
-    /// The result would sit under <c>env/</c> with a name no environment could carry: an
-    /// unexportable variable name, a project name nothing could resolve, or the <c>env</c> group
-    /// itself, where a variable is a write to nowhere.
-    /// </summary>
-    EnvNameRefused = 8,
-
-    /// <summary>
-    /// The result would leave one project holding two variables differing only in case — two on
-    /// Linux and one on Windows.
-    /// </summary>
-    EnvNameCollides = 9,
-
     /// <summary>The entry is in its new group, under its new title. One write changed both.</summary>
     RenamedAndMoved = 10,
 }
@@ -96,7 +83,4 @@ public enum GroupOutcome
 
     /// <summary>The rename would leave two entries answering to one path.</summary>
     DestinationAmbiguous = 8,
-
-    /// <summary>The result would be an env project under a name nothing could resolve.</summary>
-    EnvNameRefused = 9,
 }

@@ -157,7 +157,7 @@ public sealed class SecretCopyParityTests
                 vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = _superseded });
                 vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", _fieldValue), new FieldWrite("Region", _plainFieldValue, Protect: false)]);
                 vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = _current });
-                vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = _envValue, GroupPath = "env/billing" });
+                ProjectVariables.Set(vault, "billing", "STRIPE_KEY", _envValue);
                 vault.Save();
             }
 

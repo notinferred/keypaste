@@ -343,8 +343,8 @@ public sealed class LogVerbTests : IDisposable
     /// </summary>
     /// <remarks>
     /// Inserting an unverifiable record is the one way to add a line without breaking a link, since
-    /// nothing before or after it changes. What stops it being a way to write history is that
-    /// keypaste never puts a v1 record after a v2 one, and that the table says which rows the chain
+    /// nothing before or after it changes. What stops it being a way to write history is that no
+    /// release of keypaste wrote a v1 record (D-0416), and that the table says which rows the chain
     /// does not vouch for.
     /// </remarks>
     [Fact]
@@ -368,7 +368,7 @@ public sealed class LogVerbTests : IDisposable
         Assert.Contains($"{AuditText.UnverifiedMark}  the hash chain does not vouch", _cli.Out, StringComparison.Ordinal);
 
         _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "verify"));
-        Assert.Contains("keypaste never writes one there", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("it is not a record keypaste wrote", _cli.Out, StringComparison.Ordinal);
 
         _cli.Stdout.GetStringBuilder().Clear();
         _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "--json"));

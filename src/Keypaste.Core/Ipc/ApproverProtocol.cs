@@ -425,42 +425,29 @@ public static class ApproverProtocol
     /// <param name="request">What to ask for.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
-    /// <remarks>
-    /// The whole default profile travels as the original <c>env</c> kind, byte for byte; anything
-    /// else is <c>env-profile</c>, which an owner from before profiles does not answer, so a runner
-    /// asking an older owner for a profile gets nothing rather than the default set.
-    /// </remarks>
     public static byte[] Encode(EnvRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var profiled = !string.Equals(request.Profile, EnvProfileNames.Default, StringComparison.Ordinal)
-            || request.Keys is not null
-            || request.FileLines is not null;
-
         return Write(writer =>
         {
             writer.WriteNumber("v", Version);
-            writer.WriteString("kind", profiled ? EnvProfileKind : EnvKind);
+            writer.WriteString("kind", EnvProfileKind);
             writer.WriteString("vault", request.Vault);
             writer.WriteString("session", request.Session);
             writer.WriteString("project", request.Project);
             WriteStrings(writer, "command", request.Command);
             writer.WriteString("directory", request.Directory);
+            writer.WriteString("profile", request.Profile);
 
-            if (profiled)
+            if (request.Keys is { } keys)
             {
-                writer.WriteString("profile", request.Profile);
+                WriteStrings(writer, "keys", keys);
+            }
 
-                if (request.Keys is { } keys)
-                {
-                    WriteStrings(writer, "keys", keys);
-                }
-
-                if (request.FileLines is { } lines)
-                {
-                    WriteStrings(writer, "file_lines", lines);
-                }
+            if (request.FileLines is { } lines)
+            {
+                WriteStrings(writer, "file_lines", lines);
             }
         });
     }
@@ -864,9 +851,8 @@ public static class ApproverProtocol
         using (document)
         {
             var root = document.RootElement;
-            var profiled = IsKind(root, EnvProfileKind);
 
-            if (!(profiled || IsKind(root, EnvKind))
+            if (!IsKind(root, EnvProfileKind)
                 || !TryString(root, "vault", out var vault)
                 || !TryString(root, "session", out var session)
                 || !TryString(root, "project", out var project)
@@ -877,11 +863,6 @@ public static class ApproverProtocol
             }
 
             request = new EnvRequest(project, command, directory) { Vault = vault, Session = session };
-
-            if (!profiled)
-            {
-                return true;
-            }
 
             if (!TryString(root, "profile", out var profile)
                 || !EnvProfileNames.IsValid(profile, out _)

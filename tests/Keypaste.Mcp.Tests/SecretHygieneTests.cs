@@ -640,6 +640,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     public async Task ARun_LeavesNoValueAnywhere_WhateverTheAnswer(ApprovalAnswer answer)
     {
         _human.Answer = answer;
+        Keypaste.Core.Tests.ProjectVariables.Set(_vault!, "dev", "STRIPE_KEY", SentinelPassword);
+        _vault!.Save();
         var pipe = "keypaste-hygiene-run-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
         using var envGrants = new EnvGrantCache(TimeProvider.System);
         using var gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);

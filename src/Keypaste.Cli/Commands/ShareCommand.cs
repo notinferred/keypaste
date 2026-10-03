@@ -4,6 +4,7 @@ using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
 
@@ -133,7 +134,7 @@ internal static class ShareCommand
                 return Refuse(context, "a kp:// reference names its field, so it takes no --field", CliApp.ExitUsageError);
             }
 
-            field = reference is EntryReference named ? named.Field : "password";
+            field = reference is EntryReference named ? named.Field : ((EnvReference)reference).Key;
         }
 
         if (!ShareService.IsShareable(field))
@@ -351,14 +352,17 @@ internal static class ShareCommand
         });
     }
 
-    /// <summary>The entry a <c>kp://</c> reference names: an env variable's entry, or the named entry.</summary>
+    /// <summary>The entry a <c>kp://</c> reference names: the one entry holding an env variable as a field, or the named entry.</summary>
     private static EntryName? Resolve(Vault vault, KpReference reference, CliContext context, out int exit)
     {
+        if (reference is EnvReference env)
+        {
+            return ResolveVariable(vault, env, context, out exit);
+        }
+
         exit = CliApp.ExitSuccess;
 
-        var name = reference is EnvReference env
-            ? new EntryName(EnvProfileNames.GroupPath(env.Project, env.Profile), env.Key)
-            : ((EntryReference)reference).Entry;
+        var name = ((EntryReference)reference).Entry;
 
         if (ReservedGroups.IsReserved(name.GroupPath))
         {
@@ -384,6 +388,34 @@ internal static class ShareCommand
         }
 
         return EntryName.Of(found);
+    }
+
+    /// <summary>The entry whose field holds a variable in its environment, refusing none and several.</summary>
+    private static EntryName? ResolveVariable(Vault vault, EnvReference env, CliContext context, out int exit)
+    {
+        exit = CliApp.ExitSuccess;
+
+        var holding = EnvResolution.List(vault, env.Project, env.Profile).Sources
+            .Where(source => string.Equals(source.Key, env.Key, StringComparison.Ordinal))
+            .ToList();
+
+        switch (holding.Count)
+        {
+            case 1:
+                return holding[0].Entry;
+
+            case 0:
+                exit = Refuse(context, $"no entry holds {Clean(env.ToString())}", CliApp.ExitNotFound);
+                return null;
+
+            default:
+                var entries = string.Join(", ", holding.Select(source => ApprovalPrompt.Shown(source.Entry)).Order(StringComparer.Ordinal));
+                exit = Refuse(
+                    context,
+                    $"{Clean(env.ToString())} is on more than one entry ({entries}); share it from one: keypaste share <entry> --field {Clean(env.Key)}",
+                    CliApp.ExitUsageError);
+                return null;
+        }
     }
 
     /// <summary>An entry path, or a bare title that names exactly one entry outside keypaste's own groups.</summary>

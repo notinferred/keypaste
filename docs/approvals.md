@@ -75,7 +75,7 @@ The reason is text written by the agent. keypaste removes control characters, li
 
 `o` releases it for this request only. `h` also lets the same client ask for the same field again for an hour without asking you. Both count only once the choice has been on screen for a second, and keys typed before it appeared are discarded, so a key meant for the last prompt cannot answer this one. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds. The countdown shows the seconds left.
 
-An entry in a protected profile, a group named `prod`, `production`, `prod-…` or `production-…` below `env/<project>`, offers only `o`: it is asked about every time, no grant is kept and no policy rule releases it. In source, so does an entry whose own KeePass tag names one, such as `env:billing:prod`, and a tag keypaste cannot read as a project tag still counts when it names one in any case, such as `env:billing:Prod`.
+In source, an entry whose own KeePass tag puts it in a protected environment, one named `prod`, `production`, `prod-…` or `production-…` such as `env:billing:prod`, offers only `o`: it is asked about every time, no grant is kept and no policy rule releases it. A tag keypaste cannot read as a project tag still counts when it names one in any case, such as `env:billing:Prod`, and a group's name protects nothing (D-0416).
 
 ## Repeat requests
 
@@ -101,7 +101,7 @@ In source, a request whose client gives up, or whose `keypaste-mcp` goes away, i
 
 In source, when the desktop app has a vault unlocked, a credential request for that vault opens a keypaste prompt window over whatever you are doing. It shows who is asking (the name the client gave itself, which is not verified), the client label from its configuration, the entry, the field, what you can allow, a countdown, and the agent's reason, under a line saying the agent wrote it.
 
-Allow once releases that one field and keeps nothing. Allow for 1 hour also lets the same connection ask for the same field again for an hour without asking you, and is not offered for an entry in a protected profile. Both work a second after the prompt appears, so a click meant for another window cannot approve. Deny, Escape and closing the window refuse, and focus starts on Deny, so Enter refuses too. Nobody answering for 45 seconds refuses. Locking the app, quitting it and the client giving up each refuse the request and take the prompt down. The one-prompt-at-a-time rule, the one-minute refusal cooldown and connection-scoped grants apply as they do at `keypaste agent`.
+Allow once releases that one field and keeps nothing. Allow for 1 hour also lets the same connection ask for the same field again for an hour without asking you, and is not offered for an entry tagged into a protected environment. Both work a second after the prompt appears, so a click meant for another window cannot approve. Deny, Escape and closing the window refuse, and focus starts on Deny, so Enter refuses too. Nobody answering for 45 seconds refuses. Locking the app, quitting it and the client giving up each refuse the request and take the prompt down. The one-prompt-at-a-time rule, the one-minute refusal cooldown and connection-scoped grants apply as they do at `keypaste agent`.
 
 The app does not read `policy.toml`: every credential it releases needs a press of Allow once or Allow for 1 hour, or a grant one of them kept. A run under a scoped token is released without a prompt unless its profile is protected ([T-32](../THREATS.md#t-32--a-scoped-token-is-a-bearer-credential)).
 

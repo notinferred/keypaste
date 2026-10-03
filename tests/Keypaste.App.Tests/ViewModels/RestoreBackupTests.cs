@@ -47,7 +47,7 @@ public sealed class RestoreBackupTests : IDisposable
         using (var vault = Vault.Create(_vaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "production", GroupPath = "servers", Password = "v0" });
-            LegacyVariables.Set(vault, "billing", "API_KEY", "k0");
+            ProjectVariables.Set(vault, "billing", "API_KEY", "k0");
             vault.Save();
         }
 
@@ -91,8 +91,8 @@ public sealed class RestoreBackupTests : IDisposable
         await restore.CheckAsync();
 
         Assert.True(restore.IsConfirming);
-        // The env variable is an entry, and env and env/billing are groups: counts, and no names.
-        Assert.Equal("It holds 2 entries in 3 groups, 1 env project among them.", restore.Holds);
+        // The variable is a field of billing's home entry, and env and env/billing are groups: counts, and no names.
+        Assert.Equal("It holds 2 entries in 3 groups, and 1 env project.", restore.Holds);
         Assert.DoesNotContain("production", restore.Holds + restore.Taken + restore.Replaces, StringComparison.Ordinal);
         Assert.Contains("vault.kdbx", restore.Replaces, StringComparison.Ordinal);
         Assert.Equal(replaced, File.ReadAllBytes(_vaultPath));

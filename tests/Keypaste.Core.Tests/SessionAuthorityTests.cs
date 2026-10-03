@@ -564,21 +564,23 @@ public sealed class SessionAuthorityTests : IDisposable
     }
 
     /// <summary>
-    /// An entry in a protected profile is put to the person on every request, answered with a timed
-    /// grant or not, and the owner composed without naming the rule still applies it.
+    /// An entry tagged into a protected environment is put to the person on every request, answered
+    /// with a timed grant or not, and the owner composed without naming the rule still applies it.
     /// </summary>
     [Fact]
     public async Task ALiveOnlyEntry_ThroughTheSession_IsAskedEveryTime()
     {
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         using var vault = SavedVault("unused");
-        vault.AddEntry(new VaultEntry { GroupPath = "env/acme/prod", Title = "API_KEY", Password = "prod-sentinel" });
+        var prod = new EntryName("env/acme", "API_KEY");
+        vault.AddEntry(new VaultEntry { GroupPath = prod.GroupPath, Title = prod.Title, Password = "prod-sentinel" });
+        Assert.True(vault.AddTag(prod, "env:acme:prod"));
         vault.Save();
         await using var owner = Owner.Start(this, Over(vault));
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
 
-        var request = Request("session-one") with { Entry = "env/acme/prod/API_KEY" };
+        var request = Request("session-one") with { Entry = "env/acme/API_KEY" };
         var first = await client.RequestAsync(request, Token);
         var second = await client.RequestAsync(request, Token);
 

@@ -25,12 +25,12 @@ public sealed class RunSessionTests : IDisposable
 
     public RunSessionTests()
     {
-        _harness.SeedVault(_master, ("env/dev/TOKEN", _value));
+        _harness.SeedVault(_master);
 
-        // KeePassXC writes a name keypaste refuses to create.
         using (var vault = Vault.Open(_harness.VaultPath, _master))
         {
-            vault.AddEntry(new VaultEntry { GroupPath = "env/broken", Title = "BAD-NAME", Password = _value });
+            ProjectVariables.Set(vault, "dev", "TOKEN", _value);
+            ExpiredHolder(vault, new EntryName("services", "Broken"), "env:broken", "BROKEN_KEY");
             vault.Save();
         }
 
@@ -116,7 +116,8 @@ public sealed class RunSessionTests : IDisposable
         _harness.AssertExit(CliApp.ExitInternalError, Run("broken"));
 
         Assert.Contains("no env set for 'missing'", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("BAD-NAME", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("BROKEN_KEY expired", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("services/Broken", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.ProcessLauncher.Started);
         Assert.Null(owner.Channel.Last);
         Assert.DoesNotContain(_value, _harness.Out + _harness.Err, StringComparison.Ordinal);
@@ -206,13 +207,13 @@ public sealed class RunSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task RunSession_OwnerThatCannotReadProfiles_StartsNothing()
+    public async Task RunSession_AnOwnerThatHangsUp_StartsNothing()
     {
-        await using var old = Liar.Start(this, reply: null);
+        await using var silent = Liar.Start(this, reply: null);
 
         _harness.AssertExit(CliApp.ExitInternalError, RunProfile("staging", "dev"));
 
-        Assert.Contains("is older and cannot release profiles; update it, so nothing was started", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("did not answer, so nothing was started", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.ProcessLauncher.Started);
         Assert.Empty(_harness.Prompt.PromptsSeen);
     }
@@ -231,7 +232,7 @@ public sealed class RunSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task RunSession_AFileTooLargeForOneFrame_IsRefusedAsTooLong_NotAsAnOlderOwner()
+    public async Task RunSession_AFileTooLargeForOneFrame_IsRefusedAsTooLong_NotAsAnUnansweredRequest()
     {
         var literals = string.Concat(Enumerable.Range(0, 200).Select(i => $"LITERAL_{i}={new string('x', 400)}\n"));
         var file = WriteFile($"API_TOKEN=kp://dev/dev/TOKEN\n{literals}");
@@ -240,7 +241,7 @@ public sealed class RunSessionTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
         Assert.Contains("is too long for the prompt to show whole; run without --session", _harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("is older and cannot release profiles", _harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("did not answer", _harness.Err, StringComparison.Ordinal);
         Assert.Null(owner.Channel.Last);
         Assert.Empty(_harness.ProcessLauncher.Started);
     }
@@ -265,7 +266,7 @@ public sealed class RunSessionTests : IDisposable
         AddStaging(("TOKEN", "staging-token"), ("UNUSED", "unused-value"));
         using (var vault = Vault.Open(_harness.VaultPath, _master))
         {
-            vault.AddEntry(new VaultEntry { GroupPath = "env/dev/staging", Title = "BAD-NAME", Password = "x" });
+            ExpiredHolder(vault, new EntryName("services", "Stale"), "env:dev:staging", "STALE_KEY");
             vault.Save();
         }
 
@@ -289,10 +290,19 @@ public sealed class RunSessionTests : IDisposable
 
         foreach (var (key, value) in variables)
         {
-            LegacyVariables.Set(vault, "dev", "staging", key, value);
+            ProjectVariables.Set(vault, "dev", "staging", key, value);
         }
 
         vault.Save();
+    }
+
+    /// <summary>Adds an expired entry tagged into an environment and holding one key, which makes that key unusable.</summary>
+    private static void ExpiredHolder(Vault vault, EntryName name, string tag, string key)
+    {
+        vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = "login" });
+        Assert.True(vault.SetFields(name, [new FieldWrite(key, _value)]));
+        Assert.True(vault.AddTag(name, tag));
+        vault.SetExpiryUnchecked(name, new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
     }
 
     private string WriteFile(string text)
@@ -303,7 +313,7 @@ public sealed class RunSessionTests : IDisposable
         return path;
     }
 
-    /// <summary>Attaches anyone and answers every env request with one scripted reply, or hangs up as an owner from before profiles does.</summary>
+    /// <summary>Attaches anyone and answers every env request with one scripted reply, or hangs up unanswered.</summary>
     private sealed class Liar : IApproverHandler, IAsyncDisposable
     {
         private readonly EnvResolved? _reply;
@@ -337,10 +347,10 @@ public sealed class RunSessionTests : IDisposable
         {
             Asked = request;
 
-            // Throwing ends the connection unanswered, which is what an owner that cannot read the kind does.
+            // Throwing ends the connection unanswered.
             return _reply is { } reply
                 ? ValueTask.FromResult(new EnvReply(reply, _reason))
-                : throw new InvalidOperationException("an owner from before profiles does not answer env-profile");
+                : throw new InvalidOperationException("hangs up unanswered");
         }
 
         public void Disconnected(string connectionId)

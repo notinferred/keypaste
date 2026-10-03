@@ -47,8 +47,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     {
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            LegacyVariables.Set(vault, "dev", "API_KEY", _apiKey);
-            LegacyVariables.Set(vault, "dev", "DB_URL", _dbUrl);
+            ProjectVariables.Set(vault, "dev", "API_KEY", _apiKey);
+            ProjectVariables.Set(vault, "dev", "DB_URL", _dbUrl);
             vault.Save();
         }
 
@@ -256,8 +256,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     {
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "BAD-NAME", Password = "bad_name_value_e1b" });
-            vault.SetExpiryUnchecked(new EntryName("env/dev", "API_KEY"), _session.Clock.GetUtcNow().AddDays(-1));
+            vault.SetExpiryUnchecked(ProjectVariables.Home("dev"), _session.Clock.GetUtcNow().AddDays(-1));
             vault.Save();
         }
 
@@ -278,9 +277,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.NotNull(screen.Error);
         Assert.Contains("dev/dev cannot be used, so nothing was started", screen.Error, StringComparison.Ordinal);
         Assert.Contains("API_KEY expired", screen.Error, StringComparison.Ordinal);
-        Assert.Contains("BAD-NAME is not a valid environment variable name", screen.Error, StringComparison.Ordinal);
+        Assert.Contains("DB_URL expired", screen.Error, StringComparison.Ordinal);
         AssertNoValue(screen.Error, "the refusal");
-        Assert.DoesNotContain("bad_name_value_e1b", screen.Error, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -298,7 +296,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         Assert.True(import.IsPreviewing);
         Assert.Equal(
-            ["API_KEY  unchanged", "DB_URL  replaces the value on env/dev/DB_URL, which keeps it in history", "FRESH  new on env/dev/.env, which is created"],
+            ["API_KEY  unchanged", "DB_URL  replaces the value on env/dev/.env, which keeps it in history", "FRESH  new on env/dev/.env"],
             import.Rows);
         Assert.DoesNotContain(import.Rows, row => row.Contains(_imported, StringComparison.Ordinal) || row.Contains(_apiKey, StringComparison.Ordinal));
 

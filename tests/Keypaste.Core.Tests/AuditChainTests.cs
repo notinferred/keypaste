@@ -229,16 +229,16 @@ public sealed class AuditChainTests : IDisposable
     }
 
     /// <summary>
-    /// A forged record claiming to predate the chain, spliced into the middle of one.
+    /// A forged record claiming schema 1, spliced into the middle of a chain.
     /// </summary>
     /// <remarks>
     /// It breaks no link — nothing before or after it changes — which makes it the one insertion the
-    /// chain cannot catch arithmetically. What catches it is that keypaste never writes a v1 record
-    /// after a v2 one, so its position is the evidence. Without this, "insert a record nobody can
-    /// check" is a way to write history into an audit trail while every link still verifies.
+    /// chain cannot catch arithmetically. What catches it is that no release of keypaste wrote schema
+    /// 1 (D-0416), so the line was written by something else. Without this, "insert a record nobody
+    /// can check" is a way to write history into an audit trail while every link still verifies.
     /// </remarks>
     [Fact]
-    public void AForgedRecordClaimingToPredateTheChain_IsCaughtByItsPosition()
+    public void AForgedSchemaOneRecordInsideTheChain_IsForeign()
     {
         Write(3);
 
@@ -249,23 +249,24 @@ public sealed class AuditChainTests : IDisposable
         var report = Verify();
 
         Assert.Equal(AuditChainVerdict.Broken, report.Verdict);
-        Assert.Contains(report.Findings, f => f.Line == 3 && f.Fault == AuditChainFault.Backdated);
+        Assert.Contains(report.Findings, f => f.Line == 3 && f.Fault == AuditChainFault.Foreign);
     }
 
     /// <summary>
-    /// The same shape at the front of the file is what every upgraded log looks like, and is not
-    /// condemned — but it is still named, so a renderer can mark the row.
+    /// The same record at the front of the file, where an older log's lines would sit, breaks the
+    /// chain too, and is named so a renderer can mark the row.
     /// </summary>
     [Fact]
-    public void RecordsPredatingTheChain_AreNamedSoTheyCanBeMarked()
+    public void ASchemaOneRecordBeforeTheChain_IsABreak()
     {
         File.WriteAllText(LogPath, "{\"v\":1,\"ts\":\"2026-07-01T00:00:00.000Z\",\"seq\":1}\n");
         Write(2);
 
         var report = Verify();
 
-        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
-        Assert.Contains(report.Findings, f => f.Line == 1 && f.Fault == AuditChainFault.Predates);
+        Assert.Equal(AuditChainVerdict.Broken, report.Verdict);
+        Assert.Contains(report.Findings, f => f.Line == 1 && f.Fault == AuditChainFault.Foreign && f.IsBreak);
+        Assert.Equal(2, report.Records);
         Assert.Contains(1, report.Unverified);
         Assert.DoesNotContain(2, report.Unverified);
     }
@@ -421,30 +422,9 @@ public sealed class AuditChainTests : IDisposable
         Assert.True(report.Rewritten);
     }
 
-    /// <summary>
-    /// Records written before the chain existed are reported as exactly that. Calling them tampered
-    /// is what <see cref="AuditRecord.SchemaVersion"/> was put on line one of every record to avoid.
-    /// </summary>
+    /// <summary>The chain starts after lines keypaste did not write rather than reaching back over them.</summary>
     [Fact]
-    public void RecordsThatPredateTheChain_AreNotCondemned()
-    {
-        File.WriteAllText(
-            LogPath,
-            "{\"v\":1,\"ts\":\"2026-07-01T00:00:00.000Z\",\"seq\":1,\"pid\":1,\"decision\":\"denied\"}\n");
-
-        Write(2);
-
-        var report = Verify();
-
-        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
-        Assert.Equal(1, report.Legacy);
-        Assert.Equal(2, report.Records);
-        Assert.DoesNotContain(report.Findings, f => f.IsBreak);
-    }
-
-    /// <summary>The chain starts after the old records rather than reaching back over them.</summary>
-    [Fact]
-    public void TheFirstChainedRecordAfterOldOnes_StartsTheChain()
+    public void TheFirstChainedRecordAfterForeignLines_StartsTheChain()
     {
         File.WriteAllText(LogPath, "{\"v\":1,\"ts\":\"2026-07-01T00:00:00.000Z\",\"seq\":9,\"pid\":1}\n");
         Write(1);

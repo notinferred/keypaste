@@ -113,11 +113,6 @@ internal sealed class ChainVerdict
 
     private static IEnumerable<string> Forgiven(AuditChainReport report)
     {
-        if (report.Legacy > 0)
-        {
-            yield return $"{Count(report.Legacy, "record")} predate the hash chain and cannot be checked, which is what a log written before 2.4 looks like rather than a sign of tampering. Their rows are marked.";
-        }
-
         if (report.Newer > 0)
         {
             yield return $"{Count(report.Newer, "record")} were written by a newer keypaste, so nothing here can vouch for them. Their rows are marked.";

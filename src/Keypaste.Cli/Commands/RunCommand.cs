@@ -364,9 +364,7 @@ internal static class RunCommand
 
         if (reply is null)
         {
-            context.Stderr.WriteLine(refusal is null
-                ? $"keypaste run: the keypaste process holding {vaultPath} is older and cannot release profiles; update it, so nothing was started"
-                : $"keypaste run: {refusal}, so nothing was started");
+            context.Stderr.WriteLine($"keypaste run: {refusal}, so nothing was started");
             return CliApp.ExitInternalError;
         }
 
@@ -451,8 +449,8 @@ internal static class RunCommand
         return true;
     }
 
-    /// <returns>The reply, or null with the reason ready to print; a null reason means an owner that did not answer a profile request at all.</returns>
-    private static async Task<(EnvReply? Reply, string? Refusal)> AskAsync(
+    /// <returns>The reply, or null with the reason ready to print.</returns>
+    private static async Task<(EnvReply? Reply, string Refusal)> AskAsync(
         string pipe,
         string vaultPath,
         EnvRequest request,
@@ -485,9 +483,7 @@ internal static class RunCommand
 
         var reply = await client.ReleaseEnvAsync(request with { Session = session }, bound.Token);
 
-        return (reply, bound.IsCancellationRequested ? "no answer came in time"
-            : profiled ? null
-            : "the keypaste process holding the vault did not answer");
+        return (reply, bound.IsCancellationRequested ? "no answer came in time" : "the keypaste process holding the vault did not answer");
     }
 
     /// <summary>What a resolved set comes to: the set to start with, or the exit code and a reason on stderr.</summary>
@@ -647,9 +643,9 @@ internal static class RunCommand
         return place.Length > KpReferences.Scheme.Length ? place : KpReferences.Scheme + "/";
     }
 
-    /// <summary>One variable a set refuses: its name as an entry title is shown, then why, with the entry paths and a placeholder's braces kept.</summary>
+    /// <summary>One variable a set refuses: its name, then why, with the entry paths and a placeholder's braces kept.</summary>
     internal static string ProblemLine(EnvProblem problem) =>
-        $"{EntryNameSanitizer.Sanitize(EnvResolved.Display(problem.Key)).Text} {DisplayTextSanitizer.Sanitize(problem.Reason.Replace('\n', '\0'), 512).Text}";
+        $"{EntryNameSanitizer.Sanitize(problem.Key).Text} {DisplayTextSanitizer.Sanitize(problem.Reason.Replace('\n', '\0'), 512).Text}";
 
     /// <summary>A literal line as the child gets it.</summary>
     private static string Written(ReferenceLine line) => $"{line.Name}={line.Literal}";

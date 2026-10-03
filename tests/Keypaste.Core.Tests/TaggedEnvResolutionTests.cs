@@ -8,8 +8,8 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// A project's environment is its tagged entries' variable fields together with its legacy
-/// <c>env/&lt;project&gt;</c> variables, released whole or refused naming each cause and entry (C.1b).
+/// A project's environment is its tagged entries' variable fields, released whole or refused naming
+/// each cause and entry (C.1b); an untagged entry under <c>env/&lt;project&gt;</c> is none of them (D-0416).
 /// </summary>
 public sealed class TaggedEnvResolutionTests : IDisposable
 {
@@ -21,11 +21,11 @@ public sealed class TaggedEnvResolutionTests : IDisposable
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     [Fact]
-    public void Tagged_fields_and_the_legacy_group_are_one_set_each_with_its_source()
+    public void Tagged_fields_are_the_set_each_with_its_source_and_an_untagged_entry_under_env_is_not()
     {
         using var vault = Saved(v =>
         {
-            Legacy(v, "billing", "LEGACY_KEY", "legacy-value");
+            v.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "OLD_KEY", Password = "old-value" });
             Tagged(v, "services", "Stripe", ["env:billing", "finance"], ("STRIPE_SECRET_KEY", "stripe-value"), ("Region", "eu-value"));
             Tagged(v, "services", "Database", ["env:billing"], ("DATABASE_URL", "db-value"));
             Tagged(v, "services", "Prod", ["env:billing:prod"], ("PROD_ONLY", "prod-value"));
@@ -38,16 +38,16 @@ public sealed class TaggedEnvResolutionTests : IDisposable
 
         Assert.Equal(EnvOutcome.Resolved, resolved.Outcome);
         Assert.Equal(
-            [new EnvVariable("DATABASE_URL", "db-value"), new EnvVariable("LEGACY_KEY", "legacy-value"), new EnvVariable("STRIPE_SECRET_KEY", "stripe-value")],
+            [new EnvVariable("DATABASE_URL", "db-value"), new EnvVariable("STRIPE_SECRET_KEY", "stripe-value")],
             resolved.Variables);
         Assert.Equal(
             [
                 new EnvSource("DATABASE_URL", new EntryName("services", "Database"), "DATABASE_URL"),
-                new EnvSource("LEGACY_KEY", new EntryName("env/billing", "LEGACY_KEY"), EnvSource.LegacyField),
                 new EnvSource("STRIPE_SECRET_KEY", new EntryName("services", "Stripe"), "STRIPE_SECRET_KEY"),
             ],
             resolved.Sources);
         Assert.Equal(resolved.Sources, resolved.Preview.Sources);
+        Assert.Equal(resolved.Sources, EnvResolution.List(vault, "billing", "dev").Sources);
         Assert.False(resolved.RequiresLiveApproval);
         Assert.Equal([new EnvVariable("PROD_ONLY", "prod-value")], EnvResolution.Resolve(vault, "billing", "prod", _clock).Variables);
     }
@@ -57,8 +57,7 @@ public sealed class TaggedEnvResolutionTests : IDisposable
     {
         using var vault = Saved(v =>
         {
-            Legacy(v, "billing", "Api_Key", "legacy-api-value");
-            Tagged(v, "services", "Stripe", ["env:billing"], ("API_KEY", "tagged-api-value"), ("SHARED", "shared-one-value"));
+            Tagged(v, "services", "Stripe", ["env:billing"], ("API_KEY", "api-value"), ("SHARED", "shared-one-value"));
             Tagged(v, "services", "Twin", ["env:billing"], ("SHARED", "shared-two-value"));
             Tagged(v, "services", "Old", ["env:billing"], ("OLD_KEY", "old-value"));
             v.SetExpiryUnchecked(new EntryName("services", "Old"), _now.AddDays(-1));
@@ -73,8 +72,6 @@ public sealed class TaggedEnvResolutionTests : IDisposable
         Assert.Empty(resolved.Sources);
         Assert.Equal(
             [
-                ("API_KEY", "differs only in case from 'Api_Key', which Windows treats as one variable (env/billing/Api_Key, services/Stripe)"),
-                ("Api_Key", "differs only in case from 'API_KEY', which Windows treats as one variable (env/billing/Api_Key, services/Stripe)"),
                 ("OLD_KEY", "expired 2026-09-23 12:00:00Z (services/Old)"),
                 ("REF_KEY", "holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Ref)"),
                 ("SHARED", "is on more than one entry (services/Stripe, services/Twin)"),
@@ -83,7 +80,7 @@ public sealed class TaggedEnvResolutionTests : IDisposable
 
         var said = resolved.Refusal + string.Concat(resolved.Problems.Select(problem => problem.Key + problem.Reason));
 
-        foreach (var value in new[] { "legacy-api-value", "tagged-api-value", "shared-one-value", "shared-two-value", "old-value", "prefix-", "-suffix", "json" })
+        foreach (var value in new[] { "api-value", "shared-one-value", "shared-two-value", "old-value", "prefix-", "-suffix", "json" })
         {
             Assert.DoesNotContain(value, said, StringComparison.Ordinal);
         }
@@ -152,16 +149,19 @@ public sealed class TaggedEnvResolutionTests : IDisposable
     }
 
     [Fact]
-    public void A_protected_environment_and_a_protected_legacy_group_are_asked_live()
+    public void A_protected_environment_is_asked_live_and_a_prod_group_is_not()
     {
         using var vault = Saved(v =>
         {
             Tagged(v, "services", "Database", ["env:billing:prod"], ("DATABASE_URL", "prod-db"));
-            Legacy(v, "shop", "prod", "SHOP_KEY", "shop-prod");
+            Tagged(v, "env/shop/prod", "Shop", ["env:shop"], ("SHOP_KEY", "shop-dev"));
         });
 
         Assert.True(EnvResolution.Resolve(vault, "billing", "prod", _clock).RequiresLiveApproval);
-        Assert.True(EnvResolution.Resolve(vault, "shop", "prod", _clock).RequiresLiveApproval);
+
+        var shop = EnvResolution.Resolve(vault, "shop", _clock);
+        Assert.Equal([new EnvVariable("SHOP_KEY", "shop-dev")], shop.Variables);
+        Assert.False(shop.RequiresLiveApproval);
     }
 
     [Fact]
@@ -184,19 +184,32 @@ public sealed class TaggedEnvResolutionTests : IDisposable
     }
 
     [Fact]
-    public void An_entry_tagged_inside_the_legacy_group_gives_its_fields_and_not_its_title()
+    public void An_entry_under_env_gives_its_fields_to_the_project_its_tag_names_and_an_untagged_one_gives_nothing()
     {
         using var vault = Saved(v =>
         {
-            Legacy(v, "billing", "LEGACY_KEY", "legacy-value");
+            v.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "OLD_KEY", Password = "old-value" });
             Tagged(v, "env/billing", ".env", ["env:billing"], ("HOME_KEY", "home-value"));
             Tagged(v, "env/billing", "ELSEWHERE", ["env:other"], ("OTHER_KEY", "other-value"));
         });
 
-        Assert.Equal(
-            [new EnvVariable("HOME_KEY", "home-value"), new EnvVariable("LEGACY_KEY", "legacy-value")],
-            EnvResolution.Resolve(vault, "billing", _clock).Variables);
+        Assert.Equal([new EnvVariable("HOME_KEY", "home-value")], EnvResolution.Resolve(vault, "billing", _clock).Variables);
         Assert.Equal([new EnvVariable("OTHER_KEY", "other-value")], EnvResolution.Resolve(vault, "other", _clock).Variables);
+    }
+
+    [Fact]
+    public void Untagged_entries_under_env_alone_make_no_project()
+    {
+        using var vault = Saved(v =>
+        {
+            v.AddEntry(new VaultEntry { GroupPath = "env/acme", Title = "OLD_KEY", Password = "old-value" });
+            v.AddEntry(new VaultEntry { GroupPath = "env/acme/prod", Title = "DB", Password = "db-value" });
+        });
+
+        Assert.Equal(EnvOutcome.NoProject, EnvResolution.Resolve(vault, "acme", _clock).Outcome);
+        Assert.Equal(EnvOutcome.NoProject, EnvResolution.Resolve(vault, "acme", "prod", _clock).Outcome);
+        Assert.Equal(EnvOutcome.NoProject, EnvResolution.List(vault, "acme", "dev").Outcome);
+        Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
     [Fact]
@@ -281,12 +294,6 @@ public sealed class TaggedEnvResolutionTests : IDisposable
 
         return Vault.Open(path, EnvStoreTests.MasterPassword);
     }
-
-    private static void Legacy(Vault vault, string project, string key, string value) =>
-        LegacyVariables.Set(vault, project, key, value);
-
-    private static void Legacy(Vault vault, string project, string profile, string key, string value) =>
-        LegacyVariables.Set(vault, project, profile, key, value);
 
     private static EntryName Tagged(Vault vault, string group, string title, string[] tags, params (string Name, string Value)[] fields)
     {

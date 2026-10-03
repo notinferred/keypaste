@@ -88,14 +88,11 @@ public sealed class KpReferenceTests
     }
 
     [Theory]
-    [InlineData("env/acme-api", "KEY", "kp://acme-api/dev/KEY")]
-    [InlineData("env/acme-api/staging", "KEY", "kp://acme-api/staging/KEY")]
-    [InlineData("env/acme-api/dev", "KEY", "kp:///env/acme-api/dev/KEY")]
-    [InlineData("env/acme-api/Prod", "KEY", "kp:///env/acme-api/Prod/KEY")]
-    [InlineData("env/acme-api/staging/deeper", "KEY", "kp:///env/acme-api/staging/deeper/KEY")]
-    [InlineData("env/acme-api", "not-a-key", "kp:///env/acme-api/not-a-key")]
+    [InlineData("env/acme-api", "KEY", "kp:///env/acme-api/KEY")]
+    [InlineData("env/acme-api/staging", "KEY", "kp:///env/acme-api/staging/KEY")]
+    [InlineData("env/acme-api", ".env", "kp:///env/acme-api/.env")]
     [InlineData("work", "github", "kp:///work/github")]
-    public void ForEntry_uses_the_env_form_only_for_a_variable_keypaste_resolves(string group, string title, string expected) =>
+    public void ForEntry_names_an_entry_by_its_path_under_env_as_anywhere_else(string group, string title, string expected) =>
         Assert.Equal(expected, KpReferences.ForEntry(new EntryName(group, title)));
 
     [Fact]

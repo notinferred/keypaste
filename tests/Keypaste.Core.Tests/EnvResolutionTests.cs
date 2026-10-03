@@ -37,11 +37,9 @@ public sealed class EnvResolutionTests : IDisposable
     {
         using var vault = Saved(v =>
         {
-            Add(v, "dev", "OLD", "old-secret-value");
-            Add(v, "dev", "LATER", "later-secret-value");
-            Add(v, "dev", "NEVER", "never-secret-value");
-            v.SetExpiryUnchecked(new EntryName("env/dev", "OLD"), _now);
-            v.SetExpiryUnchecked(new EntryName("env/dev", "LATER"), _now.AddSeconds(1));
+            v.SetExpiryUnchecked(Own(v, "Old", "OLD", "old-secret-value"), _now);
+            v.SetExpiryUnchecked(Own(v, "Later", "LATER", "later-secret-value"), _now.AddSeconds(1));
+            Own(v, "Never", "NEVER", "never-secret-value");
         });
 
         var resolved = EnvResolution.Resolve(vault, "dev", _clock);
@@ -50,7 +48,7 @@ public sealed class EnvResolutionTests : IDisposable
         Assert.Empty(resolved.Variables);
         var problem = Assert.Single(resolved.Problems);
         Assert.Equal("OLD", problem.Key);
-        Assert.Equal("expired 2026-09-24 12:00:00Z (env/dev/OLD)", problem.Reason);
+        Assert.Equal("expired 2026-09-24 12:00:00Z (services/Old)", problem.Reason);
         AssertNoValue(resolved, "old-secret-value", "later-secret-value", "never-secret-value");
 
         _clock.Advance(TimeSpan.FromSeconds(1));
@@ -58,16 +56,15 @@ public sealed class EnvResolutionTests : IDisposable
     }
 
     [Fact]
-    public void Every_unusable_entry_is_named_with_its_reason()
+    public void Every_unusable_variable_is_named_and_an_untagged_entry_under_env_refuses_nothing()
     {
         using var vault = Saved(v =>
         {
             Add(v, "dev", "GOOD", "good-value");
+            Own(v, "One", "TWICE", "twice-1");
+            Own(v, "Two", "TWICE", "twice-2");
             v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "BAD-NAME", Password = "bad-value" });
-            v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TWICE", Password = "twice-1" });
-            v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TWICE", Password = "twice-2" });
-            v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "token", Password = "lower-value" });
-            v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "upper-value" });
+            v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "GOOD", Password = "untagged-value" });
             v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = string.Empty, Password = "untitled-value" });
         });
 
@@ -76,15 +73,9 @@ public sealed class EnvResolutionTests : IDisposable
         Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
         Assert.Empty(resolved.Variables);
         Assert.Equal(
-            [
-                ("", "has no title to be its variable name (env/dev/(unnamed))"),
-                ("BAD-NAME", "is not a valid environment variable name: '-' is not allowed (env/dev/BAD-NAME)"),
-                ("TOKEN", "differs only in case from 'token', which Windows treats as one variable (env/dev/TOKEN, env/dev/token)"),
-                ("TWICE", "is on more than one entry (env/dev/TWICE, env/dev/TWICE)"),
-                ("token", "differs only in case from 'TOKEN', which Windows treats as one variable (env/dev/TOKEN, env/dev/token)"),
-            ],
+            [("TWICE", "is on more than one entry (services/One, services/Two)")],
             resolved.Problems.Select(p => (p.Key, p.Reason)));
-        AssertNoValue(resolved, "good-value", "bad-value", "twice-1", "twice-2", "lower-value", "upper-value", "untitled-value");
+        AssertNoValue(resolved, "good-value", "bad-value", "twice-1", "twice-2", "untagged-value", "untitled-value");
     }
 
     [Fact]
@@ -93,9 +84,9 @@ public sealed class EnvResolutionTests : IDisposable
         using var vault = Saved(v =>
         {
             Add(v, "dev", "KEPT", "kept-value");
-            v.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "BAD-NAME", Password = "recycled-value" });
-            v.SetExpiryUnchecked(new EntryName("env/dev", "BAD-NAME"), _now.AddDays(-1));
-            Assert.Equal(DeletionOutcome.Recycled, v.RemoveEntry(new EntryName("env/dev", "BAD-NAME")));
+            var gone = Own(v, "Gone", "GONE", "recycled-value");
+            v.SetExpiryUnchecked(gone, _now.AddDays(-1));
+            Assert.Equal(DeletionOutcome.Recycled, v.RemoveEntry(gone));
         });
 
         var resolved = EnvResolution.Resolve(vault, "dev", _clock);
@@ -109,12 +100,13 @@ public sealed class EnvResolutionTests : IDisposable
     {
         using var vault = Saved(v =>
         {
-            Add(v, "dev", "GONE", "x");
-            v.RemoveEntry(new EntryName("env/dev", "GONE"));
-            v.CreateGroup("env", "empty", out _);
+            Add(v, "empty", "GONE", "x");
+            Assert.Equal(EnvRemoveOutcome.FieldRemoved, new EnvStore(v).Remove("empty", "dev", "GONE").Outcome);
+            v.CreateGroup("env", "grouped", out _);
         });
 
         Assert.Equal(EnvOutcome.NoProject, EnvResolution.Resolve(vault, "absent", _clock).Outcome);
+        Assert.Equal(EnvOutcome.NoProject, EnvResolution.Resolve(vault, "grouped", _clock).Outcome);
 
         var empty = EnvResolution.Resolve(vault, "empty", _clock);
         Assert.Equal(EnvOutcome.Resolved, empty.Outcome);
@@ -149,28 +141,28 @@ public sealed class EnvResolutionTests : IDisposable
         var path = Path.Combine(_directory, "expiry.kdbx");
         var at = new DateTimeOffset(2027, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
-        using (var vault = Saved(v => Add(v, "dev", "TOKEN", "v1"), path))
+        using (var vault = Saved(v => v.AddEntry(new VaultEntry { GroupPath = "services", Title = "TOKEN", Password = "v1" }), path))
         {
-            vault.SetExpiryUnchecked(new EntryName("env/dev", "TOKEN"), at);
+            vault.SetExpiryUnchecked(new EntryName("services", "TOKEN"), at);
             vault.Save();
         }
 
         using (var vault = Vault.Open(path, EnvStoreTests.MasterPassword))
         {
-            var entry = vault.Find("env/dev/TOKEN")!;
+            var entry = vault.Find("services/TOKEN")!;
             Assert.Equal(at, entry.Expires);
             Assert.True(vault.UpdateEntry(entry with { Password = "v2", Expires = null }));
             vault.Save();
         }
 
         using var reopened = Vault.Open(path, EnvStoreTests.MasterPassword);
-        var updated = reopened.Find("env/dev/TOKEN")!;
+        var updated = reopened.Find("services/TOKEN")!;
         Assert.Equal("v2", updated.Password);
         Assert.Equal(at, updated.Expires);
     }
 
     [Fact]
-    public void AProfile_ResolvesOnlyItsGroup()
+    public void AProfile_ResolvesOnlyItsOwnEntries()
     {
         using var vault = Saved(v =>
         {
@@ -188,7 +180,7 @@ public sealed class EnvResolutionTests : IDisposable
     }
 
     [Fact]
-    public void TheDevSet_ExcludesProfileSubgroups()
+    public void TheDevSet_ExcludesAnotherProfilesEntries()
     {
         using var vault = Saved(v =>
         {
@@ -232,7 +224,7 @@ public sealed class EnvResolutionTests : IDisposable
         using var vault = Saved(v =>
         {
             Add(v, "acme", "staging", "OLD", "old-staging-value");
-            v.SetExpiryUnchecked(new EntryName("env/acme/staging", "OLD"), _now.AddDays(-1));
+            v.SetExpiryUnchecked(ProjectVariables.Home("acme", "staging"), _now.AddDays(-1));
         });
 
         var resolved = EnvResolution.Resolve(vault, "acme", "staging", _clock);
@@ -274,10 +266,20 @@ public sealed class EnvResolutionTests : IDisposable
     }
 
     private static void Add(Vault vault, string project, string key, string value) =>
-        LegacyVariables.Set(vault, project, key, value);
+        ProjectVariables.Set(vault, project, key, value);
 
     private static void Add(Vault vault, string project, string profile, string key, string value) =>
-        LegacyVariables.Set(vault, project, profile, key, value);
+        ProjectVariables.Set(vault, project, profile, key, value);
+
+    /// <summary>An entry of its own, <c>services/&lt;title&gt;</c>, tagged into project <c>dev</c> and holding one variable.</summary>
+    private static EntryName Own(Vault vault, string title, string key, string value)
+    {
+        var name = new EntryName("services", title);
+        vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title });
+        Assert.True(vault.SetFields(name, [new FieldWrite(key, value)]));
+        Assert.True(vault.AddTag(name, "env:dev"));
+        return name;
+    }
 
     private static void AssertNoValue(EnvResolved resolved, params string[] values)
     {

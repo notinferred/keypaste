@@ -9,10 +9,9 @@ namespace Keypaste.Core.Import;
 /// writes the file.
 /// </para>
 /// <para>
-/// Every top-level group is a row. An <c>env</c> group is split into one row per project, holding
-/// only the project group's own entries, and one per profile subgroup, so each env set can land
-/// beside or apart from the target's. The recycle bin, wherever it is, and <see cref="ReservedGroups.Root"/>
-/// are never rows: tokens and share records belong to the vault that made them.
+/// Every top-level group is a row, <c>env</c> included: an entry's projects travel in its own tags
+/// (D-0416). The recycle bin, wherever it is, and <see cref="ReservedGroups.Root"/> are never rows:
+/// tokens and share records belong to the vault that made them.
 /// </para>
 /// </remarks>
 public sealed class ImportSource : IDisposable
@@ -28,6 +27,13 @@ public sealed class ImportSource : IDisposable
         Probe = probe;
         KeyFactors = interop.KeyFactors;
         Read(interop.DescribeForImport());
+        ProjectCount = interop.ReadTags()
+            .Where(entry => !ReservedGroups.IsReserved(entry.Name.GroupPath))
+            .SelectMany(entry => entry.Tags.Select(ProjectTag.Read))
+            .Where(tag => tag.Kind == ProjectTagKind.Member)
+            .Select(tag => tag.Project)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
     }
 
     /// <summary>What the file's header said.</summary>
@@ -36,8 +42,8 @@ public sealed class ImportSource : IDisposable
     /// <summary>How many entries a whole import copies: all but the recycle bin's and reserved ones.</summary>
     public int EntryCount { get; private set; }
 
-    /// <summary>How many <c>env/&lt;project&gt;</c> groups the file holds.</summary>
-    public int ProjectCount { get; private set; }
+    /// <summary>How many projects the file's entries are tagged into (<see cref="ProjectCatalog"/>).</summary>
+    public int ProjectCount { get; }
 
     /// <summary>What unlocked it: <c>password</c>, <c>key file</c>, or both.</summary>
     public IReadOnlyList<string> KeyFactors { get; }
@@ -64,10 +70,8 @@ public sealed class ImportSource : IDisposable
     /// with <c> (2)</c>, <c> (3)</c> … while that is taken.
     /// </param>
     /// <returns>
-    /// Every top-level group at <c>&lt;into&gt;/&lt;name&gt;</c>, the root's own entries at
-    /// <c>&lt;into&gt;</c>, and each env set at its own path when it is a valid set new to the
-    /// target; a project the target already has, or one whose set <see cref="Check"/> would block,
-    /// goes with all its profiles to <c>&lt;into&gt;/env/…</c> as plain groups.
+    /// Every top-level group at <c>&lt;into&gt;/&lt;name&gt;</c>, and the root's own entries at
+    /// <c>&lt;into&gt;</c>.
     /// </returns>
     public ImportPlan DefaultPlan(Vault target, string? into)
     {
@@ -76,36 +80,12 @@ public sealed class ImportSource : IDisposable
 
         var groups = target.ReadGroupPaths().ToHashSet(StringComparer.Ordinal);
         var intoGroup = into ?? DefaultInto(groups);
-        var titles = Titles(target);
-        var rerouted = new Dictionary<string, string>(StringComparer.Ordinal);
         List<ImportRow> rows = [];
 
         foreach (var (unit, index) in _units.Select((unit, index) => (unit, index)))
         {
-            var reason = unit.IsRootEntries || unit.Project is not { } project
-                ? null
-                : groups.Contains(EnvConvention.GroupPath(project))
-                    ? $"{EnvConvention.GroupPath(project)} exists here"
-                    : rerouted.TryGetValue(project, out var earlier)
-                        ? earlier
-                        : RefuseEnvSet(unit, unit.SourceGroup, titles.GetValueOrDefault(unit.SourceGroup) ?? []) is { } refused
-                            ? $"not a valid env set: {refused}"
-                            : null;
-
-            var destination = unit.IsRootEntries
-                ? intoGroup
-                : unit.Project is not null && reason is null ? unit.SourceGroup : Unreserved(intoGroup, unit.SourceGroup, groups, rows, ref reason);
-
-            // A project that moves takes its profiles with it; a profile that moves goes alone.
-            if (reason is not null && unit.Project is { } moved && string.Equals(unit.SourceGroup, EnvConvention.GroupPath(moved), StringComparison.Ordinal))
-            {
-                rerouted.TryAdd(moved, reason);
-            }
-
-            foreach (var (relative, list) in unit.Groups)
-            {
-                At(titles, Below(destination, relative)).AddRange(list);
-            }
+            string? reason = null;
+            var destination = unit.IsRootEntries ? intoGroup : Unreserved(intoGroup, unit.SourceGroup, groups, rows, ref reason);
 
             rows.Add(new ImportRow(index, unit.SourceGroup, unit.EntryCount, destination, true, unit.IsRootEntries) { Rerouted = reason });
         }
@@ -207,19 +187,6 @@ public sealed class ImportSource : IDisposable
                 continue;
             }
 
-            if (IsEnv(destination))
-            {
-                var there = At(titles, destination);
-
-                if (RefuseEnvSet(unit, destination, there) is { } env)
-                {
-                    problems.Add(new ImportProblem(row.Index, env, Blocks: true));
-                }
-
-                there.AddRange(unit.Titles);
-                continue;
-            }
-
             var duplicates = 0;
             var inSubgroups = false;
 
@@ -296,10 +263,6 @@ public sealed class ImportSource : IDisposable
             {
                 _skipped.Add(new ImportSkip(top.Name, Raw(top)));
             }
-            else if (string.Equals(top.Name, EnvConvention.RootGroup, StringComparison.Ordinal))
-            {
-                ReadEnv(top);
-            }
             else
             {
                 Add(top, ImportScope.WholeGroup, top.Name);
@@ -309,27 +272,7 @@ public sealed class ImportSource : IDisposable
         EntryCount = _units.Sum(unit => unit.EntryCount);
     }
 
-    private void ReadEnv(ImportNode env)
-    {
-        if (env.Titles.Count > 0)
-        {
-            Add(env, ImportScope.GroupOwnEntries, env.Name);
-        }
-
-        foreach (var project in Live(env, env.Name))
-        {
-            var projectPath = env.Name + "/" + project.Name;
-            ProjectCount++;
-            Add(project, ImportScope.GroupOwnEntries, projectPath, project: project.Name);
-
-            foreach (var profile in Live(project, projectPath))
-            {
-                Add(profile, ImportScope.WholeGroup, projectPath + "/" + profile.Name, project: project.Name);
-            }
-        }
-    }
-
-    private void Add(ImportNode node, ImportScope scope, string sourceGroup, bool isRoot = false, string? project = null)
+    private void Add(ImportNode node, ImportScope scope, string sourceGroup, bool isRoot = false)
     {
         List<(string Relative, IReadOnlyList<string> Titles)> groups = [(string.Empty, node.Titles)];
 
@@ -345,9 +288,7 @@ public sealed class ImportSource : IDisposable
             node.Titles,
             groups,
             groups.Sum(group => group.Titles.Count),
-            scope == ImportScope.WholeGroup && node.Children.Count > 0,
-            isRoot,
-            project));
+            isRoot));
     }
 
     /// <summary>Every live subgroup's titles, by its path below the unit's group.</summary>
@@ -406,10 +347,6 @@ public sealed class ImportSource : IDisposable
             || ReservedGroups.IsReserved(group);
     }
 
-    private static bool IsEnv(string destination) =>
-        string.Equals(destination, EnvConvention.RootGroup, StringComparison.Ordinal)
-        || destination.StartsWith(EnvConvention.RootGroup + "/", StringComparison.Ordinal);
-
     private static string? RefuseDestination(string destination, Dictionary<string, int> groupCounts)
     {
         if (destination.Length == 0)
@@ -445,66 +382,6 @@ public sealed class ImportSource : IDisposable
         return null;
     }
 
-    private static string? RefuseEnvSet(Unit unit, string destination, List<string> there)
-    {
-        var segments = destination.Split('/');
-
-        if (segments.Length == 1)
-        {
-            return "entries directly in env belong to no project; import into env/<project>";
-        }
-
-        if (segments.Length > 3)
-        {
-            return $"{destination} is not an env set: a set is env/<project> or env/<project>/<profile>";
-        }
-
-        if (!EnvConvention.IsValidProject(segments[1], out var projectError))
-        {
-            return projectError;
-        }
-
-        if (segments.Length == 3)
-        {
-            if (string.Equals(segments[2], EnvProfileNames.Default, StringComparison.Ordinal))
-            {
-                return $"'{EnvProfileNames.Default}' is the default profile; its variables live in {EnvConvention.GroupPath(segments[1])} itself";
-            }
-
-            if (!EnvProfileNames.IsValid(segments[2], out var profileError))
-            {
-                return profileError;
-            }
-        }
-        else if (unit.HasSubgroups)
-        {
-            return $"{unit.SourceGroup} has subgroups, which would become profiles of {destination}; import it elsewhere";
-        }
-
-        HashSet<string> seen = new(StringComparer.Ordinal);
-        foreach (var title in unit.Titles)
-        {
-            if (!EnvConvention.IsValidKey(title, out var keyError))
-            {
-                return keyError;
-            }
-
-            if (there.Contains(title, StringComparer.Ordinal))
-            {
-                return $"'{title}' is already in {destination}";
-            }
-
-            if (!seen.Add(title))
-            {
-                return $"'{title}' is in {unit.SourceGroup} twice";
-            }
-        }
-
-        return EnvNameRules.TryCheckCase([.. there, .. unit.Titles], out var caseError)
-            ? null
-            : $"{destination} {caseError}";
-    }
-
     private sealed record Unit(
         string Id,
         ImportScope Scope,
@@ -512,9 +389,7 @@ public sealed class ImportSource : IDisposable
         IReadOnlyList<string> Titles,
         IReadOnlyList<(string Relative, IReadOnlyList<string> Titles)> Groups,
         int EntryCount,
-        bool HasSubgroups,
-        bool IsRootEntries,
-        string? Project);
+        bool IsRootEntries);
 }
 
 /// <summary>A source group as an import sees it: names and titles only.</summary>
@@ -525,9 +400,6 @@ internal enum ImportScope
 {
     /// <summary>The group, everything under it, and its own metadata.</summary>
     WholeGroup = 0,
-
-    /// <summary>The group and its own entries, without its subgroups.</summary>
-    GroupOwnEntries = 1,
 
     /// <summary>The group's own entries, into the destination; the root's are copied this way.</summary>
     EntriesOnly = 2,

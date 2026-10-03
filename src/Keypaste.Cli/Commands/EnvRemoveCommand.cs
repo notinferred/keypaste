@@ -4,11 +4,7 @@ using Keypaste.Core.Approval;
 namespace Keypaste.Cli.Commands;
 
 /// <summary>Removes one variable: <c>keypaste env rm &lt;project&gt; &lt;KEY&gt; [-p &lt;profile&gt;] [--entry &lt;entry&gt;]</c>.</summary>
-/// <remarks>
-/// A field leaves its entry, whose history keeps the value; a legacy variable's entry goes to the
-/// recycle bin, addressed by its group and title, never the two joined, so this verb cannot reach an
-/// entry outside the environment however it is called.
-/// </remarks>
+/// <remarks>The field leaves the entry tagged into the environment, whose history keeps the value; no entry is deleted.</remarks>
 internal static class EnvRemoveCommand
 {
     private static readonly OptionSpec[] _options =
@@ -102,15 +98,11 @@ internal static class EnvRemoveCommand
             }
 
             var source = holding[0];
-            var legacy = string.Equals(source.Field, EnvSource.LegacyField, StringComparison.Ordinal);
             var shown = ApprovalPrompt.Shown(source.Entry);
 
             if (!assumeYes)
             {
-                var answer = context.Prompt.ReadLine(
-                    !legacy ? $"Remove {key} from {shown}? Its value stays in the entry's history. [y/N] "
-                    : vault.RecyclesDeletedEntries ? $"Move {shown} to the recycle bin? [y/N] "
-                    : $"Remove {shown}? This vault has no recycle bin. [y/N] ");
+                var answer = context.Prompt.ReadLine($"Remove {key} from {shown}? Its value stays in the entry's history. [y/N] ");
                 if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
                 {
                     context.Stderr.WriteLine("Cancelled.");
@@ -135,12 +127,7 @@ internal static class EnvRemoveCommand
 
             vault.Save();
 
-            context.Stderr.WriteLine(removal.Outcome switch
-            {
-                EnvRemoveOutcome.FieldRemoved => $"Removed {key} from {shown} (its value stays in the entry's history)",
-                EnvRemoveOutcome.Recycled => $"Moved {shown} to the recycle bin",
-                _ => $"Removed {shown}",
-            });
+            context.Stderr.WriteLine($"Removed {key} from {shown} (its value stays in the entry's history)");
             return CliApp.ExitSuccess;
         });
     }

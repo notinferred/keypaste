@@ -118,14 +118,14 @@ internal sealed class ActivityRow
             LeftText = Humanized(waiting.Remaining),
         };
 
-    /// <summary>The keys a run's grant releases and its set, or the command a <c>keypaste run --session</c> grant repeats.</summary>
+    /// <summary>The entries a run's grant releases and its set, or the command a <c>keypaste run --session</c> grant repeats.</summary>
     private static string EnvDetail(EnvGrantInForce grant)
     {
         var set = $"{grant.Project}/{grant.Profile}";
 
         return grant.Entries.Count == 0
             ? $"{grant.Command} · {set}"
-            : $"{string.Join(", ", grant.Entries.Select(entry => entry[(entry.LastIndexOf('/') + 1)..]))} · {set}";
+            : $"{string.Join(", ", grant.Entries)} · {set}";
     }
 
     /// <summary>Whole minutes under an hour, then hours and minutes; rounded up, as <see cref="Seconds"/> is.</summary>

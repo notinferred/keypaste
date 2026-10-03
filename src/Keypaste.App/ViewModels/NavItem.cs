@@ -60,7 +60,7 @@ internal sealed class NavItem(Destination destination) : ObservableObject
     }
 }
 
-/// <summary>An env project in the sidebar, beneath Items, with how many variables it holds.</summary>
+/// <summary>A project in the sidebar, beneath Items, with how many entries are tagged into it.</summary>
 internal sealed record ProjectRow(string Name, int Count)
 {
     /// <summary>The row's name for a screen reader.</summary>

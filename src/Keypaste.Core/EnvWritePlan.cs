@@ -17,12 +17,8 @@ public enum EnvWriteChange
 /// <param name="Key">The variable's name.</param>
 /// <param name="Change">What the write does to it.</param>
 /// <param name="Entry">The entry holding it, or the one it is added to.</param>
-/// <param name="Field">The field holding it: the key itself on a tagged entry, or <see cref="EnvSource.LegacyField"/> for a legacy variable.</param>
-public sealed record EnvKeyWrite(string Key, EnvWriteChange Change, EntryName Entry, string Field)
-{
-    /// <summary>Whether the key is a legacy <c>env/&lt;project&gt;</c> variable, updated in place.</summary>
-    public bool IsLegacy => string.Equals(Field, EnvSource.LegacyField, StringComparison.Ordinal);
-}
+/// <param name="Field">The field holding it, named as the key.</param>
+public sealed record EnvKeyWrite(string Key, EnvWriteChange Change, EntryName Entry, string Field);
 
 /// <summary>What writing keys to one environment of a project would do, planned before anything is written.</summary>
 /// <remarks>
@@ -112,12 +108,6 @@ public enum EnvRemoveOutcome
 
     /// <summary>The field was removed from its entry, whose history keeps it.</summary>
     FieldRemoved = 3,
-
-    /// <summary>The legacy variable's entry went to the recycle bin.</summary>
-    Recycled = 4,
-
-    /// <summary>The legacy variable's entry was deleted, the vault having no recycle bin.</summary>
-    Deleted = 5,
 }
 
 /// <summary>What <see cref="EnvStore.Remove"/> did and where.</summary>

@@ -9,9 +9,9 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// What the Secrets screen says about an entry beyond its name: its kind, where it lives, its
-/// reference and its profiles. Each is read from which fields are filled in or from the entry's
-/// path, never from a value.
+/// What the Secrets screen says about an entry beyond its name: its kind, where it lives and its
+/// reference. Each is read from which fields are filled in or from the entry's path, never from a
+/// value; an entry under <c>env/</c> is an ordinary entry (D-0416).
 /// </summary>
 public sealed class SecretsScreenTests : IDisposable
 {
@@ -50,8 +50,8 @@ public sealed class SecretsScreenTests : IDisposable
     [InlineData("Work", "github", "Login", "Work")]
     [InlineData("Home", "wifi", "Password", "Home")]
     [InlineData("Home", "recovery", "Secure note", "Home")]
-    [InlineData("env/acme-api", "DATABASE_URL", "Env variable", "acme-api · dev")]
-    [InlineData("env/acme-api/prod", "DATABASE_URL", "Env variable", "acme-api · prod")]
+    [InlineData("env/acme-api", "DATABASE_URL", "Password", "env/acme-api")]
+    [InlineData("env/acme-api/prod", "DATABASE_URL", "Password", "env/acme-api/prod")]
     public void A_row_says_its_kind_and_where_it_lives(string group, string title, string kind, string place)
     {
         using var context = new Context(_vaultPath);
@@ -59,52 +59,43 @@ public sealed class SecretsScreenTests : IDisposable
         var row = context.Entries.Rows.Single(row => row.GroupPath == group && row.Title == title);
 
         Assert.Equal(kind, row.KindLabel);
-        Assert.Equal(place, row.Place);
-        Assert.DoesNotContain(_value, row.Place, StringComparison.Ordinal);
+        Assert.Equal(place, row.Where);
+        Assert.DoesNotContain(_value, row.Where, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void An_env_profile_group_heads_the_list_with_its_project_and_profile()
+    public void A_group_under_env_heads_the_list_as_any_group_does()
     {
         using var context = new Context(_vaultPath);
 
         Assert.Equal("acme.kdbx", context.Entries.ListTitle);
-        Assert.False(context.Entries.HasListProfile);
         Assert.Null(context.Entries.SearchScope);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env/acme-api/prod");
 
-        Assert.Equal("acme-api", context.Entries.ListTitle);
-        Assert.Equal("prod", context.Entries.ListProfile);
-        Assert.Equal("acme-api", context.Entries.SearchScope);
+        Assert.Equal("env/acme-api/prod", context.Entries.ListTitle);
+        Assert.Equal("env/acme-api/prod", context.Entries.SearchScope);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "Work");
 
         Assert.Equal("Work", context.Entries.ListTitle);
-        Assert.Null(context.Entries.ListProfile);
     }
 
     [Fact]
-    public void A_variable_shows_its_value_its_reference_and_every_profile_and_a_protected_one_asks()
+    public void An_untagged_entry_under_env_is_a_password_named_by_its_entry_reference()
     {
         using var context = new Context(_vaultPath);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api");
         var detail = context.Entries.Detail!;
 
-        Assert.True(detail.IsVariable);
-        Assert.Equal("Value", detail.ValueLabel);
-        Assert.False(detail.ShowsUsername);
-        Assert.Equal("Env variable · acme.kdbx › env › acme-api", detail.Location);
-        Assert.Equal("kp://acme-api/dev/DATABASE_URL", detail.Reference);
-        Assert.Equal(
-            [("dev", "set"), ("prod", "approval required")],
-            detail.ProfileStates.Select(state => (state.Profile, state.State)));
-        Assert.True(detail.ProfileStates[1].IsAsked);
+        Assert.Equal(EntryKind.Password, detail.Kind);
+        Assert.Equal("Password · acme.kdbx › env › acme-api", detail.Location);
+        Assert.Equal("kp:///env/acme-api/DATABASE_URL", detail.Reference);
     }
 
     [Fact]
-    public void A_login_shows_its_username_and_url_and_has_no_profiles()
+    public void A_login_shows_where_it_lives_and_what_rotating_it_changes()
     {
         using var context = new Context(_vaultPath);
 
@@ -112,28 +103,20 @@ public sealed class SecretsScreenTests : IDisposable
         var detail = context.Entries.Detail!;
 
         Assert.Equal(EntryKind.Login, detail.Kind);
-        Assert.Equal("Password", detail.ValueLabel);
-        Assert.True(detail.ShowsUsername);
-        Assert.True(detail.ShowsUrl);
-        Assert.False(detail.HasProfiles);
         Assert.Equal("Login · acme.kdbx › Work", detail.Location);
         Assert.Matches("^uuid [0-9a-f]{4}…[0-9a-f]{4} · field Password$", detail.KdbxEntry);
-        Assert.Equal("Password", detail.ValueLabel);
-        Assert.Equal("New password", detail.ReplacementPlaceholder);
         Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void An_env_project_group_lists_its_own_profile_as_its_badge_says()
+    public void A_group_under_env_lists_its_subgroups_entries_as_a_folder_does()
     {
         using var context = new Context(_vaultPath);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env/acme-api");
 
-        Assert.Equal("acme-api", context.Entries.ListTitle);
-        Assert.Equal("dev", context.Entries.ListProfile);
-        Assert.Equal("acme-api", context.Entries.SearchScope);
-        Assert.Equal(["env/acme-api"], context.Entries.Rows.Select(row => row.GroupPath));
+        Assert.Equal("env/acme-api", context.Entries.ListTitle);
+        Assert.Equal(["env/acme-api", "env/acme-api/prod"], context.Entries.Rows.Select(row => row.GroupPath).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -159,22 +142,19 @@ public sealed class SecretsScreenTests : IDisposable
     }
 
     [Fact]
-    public void A_variable_is_edited_and_rotated_as_a_value_in_its_profile()
+    public void An_entry_under_env_is_rotated_as_a_password()
     {
         using var context = new Context(_vaultPath);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api/prod");
         var detail = context.Entries.Detail!;
 
-        Assert.Equal("New value", detail.ReplacementPlaceholder);
-        Assert.Contains("current value", detail.ReplacementCaption, StringComparison.Ordinal);
-        Assert.Contains("DATABASE_URL in acme-api · prod", detail.RotatePrompt, StringComparison.Ordinal);
-        Assert.Contains("injects this key in prod", detail.RotatePrompt, StringComparison.Ordinal);
+        Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
         Assert.DoesNotContain(_value, detail.RotatePrompt, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void A_new_login_is_made_whole_in_one_step_and_the_env_layout_is_no_folder_to_make_one_in()
+    public void A_new_login_is_made_whole_in_one_step_and_env_is_a_folder_like_any_other()
     {
         using var context = new Context(_vaultPath);
 
@@ -192,7 +172,7 @@ public sealed class SecretsScreenTests : IDisposable
         Assert.Equal("https://gitlab.com", added.Url);
 
         form = NewItemForm.Open(context.Entries);
-        Assert.DoesNotContain(form.Folders, folder => folder.Path == "env" || folder.Path.StartsWith("env/", StringComparison.Ordinal));
+        Assert.Contains(form.Folders, folder => folder.Path == "env/acme-api");
     }
 
     /// <summary>A reference names the entry and holds no value, so it is copied as plain text.</summary>
@@ -204,7 +184,7 @@ public sealed class SecretsScreenTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api");
         await context.Entries.Detail!.CopyReferenceCommand.ExecuteAsync();
 
-        Assert.Equal("kp://acme-api/dev/DATABASE_URL", context.Clipboard.Content);
+        Assert.Equal("kp:///env/acme-api/DATABASE_URL", context.Clipboard.Content);
         Assert.False(context.Clipboard.ContentWasSetAsASecret);
     }
 

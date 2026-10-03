@@ -70,7 +70,7 @@ last_lines() { tail -n 2 "$AUDIT"; }
 
 # ---------------------------------------------------------------- a vault with something in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
-legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$SECRET" \
+printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
 
 # --------------------------------------------------------------------- the app unlocks and serves

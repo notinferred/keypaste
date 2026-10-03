@@ -42,12 +42,13 @@ public sealed class ImportVerbTests : IDisposable
         _cli.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal(["Password for acme.kdbx: ", "Master password: "], _cli.Prompt.PromptsSeen);
         Assert.Contains("  acme.kdbx · KDBX 4.0 · Argon2d · AES-256", _cli.Err, StringComparison.Ordinal);
-        Assert.Contains("  ✓ 2 entries · 1 project · copied into acme", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("  ✓ 2 entries · 0 projects · copied into acme", _cli.Err, StringComparison.Ordinal);
         Assert.Empty(_cli.Out);
 
         using var vault = Vault.Open(_cli.VaultPath, _master);
         Assert.Equal("bank-pw", vault.Find(new EntryName("acme/Banking", "Bank"))!.Password);
-        Assert.Equal("api-pw", vault.Find(new EntryName("env/acme-api", "API_KEY"))!.Password);
+        Assert.Equal("api-pw", vault.Find(new EntryName("acme/env/acme-api", "API_KEY"))!.Password);
+        Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
     [Fact]
@@ -82,7 +83,7 @@ public sealed class ImportVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal(["Password for acme.kdbx: "], _cli.Prompt.PromptsSeen);
-        Assert.Contains("  ✓ 2 entries · 1 project · editing in place", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("  ✓ 2 entries · 0 projects · editing in place", _cli.Err, StringComparison.Ordinal);
         Assert.Contains($"pass --vault {source} or set KEYPASTE_VAULT", _cli.Err, StringComparison.Ordinal);
 
         var remembered = Assert.Single(RecentVaults.Load(KeypasteHome.RecentPath(Home)));
@@ -119,17 +120,15 @@ public sealed class ImportVerbTests : IDisposable
     }
 
     [Fact]
-    public void Import_AnEnvGroupThatIsNotAValidSet_LandsUnderInto()
+    public void Import_AnEnvGroup_LandsUnderIntoAsAPlainGroup()
     {
         Seed();
         var source = Source("acme.kdbx", vault => vault.AddEntry(new VaultEntry { Title = "bad-key", GroupPath = "env/acme-api", Password = "x" }));
 
         _cli.Prompt.Enqueue(_sourcePassword, _master);
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("import", source, "--into", "Imported", "--dry-run", "--vault", _cli.VaultPath));
-        Assert.Contains(
-            "Imported/env/acme-api      (not a valid env set: 'bad-key' is not a valid environment variable name",
-            _cli.Out,
-            StringComparison.Ordinal);
+        Assert.Matches(@"(?m)^    env +2  → Imported/env$", _cli.Out.ReplaceLineEndings("\n"));
+        Assert.DoesNotContain("env set", _cli.Out + _cli.Err, StringComparison.Ordinal);
     }
 
     [Fact]

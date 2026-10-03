@@ -6,11 +6,10 @@ namespace Keypaste.Core;
 /// <param name="Members">The entries whose own tag puts them in it, in ordinal order of path.</param>
 public sealed record ProjectEnvironment(string Name, bool IsProtected, IReadOnlyList<EntryName> Members);
 
-/// <summary>One project: the entries tagged for it, the legacy <c>env/&lt;project&gt;</c> group, or both.</summary>
+/// <summary>One project: the entries tagged for it.</summary>
 /// <param name="Name">The project's name.</param>
-/// <param name="IsLegacy">Whether its <c>env/&lt;project&gt;</c> group holds the one-entry-per-variable layout of earlier releases: an untagged entry anywhere in it, or a subgroup (D-0414).</param>
-/// <param name="Environments">Its environments, <c>dev</c> first and protected ones last, as <see cref="EnvStore.Profiles"/> orders them.</param>
-public sealed record ProjectListing(string Name, bool IsLegacy, IReadOnlyList<ProjectEnvironment> Environments);
+/// <param name="Environments">Its environments, <c>dev</c> first and protected ones last.</param>
+public sealed record ProjectListing(string Name, IReadOnlyList<ProjectEnvironment> Environments);
 
 /// <summary>A tag that starts like a project tag and is ignored.</summary>
 /// <param name="Entry">The entry carrying it.</param>
@@ -20,7 +19,7 @@ public sealed record ProjectListing(string Name, bool IsLegacy, IReadOnlyList<Pr
 public sealed record ProjectTagProblem(EntryName Entry, string Tag, string Problem, bool Protects);
 
 /// <summary>
-/// Every project in a vault: the tag projects together with the legacy <c>env/</c> groups (D-0367).
+/// Every project in a vault, from its entries' own project tags (D-0370); no group makes a project (D-0416).
 /// </summary>
 /// <remarks>
 /// Only an entry's own tags count; a group's tags are never read. Entries in the recycle bin and in
@@ -76,46 +75,24 @@ public sealed class ProjectCatalog
             }
         }
 
-        var store = new EnvStore(vault);
-        var legacy = store.Projects();
-
-        var projects = legacy.Union(tagged.Keys, StringComparer.Ordinal)
+        var projects = tagged.Keys
             .Order(StringComparer.Ordinal)
-            .Select(project =>
-            {
-                var members = tagged.TryGetValue(project, out var found) ? found : [];
-                var names = store.Profiles(project).Select(profile => profile.Name).Union(members.Keys, StringComparer.Ordinal);
-
-                return new ProjectListing(
-                    project,
-                    legacy.Contains(project, StringComparer.Ordinal) && HoldsLegacyLayout(snapshot, project),
-                    [
-                        .. names
-                            .Select(environment => new ProjectEnvironment(
-                                environment,
-                                EnvProfileNames.IsProtected(environment),
-                                members.TryGetValue(environment, out var entries)
-                                    ? [.. entries.Distinct().OrderBy(entry => Path(entry), StringComparer.Ordinal)]
-                                    : []))
-                            .OrderBy(environment => !string.Equals(environment.Name, EnvProfileNames.Default, StringComparison.Ordinal))
-                            .ThenBy(environment => environment.IsProtected)
-                            .ThenBy(environment => environment.Name, StringComparer.Ordinal),
-                    ]);
-            });
+            .Select(project => new ProjectListing(
+                project,
+                [
+                    .. tagged[project]
+                        .Select(environment => new ProjectEnvironment(
+                            environment.Key,
+                            EnvProfileNames.IsProtected(environment.Key),
+                            [.. environment.Value.Distinct().OrderBy(entry => Path(entry), StringComparer.Ordinal)]))
+                        .OrderBy(environment => !string.Equals(environment.Name, EnvProfileNames.Default, StringComparison.Ordinal))
+                        .ThenBy(environment => environment.IsProtected)
+                        .ThenBy(environment => environment.Name, StringComparer.Ordinal),
+                ]));
 
         return new ProjectCatalog(
             [.. projects],
             [.. problems.OrderBy(problem => Path(problem.Entry), StringComparer.Ordinal).ThenBy(problem => problem.Tag, StringComparer.Ordinal)]);
-    }
-
-    /// <summary>Whether a project's <c>env/</c> group holds an untagged entry anywhere in it, or any subgroup.</summary>
-    private static bool HoldsLegacyLayout(EnvSnapshot snapshot, string project)
-    {
-        var group = EnvConvention.GroupPath(project);
-
-        return snapshot.GroupPaths.Any(path => path.StartsWith(group + "/", StringComparison.Ordinal))
-            || snapshot.Entries.Any(entry => !entry.IsTagged
-                && (string.Equals(entry.Entry.GroupPath, group, StringComparison.Ordinal) || entry.Entry.GroupPath.StartsWith(group + "/", StringComparison.Ordinal)));
     }
 
     private static string Path(EntryName entry) => entry.GroupPath.Length == 0 ? entry.Title : entry.GroupPath + "/" + entry.Title;

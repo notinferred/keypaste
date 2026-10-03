@@ -47,7 +47,8 @@ trap cleanup EXIT
 # ---------------------------------------------------------------- a vault with the sentinel in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null \
   || die "could not create the vault"
-legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$SECRET" \
+# KEY=value, because a piped value ends at its first line break.
+printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT" >/dev/null 2>&1 \
   || die "could not store the test credential"
 
 # ------------------------------------------------------------------------------- start the owner
@@ -131,8 +132,8 @@ jq -e -s --arg s "$SESSION" '
   length == 3
   and all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16))
   and .[0].decision == "granted" and .[0].method == "prompt" and .[0].granted_seconds == 900
-  and .[0].entries == ["env/ci/DEPLOY_KEY"] and (.[0].command | startswith("sh -c"))
-  and .[1].decision == "granted" and .[1].method == "grant-cache" and .[1].entries == ["env/ci/DEPLOY_KEY"]
+  and .[0].entries == ["env/ci/.env"] and (.[0].command | startswith("sh -c"))
+  and .[1].decision == "granted" and .[1].method == "grant-cache" and .[1].entries == ["env/ci/.env"]
   and .[2].decision == "denied" and .[2].method == "prompt"' <"$AUDIT" >/dev/null \
   || die "the audit lines do not show a prompted grant, a grant-served run and a denial in session $SESSION"
 

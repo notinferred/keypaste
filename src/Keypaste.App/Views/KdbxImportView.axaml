@@ -248,7 +248,7 @@
 
       <!-- Where each group of the file lands in the open vault. -->
       <StackPanel Spacing="8" IsVisible="{Binding ShowsRows}">
-        <TextBlock Classes="label" Text="Map groups to projects" />
+        <TextBlock Classes="label" Text="Map groups into this vault" />
         <Border BorderBrush="{DynamicResource KpBorderDefault}"
                 BorderThickness="1"
                 CornerRadius="{DynamicResource KpRadiusButton}"

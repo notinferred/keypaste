@@ -113,7 +113,7 @@ asked() { [ "$(grep -c '^approved' "$HOLD_OUT")" -eq "$1" ] || die "$2: a person
 
 # ---------------------------------------------------------------- a vault with something in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
-legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$V1" \
+printf '%s\n%s\n' "$MASTER" "$V1" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
 printf '%s\n' "$MASTER" | "$CLI" add KEEP --group personal --generate --vault "$VAULT" >/dev/null \
   || die "could not make a group outside the exposure"
@@ -157,7 +157,7 @@ released 14 "$V2" prompt "the request after the entry moved back"
 asked 3 "the request after the entry moved back"
 
 # ---------------------- another program saves: refused, the file kept, and nothing until a reload
-printf '%s\n' "$MASTER" | KEYPASTE_HOME="$OTHER_HOME" "$CLI" env set ci "DEPLOY_KEY=$V3" --vault "$VAULT" >/dev/null \
+printf '%s\n%s\n' "$MASTER" "$V3" | KEYPASTE_HOME="$OTHER_HOME" "$CLI" set "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "another program could not save the vault the app holds"
 EXTERNAL="$(digest)"
 

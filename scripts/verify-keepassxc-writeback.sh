@@ -10,18 +10,18 @@
 #
 #   A. keypaste MODIFIES an entry that already exists, which makes KeePassLib write a
 #      <History> element for the first time. KeePassXC must still read the file.
-#   B. KeePassXC modifies a value -> keypaste must read what KeePassXC wrote.
-#   C. KeePassXC adds a variable -> keypaste env ls must list it.
-#   D. KeePassXC titles an entry with a SEPARATOR in it -> keypaste env rm must remove that
-#      entry and not the one whose path it shares (docs/STEPS.md F.1a), and while both are
-#      present keypaste get must refuse that path rather than release either secret, and
-#      keypaste add must refuse to put a third entry on it (docs/STEPS.md F.1e).
+#   B. KeePassXC modifies a value -> keypaste must read what KeePassXC wrote, and the
+#      variable keypaste wrote on that entry must survive KeePassXC's save.
+#   C. KeePassXC adds an entry under env/<project> -> keypaste must read it as an ordinary
+#      entry and list it as no variable of the project (D-0416).
+#   D. KeePassXC titles an entry with a SEPARATOR in it -> while it shares a path with another
+#      entry, keypaste get must refuse that path rather than release either secret, keypaste
+#      add must refuse to put a third entry on it (docs/STEPS.md F.1e), and keypaste rm must
+#      remove neither (D-0094).
 #
-# B, C and D are the claim DECISIONS.md D-0014 rests on: the env convention was chosen over
-# custom string fields precisely BECAUSE keepassxc-cli can perform them. If this file ever
-# has to be deleted to make CI green, the convention itself is wrong — change the convention,
-# not this gate. Do NOT relax an assertion, add a skip, mark the job continue-on-error, or
-# drop an operating system.
+# B, C and D are law 4.6 in the direction compat cannot see: what KeePassXC writes into a vault
+# keypaste uses is read as KeePassXC means it. Do NOT relax an assertion, add a skip, mark the
+# job continue-on-error, or drop an operating system.
 #
 # Usage:  scripts/verify-keepassxc-writeback.sh <writeback.kdbx>
 # Env:    KP_COMPAT_PASSWORD  master password for the fixture   (required)
@@ -40,6 +40,7 @@ DIE_PREFIX='WRITE-BACK GATE FAILED: '
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-writeback.sh <writeback.kdbx>"
 . "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
+require jq
 
 kp=$(keypaste_bin)
 
@@ -50,13 +51,14 @@ kp_run() { printf '%s\n' "$pw" | "$kp"  "$@" | tr -d '\r'; }
 
 project=compat-app
 key=DEMO_KEY
+home="env/${project}/.env"
 
 mkdir -p "$(dirname "$db")"
 rm -f "$db"          # re-runnable locally, not only on a fresh CI checkout
 
-step "seed: keypaste creates the vault and one env variable"
+step "seed: keypaste creates the vault and one variable on the project's home entry"
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$db"
-legacy_var "$kp" "$db" "$pw" "$project" "$key" v1-initial
+project_var "$kp" "$db" "$pw" "$project" "$key" v1-initial
 
 # ---------------------------------------------------------------------------------------
 # A. keypaste modifies an entry — the first KDBX <History> element this codebase ever writes.
@@ -80,7 +82,7 @@ info=$(kpxc db-info "$db") || die "KeePassXC cannot open the file keypaste wrote
 grep -Eqi '^[[:space:]]*KDF:[[:space:]]*Argon2' <<<"$info" \
   || die "KDF is no longer Argon2 after a keypaste update. Got: $(grep -i '^[[:space:]]*KDF:' <<<"$info" || echo '<no KDF line>')"
 
-after_update=$(kpxc show -a Password "$db" "env/${project}/${key}") \
+after_update=$(kpxc show -a "$key" "$db" "$home") \
   || die "keepassxc-cli show failed after a keypaste update"
 diff -u <(printf '%s\n' 'v2-rewritten-by-keypaste') <(printf '%s\n' "$after_update") \
   || die "KeePassXC does not see the value keypaste wrote"
@@ -99,10 +101,10 @@ echo "KeePassXC reads the updated entry, history and all."
 # `edit` requires at least one field option, which -g satisfies.
 # ---------------------------------------------------------------------------------------
 step "B: KeePassXC generates a new value; keypaste must read it"
-printf '%s\n' "$pw" | "$cli" edit -g -L 32 -l -U -n "$db" "env/${project}/${key}" >/dev/null \
-  || die "keepassxc-cli edit -g failed — the convention's central claim (KeePassXC can edit an env value) is broken"
+printf '%s\n' "$pw" | "$cli" edit -g -L 32 -l -U -n "$db" "$home" >/dev/null \
+  || die "keepassxc-cli edit -g failed on an entry keypaste wrote"
 
-expected=$(kpxc show -a Password "$db" "env/${project}/${key}") || die "keepassxc-cli show failed"
+expected=$(kpxc show -a Password "$db" "$home") || die "keepassxc-cli show failed"
 
 # Without these three checks, a `show` that returned an empty line and a `get` that returned
 # an empty line would diff clean and this gate would pass forever having compared nothing.
@@ -110,31 +112,37 @@ expected=$(kpxc show -a Password "$db" "env/${project}/${key}") || die "keepassx
 [ "${#expected}" -ge 16 ] || die "generated password is ${#expected} chars — -g/-L was not honoured"
 [ "$expected" != 'v2-rewritten-by-keypaste' ] || die "edit -g did not actually change the value"
 
-actual=$(kp_run get "env/${project}/${key}" --show --vault "$db") || die "keypaste get failed"
+actual=$(kp_run get "$home" --show --vault "$db") || die "keypaste get failed"
 diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") \
   || die "keypaste does not read the value KeePassXC wrote (left = KeePassXC, right = keypaste)"
-echo "keypaste reads the value KeePassXC generated."
+kept=$(kp_run get "$home" --field "$key" --show --vault "$db") || die "keypaste get --field failed"
+[ "$kept" = 'v2-rewritten-by-keypaste' ] || die "KeePassXC's save did not keep the variable keypaste wrote: '${kept}'"
+echo "keypaste reads the value KeePassXC generated, and its own variable beside it."
 
 # ---------------------------------------------------------------------------------------
-# C. KeePassXC adds a variable -> keypaste env ls must list it.
+# C. KeePassXC adds an entry under env/<project> -> keypaste reads it, and it is no variable.
 #
 # ORDERING DEPENDENCY: keepassxc-cli `add` cannot create missing groups — it resolves the
 # parent group and fails if it is absent. This works only because the seed above created
 # env/<project>. Do not reorder these sections.
 # ---------------------------------------------------------------------------------------
-step "C: KeePassXC adds a variable; keypaste must list it"
+step "C: KeePassXC adds an entry under env/${project}; keypaste reads it and lists it as no variable"
 printf '%s\n' "$pw" | "$cli" add -g -L 20 -l -U -n "$db" "env/${project}/ADDED_BY_KPXC" >/dev/null \
   || die "keepassxc-cli add failed"
 
+added=$(kpxc show -a Password "$db" "env/${project}/ADDED_BY_KPXC") || die "keepassxc-cli show failed for the added entry"
+[ -n "$added" ] || die "the added entry has an EMPTY password - nothing would be compared"
+[ "$(kp_run get "env/${project}/ADDED_BY_KPXC" --show --vault "$db")" = "$added" ] \
+  || die "keypaste does not read the entry KeePassXC added"
+
 keys=$(kp_run env ls "$project" --vault "$db") || die "keypaste env ls failed"
 printf '%s\n' "$keys"
-diff -u <(printf '%s\n' 'ADDED_BY_KPXC' "$key") <(printf '%s\n' "$keys") \
-  || die "keypaste env ls disagrees with KeePassXC about the project's variables"
+diff -u <(printf '%s\n' '  dev' "    ${home}" "      ${key}") <(printf '%s\n' "$keys") \
+  || die "keypaste env ls lists something other than the project's one variable"
 
-# A project with an env/<project> group is listed as legacy, with its one dev profile beneath it.
 projects=$(kp_run env ls --vault "$db") || die "keypaste env ls (projects) failed"
-diff -u <(printf '%s\n' "$project  legacy" '  dev') <(printf '%s\n' "$projects") \
-  || die "keypaste env ls does not report the project"
+diff -u <(printf '%s\n' "$project" '  dev' "    ${home}") <(printf '%s\n' "$projects") \
+  || die "keypaste env ls does not report the project as its tag makes it"
 
 # ---------------------------------------------------------------------------------------
 # D. KeePassXC titles an entry with a separator in it; keypaste must not confuse it with a
@@ -147,12 +155,11 @@ diff -u <(printf '%s\n' "$project  legacy" '  dev') <(printf '%s\n' "$projects")
 # The collision is authored HERE, by KeePassXC, rather than by the code under test: `add`
 # splits its argument on the last slash and would make the group, so the entry is added under
 # an ordinary name and then RENAMED with `edit --title`, which puts the slash in the title
-# through KeePassXC's own writer. The nested entry's password is captured BEFORE the rename,
-# because afterwards keepassxc-cli's own path lookup is ambiguous too.
+# through KeePassXC's own writer.
 #
 # ORDERING DEPENDENCY, as in C: `add` cannot create a missing parent group, hence `mkdir`.
 # ---------------------------------------------------------------------------------------
-step "D: KeePassXC authors a title containing a separator; keypaste must tell the two apart"
+step "D: KeePassXC authors a title containing a separator; keypaste lists both and refuses the path they share"
 
 set +e
 top_help=$("$cli" --help 2>&1)
@@ -169,33 +176,21 @@ printf '%s\n' "$pw" | "$cli" mkdir "$db" "env/${project}/nested" >/dev/null \
   || die "keepassxc-cli mkdir failed"
 printf '%s\n' "$pw" | "$cli" add -g -L 20 -l -U -n "$db" "env/${project}/nested/NESTED_KEY" >/dev/null \
   || die "keepassxc-cli add failed for the nested entry"
-
-nested_before=$(kpxc show -a Password "$db" "env/${project}/nested/NESTED_KEY") \
-  || die "keepassxc-cli show failed for the nested entry"
-[ -n "$nested_before" ] || die "the nested entry has an EMPTY password - nothing would be compared"
-
 printf '%s\n' "$pw" | "$cli" add -g -L 20 -l -U -n "$db" "env/${project}/PLACEHOLDER" >/dev/null \
   || die "keepassxc-cli add failed for the entry about to be renamed"
 printf '%s\n' "$pw" | "$cli" edit -t 'nested/NESTED_KEY' "$db" "env/${project}/PLACEHOLDER" >/dev/null \
   || die "keepassxc-cli edit --title failed - the collision cannot be authored"
 
-# keypaste must SEE the KeePassXC-authored name before it can be asked to remove it. The
-# listing DRAWS it with the separator replaced and says so on stderr, because a title
-# containing one reads as a path it is not (DECISIONS.md D-0084). What is removed below is
-# the name the vault holds, not the name the listing drew: sanitizing is display-only.
-keys=$(kp_run env ls "$project" --vault "$db") || die "keypaste env ls failed after the rename"
-case "$keys" in
-  *'nested NESTED_KEY'*) ;;
-  *) die "keypaste env ls does not list the title KeePassXC authored: $keys";;
-esac
-case "$keys" in
-  *'nested/NESTED_KEY'*) die "env ls drew a slash in a title unsanitized";;
-esac
+# keypaste lists both as the vault holds them: the raw group and title, which only a parser reads.
+kp_run ls --json --vault "$db" | jq -e --arg group "env/${project}" '
+  any(.[]; .type == "entry" and .group == $group and .title == "nested/NESTED_KEY")
+  and any(.[]; .type == "entry" and .group == ($group + "/nested") and .title == "NESTED_KEY")' >/dev/null \
+  || die "keypaste ls --json does not list both entries KeePassXC authored"
 
-# F.1e, and this is the only moment in the script where the collision exists: two entries now
-# answer to env/<project>/nested/NESTED_KEY. A read of that path cannot pick one — whichever the
-# file lists first is a guess, and unlike a guessed removal a guessed read hands the wrong secret
-# over and says nothing. Neither the read nor the refused add may write, so the bytes say so.
+# F.1e: two entries answer to env/<project>/nested/NESTED_KEY. A read of that path cannot pick
+# one — whichever the file lists first is a guess, and a guessed read hands the wrong secret over
+# and says nothing; a guessed removal deletes the wrong entry (F.1a). None of the refused acts may
+# write, so the bytes say so.
 before_ambiguous=$(bytes "$db")
 
 set +e
@@ -211,22 +206,14 @@ collide_add_rc=$?
 set -e
 [ "$collide_add_rc" -ne 0 ] || die "keypaste add exited 0 on a path TWO entries already answer to"
 
-[ "$(bytes "$db")" = "$before_ambiguous" ] || die "a refused read or a refused add rewrote the vault"
-printf 'ambiguous read refused (get exit %s, add exit %s, vault byte-identical)\n' "$collide_rc" "$collide_add_rc"
+set +e
+printf '%s\n' "$pw" | "$kp" rm "env/${project}/nested/NESTED_KEY" --yes --vault "$db" >/dev/null 2>&1
+collide_rm_rc=$?
+set -e
+[ "$collide_rm_rc" -ne 0 ] || die "keypaste rm exited 0 on a path TWO entries answer to"
 
-printf '%s\n' "$pw" | "$kp" env rm "$project" 'nested/NESTED_KEY' --yes --vault "$db" >/dev/null 2>&1 \
-  || die "keypaste env rm refused a name KeePassXC authored and keypaste listed"
-
-nested_after=$(kpxc show -a Password "$db" "env/${project}/nested/NESTED_KEY") \
-  || die "keypaste env rm DELETED THE NEIGHBOUR: env/${project}/nested/NESTED_KEY is gone"
-diff -u <(printf '%s\n' "$nested_before") <(printf '%s\n' "$nested_after") \
-  || die "keypaste env rm removed the wrong entry (left = before, right = after)"
-
-keys=$(kp_run env ls "$project" --vault "$db") || die "keypaste env ls failed after the removal"
-case "$keys" in
-  *'nested NESTED_KEY'*) die "keypaste env rm reported success but the entry is still listed: $keys";;
-esac
-echo "keypaste removed the slash-titled entry and left the nested one untouched."
+[ "$(bytes "$db")" = "$before_ambiguous" ] || die "a refused read, add or removal rewrote the vault"
+printf 'ambiguous path refused (get exit %s, add exit %s, rm exit %s, vault byte-identical)\n' "$collide_rc" "$collide_add_rc" "$collide_rm_rc"
 
 # ---------------------------------------------------------------------------------------
 # NEGATIVE CONTROL.
@@ -245,12 +232,8 @@ missing_out=$(printf '%s\n' "$pw" | "$kp" get "env/${project}/NO_SUCH_KEY" --sho
 missing_rc=$?
 set -e
 [ "$missing_rc" -eq 3 ] \
-  || die "a missing env variable exited ${missing_rc}, expected 3 — the not-found path is broken"
-[ -z "$missing_out" ] || die "a missing env variable produced stdout: '${missing_out}'"
-
-if diff -q <(printf '%s\n' "${nested_before}-CORRUPTED") <(printf '%s\n' "$nested_after") >/dev/null 2>&1; then
-  die "a deliberately corrupted expectation still matched D - that comparison is not gating"
-fi
+  || die "a missing entry exited ${missing_rc}, expected 3 — the not-found path is broken"
+[ -z "$missing_out" ] || die "a missing entry produced stdout: '${missing_out}'"
 
 # Two entries with one title in one group: KDBX allows it, KeePassXC makes it, and there is no
 # answer to which one was meant. keypaste must refuse and leave the file alone.
@@ -264,10 +247,10 @@ printf '%s\n' "$pw" | "$cli" edit -t 'DUPE' "$db" "env/${project}/PLACEHOLDER2" 
 before_refusal=$(bytes "$db")
 
 set +e
-printf '%s\n' "$pw" | "$kp" env rm "$project" DUPE --yes --vault "$db" >/dev/null 2>&1
+printf '%s\n' "$pw" | "$kp" rm "env/${project}/DUPE" --yes --vault "$db" >/dev/null 2>&1
 dupe_rc=$?
 set -e
-[ "$dupe_rc" -ne 0 ] || die "keypaste env rm exited 0 on a name TWO entries answer to"
+[ "$dupe_rc" -ne 0 ] || die "keypaste rm exited 0 on a name TWO entries answer to"
 [ "$(bytes "$db")" = "$before_refusal" ] \
   || die "a refused removal rewrote the vault"
 printf 'ambiguous removal refused (exit %s, vault byte-identical)\n' "$dupe_rc"
@@ -278,9 +261,9 @@ wrong_rc=$?
 set -e
 [ "$wrong_rc" -ne 0 ] || die "keepassxc-cli exited 0 with a WRONG password against the write-back vault"
 case "$wrong_out" in
-  *"$key"*) die "a wrong password still produced variable names — the gate is not gating";;
+  *"$project"*) die "a wrong password still produced entry names — the gate is not gating";;
 esac
-printf 'wrong password rejected (exit %s, no variable names emitted)\n' "$wrong_rc"
+printf 'wrong password rejected (exit %s, no entry names emitted)\n' "$wrong_rc"
 
 printf '\nWRITE-BACK GATE PASSED — %s round-trips through KeePassXC %s in both directions\n' \
   "$db" "$("$cli" --version)"

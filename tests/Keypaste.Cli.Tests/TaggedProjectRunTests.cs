@@ -4,15 +4,14 @@ using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
 using Keypaste.Core;
-using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>run</c>, <c>env export</c> and <c>env diff</c> on a project whose variables are tagged entries'
-/// fields beside one legacy <c>env/&lt;project&gt;</c> variable (C.1b). Against KeePassXC by
-/// <c>verify-keepassxc-projects.sh</c>.
+/// fields (C.1b), beside an untagged <c>env/&lt;project&gt;/OLD_KEY</c> as 0.3.0 wrote a variable, which
+/// is no variable (D-0416). Against KeePassXC by <c>verify-keepassxc-projects.sh</c>.
 /// </summary>
 public sealed class TaggedProjectRunTests : IDisposable
 {
@@ -25,7 +24,7 @@ public sealed class TaggedProjectRunTests : IDisposable
         _harness.SeedVault(_master, ("services/Stripe", "stripe-login-c1b"), ("services/Database", "database-login-c1b"));
 
         using var vault = Vault.Open(_harness.VaultPath, _master);
-        LegacyVariables.Set(vault, "billing", "LEGACY_TOKEN", "legacy-value-c1b");
+        vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "OLD_KEY", Password = "old-value-c1b" });
         vault.SetFields(new EntryName("services", "Stripe"), [new FieldWrite("STRIPE_SECRET_KEY", "stripe-value-c1b"), new FieldWrite("Region", "eu", Protect: false)]);
         vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("DATABASE_URL", "dev-db-c1b")]);
         vault.AddTag(new EntryName("services", "Stripe"), "env:billing");
@@ -57,14 +56,15 @@ public sealed class TaggedProjectRunTests : IDisposable
     }
 
     [Fact]
-    public void Run_gives_the_child_exactly_the_tagged_fields_and_the_legacy_variable()
+    public void Run_gives_the_child_exactly_the_tagged_fields_and_nothing_from_an_untagged_env_entry()
     {
         _harness.AssertExit(CliApp.ExitSuccess, Run("run", "billing", "--", "node"));
 
         var environment = _harness.ProcessLauncher.Environment;
         Assert.Equal("stripe-value-c1b", environment["STRIPE_SECRET_KEY"]);
         Assert.Equal("dev-db-c1b", environment["DATABASE_URL"]);
-        Assert.Equal("legacy-value-c1b", environment["LEGACY_TOKEN"]);
+        Assert.False(environment.ContainsKey("OLD_KEY"));
+        Assert.DoesNotContain("old-value-c1b", environment.Values);
         Assert.False(environment.ContainsKey("Region"));
         Assert.DoesNotContain("-c1b", _harness.Out + _harness.Err, StringComparison.Ordinal);
 
@@ -73,10 +73,17 @@ public sealed class TaggedProjectRunTests : IDisposable
         Assert.False(_harness.ProcessLauncher.Environment.ContainsKey("DATABASE_URL"));
     }
 
+    [Fact]
+    public void Get_reads_the_untagged_env_entry_as_an_ordinary_entry()
+    {
+        _harness.AssertExit(CliApp.ExitSuccess, Run("get", "env/billing/OLD_KEY", "--show"));
+
+        Assert.Equal("old-value-c1b", _harness.Out.Trim());
+    }
+
     public static TheoryData<string, string[]> Refusals => new()
     {
         { "two-entries", ["STRIPE_SECRET_KEY is on more than one entry (services/Database, services/Stripe)"] },
-        { "case", ["Api_Key differs only in case from 'API_KEY'", "(env/billing/Api_Key, services/Stripe)"] },
         { "expired", ["DATABASE_URL expired 2020-01-02 03:04:05Z (services/Database)"] },
         { "placeholder", ["DATABASE_URL holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Database)"] },
     };
@@ -91,10 +98,6 @@ public sealed class TaggedProjectRunTests : IDisposable
             {
                 case "two-entries":
                     vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("STRIPE_SECRET_KEY", "second-value-c1b")]);
-                    break;
-                case "case":
-                    LegacyVariables.Set(vault, "billing", "Api_Key", "legacy-api-c1b");
-                    vault.SetFields(new EntryName("services", "Stripe"), [new FieldWrite("API_KEY", "tagged-api-c1b")]);
                     break;
                 case "expired":
                     vault.SetExpiryUnchecked(new EntryName("services", "Database"), new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
@@ -119,16 +122,17 @@ public sealed class TaggedProjectRunTests : IDisposable
     }
 
     [Fact]
-    public void Export_writes_a_reference_for_each_tagged_field_and_the_legacy_variable()
+    public void Export_writes_a_reference_for_each_tagged_field_and_none_for_an_untagged_env_entry()
     {
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "export", "billing", "--stdout"));
 
-        foreach (var key in new[] { "DATABASE_URL", "LEGACY_TOKEN", "STRIPE_SECRET_KEY" })
+        foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY" })
         {
             Assert.Contains($"{key}=", _harness.Out, StringComparison.Ordinal);
             Assert.Contains($"kp://billing/dev/{key}", _harness.Out, StringComparison.Ordinal);
         }
 
+        Assert.DoesNotContain("OLD_KEY", _harness.Out, StringComparison.Ordinal);
         Assert.DoesNotContain("Region", _harness.Out, StringComparison.Ordinal);
         Assert.DoesNotContain("-c1b", _harness.Out + _harness.Err, StringComparison.Ordinal);
 
@@ -136,7 +140,7 @@ public sealed class TaggedProjectRunTests : IDisposable
         File.WriteAllText(file, _harness.Out);
         _harness.AssertExit(CliApp.ExitSuccess, Run("run", "--env-file", file, "--", "node"));
         Assert.Equal("stripe-value-c1b", _harness.ProcessLauncher.Environment["STRIPE_SECRET_KEY"]);
-        Assert.Equal("legacy-value-c1b", _harness.ProcessLauncher.Environment["LEGACY_TOKEN"]);
+        Assert.False(_harness.ProcessLauncher.Environment.ContainsKey("OLD_KEY"));
     }
 
     [Fact]
@@ -184,28 +188,27 @@ public sealed class TaggedProjectRunTests : IDisposable
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing"));
 
         Assert.Equal(
-            "LEGACY_TOKEN\n\ntagged entries\n  dev\n    services/Database\n      DATABASE_URL\n    services/Stripe\n      STRIPE_SECRET_KEY\n  staging\n    services/Stripe\n      STRIPE_SECRET_KEY\n",
+            "  dev\n    services/Database\n      DATABASE_URL\n    services/Stripe\n      STRIPE_SECRET_KEY\n  staging\n    services/Stripe\n      STRIPE_SECRET_KEY\n",
             _harness.Out.ReplaceLineEndings("\n"));
     }
 
     [Fact]
-    public void Ls_takes_a_tag_only_environment_of_a_legacy_project_and_lists_it_among_its_profiles()
+    public void Ls_lists_the_profiles_and_one_environment_from_tags()
     {
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing", "--profiles"));
         Assert.Equal("dev\nstaging\n", _harness.Out.ReplaceLineEndings("\n"));
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing", "-p", "staging"));
-        Assert.DoesNotContain("LEGACY_TOKEN", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("  staging\n    services/Stripe\n      STRIPE_SECRET_KEY\n", _harness.Out.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Equal("  staging\n    services/Stripe\n      STRIPE_SECRET_KEY\n", _harness.Out.ReplaceLineEndings("\n"));
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing", "-p", "staging", "--json"));
-        Assert.Contains("\"key\":\"STRIPE_SECRET_KEY\"", _harness.Out.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+        Assert.Contains("\"keys\":[\"STRIPE_SECRET_KEY\"]", _harness.Out.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
 
         _harness.AssertExit(CliApp.ExitNotFound, Run("env", "ls", "billing", "-p", "qa"));
     }
 
     [Fact]
-    public void Ls_lists_a_tagged_entry_inside_the_legacy_group_by_its_fields_not_as_a_variable()
+    public void Ls_lists_a_tagged_entry_under_env_by_its_fields_and_not_the_untagged_one_beside_it()
     {
         Edit(vault =>
         {
@@ -218,8 +221,8 @@ public sealed class TaggedProjectRunTests : IDisposable
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing"));
 
         var listed = _harness.Out.ReplaceLineEndings("\n");
-        Assert.StartsWith("LEGACY_TOKEN\n\ntagged entries\n", listed, StringComparison.Ordinal);
-        Assert.Contains("    env/billing/.env\n      HOME_KEY\n", listed, StringComparison.Ordinal);
+        Assert.StartsWith("  dev\n    env/billing/.env\n      HOME_KEY\n", listed, StringComparison.Ordinal);
+        Assert.DoesNotContain("OLD_KEY", listed, StringComparison.Ordinal);
         Assert.DoesNotContain("warning", _harness.Err, StringComparison.Ordinal);
     }
 

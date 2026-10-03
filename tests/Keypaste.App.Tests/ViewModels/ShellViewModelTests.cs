@@ -22,8 +22,15 @@ public sealed class ShellViewModelTests : IDisposable
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh-secret", GroupPath = "Work" });
-            vault.AddEntry(new VaultEntry { Title = "DATABASE_URL", Password = "db-secret", GroupPath = "env/billing" });
-            vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = "stripe-secret", GroupPath = "env/billing" });
+
+            foreach (var (title, value) in new[] { ("DATABASE_URL", "db-secret"), ("STRIPE_KEY", "stripe-secret") })
+            {
+                var name = new EntryName("env/billing", title);
+                vault.AddEntry(new VaultEntry { Title = title, Password = value, GroupPath = name.GroupPath });
+                Assert.True(vault.SetFields(name, [new FieldWrite(title, value)]));
+                Assert.True(vault.AddTag(name, "env:billing"));
+            }
+
             vault.Save();
         }
 
@@ -176,12 +183,56 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void The_sidebar_counts_entries_and_lists_projects_with_their_variables()
+    public void The_sidebar_counts_entries_and_lists_projects_with_their_tagged_entries()
     {
         using var shell = Shell();
 
         Assert.Equal("4", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Entries).Count);
         Assert.Equal([new ProjectRow("billing", 2)], shell.Projects);
+    }
+
+    /// <summary>
+    /// A project is its entries' own tags (D-0416): the sidebar and Env profiles list one with no group
+    /// under env, and an untagged entry under env/acme is neither a project nor a variable of acme.
+    /// </summary>
+    [Fact]
+    public void Projects_come_from_tags_alone_and_an_untagged_env_entry_is_no_variable()
+    {
+        using var fixture = new TempVault();
+
+        using (var vault = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            vault.AddEntry(new VaultEntry { Title = "OLD_KEY", Password = "old-secret", GroupPath = "env/acme" });
+
+            foreach (var (title, tag, key) in new[] { ("Stripe", "env:acme", "STRIPE_KEY"), ("Shopify", "env:shop", "SHOPIFY_TOKEN") })
+            {
+                var name = new EntryName("services", title);
+                vault.AddEntry(new VaultEntry { Title = title, Password = title + "-login", GroupPath = name.GroupPath });
+                Assert.True(vault.SetFields(name, [new FieldWrite(key, title + "-secret")]));
+                Assert.True(vault.AddTag(name, tag));
+            }
+
+            vault.Save();
+        }
+
+        using var session = new AppVaultSession(_clock);
+
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));
+        }
+
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: _clock);
+
+        Assert.Equal([new ProjectRow("acme", 1), new ProjectRow("shop", 1)], shell.Projects);
+
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<ProjectRow>().Single(row => row.Name == "acme");
+        var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
+
+        Assert.Equal(["acme", "shop"], env.Projects);
+        Assert.Equal("acme", env.OpenProject?.Name);
+        Assert.Equal(["STRIPE_KEY"], env.OpenProject!.Variables.Select(row => row.Key));
+        Assert.DoesNotContain(env.OpenProject.Rows, row => row.Key == "OLD_KEY");
     }
 
     [Fact]
@@ -203,7 +254,7 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Items_plus_menu_starts_a_project_and_imports_into_the_one_in_view()
+    public void Items_plus_menu_starts_a_project_and_imports_into_the_first()
     {
         using var shell = Shell();
 

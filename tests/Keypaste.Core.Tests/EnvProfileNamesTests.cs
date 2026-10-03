@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Which names are profiles, which of them are protected, and where each lives (D-0347, D-0348).</summary>
+/// <summary>Which names are profiles, which of them are protected, and how a set is named (D-0348, D-0416).</summary>
 public sealed class EnvProfileNamesTests
 {
     [Theory]
@@ -42,20 +42,9 @@ public sealed class EnvProfileNamesTests
         Assert.Equal(expected, EnvProfileNames.IsProtected(name));
 
     [Fact]
-    public void The_dev_profile_is_the_project_group_and_any_other_is_a_subgroup()
+    public void The_dev_set_is_named_for_the_project_and_any_other_for_its_profile()
     {
-        Assert.Equal("env/acme-api", EnvProfileNames.GroupPath("acme-api", "dev"));
-        Assert.Equal("env/acme-api/staging", EnvProfileNames.GroupPath("acme-api", "staging"));
+        Assert.Equal("env/acme-api", EnvProfileNames.SetName("acme-api", "dev"));
+        Assert.Equal("env/acme-api/staging", EnvProfileNames.SetName("acme-api", "staging"));
     }
-
-    [Theory]
-    [InlineData("env/a/prod", true)]
-    [InlineData("env/a/Prod", true)]
-    [InlineData("env/a/staging/prod", true)]
-    [InlineData("env/a", false)]
-    [InlineData("env/a/staging", false)]
-    [InlineData("env/prod", false)]
-    [InlineData("other/prod", false)]
-    public void Releasing_an_entry_is_asked_live_when_any_segment_below_its_project_is_protected(string group, bool expected) =>
-        Assert.Equal(expected, EnvProfileNames.RequiresLiveApproval(new EntryName(group, "K")));
 }

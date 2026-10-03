@@ -176,9 +176,9 @@ public sealed class AuditLogTests : IDisposable
     }
 
     /// <summary>
-    /// The version on the wire, pinned. Every reader of an old log — including
-    /// <c>keypaste log verify</c>, which uses it to tell "predates the chain" from "tampered with" —
-    /// depends on this number meaning one thing forever.
+    /// The version on the wire, pinned. Every reader of a log — including <c>keypaste log verify</c>,
+    /// which reads a line of any lower version as one keypaste did not write — depends on this number
+    /// meaning one thing forever.
     /// </summary>
     [Fact]
     public void TheSchemaVersion_IsWrittenOnEveryLine()
@@ -454,7 +454,7 @@ public sealed class AuditLogTests : IDisposable
     [Theory]
     [InlineData("somebody wrote this by hand", "a line of prose")]
     [InlineData("", "a blank line, which any editor leaves behind")]
-    [InlineData("{\"v\":1,\"ts\":\"2026-07-01T00:00:00.000Z\"}", "a forged record predating the chain")]
+    [InlineData("{\"v\":1,\"ts\":\"2026-07-01T00:00:00.000Z\"}", "a forged record claiming schema 1")]
     [InlineData("{\"v\":2,", "a write cut short")]
     public void ALineSomethingElseAppended_DoesNotStopTheLogWorking(string junk, string what)
     {
@@ -514,12 +514,12 @@ public sealed class AuditLogTests : IDisposable
     }
 
     /// <summary>
-    /// A planted record predating the chain must not make keypaste start the chain over. A genesis
+    /// A planted record claiming schema 1 must not make keypaste start the chain over. A genesis
     /// link after a chained record is the signature of a truncation, and manufacturing one would be
     /// keypaste reporting an attack on itself, permanently.
     /// </summary>
     [Fact]
-    public void APlantedLegacyRecord_DoesNotMakeTheWriterStartAgain()
+    public void APlantedSchemaOneRecord_DoesNotMakeTheWriterStartAgain()
     {
         using (var log = Open())
         {
@@ -538,10 +538,10 @@ public sealed class AuditLogTests : IDisposable
         Assert.NotEqual(new string('0', 64), latest.RootElement.GetProperty("prev").GetString());
         Assert.Equal(3, latest.RootElement.GetProperty("seq").GetInt64());
 
-        // The planted line is still reported — as an insertion, which is what it is.
+        // The planted line is still reported — as written by something else, which is what it is.
         var report = AuditChainVerifier.Verify(LogPath);
         Assert.Equal(AuditChainVerdict.Broken, report.Verdict);
-        Assert.Contains(report.Findings, f => f.Fault == AuditChainFault.Backdated);
+        Assert.Contains(report.Findings, f => f.Fault == AuditChainFault.Foreign);
     }
 
     /// <summary>

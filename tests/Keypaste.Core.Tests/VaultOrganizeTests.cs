@@ -325,39 +325,36 @@ public sealed class VaultOrganizeTests : IDisposable
 
     // ---------------------------------------------------------------- what resolves afterwards
 
+    /// <summary>A group under <c>env</c> names no project: its entries stay in the projects their own tags name (D-0416).</summary>
     [Fact]
-    public void RenamingAnEnvProject_IsWhatTheEnvStoreThenReads()
+    public void RenamingAGroupUnderEnv_LeavesItsEntriesInTheProjectsTheirTagsName()
     {
         var path = NewVaultPath();
 
         using (var vault = Seeded(path))
         {
+            ProjectVariables.Set(vault, "billing", "TOKEN", "v3");
             Assert.Equal(GroupOutcome.Renamed, vault.RenameGroup("env/billing", "invoicing", out _));
             vault.Save();
         }
 
         using var reopened = Vault.Open(path, MasterPassword);
-        var store = new EnvStore(reopened);
 
-        Assert.Contains("invoicing", store.Projects());
-        Assert.False(store.ProjectExists("billing"));
+        Assert.Equal(["billing"], ProjectCatalog.Read(reopened).Projects.Select(project => project.Name));
         Assert.Equal(
-            "v3",
-            EnvResolution.List(reopened, "invoicing", "dev").Variables.Single(variable => variable.Key == "TOKEN").Value,
-            StringComparer.Ordinal);
+            [new EnvSource("TOKEN", new EntryName("env/invoicing", EnvStore.HomeTitle), "TOKEN")],
+            EnvResolution.List(reopened, "billing", "dev").Sources);
     }
 
     [Fact]
-    public void MovingAnEntryIntoAnEnvProject_MakesItAVariableThatProjectServes()
+    public void AnEntryMovedUnderEnv_IsNoVariable_AndIsRenamedByTheOrdinaryRules()
     {
         using var vault = Seeded(NewVaultPath());
 
         Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(new EntryName("keys", "SPARE"), "env/billing", out _));
+        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(new EntryName("env/billing", "SPARE"), "spare key", out _));
 
-        Assert.Equal(
-            "spare",
-            EnvResolution.List(vault, "billing", "dev").Variables.Single(variable => variable.Key == "SPARE").Value,
-            StringComparer.Ordinal);
+        Assert.Equal(EnvOutcome.NoProject, EnvResolution.List(vault, "billing", "dev").Outcome);
     }
 
     /// <summary>
@@ -379,13 +376,13 @@ public sealed class VaultOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// The cost of renaming a project, asserted rather than described. A rule is a standing human
-    /// authorization over a <em>path</em>, so carrying a project into a granted namespace carries
+    /// The cost of renaming a group, asserted rather than described. A rule is a standing human
+    /// authorization over a <em>path</em>, so carrying a group into a granted namespace carries
     /// its credentials under that rule with nobody prompted (THREATS.md T-13). keypaste does not
     /// prevent this; it must not be able to happen without this test going red.
     /// </summary>
     [Fact]
-    public void APolicyRule_FollowsTheProjectPath_SoARenameMovesEntriesUnderTheRuleForTheNewName()
+    public void APolicyRule_FollowsTheGroupPath_SoARenameMovesEntriesUnderTheRuleForTheNewName()
     {
         using var vault = Seeded(NewVaultPath());
 
@@ -438,8 +435,8 @@ public sealed class VaultOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// A vault with an env project, a plain group, a duplicate title in another group, and an
-    /// entry whose password has been replaced three times so it has history to carry.
+    /// A vault with untagged entries under <c>env</c>, a plain group, a duplicate title in another
+    /// group, and an entry whose password has been replaced three times so it has history to carry.
     /// </summary>
     private static Vault Seeded(string path)
     {

@@ -136,20 +136,11 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>What sort of entry this is, read from which fields are filled in.</summary>
     internal EntryKind Kind { get; init; }
 
-    /// <summary>Whether the row is a variable, whose key is drawn in mono; any other title is sans.</summary>
-    internal bool IsVariable => Kind == EntryKind.Variable;
-
     /// <summary>The icon the row draws for its kind.</summary>
     internal string Icon => EntryKinds.Icon(Kind);
 
-    /// <summary>The kind column: login, variable, note and so on.</summary>
+    /// <summary>The kind column: login, note and so on.</summary>
     internal string KindLabel => EntryKinds.Label(Kind);
-
-    /// <summary>The group column: a variable's project and profile, or the group, or a dash at the root.</summary>
-    internal string Place =>
-        EnvPlace.Of(GroupPath, Title) is { } place
-            ? $"{EntryNameSanitizer.Sanitize(place.Project).Text} · {place.Profile}"
-            : Where;
 
     /// <summary>
     /// Which fields a person cannot see on this row the query was found in, worded for the list.

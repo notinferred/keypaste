@@ -57,7 +57,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     /// <param name="session">The unlocked vault the item is made in.</param>
     /// <param name="clipboard">What the masked fields paste from.</param>
     /// <param name="groupPaths">Every group the vault has.</param>
-    /// <param name="currentGroup">The group in view, which the folder starts at when it may be chosen.</param>
+    /// <param name="currentGroup">The group in view, which the folder starts at.</param>
     internal NewItemViewModel(AppVaultSession session, ClipboardCountdown clipboard, IEnumerable<string> groupPaths, string? currentGroup)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -66,12 +66,9 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
 
         _session = session;
 
-        // The env layout holds projects from before tags, where no new item goes (D-0367).
         Folders =
         [
             .. GroupNode.Flatten(groupPaths)
-                .Where(node => !string.Equals(node.Path, EnvConvention.RootGroup, StringComparison.Ordinal)
-                    && !node.Path.StartsWith(EnvConvention.RootGroup + "/", StringComparison.Ordinal))
                 .Select(node => new FolderChoice(node.Path, node.IsEverything ? "Top level" : node.Label, node.Depth)),
         ];
         _folder = Folders.FirstOrDefault(folder => string.Equals(folder.Path, currentGroup, StringComparison.Ordinal)) ?? Folders[0];

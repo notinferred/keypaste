@@ -198,6 +198,12 @@ public sealed class ShareVerbTests : IDisposable
     [InlineData("kp:///env/acme-api/STRIPE_KEY")]
     public void Share_AReference_SharesTheValueItNames(string reference)
     {
+        using (var vault = Keypaste.Core.Vault.Open(_cli.VaultPath, _master))
+        {
+            ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", _stripeValue);
+            vault.Save();
+        }
+
         var exit = Share(reference, "--print");
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);

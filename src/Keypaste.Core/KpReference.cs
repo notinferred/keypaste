@@ -116,41 +116,14 @@ public static class KpReferences
         return string.Equals(field, _defaultField, StringComparison.Ordinal) ? path.ToString() : path.Append('#').Append(field).ToString();
     }
 
-    /// <summary>How a screen names an entry: its env reference where it is a variable, else its entry reference.</summary>
+    /// <summary>How a screen names an entry: its entry reference.</summary>
     /// <param name="entry">The entry.</param>
     /// <returns>The reference, or null for an entry no reference resolves: untitled, or in a reserved group.</returns>
     public static string? ForEntry(EntryName entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (entry.Title.Length == 0 || ReservedGroups.IsReserved(entry.GroupPath))
-        {
-            return null;
-        }
-
-        var prefix = EnvConvention.RootGroup + "/";
-
-        if (entry.GroupPath.StartsWith(prefix, StringComparison.Ordinal) && EnvConvention.IsValidKey(entry.Title, out _))
-        {
-            var segments = entry.GroupPath[prefix.Length..].Split('/');
-
-            if (EnvConvention.IsValidProject(segments[0], out _))
-            {
-                if (segments.Length == 1)
-                {
-                    return For(segments[0], EnvProfileNames.Default, entry.Title);
-                }
-
-                if (segments.Length == 2
-                    && !string.Equals(segments[1], EnvProfileNames.Default, StringComparison.Ordinal)
-                    && EnvProfileNames.IsValid(segments[1], out _))
-                {
-                    return For(segments[0], segments[1], entry.Title);
-                }
-            }
-        }
-
-        return For(entry);
+        return entry.Title.Length == 0 || ReservedGroups.IsReserved(entry.GroupPath) ? null : For(entry);
     }
 
     private static bool TryParseEnv(string rest, [NotNullWhen(true)] out KpReference? reference, out string error)

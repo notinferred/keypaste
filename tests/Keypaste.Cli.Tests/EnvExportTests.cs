@@ -24,7 +24,7 @@ public sealed class EnvExportTests
             using var vault = Vault.Open(harness.VaultPath, Master);
             foreach (var (key, value) in variables)
             {
-                vault.AddEntry(new VaultEntry { Title = key, Password = value, GroupPath = "env/billing" });
+                ProjectVariables.Set(vault, "billing", key, value);
             }
 
             vault.Save();
@@ -118,9 +118,9 @@ public sealed class EnvExportTests
 
         using (var vault = Vault.Open(harness.VaultPath, Master))
         {
-            vault.AddEntry(new VaultEntry { Title = "PLACEHOLDER", Password = "x", GroupPath = "env/empty" });
+            ProjectVariables.Set(vault, "empty", "PLACEHOLDER", "x");
             Assert.Equal(
-                EnvRemoveOutcome.Recycled,
+                EnvRemoveOutcome.FieldRemoved,
                 new EnvStore(vault).Remove("empty", "dev", "PLACEHOLDER").Outcome);
             vault.Save();
         }
@@ -329,40 +329,6 @@ public sealed class EnvExportTests
 
     // ---- fail closed --------------------------------------------------------------------
 
-    /// <summary>
-    /// A name KeePassXC will let you create and no <c>.env</c> reader will accept. Every offending
-    /// key is named, so one pass in KeePassXC fixes them all.
-    /// </summary>
-    [Fact]
-    public void AnUnusableName_RefusesTheWholeExport()
-    {
-        using var harness = Seeded(("GOOD", "1"), ("BAD-NAME", "2"), ("also.bad", "3"));
-        var path = Target(harness);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "export", "billing", path, "--dotenv", "--yes", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("BAD-NAME", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("also.bad", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("Nothing was written.", harness.Err, StringComparison.Ordinal);
-        Assert.False(File.Exists(path));
-    }
-
-    [Fact]
-    public void NamesDifferingOnlyInCase_RefuseTheWholeExport()
-    {
-        using var harness = Seeded(("PATH", "1"), ("Path", "2"));
-        var path = Target(harness);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "export", "billing", path, "--dotenv", "--yes", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("case", harness.Err, StringComparison.Ordinal);
-        Assert.False(File.Exists(path));
-    }
-
     [Fact]
     public void AnUnknownProject_IsNotFound()
     {
@@ -426,7 +392,7 @@ public sealed class EnvExportTests
         Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
 
         using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.NotNull(vault.Find("env/billing/API_KEY"));
+        Assert.NotNull(vault.ReadField(ProjectVariables.Home("billing"), "API_KEY"));
     }
 
     [Fact]
@@ -679,7 +645,7 @@ public sealed class EnvExportTests
         using var harness = SeededWithTwo();
         using (var vault = Vault.Open(harness.VaultPath, Master))
         {
-            LegacyVariables.Set(vault, "billing", "staging", "API_KEY", "sk_staging_secret");
+            ProjectVariables.Set(vault, "billing", "staging", "API_KEY", "sk_staging_secret");
             vault.Save();
         }
 

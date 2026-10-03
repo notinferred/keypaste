@@ -26,9 +26,9 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     {
         using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
-            LegacyVariables.Set(created, "dev", "TOKEN", _token1);
-            LegacyVariables.Set(created, "dev", "DATABASE_URL", _token2);
-            created.AddEntry(new VaultEntry { GroupPath = "env/broken", Title = "BAD-NAME", Password = _token1 });
+            ProjectVariables.Set(created, "dev", "TOKEN", _token1);
+            ProjectVariables.Set(created, "dev", "DATABASE_URL", _token2);
+            ProjectVariables.Set(created, "broken", "REF", "{PASSWORD}");
             created.Save();
         }
 
@@ -94,7 +94,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
         Assert.Equal(["DATABASE_URL", "STRIPE_KEY", "TOKEN"], reply.Set.Variables.Select(variable => variable.Key));
         var prompt = Assert.IsType<EnvReleasePrompt>(_fixture.Channel.LastEnvPrompt);
-        Assert.Equal(["env/dev/DATABASE_URL", "services/Stripe", "env/dev/TOKEN"], prompt.Entries);
+        Assert.Equal(["env/dev/.env", "services/Stripe", "env/dev/.env"], prompt.Entries);
         Assert.True(prompt.GrantSeconds > 0);
         Assert.DoesNotContain("stripe-field-sentinel", prompt.ToString(), StringComparison.Ordinal);
 
@@ -247,7 +247,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
         Assert.NotNull(reply);
         Assert.Equal(EnvOutcome.Unusable, reply.Set.Outcome);
-        Assert.Equal("BAD-NAME", Assert.Single(reply.Set.Problems).Key);
+        Assert.Equal("REF", Assert.Single(reply.Set.Problems).Key);
         Assert.Empty(reply.Set.Variables);
         Assert.Equal(0, _fixture.Channel.Asked);
     }
@@ -279,7 +279,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         var credential = agent.RequestAsync(
             new CredentialRequest
             {
-                Entry = "env/dev/TOKEN",
+                Entry = "env/dev/.env",
                 Field = "password",
                 Reason = "deploy",
                 TtlSeconds = 60,
@@ -323,7 +323,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
         var first = await RunAsync(authority, Request("session-one"));
 
-        LegacyVariables.Set(_vault, "dev", "TOKEN", "rotated-after-the-answer");
+        ProjectVariables.Set(_vault, "dev", "TOKEN", "rotated-after-the-answer");
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Denied;
         var second = await RunAsync(authority, Request("session-one"));
@@ -359,7 +359,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     [Fact]
     public async Task AnHourAnswer_DoesNotCoverAnotherCommandDirectoryOrProject()
     {
-        LegacyVariables.Set(_vault, "other", "KEY", _token1);
+        ProjectVariables.Set(_vault, "other", "KEY", _token1);
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         using var grants = new EnvGrantCache(_fixture.Clock);
@@ -395,7 +395,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     [Fact]
     public async Task AProtectedProfile_OffersNoTimedChoice_AndStoresNothing()
     {
-        LegacyVariables.Set(_vault, "dev", "prod", "TOKEN", _stagingToken);
+        ProjectVariables.Set(_vault, "dev", "prod", "TOKEN", _stagingToken);
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         using var grants = new EnvGrantCache(_fixture.Clock);
@@ -658,7 +658,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
     private void AddStaging()
     {
-        LegacyVariables.Set(_vault, "dev", "staging", "TOKEN", _stagingToken);
+        ProjectVariables.Set(_vault, "dev", "staging", "TOKEN", _stagingToken);
         _vault.Save();
     }
 

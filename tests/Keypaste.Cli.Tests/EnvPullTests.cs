@@ -99,9 +99,9 @@ public sealed class EnvPullTests
         Assert.Contains("line 4", harness.Err, StringComparison.Ordinal);
         Assert.Contains("Nothing was imported", harness.Err, StringComparison.Ordinal);
 
-        // Not merely "GOOD is absent" — the group itself must never have been created.
+        // Not merely "GOOD is absent" — the project itself must never have been created.
         using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.False(new EnvStore(vault).ProjectExists("billing"));
+        Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
     /// <summary>
@@ -154,7 +154,7 @@ public sealed class EnvPullTests
         Assert.Contains("Cancelled.", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.False(new EnvStore(vault).ProjectExists("billing"));
+        Assert.Empty(ProjectCatalog.Read(vault).Projects);
         Assert.True(File.Exists(path));
     }
 
@@ -282,7 +282,7 @@ public sealed class EnvPullTests
         Assert.Contains("only in case", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.False(new EnvStore(vault).ProjectExists("billing"));
+        Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
     [Fact]

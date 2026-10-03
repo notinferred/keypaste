@@ -40,6 +40,9 @@ public sealed class ScreenRenderer
     private const int _width = 1280;
     private const int _height = 800;
 
+    private static readonly EntryName _apiHome = new("env/acme-api", ".env");
+    private static readonly EntryName _openAi = new("Services", "OpenAI");
+
     [Theory]
     [InlineData("dark")]
     [InlineData("light")]
@@ -190,11 +193,11 @@ public sealed class ScreenRenderer
         var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
         await using var claude = await AgentAsync(serving, demo.Path, new Core.Ipc.AttachClient("claude", "2.0", "claude-code"));
         await using var cursor = await AgentAsync(serving, demo.Path, new Core.Ipc.AttachClient("cursor", "1.4", "cursor"));
-        await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/DATABASE_URL");
-        await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/STRIPE_SECRET_KEY");
+        await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/.env", "DATABASE_URL");
+        await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/.env", "STRIPE_SECRET_KEY");
         clock.Advance(TimeSpan.FromMinutes(18));
-        await AskAsync(cursor, serving, demo.Path, "cursor", "env/acme-web/NEXT_PUBLIC_API");
-        var waiting = AskAsync(cursor, serving, demo.Path, "cursor", Allowing.Held);
+        await AskAsync(cursor, serving, demo.Path, "cursor", "env/acme-web/.env", "NEXT_PUBLIC_API");
+        var waiting = AskAsync(cursor, serving, demo.Path, "cursor", Allowing.HeldEntry, Allowing.HeldField);
         await WaitUntilAsync(() => authority.Activity.Waiting.Count == 1);
 
         Assert.True(Core.Clients.ClientPolicies.TrySave(
@@ -277,13 +280,13 @@ public sealed class ScreenRenderer
         return client;
     }
 
-    private static async Task AskAsync(Core.Ipc.ApproverClient client, AuthorityStatus.Serving serving, string vault, string label, string entry)
+    private static async Task AskAsync(Core.Ipc.ApproverClient client, AuthorityStatus.Serving serving, string vault, string label, string entry, string field)
     {
         var reply = await client.RequestAsync(
             new Core.Ipc.CredentialRequest
             {
                 Entry = entry,
-                Field = "password",
+                Field = field,
                 Reason = "run the api tests",
                 TtlSeconds = 3600,
                 Exposure = ["env/**"],
@@ -299,11 +302,12 @@ public sealed class ScreenRenderer
     /// <summary>Allows every request but one, which it leaves waiting until the session ends.</summary>
     private sealed class Allowing : IApprovalChannel
     {
-        internal const string Held = "env/acme-web/VERCEL_TOKEN";
+        internal const string HeldEntry = "env/acme-web/.env";
+        internal const string HeldField = "VERCEL_TOKEN";
 
         public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
         {
-            if (prompt.Entry == Held)
+            if (prompt.Entry == HeldEntry && prompt.Field == HeldField)
             {
                 await Task.Delay(Timeout.Infinite, cancellationToken);
             }
@@ -312,7 +316,7 @@ public sealed class ScreenRenderer
         }
     }
 
-    /// <summary>The Secrets screen in its states: a login, a variable with profiles, its menu, the new-entry form, history, and the default window.</summary>
+    /// <summary>The Secrets screen in its states: a login, a project's home entry, its menu, the new-entry form, history, and the default window.</summary>
     private static void DrawSecrets(DemoVault demo, string output)
     {
         using (var vault = Vault.Open(demo.Path, _master))
@@ -335,10 +339,10 @@ public sealed class ScreenRenderer
         }
 
         var vaultKey = authority.Session.Identity!.Key;
-        Granted(demo.Home, clock, new EntryName("env/acme-api", "DATABASE_URL"), "claude-code", vaultKey, TimeSpan.FromMinutes(4));
-        Granted(demo.Home, clock, new EntryName("env/acme-api", "DATABASE_URL"), "cursor", vaultKey, TimeSpan.FromMinutes(52));
-        Granted(demo.Home, clock, new EntryName("env/acme-api", "OPENAI_API_KEY"), "cursor", vaultKey, TimeSpan.FromMinutes(70));
-        Granted(demo.Home, clock, new EntryName("env/acme-api", "REDIS_URL"), "claude-code", vaultKey, TimeSpan.FromHours(3));
+        Granted(demo.Home, clock, _apiHome, "claude-code", vaultKey, TimeSpan.FromMinutes(4));
+        Granted(demo.Home, clock, _apiHome, "cursor", vaultKey, TimeSpan.FromMinutes(52));
+        Granted(demo.Home, clock, _openAi, "cursor", vaultKey, TimeSpan.FromMinutes(70));
+        Granted(demo.Home, clock, new EntryName("env/acme-api", ".env.staging"), "claude-code", vaultKey, TimeSpan.FromHours(3));
         Granted(demo.Home, clock, new EntryName("Work", "github"), "claude-code", vaultKey, TimeSpan.FromDays(2));
 
         using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
@@ -353,8 +357,8 @@ public sealed class ScreenRenderer
         Save(window, output, "10-secrets-login");
 
         entries.SelectedGroup = entries.Groups.First(group => group.Path == "env/acme-api");
-        entries.Selected = entries.Rows.First(row => row.Title == "DATABASE_URL" && row.GroupPath == "env/acme-api");
-        Save(window, output, "11-secrets-variable");
+        entries.Selected = entries.Rows.First(row => row.Name == _apiHome);
+        Save(window, output, "11-secrets-home-entry");
 
         WindowInput.Drain();
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = true;
@@ -376,7 +380,7 @@ public sealed class ScreenRenderer
 
         window.Width = 1000;
         window.Height = 680;
-        entries.Selected = entries.Rows.First(row => row.Title == "DATABASE_URL" && row.GroupPath == "env/acme-api");
+        entries.Selected = entries.Rows.First(row => row.Name == _apiHome);
         Save(window, output, "15-secrets-1000");
 
         window.Width = 960;
@@ -402,17 +406,7 @@ public sealed class ScreenRenderer
         Save(window, output, "20-secrets-edit");
         entries.Detail.CancelCommand.Execute(null);
 
-        // A variable's edit form and rotate prompt, which are worded for a value in a profile, and a
-        // filter that matches nothing.
-        entries.Selected = entries.Rows.First(row => row.Title == "DATABASE_URL" && row.GroupPath == "env/acme-api");
-        entries.Detail!.EditCommand.Execute(null);
-        Save(window, output, "21-secrets-variable-edit");
-        entries.Detail.CancelCommand.Execute(null);
-
-        entries.Detail.RotateCommand.Execute(null);
-        Save(window, output, "22-secrets-variable-rotate");
-        entries.Detail.CancelRotateCommand.Execute(null);
-
+        // A filter that matches nothing.
         entries.Search = "no-such-secret";
         Save(window, output, "23-secrets-no-match");
         entries.Search = string.Empty;
@@ -654,15 +648,15 @@ public sealed class ScreenRenderer
             Directory = directory,
             Project = "acme-api",
             Profile = "dev",
-            Variables = [new("DATABASE_URL", "env/acme-api/DATABASE_URL", "password"), new("STRIPE_SECRET_KEY", "env/acme-api/STRIPE_SECRET_KEY", "password")],
+            Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
             GrantSeconds = 900,
         };
         DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-approval");
 
         var protectedPrompt = ApprovalPrompt.For(
             "claude-code",
-            new EntryName("env/acme-api/prod", "DATABASE_URL"),
-            "password",
+            new EntryName("env/acme-api", ".env.prod"),
+            "DATABASE_URL",
             "I need the \u202eproduction database URL to check the schema.",
             0,
             null);
@@ -690,7 +684,7 @@ public sealed class ScreenRenderer
         }
 
         session.Unlocked!.RemoveEntry(new EntryName("Personal", "home wifi"));
-        session.Unlocked.RemoveEntry(new EntryName("env/acme-web", "VERCEL_TOKEN"));
+        session.Unlocked.RemoveEntry(_openAi);
         session.Unlocked.Save();
 
         using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start));
@@ -921,7 +915,7 @@ public sealed class ScreenRenderer
             }
         }
 
-        Add("env/acme-api/STRIPE_SECRET_KEY", "password", "maya@acme.dev", TimeSpan.FromHours(24), TimeSpan.FromHours(2), 1, true, viewsLeft: null);
+        Add("env/acme-api/.env", "STRIPE_SECRET_KEY", "maya@acme.dev", TimeSpan.FromHours(24), TimeSpan.FromHours(2), 1, true, viewsLeft: null);
         Add("Work/aws-console", "login", null, TimeSpan.FromDays(7), TimeSpan.FromDays(1), 3, true, viewsLeft: 2);
         Add("Personal/home wifi", "password", "sam", TimeSpan.FromHours(24), TimeSpan.FromMinutes(20), 1, false, viewsLeft: 1);
         Add("Work/github", "password", "jordan@acme.dev", TimeSpan.FromHours(1), TimeSpan.FromHours(3), 1, false, viewsLeft: null);
@@ -947,7 +941,7 @@ public sealed class ScreenRenderer
         Save(window, output, name);
 
         shell.Current = Destinations.Of(DestinationKind.Entries);
-        shell.ShareCommand.Execute("env/acme-api/STRIPE_SECRET_KEY");
+        shell.ShareCommand.Execute("Work/aws-console");
         var dialog = shell.Share!;
         dialog.Recipient = "sam@acme.dev";
         dialog.RequirePassphrase = true;
@@ -971,8 +965,8 @@ public sealed class ScreenRenderer
     {
         var prompt = ApprovalPrompt.For(
             "claude-code",
-            new EntryName("env/acme-api", "DATABASE_URL"),
-            "password",
+            _apiHome,
+            "DATABASE_URL",
             "Run the database migration for the api service.",
             3600,
             "work laptop");
@@ -1120,7 +1114,7 @@ public sealed class ScreenRenderer
 
     private static string Slug(string title) => title.ToLowerInvariant().Replace(' ', '-');
 
-    /// <summary>A vault that looks lived in: logins in groups, and env projects with keys.</summary>
+    /// <summary>A vault that looks lived in: logins in groups, and projects whose keys are fields of tagged entries.</summary>
     private sealed class DemoVault : IDisposable
     {
         private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-screens-").FullName;
@@ -1141,36 +1135,34 @@ public sealed class ScreenRenderer
 
             foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "OPENAI_API_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
             {
-                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-" + key.ToLowerInvariant(), GroupPath = "env/acme-api" });
+                ProjectVariables.Set(vault, "acme-api", key, "demo-" + key.ToLowerInvariant());
             }
 
             foreach (var key in new[] { "NEXT_PUBLIC_API", "VERCEL_TOKEN" })
             {
-                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-" + key.ToLowerInvariant(), GroupPath = "env/acme-web" });
+                ProjectVariables.Set(vault, "acme-web", key, "demo-" + key.ToLowerInvariant());
             }
 
-            // Env profiles: staging and prod beside the flat dev set, with every state the matrix draws:
-            // an expired staging key, a staging value reused from dev, and a key prod lacks.
-            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "OPENAI_API_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
+            // Env profiles: staging and prod beside dev, with every state the matrix draws: an expired
+            // staging key on an entry of its own, a staging value reused from dev, and a key prod lacks.
+            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
             {
-                vault.AddEntry(new VaultEntry
+                ProjectVariables.Set(vault, "acme-api", "staging", key, key switch
                 {
-                    Title = key,
-                    Password = key switch
-                    {
-                        "REDIS_URL" => "demo-redis_url",
-                        "DATABASE_URL" => "postgres://api:demo-staging-pass@db.staging.acme.internal:5432/api",
-                        _ => "demo-staging-" + key.ToLowerInvariant(),
-                    },
-                    GroupPath = "env/acme-api/staging",
+                    "REDIS_URL" => "demo-redis_url",
+                    "DATABASE_URL" => "postgres://api:demo-staging-pass@db.staging.acme.internal:5432/api",
+                    _ => "demo-staging-" + key.ToLowerInvariant(),
                 });
             }
 
-            vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "OPENAI_API_KEY"), new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
+            vault.AddEntry(new VaultEntry { Title = _openAi.Title, Username = "maya@acme.dev", Password = "demo-openai-login", Url = "https://platform.openai.com", GroupPath = _openAi.GroupPath });
+            vault.SetFields(_openAi, [new FieldWrite("OPENAI_API_KEY", "demo-staging-openai_api_key")]);
+            vault.AddTag(_openAi, "env:acme-api:staging");
+            vault.SetExpiryUnchecked(_openAi, new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
 
             foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
             {
-                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-prod-" + key.ToLowerInvariant(), GroupPath = "env/acme-api/prod" });
+                ProjectVariables.Set(vault, "acme-api", "prod", key, "demo-prod-" + key.ToLowerInvariant());
             }
 
             vault.Save();
@@ -1218,7 +1210,7 @@ public sealed class ScreenRenderer
                     Method = AuditMethod.Exposure,
                     Reason = "every name listed lies inside the exposure",
                 });
-                Write(TimeSpan.FromSeconds(41), Credential(claude, "env/acme-api/DATABASE_URL", "password", AuditDecision.Granted, AuditMethod.Prompt, "approved for 1 hour", 3600));
+                Write(TimeSpan.FromSeconds(41), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.Prompt, "approved for 1 hour", 3600));
                 Write(TimeSpan.FromMinutes(17), new AuditRecord
                 {
                     Tool = "run",
@@ -1227,10 +1219,10 @@ public sealed class ScreenRenderer
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.GrantCache,
                     Reason = "served from a grant given 17 minutes ago",
-                    Entries = ["env/acme-api/DATABASE_URL", "env/acme-api/STRIPE_SECRET_KEY"],
+                    Entries = ["env/acme-api/.env"],
                     Command = "npm run migrate",
                 });
-                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/DATABASE_URL", "password", AuditDecision.Granted, AuditMethod.GrantCache, "served from a grant given 19 minutes ago", asked: "Print the connection string so I can check it."));
+                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.GrantCache, "served from a grant given 19 minutes ago", asked: "Print the connection string so I can check it."));
                 Write(TimeSpan.FromMinutes(2), Credential(cursor, "Work/aws-console", "password", AuditDecision.Denied, AuditMethod.Prompt, "the person denied it"));
                 Write(TimeSpan.FromMinutes(18), new AuditRecord
                 {
@@ -1240,18 +1232,18 @@ public sealed class ScreenRenderer
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Token,
                     Reason = Core.Tokens.TokenAuditReason.Format("t7d2e", "ci-github-actions", "6 variable(s)"),
-                    Entries = ["env/acme-api/DATABASE_URL", "env/acme-api/STRIPE_SECRET_KEY", "env/acme-api/OPENAI_API_KEY", "env/acme-api/REDIS_URL", "env/acme-api/JWT_SIGNING_KEY", "env/acme-api/SENTRY_DSN"],
+                    Entries = ["env/acme-api/.env"],
                 });
                 Write(TimeSpan.FromMinutes(11), new AuditRecord
                 {
                     Tool = "share",
                     Client = new AuditClient("keypaste share", "1.0.0", null),
-                    Args = new AuditArgs { Entry = "env/acme-api/STRIPE_SECRET_KEY", Field = "password" },
+                    Args = new AuditArgs { Entry = "env/acme-api/.env", Field = "STRIPE_SECRET_KEY" },
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.ShareCreated,
                     Reason = "share 3a11: 1 view, expires 2026-07-29T08:30:53Z, to maya@acme.dev, passphrase",
                 });
-                Write(TimeSpan.FromMinutes(14), Credential(cursor, "env/acme-web/VERCEL_TOKEN", "password", AuditDecision.Denied, AuditMethod.TimedOut, "nobody answered within 60 seconds"));
+                Write(TimeSpan.FromMinutes(14), Credential(cursor, "env/acme-web/.env", "VERCEL_TOKEN", AuditDecision.Denied, AuditMethod.TimedOut, "nobody answered within 60 seconds"));
                 Write(TimeSpan.FromMinutes(20), Credential(claude, "Work/github", "username", AuditDecision.Granted, AuditMethod.Policy, "rule 'github-username' in policy.toml"));
                 Write(TimeSpan.FromMinutes(3), new AuditRecord
                 {

@@ -270,27 +270,41 @@ public sealed class KdbxImportTests : IDisposable
         Assert.DoesNotContain(target.Search(string.Empty), match => match.Name.Title == "gone");
     }
 
+    /// <summary>
+    /// An <c>env</c> group is an ordinary group (D-0416): it lands under the import group whole, and
+    /// its entries' projects travel in their own tags.
+    /// </summary>
     [Fact]
-    public void DefaultPlan_MapsEnvProjects_AndAvoidsCollisions()
+    public void AnEnvGroup_IsCopiedAsAPlainGroupUnderInto_KeepingItsEntriesTags()
     {
         var source = Source("acme.kdbx", vault =>
         {
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "a" });
-            vault.AddEntry(new VaultEntry { Title = "TOKEN", GroupPath = "env/infra", Password = "t" });
-            vault.AddEntry(new VaultEntry { Title = "Bank", GroupPath = "Banking", Password = "b" });
+            vault.AddEntry(new VaultEntry { Title = "OLD_KEY", GroupPath = "env/acme-api", Password = "a" });
+            ProjectVariables.Set(vault, "acme-api", "API_KEY", "k");
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", GroupPath = "env/acme-api/prod", Password = "t" });
+            vault.AddEntry(new VaultEntry { Title = "Stripe", GroupPath = "services", Password = "s" });
+            vault.AddTag(new EntryName("services", "Stripe"), "env:billing:prod");
         });
         using var target = Target();
-        target.AddEntry(new VaultEntry { Title = "OTHER", GroupPath = "env/infra", Password = "o" });
+        target.AddEntry(new VaultEntry { Title = "OTHER", GroupPath = "env/acme-api", Password = "o" });
 
         using var opened = KdbxImport.Open(source, SourcePassword, null);
         var plan = opened.DefaultPlan(target, null);
 
-        Assert.Equal("acme", plan.Into);
         Assert.Equal(2, opened.ProjectCount);
-        Assert.Equal("env/acme-api", Row(plan, "env/acme-api").Destination);
-        Assert.Equal("acme/env/infra", Row(plan, "env/infra").Destination);
-        Assert.Equal("acme/Banking", Row(plan, "Banking").Destination);
+        Assert.Equal(["env", "services"], plan.Rows.Select(row => row.SourceGroup).Order(StringComparer.Ordinal));
+        Assert.Equal("acme/env", Row(plan, "env").Destination);
+        Assert.Null(Row(plan, "env").Rerouted);
+        Assert.Equal(3, Row(plan, "env").EntryCount);
         Assert.Empty(opened.Check(target, plan));
+
+        opened.ApplyTo(target, plan);
+
+        Assert.Equal(["env:acme-api"], target.Tags(new EntryName("acme/env/acme-api", EnvStore.HomeTitle)));
+        Assert.Equal(["env:billing:prod"], target.Tags(new EntryName("acme/services", "Stripe")));
+        Assert.Equal("t", target.Find(new EntryName("acme/env/acme-api/prod", "TOKEN"))?.Password);
+        Assert.Equal("o", target.Find(new EntryName("env/acme-api", "OTHER"))?.Password);
+        Assert.Equal(["acme-api", "billing"], ProjectCatalog.Read(target).Projects.Select(project => project.Name));
     }
 
     [Fact]
@@ -320,84 +334,7 @@ public sealed class KdbxImportTests : IDisposable
         Assert.Equal("hidden", opened.DefaultPlan(target, null).Into);
     }
 
-    [Fact]
-    public void EnvProject_WithProfiles_ExpandsToOneRowPerProfile()
-    {
-        var source = Source("acme.kdbx", vault =>
-        {
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "dev" });
-            vault.AddEntry(new VaultEntry { Title = "DB_URL", GroupPath = "env/acme-api", Password = "dev-db" });
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api/staging", Password = "staging" });
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api/prod", Password = "prod" });
-        });
-        using var target = Target();
-        using var opened = KdbxImport.Open(source, SourcePassword, null);
-        var plan = opened.DefaultPlan(target, null);
-
-        Assert.Equal(["env/acme-api", "env/acme-api/prod", "env/acme-api/staging"], plan.Rows.Select(row => row.SourceGroup).Order(StringComparer.Ordinal));
-        Assert.Equal(2, Row(plan, "env/acme-api").EntryCount);
-        Assert.Equal(1, Row(plan, "env/acme-api/staging").EntryCount);
-        Assert.Equal(1, opened.ProjectCount);
-
-        var result = opened.ApplyTo(target, plan);
-
-        Assert.Equal(4, result.Entries);
-        Assert.Equal("staging", target.Find(new EntryName("env/acme-api/staging", "API_KEY"))!.Password);
-        Assert.Equal("dev", target.Find(new EntryName("env/acme-api", "API_KEY"))!.Password);
-        Assert.Single(target.ReadGroupPaths(), path => path == "env/acme-api/staging");
-    }
-
     // ---------------------------------------------------------------- what blocks
-
-    [Fact]
-    public void EnvSubgroupNamedDevOrInvalid_Blocks()
-    {
-        var source = Source("acme.kdbx", vault =>
-        {
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "a" });
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api/dev", Password = "d" });
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api/Bad_Name", Password = "b" });
-        });
-        using var target = Target();
-        using var opened = KdbxImport.Open(source, SourcePassword, null);
-        var byDefault = opened.DefaultPlan(target, null);
-        var plan = new ImportPlan([.. byDefault.Rows.Select(row => row with { Destination = row.SourceGroup })], byDefault.Into);
-        var problems = opened.Check(target, plan);
-
-        Assert.Empty(opened.Check(target, byDefault));
-        Assert.Equal("acme/env/acme-api/dev", Row(byDefault, "env/acme-api/dev").Destination);
-        Assert.Equal("env/acme-api", Row(byDefault, "env/acme-api").Destination);
-        Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/acme-api/dev").Index && p.Message.Contains("default profile", StringComparison.Ordinal));
-        Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/acme-api/Bad_Name").Index && p.Message.Contains("not a profile name", StringComparison.Ordinal));
-        Assert.DoesNotContain(problems, p => p.Index == Row(plan, "env/acme-api").Index);
-    }
-
-    [Fact]
-    public void EnvGroupThatIsNotAValidSet_DefaultsUnderInto()
-    {
-        var source = Source("servers.kdbx", vault =>
-        {
-            vault.AddEntry(new VaultEntry { Title = "ssh root", GroupPath = "env/Work Servers", Password = "r" });
-            vault.AddEntry(new VaultEntry { Title = "db pass", GroupPath = "env/Work Servers/Staging", Password = "d" });
-            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "a" });
-            vault.AddEntry(new VaultEntry { Title = "bad key", GroupPath = "env/acme-api/staging", Password = "s" });
-        });
-        using var target = Target();
-        using var opened = KdbxImport.Open(source, SourcePassword, null);
-
-        var plan = opened.DefaultPlan(target, "Imported");
-
-        Assert.Equal("Imported/env/Work Servers", Row(plan, "env/Work Servers").Destination);
-        Assert.Equal("Imported/env/Work Servers/Staging", Row(plan, "env/Work Servers/Staging").Destination);
-        Assert.Equal("env/acme-api", Row(plan, "env/acme-api").Destination);
-        Assert.Equal("Imported/env/acme-api/staging", Row(plan, "env/acme-api/staging").Destination);
-        Assert.StartsWith("not a valid env set: ", Row(plan, "env/Work Servers").Rerouted, StringComparison.Ordinal);
-        Assert.Null(Row(plan, "env/acme-api").Rerouted);
-        Assert.Empty(opened.Check(target, plan));
-
-        opened.ApplyTo(target, plan);
-        Assert.NotNull(target.Find(new EntryName("Imported/env/Work Servers/Staging", "db pass")));
-    }
 
     [Fact]
     public void ADestinationInTheReservedGroup_Blocks()
@@ -424,47 +361,30 @@ public sealed class KdbxImportTests : IDisposable
         Assert.DoesNotContain(target.ReadGroupPaths(), ReservedGroups.IsReserved);
     }
 
+    /// <summary>Importing into <c>env</c> applies only what any other group applies: no variable-name rule (D-0416).</summary>
     [Fact]
-    public void EnvDestination_InvalidOrDuplicateKey_Blocks()
+    public void ADestinationUnderEnv_IsCheckedLikeAnyOtherGroup()
     {
         var source = Source("acme.kdbx", vault =>
         {
             vault.AddEntry(new VaultEntry { Title = "bad-key", GroupPath = "env/one", Password = "1" });
             vault.AddEntry(new VaultEntry { Title = "Token", GroupPath = "env/two", Password = "2" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", GroupPath = "env/two", Password = "2" });
-            vault.AddEntry(new VaultEntry { Title = "KEY", GroupPath = "env/three", Password = "3" });
-            vault.AddEntry(new VaultEntry { Title = "KEY", GroupPath = "env/three", Password = "3" });
-            vault.AddEntry(new VaultEntry { Title = "FINE", GroupPath = "env/four", Password = "4" });
         });
         using var target = Target();
+        target.AddEntry(new VaultEntry { Title = "TOKEN", GroupPath = "env/two", Password = "mine" });
+
         using var opened = KdbxImport.Open(source, SourcePassword, null);
         var byDefault = opened.DefaultPlan(target, null);
-        var plan = new ImportPlan([.. byDefault.Rows.Select(row => row with { Destination = row.SourceGroup })], byDefault.Into);
-        var problems = opened.Check(target, plan);
+        var plan = byDefault with { Rows = [.. byDefault.Rows.Select(row => row with { Destination = row.SourceGroup })] };
 
-        Assert.DoesNotContain(opened.Check(target, byDefault), p => p.Blocks);
-        Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/one").Index && p.Message.Contains("not a valid environment variable name", StringComparison.Ordinal));
-        Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/two").Index && p.Message.Contains("differ only in case", StringComparison.Ordinal));
-        Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/three").Index && p.Message.Contains("twice", StringComparison.Ordinal));
-        Assert.DoesNotContain(problems, p => p.Index == Row(plan, "env/four").Index);
-    }
+        var problem = Assert.Single(opened.Check(target, plan));
+        Assert.False(problem.Blocks);
+        Assert.Equal("1 title in env and its subgroups names another entry too; both are kept", problem.Message);
 
-    [Fact]
-    public void EnvDestination_KeyAlreadyThere_Blocks()
-    {
-        var source = Source("acme.kdbx", vault => vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "theirs" }));
-        using var target = Target();
-        target.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "mine" });
+        opened.ApplyTo(target, plan);
 
-        using var opened = KdbxImport.Open(source, SourcePassword, null);
-        var plan = opened.DefaultPlan(target, null);
-        Assert.Equal("acme/env/acme-api", Row(plan, "env/acme-api").Destination);
-        Assert.Empty(opened.Check(target, plan));
-
-        var intoTheirs = plan with { Rows = [.. plan.Rows.Select(row => row with { Destination = "env/acme-api" })] };
-        var problem = Assert.Single(opened.Check(target, intoTheirs));
-        Assert.True(problem.Blocks);
-        Assert.Contains("already in env/acme-api", problem.Message, StringComparison.Ordinal);
+        Assert.Equal("1", target.Find(new EntryName("env/one", "bad-key"))?.Password);
     }
 
     [Fact]
@@ -479,7 +399,7 @@ public sealed class KdbxImportTests : IDisposable
 
         using var opened = KdbxImport.Open(source, SourcePassword, null);
         var plan = opened.DefaultPlan(target, null);
-        var blocked = plan with { Rows = [.. plan.Rows.Select((row, i) => i == 0 ? row with { Destination = "env" } : row)] };
+        var blocked = plan with { Rows = [.. plan.Rows.Select((row, i) => i == 0 ? row with { Destination = ReservedGroups.Tokens } : row)] };
 
         Assert.Throws<VaultException>(() => opened.ApplyTo(target, blocked));
 
@@ -504,7 +424,7 @@ public sealed class KdbxImportTests : IDisposable
         var edit = Assert.Single(edits);
         Assert.Same(result.Edit, edit);
         Assert.Equal(
-            [new EntryName("env/acme-api", "API_KEY"), new EntryName("moved", "Loose"), new EntryName("moved/Banking", "Checking"), new EntryName("moved/Banking/Cards", "Visa")],
+            [new EntryName("moved", "Loose"), new EntryName("moved/Banking", "Checking"), new EntryName("moved/Banking/Cards", "Visa"), new EntryName("moved/env/acme-api", "API_KEY")],
             edit.Entries.OrderBy(name => name.GroupPath, StringComparer.Ordinal));
     }
 
@@ -530,7 +450,7 @@ public sealed class KdbxImportTests : IDisposable
         {
             Assert.Equal(4, reopened.ReadEntries().Count);
             Assert.Equal("v2", reopened.Find(new EntryName("foreign/Banking", "Checking"))!.Password);
-            Assert.Equal("a", reopened.Find(new EntryName("env/acme-api", "API_KEY"))!.Password);
+            Assert.Equal("a", reopened.Find(new EntryName("foreign/env/acme-api", "API_KEY"))!.Password);
         }
 
         using var again = KdbxImport.Open(source, SourcePassword, null);

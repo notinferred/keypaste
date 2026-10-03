@@ -480,7 +480,7 @@ internal static class TokenCommand
                     Args = new AuditArgs
                     {
                         Entry = EntryNameSanitizer.SanitizePath(
-                            string.Join(",", info.Pairs.Select(pair => $"{EnvConvention.RootGroup}/{pair.Project}/{pair.Profile}")),
+                            string.Join(",", info.Pairs.Select(pair => EnvProfileNames.SetName(pair.Project, pair.Profile))),
                             maximumLength: AuditArgs.EntryLength).Text,
                     },
                     Decision = AuditDecision.Granted,

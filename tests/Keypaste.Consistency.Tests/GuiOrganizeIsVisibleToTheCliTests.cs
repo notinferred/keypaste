@@ -20,9 +20,9 @@ namespace Keypaste.Consistency.Tests;
 /// <para>
 /// <b>The mutations that must make this file fail:</b> a rename or a move that writes a copy rather
 /// than moving the entry, so its history is left behind; an organize that defers its
-/// <c>vault.Save()</c>, so the CLI's own handle sees the vault as it was; and a project rename that
-/// leaves <c>keypaste run</c> resolving the old name, which would mean the group path and the env
-/// convention had come apart.
+/// <c>vault.Save()</c>, so the CLI's own handle sees the vault as it was; and a group rename that
+/// changes which project <c>keypaste run</c> resolves, which would mean a group had come to name a
+/// project, where only an entry's own tags do (D-0416).
 /// </para>
 /// </remarks>
 public sealed class GuiOrganizeIsVisibleToTheCliTests
@@ -31,21 +31,21 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
     /// V-V.5b's own sequence, in its own order.
     /// </summary>
     /// <remarks>
-    /// Rename the group holding a project, move an entry into it, reopen, and read the moved entry
-    /// at its new path with its history intact — then ask <c>keypaste run</c> whether it agrees
-    /// about the project's name. The history assertion goes through <c>Vault.Open</c> because no
+    /// Rename the group holding a project's home entry, move an entry into it, reopen, and read the
+    /// moved entry at its new path with its history intact — then ask <c>keypaste run</c> whether
+    /// the project kept its name. The history assertion goes through <c>Vault.Open</c> because no
     /// CLI verb reads a revision; everything else is the CLI's answer.
     /// </remarks>
     [Fact]
-    public void A_project_renamed_and_an_entry_moved_into_it_are_what_keypaste_run_injects()
+    public void A_group_renamed_and_an_entry_moved_into_it_keep_the_project_its_tags_name()
     {
         using var fixture = new VaultFixture(("seed", "seed-password"), ("DEPLOY_TOKEN", "first"));
 
-        // A project of the env/ layout of earlier releases, its group naming it, written by the
-        // shipped CLI so the fixture is not the app's own idea of where a variable goes.
+        // The project's home entry env/billing/.env, tagged env:billing, written by the shipped CLI so
+        // the fixture is not the app's own idea of where a variable goes.
         Assert.Equal(
             CliApp.ExitSuccess,
-            fixture.RunAnswering(["sk-live-7"], "add", "env/billing/STRIPE_KEY"));
+            fixture.RunAnswering(["sk-live-7"], "env", "set", "billing", "STRIPE_KEY"));
 
         using (var screen = Entries(fixture))
         {
@@ -57,7 +57,7 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
 
             var entries = screen.Model;
 
-            // 1. Rename the group holding the env project.
+            // 1. Rename the group holding the project's home entry.
             entries.SelectedGroup = entries.Groups.Single(node => node.Path == "env/billing");
             entries.BeginRenameGroupCommand.Execute(null);
             entries.DraftGroupName = "invoicing";
@@ -88,17 +88,20 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
                 reopened.ReadHistory(moved)!.Select(revision => revision.Fields.Password));
         }
 
-        // 4. The CLI resolves the project by its new name, with both variables in the child.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "invoicing", "--", "deploy"));
+        // 4. The CLI reads the moved entry at its new path.
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/invoicing/DEPLOY_TOKEN", "--show"));
+        Assert.Equal("second", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
+
+        // 5. The project is still billing, its tag's name, and holds only its tagged field.
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));
 
         // The positive control: a child was started at all.
         Assert.NotEmpty(fixture.Cli.ProcessLauncher.Started);
         Assert.Equal("sk-live-7", fixture.Cli.ProcessLauncher.Environment["STRIPE_KEY"]);
-        Assert.Equal("second", fixture.Cli.ProcessLauncher.Environment["DEPLOY_TOKEN"]);
+        Assert.False(fixture.Cli.ProcessLauncher.Environment.ContainsKey("DEPLOY_TOKEN"));
 
-        // And not by its old one. A rename that left both names working would mean the group path
-        // and the env convention had come apart.
-        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));
+        // And the group's new name names no project.
+        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("run", "invoicing", "--", "deploy"));
     }
 
     /// <summary>

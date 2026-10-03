@@ -153,9 +153,6 @@
                        Text="{Binding ListTitle}"
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
-            <Border Classes="chip" IsVisible="{Binding HasListProfile}">
-              <TextBlock Text="{Binding ListProfile}" />
-            </Border>
             <!-- A group is renamed where its name is; the tree it is chosen from is the sidebar's. -->
             <Button x:Name="RenameGroup"
                     Classes="icon ghost sm"
@@ -280,8 +277,7 @@
           <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
           <TextBox x:Name="RenameGroupName" Text="{Binding DraftGroupName}" />
           <TextBlock Classes="caption" Text="{Binding AccessNote}" />
-          <!-- The specific case of the line above: renaming a project is also how the name
-               `keypaste run` takes changes. -->
+          <!-- A group under env is where keypaste puts a project's new keys. -->
           <TextBlock x:Name="ProjectRenameNote"
                      Classes="caption"
                      IsVisible="{Binding ShowsProjectRenameNote}"
@@ -356,9 +352,7 @@
                 <Grid ColumnDefinitions="28,*,112,*,112">
                   <ctl:KpIcon Grid.Column="0" Classes="kind" Icon="{Binding Icon}" Size="15" />
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <TextBlock Classes.mono="{Binding IsVariable}"
-                               Classes.lg="{Binding IsVariable}"
-                               Classes.row-title="{Binding !IsVariable}"
+                    <TextBlock Classes="row-title"
                                Text="{Binding DisplayTitle}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center" />
@@ -371,7 +365,7 @@
                                IsVisible="{Binding Why.Length}" />
                   </StackPanel>
                   <TextBlock Grid.Column="2" Classes="muted" FontSize="12.5" Text="{Binding KindLabel}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="3" Classes="mono muted" FontSize="12" Text="{Binding Place}"
+                  <TextBlock Grid.Column="3" Classes="mono muted" FontSize="12" Text="{Binding Where}"
                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <!-- When an agent last received it: blue in use, green recent, grey idle. A time, never a value. Not amber:
                        several rows can be in use at once, and a view has one amber element. -->
@@ -628,9 +622,7 @@
                     <ctl:HeaderRow Spacing="16">
                       <StackPanel Spacing="6">
                         <TextBlock x:Name="EntryTitle"
-                                   Classes.mono="{Binding IsVariable}"
-                                   Classes.xl="{Binding IsVariable}"
-                                   Classes.title="{Binding !IsVariable}"
+                                   Classes="title"
                                    Text="{Binding DisplayTitle}"
                                    TextWrapping="Wrap" />
                         <TextBlock Text="{Binding Location}"
@@ -951,15 +943,9 @@
                     </StackPanel>
                   </Border>
 
-                  <!-- The fields. A login leads with its username; a variable with its value. -->
+                  <!-- The fields. A login leads with its username. -->
                   <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="96,*">
-                      <Grid.IsVisible>
-                        <MultiBinding Converter="{x:Static BoolConverters.And}">
-                          <Binding Path="!IsEditing" />
-                          <Binding Path="ShowsUsername" />
-                        </MultiBinding>
-                      </Grid.IsVisible>
+                    <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
                       <TextBlock Grid.Column="0" Classes="label" Text="Username" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto">
@@ -982,7 +968,7 @@
                     </Grid>
 
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
-                      <TextBlock Grid.Column="0" Classes="label" Text="{Binding ValueLabel}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Classes="label" Text="Password" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto">
                           <!-- Not a TextBlock: its automation peer publishes its text as the element's name.
@@ -1012,13 +998,7 @@
                       </Border>
                     </Grid>
 
-                    <Grid ColumnDefinitions="96,*">
-                      <Grid.IsVisible>
-                        <MultiBinding Converter="{x:Static BoolConverters.And}">
-                          <Binding Path="!IsEditing" />
-                          <Binding Path="ShowsUrl" />
-                        </MultiBinding>
-                      </Grid.IsVisible>
+                    <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
                       <TextBlock Grid.Column="0" Classes="label" Text="URL" VerticalAlignment="Top" Margin="0,11,0,0" />
                       <!-- A web address opens in the browser; anything else is text and says why (N.5, D-0378). -->
                       <StackPanel Grid.Column="1" Spacing="6">
@@ -1273,7 +1253,7 @@
                   </StackPanel>
 
                   <!-- Agent access: who received this entry and what grant covers it now, never a value, shown
-                       only when agents can see the entry (N.5). Profiles: the variable's key in every profile of its project. -->
+                       only when agents can see the entry (N.5). -->
                   <ctl:AutoFitGrid MinItemWidth="220" Spacing="12" IsVisible="{Binding !IsEditing}">
                     <Border x:Name="AgentAccessCard" Classes="card" IsVisible="{Binding ShowsAgentAccess}">
                       <StackPanel Spacing="10">
@@ -1300,35 +1280,6 @@
                                    Text="{Binding LastUsedText, StringFormat='Last used {0}'}" />
                       </StackPanel>
                     </Border>
-                    <Border Classes="card" IsVisible="{Binding HasProfiles}">
-                      <StackPanel Spacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <ctl:KpIcon Icon="layers" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-                          <TextBlock Classes="label" Text="Profiles" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <ItemsControl ItemsSource="{Binding ProfileStates}">
-                          <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                              <StackPanel Spacing="8" />
-                            </ItemsPanelTemplate>
-                          </ItemsControl.ItemsPanel>
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProfileState">
-                              <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="{Binding Problem}">
-                                <TextBlock Grid.Column="0" Classes="mono" FontSize="12" Text="{Binding Profile}" />
-                                <TextBlock Grid.Column="1"
-                                           Classes="mono"
-                                           FontSize="12"
-                                           Classes.ok="{Binding IsOk}"
-                                           Classes.secondary="{Binding IsAsked}"
-                                           Classes.danger="{Binding IsDanger}"
-                                           Text="{Binding State}" />
-                              </Grid>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
-                    </Border>
                   </ctl:AutoFitGrid>
 
                   <Border BorderBrush="{DynamicResource KpBorderSubtle}"
@@ -1353,11 +1304,11 @@
                   <Border Classes="form" IsVisible="{Binding IsEditing}">
                     <StackPanel Spacing="10">
                       <TextBlock Classes="section" Text="Edit fields" />
-                      <StackPanel Spacing="6" IsVisible="{Binding ShowsUsername}">
+                      <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Username" />
                         <TextBox Classes="mono" Text="{Binding DraftUsername}" />
                       </StackPanel>
-                      <StackPanel Spacing="6" IsVisible="{Binding ShowsUrl}">
+                      <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="URL" />
                         <TextBox Classes="mono" Text="{Binding DraftUrl}" />
                       </StackPanel>
@@ -1366,13 +1317,13 @@
                         <TextBox Text="{Binding DraftNotes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
                       </StackPanel>
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="{Binding ValueLabel}" />
+                        <TextBlock Classes="label" Text="Password" />
                         <ctl:MaskedInput x:Name="ReplacementPassword"
                                          AllowsPaste="True"
                                          Sink="{Binding NewPassword}"
                                          MaskedLength="{Binding NewPassword.MaskedLength}"
-                                         Placeholder="{Binding ReplacementPlaceholder}" />
-                        <TextBlock Classes="caption" Text="{Binding ReplacementCaption}" TextWrapping="Wrap" />
+                                         Placeholder="New password" />
+                        <TextBlock Classes="caption" Text="Leave this empty to keep the current password. A replacement keeps the old one in this entry's history." TextWrapping="Wrap" />
                         <TextBlock Classes="caption"
                                    IsVisible="{Binding NewPassword.Note.Length}"
                                    Text="{Binding NewPassword.Note}" />

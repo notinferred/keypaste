@@ -1,59 +1,30 @@
 namespace Keypaste.Core;
 
 /// <summary>
-/// Where a project's environment variables live inside a KDBX file: the group
-/// <c>env/&lt;project&gt;</c>, one entry per variable, title = <c>KEY</c>, password = value.
+/// The names of keypaste's projects: the project-name rule, which custom fields a project releases,
+/// which names a child process can receive, and the <c>env</c> group where keypaste creates an
+/// environment's home entry (D-0413).
 /// </summary>
 /// <remarks>
-/// <para>
-/// Nothing here is keypaste-specific machinery — there are no marker attributes and no custom
-/// string fields. The group path <em>is</em> the marker, which is what lets KeePassXC add, edit,
-/// rename, and delete environment variables with no knowledge of keypaste at all. The rejected
-/// alternative (one entry per project, custom string fields for KEY→value) is recorded in
-/// DECISIONS.md D-0014: <c>keepassxc-cli</c> can read custom string fields but cannot write one,
-/// so "a KeePassXC-edited value is picked up by keypaste" could never have been proven in CI.
-/// </para>
-/// <para>
-/// This type is deliberately free of any dependency on <see cref="Vault"/>: it answers questions
-/// about paths, which the MCP bridge needs in order to scope a policy to environment secrets
-/// without opening a vault.
-/// </para>
+/// Deliberately free of any dependency on <see cref="Vault"/>: it answers questions about names,
+/// which the MCP bridge needs without opening a vault. Which entries are in a project is their own
+/// tags' answer (D-0370), never their group's (D-0416).
 /// </remarks>
 public static class EnvConvention
 {
-    /// <summary>The top-level group under which every project's variables are stored.</summary>
+    /// <summary>The top-level group holding the home entries keypaste creates, one group per project.</summary>
     public const string RootGroup = "env";
 
-    /// <summary>The group path holding one project's variables, such as <c>env/billing-api</c>.</summary>
+    /// <summary>The group holding one project's home entries, such as <c>env/billing-api</c>.</summary>
     /// <param name="project">The project name.</param>
     /// <returns>The group path.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="project"/> is null.</exception>
-    /// <remarks>
-    /// Does not validate. Building a path has to work for anything already in the file so that a
-    /// variable KeePassXC created under a name keypaste would refuse can still be listed and
-    /// removed — see <see cref="IsValidProject"/> for where the rules are actually enforced.
-    /// </remarks>
+    /// <remarks>Does not validate; <see cref="IsValidProject"/> is where the rules are enforced.</remarks>
     public static string GroupPath(string project)
     {
         ArgumentNullException.ThrowIfNull(project);
 
         return RootGroup + "/" + project;
-    }
-
-    /// <summary>The entry path of one variable, such as <c>env/billing-api/DATABASE_URL</c>.</summary>
-    /// <param name="project">The project name.</param>
-    /// <param name="key">The variable name.</param>
-    /// <returns>The entry path.</returns>
-    /// <remarks>
-    /// For showing a person where a variable lives and for scoping a policy, not for addressing
-    /// one: joining is lossy, and <see cref="EntryName"/> is the identity that survives it.
-    /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="project"/> or <paramref name="key"/> is null.</exception>
-    public static string EntryPath(string project, string key)
-    {
-        ArgumentNullException.ThrowIfNull(key);
-
-        return GroupPath(project) + "/" + key;
     }
 
     /// <summary>Whether a project name is one keypaste is willing to create.</summary>

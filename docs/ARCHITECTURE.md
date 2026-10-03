@@ -38,7 +38,7 @@ A credential request runs: MCP client â†’ `Mcp/Tools/RequestCredentialTool.cs` â
 | KDBX boundary, save retries and timing | `Internal/KeePassInterop.cs`, `Internal/SaveClock.cs`, `KdbxFormat.cs`, `ProcessTemporaryDirectory.cs`, `PathIdentity.cs` |
 | Env sets and dotenv | `EnvStore.cs` (where a key is written and removed, planned in `EnvWritePlan.cs`), `EnvConvention.cs`, `EnvNameRules.cs`, `EnvResolution.cs` (what may leave for a child), `EnvImport.cs`, `DotEnv.cs`, `DotEnvWriter.cs`, `SourceSnapshot.cs` |
 | Project tags: which tags keypaste writes, the `env:<project>[:<environment>]` grammar, the projects a vault holds and what a tag change reaches | `TagRules.cs`, `ProjectTag.cs`, `ProjectCatalog.cs`, `ProjectTagChange.cs` |
-| Profiles, the profile matrix and diffs | `EnvProfileNames.cs` (where a profile lives and which are protected), `EnvMatrix.cs`, `EnvDiff.cs` |
+| Profiles, the profile matrix and diffs | `EnvProfileNames.cs` (which profile names resolve and which are protected), `EnvMatrix.cs`, `EnvDiff.cs` |
 | `kp://` references and reference files | `KpReference.cs`, `EnvReferenceFile.cs`, `EnvReferenceResolution.cs` |
 | keypaste's own groups in the vault, hidden from every listing | `ReservedGroups.cs` |
 | Scoped tokens and token bundles | `Tokens/` |

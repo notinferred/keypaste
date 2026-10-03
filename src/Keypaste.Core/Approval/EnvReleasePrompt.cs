@@ -111,7 +111,7 @@ public sealed record EnvReleasePrompt
             Profile = EntryNameSanitizer.Sanitize(preview.Profile).Text,
             Keys = preview.Keys,
             Entries = [.. preview.Keys.Select((key, i) => ApprovalPrompt.Shown(
-                i < preview.Sources.Count ? preview.Sources[i].Entry : new EntryName(EnvProfileNames.GroupPath(preview.Project, preview.Profile), key)))],
+                i < preview.Sources.Count ? preview.Sources[i].Entry : new EntryName(EnvProfileNames.SetName(preview.Project, preview.Profile), key)))],
             Command = shownCommand.Text,
             CommandWasAltered = shownCommand.WasAltered,
             Directory = shownDirectory.Text,

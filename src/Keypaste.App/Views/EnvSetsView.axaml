@@ -231,7 +231,7 @@
           <StackPanel Spacing="10">
             <TextBlock Classes="section" Text="New project" />
             <TextBlock Classes="caption"
-                       Text="A project is a group under env/ in your vault. It appears in the vault once its first key is added." />
+                       Text="A project is the entries in your vault tagged with its name, such as env:billing-api. It appears in the vault once its first key is added." />
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" />
               <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
@@ -244,7 +244,7 @@
           <StackPanel Spacing="12">
             <TextBlock Classes="section" Text="No projects yet" />
             <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left"
-                       Text="A project is a group under env/ in your vault, with a value per profile. keypaste env set billing-api STRIPE_KEY makes one, and so does New project." />
+                       Text="A project is the entries in your vault tagged with its name, such as env:billing-api, with a value per profile. keypaste env set billing-api STRIPE_KEY makes one, and so does New project." />
             <Button Content="New project" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
                     HorizontalAlignment="Left" />
           </StackPanel>
@@ -431,14 +431,6 @@
 
                   <TextBlock Classes="caption"
                              Text="Hold a masked value to see it. Click another profile's cell or header to work in that profile." />
-
-                  <ItemsControl ItemsSource="{Binding ProfileProblems}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="x:String">
-                        <TextBlock Classes="caption secondary" Text="{Binding}" />
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
                 </StackPanel>
 
                 <!-- A form opens under the matrix, beside the footer and rows that open it. -->

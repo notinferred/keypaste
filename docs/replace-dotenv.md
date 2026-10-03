@@ -85,7 +85,7 @@ The `--` separates the project from its command. Without it, `keypaste run dev n
 
 ## Profiles and references
 
-A project holds one set per profile, named with lowercase letters, digits and `-`; everything above is the `dev` profile. A profile's keys are fields of the entries tagged into it: `env set` and `env pull` add a new key to its entry `env/<project>/.env`, or `.env.<profile>` for another profile, which they create tagged `env:<project>` or `env:<project>:<profile>`, unless `--entry` names another entry tagged into it. A project kept the earlier way, `env/<project>` for `dev` and subgroups such as `env/<project>/staging`, keeps working. Every env verb and `run` take `-p <profile>`:
+A project holds one set per profile, named with lowercase letters, digits and `-`; everything above is the `dev` profile. A profile's keys are fields of the entries tagged into it: `env set` and `env pull` add a new key to its entry `env/<project>/.env`, or `.env.<profile>` for another profile, which they create tagged `env:<project>` or `env:<project>:<profile>`, unless `--entry` names another entry tagged into it. An entry kept the earlier way, one per variable under `env/<project>`, is an ordinary entry and no longer a variable (D-0416). Every env verb and `run` take `-p <profile>`:
 
 ```sh
 keypaste env set acme-api DATABASE_URL -p staging

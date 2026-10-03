@@ -62,8 +62,8 @@ public sealed class TrashTests : IDisposable
             Password = "v1",
         });
 
-        LegacyVariables.Set(vault, "billing", "STRIPE_KEY", "sk-live");
-        LegacyVariables.Set(vault, "dev", "STRIPE_KEY", "sk-test");
+        ProjectVariables.Set(vault, "billing", "STRIPE_KEY", "sk-live");
+        ProjectVariables.Set(vault, "dev", "STRIPE_KEY", "sk-test");
 
         vault.Save();
     }
@@ -140,17 +140,17 @@ public sealed class TrashTests : IDisposable
     }
 
     [Fact]
-    public void A_deleted_variable_is_restored_and_the_project_holds_it_again()
+    public void A_deleted_tagged_entry_is_restored_and_its_project_holds_it_again()
     {
         using (var context = new Context(_vaultPath))
         {
-            RemoveVariable(context, "billing", "STRIPE_KEY");
+            Delete(context, "env/billing/.env");
 
             var trash = context.NewTrash();
             trash.Selected = Assert.Single(trash.Rows);
             trash.RestoreCommand.Execute(null);
 
-            Assert.Equal("STRIPE_KEY is back in env/billing.", trash.Notice, StringComparer.Ordinal);
+            Assert.Equal(".env is back in env/billing.", trash.Notice, StringComparer.Ordinal);
         }
 
         using var reopened = Vault.Open(_vaultPath, _master);
@@ -162,7 +162,7 @@ public sealed class TrashTests : IDisposable
     }
 
     /// <summary>
-    /// Two variables of one name from two projects land in one bin. The row a person selected is
+    /// Two home entries of one title from two projects land in one bin. The row a person selected is
     /// the row that comes back, because the address is an identity and not a title (D-0250).
     /// </summary>
     [Fact]
@@ -170,8 +170,8 @@ public sealed class TrashTests : IDisposable
     {
         using (var context = new Context(_vaultPath))
         {
-            RemoveVariable(context, "billing", "STRIPE_KEY");
-            RemoveVariable(context, "dev", "STRIPE_KEY");
+            Delete(context, "env/billing/.env");
+            Delete(context, "env/dev/.env");
 
             var trash = context.NewTrash();
             Assert.Equal(2, trash.Rows.Count);
@@ -179,7 +179,7 @@ public sealed class TrashTests : IDisposable
             trash.Selected = trash.Rows.Single(row => row.Where == "env/dev");
             trash.RestoreCommand.Execute(null);
 
-            Assert.Equal("STRIPE_KEY is back in env/dev.", trash.Notice, StringComparer.Ordinal);
+            Assert.Equal(".env is back in env/dev.", trash.Notice, StringComparer.Ordinal);
             Assert.Equal("env/billing", Assert.Single(trash.Rows).Where, StringComparer.Ordinal);
         }
 
@@ -408,17 +408,15 @@ public sealed class TrashTests : IDisposable
         Assert.Null(context.Entries.Notice);
     }
 
+    /// <summary>A key removed on the env card leaves its entry, whose history keeps it, and puts nothing in the bin.</summary>
     [Fact]
-    public void The_env_card_states_where_the_variable_went()
+    public void A_key_removed_on_the_env_card_puts_nothing_in_the_trash()
     {
         using var context = new Context(_vaultPath);
 
         RemoveVariable(context, "billing", "STRIPE_KEY");
 
-        Assert.Equal(
-            "Moved STRIPE_KEY to the trash. Restore it there.",
-            context.Env.Notice,
-            StringComparer.Ordinal);
+        Assert.Empty(context.NewTrash().Rows);
     }
 
     private static void Delete(Context context, string path)

@@ -651,8 +651,8 @@ internal sealed class KeePassInterop : IDisposable
         string parentPath = PathOf(parent) ?? string.Empty;
 
         // Both directions of the same rule: a root group cannot become the env root, and the env
-        // root cannot stop being it. Either silently reclassifies a whole subtree, in one case
-        // bringing it under the default exposure and in the other switching every project off.
+        // root cannot stop being it. Either silently moves a whole subtree into or out of the
+        // bridge's default exposure (EntryExposure.DefaultGlob).
         if (IsReserved(parentPath, name)
             || (parentPath.Length == 0
                 && string.Equals(located.Group.Name, EnvConvention.RootGroup, StringComparison.Ordinal)))
@@ -955,11 +955,6 @@ internal sealed class KeePassInterop : IDisposable
             return OrganizeOutcome.NameRefused;
         }
 
-        if (RefuseEnvName(target, destination.Group, found.Entry) is { } refused)
-        {
-            return refused;
-        }
-
         if (RefuseCollision(Projected(found.Entry, target, null, null)) is { } collision)
         {
             return collision;
@@ -1126,65 +1121,14 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>
-    /// What the env namespace will not accept, applied where the name is written rather than where
-    /// the set is later exported.
-    /// </summary>
-    /// <remarks>
-    /// One call site, because renaming and moving are one write. The entry being written is left
-    /// out of the case comparison: changing <c>PATH</c> to <c>Path</c> leaves the project holding
-    /// one variable, and refusing it would refuse the repair somebody opened the app to make.
-    /// </remarks>
-    private static OrganizeOutcome? RefuseEnvName(EntryName target, PwGroup destination, PwEntry moving)
-    {
-        if (!string.Equals(target.GroupPath, EnvConvention.RootGroup, StringComparison.Ordinal)
-            && !target.GroupPath.StartsWith(EnvConvention.RootGroup + "/", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        string[] segments = target.GroupPath.Split('/');
-
-        // An entry directly in env is a write to nowhere: EnvStore reads env/<project>, so no read
-        // path could ever find it again.
-        if (segments.Length == 1)
-        {
-            return OrganizeOutcome.EnvNameRefused;
-        }
-
-        foreach (string segment in segments[1..])
-        {
-            if (!EnvConvention.IsValidProject(segment, out _))
-            {
-                return OrganizeOutcome.EnvNameRefused;
-            }
-        }
-
-        if (!EnvConvention.IsValidKey(target.Title, out _))
-        {
-            return OrganizeOutcome.EnvNameRefused;
-        }
-
-        List<string> keys = [target.Title];
-        foreach (PwEntry sibling in destination.Entries)
-        {
-            if (!ReferenceEquals(sibling, moving))
-            {
-                keys.Add(ReadField(sibling, PwDefs.TitleField));
-            }
-        }
-
-        return EnvNameRules.TryCheckCase(keys, out _) ? null : OrganizeOutcome.EnvNameCollides;
-    }
-
-    /// <summary>
     /// Whether a name means something keypaste assigns rather than something a group may be called.
     /// </summary>
     /// <remarks>
     /// The bin is asked for directly rather than looked for among the siblings, because it is
     /// excluded from every traversal: a sibling scan would happily make a second group of its name
     /// that KeePassXC then draws as two trash cans. Creating <c>env</c> through this surface is
-    /// refused while <see cref="EnsureGroup"/> still makes it on the env write path — that group is
-    /// a consequence of storing a variable, not a folder somebody chose to make.
+    /// refused while a home entry's write still makes it (D-0413): it is the group the bridge's
+    /// default exposure names, not a folder somebody chose to make.
     /// </remarks>
     private bool IsReserved(string parentGroupPath, string name)
     {

@@ -23,8 +23,8 @@
   -->
   <ItemGroup>
     <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
-    <!-- The env/<project> layout of earlier releases, which no keypaste writer creates since D-0413. -->
-    <Compile Include="../Keypaste.Core.Tests/LegacyVariables.cs" Link="LegacyVariables.cs" />
+    <!-- A project's variables written as env set writes them, for fixtures. -->
+    <Compile Include="../Keypaste.Core.Tests/ProjectVariables.cs" Link="ProjectVariables.cs" />
     <!-- The same software YubiKey the core's hardware-key tests prove against KeePassXC's vectors. -->
     <Compile Include="../Keypaste.Core.Tests/HardwareKeys/SoftwareYubiKey.cs" Link="HardwareKeys/SoftwareYubiKey.cs" />
     <!-- The core's hand-moved clock and /api/share fake, so the app is tested against the same ones. -->

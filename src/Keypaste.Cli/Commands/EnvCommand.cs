@@ -156,7 +156,6 @@ internal static class EnvCommand
         writer.WriteLine("a variable is a field of an entry tagged env:<project> (the dev profile) or");
         writer.WriteLine("env:<project>:<profile>, editable in KeePassXC. set and pull write a new one on");
         writer.WriteLine("--entry, or on the profile's home entry env/<project>/.env, created tagged.");
-        writer.WriteLine($"variables of earlier releases, one entry each in '{EnvConvention.RootGroup}/<project>[/<profile>]', still work.");
         writer.WriteLine("to read a value: keypaste get <entry> --field <KEY> --show");
     }
 }

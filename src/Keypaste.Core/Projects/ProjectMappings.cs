@@ -4,7 +4,7 @@ namespace Keypaste.Core.Projects;
 
 /// <summary>Where a project's command runs on this machine, and which env set it runs with.</summary>
 /// <param name="Vault">The vault file holding the set, as a full path.</param>
-/// <param name="Project">The project, whose set is <c>env/&lt;project&gt;</c>.</param>
+/// <param name="Project">The project, as its entries' tags name it.</param>
 /// <param name="Directory">The working directory, as a full path.</param>
 /// <param name="Command">The line a person would type to run it.</param>
 public sealed record ProjectMapping(string Vault, string Project, string Directory, string Command);

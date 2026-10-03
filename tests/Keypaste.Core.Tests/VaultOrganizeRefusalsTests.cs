@@ -245,11 +245,6 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
             Assert.Equal(
                 OrganizeOutcome.NameRefused,
                 vault.Relocate(_token, new EntryName("keys", "a/b"), out _));
-
-            // Both halves vary, and the destination is a project the new title could not export to.
-            Assert.Equal(
-                OrganizeOutcome.EnvNameRefused,
-                vault.Relocate(new EntryName("keys", "SPARE"), new EntryName("env/shipping", "HAS-HYPHEN"), out _));
         });
     }
 
@@ -337,92 +332,36 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
             reopened.RenameEntry(new EntryName("keys", "SPARE"), "BACKUP", out _));
     }
 
-    // ---------------------------------------------------------------- the env namespace
-
-    [Theory]
-    [InlineData("lower-case")]
-    [InlineData("9LEADING_DIGIT")]
-    [InlineData("HAS-HYPHEN")]
-    public void AnEnvVariableNameNothingCouldExport_IsRefused(string title)
-    {
-        WritesNothing(vault => Assert.Equal(OrganizeOutcome.EnvNameRefused, vault.RenameEntry(_token, title, out _)));
-    }
+    // ---------------------------------------------------------------- under env
 
     /// <summary>
-    /// The env rules apply to the env namespace and nowhere else. A vault is not all environment
-    /// variables, and a password called <c>lower-case</c> outside <c>env/</c> is an ordinary name.
+    /// A group under <c>env</c> makes no project and its entries are no variables (D-0416), so the
+    /// names an environment could not export, and two titles differing only in case, are as
+    /// ordinary there as anywhere.
     /// </summary>
     [Theory]
     [InlineData("lower-case")]
     [InlineData("9LEADING_DIGIT")]
     [InlineData("HAS-HYPHEN")]
-    public void TheSameNameOutsideTheEnvNamespace_IsOrdinary(string title)
+    [InlineData("Kept")]
+    public void ANameUnderEnv_IsAsOrdinaryAsAnywhere(string title)
     {
         using var vault = Vault.Open(Seeded(), MasterPassword);
 
-        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(new EntryName("keys", "SPARE"), title, out _));
-    }
-
-    /// <summary>
-    /// An entry directly in <c>env</c> is a write to nowhere: <see cref="EnvResolution"/> reads
-    /// <c>env/&lt;project&gt;</c>, so nothing would ever find it again.
-    /// </summary>
-    [Fact]
-    public void TheEnvRootItself_IsNotAPlaceAVariableCanLive()
-    {
-        WritesNothing(vault =>
-            Assert.Equal(OrganizeOutcome.EnvNameRefused, vault.MoveEntry(new EntryName("keys", "SPARE"), "env", out _)));
+        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_token, title, out _));
     }
 
     [Fact]
-    public void MovingAnEntryIntoAnEnvProjectUnderAnUnexportableName_IsRefused()
-    {
-        var path = Seeded();
-
-        using (var vault = Vault.Open(path, MasterPassword))
-        {
-            vault.AddEntry(new VaultEntry { Title = "lower-case", Password = "x", GroupPath = "keys" });
-            vault.Save();
-        }
-
-        WritesNothing(path, vault =>
-            Assert.Equal(
-                OrganizeOutcome.EnvNameRefused,
-                vault.MoveEntry(new EntryName("keys", "lower-case"), "env/billing", out _)));
-    }
-
-    /// <summary>
-    /// Two variables differing only in case are two on Linux and one on Windows. The rule already
-    /// refuses the pair when a set is exported; a rename that creates it must be refused where it
-    /// happens, not discovered later by whoever runs the project.
-    /// </summary>
-    [Fact]
-    public void TwoKeysDifferingOnlyInCase_AreRefusedAtTheWrite()
-    {
-        WritesNothing(vault =>
-        {
-            Assert.Equal(OrganizeOutcome.EnvNameCollides, vault.RenameEntry(_token, "Kept", out _));
-            Assert.Equal(
-                OrganizeOutcome.EnvNameCollides,
-                vault.MoveEntry(new EntryName("env/shipping", "Kept"), "env/billing", out _));
-        });
-    }
-
-    /// <summary>
-    /// Changing only the case of one variable leaves the project with one variable, so the rule
-    /// must not see the entry it is about to replace. Refusing this would refuse the repair
-    /// somebody opened the app to make.
-    /// </summary>
-    [Fact]
-    public void ChangingOnlyTheCaseOfAKey_IsAllowed_BecauseTheEntryIsNotItsOwnCollision()
+    public void AnEntryMovesIntoTheEnvRootOrAGroupUnderIt_LikeAnyOther()
     {
         using var vault = Vault.Open(Seeded(), MasterPassword);
 
-        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(new EntryName("env/billing", "KEPT"), "Kept", out _));
+        Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(new EntryName("keys", "SPARE"), "env", out _));
+        Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(new EntryName("env/shipping", "Kept"), "env/billing", out _));
     }
 
     [Fact]
-    public void RenamingAnEnvProjectToANameNothingCouldResolve_IsRefused()
+    public void RenamingAGroupUnderEnvToANameNoVaultCouldAddress_IsRefused()
     {
         WritesNothing(vault =>
             Assert.Equal(GroupOutcome.NameRefused, vault.RenameGroup("env/billing", "with/slash", out _)));
@@ -431,10 +370,9 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     // ---------------------------------------------------------------- reserved names
 
     /// <summary>
-    /// <c>env</c> at the root is not an ordinary folder: every child becomes a project, every
-    /// grandchild a variable, and the whole subtree falls under <see cref="EntryExposure.Default"/>
-    /// with nobody having written a glob. Renaming the env root away is the same act in reverse and
-    /// would silently switch off every project.
+    /// <c>env</c> at the root is where keypaste puts projects' home entries, and the whole subtree
+    /// falls under <see cref="EntryExposure.Default"/> with nobody having written a glob. Renaming a
+    /// group to it would expose that group's entries to agents, and renaming it away would hide them.
     /// </summary>
     [Fact]
     public void TheEnvRootGroup_CanBeNeitherMadeNorRenamedNorReplaced()

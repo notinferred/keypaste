@@ -43,7 +43,7 @@
 #         KEYPASTE_RESTORER    path to the restore/export driver     (default: the Release build)
 #
 # The seeding AND every save are done by the SHIPPED binary (D-0012): `keypaste add` and then
-# `keypaste env set` replace the vault, so the backup under test is one a real command produced.
+# `keypaste set` replace the vault, so the backup under test is one a real command produced.
 #
 # The fifteen-minute floor (VaultBackups.Floor) is defeated WITHOUT a product knob: the stamp
 # lives in the backup's file name, so renaming it is how this gate tells the floor that time has
@@ -69,7 +69,7 @@ restorer=$(vault_restorer)
 # The password travels in the environment, never in argv — see Keypaste.VaultRestorer.
 drive() { KEYPASTE_RESTORER_PASSWORD="$pw" "$restorer" "$@" | tr -d '\r'; }
 
-kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" env set "$1" "$3" --vault "$db"; }
+kpset() { printf '%s\n%s\n' "$pw" "$1" | "$kp" set "$entry" --vault "$db"; }
 
 backups="${db}.backups"
 stem=$(basename "$db" .kdbx)
@@ -108,8 +108,7 @@ container() {
     || die "$what is not Argon2. Got: $(grep -i '^[[:space:]]*KDF:' <<<"$info" || echo '<no KDF line>')"
 }
 
-project=compat-backup
-entry="env/${project}/ROTATED"
+entry=env/compat-backup/ROTATED
 
 mkdir -p "$(dirname "$db")"
 rm -rf "$db" "$backups"   # re-runnable locally, not only on a fresh CI checkout
@@ -124,7 +123,7 @@ printf '%s
 
 # ---------------------------------------------------------------------------------------
 step "the first save over that vault keeps it as it was: empty"
-legacy_var "$kp" "$db" "$pw" "$project" ROTATED v1-first
+printf '%s\n%s\n' "$pw" v1-first | "$kp" add "$entry" --vault "$db" >/dev/null
 
 [ "$(count)" -eq 1 ] || die "the first save over an existing vault produced $(count) backups, expected 1"
 
@@ -140,7 +139,7 @@ fi
 # ---------------------------------------------------------------------------------------
 step "a later save keeps the value it replaced"
 age
-kpset "$project" v2-second ROTATED
+kpset v2-second
 
 [ "$(count)" -eq 2 ] || die "a save outside the floor left $(count) backups, expected 2"
 
@@ -168,13 +167,13 @@ grep -qF 'v1-first' <<<"$read_back"   || die "keypaste cannot read the previous 
 
 # ---------------------------------------------------------------------------------------
 step "a second save inside the floor keeps nothing more"
-kpset "$project" v3-third ROTATED
+kpset v3-third
 [ "$(count)" -eq 2 ]   || die "a save fifteen minutes inside the floor took another backup; $(count) are there"
 
 # ---------------------------------------------------------------------------------------
 step "a save outside the floor keeps another, and it holds its own generation"
 age
-kpset "$project" v4-current ROTATED
+kpset v4-current
 [ "$(count)" -eq 3 ] || die "a save outside the floor left $(count) backups, expected 3"
 
 newest=$(list | head -n1)
@@ -190,7 +189,7 @@ retained=5
 generation=5
 while [ "$(count)" -lt "$retained" ]; do
   age
-  kpset "$project" "v${generation}-gen" ROTATED
+  kpset "v${generation}-gen"
   generation=$((generation + 1))
   [ "$generation" -lt 20 ] || die "the retained count never reached $retained; it is stuck at $(count)"
 done
@@ -199,7 +198,7 @@ done
 oldest=$(list | tail -n1)
 
 age
-kpset "$project" v-rolled ROTATED
+kpset v-rolled
 
 [ "$(count)" -eq "$retained" ] \
   || die "retention left $(count) backups, expected $retained"
@@ -216,7 +215,7 @@ mv "$backups" "${backups}.held"
 : > "$backups"                          # a regular file where the directory has to go
 
 set +e
-printf '%s\n%s\n' "$pw" blocked-value | "$kp" env set "$project" ROTATED --vault "$db" >/dev/null 2>&1
+printf '%s\n%s\n' "$pw" blocked-value | "$kp" set "$entry" --vault "$db" >/dev/null 2>&1
 refused_rc=$?
 set -e
 
@@ -263,7 +262,7 @@ grep -q '^already-kept' <<<"$again_out" || die "a vault already kept byte for by
 [ "$(count)" -eq "$((retained + 1))" ] || die "a second restore changed the backups: $(count)"
 
 age
-kpset "$project" v-after-restore ROTATED
+kpset v-after-restore
 [ "$(count)" -eq "$retained" ] || die "the save after a restore left $(count) backups, expected $retained"
 rolled=$(list | head -n1)
 

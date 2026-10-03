@@ -32,10 +32,10 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     public SessionAuthorityTokenTests()
     {
         _vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "DATABASE_URL", Password = _database });
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "API_KEY", Password = _apiKey });
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/prod", Title = "DATABASE_URL", Password = _prod });
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api", Title = "DEV_ONLY", Password = "dev" });
+        ProjectVariables.Set(_vault, "acme-api", "staging", "DATABASE_URL", _database);
+        ProjectVariables.Set(_vault, "acme-api", "staging", "API_KEY", _apiKey);
+        ProjectVariables.Set(_vault, "acme-api", "prod", "DATABASE_URL", _prod);
+        ProjectVariables.Set(_vault, "acme-api", "DEV_ONLY", "dev");
         _vault.Save();
 
         Assert.True(AuditLog.TryOpen(AuditPath, _fixture.Clock, out var audit, out var error), error);
@@ -246,7 +246,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         var lines = Lines();
         Assert.Equal(["denied", "granted"], lines.Select(line => line.GetProperty("decision").GetString()));
         Assert.Equal(
-            ["env/acme-api/staging/API_KEY", "env/acme-api/staging/DATABASE_URL", "services/Deploy"],
+            ["env/acme-api/.env.staging", "services/Deploy"],
             lines[1].GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
         Assert.All(lines, line => Assert.DoesNotContain(_deploy, line.GetRawText(), StringComparison.Ordinal));
     }
@@ -314,7 +314,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     [Fact]
     public async Task ASetTooLargeForOneReply_IsAuditedAndRecordedAsRefused()
     {
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "BIG", Password = new string('x', 70_000) });
+        ProjectVariables.Set(_vault, "acme-api", "staging", "BIG", new string('x', 70_000));
         _vault.Save();
         var token = Mint("ci", "read:acme-api/staging/*");
         var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));

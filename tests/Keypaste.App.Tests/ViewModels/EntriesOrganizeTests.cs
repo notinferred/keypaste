@@ -157,10 +157,11 @@ public sealed class EntriesOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// The one case where renaming a group also renames something a command line addresses.
+    /// Renaming a group directly under <c>env</c> moves where keypaste puts a project's new keys; an
+    /// ordinary group's rename says nothing of projects.
     /// </summary>
     [Fact]
-    public void Renaming_a_project_says_what_it_costs_and_an_ordinary_group_does_not()
+    public void Renaming_a_projects_home_group_says_where_new_keys_go_and_an_ordinary_group_does_not()
     {
         using var context = New();
         var entries = context.Entries;
@@ -173,8 +174,8 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.BeginRenameGroupCommand.Execute(null);
 
         Assert.True(entries.ShowsProjectRenameNote);
-        Assert.Contains("keypaste run billing", entries.ProjectRenameNote, StringComparison.Ordinal);
-        Assert.Contains("env/billing", entries.ProjectRenameNote, StringComparison.Ordinal);
+        Assert.Contains("New keys for billing go to entries in env/billing", entries.ProjectRenameNote, StringComparison.Ordinal);
+        Assert.Contains("Moved entries keep their tags", entries.ProjectRenameNote, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -294,7 +295,6 @@ public sealed class EntriesOrganizeTests : IDisposable
     [Theory]
     [InlineData("staging", "servers")]
     [InlineData("a/b", "servers")]
-    [InlineData("lower-case", "env/billing")]
     [InlineData("production", "servers")]
     public void A_refused_organize_leaves_the_bytes_unchanged(string title, string group)
     {
@@ -349,8 +349,8 @@ public sealed class EntriesOrganizeTests : IDisposable
             Select(entries, "servers", "production");
             entries.OrganizeCommand.Execute(null);
 
-            // The rename is fine on its own; the destination is what refuses.
-            entries.DraftTitle = "production-db";
+            // The rename is fine on its own; the destination, where the title is taken, is what refuses.
+            entries.DraftTitle = "STRIPE_KEY";
             entries.MoveTarget = Group(entries, "env/billing");
             entries.ConfirmOrganizeCommand.Execute(null);
 
@@ -368,8 +368,8 @@ public sealed class EntriesOrganizeTests : IDisposable
         Assert.NotNull(reopened.Find(new EntryName(string.Empty, "unrelated")));
 
         Assert.NotNull(reopened.Find(new EntryName("servers", "production")));
-        Assert.Null(reopened.Find(new EntryName("servers", "production-db")));
-        Assert.Null(reopened.Find(new EntryName("env/billing", "production-db")));
+        Assert.Null(reopened.Find(new EntryName("servers", "STRIPE_KEY")));
+        Assert.Equal("sk", reopened.Find(new EntryName("env/billing", "STRIPE_KEY"))!.Password, StringComparer.Ordinal);
     }
 
     [Fact]

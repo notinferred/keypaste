@@ -87,7 +87,7 @@ keypaste import old.kdbx --vault mine.kdbx --dry-run
 keypaste import old.kdbx --vault mine.kdbx --into old
 ```
 
-Each top-level group lands under `--into`, which defaults to the file's name. An `env/<project>` set and its profiles keep their own path only when the set is valid and your vault does not already have that project; any other env group lands under `--into` too, and `--dry-run` shows why. Entries keep their custom fields, attachments, tags, icons, times and history, with new identities. The file's recycle bin and anything in keypaste's reserved `.keypaste` group stay behind. `--dry-run` shows every row and where it will land first; a row that still cannot land, such as a destination changed to a reserved group or to an env set that is not valid, stops the whole import before anything is written.
+Each top-level group lands under `--into`, which defaults to the file's name. In source, that includes an `env` group, whose entries keep the tags that put them in projects; the published `v0.3.0` keeps a valid `env/<project>` set at its own path when your vault does not already have that project, and `--dry-run` shows why. Entries keep their custom fields, attachments, tags, icons, times and history, with new identities. The file's recycle bin and anything in keypaste's reserved `.keypaste` group stay behind. `--dry-run` shows every row and where it will land first; a row that still cannot land, such as a destination changed to a reserved group, stops the whole import before anything is written.
 
 <a id="what-this-does-not-do"></a>
 

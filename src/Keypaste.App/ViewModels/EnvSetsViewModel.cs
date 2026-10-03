@@ -9,10 +9,11 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A project is a group under <c>env/</c> and a variable is one entry inside it — D-0014's
-/// convention, read and written through <see cref="EnvStore"/>. Nothing about where a variable lives
-/// is decided here, which is what lets <c>keypaste env ls</c> and <c>keypaste run</c> see what this
-/// screen writes the moment it is written.
+/// A project is the entries whose own tags name it, and a variable is an env-named field of one of
+/// them (D-0416), read through <see cref="ProjectCatalog"/> and <see cref="EnvResolution"/> and
+/// written through <see cref="EnvStore"/>. Nothing about where a variable lives is decided here,
+/// which is what lets <c>keypaste env ls</c> and <c>keypaste run</c> see what this screen writes the
+/// moment it is written.
 /// </para>
 /// <para>
 /// <b>Only the open project's variables are ever read.</b> A card knows a project's name and how
@@ -204,7 +205,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
 
         var wanted = OpenProject?.Name;
 
-        Projects = [.. new EnvStore(vault).Projects()];
+        Projects = [.. ProjectCatalog.Read(vault).Projects.Select(listing => listing.Name)];
 
         if (wanted is not null && Projects.Contains(wanted, StringComparer.Ordinal))
         {
@@ -319,13 +320,13 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (new EnvStore(vault).ProjectExists(project))
+        if (ProjectCatalog.Read(vault).Projects.Any(listing => string.Equals(listing.Name, project, StringComparison.Ordinal)))
         {
             Error = $"'{project}' already exists.";
             return;
         }
 
-        // A project is a group, and core creates a group when something is put in it. There is
+        // A project is its tagged entries, and its first key creates the tagged home entry. There is
         // nothing to write yet, so the card appears the moment its first variable does — which is
         // also true of `keypaste env set`, and saying otherwise would be a second convention.
         IsAdding = false;

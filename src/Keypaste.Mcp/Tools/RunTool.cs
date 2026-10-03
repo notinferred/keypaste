@@ -139,15 +139,15 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             return Finish(client, line, Invalid(programProblem.Argument, programProblem.Rule), null);
         }
 
-        // Every reference names its entry without the vault, so the exposure is applied here before
-        // anybody is asked; the owner applies it again after resolving.
+        // Every reference is checked by name before anybody is asked, an env reference by its set's
+        // name and key; the owner applies the exposure again to the entries it resolves.
         foreach (var reference in call.References ?? [])
         {
             _ = KpReferences.TryParse(reference.Reference, out var parsed, out _);
 
             var entry = parsed switch
             {
-                EnvReference env => new EntryName(EnvProfileNames.GroupPath(env.Project, env.Profile), env.Key),
+                EnvReference env => new EntryName(EnvProfileNames.SetName(env.Project, env.Profile), env.Key),
                 EntryReference named => named.Entry,
                 _ => null,
             };
@@ -383,7 +383,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         internal AuditRecord Record(AuditClient client, Verdict verdict, ServerOptions options)
         {
             var group = call.Project is { } project && call.References is null
-                ? $"{EnvConvention.RootGroup}/{project}{(call.Profile is { } profile && profile != EnvProfileNames.Default ? "/" + profile : string.Empty)}"
+                ? EnvProfileNames.SetName(project, call.Profile ?? EnvProfileNames.Default)
                 : null;
             var shown = DisplayTextSanitizer.Sanitize(EnvReleasePrompt.CommandLine(call.Command), EnvReleasePrompt.MaximumCommandLength).Text;
 

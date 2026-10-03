@@ -107,7 +107,7 @@ public sealed class EnvGrantCache : IDisposable
         ArgumentNullException.ThrowIfNull(keys);
 
         IReadOnlyList<EntryName> released = entries
-            ?? [.. keys.Select(name => new EntryName(EnvProfileNames.GroupPath(project, profile), name))];
+            ?? [.. keys.Select(name => new EntryName(EnvProfileNames.SetName(project, profile), name))];
 
         lock (_gate)
         {
