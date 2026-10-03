@@ -1,6 +1,6 @@
 # Product rules
 
-Last ratified: 2026-10-02 (v1.10, D-0408): everyone is offered a free cloud vault that keypaste syncs end to end and can never read, while local use still needs no account; once team projects exist, a team project may choose server access; no server ever reads a personal vault. v1.9's end state (D-0400) and v1.8's KeePass-first product and track order (D-0367) otherwise stand. Earlier versions remain in Git. Scope changes update this document, ROADMAP, STEPS and the decision record together. The security laws in §3 remain fixed.
+Last ratified: 2026-10-03 (v1.11, D-0416): keypaste keeps no compatibility with its own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read; KeePass compatibility is unchanged. v1.10's cloud vault and server access (D-0408), v1.9's end state (D-0400) and v1.8's KeePass-first product and track order (D-0367) otherwise stand. Earlier versions remain in Git. Scope changes update this document, ROADMAP, STEPS and the decision record together. The security laws in §3 remain fixed.
 
 ## 1. Product
 
@@ -36,7 +36,7 @@ No track is complete merely because a screen, reader, protocol or package exists
 
 KDBX is the only vault format. Keypaste preserves data it does not expose for editing, rejects unsupported operations without destroying the original, and verifies writes against real KeePassXC. A compatible file does not establish support for every unlock method, field editor or integration. Support cannot reconstruct a lost vault secret.
 
-A project's variables are env-named custom fields on ordinary entries, and an entry joins a project, or one of its environments, through its own KeePass tag: `env:<project>` or `env:<project>:<environment>`. A value lives once, however many environments use it. The one-entry-per-variable `env/<project>` layout of earlier releases stays readable, and keypaste writes no new variables in it. STEPS and the decision record own the exact grammar.
+A project's variables are env-named custom fields on ordinary entries, and an entry joins a project, or one of its environments, through its own KeePass tag: `env:<project>` or `env:<project>:<environment>`. A value lives once, however many environments use it. Entries in the one-entry-per-variable `env/<project>` layout of earlier releases are ordinary entries: keypaste reads no variable from them and keeps no compatibility with its own releases before 0.5.0. STEPS and the decision record own the exact grammar.
 
 Security checks run locally and speak through a recommendations list outside the main screens. Keys found in notes are flagged for review, and nothing is moved or changed until the person confirms.
 

@@ -2,6 +2,15 @@
 
 This file preserves historical wording and evidence, including superseded plans. The current [PRODUCT](PRODUCT.md) and [decision ledger](../DECISIONS.md) govern future work; no archived milestone, feature, pricing plan, platform promise or dependency creates a delivery obligation. A historical description of implemented behavior is not proof of the newly planned shared session. Consult this file only for a cited decision or a shipped behavior's history.
 
+## Superseded by D-0416
+
+PRODUCT v1.11 (D-0416) dropped the `env/<project>` layout these rows defined; their wording is kept here as history.
+
+| id | date | decision | supersedes |
+|---|---|---|---|
+| D-0414 | 2026-10-02 | A project is legacy while its `env/<project>` group holds an untagged entry or a subgroup; one holding only tagged entries, such as home entries, is a project of tags ([C.1c](steps/C.1c.md)) | D-0370's legacy mark on every `env/` group |
+| D-0347 | 2026-09-25 | A project's default profile `dev` is its group `env/<project>`, as before profiles; another profile is the subgroup `env/<project>/<profile>` named `[a-z0-9][a-z0-9-]{0,31}`; a subgroup named `dev` or an invalid name is ignored and reported, and project names stay one segment | — |
+
 ## Ledger before the 2026-09-19 scope reset
 
 The following decision text was retained when D-0243 reset the scope; local link targets are relative to this archive. Selected implementation decisions remain in the active ledger with shorter current wording; that wording takes precedence. D-0244 supersedes D-0054's independent agent as the future authority.

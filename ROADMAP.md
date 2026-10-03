@@ -17,7 +17,7 @@ The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md)
 - the app gets simpler;
 - connecting an agent takes one step.
 
-[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state that follows the first desktop release: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11).
+[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state that follows the first desktop release: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11). v1.11 (D-0416) drops compatibility with keypaste's own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read.
 
 ## Track order
 
@@ -45,7 +45,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | Outcome | Tasks |
 |---|---|
 | Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. | V.7a, V.7b, C.2 |
-| A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project. Projects in the old `env/` layout keep working and can be moved. An entry that loses its tag in another app is flagged. | C.1a, C.1b, C.1c, C.3, C.4, V.11 |
+| A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project, and nothing else does: keypaste keeps no compatibility with its own releases before 0.5.0. An entry that loses its tag in another app is flagged. | C.1a, C.1b, C.1c, C.6, C.4, V.11 |
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. It says at once when another program saved the vault. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14, N.16 |
 | An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose, and the app, not the agent's own configuration, sets what each agent may see and run, and the owner records every request itself. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, G.8, G.9, N.10 |
 | A project runs from the app on macOS, and every desktop install puts the CLI on PATH. | E.1d, G.5 |
@@ -59,7 +59,7 @@ Two outside inputs gate this release:
 
 Published version prefixes are immutable. If Apple enrollment lags, the choice at 4.7c2 is to wait, or to ship macOS as `0.5.1`.
 
-N.4, N.7, N.12, G.4a and C.3 could move to the next milestone without breaking the journey.
+N.4, N.7, N.12 and G.4a could move to the next milestone without breaking the journey.
 
 ## After 0.5.0: reach
 
