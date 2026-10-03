@@ -240,7 +240,7 @@ When stdin is not a terminal each prompt consumes one line in order. `init` take
 
 ## Environment variables
 
-Each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password. KeePassXC can edit these entries directly. CI checks interoperability on all three operating systems; [D-0014](docs/decisions-archive.md) explains the convention.
+In `v0.3.0` each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password; [D-0014](docs/decisions-archive.md) explains the convention. In 0.5.0, which is not yet published, a variable is a protected field of an entry tagged `env:<project>`, and `env set` and `env pull` put a new one on the project's entry `env/<project>/.env`, so the value below is read with `keypaste get env/billing/.env --field DATABASE_URL --show`; variables of the earlier layout keep working and are updated in place. KeePassXC can edit both directly. CI checks interoperability on all three operating systems.
 
 ```sh
 keypaste env pull billing

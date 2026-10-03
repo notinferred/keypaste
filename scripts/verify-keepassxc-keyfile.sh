@@ -148,10 +148,10 @@ for form in xml raw32 hex64 any; do
   # 2>&1: `env set` reports what it did on stderr, keeping stdout for a command's result.
   out=$(printf '%s\n' "$pw" | "$kp" env set "$project" "TOKEN=v-$form" --vault "$vault" --keyfile "$kf" 2>&1) \
     || die "keypaste could not write the $form vault"
-  grep -Eq '^(Set|Updated) env' <<<"$out"     || die "keypaste did not report writing the $form vault. It said: ${out}"
+  grep -Eq '^(Set|Updated) TOKEN on env/' <<<"$out" || die "keypaste did not report writing the $form vault. It said: ${out}"
 
   step "KeePassXC reads back what keypaste wrote into the $form vault"
-  got=$(kpxc show -q -a Password --key-file "$(native "$kf")" "$(native "$vault")" "env/$project/TOKEN") \
+  got=$(kpxc show -q -a TOKEN --key-file "$(native "$kf")" "$(native "$vault")" "env/$project/.env") \
     || die "KeePassXC cannot open the $form vault keypaste wrote"
   [ "$got" = "v-$form" ] \
     || die "KeePassXC reads '$got' out of the $form vault, not 'v-$form'"
@@ -194,7 +194,7 @@ step "keypaste opens it with an empty line where the password goes"
 printf '\n' | "$kp" env set "$project" "TOKEN=v-only" --vault "$only" --keyfile "$only_kf" >/dev/null 2>&1 \
   || die "keypaste could not write the keyfile-only vault. An empty password is not no password: see KeePassInterop.BuildKey."
 
-got=$(kpxc_only show -q --no-password -a Password --key-file "$(native "$only_kf")" "$(native "$only")" "env/$project/TOKEN") \
+got=$(kpxc_only show -q --no-password -a TOKEN --key-file "$(native "$only_kf")" "$(native "$only")" "env/$project/.env") \
   || die "KeePassXC cannot open the keyfile-only vault keypaste wrote"
 [ "$got" = "v-only" ] \
   || die "KeePassXC reads '$got' out of the keyfile-only vault, not 'v-only'"
@@ -293,7 +293,7 @@ printf '%s\n%s\n%s\n' "$pw" "$new_pw" "$new_pw" | "$kp" access --password --vaul
   || die "keypaste access --password failed"
 opens_in_kpxc "$new_pw" "$(native "$acc")" || die "KeePassXC cannot open the vault with the password keypaste set"
 opens_in_kpxc "$pw" "$(native "$acc")" && die "KeePassXC still opens the vault with the old password"
-got=$(kpxc_as "$new_pw" show -q -a Password "$(native "$acc")" "env/$project/TOKEN") \
+got=$(kpxc_as "$new_pw" show -q -a TOKEN "$(native "$acc")" "env/$project/.env") \
   || die "KeePassXC cannot read the entry after the password change"
 [ "$got" = "v-access" ] || die "KeePassXC reads '$got' after the password change, not 'v-access'"
 container_after=$(kpxc_as "$new_pw" db-info "$(native "$acc")" | grep -E '^(Cipher|KDF):')

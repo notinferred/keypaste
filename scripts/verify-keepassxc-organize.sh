@@ -62,6 +62,9 @@ driver=$(vault_restorer)
 export KEYPASTE_RESTORER_PASSWORD=$pw
 
 kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" env set "$1" "$3" --vault "$db"; }
+# A new variable is written in the env/<project> layout these checks address, which only `add` still
+# creates (D-0413); kpset then updates it in place.
+kpnew() { legacy_var "$kp" "$db" "$pw" "$1" "$3" "$2"; }
 
 # The KDBX container: signature, major version, and the minor version this gate exists for.
 assert_kdbx_40() {
@@ -99,11 +102,12 @@ rm -f "$db"          # re-runnable locally, not only on a fresh CI checkout
 # ---------------------------------------------------------------------------------------
 step "seed: the shipped binary writes an env project with history, a second project and a plain entry"
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$db"
-for value in v1-first v2-second v3-third v4-current; do
+kpnew "$project" v1-first TOKEN
+for value in v2-second v3-third v4-current; do
   kpset "$project" "$value" TOKEN
 done
-kpset "$project" kept-value KEPT
-kpset "$other" other-value OTHER
+kpnew "$project" kept-value KEPT
+kpnew "$other" other-value OTHER
 printf '%s\n%s\n' "$pw" 'plain-pass' | "$kp" add "keys/spare" --vault "$db" >/dev/null
 
 uuid_before=$(entry_uuid "$db")
@@ -260,7 +264,7 @@ grep -Eqi '^[[:space:]]*KDF:[[:space:]]*Argon2' <<<"$info" || die "KDF changed a
 # 4.0 must still raise a recycled one to 4.1, or those assertions are checking nothing.
 # ---------------------------------------------------------------------------------------
 step "recycling raises the same file to KDBX 4.1, which is what makes the 4.0 assertions mean something"
-kpset invoicing doomed-value DOOMED >/dev/null
+kpnew invoicing doomed-value DOOMED
 printf '%s\n' "$pw" | "$kp" rm env/invoicing/DOOMED --vault "$db" --yes >/dev/null
 
 hdr=$(header "$db")
@@ -273,7 +277,7 @@ hdr=$(header "$db")
 # collapsed into one.
 # ---------------------------------------------------------------------------------------
 step "a name something else already answers to is refused, and writes nothing"
-kpset invoicing second-value TOKEN_TAKEN >/dev/null
+kpnew invoicing second-value TOKEN_TAKEN
 refuses DestinationOccupied entry-rename "$db" env/invoicing KEPT TOKEN_TAKEN
 
 step "a destination that does not exist is refused, and creates nothing on the way"
@@ -321,7 +325,7 @@ fi
 
 # The byte comparison every refusal above rests on must be able to see a change.
 before_control=$(bytes "$db")
-kpset invoicing control-value CONTROL >/dev/null
+kpnew invoicing control-value CONTROL
 [ "$(bytes "$db")" != "$before_control" ] \
   || die "the vault file did not change after a write — the byte comparison cannot detect one, so every refusal above proved nothing"
 

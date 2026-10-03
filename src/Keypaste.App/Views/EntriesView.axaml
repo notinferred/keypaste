@@ -1252,6 +1252,24 @@
                                Width="220" />
                       <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
                     </StackPanel>
+
+                    <!-- A project tag is written only after the person has seen the environment and the fields it
+                         reaches (D-0415). -->
+                    <Border Classes="form" IsVisible="{Binding IsConfirmingTagChange}" ctl:ShowInView.OnShow="True">
+                      <StackPanel Spacing="10">
+                        <ItemsControl ItemsSource="{Binding TagChangeLines}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                              <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Classes="primary" Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
+                          <Button Classes="ghost" Content="Cancel" Command="{Binding CancelTagChangeCommand}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
                   </StackPanel>
 
                   <!-- Agent access: who received this entry and what grant covers it now, never a value, shown

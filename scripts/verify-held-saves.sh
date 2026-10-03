@@ -146,7 +146,7 @@ answered() {
 
 # ---------------------------------------------------------------- a vault, a source and a .env
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
-printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$V1" --vault "$VAULT" >/dev/null || die "could not store the credential"
+legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$V1" || die "could not store the credential"
 printf '%s\n%s\n' "$MASTER" 'gh-held' | "$CLI" add Work/github --vault "$VAULT" >/dev/null || die "could not store an entry to remove"
 printf '%s\n%s\n' "$SOURCE_PW" "$SOURCE_PW" | "$CLI" init "$SOURCE" >/dev/null || die "could not create the import source"
 printf '%s\n%s\n' "$SOURCE_PW" 'old-held' | "$CLI" add Imported/old --vault "$SOURCE" >/dev/null || die "could not fill the import source"

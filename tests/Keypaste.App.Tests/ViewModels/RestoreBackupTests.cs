@@ -47,7 +47,7 @@ public sealed class RestoreBackupTests : IDisposable
         using (var vault = Vault.Create(_vaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "production", GroupPath = "servers", Password = "v0" });
-            new EnvStore(vault).TrySet("billing", "API_KEY", "k0", out _);
+            LegacyVariables.Set(vault, "billing", "API_KEY", "k0");
             vault.Save();
         }
 

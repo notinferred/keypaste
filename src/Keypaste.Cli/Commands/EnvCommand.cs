@@ -66,6 +66,32 @@ internal static class EnvCommand
     /// <summary>The option every env verb takes to name a profile.</summary>
     internal static readonly OptionSpec ProfileOption = new("profile", TakesValue: true, Short: 'p');
 
+    /// <summary>The option the env writers take to name the entry a key is written on or removed from.</summary>
+    internal static readonly OptionSpec EntryOption = new("entry", TakesValue: true);
+
+    /// <summary>The entry <c>--entry</c> names, resolved in the open vault; null when the option is absent.</summary>
+    /// <returns>False with the reason when the option names no entry.</returns>
+    /// <exception cref="VaultException">More than one entry answers to the path.</exception>
+    internal static bool TryFindEntry(Vault vault, CommandLine line, out EntryName? entry, out string error)
+    {
+        entry = null;
+        error = string.Empty;
+
+        if (line.Value(EntryOption.Name) is not { } path)
+        {
+            return true;
+        }
+
+        if (vault.Find(path) is not { } found)
+        {
+            error = $"no entry '{EntryNameSanitizer.SanitizePath(path).Text}'";
+            return false;
+        }
+
+        entry = EntryName.Of(found);
+        return true;
+    }
+
     /// <summary>The profile a command line names, <c>dev</c> when it names none.</summary>
     /// <returns>False with the reason when the name is not one keypaste resolves.</returns>
     internal static bool TryProfile(CommandLine line, out string profile, out string error)
@@ -113,10 +139,6 @@ internal static class EnvCommand
     /// <summary>What a verb that could not infer a project asks for.</summary>
     internal const string NameAProject = "name a project, as in: keypaste run -p dev acme-api -- npm start";
 
-    /// <summary>How a command names where a variable of a profile lives.</summary>
-    internal static string EntryPath(string project, string profile, string key) =>
-        EnvProfileNames.GroupPath(project, profile) + "/" + key;
-
     internal static void WriteUsage(TextWriter writer)
     {
         writer.WriteLine("usage: keypaste env <command> [-p <profile>]");
@@ -131,10 +153,10 @@ internal static class EnvCommand
         writer.WriteLine("  tag <project> <entry>    put an entry in a project through its env: tag");
         writer.WriteLine("  untag <project> <entry>  take it out again");
         writer.WriteLine();
-        writer.WriteLine($"variables live in the '{EnvConvention.RootGroup}/<project>' group of the vault, which is");
-        writer.WriteLine($"the {EnvProfileNames.Default} profile; -p <profile> uses the '{EnvConvention.RootGroup}/<project>/<profile>' group.");
-        writer.WriteLine("one entry per variable, and fully editable in KeePassXC. An entry tagged");
-        writer.WriteLine("env:<project> or env:<project>:<profile> belongs to that project too.");
-        writer.WriteLine("to read a value: keypaste get env/<project>/<KEY> --show");
+        writer.WriteLine("a variable is a field of an entry tagged env:<project> (the dev profile) or");
+        writer.WriteLine("env:<project>:<profile>, editable in KeePassXC. set and pull write a new one on");
+        writer.WriteLine("--entry, or on the profile's home entry env/<project>/.env, created tagged.");
+        writer.WriteLine($"variables of earlier releases, one entry each in '{EnvConvention.RootGroup}/<project>[/<profile>]', still work.");
+        writer.WriteLine("to read a value: keypaste get <entry> --field <KEY> --show");
     }
 }

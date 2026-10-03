@@ -48,8 +48,8 @@ public sealed class EnvDiffTests : IDisposable
     [Fact]
     public void Two_profiles_with_the_same_usable_keys_have_no_difference()
     {
-        new EnvStore(_vault).TrySet("acme-api", "qa", "DATABASE_URL", "qa-db", out _);
-        new EnvStore(_vault).TrySet("acme-api", "qa2", "DATABASE_URL", "qa2-db", out _);
+        LegacyVariables.Set(_vault, "acme-api", "qa", "DATABASE_URL", "qa-db");
+        LegacyVariables.Set(_vault, "acme-api", "qa2", "DATABASE_URL", "qa2-db");
 
         Assert.Empty(Compare("qa", "qa2"));
         Assert.Throws<ArgumentException>(() => Compare("dev", "absent"));

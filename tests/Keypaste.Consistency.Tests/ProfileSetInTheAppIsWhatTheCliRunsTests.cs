@@ -50,7 +50,7 @@ public sealed class ProfileSetInTheAppIsWhatTheCliRunsTests
         Assert.Null(screen.Error);
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("env", "ls", "billing", "-p", "staging"));
-        Assert.Equal(["STRIPE_KEY"], fixture.Cli.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        Assert.Equal(["staging", "env/billing/.env.staging", "STRIPE_KEY"], fixture.Cli.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "-p", "staging", "billing", "--", "deploy"));
         Assert.Equal(_staging, fixture.Cli.ProcessLauncher.Environment["STRIPE_KEY"]);

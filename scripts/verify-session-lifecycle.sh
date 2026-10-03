@@ -161,7 +161,7 @@ finish_denied() {
 
 # ---------------------------------------------------------------- a vault with something in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
-printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT" >/dev/null \
+legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$SECRET" \
   || die "could not store the test credential"
 
 # -------------------------------------------- launched with no terminal, unlocking serves agents

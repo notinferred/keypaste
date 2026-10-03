@@ -246,8 +246,13 @@ fixture() {
   printf '%s\n' "$MASTER" | "$KP" add "$ENTRY" --username seeded --url https://example.test \
     --notes 'made by the CLI before the upgrade' --generate --vault "$VAULT_NATIVE" >/dev/null \
     || { echo 'keypaste add failed'; return 1; }
-  # Three values, so the entry carries two history revisions the upgrade must not lose (D-0014).
-  for value in "${VALUES[@]}"; do
+  # Three values, so the entry carries two history revisions the upgrade must not lose (D-0014). The
+  # first is written as an entry of the env/ layout, which only `add` creates since D-0413, and
+  # `env set` updates it in place in every version.
+  printf '%s\n%s\n' "$MASTER" "${VALUES[0]}" | "$KP" add "env/$PROJECT/$VARIABLE" --username upgrade --url https://example.test --notes 'a variable made before the upgrade' \
+    --vault "$VAULT_NATIVE" >/dev/null \
+    || { echo "keypaste add ${VALUES[0]} failed"; return 1; }
+  for value in "${VALUES[@]:1}"; do
     printf '%s\n%s\n' "$MASTER" "$value" | "$KP" env set "$PROJECT" "$VARIABLE" --vault "$VAULT_NATIVE" >/dev/null \
       || { echo "keypaste env set $value failed"; return 1; }
   done

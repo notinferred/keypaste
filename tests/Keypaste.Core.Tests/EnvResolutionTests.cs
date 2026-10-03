@@ -274,10 +274,10 @@ public sealed class EnvResolutionTests : IDisposable
     }
 
     private static void Add(Vault vault, string project, string key, string value) =>
-        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet(project, key, value, out _));
+        LegacyVariables.Set(vault, project, key, value);
 
     private static void Add(Vault vault, string project, string profile, string key, string value) =>
-        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet(project, profile, key, value, out _));
+        LegacyVariables.Set(vault, project, profile, key, value);
 
     private static void AssertNoValue(EnvResolved resolved, params string[] values)
     {

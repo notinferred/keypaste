@@ -8,7 +8,7 @@ public sealed record ProjectEnvironment(string Name, bool IsProtected, IReadOnly
 
 /// <summary>One project: the entries tagged for it, the legacy <c>env/&lt;project&gt;</c> group, or both.</summary>
 /// <param name="Name">The project's name.</param>
-/// <param name="IsLegacy">Whether it has an <c>env/&lt;project&gt;</c> group, the one-entry-per-variable layout of earlier releases.</param>
+/// <param name="IsLegacy">Whether its <c>env/&lt;project&gt;</c> group holds the one-entry-per-variable layout of earlier releases: an untagged entry anywhere in it, or a subgroup (D-0414).</param>
 /// <param name="Environments">Its environments, <c>dev</c> first and protected ones last, as <see cref="EnvStore.Profiles"/> orders them.</param>
 public sealed record ProjectListing(string Name, bool IsLegacy, IReadOnlyList<ProjectEnvironment> Environments);
 
@@ -51,15 +51,18 @@ public sealed class ProjectCatalog
 
         Dictionary<string, Dictionary<string, List<EntryName>>> tagged = new(StringComparer.Ordinal);
         List<ProjectTagProblem> problems = [];
+        var snapshot = vault.ReadEnvSnapshot();
 
-        foreach (var (name, tags) in vault.ReadTags())
+        foreach (var entry in snapshot.Entries)
         {
+            var name = entry.Name;
+
             if (ReservedGroups.IsReserved(name.GroupPath))
             {
                 continue;
             }
 
-            foreach (var tag in tags.Select(ProjectTag.Read))
+            foreach (var tag in entry.Tags.Select(ProjectTag.Read))
             {
                 if (tag.Kind == ProjectTagKind.Malformed)
                 {
@@ -85,7 +88,7 @@ public sealed class ProjectCatalog
 
                 return new ProjectListing(
                     project,
-                    legacy.Contains(project, StringComparer.Ordinal),
+                    legacy.Contains(project, StringComparer.Ordinal) && HoldsLegacyLayout(snapshot, project),
                     [
                         .. names
                             .Select(environment => new ProjectEnvironment(
@@ -103,6 +106,16 @@ public sealed class ProjectCatalog
         return new ProjectCatalog(
             [.. projects],
             [.. problems.OrderBy(problem => Path(problem.Entry), StringComparer.Ordinal).ThenBy(problem => problem.Tag, StringComparer.Ordinal)]);
+    }
+
+    /// <summary>Whether a project's <c>env/</c> group holds an untagged entry anywhere in it, or any subgroup.</summary>
+    private static bool HoldsLegacyLayout(EnvSnapshot snapshot, string project)
+    {
+        var group = EnvConvention.GroupPath(project);
+
+        return snapshot.GroupPaths.Any(path => path.StartsWith(group + "/", StringComparison.Ordinal))
+            || snapshot.Entries.Any(entry => !entry.IsTagged
+                && (string.Equals(entry.Entry.GroupPath, group, StringComparison.Ordinal) || entry.Entry.GroupPath.StartsWith(group + "/", StringComparison.Ordinal)));
     }
 
     private static string Path(EntryName entry) => entry.GroupPath.Length == 0 ? entry.Title : entry.GroupPath + "/" + entry.Title;

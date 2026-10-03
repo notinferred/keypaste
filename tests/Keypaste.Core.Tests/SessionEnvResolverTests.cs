@@ -20,7 +20,7 @@ public sealed class SessionEnvResolverTests : IDisposable
 
         using (var created = Vault.Create(_path, EnvStoreTests.MasterPassword))
         {
-            new EnvStore(created).TrySet("dev", "TOKEN", "v1", out _);
+            LegacyVariables.Set(created, "dev", "TOKEN", "v1");
             created.Save();
         }
 
@@ -122,7 +122,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             (_, _) =>
             {
                 using var other = Vault.Open(_path, EnvStoreTests.MasterPassword);
-                new EnvStore(other).TrySet("dev", "TOKEN", "elsewhere", out _);
+                LegacyVariables.Set(other, "dev", "TOKEN", "elsewhere");
                 other.Save();
                 return ValueTask.FromResult(true);
             },
@@ -139,7 +139,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             "dev",
             (_, _) =>
             {
-                new EnvStore(_vault).TrySet("dev", "TOKEN", "v2", out _);
+                LegacyVariables.Set(_vault, "dev", "TOKEN", "v2");
                 _vault.Save();
                 return ValueTask.FromResult(true);
             },
@@ -151,7 +151,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             "dev",
             (_, _) =>
             {
-                new EnvStore(_vault).TrySet("dev", "EXTRA", "x", out _);
+                LegacyVariables.Set(_vault, "dev", "EXTRA", "x");
                 _vault.Save();
                 return ValueTask.FromResult(true);
             },
@@ -319,7 +319,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             null,
             (_, _) =>
             {
-                new EnvStore(_vault).TrySet("dev", "staging", "EXTRA", "x", out _);
+                LegacyVariables.Set(_vault, "dev", "staging", "EXTRA", "x");
                 _vault.Save();
                 return ValueTask.FromResult(true);
             },
@@ -351,7 +351,7 @@ public sealed class SessionEnvResolverTests : IDisposable
     {
         foreach (var (key, value) in variables)
         {
-            Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(_vault).TrySet("dev", "staging", key, value, out _));
+            LegacyVariables.Set(_vault, "dev", "staging", key, value);
         }
 
         _vault.Save();

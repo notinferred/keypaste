@@ -51,7 +51,7 @@ public sealed class KeyfileOptionTests
             verbs.Add(["add", "env/demo/NEW", _vault, _keyfile]);
             verbs.Add(["rm", "env/demo/TOKEN", "--yes", _vault, _keyfile]);
             verbs.Add(["env", "ls", _vault, _keyfile]);
-            verbs.Add(["env", "tag", "demo", "env/demo/TOKEN", _vault, _keyfile]);
+            verbs.Add(["env", "tag", "demo", "env/demo/TOKEN", "--yes", _vault, _keyfile]);
             verbs.Add(["env", "set", "demo", "KEY=value", _vault, _keyfile]);
             verbs.Add(["env", "rm", "demo", "TOKEN", "--yes", _vault, _keyfile]);
             verbs.Add(["env", "export", "demo", "--dotenv", "--stdout", "--yes", _vault, _keyfile]);

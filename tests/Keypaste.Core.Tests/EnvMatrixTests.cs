@@ -21,15 +21,14 @@ public sealed class EnvMatrixTests : IDisposable
     internal static Vault Seeded(string directory)
     {
         var vault = Vault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
-        var store = new EnvStore(vault);
 
-        store.TrySet("acme-api", "DATABASE_URL", "dev-db", out _);
-        store.TrySet("acme-api", "STRIPE_KEY", Shared, out _);
-        store.TrySet("acme-api", "prod", "DATABASE_URL", "prod-db", out _);
-        store.TrySet("acme-api", "prod", "STRIPE_KEY", Shared, out _);
-        store.TrySet("acme-api", "prod", "SENTRY_DSN", "prod-sentry", out _);
-        store.TrySet("acme-api", "staging", "DATABASE_URL", "staging-db", out _);
-        store.TrySet("acme-api", "staging", "JWT_SIGNING_KEY", "staging-jwt", out _);
+        LegacyVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
+        LegacyVariables.Set(vault, "acme-api", "STRIPE_KEY", Shared);
+        LegacyVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", "prod-db");
+        LegacyVariables.Set(vault, "acme-api", "prod", "STRIPE_KEY", Shared);
+        LegacyVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
+        LegacyVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
+        LegacyVariables.Set(vault, "acme-api", "staging", "JWT_SIGNING_KEY", "staging-jwt");
         vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "JWT_SIGNING_KEY"), new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero));
 
         return vault;

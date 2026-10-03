@@ -16,11 +16,11 @@ namespace Keypaste.App.ViewModels;
 /// a row cannot reveal itself behind the screen's back.
 /// </para>
 /// <para>
-/// <b>Reading and writing go through <see cref="EnvStore"/>, which is what makes the CLI agree.</b>
-/// The group a variable lands in, the rule for a name, the outcome of a set — all of it is core's
-/// (D-0014). A screen that wrote to <c>envs/&lt;project&gt;</c> would round-trip through
-/// <c>Vault.Open</c> perfectly and be invisible to <c>keypaste env ls</c>, which is exactly the
-/// mutation the consistency tests exist to catch.
+/// <b>Reading goes through <see cref="EnvResolution"/> and writing through <see cref="EnvStore"/>,
+/// which is what makes the CLI agree.</b> Where a key lives, where a new one lands, the rule for a
+/// name and the outcome of a write are all core's (D-0413). A screen that wrote anywhere else would
+/// round-trip through <c>Vault.Open</c> perfectly and be invisible to <c>keypaste run</c>, which is
+/// exactly the mutation the consistency tests exist to catch.
 /// </para>
 /// </remarks>
 internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
@@ -31,6 +31,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private readonly IVaultFilePicker? _picker;
 
     private IReadOnlyList<EnvVariableRow> _variables = [];
+    private IReadOnlyList<EnvEntryChoice> _entryChoices = [];
+    private EnvEntryChoice? _newEntry;
     private IReadOnlyList<EnvProfileColumn> _columns = [];
     private IReadOnlyList<EnvKeyRow> _rows = [];
     private IReadOnlyList<EnvProfileInfo> _profiles = [];
@@ -417,6 +419,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
                 return string.Empty;
             }
 
+            if (!row.IsLegacy)
+            {
+                return $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}? Its value stays in the entry's history.";
+            }
+
             return _session.Unlocked?.RecyclesDeletedEntries == true
                 ? $"Remove {row.DisplayKey} from {DisplayName}? It goes to the vault's recycle bin."
                 : $"Remove {row.DisplayKey} from {DisplayName}? There is no undo.";
@@ -444,6 +451,20 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         set => Set(ref _newKey, value);
     }
 
+    /// <summary>The entries a new key can go on: the selected profile's home entry first, then the entries tagged into it.</summary>
+    internal IReadOnlyList<EnvEntryChoice> EntryChoices
+    {
+        get => _entryChoices;
+        private set => Set(ref _entryChoices, value);
+    }
+
+    /// <summary>The entry the new key goes on.</summary>
+    internal EnvEntryChoice? NewEntry
+    {
+        get => _newEntry;
+        set => Set(ref _newEntry, value);
+    }
+
     internal AsyncRelayCommand CopyRunCommandCommand { get; }
 
     internal RelayCommand BeginAddCommand { get; }
@@ -462,6 +483,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         if (_session.Unlocked is not { } vault)
         {
             Variables = [];
+            EntryChoices = [];
+            NewEntry = null;
             _referenceKeys = [];
             Profiles = [];
             ProfileProblems = [];
@@ -479,33 +502,44 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var store = new EnvStore(vault);
         var matrix = EnvMatrix.Build(vault, Name, _session.Clock);
         Matrix = matrix;
         Profiles = matrix.Profiles;
         ProfileProblems = matrix.Problems;
-        _referenceKeys = [.. EnvResolution.List(vault, Name, SelectedProfile).Variables.Select(variable => variable.Key).Distinct(StringComparer.Ordinal)];
 
-        try
-        {
-            Variables =
-            [
-                .. store
-                    .Read(Name, SelectedProfile)
-                    .Select(variable => new EnvVariableRow(
-                        this,
-                        variable.Key,
-                        variable.Value.Length,
-                        variable.IsUsableName))
-            ];
-        }
-        catch (VaultException e)
-        {
-            // A project holding two variables of the same name is a file KeePassXC can make and
-            // keypaste will not guess about. Core says so; this repeats it rather than hiding it.
-            Variables = [];
-            _report(e.Message);
-        }
+        var listing = EnvResolution.List(vault, Name, SelectedProfile);
+        _referenceKeys = [.. listing.Variables.Select(variable => variable.Key).Distinct(StringComparer.Ordinal)];
+
+        // A key two entries hold has no one value to copy, replace or remove; its cell says so,
+        // and the entry pane edits each copy.
+        var single = listing.Sources.GroupBy(source => source.Key, StringComparer.Ordinal)
+            .Where(key => key.Count() == 1)
+            .Select(key => key.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Variables =
+        [
+            .. listing.Variables
+                .Zip(listing.Sources)
+                .Where(pair => single.Contains(pair.Second.Key))
+                .Select(pair => new EnvVariableRow(this, pair.Second, pair.First.Value.Length, pair.First.IsUsableName)),
+        ];
+
+        var home = EnvStore.HomeEntry(Name, SelectedProfile);
+        var tagged = ProjectCatalog.Read(vault).Projects
+            .FirstOrDefault(project => string.Equals(project.Name, Name, StringComparison.Ordinal))?.Environments
+            .FirstOrDefault(environment => string.Equals(environment.Name, SelectedProfile, StringComparison.Ordinal))?.Members ?? [];
+
+        var homeExists = vault.ReadEntries().Any(entry => EntryName.Of(entry) == home);
+
+        EntryChoices =
+        [
+            new EnvEntryChoice(
+                tagged.Contains(home) ? home : null,
+                homeExists ? ApprovalPrompt.Shown(home) : $"{ApprovalPrompt.Shown(home)}, created on first use"),
+            .. tagged.Where(entry => entry != home).Select(entry => new EnvEntryChoice(entry, ApprovalPrompt.Shown(entry))),
+        ];
+        NewEntry = EntryChoices[0];
 
         Layout();
         RaiseProfileText();
@@ -638,7 +672,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             Raise(nameof(RevealedKey));
         }
 
-        return Read(row.Key);
+        return Read(row);
     }
 
     /// <summary>Notes that a row's hold ended.</summary>
@@ -651,23 +685,25 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Reads one value out of the open vault, for a copy or a hold.</summary>
-    internal string? Read(string key)
+    /// <summary>Reads one value out of the open vault, from the entry and field holding it, for a copy or a hold.</summary>
+    internal string? Read(EnvVariableRow row)
     {
+        ArgumentNullException.ThrowIfNull(row);
+
         if (_session.Unlocked is not { } vault)
         {
             return null;
         }
 
-        foreach (var variable in new EnvStore(vault).Read(Name, SelectedProfile))
+        try
         {
-            if (string.Equals(variable.Key, key, StringComparison.Ordinal))
-            {
-                return variable.Value;
-            }
+            return row.IsLegacy ? vault.Find(row.Source.Entry)?.Password : vault.ReadField(row.Source.Entry, row.Source.Field);
         }
-
-        return null;
+        catch (VaultException e)
+        {
+            _report(e.Message);
+            return null;
+        }
     }
 
     /// <summary>Passes a message up to the screen, which draws the banner.</summary>
@@ -701,6 +737,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private void BeginAdd()
     {
         NewKey = string.Empty;
+        NewEntry = EntryChoices.Count > 0 ? EntryChoices[0] : null;
         NewValue.Clear();
         IsAdding = true;
         _report(null);
@@ -716,9 +753,14 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     private void CancelReplace()
     {
+        CancelReplaceQuietly();
+        _report(null);
+    }
+
+    private void CancelReplaceQuietly()
+    {
         Replacing = null;
         ReplacementValue.Clear();
-        _report(null);
     }
 
     private void ConfirmAdd()
@@ -731,11 +773,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         var key = NewKey.Trim();
 
-        // Core's rule, not one written next to this error message. keypaste env set refuses the
-        // same names for the same reasons, and the two must not drift.
-        if (!EnvConvention.IsValidKey(key, out var invalid))
+        if (key.Length == 0)
         {
-            _report(invalid);
+            _report("The key needs a name.");
             return;
         }
 
@@ -760,15 +800,20 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
                 value = NewValue.Compose();
             }
 
-            var store = new EnvStore(vault);
+            // Core's rules, not ones written next to this message: keypaste env set refuses the same
+            // names and entries for the same reasons, and the two must not drift.
+            var plan = new EnvStore(vault).Set(Name, SelectedProfile, key, value, NewEntry?.Entry);
 
-            if (store.TrySet(Name, SelectedProfile, key, value, out var rejection) == EnvSetOutcome.Rejected)
+            if (plan.Refusal is { } refusal)
             {
-                _report(rejection);
+                _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
                 return;
             }
 
-            vault.Save();
+            if (plan.WritesAnything)
+            {
+                vault.Save();
+            }
         }
         catch (VaultChangedOnDiskException)
         {
@@ -789,13 +834,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Writes a new value over an existing variable, keeping the old one in history.
+    /// Writes a new value over an existing variable on the entry holding it, keeping the old one in history.
     /// </summary>
-    /// <remarks>
-    /// Straight through <see cref="EnvStore.TrySet(string, string, string, out string)"/>, whose update branch goes to
-    /// <c>Vault.UpdateEntry</c> and therefore to <c>CreateBackup</c> — which is what keeps the
-    /// replaced value in KeePass history (D-0014) without this screen knowing anything about it.
-    /// </remarks>
     private void ConfirmReplace()
     {
         if (Replacing is not { } row)
@@ -809,29 +849,32 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // Something may have removed it while this form was open; writing it elsewhere would be a
+        // new key the person did not ask for.
+        if (!EnvResolution.List(vault, Name, SelectedProfile).Sources.Contains(row.Source))
+        {
+            _report($"{row.DisplayKey} is no longer on {ApprovalPrompt.Shown(row.Source.Entry)}, so nothing was written.");
+            CancelReplaceQuietly();
+            Reload();
+            return;
+        }
+
         var value = ReplacementValue.Compose();
 
         try
         {
-            var store = new EnvStore(vault);
+            var plan = new EnvStore(vault).Set(Name, SelectedProfile, row.Key, value, row.Source.Entry);
 
-            switch (store.TrySet(Name, SelectedProfile, row.Key, value, out var rejection))
+            if (plan.Refusal is { } refusal)
             {
-                case EnvSetOutcome.Rejected:
-                    _report(rejection);
-                    return;
-
-                case EnvSetOutcome.Created:
-                    // TrySet created it, so it was not there to replace: something removed it
-                    // while this form was open. Say so rather than report a replacement.
-                    _report($"{row.DisplayKey} was not in {DisplayName} any more, so it was added.");
-                    break;
-
-                default:
-                    break;
+                _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
+                return;
             }
 
-            vault.Save();
+            if (plan.WritesAnything)
+            {
+                vault.Save();
+            }
         }
         catch (VaultChangedOnDiskException)
         {
@@ -871,17 +914,23 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        DeletionOutcome outcome;
+        EnvRemoval removal;
 
         try
         {
-            outcome = new EnvStore(vault).Remove(Name, SelectedProfile, row.Key);
+            removal = new EnvStore(vault).Remove(Name, SelectedProfile, row.Key, row.Source.Entry);
 
-            if (outcome == DeletionOutcome.NothingMatched)
+            if (removal.Outcome == EnvRemoveOutcome.NothingMatched)
             {
                 _report($"{row.DisplayKey} is not in {DisplayName} any more.");
                 Removing = null;
                 Reload();
+                return;
+            }
+
+            if (removal.Outcome is EnvRemoveOutcome.Ambiguous or EnvRemoveOutcome.Refused)
+            {
+                _report(EntryNameSanitizer.SanitizeProse(removal.Refusal, 1024).Text);
                 return;
             }
 
@@ -902,10 +951,22 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _report(null);
 
         // Reported after the act, from the outcome core returned, as the CLI reports it.
-        _announce(outcome == DeletionOutcome.Recycled
-            ? $"Moved {row.DisplayKey} to the trash. Restore it there."
-            : $"Removed {row.DisplayKey}. This vault has no recycle bin, so nothing can put it back.");
+        _announce(removal.Outcome switch
+        {
+            EnvRemoveOutcome.FieldRemoved => $"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the entry's history.",
+            EnvRemoveOutcome.Recycled => $"Moved {row.DisplayKey} to the trash. Restore it there.",
+            _ => $"Removed {row.DisplayKey}. This vault has no recycle bin, so nothing can put it back.",
+        });
 
         Reload();
     }
+}
+
+/// <summary>An entry a new key can be written on, as the add form offers it.</summary>
+/// <param name="Entry">The entry, or null for the home entry not yet created.</param>
+/// <param name="Display">What the form shows.</param>
+internal sealed record EnvEntryChoice(EntryName? Entry, string Display)
+{
+    /// <inheritdoc/>
+    public override string ToString() => Display;
 }

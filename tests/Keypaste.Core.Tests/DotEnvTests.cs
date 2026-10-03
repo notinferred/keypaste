@@ -335,7 +335,7 @@ public sealed class DotEnvTests
 
     /// <summary>
     /// dotenv keeps the first, godotenv keeps the last. Since the two disagree there is no answer
-    /// to give, so it fails closed — the same reasoning as <see cref="EnvStore.Read(string)"/>.
+    /// to give, so it fails closed — the same reasoning as <see cref="EnvResolution"/> applies to a key two entries hold.
     /// </summary>
     [Fact]
     public void ADuplicateKey_IsAProblem_NamingBothLines()

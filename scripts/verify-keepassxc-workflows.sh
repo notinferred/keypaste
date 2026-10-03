@@ -342,13 +342,13 @@ exercise() {
   intact "$db" servers/database
 
   step "[$kind] tags: the CLI tags the entry KeePassXC made into a project and untags it"
-  did "keypaste env tag" kp_cli "$db" env tag kp94 servers/database -p prod
+  did "keypaste env tag" kp_cli "$db" env tag kp94 servers/database -p prod --yes
   listed=$(value "$db" servers/database Tags) || die "KeePassXC cannot read the entry's tags"
   grep -qx 'env:kp94:prod' <<<"${listed//,/$'\n'}" || die "KeePassXC does not read the tag keypaste added: ${listed}"
-  did "keypaste env untag" kp_cli "$db" env untag kp94 servers/database -p prod
+  did "keypaste env untag" kp_cli "$db" env untag kp94 servers/database -p prod --yes
   listed=$(value "$db" servers/database Tags) || die "KeePassXC cannot read the entry's tags"
   grep -qx 'env:kp94:prod' <<<"${listed//,/$'\n'}" && die "KeePassXC still reads the tag keypaste removed: ${listed}"
-  refused "the CLI writing a malformed project tag" "$db" kp_cli "$db" env tag kp94 servers/database -p Prod
+  refused "the CLI writing a malformed project tag" "$db" kp_cli "$db" env tag kp94 servers/database -p Prod --yes
   intact "$db" servers/database
 
   step "[$kind] fields and tags in the app: add a protected field, change, protect and remove others, and tag"
@@ -588,7 +588,8 @@ step "create: keypaste init makes a vault KeePassXC opens and reads"
 cur_pw=$pw cur_kf= new_pw=$pw
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$dir/created-cli.kdbx" >/dev/null 2>&1 || die "keypaste init failed"
 did "keypaste env set" kp_cli "$dir/created-cli.kdbx" env set kp94 TOKEN=created
-expect "$dir/created-cli.kdbx" env/kp94/TOKEN Password created
+expect "$dir/created-cli.kdbx" env/kp94/.env TOKEN created
+expect "$dir/created-cli.kdbx" env/kp94/.env Tags env:kp94
 
 step "create: the app makes a password-and-keyfile vault KeePassXC opens only with both"
 cur_kf="$dir/next.keyx"

@@ -62,9 +62,8 @@ public sealed class TrashTests : IDisposable
             Password = "v1",
         });
 
-        var store = new EnvStore(vault);
-        store.TrySet("billing", "STRIPE_KEY", "sk-live", out _);
-        store.TrySet("dev", "STRIPE_KEY", "sk-test", out _);
+        LegacyVariables.Set(vault, "billing", "STRIPE_KEY", "sk-live");
+        LegacyVariables.Set(vault, "dev", "STRIPE_KEY", "sk-test");
 
         vault.Save();
     }
@@ -158,7 +157,7 @@ public sealed class TrashTests : IDisposable
 
         Assert.Equal(
             "sk-live",
-            Assert.Single(new EnvStore(reopened).Read("billing")).Value,
+            Assert.Single(EnvResolution.List(reopened, "billing", "dev").Variables).Value,
             StringComparer.Ordinal);
     }
 
@@ -188,10 +187,10 @@ public sealed class TrashTests : IDisposable
 
         Assert.Equal(
             "sk-test",
-            Assert.Single(new EnvStore(reopened).Read("dev")).Value,
+            Assert.Single(EnvResolution.List(reopened, "dev", "dev").Variables).Value,
             StringComparer.Ordinal);
 
-        Assert.Empty(new EnvStore(reopened).Read("billing"));
+        Assert.Empty(EnvResolution.List(reopened, "billing", "dev").Variables);
     }
 
     [Fact]

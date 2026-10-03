@@ -21,8 +21,8 @@ public sealed class SecretHygieneTests
     private static readonly string[] _everySentinel =
         [SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl, SentinelField, SentinelPlainField];
 
-    /// <summary>Where <c>env set hygiene GENERATED</c> lands, for reading back with <c>get</c>.</summary>
-    internal const string EnvPath = "env/hygiene/GENERATED";
+    /// <summary>The entry <c>env set hygiene GENERATED</c> lands on, for reading back with <c>get --field</c>.</summary>
+    internal const string EnvPath = "env/hygiene/.env";
 
     /// <summary>
     /// Sweeps every verb in every shape that is not <c>--show</c> and asserts no field value
@@ -43,8 +43,8 @@ public sealed class SecretHygieneTests
     [InlineData("env", "export", "hygiene")]
     [InlineData("env", "diff", "hygiene")]
     [InlineData("ls", "--json")]
-    [InlineData("env", "tag", "hygiene", "secrets/target", "-p", "prod")]
-    [InlineData("env", "untag", "hygiene", "secrets/target")]
+    [InlineData("env", "tag", "hygiene", "secrets/target", "-p", "prod", "--yes")]
+    [InlineData("env", "untag", "hygiene", "secrets/target", "--yes")]
     [InlineData("field", "ls", "secrets/target")]
     [InlineData("field", "ls", "secrets/target", "--json")]
     [InlineData("field", "rm", "secrets/target", "Region")]
@@ -207,7 +207,8 @@ public sealed class SecretHygieneTests
         harness.Stderr.GetStringBuilder().Clear();
 
         harness.Prompt.Enqueue(Master);
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("get", target, "--show", "--vault", harness.VaultPath));
+        string[] field = entry ? [] : ["--field", "GENERATED"];
+        Assert.Equal(CliApp.ExitSuccess, harness.Run([.. new[] { "get", target }, .. field, .. new[] { "--show", "--vault", harness.VaultPath }]));
 
         var value = harness.Out.Trim();
 
@@ -410,9 +411,8 @@ public sealed class SecretHygieneTests
 
         using (var vault = Vault.Open(harness.VaultPath, Master))
         {
-            var store = new EnvStore(vault);
-            store.TrySet("hygiene", "prod", "API_KEY", SentinelPassword, out _);
-            store.TrySet("hygiene", "prod", "OTHER", SentinelNotes, out _);
+            LegacyVariables.Set(vault, "hygiene", "prod", "API_KEY", SentinelPassword);
+            LegacyVariables.Set(vault, "hygiene", "prod", "OTHER", SentinelNotes);
             vault.SetExpiryUnchecked(new EntryName("env/hygiene/prod", "OTHER"), new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
             vault.Save();
         }

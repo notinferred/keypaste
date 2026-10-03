@@ -35,7 +35,7 @@ public sealed class EnvPullTests
     private static IReadOnlyList<EnvVariable> Stored(CliHarness harness, string project)
     {
         using var vault = Vault.Open(harness.VaultPath, Master);
-        return new EnvStore(vault).Read(project);
+        return EnvResolution.List(vault, project, EnvProfileNames.Default).Variables;
     }
 
     [Fact]
@@ -130,14 +130,14 @@ public sealed class EnvPullTests
         Assert.Contains("history", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
-        var stored = new EnvStore(vault).Read("billing").ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
+        var stored = EnvResolution.List(vault, "billing", EnvProfileNames.Default).Variables.ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
         Assert.Equal("new", stored["CHANGED"]);
         Assert.Equal("keep-me", stored["SAME"]);
         Assert.Equal("1", stored["FRESH"]);
 
-        // That the unchanged entry was not rewritten is the other half of this, and it is asserted
-        // where it can be seen: EnvStoreTests.Set_WithTheValueItAlreadyHas_StillCostsAHistoryItem
-        // shows why skipping matters, and Vault.CountHistoryItems is internal to the core.
+        // One revision for the home entry the three keys share, not one per key: SAME was not
+        // rewritten, and CHANGED and FRESH were written together.
+        Assert.Equal(2, vault.ReadHistory(new EntryName("env/billing", ".env"))!.Count);
     }
 
     [Fact]

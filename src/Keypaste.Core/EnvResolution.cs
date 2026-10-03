@@ -208,7 +208,7 @@ internal sealed record EnvMember(string Key, string Value, EnvEntry Entry, strin
 /// </summary>
 /// <remarks>
 /// <para>
-/// Reading stays permissive elsewhere (<see cref="EnvStore.Read(string)"/>) so KeePassXC's view of the file
+/// Reading stays permissive elsewhere (<see cref="List"/>) so KeePassXC's view of the file
 /// is never hidden; this is the moment a value leaves the vault, where a silently incomplete set
 /// becomes a program running with the wrong credentials. A deleted entry is not in the set at all:
 /// the recycle bin is outside every traversal (D-0248), and keypaste's own groups hold no project.

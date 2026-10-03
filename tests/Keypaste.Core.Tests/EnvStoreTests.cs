@@ -3,18 +3,22 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The env storage convention (DECISIONS.md D-0014).
+/// Where a project's keys are written (D-0413), and the <c>env/&lt;project&gt;</c> layout of earlier
+/// releases that stays readable and is still updated and removed in place.
 /// </summary>
 /// <remarks>
 /// The tests that matter most here are the ones covering input keypaste would never produce
 /// itself. Every one of them describes something a user can do in KeePassXC — an entry with a
-/// name that is not a legal variable, two entries with the same name, an entry with no title —
+/// name that is not a legal variable, two entries with the same name, an untagged home entry —
 /// and keypaste has to have an answer for each that does not involve pretending the file says
 /// something other than what it says (docs/PRODUCT.md law 4.6).
 /// </remarks>
 public sealed class EnvStoreTests : IDisposable
 {
     internal const string MasterPassword = "correct horse battery staple";
+
+    private static readonly EntryName _home = new("env/billing", ".env");
+    private static readonly EntryName _stripe = new("services", "Stripe");
 
     private readonly string _directory;
 
@@ -29,53 +33,91 @@ public sealed class EnvStoreTests : IDisposable
     }
 
     [Fact]
-    public void Set_WritesToEnvProjectKey_AndSurvivesAReopen()
+    public void HomeEntry_IsDotEnvForDev_AndDotEnvDotNameForAnother()
+    {
+        Assert.Equal(new EntryName("env/billing", ".env"), EnvStore.HomeEntry("billing", "dev"));
+        Assert.Equal(new EntryName("env/billing", ".env.staging"), EnvStore.HomeEntry("billing", "staging"));
+    }
+
+    [Fact]
+    public void Set_ANewKey_CreatesTheHomeEntryTagged_HoldingItProtected_WithNoRevision_AndSurvivesAReopen()
     {
         var path = NewVaultPath();
 
         using (var vault = Vault.Create(path, MasterPassword))
         {
-            var store = new EnvStore(vault);
-            Assert.Equal(EnvSetOutcome.Created, store.TrySet("billing", "DATABASE_URL", "postgres://x", out _));
+            var plan = new EnvStore(vault).Set("billing", "dev", "DATABASE_URL", "postgres://x");
+
+            Assert.Null(plan.Refusal);
+            Assert.True(plan.CreatesHome);
+            Assert.Equal(new EnvKeyWrite("DATABASE_URL", EnvWriteChange.New, _home, "DATABASE_URL"), Assert.Single(plan.Keys));
             vault.Save();
         }
 
         using var reopened = Vault.Open(path, MasterPassword);
 
-        // The convention is a promise about where the value lands, not just that it round-trips:
-        // KeePassXC users navigate to this path by hand.
-        Assert.Equal("postgres://x", reopened.Find("env/billing/DATABASE_URL")?.Password, StringComparer.Ordinal);
-        Assert.Equal(["DATABASE_URL"], new EnvStore(reopened).Read("billing").Select(v => v.Key));
+        Assert.Equal(["env:billing"], reopened.Tags(_home));
+        Assert.Equal([new EntryField("DATABASE_URL", IsProtected: true, IsReadOnly: false)], reopened.Fields(_home));
+        Assert.Equal("postgres://x", reopened.ReadField(_home, "DATABASE_URL"), StringComparer.Ordinal);
+        Assert.Equal(0, HistoryCount(reopened, _home));
+        Assert.Null(reopened.Find(new EntryName("env/billing", "DATABASE_URL")));
+
+        var resolved = EnvResolution.Resolve(reopened, "billing", TimeProvider.System);
+        Assert.Equal([new EnvVariable("DATABASE_URL", "postgres://x")], resolved.Variables);
+        Assert.Equal([new EnvSource("DATABASE_URL", _home, "DATABASE_URL")], resolved.Sources);
     }
 
     [Fact]
-    public void Set_OnAnExistingKey_ReplacesTheValue_AndReportsItAsAnUpdate()
+    public void Set_ANewKeyInAnotherEnvironment_GoesOnThatEnvironmentsOwnHomeEntry()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var plan = new EnvStore(vault).Set("billing", "staging", "DATABASE_URL", "staging-db");
+
+        var home = new EntryName("env/billing", ".env.staging");
+        Assert.Equal(home, Assert.Single(plan.Keys).Entry);
+        Assert.Equal(["env:billing:staging"], vault.Tags(home));
+        Assert.DoesNotContain("env/billing/staging", vault.ReadGroupPaths());
+        Assert.Empty(EnvResolution.List(vault, "billing", "dev").Variables);
+        Assert.Equal([new EnvVariable("DATABASE_URL", "staging-db")], EnvResolution.List(vault, "billing", "staging").Variables);
+    }
+
+    [Fact]
+    public void Set_ASecondNewKey_GoesOnTheExistingHomeEntry_AsOneRevision()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
+        store.Set("billing", "dev", "FIRST", "1");
 
-        store.TrySet("billing", "TOKEN", "first", out _);
-        Assert.Equal(EnvSetOutcome.Updated, store.TrySet("billing", "TOKEN", "second", out _));
+        var plan = store.Set("billing", "dev", "SECOND", "2");
 
-        Assert.Equal(["TOKEN"], store.Read("billing").Select(v => v.Key));
-        Assert.Equal("second", store.Read("billing")[0].Value, StringComparer.Ordinal);
+        Assert.False(plan.CreatesHome);
+        Assert.Equal(["FIRST", "SECOND"], vault.Fields(_home)!.Select(field => field.Name));
+        Assert.Equal(1, HistoryCount(vault, _home));
+    }
+
+    [Fact]
+    public void Set_AKeyATaggedEntryHolds_UpdatesItThere_Protected_AsOneRevision()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "first", false));
+        var before = HistoryCount(vault, _stripe);
+
+        var plan = new EnvStore(vault).Set("billing", "dev", "STRIPE_KEY", "second");
+
+        Assert.Equal(new EnvKeyWrite("STRIPE_KEY", EnvWriteChange.Replaces, _stripe, "STRIPE_KEY"), Assert.Single(plan.Keys));
+        Assert.Equal("second", vault.ReadField(_stripe, "STRIPE_KEY"), StringComparer.Ordinal);
+        Assert.True(vault.Fields(_stripe)!.Single().IsProtected);
+        Assert.Equal(before + 1, HistoryCount(vault, _stripe));
+        Assert.Null(vault.Find(_home));
     }
 
     /// <summary>
-    /// Setting a value must carry the entry's other fields across rather than rebuilding the
-    /// entry from the two things env knows about. A user who annotated a variable in KeePassXC
-    /// should not lose the note by rotating the secret.
+    /// Setting a legacy variable carries the entry's other fields across rather than rebuilding it
+    /// from the two things env knows about. A user who annotated a variable in KeePassXC should not
+    /// lose the note by rotating the secret, and the value it replaced stays in history (D-0014).
     /// </summary>
-    /// <remarks>
-    /// This covers the fields <see cref="VaultEntry"/> models, which is a property of
-    /// <see cref="EnvStore.TrySet(string, string, string, out string)"/>, not of the update primitive underneath it — a
-    /// remove-and-re-add implementation of <see cref="Vault.UpdateEntry"/> passes this test.
-    /// What survives only because the entry is edited in place is asserted by
-    /// <see cref="Set_OnAnExistingKey_KeepsThePreviousValueAsHistory"/>, which does fail against
-    /// remove-and-re-add; that was confirmed by trying it.
-    /// </remarks>
     [Fact]
-    public void Set_OnAnExistingKey_KeepsTheOtherFields()
+    public void Set_ALegacyVariable_UpdatesItInPlace_KeepingTheOtherFields_AndHistory()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         vault.AddEntry(new VaultEntry
@@ -87,77 +129,269 @@ public sealed class EnvStoreTests : IDisposable
             Notes = "rotate this quarterly",
             GroupPath = "env/billing",
         });
+        var store = new EnvStore(vault);
+        var token = new EntryName("env/billing", "TOKEN");
 
-        new EnvStore(vault).TrySet("billing", "TOKEN", "second", out _);
+        var plan = store.Set("billing", "dev", "TOKEN", "second");
+        store.Set("billing", "dev", "TOKEN", "third");
 
-        var entry = vault.Find("env/billing/TOKEN");
-        Assert.Equal("second", entry?.Password, StringComparer.Ordinal);
+        Assert.Equal(new EnvKeyWrite("TOKEN", EnvWriteChange.Replaces, token, EnvSource.LegacyField), Assert.Single(plan.Keys));
+        var entry = vault.Find(token);
+        Assert.Equal("third", entry?.Password, StringComparer.Ordinal);
         Assert.Equal("set-in-keepassxc", entry?.Username, StringComparer.Ordinal);
         Assert.Equal("https://example.invalid/rotate", entry?.Url, StringComparer.Ordinal);
         Assert.Equal("rotate this quarterly", entry?.Notes, StringComparer.Ordinal);
+        Assert.Equal(2, HistoryCount(vault, token));
+        Assert.Null(vault.Find(_home));
     }
 
     /// <summary>
-    /// Pins the retention decision in D-0014: setting a variable that already exists keeps what it
-    /// replaced. SECURITY.md and the CLI's own output promise that, and this is where the promise
-    /// is checked rather than assumed.
+    /// A value identical to the one stored is not written, so a set or an import re-run after one
+    /// edit does not burn through the ten history items the format keeps.
     /// </summary>
     [Fact]
-    public void Set_OnAnExistingKey_KeepsThePreviousValueAsHistory()
+    public void Set_WithTheValueItAlreadyHas_WritesNothing()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
+        store.Set("billing", "dev", "TOKEN", "same");
+        vault.Save();
 
-        store.TrySet("billing", "TOKEN", "first", out _);
-        Assert.Equal(0, HistoryCount(vault, "env/billing", "TOKEN"));
+        var plan = store.Set("billing", "dev", "TOKEN", "same");
 
-        store.TrySet("billing", "TOKEN", "second", out _);
-        Assert.Equal(1, HistoryCount(vault, "env/billing", "TOKEN"));
+        Assert.Equal(EnvWriteChange.Unchanged, Assert.Single(plan.Keys).Change);
+        Assert.False(plan.WritesAnything);
+        Assert.Equal(0, HistoryCount(vault, _home));
+        Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
+    }
 
-        store.TrySet("billing", "TOKEN", "third", out _);
-        Assert.Equal(2, HistoryCount(vault, "env/billing", "TOKEN"));
+    [Fact]
+    public void Set_WithAnEntry_PutsANewKeyOnThatTaggedEntry()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        Tagged(vault, _stripe, ["env:billing"]);
+
+        var plan = new EnvStore(vault).Set("billing", "dev", "WEBHOOK_SECRET", "whsec", _stripe);
+
+        Assert.Equal(new EnvKeyWrite("WEBHOOK_SECRET", EnvWriteChange.New, _stripe, "WEBHOOK_SECRET"), Assert.Single(plan.Keys));
+        Assert.Equal("whsec", vault.ReadField(_stripe, "WEBHOOK_SECRET"), StringComparer.Ordinal);
+        Assert.Null(vault.Find(_home));
+    }
+
+    [Fact]
+    public void Set_WithAnEntryNotInTheEnvironment_IsRefused_AndWritesNothing()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        Tagged(vault, _stripe, ["env:billing:prod"]);
+        vault.Save();
+
+        var untagged = new EnvStore(vault).Set("billing", "dev", "WEBHOOK_SECRET", "whsec", _stripe);
+        var missing = new EnvStore(vault).Set("billing", "dev", "WEBHOOK_SECRET", "whsec", new EntryName("services", "Absent"));
+
+        Assert.Equal("services/Stripe is not in 'billing/dev'; tag it into the environment first", untagged.Refusal);
+        Assert.Equal("there is no entry services/Absent", missing.Refusal);
+        Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
+    }
+
+    [Fact]
+    public void Set_AKeyOnTwoEntries_IsRefusedNamingBoth_UnlessTheEntryIsNamed()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var twin = new EntryName("services", "Twin");
+        Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "one", true));
+        Tagged(vault, twin, ["env:billing"], ("STRIPE_KEY", "two", true));
+        var store = new EnvStore(vault);
+
+        Assert.Equal(
+            "STRIPE_KEY is on more than one entry (services/Stripe, services/Twin); name the one to write",
+            store.Set("billing", "dev", "STRIPE_KEY", "three").Refusal);
+
+        Assert.Null(store.Set("billing", "dev", "STRIPE_KEY", "three", twin).Refusal);
+        Assert.Equal("one", vault.ReadField(_stripe, "STRIPE_KEY"), StringComparer.Ordinal);
+        Assert.Equal("three", vault.ReadField(twin, "STRIPE_KEY"), StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void Set_WithAnEntry_StillUpdatesAKeyOneOtherEntryHoldsWhereItLives()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var other = new EntryName("services", "Other");
+        Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "one", true));
+        Tagged(vault, other, ["env:billing"]);
+
+        var plan = new EnvStore(vault).Set("billing", "dev", "STRIPE_KEY", "two", other);
+
+        Assert.Equal(new EnvKeyWrite("STRIPE_KEY", EnvWriteChange.Replaces, _stripe, "STRIPE_KEY"), Assert.Single(plan.Keys));
+        Assert.Equal("two", vault.ReadField(_stripe, "STRIPE_KEY"), StringComparer.Ordinal);
+        Assert.Null(vault.ReadField(other, "STRIPE_KEY"));
     }
 
     /// <summary>
-    /// Writing a value identical to the one already stored still costs a history item, because
-    /// <see cref="EnvStore.TrySet(string, string, string, out string)"/> compares nothing — it is told to set, so it sets.
+    /// A new key must be a field a project releases (D-0388), and the project and environment
+    /// names a tag can hold. Each of these would otherwise be written and then never reach a child.
     /// </summary>
-    /// <remarks>
-    /// This is why <c>keypaste env pull</c> classifies before it writes and skips the unchanged
-    /// ones: a bulk import re-run after editing a single line would otherwise burn through the
-    /// ten history items the format keeps, evicting the values a user might actually need, and
-    /// touch the modification time of every entry they maintain in KeePassXC. Nothing else in the
-    /// codebase would notice that happening, which is what makes it worth pinning here.
-    /// </remarks>
-    [Fact]
-    public void Set_WithTheValueItAlreadyHas_StillCostsAHistoryItem()
+    [Theory]
+    [InlineData("billing", "dev", "api_key")]
+    [InlineData("billing", "dev", "Mixed_Case")]
+    [InlineData("billing", "dev", "KPXC_X")]
+    [InlineData("billing", "dev", "URL")]
+    [InlineData("billing", "dev", "PASSWORD")]
+    [InlineData("billing", "dev", "WITH-DASH")]
+    [InlineData("billing", "dev", "2LEADING_DIGIT")]
+    [InlineData("billing", "dev", "")]
+    [InlineData("", "dev", "TOKEN")]
+    [InlineData("a/b", "dev", "TOKEN")]
+    [InlineData("bill:ing", "dev", "TOKEN")]
+    [InlineData(" billing", "dev", "TOKEN")]
+    [InlineData("billing", "Staging", "TOKEN")]
+    public void Set_RefusesWhatNoProjectCouldRelease(string project, string environment, string key)
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
 
-        store.TrySet("billing", "TOKEN", "same", out _);
-        Assert.Equal(0, HistoryCount(vault, "env/billing", "TOKEN"));
+        var plan = new EnvStore(vault).Set(project, environment, key, "value");
 
-        Assert.Equal(EnvSetOutcome.Updated, store.TrySet("billing", "TOKEN", "same", out _));
-        Assert.Equal(1, HistoryCount(vault, "env/billing", "TOKEN"));
+        Assert.False(string.IsNullOrEmpty(plan.Refusal));
+        Assert.Empty(vault.ReadEntries());
     }
 
     /// <summary>
-    /// Removing takes the history out of the project with it, and purging what it recycled is what
-    /// erases a rotated value. Two deliberate acts rather than one: removing used to be the erasure.
+    /// <c>PATH</c> and <c>Path</c> are two variables on Linux and one on Windows. Allowing both
+    /// into an environment would make the injected set depend on which machine ran the command.
     /// </summary>
     [Fact]
-    public void Remove_TakesTheHistoryOutOfTheProject_AndPurgingIsWhatErasesIt()
+    public void Set_RefusesAKeyDifferingOnlyInCaseFromOneTheEnvironmentHas()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        LegacyVariables.Set(vault, "billing", "Token", "first");
+
+        var plan = new EnvStore(vault).Set("billing", "dev", "TOKEN", "second");
+
+        Assert.Equal("'billing/dev' already has 'Token', which differs from 'TOKEN' only in case (env/billing/Token)", plan.Refusal);
+        Assert.Null(vault.Find(_home));
+    }
+
+    [Fact]
+    public void CaseCollision_IsCheckedWithinTheEnvironment()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
+        store.Set("acme-api", "dev", "TOKEN", "dev");
 
-        store.TrySet("billing", "TOKEN", "first", out _);
-        store.TrySet("billing", "TOKEN", "second", out _);
+        Assert.Null(store.Set("acme-api", "staging", "TOKEN_TWO", "staging").Refusal);
+        Assert.Contains("only in case", store.Set("acme-api", "staging", "Token_Two", "x").Refusal, StringComparison.Ordinal);
+    }
 
-        Assert.Equal(DeletionOutcome.Recycled, store.Remove("billing", "TOKEN"));
-        Assert.Equal(-1, HistoryCount(vault, "env/billing", "TOKEN"));
-        Assert.Empty(store.Read("billing"));
+    [Fact]
+    public void Set_AHomeEntryNotTaggedIntoTheEnvironment_IsRefusedNamingIt()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = ".env", Password = "kept" });
+        vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = ".env.staging" });
+        Assert.True(vault.AddTag(new EntryName("env/billing", ".env.staging"), "env:other:staging"));
+        vault.Save();
+        var store = new EnvStore(vault);
+
+        Assert.Equal("env/billing/.env is not tagged env:billing; tag it into 'billing/dev' or rename it", store.Set("billing", "dev", "NEW_KEY", "v").Refusal);
+        Assert.Equal(
+            "env/billing/.env.staging is not tagged env:billing:staging; tag it into 'billing/staging' or rename it",
+            store.Set("billing", "staging", "NEW_KEY", "v").Refusal);
+        Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
+    }
+
+    /// <summary>
+    /// An entry titled <c>billing/TOKEN</c> sitting directly in <c>env</c> shares the path of the real
+    /// <c>env/billing/TOKEN</c>, so a set could write the project's secret into an entry outside the
+    /// project and report success.
+    /// </summary>
+    [Fact]
+    public void Set_UpdatesTheProjectsOwnEntry_NotAnEntryWhosePathCollidesWithIt()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "billing/TOKEN", Password = "foreign", GroupPath = "env" });
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "mine", GroupPath = "env/billing" });
+
+        var plan = new EnvStore(vault).Set("billing", "dev", "TOKEN", "rotated");
+
+        Assert.Equal(EnvWriteChange.Replaces, Assert.Single(plan.Keys).Change);
+        Assert.Equal("rotated", vault.Find(new EntryName("env/billing", "TOKEN"))?.Password, StringComparer.Ordinal);
+        Assert.Equal("foreign", vault.Find(new EntryName("env", "billing/TOKEN"))?.Password, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void Set_AllowsAnEmptyValue()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+
+        Assert.Null(new EnvStore(vault).Set("billing", "dev", "OPTIONAL", string.Empty).Refusal);
+        Assert.Equal(string.Empty, vault.ReadField(_home, "OPTIONAL"), StringComparer.Ordinal);
+    }
+
+    /// <summary>One plan touching three entries costs each one revision, and a created home entry none.</summary>
+    [Fact]
+    public void TryApply_WritesEachEntryOnce()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var database = new EntryName("services", "Database");
+        var legacy = new EntryName("env/billing", "LEGACY_TOKEN");
+        Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "s1", true), ("STRIPE_WEBHOOK", "w1", true));
+        Tagged(vault, database, ["env:billing"], ("DATABASE_URL", "d1", true));
+        LegacyVariables.Set(vault, "billing", "LEGACY_TOKEN", "l1");
+        var stripeBefore = HistoryCount(vault, _stripe);
+        var databaseBefore = HistoryCount(vault, database);
+        var store = new EnvStore(vault);
+
+        var plan = store.Plan(
+            "billing",
+            "dev",
+            [new("STRIPE_KEY", "s2"), new("STRIPE_WEBHOOK", "w2"), new("DATABASE_URL", "d1"), new("LEGACY_TOKEN", "l2"), new("NEW_ONE", "n"), new("NEW_TWO", "m")]);
+
+        Assert.Equal(["NEW_ONE", "NEW_TWO"], plan.Created);
+        Assert.Equal(["LEGACY_TOKEN", "STRIPE_KEY", "STRIPE_WEBHOOK"], plan.Updated);
+        Assert.Equal(1, plan.Unchanged);
+        Assert.True(store.TryApply(plan, out var rejection), rejection);
+
+        Assert.Equal(stripeBefore + 1, HistoryCount(vault, _stripe));
+        Assert.Equal(databaseBefore, HistoryCount(vault, database));
+        Assert.Equal(1, HistoryCount(vault, legacy));
+        Assert.Equal(0, HistoryCount(vault, _home));
+        Assert.Equal(["NEW_ONE", "NEW_TWO"], vault.Fields(_home)!.Select(field => field.Name));
+        Assert.Equal("l2", vault.Find(legacy)?.Password, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void Remove_AField_TakesItOffItsEntry_AndHistoryKeepsIt()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+        store.Set("billing", "dev", "TOKEN", "first");
+        store.Set("billing", "dev", "OTHER", "kept");
+
+        var removal = store.Remove("billing", "dev", "TOKEN");
+
+        Assert.Equal(new EnvRemoval(EnvRemoveOutcome.FieldRemoved, new EnvSource("TOKEN", _home, "TOKEN"), string.Empty), removal);
+        Assert.Equal(["OTHER"], vault.Fields(_home)!.Select(field => field.Name));
+        Assert.Empty(vault.ReadRecycled());
+
+        Assert.True(vault.RestoreRevision(_home, 0));
+        Assert.Equal("first", vault.ReadField(_home, "TOKEN"), StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Removing a legacy variable takes its history out of the project with it, and purging what
+    /// it recycled is what erases a rotated value.
+    /// </summary>
+    [Fact]
+    public void Remove_ALegacyVariable_RecyclesItsEntry_AndPurgingIsWhatErasesIt()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var token = new EntryName("env/billing", "TOKEN");
+        LegacyVariables.Set(vault, "billing", "TOKEN", "first");
+        LegacyVariables.Set(vault, "billing", "TOKEN", "second");
+
+        var removal = new EnvStore(vault).Remove("billing", "dev", "TOKEN");
+
+        Assert.Equal(new EnvRemoval(EnvRemoveOutcome.Recycled, new EnvSource("TOKEN", token, EnvSource.LegacyField), string.Empty), removal);
+        Assert.Equal(-1, HistoryCount(vault, token));
 
         var recycled = Assert.Single(vault.ReadRecycled());
         Assert.Equal("TOKEN", recycled.Title, StringComparer.Ordinal);
@@ -165,7 +399,6 @@ public sealed class EnvStoreTests : IDisposable
 
         Assert.True(vault.PurgeRecycled(recycled.Id));
         Assert.Empty(vault.ReadRecycled());
-        Assert.Equal(-1, HistoryCount(vault, "env/billing", "TOKEN"));
     }
 
     /// <summary>
@@ -174,36 +407,7 @@ public sealed class EnvStoreTests : IDisposable
     /// of those; keypaste has to remove the one it was asked for and leave the other alone.
     /// </summary>
     [Fact]
-    public void Remove_TheProjectsOwnVariable_LeavesANestedEntrySharingItsPath()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
-        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
-
-        Assert.Equal(DeletionOutcome.Recycled, new EnvStore(vault).Remove("dev", "nested/TOKEN"));
-
-        var survivors = vault.ReadEntries();
-        var survivor = Assert.Single(survivors);
-        Assert.Equal("env/dev/nested", survivor.GroupPath, StringComparer.Ordinal);
-        Assert.Equal("nested", survivor.Password, StringComparer.Ordinal);
-    }
-
-    [Fact]
-    public void Remove_ANestedEntry_LeavesTheSlashedTitleSharingItsPath()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
-        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
-
-        Assert.Equal(DeletionOutcome.Recycled, new EnvStore(vault).Remove("dev/nested", "TOKEN"));
-
-        var survivor = Assert.Single(vault.ReadEntries());
-        Assert.Equal("env/dev", survivor.GroupPath, StringComparer.Ordinal);
-        Assert.Equal("slashed", survivor.Password, StringComparer.Ordinal);
-    }
-
-    [Fact]
-    public void Remove_SurvivesAReopen_WithEveryNeighbourIntact()
+    public void Remove_TheProjectsOwnVariable_LeavesANestedEntrySharingItsPath_AcrossAReopen()
     {
         var path = NewVaultPath();
 
@@ -212,7 +416,7 @@ public sealed class EnvStoreTests : IDisposable
             vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
             vault.AddEntry(new VaultEntry { Title = "KEEP", Password = "keep", GroupPath = "env/dev" });
-            new EnvStore(vault).Remove("dev", "nested/TOKEN");
+            Assert.Equal(EnvRemoveOutcome.Recycled, new EnvStore(vault).Remove("dev", "dev", "nested/TOKEN").Outcome);
             vault.Save();
         }
 
@@ -228,185 +432,62 @@ public sealed class EnvStoreTests : IDisposable
 
     /// <summary>
     /// A project holding two entries with one title: KDBX permits it and KeePassXC will make it.
-    /// <see cref="EnvStore.Read(string)"/> already refuses to answer "what is the value of that variable";
-    /// removal must refuse for the same reason rather than delete whichever came first.
+    /// There is no answer to which was meant, so removal refuses rather than delete whichever came first.
     /// </summary>
     [Fact]
-    public void Remove_ADuplicatedVariableName_IsRefused_AndRemovesNothing()
+    public void Remove_ADuplicatedVariableName_IsAmbiguous_AndRemovesNothing()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "first", GroupPath = "env/billing" });
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "second", GroupPath = "env/billing" });
 
-        Assert.Throws<VaultException>(() => new EnvStore(vault).Remove("billing", "TOKEN"));
+        var removal = new EnvStore(vault).Remove("billing", "dev", "TOKEN");
+
+        Assert.Equal(EnvRemoveOutcome.Ambiguous, removal.Outcome);
+        Assert.Contains("is on more than one entry", removal.Refusal, StringComparison.Ordinal);
         Assert.Equal(2, vault.ReadEntries().Count);
     }
 
-    /// <summary>
-    /// The write half of the same defect, and the worse one: an entry titled <c>billing/TOKEN</c>
-    /// sitting directly in <c>env</c> shares the path of the real <c>env/billing/TOKEN</c>, so a
-    /// set could write the project's secret into an entry outside the project and report success.
-    /// </summary>
     [Fact]
-    public void Set_UpdatesTheProjectsOwnEntry_NotAnEntryWhosePathCollidesWithIt()
+    public void Remove_AKeyOnTwoEntries_TakesItOnlyFromTheEntryNamed()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        vault.AddEntry(new VaultEntry { Title = "billing/TOKEN", Password = "foreign", GroupPath = "env" });
-        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "mine", GroupPath = "env/billing" });
-
+        var twin = new EntryName("services", "Twin");
+        Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "one", true));
+        Tagged(vault, twin, ["env:billing"], ("STRIPE_KEY", "two", true));
         var store = new EnvStore(vault);
-        Assert.Equal(EnvSetOutcome.Updated, store.TrySet("billing", "TOKEN", "rotated", out _));
 
-        Assert.Equal("rotated", Assert.Single(store.Read("billing")).Value, StringComparer.Ordinal);
-        Assert.Equal(
-            "foreign",
-            vault.ReadEntries().Single(entry => entry.Title == "billing/TOKEN").Password,
-            StringComparer.Ordinal);
+        Assert.Equal(EnvRemoveOutcome.Ambiguous, store.Remove("billing", "dev", "STRIPE_KEY").Outcome);
+        Assert.Equal(EnvRemoveOutcome.FieldRemoved, store.Remove("billing", "dev", "STRIPE_KEY", twin).Outcome);
+        Assert.Equal("one", vault.ReadField(_stripe, "STRIPE_KEY"), StringComparer.Ordinal);
+        Assert.Null(vault.ReadField(twin, "STRIPE_KEY"));
     }
 
     [Fact]
-    public void Remove_MatchesNothing_WhenTheKeyOrProjectIsAbsent()
+    public void Remove_MatchesNothing_WhenTheKeyProjectOrEnvironmentIsAbsent()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
-        store.TrySet("billing", "TOKEN", "first", out _);
+        store.Set("billing", "dev", "TOKEN", "first");
 
-        Assert.Equal(DeletionOutcome.NothingMatched, store.Remove("billing", "NOT_THERE"));
-        Assert.Equal(DeletionOutcome.NothingMatched, store.Remove("no-such-project", "TOKEN"));
-        Assert.Empty(vault.ReadRecycled());
-    }
-
-    [Fact]
-    public void Set_AllowsAnEmptyValue()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-
-        Assert.Equal(EnvSetOutcome.Created, store.TrySet("billing", "OPTIONAL", string.Empty, out _));
-        Assert.Equal(string.Empty, store.Read("billing")[0].Value, StringComparer.Ordinal);
-    }
-
-    /// <summary>
-    /// Each of these would otherwise write to a path no read could reach: an empty or
-    /// separator-bearing project resolves somewhere the project listing never looks, and a key
-    /// containing a slash produces an entry whose path is also some other entry's. Removal now
-    /// tells those apart, so a name KeePassXC authored is still clearable; keypaste declines to
-    /// author one itself.
-    /// </summary>
-    [Theory]
-    [InlineData("", "TOKEN")]
-    [InlineData("   ", "TOKEN")]
-    [InlineData("a/b", "TOKEN")]
-    [InlineData("a\\b", "TOKEN")]
-    [InlineData(" billing", "TOKEN")]
-    [InlineData("billing", "")]
-    [InlineData("billing", "with/slash")]
-    [InlineData("billing", "with space")]
-    [InlineData("billing", "with-dash")]
-    [InlineData("billing", "2LEADING_DIGIT")]
-    [InlineData("billing", "WITH=EQUALS")]
-    public void Set_RefusesNamesItCouldNotReadBack(string project, string key)
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-
-        var outcome = new EnvStore(vault).TrySet(project, key, "value", out var error);
-
-        Assert.Equal(EnvSetOutcome.Rejected, outcome);
-        Assert.NotEmpty(error);
-        Assert.Empty(vault.ReadEntries());
-    }
-
-    /// <summary>
-    /// <c>PATH</c> and <c>Path</c> are two variables on Linux and one on Windows. Allowing both
-    /// into a vault would make the injected environment depend on which machine ran the command.
-    /// </summary>
-    [Fact]
-    public void Set_RefusesAKeyDifferingOnlyInCaseFromAnExistingOne()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("billing", "TOKEN", "first", out _);
-
-        var outcome = store.TrySet("billing", "Token", "second", out var error);
-
-        Assert.Equal(EnvSetOutcome.Rejected, outcome);
-        Assert.Contains("TOKEN", error, StringComparison.Ordinal);
-        Assert.Equal(["TOKEN"], store.Read("billing").Select(v => v.Key));
-    }
-
-    /// <summary>
-    /// The permissive half of the rule. keypaste will not create these names, but KeePassXC will,
-    /// and a listing that hid them would disagree with what the user sees in the other tool.
-    /// </summary>
-    [Fact]
-    public void Read_ListsNamesKeypasteWouldRefuseToCreate()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        vault.AddEntry(new VaultEntry { Title = "not a key", Password = "v", GroupPath = "env/billing" });
-        vault.AddEntry(new VaultEntry { Title = "FINE", Password = "v", GroupPath = "env/billing" });
-
-        var variables = new EnvStore(vault).Read("billing");
-
-        Assert.Equal(["FINE", "not a key"], variables.Select(v => v.Key));
-        Assert.True(variables.Single(v => string.Equals(v.Key, "FINE", StringComparison.Ordinal)).IsUsableName);
-        Assert.False(variables.Single(v => string.Equals(v.Key, "not a key", StringComparison.Ordinal)).IsUsableName);
-    }
-
-    /// <summary>
-    /// KDBX permits two entries with the same title in one group. There is no correct value to
-    /// return for that name, so reading fails closed instead of picking one (docs/PRODUCT.md law 3.7).
-    /// </summary>
-    [Fact]
-    public void Read_FailsClosed_WhenTwoEntriesShareAName()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "one", GroupPath = "env/billing" });
-        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "two", GroupPath = "env/billing" });
-
-        var store = new EnvStore(vault);
-
-        var ex = Assert.Throws<VaultException>(() => store.Read("billing"));
-        Assert.Contains("TOKEN", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Read_SkipsAnEntryWithNoTitle()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        vault.AddEntry(new VaultEntry { Title = string.Empty, Password = "v", GroupPath = "env/billing" });
-        vault.AddEntry(new VaultEntry { Title = "FINE", Password = "v", GroupPath = "env/billing" });
-
-        Assert.Equal(["FINE"], new EnvStore(vault).Read("billing").Select(v => v.Key));
-    }
-
-    [Fact]
-    public void Read_IgnoresEntriesOutsideTheProjectGroup()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("billing", "TOKEN", "mine", out _);
-        store.TrySet("other", "TOKEN", "theirs", out _);
-
-        // Directly under env/, and one level deeper than a project: neither is billing's.
-        vault.AddEntry(new VaultEntry { Title = "STRAY", Password = "v", GroupPath = "env" });
-        vault.AddEntry(new VaultEntry { Title = "DEEP", Password = "v", GroupPath = "env/billing/nested" });
-
-        Assert.Equal(["TOKEN"], store.Read("billing").Select(v => v.Key));
-        Assert.Equal("mine", store.Read("billing")[0].Value, StringComparer.Ordinal);
+        Assert.Equal(EnvRemoveOutcome.NothingMatched, store.Remove("billing", "dev", "NOT_THERE").Outcome);
+        Assert.Equal(EnvRemoveOutcome.NothingMatched, store.Remove("no-such-project", "dev", "TOKEN").Outcome);
+        Assert.Equal(EnvRemoveOutcome.NothingMatched, store.Remove("billing", "qa", "TOKEN").Outcome);
+        Assert.Equal(EnvRemoveOutcome.NothingMatched, store.Remove("billing", "Prod", "TOKEN").Outcome);
+        Assert.Equal(["TOKEN"], vault.Fields(_home)!.Select(field => field.Name));
     }
 
     [Fact]
     public void Projects_ListsImmediateChildrenOfEnvOnly_OrdinalSorted()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("web", "A", "v", out _);
-        store.TrySet("api", "A", "v", out _);
+        LegacyVariables.Set(vault, "web", "A", "v");
+        new EnvStore(vault).Set("api", "dev", "A", "v");
 
         vault.AddEntry(new VaultEntry { Title = "A", Password = "v", GroupPath = "env/api/nested" });
         vault.AddEntry(new VaultEntry { Title = "A", Password = "v", GroupPath = "unrelated" });
 
-        Assert.Equal(["api", "web"], store.Projects());
+        Assert.Equal(["api", "web"], new EnvStore(vault).Projects());
     }
 
     [Fact]
@@ -427,61 +508,26 @@ public sealed class EnvStoreTests : IDisposable
     public void ProjectExists_IsTrue_ForAProjectWithNoVariablesLeft()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        LegacyVariables.Set(vault, "billing", "TOKEN", "v");
         var store = new EnvStore(vault);
-        store.TrySet("billing", "TOKEN", "v", out _);
-        store.Remove("billing", "TOKEN");
+        store.Remove("billing", "dev", "TOKEN");
 
         Assert.True(store.ProjectExists("billing"));
-        Assert.Empty(store.Read("billing"));
-    }
-
-    [Fact]
-    public void TheProjectGroup_IsTheDevProfile()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-
-        Assert.Equal(EnvSetOutcome.Created, store.TrySet("acme-api", "dev", "DATABASE_URL", "dev-db", out _));
-
-        Assert.Equal("dev-db", vault.Find(new EntryName("env/acme-api", "DATABASE_URL"))?.Password);
-        Assert.Equal(store.Read("acme-api"), store.Read("acme-api", "dev"));
-        Assert.True(store.ProfileExists("acme-api", "dev"));
-    }
-
-    [Fact]
-    public void SetWithAProfile_CreatesItsSubgroup()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("acme-api", "DATABASE_URL", "dev-db", out _);
-
-        Assert.False(store.ProfileExists("acme-api", "staging"));
-        Assert.Equal(EnvSetOutcome.Created, store.TrySet("acme-api", "staging", "DATABASE_URL", "staging-db", out _));
-
-        Assert.True(store.ProfileExists("acme-api", "staging"));
-        Assert.Equal("staging-db", vault.Find(new EntryName("env/acme-api/staging", "DATABASE_URL"))?.Password);
-        Assert.Equal([new EnvVariable("DATABASE_URL", "staging-db")], store.Read("acme-api", "staging"));
-        Assert.Equal([new EnvVariable("DATABASE_URL", "dev-db")], store.Read("acme-api"));
-
-        Assert.Equal(DeletionOutcome.NothingMatched, store.Remove("acme-api", "qa", "DATABASE_URL"));
-        Assert.NotEqual(DeletionOutcome.NothingMatched, store.Remove("acme-api", "staging", "DATABASE_URL"));
-        Assert.Equal([new EnvVariable("DATABASE_URL", "dev-db")], store.Read("acme-api"));
-        Assert.Equal(EnvSetOutcome.Rejected, store.TrySet("acme-api", "Staging", "DATABASE_URL", "x", out var error));
-        Assert.Contains("profile", error, StringComparison.Ordinal);
+        Assert.Empty(EnvResolution.List(vault, "billing", "dev").Variables);
     }
 
     [Fact]
     public void Profiles_DevFirst_ProtectedLast()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("acme-api", "A", "v", out _);
+        LegacyVariables.Set(vault, "acme-api", "A", "v");
 
         foreach (var profile in new[] { "prod", "staging", "production-eu", "alpha" })
         {
-            store.TrySet("acme-api", profile, "A", "v", out _);
+            LegacyVariables.Set(vault, "acme-api", profile, "A", "v");
         }
 
+        var store = new EnvStore(vault);
         Assert.Equal(
             [
                 new EnvProfileInfo("dev", false),
@@ -499,11 +545,11 @@ public sealed class EnvStoreTests : IDisposable
     public void ASubgroupNamedDev_IsReportedAndNeverRead()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("acme-api", "A", "flat", out _);
+        LegacyVariables.Set(vault, "acme-api", "A", "flat");
         vault.AddEntry(new VaultEntry { Title = "B", Password = "nested", GroupPath = "env/acme-api/dev" });
+        var store = new EnvStore(vault);
 
-        Assert.Equal([new EnvVariable("A", "flat")], store.Read("acme-api", "dev"));
+        Assert.Equal([new EnvVariable("A", "flat")], EnvResolution.List(vault, "acme-api", "dev").Variables);
         Assert.Equal(["dev"], store.Profiles("acme-api").Select(profile => profile.Name));
         Assert.Equal(
             ["'env/acme-api/dev' is ignored: the dev profile is the project group itself; move its entries up"],
@@ -514,43 +560,15 @@ public sealed class EnvStoreTests : IDisposable
     public void AnInvalidSubgroup_IsReportedAndNeverRead()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("acme-api", "A", "flat", out _);
+        LegacyVariables.Set(vault, "acme-api", "A", "flat");
         vault.AddEntry(new VaultEntry { Title = "B", Password = "shouted", GroupPath = "env/acme-api/Prod" });
+        var store = new EnvStore(vault);
 
-        Assert.Empty(store.Read("acme-api", "Prod"));
         Assert.False(store.ProfileExists("acme-api", "Prod"));
         Assert.Equal(["dev"], store.Profiles("acme-api").Select(profile => profile.Name));
 
         var problem = Assert.Single(store.ProfileProblems("acme-api"));
         Assert.StartsWith("'env/acme-api/Prod' is ignored: ", problem, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void CaseCollision_IsCheckedWithinTheProfile()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("acme-api", "TOKEN", "dev", out _);
-
-        Assert.Equal(EnvSetOutcome.Created, store.TrySet("acme-api", "staging", "Token", "staging", out _));
-        Assert.Equal(EnvSetOutcome.Rejected, store.TrySet("acme-api", "staging", "TOKEN", "staging", out var error));
-        Assert.Contains("only in case", error, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void AVaultWithoutProfiles_ReadsExactlyAsBefore()
-    {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
-        var store = new EnvStore(vault);
-        store.TrySet("billing", "B", "2", out _);
-        store.TrySet("billing", "A", "1", out _);
-
-        Assert.Equal(["billing"], store.Projects());
-        Assert.Equal([new EnvProfileInfo("dev", false)], store.Profiles("billing"));
-        Assert.Empty(store.ProfileProblems("billing"));
-        Assert.Equal([new EnvVariable("A", "1"), new EnvVariable("B", "2")], store.Read("billing"));
-        Assert.Equal(store.Read("billing"), store.Read("billing", "dev"));
     }
 
     private string NewVaultPath()
@@ -559,8 +577,24 @@ public sealed class EnvStoreTests : IDisposable
     }
 
     /// <summary>History items on one entry, or -1 when no entry answers to that name.</summary>
-    private static int HistoryCount(Vault vault, string groupPath, string title)
+    private static int HistoryCount(Vault vault, EntryName name)
     {
-        return vault.ReadHistory(new EntryName(groupPath, title))?.Count ?? -1;
+        return vault.ReadHistory(name)?.Count ?? -1;
+    }
+
+    /// <summary>An ordinary entry carrying tags and fields, as KeePassXC would hold one.</summary>
+    private static void Tagged(Vault vault, EntryName name, string[] tags, params (string Name, string Value, bool Protect)[] fields)
+    {
+        vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = "login" });
+
+        if (fields.Length > 0)
+        {
+            Assert.True(vault.SetFields(name, [.. fields.Select(field => new FieldWrite(field.Name, field.Value, field.Protect))]));
+        }
+
+        foreach (var tag in tags)
+        {
+            Assert.True(vault.AddTag(name, tag));
+        }
     }
 }

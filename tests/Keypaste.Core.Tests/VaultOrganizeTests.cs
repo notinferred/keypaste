@@ -343,7 +343,7 @@ public sealed class VaultOrganizeTests : IDisposable
         Assert.False(store.ProjectExists("billing"));
         Assert.Equal(
             "v3",
-            store.Read("invoicing").Single(variable => variable.Key == "TOKEN").Value,
+            EnvResolution.List(reopened, "invoicing", "dev").Variables.Single(variable => variable.Key == "TOKEN").Value,
             StringComparer.Ordinal);
     }
 
@@ -354,10 +354,9 @@ public sealed class VaultOrganizeTests : IDisposable
 
         Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(new EntryName("keys", "SPARE"), "env/billing", out _));
 
-        var store = new EnvStore(vault);
         Assert.Equal(
             "spare",
-            store.Read("billing").Single(variable => variable.Key == "SPARE").Value,
+            EnvResolution.List(vault, "billing", "dev").Variables.Single(variable => variable.Key == "SPARE").Value,
             StringComparer.Ordinal);
     }
 

@@ -23,10 +23,9 @@ public sealed class EnvProfilesTests : IDisposable
     {
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            var store = new EnvStore(vault);
-            store.TrySet("acme-api", "DATABASE_URL", "dev-db", out _);
-            store.TrySet("acme-api", "prod", "DATABASE_URL", _prodValue, out _);
-            store.TrySet("acme-api", "prod", "SENTRY_DSN", "prod-sentry", out _);
+            LegacyVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
+            LegacyVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", _prodValue);
+            LegacyVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
             vault.Save();
         }
 
@@ -81,10 +80,83 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal("prod", project.SelectedProfile);
 
         using var vault = Vault.Open(_fixture.Path_, TempVault.Password);
-        Assert.NotNull(vault.Find(new EntryName("env/acme-api/staging", "STAGING_ONLY")));
-        Assert.Null(vault.Find(new EntryName("env/acme-api", "STAGING_ONLY")));
+        var staging = new EntryName("env/acme-api", ".env.staging");
+        Assert.NotNull(vault.ReadField(staging, "STAGING_ONLY"));
+        Assert.Equal(["env:acme-api:staging"], vault.Tags(staging));
+        Assert.Null(vault.Find(new EntryName("env/acme-api/staging", "STAGING_ONLY")));
         Assert.Null(vault.Find(new EntryName("env/acme-api/prod", "SENTRY_DSN")));
         Assert.Equal("dev-db", vault.Find(new EntryName("env/acme-api", "DATABASE_URL"))?.Password);
+    }
+
+    [Fact]
+    public void ATaggedKey_IsReadReplacedAndRemovedOnItsOwnEntry()
+    {
+        var stripe = TaggedStripe();
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        var row = project.Variables.Single(row => row.Key == "STRIPE_KEY");
+        Assert.Equal(new EnvSource("STRIPE_KEY", stripe, "STRIPE_KEY"), row.Source);
+        Assert.Equal("stripe-sentinel", project.Read(row));
+
+        var before = _session.Unlocked!.ReadHistory(stripe)!.Count;
+        project.BeginReplace(row);
+        foreach (var c in "stripe-replaced")
+        {
+            project.ReplacementValue.Type(c);
+        }
+
+        project.ConfirmReplaceCommand.Execute(null);
+        Assert.Null(screen.Error);
+        Assert.Equal("stripe-replaced", _session.Unlocked.ReadField(stripe, "STRIPE_KEY"));
+        Assert.Equal(before + 1, _session.Unlocked.ReadHistory(stripe)!.Count);
+
+        project.BeginRemove(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
+        Assert.Equal("Remove STRIPE_KEY from services/Stripe? Its value stays in the entry's history.", project.RemovePrompt);
+        project.ConfirmRemoveCommand.Execute(null);
+
+        Assert.Null(screen.Error);
+        Assert.Equal("Removed STRIPE_KEY from services/Stripe. Its value stays in the entry's history.", screen.Notice);
+        Assert.Null(_session.Unlocked.ReadField(stripe, "STRIPE_KEY"));
+        Assert.DoesNotContain(project.Variables, row => row.Key == "STRIPE_KEY");
+        Assert.Empty(_session.Unlocked.ReadRecycled());
+    }
+
+    [Fact]
+    public void Add_OffersTheHomeEntryAndTheTaggedEntries_AndWritesOnTheOneChosen()
+    {
+        var stripe = TaggedStripe();
+        var home = new EntryName("env/acme-api", ".env");
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        project.BeginAddCommand.Execute(null);
+        Assert.Equal(
+            [new EnvEntryChoice(null, "env/acme-api/.env, created on first use"), new EnvEntryChoice(stripe, "services/Stripe")],
+            project.EntryChoices);
+        Assert.Equal(project.EntryChoices[0], project.NewEntry);
+
+        project.NewKey = "WEBHOOK_SECRET";
+        project.NewEntry = project.EntryChoices[1];
+        project.ConfirmAddCommand.Execute(null);
+        Assert.Null(screen.Error);
+        Assert.Equal(20, _session.Unlocked!.ReadField(stripe, "WEBHOOK_SECRET")?.Length);
+        Assert.Null(_session.Unlocked.Find(home));
+
+        project.BeginAddCommand.Execute(null);
+        project.NewKey = "HOME_KEY";
+        project.ConfirmAddCommand.Execute(null);
+        Assert.Null(screen.Error);
+        Assert.Equal(["env:acme-api"], _session.Unlocked.Tags(home));
+        Assert.True(Assert.Single(_session.Unlocked.Fields(home)!).IsProtected);
+        Assert.Equal(new EnvEntryChoice(home, "env/acme-api/.env"), project.EntryChoices[0]);
+
+        project.BeginAddCommand.Execute(null);
+        project.NewKey = "lower_case";
+        project.ConfirmAddCommand.Execute(null);
+        Assert.Contains("'lower_case' cannot be a project's variable", screen.Error, StringComparison.Ordinal);
+        Assert.True(project.IsAdding);
+        Assert.Single(_session.Unlocked.Fields(home)!);
     }
 
     [Fact]
@@ -268,6 +340,18 @@ public sealed class EnvProfilesTests : IDisposable
         picker.Path = _fixture.Path_;
         await project.ExportReferencesCommand.ExecuteAsync();
         Assert.Contains("is a vault", screen.Error, StringComparison.Ordinal);
+    }
+
+    /// <summary>An ordinary entry tagged into acme-api's dev, holding STRIPE_KEY as a field, saved.</summary>
+    private EntryName TaggedStripe()
+    {
+        var vault = _session.Unlocked!;
+        var stripe = new EntryName("services", "Stripe");
+        vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "stripe-login" });
+        Assert.True(vault.SetFields(stripe, [new FieldWrite("STRIPE_KEY", "stripe-sentinel")]));
+        Assert.True(vault.AddTag(stripe, "env:acme-api"));
+        vault.Save();
+        return stripe;
     }
 
     private static EnvProjectViewModel Open(EnvSetsViewModel screen)

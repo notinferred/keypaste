@@ -113,7 +113,7 @@ asked() { [ "$(grep -c '^approved' "$HOLD_OUT")" -eq "$1" ] || die "$2: a person
 
 # ---------------------------------------------------------------- a vault with something in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
-printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$V1" --vault "$VAULT" >/dev/null \
+legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$V1" \
   || die "could not store the test credential"
 printf '%s\n' "$MASTER" | "$CLI" add KEEP --group personal --generate --vault "$VAULT" >/dev/null \
   || die "could not make a group outside the exposure"

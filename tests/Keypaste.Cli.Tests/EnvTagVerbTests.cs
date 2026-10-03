@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -48,21 +49,55 @@ public sealed class EnvTagVerbTests : IDisposable
     private byte[] Bytes() => File.ReadAllBytes(_harness.VaultPath);
 
     [Fact]
-    public void Tag_writes_the_environments_tag_and_names_the_env_named_fields_that_join()
+    public void Tag_names_the_environment_and_the_env_named_fields_that_join_then_writes_the_tag()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "-p", "prod"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "-p", "prod", "--yes"));
 
         Assert.Equal(["env:billing:prod"], Tags(_stripe));
         Assert.Contains("tagged services/Stripe env:billing:prod", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("joins billing/prod: STRIPE_SECRET_KEY", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Joining billing/prod: STRIPE_SECRET_KEY.", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("Region", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("sk_test_tag", _harness.Err + _harness.Out, StringComparison.Ordinal);
     }
 
     [Fact]
+    public void Tag_asks_first_and_declined_writes_nothing()
+    {
+        var before = Bytes();
+        _harness.Prompt.Interactive = true;
+        _harness.Stderr.GetStringBuilder().Clear();
+        _harness.Prompt.Enqueue(_master, "n");
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("env", "tag", "billing", "services/Stripe", "-p", "prod", "--vault", _harness.VaultPath));
+
+        var said = _harness.Err.ReplaceLineEndings("\n");
+        Assert.Contains("env:billing:prod puts services/Stripe in billing/prod, a protected environment whose every release is asked live.", said, StringComparison.Ordinal);
+        Assert.Contains("Joining billing/prod: STRIPE_SECRET_KEY.", said, StringComparison.Ordinal);
+        Assert.True(said.IndexOf("Joining", StringComparison.Ordinal) < said.IndexOf("Cancelled; nothing was written.", StringComparison.Ordinal));
+        Assert.Contains("Tag services/Stripe? [y/N] ", _harness.Prompt.PromptsSeen);
+        Assert.Equal(before, Bytes());
+
+        _harness.Prompt.Enqueue(_master, "y");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("env", "tag", "billing", "services/Stripe", "-p", "prod", "--vault", _harness.VaultPath));
+        Assert.Equal(["env:billing:prod"], Tags(_stripe));
+    }
+
+    [Fact]
+    public void Tag_and_untag_without_a_terminal_need_yes_and_write_nothing_without_it()
+    {
+        var before = Bytes();
+
+        _harness.AssertExit(CliApp.ExitUsageError, Run("env", "tag", "billing", "services/Stripe"));
+        Assert.Contains("--yes is required when stdin is not a terminal", _harness.Err, StringComparison.Ordinal);
+        _harness.AssertExit(CliApp.ExitUsageError, Run("env", "untag", "billing", "services/Database", "-p", "prod"));
+
+        Assert.Equal(before, Bytes());
+    }
+
+    [Fact]
     public void Tag_without_an_environment_writes_the_bare_project_tag_for_dev()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "--yes"));
 
         Assert.Equal(["env:billing"], Tags(_stripe));
     }
@@ -70,12 +105,12 @@ public sealed class EnvTagVerbTests : IDisposable
     [Fact]
     public void Tagging_twice_or_untagging_an_entry_not_in_the_environment_writes_nothing()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "-p", "dev"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "-p", "dev", "--yes"));
         var before = Bytes();
 
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "--yes"));
         Assert.Contains("already in billing/dev", _harness.Err, StringComparison.Ordinal);
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "untag", "billing", "services/Stripe", "-p", "prod"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "untag", "billing", "services/Stripe", "-p", "prod", "--yes"));
         Assert.Contains("not in billing/prod", _harness.Err, StringComparison.Ordinal);
 
         Assert.Equal(before, Bytes());
@@ -99,11 +134,11 @@ public sealed class EnvTagVerbTests : IDisposable
         }
 
         var before = Revisions();
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "untag", "billing", "services/Stripe"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "untag", "billing", "services/Stripe", "--yes"));
 
         Assert.Equal(["finance"], Tags(_stripe));
         Assert.Equal(before + 1, Revisions());
-        Assert.Contains("leaves billing/dev: STRIPE_SECRET_KEY", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Leaving billing/dev: STRIPE_SECRET_KEY.", _harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -111,7 +146,7 @@ public sealed class EnvTagVerbTests : IDisposable
     {
         var before = Bytes();
 
-        _harness.AssertExit(CliApp.ExitNotFound, Run("env", "tag", "billing", "services/Nobody"));
+        _harness.AssertExit(CliApp.ExitNotFound, Run("env", "tag", "billing", "services/Nobody", "--yes"));
 
         Assert.Equal(before, Bytes());
     }
@@ -119,7 +154,7 @@ public sealed class EnvTagVerbTests : IDisposable
     [Fact]
     public void Ls_lists_projects_environments_protection_and_exactly_the_tagged_entries()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "--yes"));
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls"));
 
@@ -141,7 +176,7 @@ public sealed class EnvTagVerbTests : IDisposable
     [Fact]
     public void Ls_of_a_project_known_only_from_tags_lists_its_environments_and_entries()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe", "--yes"));
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing"));
         Assert.Equal("  dev\n    services/Stripe\n      STRIPE_SECRET_KEY\n  prod  protected\n    services/Database\n", Out);
@@ -160,7 +195,7 @@ public sealed class EnvTagVerbTests : IDisposable
     {
         using (var vault = Vault.Open(_harness.VaultPath, _master))
         {
-            new EnvStore(vault).TrySet("billing", "TOKEN", "legacy-token", out _);
+            LegacyVariables.Set(vault, "billing", "TOKEN", "legacy-token");
             vault.Save();
         }
 

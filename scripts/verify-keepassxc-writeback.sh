@@ -56,7 +56,7 @@ rm -f "$db"          # re-runnable locally, not only on a fresh CI checkout
 
 step "seed: keypaste creates the vault and one env variable"
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$db"
-printf '%s\n%s\n' "$pw" 'v1-initial' | "$kp" env set "$project" "$key" --vault "$db"
+legacy_var "$kp" "$db" "$pw" "$project" "$key" v1-initial
 
 # ---------------------------------------------------------------------------------------
 # A. keypaste modifies an entry — the first KDBX <History> element this codebase ever writes.

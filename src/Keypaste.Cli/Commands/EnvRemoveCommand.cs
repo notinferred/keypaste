@@ -1,11 +1,13 @@
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Removes one variable: <c>keypaste env rm &lt;project&gt; &lt;KEY&gt; [-p &lt;profile&gt;]</c>.</summary>
+/// <summary>Removes one variable: <c>keypaste env rm &lt;project&gt; &lt;KEY&gt; [-p &lt;profile&gt;] [--entry &lt;entry&gt;]</c>.</summary>
 /// <remarks>
-/// The variable is addressed by its group and its title, never by the two joined, so this verb
-/// cannot reach an entry outside the project's group however it is called.
+/// A field leaves its entry, whose history keeps the value; a legacy variable's entry goes to the
+/// recycle bin, addressed by its group and title, never the two joined, so this verb cannot reach an
+/// entry outside the environment however it is called.
 /// </remarks>
 internal static class EnvRemoveCommand
 {
@@ -15,6 +17,7 @@ internal static class EnvRemoveCommand
         new("keyfile", TakesValue: true),
         new("yes", TakesValue: false),
         EnvCommand.ProfileOption,
+        EnvCommand.EntryOption,
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -27,7 +30,7 @@ internal static class EnvRemoveCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env rm <project> <KEY> [-p <profile>] [--yes]");
+            context.Stdout.WriteLine("usage: keypaste env rm <project> <KEY> [-p <profile>] [--entry <entry>] [--yes]");
             return CliApp.ExitSuccess;
         }
 
@@ -63,24 +66,27 @@ internal static class EnvRemoveCommand
 
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            var store = new EnvStore(vault);
-
-            if (!store.ProjectExists(project))
+            if (!EnvCommand.TryFindEntry(vault, line, out var entry, out var missing))
             {
-                context.Stderr.WriteLine($"keypaste env rm: no env set for '{project}'");
+                context.Stderr.WriteLine($"keypaste env rm: {missing}");
                 return CliApp.ExitNotFound;
             }
 
-            if (!store.ProfileExists(project, profile))
+            var listing = EnvResolution.List(vault, project, profile);
+
+            if (listing.Outcome != EnvOutcome.Resolved)
             {
-                context.Stderr.WriteLine($"keypaste env rm: '{project}' has no '{profile}' profile");
+                context.Stderr.WriteLine(listing.Outcome == EnvOutcome.NoProject
+                    ? $"keypaste env rm: no env set for '{project}'"
+                    : $"keypaste env rm: '{project}' has no '{profile}' profile");
                 return CliApp.ExitNotFound;
             }
 
-            var name = new EntryName(EnvProfileNames.GroupPath(project, profile), key);
-            var entryPath = EnvCommand.EntryPath(project, profile, key);
+            var holding = listing.Sources
+                .Where(source => string.Equals(source.Key, key, StringComparison.Ordinal) && (entry is null || source.Entry == entry))
+                .ToList();
 
-            if (vault.Find(name) is null)
+            if (holding.Count == 0)
             {
                 context.Stderr.WriteLine(string.Equals(profile, EnvProfileNames.Default, StringComparison.Ordinal)
                     ? $"keypaste env rm: '{project}' has no variable '{key}'"
@@ -88,11 +94,23 @@ internal static class EnvRemoveCommand
                 return CliApp.ExitNotFound;
             }
 
+            if (holding.Count > 1)
+            {
+                var entries = string.Join(", ", holding.Select(source => ApprovalPrompt.Shown(source.Entry)).Order(StringComparer.Ordinal));
+                context.Stderr.WriteLine($"keypaste env rm: {key} is on more than one entry ({entries}); name the one to remove from with --entry");
+                return CliApp.ExitInternalError;
+            }
+
+            var source = holding[0];
+            var legacy = string.Equals(source.Field, EnvSource.LegacyField, StringComparison.Ordinal);
+            var shown = ApprovalPrompt.Shown(source.Entry);
+
             if (!assumeYes)
             {
-                var answer = context.Prompt.ReadLine(vault.RecyclesDeletedEntries
-                    ? $"Move {entryPath} to the recycle bin? [y/N] "
-                    : $"Remove {entryPath}? This vault has no recycle bin. [y/N] ");
+                var answer = context.Prompt.ReadLine(
+                    !legacy ? $"Remove {key} from {shown}? Its value stays in the entry's history. [y/N] "
+                    : vault.RecyclesDeletedEntries ? $"Move {shown} to the recycle bin? [y/N] "
+                    : $"Remove {shown}? This vault has no recycle bin. [y/N] ");
                 if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
                 {
                     context.Stderr.WriteLine("Cancelled.");
@@ -102,19 +120,27 @@ internal static class EnvRemoveCommand
 
             // Nothing removed means nothing to save. Something wrote to the file between the
             // check above and here, and the honest answer is that this run did not do it.
-            var outcome = store.Remove(project, profile, key);
-            if (outcome == DeletionOutcome.NothingMatched)
+            var removal = new EnvStore(vault).Remove(project, profile, key, source.Entry);
+
+            switch (removal.Outcome)
             {
-                context.Stderr.WriteLine(
-                    $"keypaste env rm: '{entryPath}' was not removed; the vault is unchanged");
-                return CliApp.ExitNotFound;
+                case EnvRemoveOutcome.NothingMatched:
+                    context.Stderr.WriteLine($"keypaste env rm: '{key}' was not removed; the vault is unchanged");
+                    return CliApp.ExitNotFound;
+                case EnvRemoveOutcome.Ambiguous:
+                case EnvRemoveOutcome.Refused:
+                    context.Stderr.WriteLine($"keypaste env rm: {EntryNameSanitizer.SanitizeProse(removal.Refusal, 1024).Text}");
+                    return CliApp.ExitInternalError;
             }
 
             vault.Save();
 
-            context.Stderr.WriteLine(outcome == DeletionOutcome.Recycled
-                ? $"Moved {entryPath} to the recycle bin"
-                : $"Removed {entryPath}");
+            context.Stderr.WriteLine(removal.Outcome switch
+            {
+                EnvRemoveOutcome.FieldRemoved => $"Removed {key} from {shown} (its value stays in the entry's history)",
+                EnvRemoveOutcome.Recycled => $"Moved {shown} to the recycle bin",
+                _ => $"Removed {shown}",
+            });
             return CliApp.ExitSuccess;
         });
     }

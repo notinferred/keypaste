@@ -1,5 +1,6 @@
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
 
@@ -32,7 +33,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
     private string _planned = EnvProfileNames.Default;
 
     private DotEnvDocument? _document;
-    private IReadOnlyList<EnvImportKey> _previewed = [];
+    private IReadOnlyList<EnvKeyWrite> _previewed = [];
     private IReadOnlyList<string> _rows = [];
     private string _source = string.Empty;
     private string _notes = string.Empty;
@@ -161,7 +162,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
             return;
         }
 
-        EnvImportPlan plan;
+        EnvWritePlan plan;
 
         try
         {
@@ -175,15 +176,15 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
         if (plan.Refusal is { } refusal)
         {
-            _report($"Nothing was imported: {refusal}.");
+            _report($"Nothing was imported: {EntryNameSanitizer.SanitizeProse(refusal, 1024).Text}.");
             return;
         }
 
         _document = document;
-        _planned = plan.Profile;
+        _planned = plan.Environment;
         _previewed = plan.Keys;
         Source = path;
-        Rows = [.. plan.Keys.Select(key => $"{EntryNameSanitizer.Sanitize(key.Key).Text}  {Describe(key.Change)}")];
+        Rows = [.. plan.Keys.Select(key => $"{EntryNameSanitizer.Sanitize(key.Key).Text}  {Describe(key, plan)}")];
         Notes = NotesOf(document);
         RaisePreviewing();
     }
@@ -217,12 +218,12 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
             if (!plan.WritesAnything)
             {
-                _announce($"{EnvProfileNames.GroupPath(_project, _planned)} already matches the file; nothing was written.");
+                _announce($"{Where} already matches the file; nothing was written.");
                 Clear();
                 return;
             }
 
-            if (!EnvImport.TryApply(store, plan, out var rejection))
+            if (!store.TryApply(plan, out var rejection))
             {
                 // Checked before anybody was asked, so nothing has been saved. Say so and stop.
                 _report($"{rejection} Nothing was imported.");
@@ -233,7 +234,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
             vault.Save();
 
             var written = plan.Created.Count + plan.Updated.Count;
-            _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {EnvProfileNames.GroupPath(_project, _planned)}. {Source} is still there.");
+            _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}. {Source} is still there.");
         }
         catch (VaultChangedOnDiskException)
         {
@@ -267,10 +268,15 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         CancelCommand.RaiseCanExecuteChanged();
     }
 
-    private static string Describe(EnvImportChange change) => change switch
+    /// <summary>The project and environment imported into, as the screen names them.</summary>
+    private string Where => $"{EntryNameSanitizer.Sanitize(_project).Text}/{_planned}";
+
+    /// <summary>What importing does to one key and on which entry, never its value.</summary>
+    private static string Describe(EnvKeyWrite key, EnvWritePlan plan) => key.Change switch
     {
-        EnvImportChange.New => "new",
-        EnvImportChange.Replaces => "replaces the stored value, which stays in history",
+        EnvWriteChange.New when plan.CreatesHome && key.Entry == plan.Home => $"new on {ApprovalPrompt.Shown(key.Entry)}, which is created",
+        EnvWriteChange.New => $"new on {ApprovalPrompt.Shown(key.Entry)}",
+        EnvWriteChange.Replaces => $"replaces the value on {ApprovalPrompt.Shown(key.Entry)}, which keeps it in history",
         _ => "unchanged",
     };
 

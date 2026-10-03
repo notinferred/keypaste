@@ -29,9 +29,10 @@ keypaste env pull dev --keep
 
 ```
 note: a trailing ' #' comment was removed from: PORT. Quote the value if the '#' was part of it.
-env/dev: 4 new, 0 updated, 0 unchanged
-  new       DATABASE_URL, MOTD, PORT, STRIPE_KEY
-Import 4 variables into env/dev? [y/N]
+dev/dev: 4 new, 0 updated, 0 unchanged
+  new       DATABASE_URL, MOTD, PORT, STRIPE_KEY on env/dev/.env
+env/dev/.env will be created and tagged into dev/dev.
+Import 4 variables into dev/dev? [y/N]
 ```
 
 The import plan lists names without values before writing anything.
@@ -44,7 +45,7 @@ If any line is malformed, the vault remains unchanged. The error report lists up
 
 ```sh
 keypaste env ls dev
-keypaste get env/dev/DATABASE_URL --show
+keypaste get env/dev/.env --field DATABASE_URL --show
 ```
 
 The import above used `--keep` so you can inspect the result before deletion. Once satisfied, run `keypaste env pull dev` again; unchanged values are left alone, and you can answer its deletion prompt. keypaste tells you what deleting does and does not do:
@@ -84,7 +85,7 @@ The `--` separates the project from its command. Without it, `keypaste run dev n
 
 ## Profiles and references
 
-A project holds one set per profile. `dev` is the project group itself, `env/<project>`, so everything above is the dev profile; any other profile is a subgroup such as `env/<project>/staging`, named with lowercase letters, digits and `-`. Every env verb and `run` take `-p <profile>`:
+A project holds one set per profile, named with lowercase letters, digits and `-`; everything above is the `dev` profile. A profile's keys are fields of the entries tagged into it: `env set` and `env pull` add a new key to its entry `env/<project>/.env`, or `.env.<profile>` for another profile, which they create tagged `env:<project>` or `env:<project>:<profile>`, unless `--entry` names another entry tagged into it. A project kept the earlier way, `env/<project>` for `dev` and subgroups such as `env/<project>/staging`, keeps working. Every env verb and `run` take `-p <profile>`:
 
 ```sh
 keypaste env set acme-api DATABASE_URL -p staging
@@ -187,7 +188,7 @@ The vault path contains no network code and works offline.
 
 ### What does KeePassXC see?
 
-Ordinary entries. `env/dev` is a group, each variable is an entry with the name as its title and the value as its password. You can read, edit, add and delete them in KeePassXC with no knowledge of keypaste, and the compatibility gate checks both directions on Linux, macOS and Windows for qualifying CI runs.
+Ordinary entries. Each variable is a protected field, named as the variable, of an entry whose tag puts it in the project: `env/dev/.env`, tagged `env:dev`, for the ones keypaste added, or any entry you tag yourself. A project kept the earlier way has an entry per variable under `env/dev`, its title the name and its password the value. You can read, edit, add and delete either in KeePassXC with no knowledge of keypaste, and the compatibility gate checks both directions on Linux, macOS and Windows for qualifying CI runs.
 
 ### Can I keep using `direnv`?
 

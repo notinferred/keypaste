@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -87,9 +88,8 @@ public sealed class EnvExportTests
             "env", "pull", "roundtrip", path, "--yes", "--keep", "--vault", harness.VaultPath));
 
         using var vault = Vault.Open(harness.VaultPath, Master);
-        var store = new EnvStore(vault);
 
-        Assert.Equal(store.Read("billing"), store.Read("roundtrip"));
+        Assert.Equal(EnvResolution.List(vault, "billing", "dev").Variables, EnvResolution.List(vault, "roundtrip", "dev").Variables);
     }
 
     [Fact]
@@ -120,8 +120,8 @@ public sealed class EnvExportTests
         {
             vault.AddEntry(new VaultEntry { Title = "PLACEHOLDER", Password = "x", GroupPath = "env/empty" });
             Assert.Equal(
-                DeletionOutcome.Recycled,
-                new EnvStore(vault).Remove("empty", "PLACEHOLDER"));
+                EnvRemoveOutcome.Recycled,
+                new EnvStore(vault).Remove("empty", "dev", "PLACEHOLDER").Outcome);
             vault.Save();
         }
 
@@ -679,7 +679,7 @@ public sealed class EnvExportTests
         using var harness = SeededWithTwo();
         using (var vault = Vault.Open(harness.VaultPath, Master))
         {
-            new EnvStore(vault).TrySet("billing", "staging", "API_KEY", "sk_staging_secret", out _);
+            LegacyVariables.Set(vault, "billing", "staging", "API_KEY", "sk_staging_secret");
             vault.Save();
         }
 

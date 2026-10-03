@@ -300,7 +300,7 @@ public sealed class ExistingSecretTests : IDisposable
             Assert.Null(context.EnvSets.Error);
         }
 
-        Assert.Equal(_typed, Reread("env/billing/DATABASE_URL"));
+        Assert.Equal(_typed, RereadHomeField("DATABASE_URL"));
     }
 
     [Fact]
@@ -320,7 +320,7 @@ public sealed class ExistingSecretTests : IDisposable
             Assert.Null(context.EnvSets.Error);
         }
 
-        Assert.Equal(_pasted, Reread("env/billing/DATABASE_URL"));
+        Assert.Equal(_pasted, RereadHomeField("DATABASE_URL"));
     }
 
     [Fact]
@@ -409,7 +409,11 @@ public sealed class ExistingSecretTests : IDisposable
         Enter(project.ReplacementValue, _typed);
         project.ConfirmReplaceCommand.Execute(null);
 
-        Assert.Contains("was not in", context.EnvSets.Error ?? string.Empty, StringComparison.Ordinal);
+        Assert.Equal("STRIPE_KEY is no longer on env/billing/STRIPE_KEY, so nothing was written.", context.EnvSets.Error);
+        Assert.False(project.IsReplacing);
+        Assert.DoesNotContain(project.Variables, variable => variable.Key == "STRIPE_KEY");
+        Assert.Null(Reread("env/billing/STRIPE_KEY"));
+        Assert.Null(RereadHomeField("STRIPE_KEY"));
     }
 
     private static void Enter(SecretField field, string value)
@@ -433,6 +437,13 @@ public sealed class ExistingSecretTests : IDisposable
     }
 
     /// <summary>Opens the file again, from nothing, and reads one entry's password.</summary>
+    /// <summary>A new key the screen added, from billing's home entry (D-0413).</summary>
+    private string? RereadHomeField(string key)
+    {
+        using var vault = Vault.Open(_vaultPath, _master);
+        return vault.ReadField(new EntryName("env/billing", ".env"), key);
+    }
+
     private string? Reread(string path)
     {
         using var vault = Vault.Open(_vaultPath, _master);

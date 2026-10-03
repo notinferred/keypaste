@@ -236,7 +236,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
 
         try
         {
-            return new EnvStore(vault).Read(project).Count;
+            return EnvResolution.List(vault, project, EnvProfileNames.Default).Variables.Count;
         }
         catch (VaultException)
         {

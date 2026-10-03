@@ -49,7 +49,8 @@ rm -f "$db"          # re-runnable locally, not only on a fresh CI checkout
 
 step "seed: the shipped binary writes four values into one entry"
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$db"
-for value in v1-first v2-second v3-third v4-current; do
+legacy_var "$kp" "$db" "$pw" "$project" "$key" v1-first
+for value in v2-second v3-third v4-current; do
   printf '%s\n%s\n' "$pw" "$value" | "$kp" env set "$project" "$key" --vault "$db"
 done
 

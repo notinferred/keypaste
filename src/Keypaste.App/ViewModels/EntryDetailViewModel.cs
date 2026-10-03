@@ -59,6 +59,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private EntryFieldRow? _replacingField;
     private EntryFieldRow? _removingField;
     private string _draftTag = string.Empty;
+    private ProjectTagChange? _pendingTagChange;
 
     internal EntryDetailViewModel(
         AppVaultSession session,
@@ -137,6 +138,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ConfirmRemoveFieldCommand = new RelayCommand(ConfirmRemoveField, () => RemovingField is not null);
         CancelRemoveFieldCommand = new RelayCommand(() => RemovingField = null, () => RemovingField is not null);
         AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
+        ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
+        CancelTagChangeCommand = new RelayCommand(() => PendingTagChange = null, () => PendingTagChange is not null);
 
         ReadTimes();
         ReadFieldsAndTags();
@@ -290,6 +293,37 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     internal RelayCommand AddTagCommand { get; }
 
+    /// <summary>A project tag being added or removed, held until the person confirms what it reaches (D-0415); null otherwise.</summary>
+    internal ProjectTagChange? PendingTagChange
+    {
+        get => _pendingTagChange;
+        private set
+        {
+            if (Set(ref _pendingTagChange, value))
+            {
+                Raise(nameof(IsConfirmingTagChange));
+                Raise(nameof(TagChangeLines));
+                Raise(nameof(TagChangeAction));
+                ConfirmTagChangeCommand.RaiseCanExecuteChanged();
+                CancelTagChangeCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool IsConfirmingTagChange => _pendingTagChange is not null;
+
+    /// <summary>What the pending tag change reaches: its environment and the fields joining or leaving it, never a value.</summary>
+    internal IReadOnlyList<string> TagChangeLines => _pendingTagChange?.Describe() ?? [];
+
+    /// <summary>What the confirming button says.</summary>
+    internal string TagChangeAction => _pendingTagChange?.Adding == false ? "Remove tag" : "Add tag";
+
+    /// <summary>Writes the pending tag change.</summary>
+    internal RelayCommand ConfirmTagChangeCommand { get; }
+
+    /// <summary>Drops the pending tag change, writing nothing.</summary>
+    internal RelayCommand CancelTagChangeCommand { get; }
+
     /// <summary>Reads one custom field out of the open vault, for a hold or a copy.</summary>
     internal string? ReadField(string field)
     {
@@ -326,9 +360,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal void ToggleProtection(EntryFieldRow row) =>
         Write(vault => vault.SetFields(Name, [new FieldWrite(row.Name, Value: null, Protect: !row.IsProtected)]), null);
 
-    /// <summary>Removes one of the entry's tags.</summary>
-    internal void RemoveTag(EntryTagChip chip) =>
-        Write(vault => vault.RemoveTags(Name, [chip.Tag]), "That tag is no longer on this entry.");
+    /// <summary>Removes one of the entry's tags, first asking about a project tag.</summary>
+    internal void RemoveTag(EntryTagChip chip)
+    {
+        if (!Ask(chip.Tag, adding: false))
+        {
+            Write(vault => vault.RemoveTags(Name, [chip.Tag]), "That tag is no longer on this entry.");
+        }
+    }
 
     /// <summary>Replaces the password with a generated one, after asking.</summary>
     internal RelayCommand RotateCommand { get; }
@@ -1100,9 +1139,58 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     {
         var tag = DraftTag.Trim();
 
-        if (Write(vault => vault.AddTag(Name, tag), "This entry already has that tag."))
+        if (Tags.Any(chip => string.Equals(chip.Tag, tag, StringComparison.Ordinal)) || !Ask(tag, adding: true))
         {
-            DraftTag = string.Empty;
+            WriteTag(tag, adding: true);
+        }
+    }
+
+    /// <summary>Holds a project tag change for the person to confirm.</summary>
+    /// <returns>Whether the tag reaches a project and is now waiting; false for a tag to write at once.</returns>
+    private bool Ask(string tag, bool adding)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            return false;
+        }
+
+        try
+        {
+            PendingTagChange = ProjectTagChange.Preview(vault, Name, [tag], adding);
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return true;
+        }
+
+        Report(null);
+        return PendingTagChange is not null;
+    }
+
+    private void ConfirmTagChange()
+    {
+        if (PendingTagChange is not { } change)
+        {
+            return;
+        }
+
+        PendingTagChange = null;
+        WriteTag(change.Tags[0], change.Adding);
+    }
+
+    private void WriteTag(string tag, bool adding)
+    {
+        if (adding)
+        {
+            if (Write(vault => vault.AddTag(Name, tag), "This entry already has that tag."))
+            {
+                DraftTag = string.Empty;
+            }
+        }
+        else
+        {
+            Write(vault => vault.RemoveTags(Name, [tag]), "That tag is no longer on this entry.");
         }
     }
 

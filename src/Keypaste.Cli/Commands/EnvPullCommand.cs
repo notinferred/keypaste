@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Cli.Commands;
 
@@ -27,6 +28,7 @@ internal static class EnvPullCommand
         new("delete-source", TakesValue: false),
         new("keep", TakesValue: false),
         EnvCommand.ProfileOption,
+        EnvCommand.EntryOption,
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -94,7 +96,9 @@ internal static class EnvPullCommand
         }
 
         var exit = VaultSession.OpenHeld(vaultPath, line, context, vault =>
-            Import(vault, project, profile, document, assumeYes, context));
+            EnvCommand.TryFindEntry(vault, line, out var entry, out var missing)
+                ? Import(vault, project, profile, entry, document, assumeYes, context)
+                : Fail(context, missing, CliApp.ExitNotFound));
 
         if (exit != CliApp.ExitSuccess)
         {
@@ -212,32 +216,37 @@ internal static class EnvPullCommand
         Vault vault,
         string project,
         string profile,
+        EntryName? entry,
         DotEnvDocument document,
         bool assumeYes,
         CliContext context)
     {
         var store = new EnvStore(vault);
-        var plan = EnvImport.Plan(store, project, profile, document);
+        var plan = EnvImport.Plan(store, project, profile, document, entry);
 
-        if (plan.Refusal is { } collision)
+        if (plan.Refusal is { } refusal)
         {
-            return Fail(context, collision);
+            return Fail(context, EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
         }
 
         var created = plan.Created;
         var updated = plan.Updated;
-        var unchanged = plan.Unchanged;
+        var where = $"{project}/{profile}";
 
-        var groupPath = EnvProfileNames.GroupPath(project, profile);
         context.Stderr.WriteLine(
-            $"{groupPath}: {created.Count} new, {updated.Count} updated, {unchanged} unchanged");
-        WriteNames(context, "new", created);
-        WriteNames(context, "updated", updated);
+            $"{where}: {created.Count} new, {updated.Count} updated, {plan.Unchanged} unchanged");
+        WriteKeys(context, "new", plan, EnvWriteChange.New);
+        WriteKeys(context, "updated", plan, EnvWriteChange.Replaces);
 
         if (created.Count + updated.Count == 0)
         {
-            context.Stderr.WriteLine($"{groupPath} already matches the file; nothing to do.");
+            context.Stderr.WriteLine($"{where} already matches the file; nothing to do.");
             return CliApp.ExitSuccess;
+        }
+
+        if (plan.CreatesHome)
+        {
+            context.Stderr.WriteLine($"{ApprovalPrompt.Shown(plan.Home)} will be created and tagged into {where}.");
         }
 
         if (updated.Count > 0)
@@ -249,7 +258,7 @@ internal static class EnvPullCommand
         if (!assumeYes)
         {
             var answer = context.Prompt.ReadLine(
-                $"Import {Count(created.Count + updated.Count, "variable")} into {groupPath}? [y/N] ");
+                $"Import {Count(created.Count + updated.Count, "variable")} into {where}? [y/N] ");
             if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
             {
                 context.Stderr.WriteLine("Cancelled.");
@@ -257,7 +266,7 @@ internal static class EnvPullCommand
             }
         }
 
-        if (!EnvImport.TryApply(store, plan, out var rejection))
+        if (!store.TryApply(plan, out var rejection))
         {
             // Everything that could be refused was checked before the confirmation, so reaching
             // here means the check and the writer disagree. Nothing has been saved, so the file on
@@ -270,7 +279,7 @@ internal static class EnvPullCommand
         vault.Save();
 
         context.Stderr.WriteLine(
-            $"Imported {Count(created.Count + updated.Count, "variable")} into {groupPath}.");
+            $"Imported {Count(created.Count + updated.Count, "variable")} into {where}.");
         return CliApp.ExitSuccess;
     }
 
@@ -428,27 +437,30 @@ internal static class EnvPullCommand
         return CliApp.ExitSuccess;
     }
 
-    private static void WriteNames(CliContext context, string label, IReadOnlyList<string> names)
+    /// <summary>Names the keys of one kind, each with the entry it is written on.</summary>
+    private static void WriteKeys(CliContext context, string label, EnvWritePlan plan, EnvWriteChange change)
     {
-        if (names.Count > 0)
+        foreach (var entry in plan.Keys.Where(key => key.Change == change).GroupBy(key => key.Entry))
         {
-            context.Stderr.WriteLine($"  {label,-9} {string.Join(", ", names)}");
+            context.Stderr.WriteLine($"  {label,-9} {string.Join(", ", entry.Select(key => key.Key))} on {ApprovalPrompt.Shown(entry.Key)}");
         }
     }
 
     private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 
-    private static int Fail(CliContext context, string message)
+    private static int Fail(CliContext context, string message, int exit = CliApp.ExitUsageError)
     {
         context.Stderr.WriteLine($"keypaste env pull: {message}");
-        return CliApp.ExitUsageError;
+        return exit;
     }
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste env pull <project> [file] [-p <profile>] [--yes] [--delete-source | --keep]");
+        writer.WriteLine("usage: keypaste env pull <project> [file] [-p <profile>] [--entry <entry>] [--yes] [--delete-source | --keep]");
         writer.WriteLine();
         writer.WriteLine($"imports a .env file, defaulting to ./{DefaultFileName}, then offers to delete it.");
+        writer.WriteLine("a key the project has is updated where it lives; a new one becomes a protected field of");
+        writer.WriteLine("--entry, or of the environment's home entry env/<project>/.env, created tagged.");
         writer.WriteLine("if any line is malformed, every problem is reported and nothing is imported.");
         writer.WriteLine("values are stored exactly as written -- ${VAR} is not expanded.");
     }

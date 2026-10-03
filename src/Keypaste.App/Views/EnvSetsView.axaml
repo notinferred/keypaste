@@ -460,6 +460,21 @@
                     <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
                     <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left"
                              AutomationProperties.Name="New key" />
+                    <!-- A new key is a protected field of the entry chosen here: the profile's home entry, or
+                         one of the entries tagged into it (D-0413). -->
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Classes="caption" Text="On" VerticalAlignment="Center" />
+                      <ComboBox ItemsSource="{Binding EntryChoices}"
+                                SelectedItem="{Binding NewEntry}"
+                                MinWidth="320"
+                                AutomationProperties.Name="Entry for the new key">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate x:DataType="vm:EnvEntryChoice">
+                            <TextBlock Text="{Binding Display}" FontFamily="{DynamicResource KpMono}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
                     <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
                     <StackPanel Spacing="6" IsVisible="{Binding GenerateValue}">
                       <StackPanel Orientation="Horizontal" Spacing="12">

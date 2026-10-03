@@ -283,10 +283,10 @@ public sealed class TaggedEnvResolutionTests : IDisposable
     }
 
     private static void Legacy(Vault vault, string project, string key, string value) =>
-        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet(project, key, value, out _));
+        LegacyVariables.Set(vault, project, key, value);
 
     private static void Legacy(Vault vault, string project, string profile, string key, string value) =>
-        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet(project, profile, key, value, out _));
+        LegacyVariables.Set(vault, project, profile, key, value);
 
     private static EntryName Tagged(Vault vault, string group, string title, string[] tags, params (string Name, string Value)[] fields)
     {

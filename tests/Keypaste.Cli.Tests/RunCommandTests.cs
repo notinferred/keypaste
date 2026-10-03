@@ -1,5 +1,6 @@
 using Keypaste.Cli.Commands;
 using Keypaste.Core.Launch;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -22,15 +23,16 @@ public sealed class RunCommandTests
         var harness = new CliHarness();
         harness.SeedVault(Master);
 
-        foreach (var (key, value) in variables)
+        // The env/dev layout of earlier releases, beside which the refusals below add entries the
+        // way KeePassXC would.
+        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
         {
-            harness.Prompt.Enqueue(Master, value);
+            foreach (var (key, value) in variables)
+            {
+                LegacyVariables.Set(vault, "dev", key, value);
+            }
 
-            // Checked, so a seeding failure says so here rather than surfacing later as an
-            // assertion about something else entirely.
-            harness.AssertExit(
-                CliApp.ExitSuccess,
-                harness.Run("env", "set", "dev", key, "--vault", harness.VaultPath));
+            vault.Save();
         }
 
         harness.Stdout.GetStringBuilder().Clear();
@@ -642,10 +644,9 @@ public sealed class RunCommandTests
 
         using (var vault = Core.Vault.Open(harness.VaultPath, Master))
         {
-            var store = new Core.EnvStore(vault);
-            store.TrySet("acme-api", "DATABASE_URL", "dev-db", out _);
-            store.TrySet("acme-api", "STRIPE_KEY", "sk_dev", out _);
-            store.TrySet("acme-api", "staging", "DATABASE_URL", "staging-db", out _);
+            LegacyVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
+            LegacyVariables.Set(vault, "acme-api", "STRIPE_KEY", "sk_dev");
+            LegacyVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
             vault.AddEntry(new Core.VaultEntry { GroupPath = "work", Title = "github", Username = "octocat", Password = "gh-password" });
             vault.Save();
         }

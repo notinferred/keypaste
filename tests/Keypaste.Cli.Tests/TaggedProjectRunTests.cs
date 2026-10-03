@@ -4,6 +4,7 @@ using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -24,7 +25,7 @@ public sealed class TaggedProjectRunTests : IDisposable
         _harness.SeedVault(_master, ("services/Stripe", "stripe-login-c1b"), ("services/Database", "database-login-c1b"));
 
         using var vault = Vault.Open(_harness.VaultPath, _master);
-        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet("billing", "LEGACY_TOKEN", "legacy-value-c1b", out _));
+        LegacyVariables.Set(vault, "billing", "LEGACY_TOKEN", "legacy-value-c1b");
         vault.SetFields(new EntryName("services", "Stripe"), [new FieldWrite("STRIPE_SECRET_KEY", "stripe-value-c1b"), new FieldWrite("Region", "eu", Protect: false)]);
         vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("DATABASE_URL", "dev-db-c1b")]);
         vault.AddTag(new EntryName("services", "Stripe"), "env:billing");
@@ -92,7 +93,7 @@ public sealed class TaggedProjectRunTests : IDisposable
                     vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("STRIPE_SECRET_KEY", "second-value-c1b")]);
                     break;
                 case "case":
-                    new EnvStore(vault).TrySet("billing", "Api_Key", "legacy-api-c1b", out _);
+                    LegacyVariables.Set(vault, "billing", "Api_Key", "legacy-api-c1b");
                     vault.SetFields(new EntryName("services", "Stripe"), [new FieldWrite("API_KEY", "tagged-api-c1b")]);
                     break;
                 case "expired":

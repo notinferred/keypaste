@@ -216,7 +216,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
 
         Assert.Null(screen.Model.Error);
 
-        var stored = project.Read("STRIPE_KEY");
+        var stored = project.Read(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Assert.NotNull(stored);
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));
@@ -398,6 +398,8 @@ public sealed class GuiEditIsVisibleToTheCliTests
         detail.ConfirmAddFieldCommand.Execute(null);
         detail.DraftTag = "env:billing:prod";
         detail.AddTagCommand.Execute(null);
+        Assert.Contains("Joining billing/prod: API_TOKEN.", detail.TagChangeLines);
+        detail.ConfirmTagChangeCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
 

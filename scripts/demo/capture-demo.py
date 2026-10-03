@@ -195,7 +195,7 @@ def main():
         subprocess.run(keypaste + list(args), input=stdin.encode(), env=env, check=True, capture_output=True)
 
     setup("init", vault, stdin=f"{MASTER}\n{MASTER}\n")
-    setup("env", "set", "demo", "STRIPE_KEY", "--vault", vault, stdin=f"{MASTER}\n{SECRET}\n")
+    setup("add", ENTRY, "--vault", vault, stdin=f"{MASTER}\n{SECRET}\n")
 
     tape = Tape()
     tape.add("top", "prompt")

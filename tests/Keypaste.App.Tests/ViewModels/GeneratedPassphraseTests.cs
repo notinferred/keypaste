@@ -83,7 +83,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
             Assert.Null(context.EnvSets.Error);
         }
 
-        AssertIsAPassphrase(Reread("env/billing/DATABASE_URL"), 8, PasswordGenerator.DefaultSeparator);
+        AssertIsAPassphrase(RereadHomeField("DATABASE_URL"), 8, PasswordGenerator.DefaultSeparator);
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
         }
 
         Assert.Equal(PasswordGenerator.DefaultLength, Reread("database").Length);
-        Assert.Equal(PasswordGenerator.DefaultLength, Reread("env/billing/DATABASE_URL").Length);
+        Assert.Equal(PasswordGenerator.DefaultLength, RereadHomeField("DATABASE_URL").Length);
     }
 
     /// <summary>
@@ -177,6 +177,16 @@ public sealed class GeneratedPassphraseTests : IDisposable
     }
 
     /// <summary>Opens the file again, from nothing, and reads one entry's password.</summary>
+    /// <summary>A new key the screen added, from billing's home entry (D-0413).</summary>
+    private string RereadHomeField(string key)
+    {
+        using var vault = Vault.Open(_vaultPath, Master);
+        var value = vault.ReadField(new EntryName("env/billing", ".env"), key);
+
+        Assert.NotNull(value);
+        return value;
+    }
+
     private string Reread(string path)
     {
         using var vault = Vault.Open(_vaultPath, Master);

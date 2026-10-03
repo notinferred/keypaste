@@ -21,7 +21,7 @@ Use a disposable vault. The tool returns credentials as text and structured data
 ```sh
 keypaste init ~/keypaste-demo.kdbx
 export KEYPASTE_VAULT=~/keypaste-demo.kdbx
-keypaste env set demo STRIPE_KEY
+keypaste add env/demo/STRIPE_KEY
 ```
 
 ```
@@ -29,11 +29,14 @@ New master password:
 Confirm master password:
 Created /home/you/keypaste-demo.kdbx
 Master password:
-Value for STRIPE_KEY:
-Set env/demo/STRIPE_KEY
+Username:
+URL:
+Notes:
+Password:
+Added env/demo/STRIPE_KEY
 ```
 
-Nothing is echoed at either prompt. When it asks for the value, paste this:
+The key is an entry of its own, the one the request below names. Press Enter at Username, URL and Notes; nothing is echoed at the password prompts. When it asks for the password, paste this:
 
 ```
 sk_test_EXAMPLE_ONLY_not_a_real_key_0000

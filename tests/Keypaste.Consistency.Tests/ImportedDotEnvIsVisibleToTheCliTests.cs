@@ -46,7 +46,7 @@ public sealed class ImportedDotEnvIsVisibleToTheCliTests : IDisposable
         Assert.Null(screen.Error);
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("env", "ls", "billing"));
-        Assert.Equal(["DATABASE_URL", "STRIPE_KEY"], fixture.Cli.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        Assert.Equal(["dev", "env/billing/.env", "DATABASE_URL", "STRIPE_KEY"], fixture.Cli.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));
         Assert.Equal(_first, fixture.Cli.ProcessLauncher.Environment["STRIPE_KEY"]);

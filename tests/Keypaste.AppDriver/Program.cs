@@ -63,8 +63,12 @@ internal static class Program
         "       field-set <vault> <entry-path> <name>\n" +
         "       field-protect <vault> <entry-path> <name>\n" +
         "       field-rm <vault> <entry-path> <name>\n" +
-        "       tag-add <vault> <entry-path> <tag>\n" +
-        "       tag-rm <vault> <entry-path> <tag>\n" +
+        "       tag-add <vault> <entry-path> <tag> [--decline]\n" +
+        "       tag-rm <vault> <entry-path> <tag> [--decline]\n" +
+        "       env-add <vault> <project> <environment> <KEY> [--entry <entry-path>]\n" +
+        "       env-set <vault> <project> <environment> <KEY>\n" +
+        "       env-rm <vault> <project> <environment> <KEY>\n" +
+        "       env-import <vault> <project> <environment> <file>\n" +
         "       group-rename <vault> <group-path> <new-name>\n" +
         "       relocate <vault> <entry-path> <destination-group-path> <new-title>\n" +
         "       delete <vault> <entry-path>\n" +
@@ -116,8 +120,15 @@ internal static class Program
                 ["field-set", var vault, var entry, var name] => await driver.ReplaceFieldAsync(vault, entry, name).ConfigureAwait(true),
                 ["field-protect", var vault, var entry, var name] => await driver.ToggleProtectionAsync(vault, entry, name).ConfigureAwait(true),
                 ["field-rm", var vault, var entry, var name] => await driver.RemoveFieldAsync(vault, entry, name).ConfigureAwait(true),
-                ["tag-add", var vault, var entry, var tag] => await driver.AddTagAsync(vault, entry, tag).ConfigureAwait(true),
-                ["tag-rm", var vault, var entry, var tag] => await driver.RemoveTagAsync(vault, entry, tag).ConfigureAwait(true),
+                ["tag-add", var vault, var entry, var tag] => await driver.AddTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
+                ["tag-add", var vault, var entry, var tag, "--decline"] => await driver.AddTagAsync(vault, entry, tag, decline: true).ConfigureAwait(true),
+                ["tag-rm", var vault, var entry, var tag] => await driver.RemoveTagAsync(vault, entry, tag, decline: false).ConfigureAwait(true),
+                ["tag-rm", var vault, var entry, var tag, "--decline"] => await driver.RemoveTagAsync(vault, entry, tag, decline: true).ConfigureAwait(true),
+                ["env-add", var vault, var project, var environment, var key] => await driver.AddEnvKeyAsync(vault, project, environment, key, null).ConfigureAwait(true),
+                ["env-add", var vault, var project, var environment, var key, "--entry", var entry] => await driver.AddEnvKeyAsync(vault, project, environment, key, entry).ConfigureAwait(true),
+                ["env-set", var vault, var project, var environment, var key] => await driver.ReplaceEnvKeyAsync(vault, project, environment, key).ConfigureAwait(true),
+                ["env-rm", var vault, var project, var environment, var key] => await driver.RemoveEnvKeyAsync(vault, project, environment, key).ConfigureAwait(true),
+                ["env-import", var vault, var project, var environment, var file] => await driver.ImportEnvAsync(vault, project, environment, file).ConfigureAwait(true),
                 ["group-rename", var vault, var group, var name] => await driver.RenameGroupAsync(vault, group, name).ConfigureAwait(true),
                 ["relocate", var vault, var entry, var group, var title] => await driver.RelocateAsync(vault, entry, group, title).ConfigureAwait(true),
                 ["delete", var vault, var entry] => await driver.DeleteAsync(vault, entry).ConfigureAwait(true),
@@ -403,17 +414,17 @@ internal sealed class Driver(string home)
             return detail.IsRemovingField || entries.Error is not null ? Refused(entries.Error) : Did($"removed {name} from {entry}");
         });
 
-    internal Task<int> AddTagAsync(string vault, string entry, string tag) =>
+    internal Task<int> AddTagAsync(string vault, string entry, string tag, bool decline) =>
         WithEntriesAsync(vault, entries =>
         {
             var detail = Select(entries, entry);
 
             detail.DraftTag = tag;
             Press(detail.AddTagCommand, "Add tag");
-            return entries.Error is not null ? Refused(entries.Error) : Did($"tagged {entry} {tag}");
+            return Answer(entries, detail, decline) ?? (entries.Error is not null ? Refused(entries.Error) : Did($"tagged {entry} {tag}"));
         });
 
-    internal Task<int> RemoveTagAsync(string vault, string entry, string tag) =>
+    internal Task<int> RemoveTagAsync(string vault, string entry, string tag, bool decline) =>
         WithEntriesAsync(vault, entries =>
         {
             var detail = Select(entries, entry);
@@ -421,8 +432,109 @@ internal sealed class Driver(string home)
                 ?? throw new DriverException($"'{entry}' has no chip for the tag '{tag}'");
 
             Press(chip.RemoveCommand, "Remove tag");
-            return entries.Error is not null ? Refused(entries.Error) : Did($"untagged {entry} {tag}");
+            return Answer(entries, detail, decline) ?? (entries.Error is not null ? Refused(entries.Error) : Did($"untagged {entry} {tag}"));
         });
+
+    /// <summary>Prints what a project tag change says it reaches, then confirms or cancels it; null when nothing was asked.</summary>
+    private static int? Answer(EntriesViewModel entries, EntryDetailViewModel detail, bool decline)
+    {
+        if (!detail.IsConfirmingTagChange)
+        {
+            return decline ? Refused("nothing was asked, so there was nothing to decline") : null;
+        }
+
+        foreach (var line in detail.TagChangeLines)
+        {
+            Console.Out.WriteLine($"asked: {line}");
+        }
+
+        if (decline)
+        {
+            Press(detail.CancelTagChangeCommand, "Cancel");
+            return Did("declined");
+        }
+
+        Press(detail.ConfirmTagChangeCommand, detail.TagChangeAction);
+        return entries.Error is not null ? Refused(entries.Error) : null;
+    }
+
+    internal Task<int> AddEnvKeyAsync(string vault, string project, string environment, string key, string? entry) =>
+        WithProjectAsync(vault, project, environment, (screen, open) =>
+        {
+            Press(open.BeginAddCommand, "Add a key");
+            open.NewKey = key;
+
+            if (entry is not null)
+            {
+                open.NewEntry = open.EntryChoices.SingleOrDefault(choice => choice.Entry is { } named && ApprovalPrompt.Shown(named) == entry)
+                    ?? throw new DriverException($"'{entry}' is not offered for a new key in {project}/{environment}");
+            }
+
+            open.GenerateValue = false;
+            Type(open.NewValue);
+            Press(open.ConfirmAddCommand, "Add");
+            return open.IsAdding || screen.Error is not null ? Refused(screen.Error) : Did($"added {key} to {project}/{environment}");
+        });
+
+    internal Task<int> ReplaceEnvKeyAsync(string vault, string project, string environment, string key) =>
+        WithProjectAsync(vault, project, environment, (screen, open) =>
+        {
+            Press(Variable(open, key).ReplaceCommand, "Replace");
+            Type(open.ReplacementValue);
+            Press(open.ConfirmReplaceCommand, "Replace");
+            return open.IsReplacing || screen.Error is not null ? Refused(screen.Error) : Did($"replaced {key} in {project}/{environment}");
+        });
+
+    internal Task<int> RemoveEnvKeyAsync(string vault, string project, string environment, string key) =>
+        WithProjectAsync(vault, project, environment, (screen, open) =>
+        {
+            Press(Variable(open, key).RemoveCommand, "Remove");
+            Press(open.ConfirmRemoveCommand, "Remove");
+            return open.IsRemoving || screen.Error is not null ? Refused(screen.Error) : Did($"removed {key} from {project}/{environment}");
+        });
+
+    internal Task<int> ImportEnvAsync(string vault, string project, string environment, string file) =>
+        WithProjectAsync(vault, project, environment, (screen, open) =>
+        {
+            open.Import.Preview(Path.GetFullPath(file));
+
+            if (!open.Import.IsPreviewing)
+            {
+                return Refused(screen.Error);
+            }
+
+            foreach (var row in open.Import.Rows)
+            {
+                Console.Out.WriteLine($"previewed: {row}");
+            }
+
+            Press(open.Import.ConfirmCommand, "Import");
+            return screen.Error is not null ? Refused(screen.Error) : Did($"imported {file} into {project}/{environment}");
+        });
+
+    private static EnvVariableRow Variable(EnvProjectViewModel open, string key) =>
+        open.Variables.SingleOrDefault(row => row.Key == key)
+            ?? throw new DriverException($"no single '{key}' in {open.Name}/{open.SelectedProfile}");
+
+    /// <summary>Unlocks the vault and opens one environment of a project on the Env profiles screen.</summary>
+    private async Task<int> WithProjectAsync(string vault, string project, string environment, Func<EnvSetsViewModel, EnvProjectViewModel, int> act)
+    {
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
+        using var unlock = Screen(session);
+
+        if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
+        {
+            return refused;
+        }
+
+        using var countdown = new ClipboardCountdown(NoClipboard.Instance, TimeProvider.System);
+        using var screen = new EnvSetsViewModel(session, countdown, _picker);
+        screen.OpenCommand.Execute(project);
+
+        var open = screen.OpenProject ?? throw new DriverException($"'{project}' did not open: {screen.Error}");
+        open.SelectedProfile = environment;
+        return act(screen, open);
+    }
 
     internal Task<int> RenameGroupAsync(string vault, string group, string name) =>
         WithEntriesAsync(vault, entries =>

@@ -47,9 +47,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     {
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            var store = new EnvStore(vault);
-            Assert.NotEqual(EnvSetOutcome.Rejected, store.TrySet("dev", "API_KEY", _apiKey, out _));
-            Assert.NotEqual(EnvSetOutcome.Rejected, store.TrySet("dev", "DB_URL", _dbUrl, out _));
+            LegacyVariables.Set(vault, "dev", "API_KEY", _apiKey);
+            LegacyVariables.Set(vault, "dev", "DB_URL", _dbUrl);
             vault.Save();
         }
 
@@ -299,7 +298,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         Assert.True(import.IsPreviewing);
         Assert.Equal(
-            ["API_KEY  unchanged", "DB_URL  replaces the stored value, which stays in history", "FRESH  new"],
+            ["API_KEY  unchanged", "DB_URL  replaces the value on env/dev/DB_URL, which keeps it in history", "FRESH  new on env/dev/.env, which is created"],
             import.Rows);
         Assert.DoesNotContain(import.Rows, row => row.Contains(_imported, StringComparison.Ordinal) || row.Contains(_apiKey, StringComparison.Ordinal));
 
@@ -307,7 +306,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         Assert.False(import.IsPreviewing);
         Assert.Null(screen.Error);
-        Assert.Contains("Imported 2 variables into env/dev.", screen.Notice, StringComparison.Ordinal);
+        Assert.Contains("Imported 2 variables into dev/dev.", screen.Notice, StringComparison.Ordinal);
         Assert.DoesNotContain(_imported, screen.Notice, StringComparison.Ordinal);
         Assert.Equal(3, screen.OpenProject.Count);
         Assert.True(File.Exists(file));
@@ -315,7 +314,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal(
             [new EnvVariable("API_KEY", _apiKey), new EnvVariable("DB_URL", "replaced_" + _dbUrl), new EnvVariable("FRESH", _imported)],
-            new EnvStore(reread).Read("dev"));
+            EnvResolution.List(reread, "dev", "dev").Variables);
     }
 
     [Fact]
@@ -335,7 +334,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         Assert.False(import.IsPreviewing);
         using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
-        Assert.Equal(["API_KEY", "DB_URL"], new EnvStore(reread).Read("dev").Select(variable => variable.Key));
+        Assert.Equal(["API_KEY", "DB_URL"], EnvResolution.List(reread, "dev", "dev").Variables.Select(variable => variable.Key));
     }
 
     [Fact]
@@ -355,7 +354,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.DoesNotContain(_imported, screen.Error, StringComparison.Ordinal);
 
         using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
-        Assert.DoesNotContain(new EnvStore(reread).Read("dev"), variable => variable.Key == "FRESH");
+        Assert.DoesNotContain(EnvResolution.List(reread, "dev", "dev").Variables, variable => variable.Key == "FRESH");
     }
 
     [Fact]
@@ -376,7 +375,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal(
             [new EnvVariable("API_KEY", _apiKey), new EnvVariable("DB_URL", _dbUrl)],
-            new EnvStore(reread).Read("dev"));
+            EnvResolution.List(reread, "dev", "dev").Variables);
     }
 
     /// <summary>

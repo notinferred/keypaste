@@ -24,12 +24,13 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
     private readonly EnvProjectViewModel _owner;
     private int _maskedLength;
 
-    internal EnvVariableRow(EnvProjectViewModel owner, string key, int length, bool isUsableName)
+    internal EnvVariableRow(EnvProjectViewModel owner, EnvSource source, int length, bool isUsableName)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(source);
 
         _owner = owner;
-        Key = key;
+        Source = source;
         _maskedLength = length;
         IsUsableName = isUsableName;
 
@@ -38,8 +39,14 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
         ReplaceCommand = new RelayCommand(() => _owner.BeginReplace(this));
     }
 
-    /// <summary>The variable's name, as the vault holds it. Addresses the row on removal.</summary>
-    internal string Key { get; }
+    /// <summary>The variable's name, as the vault holds it.</summary>
+    internal string Key => Source.Key;
+
+    /// <summary>The entry and field holding the value, which a copy, hold, replace or removal addresses.</summary>
+    internal EnvSource Source { get; }
+
+    /// <summary>Whether the value is a legacy variable's password rather than a field.</summary>
+    internal bool IsLegacy => string.Equals(Source.Field, EnvSource.LegacyField, StringComparison.Ordinal);
 
     /// <summary>The name as the table draws it.</summary>
     internal string DisplayKey => EntryNameSanitizer.Sanitize(Key).Text;
@@ -78,7 +85,7 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 
     private async Task CopyAsync()
     {
-        if (_owner.Read(Key) is not { } value)
+        if (_owner.Read(this) is not { } value)
         {
             _owner.Report("That value could not be read. The vault may have locked.");
             return;

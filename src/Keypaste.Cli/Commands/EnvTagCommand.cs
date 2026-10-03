@@ -10,7 +10,8 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// The tag is <c>env:&lt;project&gt;</c> for <c>dev</c> and <c>env:&lt;project&gt;:&lt;environment&gt;</c>
 /// otherwise (D-0370), which KeePassXC shows and edits as an ordinary tag. Each change is one edit
-/// with one revision, and it names the fields that join or leave, never a value.
+/// with one revision. Before it is written the verb names the environment it reaches and the fields
+/// that join or leave, never a value, and asks (D-0415).
 /// </remarks>
 internal static class EnvTagCommand
 {
@@ -18,6 +19,7 @@ internal static class EnvTagCommand
     [
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
+        new("yes", TakesValue: false),
         EnvCommand.ProfileOption,
     ];
 
@@ -32,7 +34,7 @@ internal static class EnvTagCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine($"usage: keypaste env {verb} <project> <entry> [-p <environment>]");
+            context.Stdout.WriteLine($"usage: keypaste env {verb} <project> <entry> [-p <environment>] [--yes]");
             return CliApp.ExitSuccess;
         }
 
@@ -47,6 +49,15 @@ internal static class EnvTagCommand
         if (!ProjectTag.TryFor(project, environment, out var tag, out var tagError))
         {
             return Fail(context, verb, tagError);
+        }
+
+        var assumeYes = line.HasFlag("yes");
+
+        // Same rule as `rm`: a piped run asks for the change explicitly rather than have a
+        // confirmation answered by whatever the next line of stdin happens to be.
+        if (!assumeYes && !context.Prompt.IsInteractive)
+        {
+            return Fail(context, verb, "--yes is required when stdin is not a terminal");
         }
 
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
@@ -87,21 +98,30 @@ internal static class EnvTagCommand
                 return CliApp.ExitSuccess;
             }
 
+            IReadOnlyList<string> changing = tagging ? [tag] : matching;
+
+            foreach (var sentence in ProjectTagChange.Preview(vault, name, changing, tagging)!.Describe())
+            {
+                context.Stderr.WriteLine(sentence);
+            }
+
+            if (!assumeYes)
+            {
+                var answer = context.Prompt.ReadLine($"{(tagging ? "Tag" : "Untag")} {Shown(entry.Path)}? [y/N] ");
+                if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
+                {
+                    context.Stderr.WriteLine("Cancelled; nothing was written.");
+                    return CliApp.ExitUsageError;
+                }
+            }
+
             _ = tagging ? vault.AddTag(name, tag) : vault.RemoveTags(name, matching);
             vault.Save();
-
-            var fields = (vault.Fields(name) ?? [])
-                .Where(field => EnvConvention.IsEnvNamedField(field.Name))
-                .Select(field => EntryNameSanitizer.Sanitize(field.Name).Text)
-                .ToList();
 
             var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
             context.Stderr.WriteLine(tagging
                 ? $"  {done} tagged {Shown(entry.Path)} {tag}"
                 : $"  {done} untagged {Shown(entry.Path)} {string.Join(", ", matching)}");
-            context.Stderr.WriteLine(fields.Count == 0
-                ? $"    no env-named field {(tagging ? "joins" : "leaves")} {where}"
-                : $"    {(tagging ? "joins" : "leaves")} {where}: {string.Join(", ", fields)}");
 
             return CliApp.ExitSuccess;
         });

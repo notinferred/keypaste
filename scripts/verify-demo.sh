@@ -133,7 +133,7 @@ grep -q 'abc123' "$OUT" && die "the deploy fixture showed part of a key too shor
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null \
   || die "could not create the demo vault"
 
-printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" env set demo STRIPE_KEY --vault "$VAULT" >/dev/null \
+legacy_var "$CLI" "$VAULT" "$MASTER" demo STRIPE_KEY "$SECRET" \
   || die "could not store the demo credential"
 
 # --------------------------------------------------------------------------- start the approver

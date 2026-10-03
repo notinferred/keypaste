@@ -1,9 +1,15 @@
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Sets one variable: <c>keypaste env set &lt;project&gt; &lt;KEY&gt;[=value] [-p &lt;profile&gt;]</c>.</summary>
+/// <summary>Sets one variable: <c>keypaste env set &lt;project&gt; &lt;KEY&gt;[=value] [-p &lt;profile&gt;] [--entry &lt;entry&gt;]</c>.</summary>
 /// <remarks>
+/// <para>
+/// An existing key is written where it lives; a new one becomes a protected field of the entry
+/// <c>--entry</c> names or of the environment's home entry, which is created tagged on first use
+/// (D-0413).
+/// </para>
 /// <para>
 /// With a bare <c>KEY</c> the value is read the way every other secret is — hidden, or one line of
 /// stdin when piped, after the master password. The <c>KEY=value</c> form is accepted for
@@ -22,6 +28,7 @@ internal static class EnvSetCommand
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
         EnvCommand.ProfileOption,
+        EnvCommand.EntryOption,
         .. GenerateOption.Specs,
     ];
 
@@ -35,7 +42,7 @@ internal static class EnvSetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value] [-p <profile>]");
+            context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value] [-p <profile>] [--entry <entry>]");
             context.Stdout.WriteLine($"       {GenerateOption.Usage}");
             return CliApp.ExitSuccess;
         }
@@ -87,6 +94,12 @@ internal static class EnvSetCommand
 
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
+            if (!EnvCommand.TryFindEntry(vault, line, out var entry, out var missing))
+            {
+                context.Stderr.WriteLine($"keypaste env set: {missing}");
+                return CliApp.ExitNotFound;
+            }
+
             string value;
             if (inlineValue is not null)
             {
@@ -113,27 +126,40 @@ internal static class EnvSetCommand
                 value = new string(secret.Value);
             }
 
-            var store = new EnvStore(vault);
-            var outcome = store.TrySet(project, profile, key, value, out var rejection);
+            var plan = new EnvStore(vault).Set(project, profile, key, value, entry);
 
-            if (outcome == EnvSetOutcome.Rejected)
+            if (plan.Refusal is { } refusal)
             {
-                context.Stderr.WriteLine($"keypaste env set: {rejection}");
+                context.Stderr.WriteLine($"keypaste env set: {EntryNameSanitizer.SanitizeProse(refusal, 1024).Text}");
                 return CliApp.ExitUsageError;
             }
 
-            vault.Save();
-
-            var entryPath = EnvCommand.EntryPath(project, profile, key);
+            var written = plan.Keys[0];
+            var where = ApprovalPrompt.Shown(written.Entry);
             var generated = recipe is { } used
                 ? $" ({used.Describe("value")} generated)"
                 : string.Empty;
 
-            context.Stderr.WriteLine(outcome == EnvSetOutcome.Created
-                ? $"Set {entryPath}{generated}"
-                : $"Updated {entryPath} (previous value kept in entry history){generated}");
+            if (written.Change == EnvWriteChange.Unchanged)
+            {
+                context.Stderr.WriteLine($"{where} already holds that value for {key}; nothing was written");
+                return CliApp.ExitSuccess;
+            }
+
+            vault.Save();
+
+            context.Stderr.WriteLine(written switch
+            {
+                { Change: EnvWriteChange.New } when plan.CreatesHome => $"Set {key} on {where}, created and tagged {ProjectTagFor(project, profile)}{generated}",
+                { Change: EnvWriteChange.New } => $"Set {key} on {where}{generated}",
+                { IsLegacy: true } => $"Updated {where} (previous value kept in entry history){generated}",
+                _ => $"Updated {key} on {where} (previous value kept in entry history){generated}",
+            });
 
             return CliApp.ExitSuccess;
         });
     }
+
+    private static string ProjectTagFor(string project, string environment) =>
+        ProjectTag.TryFor(project, environment, out var tag, out _) ? tag : string.Empty;
 }

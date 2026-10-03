@@ -5,6 +5,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -288,7 +289,7 @@ public sealed class RunSessionTests : IDisposable
 
         foreach (var (key, value) in variables)
         {
-            Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet("dev", "staging", key, value, out _));
+            LegacyVariables.Set(vault, "dev", "staging", key, value);
         }
 
         vault.Save();

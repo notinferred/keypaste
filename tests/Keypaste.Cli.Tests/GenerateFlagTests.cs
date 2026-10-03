@@ -104,7 +104,7 @@ public sealed class GenerateFlagTests
             CliApp.ExitSuccess,
             harness.Run("env", "set", "billing", "STRIPE_KEY", "--generate", "--vault", harness.VaultPath));
 
-        Assert.Equal(20, Read(harness, "env/billing/STRIPE_KEY").Length);
+        Assert.Equal(20, Read(harness, "env/billing/.env", "STRIPE_KEY").Length);
     }
 
     /// <summary>
@@ -219,7 +219,7 @@ public sealed class GenerateFlagTests
 
         Assert.Equal(
             6,
-            Read(harness, "env/billing/STRIPE_KEY").Split(PasswordGenerator.DefaultSeparator).Length);
+            Read(harness, "env/billing/.env", "STRIPE_KEY").Split(PasswordGenerator.DefaultSeparator).Length);
         Assert.Contains("6-word passphrase generated", harness.Err, StringComparison.Ordinal);
     }
 
@@ -327,14 +327,15 @@ public sealed class GenerateFlagTests
         return harness;
     }
 
-    private static string Read(CliHarness harness, string entryPath)
+    private static string Read(CliHarness harness, string entryPath, string? field = null)
     {
         harness.Stdout.GetStringBuilder().Clear();
         harness.Prompt.Enqueue(Master);
 
+        string[] named = field is null ? [] : ["--field", field];
         Assert.Equal(
             CliApp.ExitSuccess,
-            harness.Run("get", entryPath, "--show", "--vault", harness.VaultPath));
+            harness.Run([.. new[] { "get", entryPath }, .. named, .. new[] { "--show", "--vault", harness.VaultPath }]));
 
         return harness.Out.Trim();
     }

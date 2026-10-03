@@ -79,10 +79,10 @@ trap cleanup EXIT
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null \
   || die "could not create the vault"
 
-printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT" >/dev/null \
+legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$SECRET" \
   || die "could not store the test credential"
 
-printf '%s\n' "$MASTER" | "$CLI" env set ci "OTHER_KEY=$OTHER" --vault "$VAULT" >/dev/null \
+legacy_var "$CLI" "$VAULT" "$MASTER" ci OTHER_KEY "$OTHER" \
   || die "could not store the second test credential"
 
 printf '%s\n' "$MASTER" | "$CLI" add personal/bank --password "$OUTSIDE" --vault "$VAULT" >/dev/null 2>&1 \

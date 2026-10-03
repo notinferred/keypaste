@@ -69,12 +69,8 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
     {
         using var fixture = new VaultFixture(("seed", "seed-password"));
 
-        foreach (var value in new[] { "v1-first", "v2-current" })
-        {
-            Assert.Equal(
-                CliApp.ExitSuccess,
-                fixture.RunAnswering([value], "env", "set", "billing", "ROTATED"));
-        }
+        Assert.Equal(CliApp.ExitSuccess, fixture.RunAnswering(["v1-first"], "add", "env/billing/ROTATED"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.RunAnswering(["v2-current"], "env", "set", "billing", "ROTATED"));
 
         using var screen = Entries(fixture);
 
@@ -111,9 +107,11 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
     {
         using var fixture = new VaultFixture(("seed", "seed-password"));
 
+        // A variable of the env/ layout, whose removal is its entry going to the trash; a field's
+        // removal stays in its entry's history instead (D-0413).
         Assert.Equal(
             CliApp.ExitSuccess,
-            fixture.RunAnswering(["sk-live"], "env", "set", "billing", "STRIPE_KEY"));
+            fixture.RunAnswering(["sk-live"], "add", "env/billing/STRIPE_KEY"));
 
         Assert.Equal(UnlockOutcome.Opened, fixture.Unlock());
 

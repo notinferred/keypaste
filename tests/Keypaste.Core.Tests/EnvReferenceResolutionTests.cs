@@ -19,10 +19,9 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     {
         using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
-            var store = new EnvStore(created);
-            store.TrySet("acme-api", "DATABASE_URL", _devDb, out _);
-            store.TrySet("acme-api", "staging", "DATABASE_URL", _stagingDb, out _);
-            store.TrySet("acme-api", "staging", "STRIPE_KEY", "sk_staging_sentinel", out _);
+            LegacyVariables.Set(created, "acme-api", "DATABASE_URL", _devDb);
+            LegacyVariables.Set(created, "acme-api", "staging", "DATABASE_URL", _stagingDb);
+            LegacyVariables.Set(created, "acme-api", "staging", "STRIPE_KEY", "sk_staging_sentinel");
             created.AddEntry(new VaultEntry { GroupPath = "work", Title = "aws", Username = _awsUser, Password = "aws-password-sentinel" });
             created.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Tokens, Title = "t1", Password = _tokenVerifier });
             created.Save();
@@ -90,7 +89,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     {
         using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
-            new EnvStore(other).TrySet("acme-api", "staging", "DATABASE_URL", "elsewhere", out _);
+            LegacyVariables.Set(other, "acme-api", "staging", "DATABASE_URL", "elsewhere");
             other.Save();
         }
 

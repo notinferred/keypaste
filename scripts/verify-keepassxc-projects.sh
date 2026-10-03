@@ -28,6 +28,15 @@
 # asked once only. A scoped token's run of the dev set is audited with its source entries, and its
 # staging set is refused because a member is also tagged env:billing:prod.
 #
+# A fourth vault KeePassXC makes from the same document takes the writers (C.1c). `env set` of a tagged
+# key changes it on its own entry; a new key with no --entry creates env/billing/.env, tagged env:billing
+# and holding it protected; `env pull` of a .env touching keys on two entries adds one revision to each;
+# `env rm` removes a field and history keeps it; `keypaste run` then gives a child the new values. A tag
+# change refused for want of --yes writes nothing, and one confirmed names its environment and fields
+# first. The app, through tests/Keypaste.AppDriver on an untouched copy, adds, replaces, imports and
+# removes the same way, and a declined tag change on its entry pane, having named what it reaches,
+# writes nothing. KeePassXC reads every value, protection and tag written.
+#
 # NEGATIVE CONTROL: a corrupted expectation must fail the comparison the listing check rests on, and
 # the hour must be honoured for an entry no tag protects.
 #
@@ -143,24 +152,24 @@ jq -e '. == [{"project":"billing","legacy":false,"environments":[
   <<<"$json" >/dev/null || die "env ls --json printed ${json}"
 
 step "env tag and env untag change the entry's own tags, and KeePassXC reads them"
-said=$(kp_on "$plain" env tag billing services/Stripe -p prod 2>&1) || die "env tag failed: ${said}"
+said=$(kp_on "$plain" env tag billing services/Stripe -p prod --yes 2>&1) || die "env tag failed: ${said}"
 grep -qF 'STRIPE_SECRET_KEY' <<<"$said" || die "env tag did not name the field that joins: ${said}"
 grep -qF 'Region' <<<"$said" && die "env tag named a field that is not env-named: ${said}"
 [ "$(tags "$plain" services/Stripe | paste -sd' ' -)" = "env:billing env:billing:prod finance" ] \
   || die "KeePassXC reads the tags $(tags "$plain" services/Stripe | paste -sd' ' -)"
 [ "$(version "$plain")" = 000004 ] || die "tagging raised the plain vault above KDBX 4.0: $(version "$plain")"
-said=$(kp_on "$plain" env untag billing services/Stripe 2>&1) || die "env untag failed: ${said}"
+said=$(kp_on "$plain" env untag billing services/Stripe --yes 2>&1) || die "env untag failed: ${said}"
 [ "$(tags "$plain" services/Stripe | paste -sd' ' -)" = "env:billing:prod finance" ] \
   || die "after untag KeePassXC reads the tags $(tags "$plain" services/Stripe | paste -sd' ' -)"
 
-said=$(kp_on "$grouped" env tag billing services/Other -p qa 2>&1) || die "env tag on the group-tagged vault failed: ${said}"
+said=$(kp_on "$grouped" env tag billing services/Other -p qa --yes 2>&1) || die "env tag on the group-tagged vault failed: ${said}"
 grep -qx 'env:billing:qa' <<<"$(tags "$grouped" services/Other)" || die "KeePassXC does not read the tag keypaste added"
 [ "$(version "$grouped")" = "$grouped_version" ] || die "tagging changed the group-tagged vault's version"
 exported=$(kx export "$grouped" -f xml) || die "KeePassXC cannot export the group-tagged vault"
 [ "$(grep -c '<Tags>env:billing:staging</Tags>' <<<"$exported")" = 1 ] || die "the group tag did not survive"
-said=$(kp_on "$grouped" env untag billing services/Other -p qa 2>&1) || die "env untag on the group-tagged vault failed: ${said}"
+said=$(kp_on "$grouped" env untag billing services/Other -p qa --yes 2>&1) || die "env untag on the group-tagged vault failed: ${said}"
 
-for line in "env tag bill:ing services/Stripe" "env tag billing services/Stripe -p Prod" "env tag billing .keypaste/x"; do
+for line in "env tag bill:ing services/Stripe --yes" "env tag billing services/Stripe -p Prod --yes" "env tag billing .keypaste/x --yes"; do
   was=$(bytes "$plain")
   set +e
   # shellcheck disable=SC2086 # the line is split into its words on purpose
@@ -440,6 +449,146 @@ app_run staging 'keys=SHARED_KEY entries=services/Shared timed=False' \
 grep -qF -- '-c1b' "$hold_out" && die "a value reached the app's output"
 exec 7>&-
 wait_for '^shut down' "$hold_out" 1
+
+step "C.1c: KeePassXC makes a vault for the writers, and an untouched copy for the app"
+c1c="$dir/c1c.kdbx"
+make_fields c1c '' 'db-c1b' '' ''
+app_c1c="$dir/c1c-app.kdbx"
+cp "$c1c" "$app_c1c"
+c1c_probe='printf "stripe=%s db=%s new=%s app=%s" "${STRIPE_SECRET_KEY-unset}" "${DATABASE_URL-unset}" "${NEW_KEY-unset}" "${APP_KEY-unset}"'
+
+# The revisions KeePassXC holds for the entry at the path $2 in the vault $1.
+revisions_at() {
+  local id
+  id=$(kx show "$1" "$2" -a Uuid | tr -d '{}-' | xxd -r -p | base64) || die "KeePassXC cannot read the UUID of '$2'"
+  kx export "$1" -f xml >"$dir/revisions.xml" || die "KeePassXC cannot export $1"
+  awk -v id="<UUID>$id</UUID>" '
+    /<History>/ { inhist = 1; if (mine) n = 0; next }
+    /<\/History>/ { inhist = 0; if (mine) { print n; found = 1; exit } next }
+    inhist { if (mine && /<Entry>/) n++; next }
+    /<UUID>/ { mine = index($0, id) > 0 }
+    END { if (!found) print 0 }' "$dir/revisions.xml"
+}
+# "protected" or "plain" for the current string called $2 in the vault $1, never a revision's.
+protection_of() {
+  local xml
+  xml=$(kx export "$1" -f xml | awk '/<History>/{past=1} !past{print} /<\/History>/{past=0}') || die "KeePassXC cannot export $1"
+  awk -v key="<Key>$2</Key>" '
+    !want && (p = index($0, key)) { want = 1; $0 = substr($0, p + length(key)) }
+    want && (v = index($0, "<Value")) {
+      tag = substr($0, v); tag = substr(tag, 1, index(tag, ">"))
+      print (index(tag, "ProtectInMemory=\"True\"") ? "protected" : "plain"); exit
+    }' <<<"$xml"
+}
+history_holds() { kx export "$1" -f xml | awk '/<History>/{inside=1} inside{print} /<\/History>/{inside=0}' | grep -cF "$2" || true; }
+c1c_run() { printf '%s\n' "$pw" | "$kp" run billing --vault "$1" -- "$child" -c "$c1c_probe" 2>"$dir/c1c-run.err" | tr -d '\r'; }
+drive() { KEYPASTE_DRIVER_PASSWORD="$pw" KEYPASTE_DRIVER_NEW_PASSWORD="${value:-}" "$drv" "$@" | tr -d '\r'; }
+
+step "C.1c: env set of a tagged key changes it on its own entry, protected, with one revision"
+was=$(revisions_at "$c1c" services/Stripe)
+said=$(kp_on "$c1c" env set billing STRIPE_SECRET_KEY=stripe-c1c 2>&1) || die "env set of a tagged key failed: ${said}"
+grep -qF 'Updated STRIPE_SECRET_KEY on services/Stripe' <<<"$said" || die "env set did not say where it wrote: ${said}"
+[ "$(kx show "$c1c" services/Stripe -a STRIPE_SECRET_KEY)" = stripe-c1c ] || die "KeePassXC does not read the value env set wrote on services/Stripe"
+[ "$(protection_of "$c1c" STRIPE_SECRET_KEY)" = protected ] || die "the value env set wrote is not protected"
+[ "$(revisions_at "$c1c" services/Stripe)" = $((was + 1)) ] || die "env set did not add exactly one revision to services/Stripe"
+kx show "$c1c" env/billing/STRIPE_SECRET_KEY >/dev/null 2>&1 && die "env set made a legacy entry for a key a tagged entry holds"
+
+step "C.1c: env set of a new key creates env/billing/.env, tagged env:billing, holding it protected"
+said=$(kp_on "$c1c" env set billing NEW_KEY=new-c1c 2>&1) || die "env set of a new key failed: ${said}"
+grep -qF 'Set NEW_KEY on env/billing/.env, created and tagged env:billing' <<<"$said" || die "env set did not say it created the home entry: ${said}"
+[ "$(kx show "$c1c" env/billing/.env -a NEW_KEY)" = new-c1c ] || die "KeePassXC does not read NEW_KEY on env/billing/.env"
+[ "$(protection_of "$c1c" NEW_KEY)" = protected ] || die "NEW_KEY is not protected"
+[ "$(tags "$c1c" env/billing/.env | paste -sd' ' -)" = "env:billing" ] || die "KeePassXC reads the home entry's tags as $(tags "$c1c" env/billing/.env | paste -sd' ' -)"
+[ "$(revisions_at "$c1c" env/billing/.env)" = 0 ] || die "creating the home entry left a revision"
+kx show "$c1c" env/billing/NEW_KEY >/dev/null 2>&1 && die "env set made a legacy entry for a new key"
+for refused_key in api_key KPXC_X URL; do
+  was=$(bytes "$c1c")
+  set +e
+  said=$(kp_on "$c1c" env set billing "${refused_key}=nope-c1c" 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || die "env set accepted the new key ${refused_key}, which no field of a project can be named"
+  [ "$was" = "$(bytes "$c1c")" ] || die "the refused new key ${refused_key} changed the vault"
+done
+
+step "C.1c: env pull of a .env touching keys on two entries makes one revision on each, and run gives the child the new values"
+printf 'STRIPE_SECRET_KEY=stripe-pull-c1c\nDATABASE_URL=db-pull-c1c\nNEW_KEY=new-pull-c1c\n' >"$dir/c1c.env"
+stripe_was=$(revisions_at "$c1c" services/Stripe)
+database_was=$(revisions_at "$c1c" services/Database)
+home_was=$(revisions_at "$c1c" env/billing/.env)
+said=$(kp_on "$c1c" env pull billing "$(native "$dir/c1c.env")" --yes --keep 2>&1) || die "env pull failed: ${said}"
+grep -qF 'DATABASE_URL on services/Database' <<<"$said" || die "env pull did not name the entry each key goes to: ${said}"
+[ "$(revisions_at "$c1c" services/Stripe)" = $((stripe_was + 1)) ] || die "env pull did not add exactly one revision to services/Stripe"
+[ "$(revisions_at "$c1c" services/Database)" = $((database_was + 1)) ] || die "env pull did not add exactly one revision to services/Database"
+[ "$(revisions_at "$c1c" env/billing/.env)" = $((home_was + 1)) ] || die "env pull did not add exactly one revision to env/billing/.env"
+[ "$(kx show "$c1c" services/Database -a DATABASE_URL)" = db-pull-c1c ] || die "KeePassXC does not read the pulled DATABASE_URL"
+[ "$(protection_of "$c1c" DATABASE_URL)" = protected ] || die "the pulled DATABASE_URL is not protected"
+out=$(c1c_run "$c1c") || die "keypaste run after the writes failed: $(cat "$dir/c1c-run.err")"
+[ "$out" = "stripe=stripe-pull-c1c db=db-pull-c1c new=new-pull-c1c app=unset" ] || die "the child's environment after the writes was: ${out}"
+
+step "C.1c: env rm removes a field, and the entry's history keeps it"
+said=$(kp_on "$c1c" env rm billing NEW_KEY --yes 2>&1) || die "env rm of a field failed: ${said}"
+kx show "$c1c" env/billing/.env -a NEW_KEY >/dev/null 2>&1 && die "KeePassXC still reads the field env rm removed"
+[ "$(history_holds "$c1c" new-pull-c1c)" -ge 1 ] || die "the removed field's value is not in the entry's history"
+
+step "C.1c: a tag change names what it reaches before writing, and writes nothing unconfirmed"
+was=$(bytes "$c1c")
+set +e
+said=$(kp_on "$c1c" env tag billing services/Database -p staging 2>&1)
+rc=$?
+set -e
+[ "$rc" -ne 0 ] || die "env tag without a terminal or --yes was accepted"
+[ "$was" = "$(bytes "$c1c")" ] || die "an unconfirmed tag change changed the vault"
+said=$(kp_on "$c1c" env tag billing services/Database -p staging --yes 2>&1) || die "env tag --yes failed: ${said}"
+[ "$(grep -nF 'billing/staging' <<<"$said" | head -1 | cut -d: -f1)" -lt "$(grep -nF 'tagged services/Database' <<<"$said" | cut -d: -f1)" ] \
+  || die "env tag did not name the environment before it wrote: ${said}"
+grep -qF 'Joining billing/staging: DATABASE_URL.' <<<"$said" || die "env tag did not name the field that joins: ${said}"
+grep -qx 'env:billing:staging' <<<"$(tags "$c1c" services/Database)" || die "KeePassXC does not read the confirmed tag"
+said=$(kp_on "$c1c" env untag billing services/Database -p staging --yes 2>&1) || die "env untag --yes failed: ${said}"
+grep -qF 'Leaving billing/staging: DATABASE_URL.' <<<"$said" || die "env untag did not name the field that leaves: ${said}"
+
+step "C.1c: the app adds, replaces, imports and removes keys on the untouched copy, and KeePassXC reads each"
+value=app-stripe-c1c
+said=$(drive env-set "$(native "$app_c1c")" billing dev STRIPE_SECRET_KEY) || die "the app's replace failed: ${said}"
+[ "$(kx show "$app_c1c" services/Stripe -a STRIPE_SECRET_KEY)" = app-stripe-c1c ] || die "KeePassXC does not read the value the app replaced on services/Stripe"
+value=app-key-c1c
+said=$(drive env-add "$(native "$app_c1c")" billing dev APP_KEY) || die "the app's add failed: ${said}"
+[ "$(kx show "$app_c1c" env/billing/.env -a APP_KEY)" = app-key-c1c ] || die "KeePassXC does not read APP_KEY on the home entry the app created"
+[ "$(protection_of "$app_c1c" APP_KEY)" = protected ] || die "the app's new key is not protected"
+[ "$(tags "$app_c1c" env/billing/.env | paste -sd' ' -)" = "env:billing" ] || die "the home entry the app created is not tagged env:billing"
+value=app-entry-c1c
+said=$(drive env-add "$(native "$app_c1c")" billing dev ENTRY_KEY --entry services/Database) || die "the app's add onto a chosen entry failed: ${said}"
+[ "$(kx show "$app_c1c" services/Database -a ENTRY_KEY)" = app-entry-c1c ] || die "KeePassXC does not read ENTRY_KEY on the entry chosen in the app"
+value=
+printf 'DATABASE_URL=app-db-c1c\nAPP_KEY=app-key-pull-c1c\n' >"$dir/c1c-app.env"
+database_was=$(revisions_at "$app_c1c" services/Database)
+said=$(drive env-import "$(native "$app_c1c")" billing dev "$(native "$dir/c1c-app.env")") || die "the app's import failed: ${said}"
+grep -qF 'previewed: DATABASE_URL  replaces the value on services/Database' <<<"$said" || die "the app's import preview did not name the entry: ${said}"
+[ "$(kx show "$app_c1c" services/Database -a DATABASE_URL)" = app-db-c1c ] || die "KeePassXC does not read the DATABASE_URL the app imported"
+[ "$(revisions_at "$app_c1c" services/Database)" = $((database_was + 1)) ] || die "the app's import did not add exactly one revision to services/Database"
+out=$(c1c_run "$app_c1c") || die "keypaste run after the app's writes failed: $(cat "$dir/c1c-run.err")"
+[ "$out" = "stripe=app-stripe-c1c db=app-db-c1c new=unset app=app-key-pull-c1c" ] || die "the child's environment after the app's writes was: ${out}"
+said=$(drive env-rm "$(native "$app_c1c")" billing dev APP_KEY) || die "the app's remove failed: ${said}"
+kx show "$app_c1c" env/billing/.env -a APP_KEY >/dev/null 2>&1 && die "KeePassXC still reads the field the app removed"
+[ "$(history_holds "$app_c1c" app-key-pull-c1c)" -ge 1 ] || die "the field the app removed is not in the entry's history"
+
+step "C.1c: a tag change on the app's entry pane names what it reaches, and declined writes nothing"
+for act in tag-add tag-rm; do
+  if [ "$act" = tag-rm ]; then
+    said=$(drive tag-add "$(native "$app_c1c")" services/Database env:billing:staging) || die "the app's confirmed tag failed: ${said}"
+    grep -qx 'env:billing:staging' <<<"$(tags "$app_c1c" services/Database)" || die "KeePassXC does not read the tag the app confirmed"
+  fi
+  was=$(bytes "$app_c1c")
+  said=$(drive "$act" "$(native "$app_c1c")" services/Database env:billing:staging --decline) || die "the app's declined ${act} failed: ${said}"
+  grep -qF 'asked: ' <<<"$said" || die "the app's ${act} asked nothing: ${said}"
+  grep -qF 'billing/staging' <<<"$said" || die "the app's ${act} did not name the environment: ${said}"
+  grep -qF 'DATABASE_URL' <<<"$said" || die "the app's ${act} did not name the field: ${said}"
+  grep -qx 'declined' <<<"$said" || die "the app's ${act} was not declined: ${said}"
+  [ "$was" = "$(bytes "$app_c1c")" ] || die "the app's declined ${act} changed the vault"
+done
+said=$(drive tag-rm "$(native "$app_c1c")" services/Database env:billing:staging) || die "the app's confirmed untag failed: ${said}"
+grep -qx 'env:billing:staging' <<<"$(tags "$app_c1c" services/Database)" && die "KeePassXC still reads the tag the app removed"
+grep -qF -- '-c1c' <<<"$(cat "$dir"/c1c-run.err)" && die "a value reached the runner's output"
 
 step "NEGATIVE CONTROL: the listing comparison must be able to fail"
 [ "$listed" = "${expected}-CORRUPTED" ] && die "a deliberately corrupted expectation still matched — this gate is not gating"

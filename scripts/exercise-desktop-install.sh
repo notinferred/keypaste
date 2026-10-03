@@ -312,7 +312,8 @@ first_session() {
 env_run() {
   local child="${BASH:-/bin/bash}"
   fact env_list "$(cli env ls "$PROJECT" 2>&1 || true)"
-  fact get_output "$(cli get "env/$PROJECT/$VARIABLE" --show 2>/dev/null || true)"
+  # The app adds a new key as a field of the project's home entry (D-0413).
+  fact get_output "$(cli get "env/$PROJECT/.env" --field "$VARIABLE" --show 2>/dev/null || true)"
   fact run_output "$(printf '%s\n' "$MASTER" | "$KP" run "$PROJECT" --vault "$VAULT_NATIVE" -- "$child" -c "printf %s \"\$$VARIABLE\"" 2>/dev/null | tr -d '\r' || true)"
 }
 

@@ -40,7 +40,7 @@ public sealed class AccessibleDriveTests
         Named<IInvokeProvider>(shell, "Add", AutomationControlType.Button).Invoke();
         RenderedShell.Drain();
 
-        Assert.Contains(new EnvStore(shell.Session.Unlocked!).Read("billing", "dev"), variable => variable.Key == "APP_ADDED");
+        Assert.Contains(EnvResolution.List(shell.Session.Unlocked!, "billing", "dev").Variables, variable => variable.Key == "APP_ADDED");
 
         Named<IInvokeProvider>(shell, "Lock now", AutomationControlType.Button).Invoke();
         RenderedShell.Drain();

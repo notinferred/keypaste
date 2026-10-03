@@ -16,7 +16,7 @@ namespace Keypaste.App.Tests;
 /// <para>
 /// <b>The argument.</b> Every vault mutation the app can perform goes through
 /// <c>Vault.AddEntry</c>, <c>UpdateEntry</c>, <c>RemoveEntry</c>, <c>RestoreRevision</c>,
-/// <c>EnvStore.TrySet</c> or
+/// <c>EnvStore.Set</c> or
 /// <c>EnvStore.Remove</c>, and every write goes through <c>Vault.Save()</c> into the same vendored
 /// KeePassLib with the same <c>KdbxFormat</c> parameters. The CLI's path is the identical set of
 /// calls. The salt and nonces differ per save, which is a property of the format rather than of the

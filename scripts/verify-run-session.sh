@@ -114,20 +114,19 @@ withdrawn() { wait_for '^prompt withdrawn' "$HOLD_OUT" "$PROMPTS"; }
 
 # ---------------------------------------------------------------- a vault with two sets in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
-for pair in "DEPLOY_KEY=$DEPLOY" "DB_URL=$DATABASE"; do
-  printf '%s\n' "$MASTER" | "$CLI" env set ci "$pair" --vault "$VAULT" >/dev/null || die "could not store the ci set"
-done
+legacy_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$DEPLOY" || die "could not store the ci set"
+legacy_var "$CLI" "$VAULT" "$MASTER" ci DB_URL "$DATABASE" || die "could not store the ci set"
 # KeePassXC can write a name keypaste refuses to create; the driver's raw-add stands in for it.
 printf '%s\n' "$DEPLOY" | KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" raw-add "$VAULT" env/broken BAD-NAME >/dev/null \
   || die "could not store an entry whose name cannot be exported"
 # The tagged project: a legacy DB_URL beside DEPLOY_KEY on an entry tagged into dev and prod (C.1b).
-printf '%s\n' "$MASTER" | "$CLI" env set tagged "DB_URL=$DATABASE" --vault "$VAULT" >/dev/null || die "could not store the tagged set's legacy variable"
+legacy_var "$CLI" "$VAULT" "$MASTER" tagged DB_URL "$DATABASE" || die "could not store the tagged set's legacy variable"
 printf '%s\n' "deploy-login" | KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" raw-add "$VAULT" services Deploy >/dev/null \
   || die "could not store the tagged entry"
 printf '%s\n%s\n' "$MASTER" "$DEPLOY" | "$CLI" set services/Deploy --field DEPLOY_KEY --vault "$VAULT" >/dev/null 2>&1 \
   || die "could not set the tagged entry's field"
 for environment in dev prod; do
-  printf '%s\n' "$MASTER" | "$CLI" env tag tagged services/Deploy -p "$environment" --vault "$VAULT" >/dev/null 2>&1 \
+  printf '%s\n' "$MASTER" | "$CLI" env tag tagged services/Deploy -p "$environment" --yes --vault "$VAULT" >/dev/null 2>&1 \
     || die "could not tag the entry into tagged/$environment"
 done
 

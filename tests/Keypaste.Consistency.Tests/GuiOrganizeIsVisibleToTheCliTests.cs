@@ -41,11 +41,11 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
     {
         using var fixture = new VaultFixture(("seed", "seed-password"), ("DEPLOY_TOKEN", "first"));
 
-        // A project with a variable, written by the shipped CLI so the fixture is not the app's own
-        // idea of where a variable goes.
+        // A project of the env/ layout of earlier releases, its group naming it, written by the
+        // shipped CLI so the fixture is not the app's own idea of where a variable goes.
         Assert.Equal(
             CliApp.ExitSuccess,
-            fixture.RunAnswering(["sk-live-7"], "env", "set", "billing", "STRIPE_KEY"));
+            fixture.RunAnswering(["sk-live-7"], "add", "env/billing/STRIPE_KEY"));
 
         using (var screen = Entries(fixture))
         {

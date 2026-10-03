@@ -35,9 +35,8 @@ public sealed class SessionAuthorityRunTests : IDisposable
     {
         using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
-            var store = new EnvStore(created);
-            store.TrySet("acme-api", "DATABASE_URL", _database, out _);
-            store.TrySet("acme-api", "STRIPE_SECRET_KEY", _stripe, out _);
+            LegacyVariables.Set(created, "acme-api", "DATABASE_URL", _database);
+            LegacyVariables.Set(created, "acme-api", "STRIPE_SECRET_KEY", _stripe);
             created.AddEntry(new VaultEntry { GroupPath = "env/acme-api/prod", Title = "DATABASE_URL", Password = _prod });
             created.AddEntry(new VaultEntry { GroupPath = "env/hijack", Title = "PATH", Password = "/tmp/evil" });
             created.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "TOKEN", Password = "billing-token" });
@@ -192,7 +191,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         var first = await client.ReleaseRunAsync(Run(), Token);
         Assert.Equal(EnvGrantCache.CeilingSeconds, first!.GrantedSeconds);
 
-        new EnvStore(_vault).TrySet("acme-api", "DATABASE_URL", "postgres://rotated", out _);
+        LegacyVariables.Set(_vault, "acme-api", "DATABASE_URL", "postgres://rotated");
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Denied;
 
@@ -491,7 +490,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
-            new EnvStore(other).TrySet("acme-api", "NEW_KEY", "x", out _);
+            LegacyVariables.Set(other, "acme-api", "NEW_KEY", "x");
             other.Save();
         }
 

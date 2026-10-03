@@ -54,6 +54,9 @@ driver=$(vault_restorer)
 export KEYPASTE_RESTORER_PASSWORD=$pw
 
 kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" env set "$1" "$3" --vault "$db"; }
+# A new variable is written in the env/<project> layout these checks address, which only `add` still
+# creates (D-0413); kpset then updates it in place.
+kpnew() { legacy_var "$kp" "$db" "$pw" "$1" "$3" "$2"; }
 kprm()  { printf '%s\n' "$pw" | "$kp" rm "$1" --vault "$db" --yes; }
 
 # The identity trash-ls gives an entry, by the title it prints beside it.
@@ -67,12 +70,13 @@ rm -f "$db"          # re-runnable locally, not only on a fresh CI checkout
 
 step "seed: the shipped binary writes four values into one entry, and three more entries"
 printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$db"
-for value in v1-first v2-second v3-third v4-current; do
+kpnew "$project" v1-first ROTATED
+for value in v2-second v3-third v4-current; do
   kpset "$project" "$value" ROTATED
 done
-kpset "$project" kept-value KEPT
-kpset "$project" doomed-value GONE
-kpset compat-trash-gone orphan-value DOOMED
+kpnew "$project" kept-value KEPT
+kpnew "$project" doomed-value GONE
+kpnew compat-trash-gone orphan-value DOOMED
 
 uuid_before=$(entry_uuid "$db")
 [ -n "$uuid_before" ] || die "could not read the entry's UUID out of the XML export"
@@ -242,7 +246,7 @@ set -e
 # and reading the env project throws (D-0091).
 step "NEGATIVE CONTROL: a restore onto a name something else took is refused"
 kprm "$entry" >/dev/null 2>&1 || die "keypaste rm failed on the re-deleted entry"
-kpset "$project" a-new-value ROTATED >/dev/null
+kpnew "$project" a-new-value ROTATED
 
 taken_id=$(trash_id ROTATED)
 [ -n "$taken_id" ] || die "the re-deleted entry is not in the trash"

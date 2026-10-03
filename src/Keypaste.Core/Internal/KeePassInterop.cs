@@ -373,15 +373,21 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>
-    /// Creates an entry with its fields and tags in an existing group as one mutation, with no
-    /// history item. The caller has checked every name.
+    /// Creates an entry with its fields and tags as one mutation, with no history item. The caller
+    /// has checked every name.
     /// </summary>
-    /// <exception cref="VaultException">The group does not exist or names more than one, or the entry's name is taken. Nothing is changed.</exception>
-    internal void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags)
+    /// <param name="entry">The entry's standard fields and its group.</param>
+    /// <param name="fields">Its custom fields.</param>
+    /// <param name="tags">Its tags.</param>
+    /// <param name="createGroup">Whether a missing group is created, as <see cref="AddEntry"/> creates one.</param>
+    /// <exception cref="VaultException">The group is missing and not to be created, or names more than one, or the entry's name is taken. Nothing is changed.</exception>
+    internal void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags, bool createGroup = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (LocateGroup(entry.GroupPath) is not { } destination)
+        var destination = LocateGroup(entry.GroupPath)?.Group;
+
+        if (destination is null && !createGroup)
         {
             throw new VaultException($"There is no group '{entry.GroupPath}'. Choose one the vault has.");
         }
@@ -416,7 +422,7 @@ internal sealed class KeePassInterop : IDisposable
             pwEntry.AddTag(tag);
         }
 
-        destination.Group.AddEntry(pwEntry, true);
+        (destination ?? EnsureGroup(entry.GroupPath)).AddEntry(pwEntry, true);
     }
 
     /// <summary>Overwrites the fields of the one entry with this entry's name.</summary>

@@ -42,8 +42,8 @@
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
 #         KEYPASTE_RESTORER    path to the restore/export driver     (default: the Release build)
 #
-# The seeding AND every save are done by the SHIPPED binary (D-0012): `keypaste env set` is what
-# replaces the vault, so the backup under test is one a real command produced.
+# The seeding AND every save are done by the SHIPPED binary (D-0012): `keypaste add` and then
+# `keypaste env set` replace the vault, so the backup under test is one a real command produced.
 #
 # The fifteen-minute floor (VaultBackups.Floor) is defeated WITHOUT a product knob: the stamp
 # lives in the backup's file name, so renaming it is how this gate tells the floor that time has
@@ -124,7 +124,7 @@ printf '%s
 
 # ---------------------------------------------------------------------------------------
 step "the first save over that vault keeps it as it was: empty"
-kpset "$project" v1-first ROTATED
+legacy_var "$kp" "$db" "$pw" "$project" ROTATED v1-first
 
 [ "$(count)" -eq 1 ] || die "the first save over an existing vault produced $(count) backups, expected 1"
 

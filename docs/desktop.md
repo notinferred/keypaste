@@ -12,7 +12,7 @@ The focused target is one unlock session for desktop use, MCP requests and env l
 
 The desktop app is not published. Build it from source, below. CI produces desktop archives and internal unsigned candidates: a Windows MSI, a Linux AppImage and a macOS `keypaste.app`. A desktop publication path exists but remains gated; [RELEASE](RELEASE.md) owns the distribution matrix and outstanding signing, publication and installation evidence.
 
-An existing password or variable value can now be stored and replaced in the app, so `keypaste add` and `keypaste env set` are no longer the only way; an entry's history can be read and restored on its pane, and groups and entries can be renamed and moved there, so neither recovering a replaced password nor tidying a vault needs KeePassXC. Both forms that generate a secret can generate a passphrase as well as a password. A variable's earlier values are reached the same way, through the entry under `env/<project>` that holds it.
+An existing password or variable value can now be stored and replaced in the app, so `keypaste add` and `keypaste env set` are no longer the only way; an entry's history can be read and restored on its pane, and groups and entries can be renamed and moved there, so neither recovering a replaced password nor tidying a vault needs KeePassXC. Both forms that generate a secret can generate a passphrase as well as a password. A variable's earlier values are reached the same way, through the entry that holds it.
 
 ## What the screens show
 
@@ -222,7 +222,7 @@ CI builds and packages on three operating systems; desktop tests read secret sur
 30. Open Show history on that entry, hold a revision's password to reveal it and release to hide it. Switch screens while holding, and lock while holding: both must take it off the screen. Select a revision and check the layout at the smallest window the app allows — the entry list must still be usable.
 31. Restore the oldest revision. `keypaste get --show` returns it, the value it replaced is now the newest history item in both the app and KeePassXC, and the entry keeps its other fields. Restore again to go back.
 32. Delete an entry and press Restore on the line that appears. It is back in the list and `keypaste get --show` returns its password.
-33. Delete an entry, then a variable on Env profiles, and open Trash: both are listed with the groups they came from, and neither is in `keypaste ls`. Restore each and check `keypaste get --show` and `keypaste run <project> -- printenv`.
+33. Delete an entry and open Trash: it is listed with the group it came from and is not in `keypaste ls`. Restore it and check `keypaste get --show`. Remove a variable on Env profiles: it leaves its entry, `keypaste run <project> -- printenv` no longer has it, and the entry's History tab keeps its value.
 34. Delete an entry, re-create one with the same name, then try to restore the deleted one from Trash: it is refused, says why, and neither entry changes. Delete the new one and restore again: it works.
 35. Delete an entry, open Trash and use Delete for good. It takes a second confirmation, the entry leaves the list, and KeePassXC no longer shows it in the Recycle Bin.
 36. Delete something, then lock with `Ctrl/Cmd+L`. Unlock and open Trash: the entry is still recoverable, and nothing from before the lock is still on screen.

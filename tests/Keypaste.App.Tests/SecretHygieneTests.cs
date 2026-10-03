@@ -1015,11 +1015,10 @@ public sealed class SecretHygieneTests
                 GroupPath = SentinelGroup,
             });
 
-            var store = new EnvStore(vault);
-            store.TrySet(SentinelProject, SentinelEnvKey, SentinelEnvValue, out _);
+            LegacyVariables.Set(vault, SentinelProject, SentinelEnvKey, SentinelEnvValue);
 
             // A second project, whose card is drawn and whose table is never opened.
-            store.TrySet(SentinelOtherProject, "OTHER_KEY", SentinelOtherEnvValue, out _);
+            LegacyVariables.Set(vault, SentinelOtherProject, "OTHER_KEY", SentinelOtherEnvValue);
 
             vault.Save();
         }

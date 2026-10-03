@@ -135,8 +135,10 @@ public sealed class EntryFieldsTests : IDisposable
 
         detail.DraftTag = "env:billing:prod";
         detail.AddTagCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Execute(null);
         detail.DraftTag = "env:billing:Prod";
         detail.AddTagCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Execute(null);
 
         var project = detail.Tags.Single(chip => chip.Tag == "env:billing:prod");
         Assert.Equal(("billing · prod", true, true), (project.Display, project.IsProject, project.IsProtected));
@@ -148,10 +150,53 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.Null(plain.Tip);
 
         project.RemoveCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Execute(null);
 
         Assert.Equal(["env:billing:Prod", "finance"], Tags().Order(StringComparer.Ordinal));
         Assert.Equal(revisions + 3, Revisions());
         Assert.Empty(detail.DraftTag);
+    }
+
+    [Fact]
+    public void A_project_tag_change_names_its_environment_and_fields_first_and_cancelled_writes_nothing()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        var before = File.ReadAllBytes(_vaultPath);
+
+        detail.DraftTag = "env:billing:staging";
+        detail.AddTagCommand.Execute(null);
+
+        Assert.True(detail.IsConfirmingTagChange);
+        Assert.Equal(
+            ["env:billing:staging puts Banking/Checking in billing/staging.", "Joining billing/staging: PIN."],
+            detail.TagChangeLines);
+        Assert.Equal("Add tag", detail.TagChangeAction);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+
+        detail.CancelTagChangeCommand.Execute(null);
+        Assert.False(detail.IsConfirmingTagChange);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+        Assert.DoesNotContain("env:billing:staging", Tags());
+
+        detail.AddTagCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Execute(null);
+        Assert.Contains("env:billing:staging", Tags());
+        Assert.Empty(detail.DraftTag);
+
+        before = File.ReadAllBytes(_vaultPath);
+        detail.Tags.Single(chip => chip.Tag == "env:billing:staging").RemoveCommand.Execute(null);
+        Assert.Equal(
+            ["Removing env:billing:staging takes Banking/Checking out of billing/staging.", "Leaving billing/staging: PIN."],
+            detail.TagChangeLines);
+        Assert.Equal("Remove tag", detail.TagChangeAction);
+        detail.CancelTagChangeCommand.Execute(null);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+
+        detail.DraftTag = "work";
+        detail.AddTagCommand.Execute(null);
+        Assert.False(detail.IsConfirmingTagChange);
+        Assert.Contains("work", Tags());
     }
 
     [Fact]

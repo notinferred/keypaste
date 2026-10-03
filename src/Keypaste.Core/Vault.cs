@@ -325,6 +325,37 @@ public sealed class Vault : IDisposable
             throw new VaultException("The env group holds projects from before tags. Choose another group, and tag the item into a project instead.");
         }
 
+        CheckNew(fields, tags);
+        Change(() => _interop.CreateEntry(entry, fields, tags), VaultEdit.Of(EntryName.Of(entry)));
+    }
+
+    /// <summary>
+    /// Creates a project environment's home entry, <c>env/&lt;project&gt;/.env</c> or
+    /// <c>.env.&lt;environment&gt;</c>, tagged into the environment and holding its first fields, in one
+    /// change with no history item and creating its group when missing (D-0413). Call
+    /// <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="name">The home entry (<see cref="EnvStore.HomeEntry"/>).</param>
+    /// <param name="tag">The environment's member tag.</param>
+    /// <param name="fields">Its fields, each named once and holding a value.</param>
+    /// <exception cref="VaultException">A name or the tag is refused, or the entry's name is taken. Nothing is changed.</exception>
+    internal void CreateHomeEntry(EntryName name, string tag, IReadOnlyList<FieldWrite> fields)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(tag);
+        ArgumentNullException.ThrowIfNull(fields);
+
+        CheckNew(fields, [tag]);
+        Change(
+            () => _interop.CreateEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title }, fields, [tag], createGroup: true),
+            VaultEdit.Of(name));
+    }
+
+    /// <summary>Refuses a new entry's fields and tags before anything is written.</summary>
+    private static void CheckNew(IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags)
+    {
+        string error;
         HashSet<string> named = new(StringComparer.Ordinal);
 
         foreach (FieldWrite write in fields)
@@ -359,8 +390,6 @@ public sealed class Vault : IDisposable
                 throw new VaultException($"The tag '{tag}' is named twice.");
             }
         }
-
-        Change(() => _interop.CreateEntry(entry, fields, tags), VaultEdit.Of(EntryName.Of(entry)));
     }
 
     /// <summary>Overwrites the fields of the entry at <paramref name="entry"/>'s

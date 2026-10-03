@@ -26,9 +26,8 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     {
         using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
-            var store = new EnvStore(created);
-            store.TrySet("dev", "TOKEN", _token1, out _);
-            store.TrySet("dev", "DATABASE_URL", _token2, out _);
+            LegacyVariables.Set(created, "dev", "TOKEN", _token1);
+            LegacyVariables.Set(created, "dev", "DATABASE_URL", _token2);
             created.AddEntry(new VaultEntry { GroupPath = "env/broken", Title = "BAD-NAME", Password = _token1 });
             created.Save();
         }
@@ -324,7 +323,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
         var first = await RunAsync(authority, Request("session-one"));
 
-        new EnvStore(_vault).TrySet("dev", "TOKEN", "rotated-after-the-answer", out _);
+        LegacyVariables.Set(_vault, "dev", "TOKEN", "rotated-after-the-answer");
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Denied;
         var second = await RunAsync(authority, Request("session-one"));
@@ -360,7 +359,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     [Fact]
     public async Task AnHourAnswer_DoesNotCoverAnotherCommandDirectoryOrProject()
     {
-        new EnvStore(_vault).TrySet("other", "KEY", _token1, out _);
+        LegacyVariables.Set(_vault, "other", "KEY", _token1);
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         using var grants = new EnvGrantCache(_fixture.Clock);
@@ -396,7 +395,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     [Fact]
     public async Task AProtectedProfile_OffersNoTimedChoice_AndStoresNothing()
     {
-        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(_vault).TrySet("dev", "prod", "TOKEN", _stagingToken, out _));
+        LegacyVariables.Set(_vault, "dev", "prod", "TOKEN", _stagingToken);
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         using var grants = new EnvGrantCache(_fixture.Clock);
@@ -659,7 +658,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
     private void AddStaging()
     {
-        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(_vault).TrySet("dev", "staging", "TOKEN", _stagingToken, out _));
+        LegacyVariables.Set(_vault, "dev", "staging", "TOKEN", _stagingToken);
         _vault.Save();
     }
 

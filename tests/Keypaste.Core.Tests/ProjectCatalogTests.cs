@@ -57,6 +57,36 @@ public sealed class ProjectCatalogTests : IDisposable
         Assert.Equal([new EntryName("services", "Stripe")], catalog.Projects[1].Environments[1].Members);
     }
 
+    /// <summary>
+    /// An <c>env/</c> group is legacy while it holds the one-entry-per-variable layout. One holding
+    /// only tagged entries, such as the home entries keypaste writes, is a project of tags (D-0414).
+    /// </summary>
+    [Fact]
+    public void A_group_holding_only_tagged_entries_is_not_legacy_and_an_untagged_entry_or_a_subgroup_makes_one()
+    {
+        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        var store = new EnvStore(vault);
+        Assert.Null(store.Set("home", "dev", "TOKEN", "t").Refusal);
+        Assert.Null(store.Set("home", "staging", "TOKEN", "s").Refusal);
+        Assert.Null(store.Set("mixed", "dev", "TOKEN", "t").Refusal);
+        vault.AddEntry(new VaultEntry { GroupPath = "env/mixed", Title = "OLD", Password = "o" });
+        Assert.Null(store.Set("nested", "dev", "TOKEN", "t").Refusal);
+        vault.AddEntry(new VaultEntry { GroupPath = "env/nested/qa", Title = "OLD", Password = "o" });
+
+        var catalog = ProjectCatalog.Read(vault);
+
+        Assert.Equal(
+            [("home", false), ("mixed", true), ("nested", true)],
+            catalog.Projects.Select(project => (project.Name, project.IsLegacy)));
+        Assert.Equal(
+            [
+                new ProjectEnvironment("dev", false, [new EntryName("env/home", ".env")]),
+                new ProjectEnvironment("staging", false, [new EntryName("env/home", ".env.staging")]),
+            ],
+            catalog.Projects[0].Environments,
+            new EnvironmentComparer());
+    }
+
     [Fact]
     public void Entries_in_the_recycle_bin_or_keypastes_own_groups_belong_to_no_project()
     {

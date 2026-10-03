@@ -250,11 +250,11 @@ public sealed class VaultRecycleBinTests : IDisposable
         using var vault = Seeded(out _);
         var store = new EnvStore(vault);
 
-        Assert.Single(store.Read("billing"));
+        Assert.Single(EnvResolution.List(vault, "billing", "dev").Variables);
 
         Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
 
-        Assert.Empty(store.Read("billing"));
+        Assert.Empty(EnvResolution.List(vault, "billing", "dev").Variables);
         Assert.DoesNotContain(store.Projects(), project => project.Contains("Recycle", StringComparison.Ordinal));
     }
 
@@ -353,7 +353,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
         Assert.Equal("v3", vault.Find(_token)?.Password, StringComparer.Ordinal);
         Assert.Empty(vault.ReadRecycled());
-        Assert.Single(new EnvStore(vault).Read("billing"));
+        Assert.Single(EnvResolution.List(vault, "billing", "dev").Variables);
     }
 
     /// <summary>
@@ -383,7 +383,7 @@ public sealed class VaultRecycleBinTests : IDisposable
     /// <summary>
     /// Restoring onto a name something else now answers to would make both entries unusable:
     /// <see cref="Vault.Find(EntryName)"/> refuses, a release is denied as ambiguous, and
-    /// <see cref="EnvStore.Read(string)"/> throws for the whole project. A recovery must not do that.
+    /// <see cref="EnvResolution.Resolve(Vault, string, TimeProvider)"/> refuses the whole project. A recovery must not do that.
     /// </summary>
     [Fact]
     public void RestoreRecycled_IsRefusedAndWritesNothing_WhenTheNameIsTakenAgain()

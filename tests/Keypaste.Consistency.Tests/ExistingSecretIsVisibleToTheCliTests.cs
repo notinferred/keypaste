@@ -180,7 +180,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
         screen.Model.OpenCommand.Execute("billing");
         var project = screen.Model.OpenProject!;
 
-        Assert.Equal(0, HistoryOf(fixture, "env/billing", "STRIPE_KEY"));
+        Assert.Equal(0, HistoryOf(fixture, "env/billing", ".env"));
 
         project.BeginReplace(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Enter(project.ReplacementValue, _typed);
@@ -194,7 +194,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));
         Assert.Equal(_typed, fixture.Cli.ProcessLauncher.Environment["STRIPE_KEY"]);
 
-        Assert.Equal(1, HistoryOf(fixture, "env/billing", "STRIPE_KEY"));
+        Assert.Equal(1, HistoryOf(fixture, "env/billing", ".env"));
     }
 
     private static void Enter(SecretField field, string value)

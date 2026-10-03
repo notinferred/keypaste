@@ -521,9 +521,8 @@ public sealed class RunToolTests : IDisposable
         {
             _answer = answer;
             _vault = Vault.Create(test.VaultPath, "correct horse battery staple");
-            var store = new EnvStore(_vault);
-            store.TrySet("acme-api", "DATABASE_URL", _value, out _);
-            store.TrySet("acme-api", "TOKEN", "tok-" + _core, out _);
+            LegacyVariables.Set(_vault, "acme-api", "DATABASE_URL", _value);
+            LegacyVariables.Set(_vault, "acme-api", "TOKEN", "tok-" + _core);
             _vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "bank", Password = "bank-" + _core });
             _vault.Save();
 
