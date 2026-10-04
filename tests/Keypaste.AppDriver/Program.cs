@@ -66,9 +66,13 @@ internal static class Program
         "       tag-add <vault> <entry-path> <tag> [--decline]\n" +
         "       tag-rm <vault> <entry-path> <tag> [--decline]\n" +
         "       env-add <vault> <project> <environment> <KEY> [--entry <entry-path>]\n" +
-        "       env-set <vault> <project> <environment> <KEY>\n" +
+        "       env-set <vault> <project> <environment> <KEY> [--decline]\n" +
         "       env-rm <vault> <project> <environment> <KEY>\n" +
         "       env-import <vault> <project> <environment> <file>\n" +
+        "       env-export <vault> <project> <environment> <file>\n" +
+        "       env-entry-add <vault> <project> <environment> <entry-path> [--decline]\n" +
+        "       env-entry-rm <vault> <project> <environment> <entry-path> [--decline]\n" +
+        "       projects <vault>\n" +
         "       group-rename <vault> <group-path> <new-name>\n" +
         "       relocate <vault> <entry-path> <destination-group-path> <new-title>\n" +
         "       delete <vault> <entry-path>\n" +
@@ -126,9 +130,16 @@ internal static class Program
                 ["tag-rm", var vault, var entry, var tag, "--decline"] => await driver.RemoveTagAsync(vault, entry, tag, decline: true).ConfigureAwait(true),
                 ["env-add", var vault, var project, var environment, var key] => await driver.AddEnvKeyAsync(vault, project, environment, key, null).ConfigureAwait(true),
                 ["env-add", var vault, var project, var environment, var key, "--entry", var entry] => await driver.AddEnvKeyAsync(vault, project, environment, key, entry).ConfigureAwait(true),
-                ["env-set", var vault, var project, var environment, var key] => await driver.ReplaceEnvKeyAsync(vault, project, environment, key).ConfigureAwait(true),
+                ["env-set", var vault, var project, var environment, var key] => await driver.ReplaceEnvKeyAsync(vault, project, environment, key, decline: false).ConfigureAwait(true),
+                ["env-set", var vault, var project, var environment, var key, "--decline"] => await driver.ReplaceEnvKeyAsync(vault, project, environment, key, decline: true).ConfigureAwait(true),
                 ["env-rm", var vault, var project, var environment, var key] => await driver.RemoveEnvKeyAsync(vault, project, environment, key).ConfigureAwait(true),
                 ["env-import", var vault, var project, var environment, var file] => await driver.ImportEnvAsync(vault, project, environment, file).ConfigureAwait(true),
+                ["env-export", var vault, var project, var environment, var file] => await driver.ExportEnvAsync(vault, project, environment, file).ConfigureAwait(true),
+                ["env-entry-add", var vault, var project, var environment, var entry] => await driver.AddEnvEntryAsync(vault, project, environment, entry, decline: false).ConfigureAwait(true),
+                ["env-entry-add", var vault, var project, var environment, var entry, "--decline"] => await driver.AddEnvEntryAsync(vault, project, environment, entry, decline: true).ConfigureAwait(true),
+                ["env-entry-rm", var vault, var project, var environment, var entry] => await driver.RemoveEnvEntryAsync(vault, project, environment, entry, decline: false).ConfigureAwait(true),
+                ["env-entry-rm", var vault, var project, var environment, var entry, "--decline"] => await driver.RemoveEnvEntryAsync(vault, project, environment, entry, decline: true).ConfigureAwait(true),
+                ["projects", var vault] => await driver.ListProjectsAsync(vault).ConfigureAwait(true),
                 ["group-rename", var vault, var group, var name] => await driver.RenameGroupAsync(vault, group, name).ConfigureAwait(true),
                 ["relocate", var vault, var entry, var group, var title] => await driver.RelocateAsync(vault, entry, group, title).ConfigureAwait(true),
                 ["delete", var vault, var entry] => await driver.DeleteAsync(vault, entry).ConfigureAwait(true),
@@ -476,14 +487,110 @@ internal sealed class Driver(string home)
             return open.IsAdding || screen.Error is not null ? Refused(screen.Error) : Did($"added {key} to {project}/{environment}");
         });
 
-    internal Task<int> ReplaceEnvKeyAsync(string vault, string project, string environment, string key) =>
+    internal Task<int> ReplaceEnvKeyAsync(string vault, string project, string environment, string key, bool decline) =>
         WithProjectAsync(vault, project, environment, (screen, open) =>
         {
             Press(Variable(open, key).ReplaceCommand, "Replace");
+            Console.Out.WriteLine($"asked: {open.ReplacePrompt}");
+
+            if (decline)
+            {
+                Press(open.CancelReplaceCommand, "Cancel");
+                return Did("declined");
+            }
+
             Type(open.ReplacementValue);
             Press(open.ConfirmReplaceCommand, "Replace");
             return open.IsReplacing || screen.Error is not null ? Refused(screen.Error) : Did($"replaced {key} in {project}/{environment}");
         });
+
+    internal Task<int> ExportEnvAsync(string vault, string project, string environment, string file) =>
+        WithProjectAsync(vault, project, environment, (screen, open) =>
+        {
+            var said = open.ExportReferences(Path.GetFullPath(file), replace: true);
+            return said.StartsWith("Wrote", StringComparison.Ordinal) ? Did(said) : Refused(said);
+        });
+
+    internal Task<int> AddEnvEntryAsync(string vault, string project, string environment, string entry, bool decline) =>
+        WithProjectAsync(vault, project, environment, (screen, open) =>
+        {
+            Press(Listed(open, environment).AddEntry, "Add entry");
+            open.EntryFilter = entry;
+            open.ChosenEntry = open.EntryCandidates.SingleOrDefault(candidate => candidate.Display == entry)
+                ?? throw new DriverException($"'{entry}' is not offered to add to {project}/{environment}");
+            return AnswerTagChange(screen, open, decline) ?? Did($"added {entry} to {project}/{environment}");
+        });
+
+    internal Task<int> RemoveEnvEntryAsync(string vault, string project, string environment, string entry, bool decline) =>
+        WithProjectAsync(vault, project, environment, (screen, open) =>
+        {
+            var member = Listed(open, environment).Members.SingleOrDefault(row => row.Display == entry)
+                ?? throw new DriverException($"'{entry}' is not listed in {project}/{environment}");
+            Press(member.Remove, "Remove");
+            return AnswerTagChange(screen, open, decline) ?? Did($"removed {entry} from {project}/{environment}");
+        });
+
+    /// <summary>Prints what the Projects screen lists for every project: environments, entries, where each value lives, and the tags it ignores.</summary>
+    internal Task<int> ListProjectsAsync(string vault) =>
+        WithProjectsAsync(vault, screen =>
+        {
+            foreach (var problem in screen.MalformedTags)
+            {
+                Console.Out.WriteLine($"ignored: {problem.Sentence}");
+            }
+
+            foreach (var project in screen.Projects)
+            {
+                screen.OpenCommand.Execute(project);
+                var open = screen.OpenProject ?? throw new DriverException($"'{project}' did not open: {screen.Error}");
+                Console.Out.WriteLine($"project {open.DisplayName}{(open.Launch.Mapping is { } mapping ? $" runs {mapping.Command} in {mapping.Directory}" : string.Empty)}");
+
+                foreach (var environment in open.Environments)
+                {
+                    foreach (var member in environment.Members)
+                    {
+                        Console.Out.WriteLine($"entry {open.DisplayName}/{environment.DisplayName}: {member.Display} holds {member.KeysText}{(member.HasAlso ? $", {member.AlsoText}" : string.Empty)}");
+                    }
+                }
+
+                foreach (var row in open.Rows)
+                {
+                    foreach (var cell in row.Cells.Where(cell => cell.HasSourceNote))
+                    {
+                        Console.Out.WriteLine($"value {open.DisplayName}/{cell.Profile} {row.DisplayKey}: {cell.SourceNote}");
+                    }
+                }
+            }
+
+            return 0;
+        });
+
+    private static EnvEnvironmentEntries Listed(EnvProjectViewModel open, string environment) =>
+        open.Environments.SingleOrDefault(listed => listed.Name == environment)
+            ?? throw new DriverException($"{open.Name} lists no environment '{environment}'");
+
+    /// <summary>Prints what a tag change on the Projects screen says it reaches, then confirms or cancels it.</summary>
+    private static int? AnswerTagChange(EnvSetsViewModel screen, EnvProjectViewModel open, bool decline)
+    {
+        if (!open.IsConfirmingTagChange)
+        {
+            return Refused(screen.Error ?? "nothing was asked");
+        }
+
+        foreach (var line in open.TagChangeLines)
+        {
+            Console.Out.WriteLine($"asked: {line}");
+        }
+
+        if (decline)
+        {
+            Press(open.CancelTagChangeCommand, open.TagChangeCancel);
+            return Did("declined");
+        }
+
+        Press(open.ConfirmTagChangeCommand, open.TagChangeAction);
+        return open.IsConfirmingTagChange || screen.Error is not null ? Refused(screen.Error) : null;
+    }
 
     internal Task<int> RemoveEnvKeyAsync(string vault, string project, string environment, string key) =>
         WithProjectAsync(vault, project, environment, (screen, open) =>
@@ -516,8 +623,19 @@ internal sealed class Driver(string home)
         open.Variables.SingleOrDefault(row => row.Key == key)
             ?? throw new DriverException($"no single '{key}' in {open.Name}/{open.SelectedProfile}");
 
-    /// <summary>Unlocks the vault and opens one environment of a project on the Env profiles screen.</summary>
-    private async Task<int> WithProjectAsync(string vault, string project, string environment, Func<EnvSetsViewModel, EnvProjectViewModel, int> act)
+    /// <summary>Unlocks the vault and opens one environment of a project on the Projects screen.</summary>
+    private Task<int> WithProjectAsync(string vault, string project, string environment, Func<EnvSetsViewModel, EnvProjectViewModel, int> act) =>
+        WithProjectsAsync(vault, screen =>
+        {
+            screen.OpenCommand.Execute(project);
+
+            var open = screen.OpenProject ?? throw new DriverException($"'{project}' did not open: {screen.Error}");
+            open.SelectedProfile = environment;
+            return act(screen, open);
+        });
+
+    /// <summary>Unlocks the vault and shows the Projects screen.</summary>
+    private async Task<int> WithProjectsAsync(string vault, Func<EnvSetsViewModel, int> act)
     {
         using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
@@ -529,11 +647,7 @@ internal sealed class Driver(string home)
 
         using var countdown = new ClipboardCountdown(NoClipboard.Instance, TimeProvider.System);
         using var screen = new EnvSetsViewModel(session, countdown, _picker);
-        screen.OpenCommand.Execute(project);
-
-        var open = screen.OpenProject ?? throw new DriverException($"'{project}' did not open: {screen.Error}");
-        open.SelectedProfile = environment;
-        return act(screen, open);
+        return act(screen);
     }
 
     internal Task<int> RenameGroupAsync(string vault, string group, string name) =>

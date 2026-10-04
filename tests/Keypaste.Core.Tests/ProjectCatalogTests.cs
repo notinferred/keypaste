@@ -102,6 +102,29 @@ public sealed class ProjectCatalogTests : IDisposable
         Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
+    [Fact]
+    public void An_entry_names_every_environment_its_own_tags_put_it_in_and_nothing_else()
+    {
+        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        Add(vault, "services", "Stripe", "env:billing", "env:billing:staging", "env:payments:prod", "env:billing:Prod", "finance");
+        Add(vault, "services", "Mail", "env:billing", "env:billing:dev");
+        Add(vault, "services", "Odd", "env:billing:Prod");
+        Add(vault, ".keypaste/tokens", "planted", "env:billing");
+        Add(vault, "services", "Deleted", "env:billing");
+        vault.RemoveEntry(new EntryName("services", "Deleted"), out _);
+
+        var catalog = ProjectCatalog.Read(vault);
+
+        Assert.Equal(
+            [new ProjectMembership("billing", "dev"), new ProjectMembership("billing", "staging"), new ProjectMembership("payments", "prod")],
+            catalog.EnvironmentsOf(new EntryName("services", "Stripe")));
+        Assert.Equal([new ProjectMembership("billing", "dev")], catalog.EnvironmentsOf(new EntryName("services", "Mail")));
+        Assert.Empty(catalog.EnvironmentsOf(new EntryName("services", "Odd")));
+        Assert.Empty(catalog.EnvironmentsOf(new EntryName(".keypaste/tokens", "planted")));
+        Assert.Empty(catalog.EnvironmentsOf(new EntryName("services", "Deleted")));
+        Assert.Equal("billing/staging", catalog.EnvironmentsOf(new EntryName("services", "Stripe"))[1].ToString());
+    }
+
     private static void Add(Vault vault, string group, string title, params string[] tags)
     {
         var name = new EntryName(group, title);

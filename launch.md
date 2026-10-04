@@ -16,7 +16,7 @@ The current public release is CLI/MCP `v0.3.0`, with downloads for Windows x64, 
 
 For agent access, your MCP client starts `keypaste-mcp`. You start and unlock a separate `keypaste agent` in a terminal, which shows credential requests. You answer Deny, Allow once, which releases one field and keeps nothing, or Allow for 1 hour, which lets that connection reuse the approval for the hour; silence for 45 seconds denies access. User-written policy can authorize a matching request without a prompt. The bridge records calls in a local hash-chained audit log and refuses release when the required record cannot be written.
 
-The binaries are unsigned and un-notarized. There is no public desktop download. In source, the desktop and `keypaste agent` share one owner per vault, the unlocked app answers agents in its own prompt window, and the Env profiles screen launches a project's command or a terminal from that session; none of this is published yet.
+The binaries are unsigned and un-notarized. There is no public desktop download. In source, the desktop and `keypaste agent` share one owner per vault, the unlocked app answers agents in its own prompt window, and the Projects screen launches a project's command or a terminal from that session; none of this is published yet.
 
 The intended product is a familiar local password manager with one unlock session for vault use, native MCP approval and project launches. Existing processes retain credentials they already received; neither locking the vault nor expiring an approval erases those copies.
 

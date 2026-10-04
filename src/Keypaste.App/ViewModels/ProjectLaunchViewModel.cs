@@ -1,5 +1,6 @@
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Projects;
@@ -40,6 +41,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
     private string _confirmStarts = string.Empty;
     private string _confirmDirectory = string.Empty;
     private string _confirmKeys = string.Empty;
+    private string _confirmSources = string.Empty;
 
     internal ProjectLaunchViewModel(
         AppVaultSession session,
@@ -150,6 +152,13 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
     {
         get => _confirmKeys;
         private set => Set(ref _confirmKeys, value);
+    }
+
+    /// <summary>The entries the values come from, each once.</summary>
+    internal string ConfirmSources
+    {
+        get => _confirmSources;
+        private set => Set(ref _confirmSources, value);
     }
 
     /// <summary>How the last start went, for a test to find the child it started.</summary>
@@ -295,6 +304,9 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         ConfirmStarts = run ? Shown(_mapping?.Command ?? string.Empty) : Shown(target.FileName);
         ConfirmDirectory = Shown(target.WorkingDirectory ?? string.Empty);
         ConfirmKeys = preview.Keys.Count == 0 ? "(none)" : string.Join(", ", preview.Keys.Select(key => EntryNameSanitizer.Sanitize(key).Text));
+        ConfirmSources = preview.Sources.Count == 0
+            ? string.Empty
+            : "From " + string.Join(", ", preview.Sources.Select(source => source.Entry).Distinct().Select(ApprovalPrompt.Shown));
 
         _answer = answer;
         RaiseConfirming();
@@ -309,6 +321,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         ConfirmStarts = string.Empty;
         ConfirmDirectory = string.Empty;
         ConfirmKeys = string.Empty;
+        ConfirmSources = string.Empty;
         RaiseConfirming();
     }
 

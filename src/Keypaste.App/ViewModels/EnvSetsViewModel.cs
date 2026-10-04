@@ -30,6 +30,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     private readonly Action<string>? _toast;
 
     private IReadOnlyList<string> _projectNames = [];
+    private IReadOnlyList<EnvTagProblemRow> _malformed = [];
     private EnvProjectViewModel? _open;
     private string? _error;
     private string? _notice;
@@ -79,6 +80,21 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     }
 
     internal bool HasProjects => _projectNames.Count > 0;
+
+    /// <summary>Every tag in the vault that starts like a project tag and puts its entry in no project, as <c>keypaste env ls</c> warns of them.</summary>
+    internal IReadOnlyList<EnvTagProblemRow> MalformedTags
+    {
+        get => _malformed;
+        private set
+        {
+            if (Set(ref _malformed, value))
+            {
+                Raise(nameof(HasMalformedTags));
+            }
+        }
+    }
+
+    internal bool HasMalformedTags => _malformed.Count > 0;
 
     /// <summary>What the header's project picker offers: every project, and the open one while it has no variable yet.</summary>
     internal IReadOnlyList<string> ProjectChoices =>
@@ -199,13 +215,14 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         if (_session.Unlocked is not { } vault)
         {
             Projects = [];
+            MalformedTags = [];
             OpenProject = null;
             return;
         }
 
         var wanted = OpenProject?.Name;
 
-        Projects = [.. ProjectCatalog.Read(vault).Projects.Select(listing => listing.Name)];
+        ReadCatalog(vault);
 
         if (wanted is not null && Projects.Contains(wanted, StringComparer.Ordinal))
         {
@@ -221,6 +238,26 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         {
             Open(Projects[0]);
         }
+    }
+
+    /// <summary>Reads the project list and the malformed tags again, leaving the open project as it is.</summary>
+    /// <remarks>
+    /// A tag change on the open project can make a project or take its last entry away; the
+    /// project stays open either way, as a new one does before its first entry.
+    /// </remarks>
+    internal void RefreshProjects()
+    {
+        if (_session.Unlocked is { } vault)
+        {
+            ReadCatalog(vault);
+        }
+    }
+
+    private void ReadCatalog(Vault vault)
+    {
+        var catalog = ProjectCatalog.Read(vault);
+        Projects = [.. catalog.Projects.Select(listing => listing.Name)];
+        MalformedTags = [.. catalog.Problems.Select(problem => new EnvTagProblemRow(problem))];
     }
 
     /// <summary>How many variables a project holds, without opening it.</summary>
@@ -257,6 +294,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     {
         OpenProject = null;
         Projects = [];
+        MalformedTags = [];
     }
 
     private void Open(string? project)
@@ -274,7 +312,8 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
                 Announce,
                 _picker,
                 _launching,
-                Reload);
+                Reload,
+                RefreshProjects);
     }
 
     private void Announce(string? outcome)

@@ -4,7 +4,7 @@
 keypaste is an open-source, local password manager on a KDBX file, for people who keep their passwords in KeePass and write software ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes the current screens were built from; [ROADMAP](../../ROADMAP.md) has the simpler app that replaces parts of them. Core ideas:
 - **MCP server**: AI clients (claude-code, cursor, …) request secrets over MCP stdio. A human approves each request (deny / allow once / allow for 1h), or a time-boxed **grant** covers it.
 - **Inject first**: agents list key *names*; a value reaches an agent only through a request the person approves, and `keypaste run -p dev -- cmd` injects values into a child process instead.
-- **Env profiles**: one key set per project, with a value per profile (dev / staging / prod). Prod always needs a live approval.
+- **Projects**: one key set per project, with a value per environment (dev / staging / prod). Prod always needs a live approval.
 - **.env import/export**: export writes `.env.keypaste` containing **references only** (`KEY=kp://project/profile/KEY`), which is safe to commit.
 - **Sharing**: end-to-end encrypted, expiring, view-limited links; the key lives in the URL fragment.
 - **Scoped tokens**: for CI and scripts, e.g. `read:acme/api/staging/*`, inject-only, with expiry.
@@ -55,7 +55,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - Four places (D-0374), one list read top to bottom: Items, with a chevron that folds the vault's group tree beneath it (D-0376: rows 28h, 13/400, folder icon 14px, 14px indent a level, a 16px chevron on a group with groups inside it); a PROJECTS heading (table-heading style, not selectable) over each env project's row (indented, mono 12, with count); then Agents; Trash and Settings quieter at the foot. `Ctrl/Cmd+1`–`4` in that order; Left and Right fold the chosen row.
   - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or the text colour when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents.
   - No Import row and no MCP server card: import is in Items' "+" menu, and what the card said is the Agents row's tooltip.
-- **Back**: a screen under a place (a project's Env profiles, Agents › History, and Settings › Advanced's activity log, share links, scoped tokens and diagnostics) has a ghost "‹ <place>" button above its title.
+- **Back**: a screen under a place (a project's screen, Agents › History, and Settings › Advanced's activity log, share links, scoped tokens and diagnostics) has a ghost "‹ <place>" button above its title.
 
 **1. Items**, as KeePassXC's main window (D-0376): the list header, then the table over the chosen item's preview, split 2:3 by a draggable 1px line (the table at least 100px tall, the preview 140px). A new item, an edit or a comparison of two revisions takes the whole area below the header.
 - List header: the group or project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), Rename group (a 14px folder-pen icon) while a group is chosen, and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New group, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
@@ -81,12 +81,14 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - Table columns `64 | 110 | 100 | 1.6fr | 1fr | 100`, min-width 680, scrolls horizontally: TIME (mono muted), ACTOR, ACTION, SECRETS (mono), WHERE (mono muted), RESULT (colored dot + label: Granted / Approved 1h = ok, Denied = danger, Token = info, Expired / Link = muted).
 - Subtitle: "Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only."
 
-**4. Env profiles**
-- Header actions: "Import .env", "Export .env.keypaste".
-- Matrix with columns KEY | DEV | STAGING | PROD (shield icon on PROD). Cells: "••••••" (set), "differs" (secondary), "missing" (danger).
+**4. Projects** (D-0417; the prototype still calls it Env profiles)
+- Title: the open project's name, sans 24/600, which is also its picker; "Projects" when none is open. Header actions: "Import .env", "Export .env.keypaste".
+- A card listing each tag that starts `env:` and puts its entry in no project, muted icon, no amber.
+- Matrix with columns KEY | DEV | STAGING | PROD (shield icon on PROD), and "+ ENVIRONMENT". Cells: "••••••" (set), "differs" (secondary), "missing" (danger), and under a value its entry and the other environments that entry serves (mono 11, muted).
+- Entries: a table per environment, its name as the table heading with "Add entry", each row the entry's path, its keys, "also staging" (mono 11, muted) and a Remove action shown on hover. Add entry opens a form with a filter and a list of entries; choosing one, or Remove, shows what the tag change reaches, with "Add to staging" as the primary or "Remove from dev" in danger, and "Keep it".
 - Below it, two panels:
   - `.env.keypaste` preview (terminal style) with a dev/staging/prod segmented toggle that rewrites the references.
-  - "Run with this profile" card showing the command `keypaste run -p <profile> -- npm start` plus explanatory copy.
+  - "Run with this environment" card showing the command `keypaste run -p <environment> -- npm start` plus explanatory copy.
 
 **Scoped tokens** (Settings › Advanced): a table with columns NAME, TOKEN, SCOPE, MODE (outlined chip), EXPIRES. "New token" is the screen's primary, and the form's Create token, then the minted token's Copy, take its place while shown.
 

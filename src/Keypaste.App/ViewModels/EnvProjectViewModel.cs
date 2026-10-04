@@ -25,12 +25,22 @@ namespace Keypaste.App.ViewModels;
 /// </remarks>
 internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 {
+    private const int _shownCandidates = 50;
+
     private readonly AppVaultSession _session;
     private readonly Action<string?> _report;
     private readonly Action<string?> _announce;
     private readonly IVaultFilePicker? _picker;
+    private readonly Action _projectsChanged;
 
     private IReadOnlyList<EnvVariableRow> _variables = [];
+    private ProjectCatalog? _catalog;
+    private IReadOnlyList<EnvEnvironmentEntries> _environments = [];
+    private string? _addingEntryTo;
+    private string _entryFilter = string.Empty;
+    private IReadOnlyList<EnvEntryCandidate> _candidates = [];
+    private EnvEntryCandidate? _chosenEntry;
+    private ProjectTagChange? _tagChange;
     private IReadOnlyList<EnvEntryChoice> _entryChoices = [];
     private EnvEntryChoice? _newEntry;
     private IReadOnlyList<EnvProfileColumn> _columns = [];
@@ -56,7 +66,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Action<string?>? announce = null,
         IVaultFilePicker? picker = null,
         ProjectLaunching? launching = null,
-        Action? imported = null)
+        Action? imported = null,
+        Action? projectsChanged = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -66,6 +77,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _report = report;
         _announce = announce ?? (_ => { });
         _picker = picker;
+        _projectsChanged = projectsChanged ?? (() => { });
         Clipboard = clipboard;
         Name = name;
 
@@ -84,6 +96,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         BeginAddProfileCommand = new RelayCommand(BeginAddProfile, () => !IsAddingProfile);
         ConfirmAddProfileCommand = new RelayCommand(ConfirmAddProfile, () => IsAddingProfile);
         CancelAddProfileCommand = new RelayCommand(() => IsAddingProfile = false, () => IsAddingProfile);
+        CancelAddEntryCommand = new RelayCommand(CancelAddEntry, () => IsAddingEntry);
+        ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
+        CancelTagChangeCommand = new RelayCommand(CancelTagChange, () => PendingTagChange is not null);
 
         Import = new EnvImportViewModel(session, name, picker, report, _announce, imported ?? Reload);
         Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(), report, _announce);
@@ -236,6 +251,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
                 Raise(nameof(RevealedKey));
                 Removing = null;
                 CancelReplace();
+                CloseEntryForms();
                 Reload();
             }
         }
@@ -353,8 +369,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal bool IsReplacing => _replacing is not null;
 
     /// <summary>What the replace form is headed with.</summary>
+    /// <remarks>An entry several environments read is named with each of them, since every one gets the new value.</remarks>
     internal string ReplacePrompt => _replacing is { } row
-        ? $"New value for {row.DisplayKey}. The old one stays in this entry history."
+        ? $"New value for {row.DisplayKey} on {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}. The old one stays in the entry's history."
         : string.Empty;
 
     /// <summary>The value being entered for a new variable, when it is not being generated.</summary>
@@ -392,6 +409,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <param name="row">The variable whose value is being replaced.</param>
     internal void BeginReplace(EnvVariableRow row)
     {
+        CloseEntryForms();
         ReplacementValue.Clear();
         Replacing = row;
         _report(null);
@@ -399,8 +417,31 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     /// <summary>What the confirmation asks.</summary>
     internal string RemovePrompt => _removing is { } row
-        ? $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}? Its value stays in the entry's history."
+        ? $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}? Its value stays in the entry's history."
         : string.Empty;
+
+    /// <summary>The other environments an entry serves, the open project's by name and another project's as <c>project/environment</c>.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <param name="environment">The environment it is being shown in, left out.</param>
+    internal IReadOnlyList<string> Elsewhere(EntryName entry, string environment) =>
+    [
+        .. (_catalog?.EnvironmentsOf(entry) ?? [])
+            .Where(membership => !(string.Equals(membership.Project, Name, StringComparison.Ordinal)
+                && string.Equals(membership.Environment, environment, StringComparison.Ordinal)))
+            .Select(membership => string.Equals(membership.Project, Name, StringComparison.Ordinal)
+                ? EntryNameSanitizer.Sanitize(membership.Environment).Text
+                : EntryNameSanitizer.SanitizePath(membership.ToString()).Text),
+    ];
+
+    /// <summary>", which billing/dev and billing/staging read" for an entry more than one environment reads; empty otherwise.</summary>
+    private string ReadBy(EntryName entry)
+    {
+        var environments = (_catalog?.EnvironmentsOf(entry) ?? []).Select(membership => EntryNameSanitizer.SanitizePath(membership.ToString()).Text).ToArray();
+
+        return environments.Length < 2
+            ? string.Empty
+            : $", which {string.Join(", ", environments[..^1])} and {environments[^1]} read";
+    }
 
     internal bool IsAdding
     {
@@ -449,6 +490,107 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     internal RelayCommand CancelRemoveCommand { get; }
 
+    /// <summary>Each environment of <see cref="Columns"/> with the entries tagged into it.</summary>
+    internal IReadOnlyList<EnvEnvironmentEntries> Environments
+    {
+        get => _environments;
+        private set => Set(ref _environments, value);
+    }
+
+    /// <summary>Whether the form that tags an entry into an environment is open.</summary>
+    internal bool IsAddingEntry => _addingEntryTo is not null;
+
+    internal string AddEntryTitle => _addingEntryTo is { } environment
+        ? $"Add an entry to {EntryNameSanitizer.Sanitize(environment).Text}"
+        : string.Empty;
+
+    /// <summary>What the add form's list is narrowed to: part of an entry's path, in any case.</summary>
+    internal string EntryFilter
+    {
+        get => _entryFilter;
+        set
+        {
+            if (Set(ref _entryFilter, value))
+            {
+                Raise(nameof(EntryCandidates));
+                Raise(nameof(CandidateNote));
+            }
+        }
+    }
+
+    /// <summary>
+    /// The entries the add form offers for <see cref="EntryFilter"/>: never one already in the
+    /// environment, one in the recycle bin or one of keypaste's own.
+    /// </summary>
+    internal IReadOnlyList<EnvEntryCandidate> EntryCandidates => [.. Matching().Take(_shownCandidates)];
+
+    /// <summary>What the add form says under its list: that nothing matches, or how many more the filter hides.</summary>
+    internal string CandidateNote
+    {
+        get
+        {
+            var count = Matching().Count();
+
+            return count == 0 ? "No other entry matches."
+                : count > _shownCandidates ? $"{count - _shownCandidates} more. Type part of a path to narrow the list."
+                : string.Empty;
+        }
+    }
+
+    /// <summary>The entry chosen in the add form; choosing one says what tagging it does, before anything is written.</summary>
+    internal EnvEntryCandidate? ChosenEntry
+    {
+        get => _chosenEntry;
+        set
+        {
+            if (Set(ref _chosenEntry, value))
+            {
+                PreviewAdd(value);
+            }
+        }
+    }
+
+    internal RelayCommand CancelAddEntryCommand { get; }
+
+    /// <summary>The tag change waiting for the person's answer, as the entry pane asks it (D-0415).</summary>
+    internal ProjectTagChange? PendingTagChange
+    {
+        get => _tagChange;
+        private set
+        {
+            if (Set(ref _tagChange, value))
+            {
+                Raise(nameof(IsConfirmingTagChange));
+                Raise(nameof(TagChangeLines));
+                Raise(nameof(TagChangeAdds));
+                Raise(nameof(TagChangeAction));
+                Raise(nameof(TagChangeCancel));
+                ConfirmTagChangeCommand.RaiseCanExecuteChanged();
+                CancelTagChangeCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool IsConfirmingTagChange => _tagChange is not null;
+
+    /// <summary>What the change does: the environment it reaches and the fields that join or leave it, never a value.</summary>
+    internal IReadOnlyList<string> TagChangeLines => _tagChange?.Describe() ?? [];
+
+    internal bool TagChangeAdds => _tagChange?.Adding ?? false;
+
+    internal string TagChangeAction => _tagChange is { Read.Environment: { } environment } change
+        ? change.Adding
+            ? $"Add to {EntryNameSanitizer.Sanitize(environment).Text}"
+            : $"Remove from {EntryNameSanitizer.Sanitize(environment).Text}"
+        : string.Empty;
+
+    internal string TagChangeCancel => TagChangeAdds ? "Cancel" : "Keep it";
+
+    /// <summary>Writes the pending tag change.</summary>
+    internal RelayCommand ConfirmTagChangeCommand { get; }
+
+    internal RelayCommand CancelTagChangeCommand { get; }
+
     /// <summary>Reads the project again.</summary>
     internal void Reload()
     {
@@ -457,6 +599,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             Variables = [];
             EntryChoices = [];
             NewEntry = null;
+            _catalog = null;
+            Environments = [];
+            CloseEntryForms();
             _referenceKeys = [];
             Profiles = [];
             Matrix = null;
@@ -496,9 +641,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         ];
 
         var home = EnvStore.HomeEntry(Name, SelectedProfile);
-        var tagged = ProjectCatalog.Read(vault).Projects
-            .FirstOrDefault(project => string.Equals(project.Name, Name, StringComparison.Ordinal))?.Environments
-            .FirstOrDefault(environment => string.Equals(environment.Name, SelectedProfile, StringComparison.Ordinal))?.Members ?? [];
+        _catalog = ProjectCatalog.Read(vault);
+        var tagged = MembersOf(SelectedProfile);
 
         var homeExists = vault.ReadEntries().Any(entry => EntryName.Of(entry) == home);
 
@@ -512,7 +656,44 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         NewEntry = EntryChoices[0];
 
         Layout();
+        ListEnvironments(vault);
         RaiseProfileText();
+    }
+
+    /// <summary>The entries tagged into one of this project's environments.</summary>
+    private IReadOnlyList<EntryName> MembersOf(string environment) =>
+        _catalog?.Projects
+            .FirstOrDefault(project => string.Equals(project.Name, Name, StringComparison.Ordinal))?.Environments
+            .FirstOrDefault(listed => string.Equals(listed.Name, environment, StringComparison.Ordinal))?.Members ?? [];
+
+    private void ListEnvironments(Vault vault)
+    {
+        Environments =
+        [
+            .. Columns.Select(column => new EnvEnvironmentEntries(
+                column.Name,
+                column.IsProtected,
+                [.. MembersOf(column.Name).Select(entry => new EnvMemberRow(
+                    entry,
+                    column.Name,
+                    KeysOn(vault, entry),
+                    Elsewhere(entry, column.Name),
+                    new RelayCommand(() => BeginRemoveEntry(entry, column.Name))))],
+                new RelayCommand(() => BeginAddEntry(column.Name)))),
+        ];
+    }
+
+    /// <summary>The names of an entry's fields a project releases; no value is read.</summary>
+    private static IReadOnlyList<string> KeysOn(Vault vault, EntryName entry)
+    {
+        try
+        {
+            return [.. (vault.Fields(entry) ?? []).Select(field => field.Name).Where(EnvConvention.IsEnvNamedField).Order(StringComparer.Ordinal)];
+        }
+        catch (VaultException)
+        {
+            return [];
+        }
     }
 
     private void Layout()
@@ -559,6 +740,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
                 new RelayCommand(() => Act(key, profile, state)))
             {
                 Sources = [.. (known?.Sources ?? []).Select(ApprovalPrompt.Shown)],
+                Also = known?.Sources is [var only] ? Elsewhere(only, profile) : [],
             };
         }
     }
@@ -576,6 +758,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     private void BeginAddProfile()
     {
+        CloseEntryForms();
         NewProfile = string.Empty;
         IsAddingProfile = true;
         _report(null);
@@ -680,7 +863,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal void Report(string? message) => _report(message);
 
     /// <summary>Asks to remove a variable.</summary>
-    internal void BeginRemove(EnvVariableRow row) => Removing = row;
+    internal void BeginRemove(EnvVariableRow row)
+    {
+        CloseEntryForms();
+        Removing = row;
+    }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>
     public void Dispose()
@@ -693,6 +880,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Rows = [];
         Removing = null;
         Replacing = null;
+        CloseEntryForms();
+        Environments = [];
+        _catalog = null;
         Launch.PropertyChanged -= OnLaunchChanged;
         NewValue.Dispose();
         ReplacementValue.Dispose();
@@ -705,6 +895,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     private void BeginAdd()
     {
+        CloseEntryForms();
         NewKey = string.Empty;
         NewEntry = EntryChoices.Count > 0 ? EntryChoices[0] : null;
         NewValue.Clear();
@@ -919,6 +1110,214 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _announce($"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the entry's history.");
 
         Reload();
+    }
+
+    /// <summary>Opens the form that tags another entry into an environment.</summary>
+    private void BeginAddEntry(string environment)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            _report("The vault is locked.");
+            return;
+        }
+
+        IsAdding = false;
+        IsAddingProfile = false;
+        Removing = null;
+        CancelReplaceQuietly();
+        PendingTagChange = null;
+
+        var members = MembersOf(environment).ToHashSet();
+        _candidates =
+        [
+            .. vault.ReadEntries()
+                .Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))
+                .Select(EntryName.Of)
+                .Distinct()
+                .Where(entry => !members.Contains(entry))
+                .Select(entry => new EnvEntryCandidate(entry, ApprovalPrompt.Shown(entry)))
+                .OrderBy(candidate => candidate.Display, StringComparer.Ordinal),
+        ];
+        _chosenEntry = null;
+        _entryFilter = string.Empty;
+        _addingEntryTo = environment;
+        RaiseEntryForm();
+        _report(null);
+    }
+
+    private void CancelAddEntry()
+    {
+        CloseEntryForms();
+        _report(null);
+    }
+
+    private void CloseEntryForms()
+    {
+        PendingTagChange = null;
+
+        if (_addingEntryTo is null)
+        {
+            return;
+        }
+
+        _addingEntryTo = null;
+        _candidates = [];
+        _chosenEntry = null;
+        _entryFilter = string.Empty;
+        RaiseEntryForm();
+    }
+
+    private void RaiseEntryForm()
+    {
+        Raise(nameof(IsAddingEntry));
+        Raise(nameof(AddEntryTitle));
+        Raise(nameof(EntryFilter));
+        Raise(nameof(EntryCandidates));
+        Raise(nameof(CandidateNote));
+        Raise(nameof(ChosenEntry));
+        CancelAddEntryCommand.RaiseCanExecuteChanged();
+    }
+
+    private IEnumerable<EnvEntryCandidate> Matching()
+    {
+        var filter = _entryFilter.Trim();
+
+        return filter.Length == 0
+            ? _candidates
+            : _candidates.Where(candidate => candidate.Display.Contains(filter, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Says what tagging the chosen entry into the environment does; nothing is written until it is confirmed.</summary>
+    private void PreviewAdd(EnvEntryCandidate? chosen)
+    {
+        if (chosen is null || _addingEntryTo is not { } environment || _session.Unlocked is not { } vault)
+        {
+            PendingTagChange = null;
+            return;
+        }
+
+        if (!ProjectTag.TryFor(Name, environment, out var tag, out var invalid))
+        {
+            PendingTagChange = null;
+            _report(invalid);
+            return;
+        }
+
+        Preview(vault, chosen.Entry, [tag], adding: true);
+    }
+
+    /// <summary>Asks to take an entry out of an environment by every tag of its own that puts it there; the entry and its fields stay.</summary>
+    private void BeginRemoveEntry(EntryName entry, string environment)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            _report("The vault is locked.");
+            return;
+        }
+
+        IsAdding = false;
+        IsAddingProfile = false;
+        Removing = null;
+        CancelReplaceQuietly();
+        CloseEntryForms();
+
+        IReadOnlyList<string> tags;
+
+        try
+        {
+            tags =
+            [
+                .. (vault.Tags(entry) ?? []).Where(tag => ProjectTag.Read(tag) is { Kind: ProjectTagKind.Member } read
+                    && string.Equals(read.Project, Name, StringComparison.Ordinal)
+                    && string.Equals(read.Environment, environment, StringComparison.Ordinal)),
+            ];
+        }
+        catch (VaultException e)
+        {
+            _report(e.Message);
+            return;
+        }
+
+        if (tags.Count == 0)
+        {
+            _report($"{ApprovalPrompt.Shown(entry)} is no longer in {DisplayName}/{EntryNameSanitizer.Sanitize(environment).Text}.");
+            Reload();
+            return;
+        }
+
+        Preview(vault, entry, tags, adding: false);
+    }
+
+    private void Preview(Vault vault, EntryName entry, IReadOnlyList<string> tags, bool adding)
+    {
+        try
+        {
+            PendingTagChange = ProjectTagChange.Preview(vault, entry, tags, adding);
+            _report(null);
+        }
+        catch (VaultException e)
+        {
+            PendingTagChange = null;
+            _report(e.Message);
+        }
+    }
+
+    private void CancelTagChange()
+    {
+        PendingTagChange = null;
+        _chosenEntry = null;
+        Raise(nameof(ChosenEntry));
+        _report(null);
+    }
+
+    private void ConfirmTagChange()
+    {
+        if (PendingTagChange is not { } change)
+        {
+            return;
+        }
+
+        if (_session.Unlocked is not { } vault)
+        {
+            _report("The vault is locked.");
+            return;
+        }
+
+        var entry = ApprovalPrompt.Shown(change.Entry);
+        var environment = EntryNameSanitizer.SanitizePath(change.Environment ?? string.Empty).Text;
+
+        try
+        {
+            if (!(change.Adding ? vault.AddTag(change.Entry, change.Tags[0]) : vault.RemoveTags(change.Entry, change.Tags)))
+            {
+                _report(change.Adding
+                    ? $"{entry} is already in {environment} or no longer in this vault, so nothing was written."
+                    : $"{entry} is no longer in {environment}, so nothing was written.");
+                CloseEntryForms();
+                Reload();
+                return;
+            }
+
+            vault.Save();
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            _report("Something else changed this vault since you opened it. Reload to see it, then make this change again.");
+            return;
+        }
+        catch (VaultException e)
+        {
+            _report(e.Message);
+            return;
+        }
+
+        CloseEntryForms();
+        _report(null);
+        _announce(change.Adding
+            ? $"Added {entry} to {environment}."
+            : $"Removed {entry} from {environment}. The entry and its fields are kept.");
+        Reload();
+        _projectsChanged();
     }
 }
 

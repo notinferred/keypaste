@@ -84,7 +84,7 @@ internal static class Destinations
         new(DestinationKind.AgentActivity, "Agents", "bot", OwnsHeader: true),
         new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer, OwnsHeader: true),
         new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer, OwnsHeader: true),
-        new(DestinationKind.EnvSets, "Env profiles", "layers", OwnsHeader: true, Parent: DestinationKind.Entries),
+        new(DestinationKind.EnvSets, "Projects", "layers", OwnsHeader: true, Parent: DestinationKind.Entries),
         new(DestinationKind.AgentHistory, "History", "history", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
         new(DestinationKind.Log, "Activity log", "activity", OwnsHeader: true, Parent: DestinationKind.Settings),
         new(DestinationKind.Sharing, "Share links", "link", OwnsHeader: true, Parent: DestinationKind.Settings),

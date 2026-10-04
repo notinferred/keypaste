@@ -39,6 +39,15 @@
 # removes the same way, and a declined tag change on its entry pane, having named what it reaches,
 # writes nothing. KeePassXC reads every value, protection and tag written.
 #
+# A fifth vault KeePassXC makes holds web, mapped in projects.json, and billing, whose dev and staging
+# share Stripe, beside Mail in dev, an untagged Queue and Odd tagged env:billing:Prod (C.4). The app's
+# Projects screen, through tests/Keypaste.AppDriver, lists both projects, where each value lives, the
+# shared entry's two environments and the ignored tag. It adds Queue to staging and takes Mail out of
+# dev, each having named what it reaches, replaces the shared value naming both environments, adds a
+# key with no entry chosen and imports a .env; each declined or refused act leaves the file byte-
+# identical, and KeePassXC reads every tag, value and protection written. `keypaste run` resolves the
+# exported references to exactly dev's fields.
+#
 # NEGATIVE CONTROL: a corrupted expectation must fail the comparison the listing check rests on, a
 # child holding OLD_KEY must fail the one the runs rest on, and the hour must be honoured for an entry
 # no tag protects.
@@ -613,6 +622,150 @@ done
 said=$(drive tag-rm "$(native "$app_c1c")" services/Database env:billing:staging) || die "the app's confirmed untag failed: ${said}"
 grep -qx 'env:billing:staging' <<<"$(tags "$app_c1c" services/Database)" && die "KeePassXC still reads the tag the app removed"
 grep -qF -- '-c1c' <<<"$(cat "$dir"/c1c-run.err)" && die "a value reached the runner's output"
+
+step "C.4: KeePassXC makes a vault with web, mapped in projects.json, and billing, whose dev and staging share an entry"
+c4_seed() {
+  cat <<EOF
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta><Generator>verify-keepassxc-projects</Generator><DatabaseName>c4</DatabaseName></Meta>
+  <Root>
+    <Group>
+      <UUID>$(uuid c4root)</UUID><Name>Root</Name>
+      <Group>
+        <UUID>$(uuid c4apps)</UUID><Name>apps</Name>
+        <Entry>
+          <UUID>$(uuid c4web)</UUID>
+          <Tags>env:web</Tags>
+          <String><Key>Title</Key><Value>Web</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">web-login-c4</Value></String>
+          <String><Key>WEB_KEY</Key><Value ProtectInMemory="True">web-c4</Value></String>
+        </Entry>
+      </Group>
+      <Group>
+        <UUID>$(uuid c4services)</UUID><Name>services</Name>
+        <Entry>
+          <UUID>$(uuid c4stripe)</UUID>
+          <Tags>env:billing,env:billing:staging</Tags>
+          <String><Key>Title</Key><Value>Stripe</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">stripe-login-c4</Value></String>
+          <String><Key>STRIPE_KEY</Key><Value ProtectInMemory="True">stripe-c4</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid c4mail)</UUID>
+          <Tags>env:billing</Tags>
+          <String><Key>Title</Key><Value>Mail</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">mail-login-c4</Value></String>
+          <String><Key>MAIL_KEY</Key><Value ProtectInMemory="True">mail-c4</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid c4odd)</UUID>
+          <Tags>env:billing:Prod</Tags>
+          <String><Key>Title</Key><Value>Odd</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">odd-login-c4</Value></String>
+          <String><Key>ODD_KEY</Key><Value ProtectInMemory="True">odd-c4</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid c4queue)</UUID>
+          <String><Key>Title</Key><Value>Queue</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">queue-login-c4</Value></String>
+          <String><Key>QUEUE_KEY</Key><Value ProtectInMemory="True">queue-c4</Value></String>
+        </Entry>
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>
+EOF
+}
+c4_seed >"$dir/c4.xml"
+c4="$(cd "$dir" && pwd)/c4.kdbx"
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/c4.xml")" "$(native "$c4")" || die "keepassxc-cli could not import the C.4 seed"
+web_dir="$(cd "$dir" && pwd)/web"
+mkdir -p "$web_dir" "$dir/c4-ref"
+jq -n --arg vault "$(native "$c4")" --arg directory "$(native "$web_dir")" \
+  '{projects: [{vault: $vault, project: "web", directory: $directory, command: "npm start"}]}' >"$KEYPASTE_HOME/projects.json"
+c4_probe='printf "stripe=%s mail=%s queue=%s new=%s imported=%s web=%s" "${STRIPE_KEY-unset}" "${MAIL_KEY-unset}" "${QUEUE_KEY-unset}" "${NEW_KEY-unset}" "${IMPORTED_KEY-unset}" "${WEB_KEY-unset}"'
+c4_run() { printf '%s\n' "$pw" | "$kp" run "$@" --vault "$(native "$c4")" -- "$child" -c "$c4_probe" 2>"$dir/c4-run.err" | tr -d '\r'; }
+
+step "C.4: the screen lists both projects, where each value lives, the entry dev and staging share, and the tag that puts its entry in no project"
+value=
+said=$(drive projects "$(native "$c4")") || die "the screen's listing failed: ${said}"
+for line in \
+  "project web runs npm start in $(native "$web_dir")" \
+  "project billing" \
+  "entry billing/dev: services/Mail holds MAIL_KEY" \
+  "entry billing/dev: services/Stripe holds STRIPE_KEY, also staging" \
+  "entry billing/staging: services/Stripe holds STRIPE_KEY, also dev" \
+  "entry web/dev: apps/Web holds WEB_KEY"; do
+  grep -qxF -- "$line" <<<"$said" || die "the screen does not list '${line}': ${said}"
+done
+grep -F 'value billing/dev STRIPE_KEY: services/Stripe' <<<"$said" | grep -qF 'also staging' || die "the dev value does not name its entry and staging: ${said}"
+grep -F 'value billing/staging STRIPE_KEY: services/Stripe' <<<"$said" | grep -qF 'also dev' || die "the staging value does not name its entry and dev: ${said}"
+grep -qF 'ignored: services/Odd has the tag env:billing:Prod, which puts it in no project' <<<"$said" || die "the screen does not name the ignored tag: ${said}"
+grep -qE '^entry [a-z]+/[a-z]+: services/(Odd|Queue) ' <<<"$said" && die "the screen lists an entry no well-formed tag puts in a project: ${said}"
+
+step "C.4: adding Queue to staging names what it reaches; declined it writes nothing, and KeePassXC reads the confirmed tag"
+was=$(bytes "$c4")
+said=$(drive env-entry-add "$(native "$c4")" billing staging services/Queue --decline) || die "the declined add failed: ${said}"
+grep -qxF 'asked: env:billing:staging puts services/Queue in billing/staging.' <<<"$said" || die "the add did not name the environment: ${said}"
+grep -qxF 'asked: Joining billing/staging: QUEUE_KEY.' <<<"$said" || die "the add did not name the field that joins: ${said}"
+grep -qx 'declined' <<<"$said" || die "the add was not declined: ${said}"
+[ "$was" = "$(bytes "$c4")" ] || die "a declined add changed the vault"
+said=$(drive env-entry-add "$(native "$c4")" billing staging services/Queue) || die "the add failed: ${said}"
+[ "$(tags "$c4" services/Queue | paste -sd' ' -)" = "env:billing:staging" ] || die "KeePassXC reads Queue's tags as $(tags "$c4" services/Queue | paste -sd' ' -)"
+
+step "C.4: taking Mail out of dev keeps the entry and its protected field; declined it writes nothing"
+was=$(bytes "$c4")
+said=$(drive env-entry-rm "$(native "$c4")" billing dev services/Mail --decline) || die "the declined removal failed: ${said}"
+grep -qxF 'asked: Leaving billing/dev: MAIL_KEY.' <<<"$said" || die "the removal did not name the field that leaves: ${said}"
+[ "$was" = "$(bytes "$c4")" ] || die "a declined removal changed the vault"
+said=$(drive env-entry-rm "$(native "$c4")" billing dev services/Mail) || die "the removal failed: ${said}"
+[ -z "$(tags "$c4" services/Mail)" ] || die "KeePassXC still reads a tag on Mail: $(tags "$c4" services/Mail | paste -sd' ' -)"
+[ "$(kx show "$c4" services/Mail -a MAIL_KEY)" = mail-c4 ] || die "KeePassXC no longer reads Mail's field"
+[ "$(protection_of "$c4" MAIL_KEY)" = protected ] || die "Mail's field lost its protection"
+
+step "C.4: replacing the shared value names dev and staging; declined it writes nothing, and KeePassXC reads the new value"
+was=$(bytes "$c4")
+said=$(drive env-set "$(native "$c4")" billing dev STRIPE_KEY --decline) || die "the declined replace failed: ${said}"
+grep -qxF "asked: New value for STRIPE_KEY on services/Stripe, which billing/dev and billing/staging read. The old one stays in the entry's history." <<<"$said" \
+  || die "the replace did not name both environments: ${said}"
+[ "$was" = "$(bytes "$c4")" ] || die "a declined replace changed the vault"
+value=stripe-c4-new
+said=$(drive env-set "$(native "$c4")" billing dev STRIPE_KEY) || die "the replace failed: ${said}"
+[ "$(kx show "$c4" services/Stripe -a STRIPE_KEY)" = stripe-c4-new ] || die "KeePassXC does not read the replaced value"
+[ "$(protection_of "$c4" STRIPE_KEY)" = protected ] || die "the replaced value is not protected"
+
+step "C.4: a key added with no entry chosen lands protected on env/billing/.env, tagged env:billing; a name no field can have writes nothing"
+value=new-c4
+said=$(drive env-add "$(native "$c4")" billing dev NEW_KEY) || die "the add with no entry chosen failed: ${said}"
+[ "$(kx show "$c4" env/billing/.env -a NEW_KEY)" = new-c4 ] || die "KeePassXC does not read NEW_KEY on env/billing/.env"
+[ "$(protection_of "$c4" NEW_KEY)" = protected ] || die "NEW_KEY is not protected"
+[ "$(tags "$c4" env/billing/.env | paste -sd' ' -)" = "env:billing" ] || die "the home entry is not tagged env:billing"
+was=$(bytes "$c4")
+set +e
+said=$(drive env-add "$(native "$c4")" billing dev api_key)
+rc=$?
+set -e
+[ "$rc" -ne 0 ] || die "the screen added the key api_key, which no field of a project can be named: ${said}"
+[ "$was" = "$(bytes "$c4")" ] || die "the refused key changed the vault"
+
+step "C.4: an imported .env is read back by KeePassXC"
+value=
+printf 'IMPORTED_KEY=imported-c4\n' >"$dir/c4.env"
+said=$(drive env-import "$(native "$c4")" billing dev "$(native "$dir/c4.env")") || die "the import failed: ${said}"
+[ "$(kx show "$c4" env/billing/.env -a IMPORTED_KEY)" = imported-c4 ] || die "KeePassXC does not read the imported key"
+[ "$(protection_of "$c4" IMPORTED_KEY)" = protected ] || die "the imported key is not protected"
+
+step "C.4: keypaste run resolves the exported references to exactly dev's fields; staging and web run their own"
+said=$(drive env-export "$(native "$c4")" billing dev "$(native "$dir/c4-ref/.env.keypaste")") || die "the export failed: ${said}"
+grep -qF 'Wrote 3 references' <<<"$said" || die "the export did not write dev's three references: ${said}"
+grep -qF -- '-c4' "$dir/c4-ref/.env.keypaste" && die "the exported references hold a value"
+out=$(c4_run --env-file "$(native "$dir/c4-ref/.env.keypaste")") || die "run --env-file failed: $(cat "$dir/c4-run.err")"
+[ "$out" = "stripe=stripe-c4-new mail=unset queue=unset new=new-c4 imported=imported-c4 web=unset" ] || die "the exported references gave the child: ${out}"
+out=$(c4_run -p staging billing) || die "the staging run failed: $(cat "$dir/c4-run.err")"
+[ "$out" = "stripe=stripe-c4-new mail=unset queue=queue-c4 new=unset imported=unset web=unset" ] || die "the staging run gave the child: ${out}"
+out=$(c4_run web) || die "web's run failed: $(cat "$dir/c4-run.err")"
+[ "$out" = "stripe=unset mail=unset queue=unset new=unset imported=unset web=web-c4" ] || die "web's run gave the child: ${out}"
 
 step "NEGATIVE CONTROL: the listing and run comparisons must be able to fail"
 [ "$listed" = "${expected}-CORRUPTED" ] && die "a deliberately corrupted expectation still matched — this gate is not gating"

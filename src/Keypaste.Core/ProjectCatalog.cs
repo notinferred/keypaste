@@ -18,6 +18,15 @@ public sealed record ProjectListing(string Name, IReadOnlyList<ProjectEnvironmen
 /// <param name="Protects">Whether it still makes the entry's releases ask live (<see cref="ProjectTag.Protects"/>).</param>
 public sealed record ProjectTagProblem(EntryName Entry, string Tag, string Problem, bool Protects);
 
+/// <summary>One environment an entry's own tags put it in.</summary>
+/// <param name="Project">The project.</param>
+/// <param name="Environment">The environment.</param>
+public sealed record ProjectMembership(string Project, string Environment)
+{
+    /// <inheritdoc/>
+    public override string ToString() => $"{Project}/{Environment}";
+}
+
 /// <summary>
 /// Every project in a vault, from its entries' own project tags (D-0370); no group makes a project (D-0416).
 /// </summary>
@@ -28,10 +37,23 @@ public sealed record ProjectTagProblem(EntryName Entry, string Tag, string Probl
 /// </remarks>
 public sealed class ProjectCatalog
 {
+    private readonly Dictionary<EntryName, List<ProjectMembership>> _memberships = [];
+
     private ProjectCatalog(IReadOnlyList<ProjectListing> projects, IReadOnlyList<ProjectTagProblem> problems)
     {
         Projects = projects;
         Problems = problems;
+
+        foreach (var project in projects)
+        {
+            foreach (var environment in project.Environments)
+            {
+                foreach (var member in environment.Members)
+                {
+                    (_memberships.TryGetValue(member, out var found) ? found : _memberships[member] = []).Add(new ProjectMembership(project.Name, environment.Name));
+                }
+            }
+        }
     }
 
     /// <summary>The projects, in ordinal order of name.</summary>
@@ -39,6 +61,16 @@ public sealed class ProjectCatalog
 
     /// <summary>The malformed project tags, in ordinal order of entry path and tag.</summary>
     public IReadOnlyList<ProjectTagProblem> Problems { get; }
+
+    /// <summary>Every environment an entry's own tags put it in, in the order <see cref="Projects"/> lists them.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <returns>Its environments; empty for an entry in none.</returns>
+    public IReadOnlyList<ProjectMembership> EnvironmentsOf(EntryName entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        return _memberships.TryGetValue(entry, out var found) ? found : [];
+    }
 
     /// <summary>Reads the projects an open vault holds.</summary>
     /// <param name="vault">The vault.</param>

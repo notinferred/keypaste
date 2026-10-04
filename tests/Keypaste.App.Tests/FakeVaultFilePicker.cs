@@ -72,4 +72,9 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
     public Task<string?> PickDotEnvAsync() => Task.FromResult(DotEnvPath);
 
     public Task<string?> PickFolderAsync() => Task.FromResult(FolderPath);
+
+    /// <summary>What <see cref="PickReferenceFileAsync"/> answers. Null is a cancelled picker.</summary>
+    internal string? ReferencePath { get; set; }
+
+    public Task<string?> PickReferenceFileAsync(string suggestedName, string? directory) => Task.FromResult(ReferencePath);
 }

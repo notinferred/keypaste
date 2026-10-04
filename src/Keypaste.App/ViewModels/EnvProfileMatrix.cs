@@ -56,6 +56,16 @@ internal sealed record EnvProfileCell(
     /// <summary>The entries holding the key in this profile, as a prompt shows them.</summary>
     internal IReadOnlyList<string> Sources { get; init; } = [];
 
+    /// <summary>The other environments the one source entry serves, which a change to its value reaches too.</summary>
+    internal IReadOnlyList<string> Also { get; init; } = [];
+
+    /// <summary>Where the value lives, drawn under it: its entry, and the other environments that entry serves.</summary>
+    internal string SourceNote => Sources.Count == 0
+        ? string.Empty
+        : string.Join(", ", Sources) + (Also.Count > 0 ? " · also " + string.Join(", ", Also) : string.Empty);
+
+    internal bool HasSourceNote => SourceNote.Length > 0;
+
     internal bool ShowsLabel => Variable is null;
 
     /// <summary>Draws the hold target's cell above its row neighbours, which a held value may cover.</summary>

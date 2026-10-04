@@ -852,7 +852,7 @@ public sealed class ScreenRenderer
         window.Close();
     }
 
-    /// <summary>Env profiles in its own shell, with a file picker so Import and Export draw enabled.</summary>
+    /// <summary>A project in its own shell, with a file picker so Import and Export draw enabled.</summary>
     private static void DrawEnv(DemoVault demo, string output)
     {
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
@@ -881,6 +881,22 @@ public sealed class ScreenRenderer
 
         project.BeginAddCommand.Execute(null);
         Save(window, output, "41-env-add");
+        project.CancelAddCommand.Execute(null);
+
+        project.Environments[0].AddEntry.Execute(null);
+        project.ChosenEntry = project.EntryCandidates[0];
+        Save(window, output, "46-env-add-entry");
+        project.CancelAddEntryCommand.Execute(null);
+
+        project.Environments.Single(environment => environment.Name == "staging").Members[^1].Remove.Execute(null);
+        Save(window, output, "47-env-remove-entry");
+        project.CancelTagChangeCommand.Execute(null);
+
+        // A tag KeePassXC or a phone app wrote with a capital, left unsaved.
+        session.Unlocked!.AddTag(project.Environments[0].Members[0].Entry, "env:acme-api:Prod");
+        var screen = Assert.IsType<EnvSetsViewModel>(shell.Content);
+        screen.Reload();
+        Save(window, output, "48-env-ignored-tag");
 
         window.Close();
 
@@ -1143,7 +1159,7 @@ public sealed class ScreenRenderer
                 ProjectVariables.Set(vault, "acme-web", key, "demo-" + key.ToLowerInvariant());
             }
 
-            // Env profiles: staging and prod beside dev, with every state the matrix draws: an expired
+            // A project's environments: staging and prod beside dev, with every state the matrix draws: an expired
             // staging key on an entry of its own, a staging value reused from dev, and a key prod lacks.
             foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
             {

@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here and adds i
 
 ## Selection and evidence
 
-C.4 is detailed. Other rows name a bounded outcome and the dependencies their own implementation or verifier needs; a task is detailed when it is selected, against the code as it then is. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+No open row is detailed: each names a bounded outcome and the dependencies its own implementation or verifier needs, and is detailed when it is selected, against the code as it then is. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -46,12 +46,6 @@ A variable becomes an env-named custom field on an ordinary entry. The entry's o
 
 keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an untagged entry under `env/<project>`, the layout 0.3.0 wrote, is an ordinary entry and no variable. The syntax of `-p`, of `kp://<project>/<environment>/<KEY>` and of token scopes is kept.
 
-- [ ] **C.4 — Build the Projects screen on tags.** Needs: C.1c, C.6.
-  **Build:** the sidebar's project rows, the page's picker and New project read `ProjectCatalog`. An open project shows each key by environment with its value's source entry. A value whose entry serves several environments or projects is marked with them, and Replace names each of them before writing. Each environment lists its entries. Add entry tags one and Remove untags it, both behind C.1c's confirmation and deleting nothing. Keys are added, replaced, removed and imported through C.1c's writes. Export .env.keypaste references the resolved set, and Run goes through E.1b's launch, its confirmation naming the source entries. The page names the malformed tags `env ls` warns of. Traces to PRODUCT §§1, 2 and 5.8 and T4.
-
-  **Verify (V-C.4):** the vault is one KeePassXC made, with a project mapped in `projects.json`, another with two `dev` entries (one also tagged `staging`) and an `env:<project>:Prod` tag. A driver through the app's launch composition (D-0342) finds in the automation tree both projects, each value's source entry, the shared entry's two environments and the malformed tag. On the second project it adds an entry to `staging`, removes the other from `dev`, replaces the shared value, adds a key with no entry chosen and imports a `.env`. Each declined or refused act leaves the bytes unchanged. Real KeePassXC reads every tag, value and protection written. `keypaste run` resolves the exported references; Run starts `Keypaste.EnvReporter` holding exactly `dev`'s fields, and the mapped project's Run gives a child its environment. Every frame passes N.1a2's amber check.
-
-  A page shown only through its view models, with no KeePassXC read of its writes, does not pass.
 - [ ] **E.1d — Run a project from the app on macOS.** Needs: G.5.
   - Terminal.app runs the bundle's `keypaste run --session` for the project.
   - The command is passed as arguments and never spliced into script text.

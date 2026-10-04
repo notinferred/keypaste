@@ -68,6 +68,11 @@ public sealed class AccessibleDriveTests
         shell.Shell.OpenProjectCommand.Execute("billing");
         AssertNamedByText(shell, "a project");
 
+        var project = Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject!;
+        project.Environments[0].AddEntry.Execute(null);
+        project.ChosenEntry = project.EntryCandidates[0];
+        AssertNamedByText(shell, "a project's add-entry form, asked");
+
         shell.PressLock();
         AssertNamedByText(shell, "the lock screen");
     });

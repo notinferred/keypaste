@@ -7,6 +7,7 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Tests;
@@ -92,6 +93,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Contains(pipeName, launch.ConfirmStarts, StringComparison.Ordinal);
         Assert.Equal(_project, launch.ConfirmDirectory);
         Assert.Equal("API_KEY, DB_URL", launch.ConfirmKeys);
+        Assert.Equal($"From {ApprovalPrompt.Shown(ProjectVariables.Home("dev"))}", launch.ConfirmSources);
         Assert.Equal(0, _launcher.Calls);
 
         launch.ConfirmLaunchCommand.Execute(null);
@@ -111,7 +113,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         AssertNoValue(commandLine, "the child's command line");
 
         AssertNoValue(File.ReadAllText(KeypasteHome.ProjectsPath(_fixture.Home)), "projects.json");
-        AssertNoValue(string.Join("\n", screen.Notice, screen.Error, launch.ConfirmTitle, launch.ConfirmStarts, launch.ConfirmKeys), "the screen");
+        AssertNoValue(string.Join("\n", screen.Notice, screen.Error, launch.ConfirmTitle, launch.ConfirmStarts, launch.ConfirmKeys, launch.ConfirmSources), "the screen");
         AssertNoFileHoldsAValue();
     }
 

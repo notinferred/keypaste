@@ -336,6 +336,142 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Contains("is a vault", screen.Error, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Each_environment_lists_its_entries_and_an_entry_several_read_is_marked_with_them()
+    {
+        var stripe = Tagged("services", "Stripe", "STRIPE_KEY", "env:acme-api", "env:acme-api:staging", "env:billing");
+        var mail = Tagged("services", "Mail", "MAIL_KEY", "env:acme-api");
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        Assert.Equal(["dev", "staging", "prod"], project.Environments.Select(environment => environment.Name));
+        var dev = project.Environments[0];
+        Assert.Equal([ProjectVariables.Home("acme-api"), mail, stripe], dev.Members.Select(member => member.Entry));
+        Assert.Equal(["DATABASE_URL", "MAIL_KEY", "STRIPE_KEY"], dev.Members.Select(member => member.KeysText));
+        Assert.Equal(["", "", "also staging, billing/dev"], dev.Members.Select(member => member.AlsoText));
+        Assert.Equal("also dev, billing/dev", Assert.Single(project.Environments[1].Members).AlsoText);
+        Assert.Equal("env/acme-api/.env.prod", Assert.Single(project.Environments[2].Members).Display);
+
+        var cells = project.Rows.Single(row => row.Key == "STRIPE_KEY").Cells;
+        Assert.Equal(["services/Stripe · also staging, billing/dev", "services/Stripe · also dev, billing/dev", ""], cells.Select(cell => cell.SourceNote));
+        Assert.Equal("env/acme-api/.env", project.Rows.Single(row => row.Key == "DATABASE_URL").Cells[0].SourceNote);
+
+        project.BeginReplace(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
+        Assert.Equal(
+            "New value for STRIPE_KEY on services/Stripe, which acme-api/dev, acme-api/staging and billing/dev read. The old one stays in the entry's history.",
+            project.ReplacePrompt);
+        project.BeginRemove(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
+        Assert.Equal(
+            "Remove STRIPE_KEY from services/Stripe, which acme-api/dev, acme-api/staging and billing/dev read? Its value stays in the entry's history.",
+            project.RemovePrompt);
+        project.BeginReplace(project.Variables.Single(row => row.Key == "MAIL_KEY"));
+        Assert.Equal("New value for MAIL_KEY on services/Mail. The old one stays in the entry's history.", project.ReplacePrompt);
+    }
+
+    [Fact]
+    public void Add_entry_says_what_it_reaches_and_writes_the_tag_only_when_confirmed()
+    {
+        var stripe = TaggedStripe();
+        var queue = Tagged("services", "Queue", "QUEUE_KEY");
+        Tagged(".keypaste/tokens", "planted", "PLANTED_KEY");
+        Tagged("services", "Deleted", "DELETED_KEY");
+        Assert.Equal(DeletionOutcome.Recycled, _session.Unlocked!.RemoveEntry(new EntryName("services", "Deleted")));
+        _session.Unlocked.Save();
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        project.Environments[0].AddEntry.Execute(null);
+        Assert.True(project.IsAddingEntry);
+        Assert.Equal("Add an entry to dev", project.AddEntryTitle);
+        var offered = project.EntryCandidates.Select(candidate => candidate.Entry).ToList();
+        Assert.Contains(queue, offered);
+        Assert.Contains(ProjectVariables.Home("acme-api", "prod"), offered);
+        Assert.DoesNotContain(stripe, offered);
+        Assert.DoesNotContain(ProjectVariables.Home("acme-api"), offered);
+        Assert.DoesNotContain(offered, entry => entry.Title is "planted" or "Deleted");
+
+        project.EntryFilter = "QUEUE";
+        project.ChosenEntry = Assert.Single(project.EntryCandidates);
+        Assert.Equal(["env:acme-api puts services/Queue in acme-api/dev.", "Joining acme-api/dev: QUEUE_KEY."], project.TagChangeLines);
+        Assert.Equal("Add to dev", project.TagChangeAction);
+
+        var before = File.ReadAllBytes(_fixture.Path_);
+        project.CancelTagChangeCommand.Execute(null);
+        Assert.False(project.IsConfirmingTagChange);
+        Assert.Empty(_session.Unlocked.Tags(queue)!);
+        Assert.Equal(before, File.ReadAllBytes(_fixture.Path_));
+
+        project.ChosenEntry = Assert.Single(project.EntryCandidates);
+        project.ConfirmTagChangeCommand.Execute(null);
+
+        Assert.Null(screen.Error);
+        Assert.Equal("Added services/Queue to acme-api/dev.", screen.Notice);
+        Assert.False(project.IsAddingEntry);
+        Assert.Contains(queue, project.Environments[0].Members.Select(member => member.Entry));
+        Assert.Contains("QUEUE_KEY", project.Variables.Select(row => row.Key));
+        using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
+        Assert.Equal(["env:acme-api"], saved.Tags(queue));
+    }
+
+    [Fact]
+    public void Remove_entry_takes_off_every_tag_that_puts_it_there_and_keeps_the_entry_and_its_fields()
+    {
+        var mail = Tagged("services", "Mail", "MAIL_KEY", "env:acme-api", "env:acme-api:dev", "finance");
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        project.Environments[0].Members.Single(member => member.Entry == mail).Remove.Execute(null);
+        Assert.Equal(
+            ["Removing env:acme-api, env:acme-api:dev takes services/Mail out of acme-api/dev.", "Leaving acme-api/dev: MAIL_KEY."],
+            project.TagChangeLines);
+        Assert.Equal(("Remove from dev", "Keep it"), (project.TagChangeAction, project.TagChangeCancel));
+
+        var before = File.ReadAllBytes(_fixture.Path_);
+        project.CancelTagChangeCommand.Execute(null);
+        Assert.Equal(before, File.ReadAllBytes(_fixture.Path_));
+
+        project.Environments[0].Members.Single(member => member.Entry == mail).Remove.Execute(null);
+        project.ConfirmTagChangeCommand.Execute(null);
+
+        Assert.Null(screen.Error);
+        Assert.Equal("Removed services/Mail from acme-api/dev. The entry and its fields are kept.", screen.Notice);
+        Assert.DoesNotContain(mail, project.Environments[0].Members.Select(member => member.Entry));
+        Assert.DoesNotContain("MAIL_KEY", project.Variables.Select(row => row.Key));
+        using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
+        Assert.Equal(["finance"], saved.Tags(mail));
+        Assert.Equal("mail_key-sentinel", saved.ReadField(mail, "MAIL_KEY"));
+        Assert.Empty(saved.ReadRecycled());
+    }
+
+    [Fact]
+    public void The_screen_names_every_tag_that_puts_its_entry_in_no_project()
+    {
+        Tagged("services", "Odd", "ODD_KEY", "env:acme-api:Prod");
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+
+        var problem = Assert.Single(screen.MalformedTags);
+        Assert.StartsWith("services/Odd has the tag env:acme-api:Prod, which puts it in no project: ", problem.Sentence, StringComparison.Ordinal);
+        Assert.EndsWith(" Every agent request for the entry is still asked live.", problem.Sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("services/Odd", Open(screen).Environments.SelectMany(environment => environment.Members).Select(member => member.Display));
+    }
+
+    /// <summary>An ordinary entry holding <paramref name="key"/> as a field, with these tags, saved.</summary>
+    private EntryName Tagged(string group, string title, string key, params string[] tags)
+    {
+        var vault = _session.Unlocked!;
+        var entry = new EntryName(group, title);
+        vault.AddEntry(new VaultEntry { GroupPath = group, Title = title, Password = title + "-login" });
+        Assert.True(vault.SetFields(entry, [new FieldWrite(key, key.ToLowerInvariant() + "-sentinel")]));
+
+        foreach (var tag in tags)
+        {
+            Assert.True(vault.AddTag(entry, tag));
+        }
+
+        vault.Save();
+        return entry;
+    }
+
     /// <summary>An ordinary entry tagged into one of acme-api's environments, dev unless named, holding STRIPE_KEY as a field, saved.</summary>
     private EntryName TaggedStripe(string tag = "env:acme-api")
     {
