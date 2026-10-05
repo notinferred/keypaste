@@ -19,7 +19,7 @@ namespace Keypaste.Cli.Commands;
 /// The process that makes docs/PRODUCT.md law 3.2 real. It is started by a human, in a terminal a human
 /// opened, and the master password is typed there in response to a command they typed — so nothing
 /// an agent does can raise a password prompt. That property is the whole reason the approval flow
-/// is not built into <c>keypaste-mcp</c> (DECISIONS.md D-0023).
+/// is not built into the bridge (DECISIONS.md D-0023).
 /// </para>
 /// <para>
 /// <b>Deliberately not a daemon.</b> No service, no launch agent, no PID file, no starting itself
@@ -32,7 +32,7 @@ namespace Keypaste.Cli.Commands;
 /// opened (D-0309).
 /// </para>
 /// <para>
-/// <b>It writes audit lines for scoped tokens and nothing else.</b> <c>keypaste-mcp</c> records what
+/// <b>It writes audit lines for scoped tokens and nothing else.</b> The bridge records what
 /// agents asked for (DECISIONS.md D-0020); a <c>keypaste run --token</c> is recorded here, by the
 /// owner that verified it, because the runner is the side that could skip it. A log that cannot be
 /// opened refuses every token and nothing else. What this process prints is for the person

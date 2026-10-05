@@ -2,13 +2,8 @@
   "schema": 1,
   "components": {
     "cli": {
-      "binaries": [
-        "keypaste",
-        "keypaste-mcp"
-      ],
       "projects": [
-        "src/Keypaste.Cli/Keypaste.Cli.csproj",
-        "src/Keypaste.Mcp/Keypaste.Mcp.csproj"
+        "src/Keypaste.Cli/Keypaste.Cli.csproj"
       ],
       "runtime_identifiers": [
         "linux-x64",
@@ -121,13 +116,9 @@
       ]
     },
     "app": {
-      "binaries": [
-        "keypaste-app",
-        "keypaste-mcp"
-      ],
       "projects": [
         "src/Keypaste.App/Keypaste.App.csproj",
-        "src/Keypaste.Mcp/Keypaste.Mcp.csproj"
+        "src/Keypaste.Cli/Keypaste.Cli.csproj"
       ],
       "runtime_identifiers": [
         "linux-x64",
@@ -246,7 +237,8 @@
     }
   },
   "shared_projects": [
-    "src/Keypaste.Core/Keypaste.Core.csproj"
+    "src/Keypaste.Core/Keypaste.Core.csproj",
+    "src/Keypaste.Mcp/Keypaste.Mcp.csproj"
   ],
   "source_only": [
     "osx-x64",

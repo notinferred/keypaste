@@ -2,6 +2,14 @@
 
 This file preserves historical wording and evidence, including superseded plans. The current [PRODUCT](PRODUCT.md) and [decision ledger](../DECISIONS.md) govern future work; no archived milestone, feature, pricing plan, platform promise or dependency creates a delivery obligation. A historical description of implemented behavior is not proof of the newly planned shared session. Consult this file only for a cited decision or a shipped behavior's history.
 
+## Superseded by D-0418
+
+D-0418 moved the bridge into `keypaste`; D-0334's wording before it is kept here as history, and its current wording is in the ledger.
+
+| id | date | decision | supersedes |
+|---|---|---|---|
+| D-0334 | 2026-09-23 | The desktop packages carry the NativeAOT `keypaste-mcp` beside `keypaste-app`, and both package verifiers require it; in an AppImage, whose mount path changes each launch, a client is registered as the image file with `mcp`, which `AppRun` dispatches to the bridge (an amendment of 2.6a) | Desktop payloads holding the app alone |
+
 ## Superseded by D-0416
 
 PRODUCT v1.11 (D-0416) dropped the `env/<project>` layout these rows defined; their wording is kept here as history.

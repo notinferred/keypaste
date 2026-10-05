@@ -48,7 +48,7 @@ public sealed class AuditLogTests : IDisposable
     /// </summary>
     /// <remarks>
     /// Not <see cref="File.ReadAllLines(string)"/>: that asks for <see cref="FileShare.Read"/>,
-    /// which denies other <em>writers</em>, so on Windows it fails outright while any keypaste-mcp
+    /// which denies other <em>writers</em>, so on Windows it fails outright while any bridge
     /// has the log open. This is the same constraint <c>keypaste log</c> is under.
     /// </remarks>
     private string[] Lines()

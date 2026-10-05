@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Agent Activity shows what the app's session holds and what this session answered (4.3b, V-4.3b), across
-# real processes: the shipped keypaste and keypaste-mcp, and tests/Keypaste.AppDriver holding the vault as
+# real processes: the shipped keypaste and keypaste mcp, and tests/Keypaste.AppDriver holding the vault as
 # launch composes the app, with its prompt window drawn on a headless display and clicked. The driver's
 # `activity` prints what the screen's own view model reads from the authority and the audit file, and its
 # `revoke` presses the screen's buttons.
 #
-# A real keypaste-mcp request waiting at the unlocked app is listed. After Approve its grant is listed and
+# A real keypaste mcp request waiting at the unlocked app is listed. After Approve its grant is listed and
 # the history shows the prompted grant from the audit file the bridge wrote. Revoke and Revoke all make the
 # same request ask again. A lock empties both lists, and the next session starts with nothing listed. A
 # missing audit log reads as a session with no records yet, and an unreadable one is shown as unavailable.
@@ -25,7 +25,6 @@ DIE_FILES='HOLD_OUT SHOWN OUT ERR'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
@@ -57,7 +56,7 @@ start_bridge() {
   ERR="$WORK/$1-stderr.txt"
   exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec 8> >(exec 7>&-; exec "$MCP" mcp --vault "$VAULT" --client-label "$LABEL" >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&-; exec "$CLI" mcp --vault "$VAULT" --client-label "$LABEL" >"$OUT" 2>"$ERR")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 }
@@ -221,6 +220,6 @@ exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-echo "ok: Agent Activity listed a real keypaste-mcp request waiting at the app and the grant Approve gave,"
+echo "ok: Agent Activity listed a real keypaste mcp request waiting at the app and the grant Approve gave,"
 echo "    showed this session's audit records, made revoked grants ask again, held nothing after a lock,"
 echo "    read a missing log as no records yet and said an unreadable log was unavailable"

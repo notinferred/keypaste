@@ -16,10 +16,11 @@
     <PackageVersion Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.745401" />
   </ItemGroup>
 
-  <!-- The only runtime dependency in src/, and the narrowest form of it: ModelContextProtocol.Core
-       rather than ModelContextProtocol, which costs four transitive packages on net10.0 instead of
-       about twelve and brings no generic host. Justified in DECISIONS.md D-0019 as docs/PRODUCT.md law 3.9
-       requires. Keypaste.Core — the vault and crypto path — still has none. -->
+  <!-- The MCP bridge's one package, in its narrowest form: ModelContextProtocol.Core rather than
+       ModelContextProtocol, which costs four transitive packages on net10.0 instead of about twelve
+       and brings no generic host. Justified in DECISIONS.md D-0019 for the bridge and D-0419 for its
+       place in the keypaste binary, as docs/PRODUCT.md law 3.9 requires. Keypaste.Core — the vault and
+       crypto path — still has none. -->
   <ItemGroup Label="MCP bridge">
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
   </ItemGroup>

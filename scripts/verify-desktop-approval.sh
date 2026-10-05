@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # The app asks in its own prompt window (4.4, V-4.4), across real processes: the shipped keypaste and
-# keypaste-mcp, and tests/Keypaste.AppDriver holding the vault as launch composes the app, with the
+# keypaste mcp, and tests/Keypaste.AppDriver holding the vault as launch composes the app, with the
 # app's prompt window drawn on a headless display and clicked through its hit-testing.
 #
-# A real keypaste-mcp request raises the prompt, which shows the client's label, the entry, the field and
+# A real keypaste mcp request raises the prompt, which shows the client's label, the entry, the field and
 # the lifetime. Approve returns the field, audited as a prompted grant naming the app's session and the
 # label. Deny, closing the prompt, the client cancelling, the bridge going away, a lock and the gate's
 # timeout each return a denial with the matching method and take the prompt down. Each case uses a new
@@ -31,7 +31,6 @@ DIE_FILES='HOLD_OUT OUT ERR'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
@@ -72,7 +71,7 @@ raise_prompt() {
   ERR="$WORK/$1-stderr.txt"
   exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec 8> >(exec 7>&-; exec "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&-; exec "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR")
   BRIDGE_PID=$!
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
@@ -257,5 +256,5 @@ exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-echo "ok: the app's prompt window showed a real keypaste-mcp request with its label, released it only on Approve,"
+echo "ok: the app's prompt window showed a real keypaste mcp request with its label, released it only on Approve,"
 echo "    and denied and withdrew it on Deny, closing, the client cancelling, the bridge going, a lock and the timeout"

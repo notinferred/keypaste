@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Keypaste.Cli.Tests;
+namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The argument parser, tested on its own: these are fast and touch no vault, so they carry no
@@ -107,8 +107,8 @@ public sealed class CommandLineTests
 
     private static readonly OptionSpec[] _shortSpec =
     [
-        new("profile", TakesValue: true, Short: 'p'),
-        new("json", TakesValue: false, Short: 'j'),
+        new("profile", TakesValue: true, Alias: 'p'),
+        new("json", TakesValue: false, Alias: 'j'),
     ];
 
     [Fact]

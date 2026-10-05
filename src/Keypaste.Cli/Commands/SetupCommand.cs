@@ -1,3 +1,4 @@
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Settings;
@@ -24,7 +25,7 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// Nothing here touches a vault or a secret. <c>setup</c> writes a path into a configuration file;
-/// what that path can release is still bounded by <c>keypaste-mcp</c>'s own exposure default, and
+/// what that path can release is still bounded by the bridge's own exposure default, and
 /// still needs a running <c>keypaste agent</c> and a human saying yes.
 /// </para>
 /// </remarks>
@@ -34,7 +35,6 @@ internal static class SetupCommand
     [
         new("vault", TakesValue: true),
         new("client", TakesValue: true),
-        new("server-path", TakesValue: true),
         new("label", TakesValue: true),
         new("expose", TakesValue: true),
         new("dry-run", TakesValue: false),
@@ -199,19 +199,16 @@ internal static class SetupCommand
                 ? named
                 : null;
 
-        var beside = Path.GetDirectoryName(Environment.ProcessPath);
-        server = line.Value("server-path") is { Length: > 0 } explicitPath
-            ? File.Exists(Path.GetFullPath(explicitPath)) ? new McpServerCommand(Path.GetFullPath(explicitPath), ["mcp"]) : null
-            : McpServerLocator.Find(beside, context.Environment.Get("PATH"));
-
-        if (server is null)
+        // The client starts this binary, so setup and the bridge it registers are always one version.
+        if (context.ProcessPath is not { } self
+            || !string.Equals(Path.GetFileName(self), McpServerLocator.ExecutableName, StringComparison.OrdinalIgnoreCase))
         {
-            // Naming where it looked is the difference between a one-minute fix and a puzzle: the
-            // usual cause is the two binaries having been built to separate trees.
-            reason = $"cannot find {McpServerLocator.FileName}. Looked beside keypaste, "
-                + $"{McpServerLocator.Places(beside ?? "(unknown)")}. Build it, or pass --server-path.";
+            reason = $"setup registers the {McpServerLocator.FileName} that runs it, and this is {context.ProcessPath ?? "an unknown program"}; "
+                + $"run {McpServerLocator.FileName} itself rather than through dotnet";
             return false;
         }
+
+        server = new McpServerCommand(Path.GetFullPath(self), [McpServerLocator.BridgeArgument]);
 
         // The label is filled in per client; a single run wires several, and the audit log exists
         // to tell them apart.
@@ -297,14 +294,13 @@ internal static class SetupCommand
 
     private static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste setup [--vault <path>] [--client <a,b>] [--server-path <path>]");
-        writer.WriteLine("                      [--label <name>] [--expose <glob,glob>] [--dry-run] [--remove]");
+        writer.WriteLine("usage: keypaste setup [--vault <path>] [--client <a,b>] [--label <name>]");
+        writer.WriteLine("                      [--expose <glob,glob>] [--dry-run] [--remove]");
         writer.WriteLine();
         writer.WriteLine("Finds the AI clients on this machine and points them at your vault.");
         writer.WriteLine();
         writer.WriteLine("  --vault <path>      pin the clients to this vault instead of the chosen one");
         writer.WriteLine("  --client <a,b>      only these, from: " + KnownClientIds());
-        writer.WriteLine("  --server-path <p>   where keypaste is, if not beside keypaste-app or on PATH");
         writer.WriteLine("  --label <name>      what the audit log calls the client (default: its id)");
         writer.WriteLine("  --expose <globs>    widen what may be named. Default is env/** and nothing else");
         writer.WriteLine("  --dry-run           print the exact commands and change nothing");

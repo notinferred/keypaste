@@ -4,7 +4,7 @@
 # presses Agent Activity's Connect section. The client is tests/Keypaste.FakeMcpClient, a stand-in named
 # `claude` that answers Claude Code's `mcp add`, `remove` and `list` and keeps its servers in a file this
 # gate reads; it is on PATH only here, so no real client's configuration is ever written. The bridge is the
-# shipped Release keypaste-mcp, found on PATH as the app finds it.
+# shipped Release keypaste, found on PATH as the app finds it and started as keypaste mcp.
 #
 # The first unlock chooses the vault for agents and the CLI (G.1): `keypaste use` prints it and `keypaste
 # grants` reaches the app with no --vault. Cancelling a preview writes nothing. Running it registers exactly
@@ -43,7 +43,6 @@ same_file() {
 }
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 FAKE="$(resolve KEYPASTE_FAKE_CLIENT artifacts/bin/Keypaste.FakeMcpClient/release/claude)"
 
@@ -60,7 +59,7 @@ KEYPASTE_FAKE_CLIENT_CONFIG="$(native "$CONFIG")"
 export KEYPASTE_FAKE_CLIENT_CONFIG
 
 # The stand-in client and the bridge, first on PATH for the driver and everything it starts.
-CLIENT_PATH="$(cd "$(dirname "$FAKE")" && pwd):$(cd "$(dirname "$MCP")" && pwd):$PATH"
+CLIENT_PATH="$(cd "$(dirname "$FAKE")" && pwd):$(cd "$(dirname "$CLI")" && pwd):$PATH"
 
 HOLD_PID=""
 # Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input.

@@ -16,7 +16,7 @@ namespace Keypaste.App.ViewModels;
 /// meet. A revoke is made there too.
 /// </para>
 /// <para>
-/// <b>History is read from the audit file <c>keypaste-mcp</c> wrote</b>, kept to the records naming
+/// <b>History is read from the audit file the bridge wrote</b>, kept to the records naming
 /// this session and rendered by <see cref="AuditText"/> as the activity log reads the whole file
 /// (D-0331). A log that is missing or unreadable is said to be unavailable, never shown as a
 /// session in which nothing happened.

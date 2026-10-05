@@ -14,7 +14,7 @@
 # the 4.0 vault stays 4.0, the 4.1 vault keeps its version and its group tag, and a refused tag leaves
 # the file byte-identical.
 #
-# Then a real `keypaste agent` holds the 4.1 vault and a real `keypaste-mcp`, exposed to the entries,
+# Then a real `keypaste agent` holds the 4.1 vault and a real `keypaste mcp`, exposed to the entries,
 # asks for passwords. An untagged-for-prod entry answered with the hour gets it, and so does
 # env/billing/prod/DB. The entry tagged env:billing:prod, and one KeePassXC tagged env:billing:Prod
 # through `keepassxc-cli merge`, are offered Allow once only: the hour is refused and once is honoured.
@@ -56,7 +56,6 @@
 # Env:    KP_COMPAT_PASSWORD   master password for the vaults        (required)
 #         KPXC_CLI             path to keepassxc-cli                 (default: PATH lookup)
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
-#         KEYPASTE_MCP_BIN     path to the keypaste-mcp binary       (default: the Release build)
 #         KEYPASTE_APP_DRIVER  path to tests/Keypaste.AppDriver      (default: the Release build)
 set -euo pipefail
 
@@ -68,7 +67,6 @@ dir=${1:-}
 . "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 require jq
 kp=$(keypaste_bin)
-mcp=$(keypaste_mcp)
 drv=$(app_driver)
 
 rm -rf "$dir"
@@ -233,7 +231,7 @@ printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$grouped")" "$(native "$dir/
   || die "keepassxc-cli could not merge the newer copy"
 grep -qx 'env:billing:Prod' <<<"$(tags "$grouped" services/Other)" || die "the merge did not bring env:billing:Prod"
 
-step "a real keypaste agent and keypaste-mcp: the hour is refused for a protected tag and honoured otherwise, under a prod path too"
+step "a real keypaste agent and keypaste mcp: the hour is refused for a protected tag and honoured otherwise, under a prod path too"
 pipe="keypaste-projects-$$-$(date +%s)"
 audit="$dir/audit.jsonl"
 agent_err="$dir/agent.err"
@@ -256,7 +254,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"password\",\"reason\":\"projects gate\",\"ttl_seconds\":60}}}"
     sleep 8
-  } | "$mcp" mcp --vault "$(native "$grouped")" --expose 'services/**' --expose 'env/**' --audit-log "$(native "$audit")" --approver "$pipe" \
+  } | "$kp" mcp --vault "$(native "$grouped")" --expose 'services/**' --expose 'env/**' --audit-log "$(native "$audit")" --approver "$pipe" \
         --client-label projects-probe >"$out" 2>"$dir/ask-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/ask-$id.err")"
   tr -d '\r' <"$out"
 }

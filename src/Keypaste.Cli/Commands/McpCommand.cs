@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 
@@ -8,9 +9,10 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary><c>keypaste mcp serve</c>, <c>setup</c> and <c>policy</c>: the agent verbs under the name the MCP world looks for.</summary>
 /// <remarks>
-/// <c>serve</c> and <c>setup</c> are aliases: <c>keypaste mcp</c> starts the MCP bridge, and <c>serve</c>
-/// is the terminal approver it talks to. <c>policy</c> reads and writes <c>clients.toml</c>, which the
-/// owner reads at each request, so it needs no vault and no owner (D-0360).
+/// <c>serve</c> and <c>setup</c> are aliases: every other <c>keypaste mcp</c>, its help included, is the
+/// MCP bridge, which <see cref="Program.StartsBridge"/> sends there before this class is reached, and
+/// <c>serve</c> is the terminal approver it talks to. <c>policy</c> reads and writes <c>clients.toml</c>,
+/// which the owner reads at each request, so it needs no vault and no owner (D-0360).
 /// </remarks>
 internal static class McpCommand
 {
@@ -34,24 +36,14 @@ internal static class McpCommand
             case "policy":
                 return Policy(args, context);
 
-            case "-h" or "--help" or "help":
-                WriteUsage(context.Stdout);
-                return CliApp.ExitSuccess;
-
             default:
-                WriteUsage(context.Stderr);
+                context.Stderr.WriteLine("keypaste mcp: serve, setup and policy are its verbs; keypaste mcp --help lists them");
                 return CliApp.ExitUsageError;
         }
     }
 
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste mcp <serve|setup|policy> [options]");
-        writer.WriteLine("  serve   approve agents' requests in this terminal (same as keypaste agent)");
-        writer.WriteLine("  setup   point the AI clients on this machine at your vault (same as keypaste setup)");
-        writer.WriteLine("  policy  how each MCP client is asked: keypaste mcp policy [<label> <session|ask|inject-only>]");
-        writer.WriteLine("your MCP client starts keypaste mcp to reach the vault's owner.");
-    }
+    private static void WritePolicyUsage(TextWriter writer) =>
+        writer.WriteLine($"usage: {_policyVerb} [<label> <session|ask|inject-only>] [--json]");
 
     private static int Policy(string[] args, CliContext context)
     {
@@ -62,7 +54,7 @@ internal static class McpCommand
 
         if (line.WantsHelp)
         {
-            WriteUsage(context.Stdout);
+            WritePolicyUsage(context.Stdout);
             return CliApp.ExitSuccess;
         }
 
@@ -158,7 +150,7 @@ internal static class McpCommand
     private static int Usage(CliContext context, string error)
     {
         context.Stderr.WriteLine($"{_policyVerb}: {error}");
-        WriteUsage(context.Stderr);
+        WritePolicyUsage(context.Stderr);
         return CliApp.ExitUsageError;
     }
 }

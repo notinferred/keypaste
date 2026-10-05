@@ -236,9 +236,8 @@ keepassxc() {
 fixture() {
   local value
   KP="$(find "$CLI_DIR" -maxdepth 3 -type f \( -name keypaste -o -name keypaste.exe \) | head -n 1)"
-  MCP="$(find "$CLI_DIR" -maxdepth 3 -type f \( -name keypaste-mcp -o -name keypaste-mcp.exe \) | head -n 1)"
-  [ -n "$KP" ] && [ -n "$MCP" ] || { echo "no keypaste or keypaste-mcp under $CLI_DIR"; return 1; }
-  chmod +x "$KP" "$MCP" 2>/dev/null || true
+  [ -n "$KP" ] || { echo "no keypaste under $CLI_DIR"; return 1; }
+  chmod +x "$KP" 2>/dev/null || true
   "$KP" --version | tr -d "$CR" | grep -qF "$CLI_VERSION" || { echo "the CLI is not $CLI_VERSION: $("$KP" --version)"; return 1; }
 
   mkdir -p "$(dirname "$VAULT")" "$HOME_DIR"
@@ -288,7 +287,7 @@ audit_record() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"env/$PROJECT/$VARIABLE\",\"field\":\"password\",\"reason\":\"4.7d writes one audit record before the upgrade\",\"ttl_seconds\":60}}}"
     sleep 5
-  } | "$MCP" --vault "$VAULT_NATIVE" --expose "env/**" --approver "$pipe" --client-label upgrade-check \
+  } | "$KP" mcp --vault "$VAULT_NATIVE" --expose "env/**" --approver "$pipe" --client-label upgrade-check \
       > "$OUT/mcp-response.jsonl" 2> "$OUT/mcp-stderr.txt" || true
   kill "$agent_pid" 2>/dev/null || true
   wait "$agent_pid" 2>/dev/null || true

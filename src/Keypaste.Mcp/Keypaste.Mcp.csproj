@@ -3,11 +3,8 @@
   <PropertyGroup>
     <OutputType>Library</OutputType>
     <RootNamespace>Keypaste.Mcp</RootNamespace>
-    <!-- PublishAot keeps AOT analysis active when Keypaste.Cli references this library. -->
-    <PublishAot>true</PublishAot>
-    <!-- This project emits none today; the baseline gate is what keeps that true. -->
-    <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
-    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
+    <!-- A RID-specific publish of Keypaste.Cli reaches this project through ProjectReference, as it reaches Keypaste.Core. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
@@ -17,19 +14,15 @@
 
   <ItemGroup>
     <!--
-      The first and only runtime dependency in src/ (DECISIONS.md D-0019). ModelContextProtocol.Core
-      rather than the main ModelContextProtocol package: the stdio transport, the server, and the
-      tool types all live here, so the extra packages the main one brings would buy a generic host
-      this server does not want.
-
-      IsAotCompatible stays on for this project. That was verified rather than assumed, against the
-      real assembly and with a negative control — see D-0019.
+      ModelContextProtocol.Core rather than the main ModelContextProtocol package: the stdio transport,
+      the server and the tool types all live here, and the main package adds a generic host this
+      server does not want. It shares the keypaste binary under D-0419; its AOT compatibility was
+      verified against the real assembly with a negative control (D-0019).
     -->
     <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="keypaste" />
     <InternalsVisibleTo Include="Keypaste.Mcp.Tests" />
     <InternalsVisibleTo Include="Keypaste.PoolStarver" />
   </ItemGroup>

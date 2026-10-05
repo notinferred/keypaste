@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Mcp.Tests;
 
-/// <summary>What <c>keypaste-mcp</c> accepts on its command line for the run tool and the client label.</summary>
+/// <summary>What <c>keypaste mcp</c> accepts on its command line for help, the run tool and the client label.</summary>
 public sealed class ServerOptionsTests
 {
     private static bool Parse(out ServerOptions? options, out string error, params string[] argv) =>
@@ -53,12 +53,30 @@ public sealed class ServerOptionsTests
         Assert.Null(none.VaultKey);
     }
 
-    [Fact]
-    public void TheUsage_KeepsTheOptionNamesTheDemoChecks_AndNamesAllowRun()
+    [Theory]
+    [InlineData("help")]
+    [InlineData("-h")]
+    [InlineData("--help")]
+    [InlineData("--vault", "v.kdbx", "--help")]
+    public void EveryHelpForm_AsksForTheOneUsage(params string[] argv)
     {
-        foreach (var option in new[] { "--vault", "--client-label", "--expose", "--allow-run" })
+        Assert.True(Parse(out var options, out _, argv));
+        Assert.True(options!.WantsHelp);
+    }
+
+    [Fact]
+    public void AnArgumentOtherThanHelp_IsRefused()
+    {
+        Assert.False(Parse(out _, out var error, "--allow-run", "serve"));
+        Assert.Contains("'serve'", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheUsage_KeepsTheOptionNamesTheDemoChecks_AndNamesTheVerbs()
+    {
+        foreach (var name in new[] { "--vault", "--client-label", "--expose", "--allow-run", "serve", "setup", "policy" })
         {
-            Assert.Contains(option, ServerOptions.Usage, StringComparison.Ordinal);
+            Assert.Contains(name, ServerOptions.Usage, StringComparison.Ordinal);
         }
     }
 }

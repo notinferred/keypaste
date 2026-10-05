@@ -9,14 +9,14 @@ In source, one vault has one owner: while the app has a vault unlocked, `keypast
 ```
   your terminal                     your MCP client
        │                                   │
-  keypaste agent  ◄──── local pipe ────  keypaste-mcp
+  keypaste agent  ◄──── local pipe ────  keypaste mcp
    • unlocked vault                       • validates the request
    • asks you                             • refuses anything out of scope
    • holds live grants                    • writes the audit line
                                           • returns one field
 ```
 
-`keypaste-mcp` is started by the MCP client and forwards requests without holding the vault. You start `keypaste agent`, which holds the vault and decides whether to prompt, reuse an approval or apply a policy rule.
+`keypaste mcp` is started by the MCP client and forwards requests without holding the vault. You start `keypaste agent`, which holds the vault and decides whether to prompt, reuse an approval or apply a policy rule.
 
 An agent cannot trigger a master-password prompt. You enter the password only in a terminal you opened, after running `keypaste agent`. This avoids teaching you to trust password windows that another program could imitate.
 
@@ -67,7 +67,7 @@ keypaste: an agent is asking for a credential.
 
 `v0.3.0` asks `Approve? [y/N]`; `y` releases the value and keeps a grant up to `--max-ttl`, and anything else is a no.
 
-`client` is the connecting program's unauthenticated name. Any process that can start `keypaste-mcp` can claim it; keypaste displays it but does not authorize from it.
+`client` is the connecting program's unauthenticated name. Any process that can start `keypaste mcp` can claim it; keypaste displays it but does not authorize from it.
 
 `entry` and `field` identify the requested value in your vault. A `/` inside an entry title is displayed as a space so a title such as `../../prod/ROOT_TOKEN` cannot impersonate a different group path.
 
@@ -95,7 +95,7 @@ An explicit refusal tells the agent not to retry. The same request is refused fo
 
 Only one request is displayed at a time. Additional requests on that connection, including entry listings, receive `BUSY` immediately. They are not queued, and the response does not identify the call already in progress.
 
-In source, a request whose client gives up, or whose `keypaste-mcp` goes away, is withdrawn from the prompt rather than waiting out its 45 seconds.
+In source, a request whose client gives up, or whose `keypaste mcp` goes away, is withdrawn from the prompt rather than waiting out its 45 seconds.
 
 ## Approving in the desktop app
 
@@ -136,7 +136,7 @@ On `0.2.0`, this refusal can also occur under load while the approver is running
 
 ## What is written down
 
-`keypaste-mcp` appends one line to `~/.keypaste/audit.jsonl` for every call, including granted, denied, malformed and abandoned requests. It records the entry, field, client, stated reason and decision.
+`keypaste mcp` appends one line to `~/.keypaste/audit.jsonl` for every call, including granted, denied, malformed and abandoned requests. It records the entry, field, client, stated reason and decision.
 
 It does not add the returned field value to the log. Names and reason excerpts are logged metadata, so do not put secret values in them. See [docs/mcp-setup.md](mcp-setup.md) for the format.
 

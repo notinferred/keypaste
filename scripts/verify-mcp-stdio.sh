@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Proves the shipped keypaste-mcp binary really speaks MCP over real pipes, and that nothing but
+# Proves the shipped keypaste mcp really speaks MCP over real pipes, and that nothing but
 # protocol ever reaches stdout.
 #
 # The in-process tests drive the server through StreamServerTransport, so they never exercise
-# StdioServerTransport or Main - and "an MCP client spawns it with redirected stdio and no
+# StdioServerTransport or BridgeEntry.RunAsync - and "an MCP client spawns it with redirected stdio and no
 # terminal" is the premise of the entire feature. This is the only place that premise is tested.
 # It is the same gap scripts/verify-run-injection.sh exists to close for `keypaste run`.
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 DIE_FILES='OUT ERR'
 require jq
 
-BIN_PATH="$(keypaste_mcp)"
+BIN_PATH="$(keypaste_bin)"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -156,25 +156,33 @@ printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destr
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
   || die "a tool other than run lost its false hints"
 
-# 9. The dispatch in keypaste's Program.cs reaches both sides: the bridge path and the verbs path.
-#    This is the gate B.4a noted was missing: no existing gate ran mcp serve/policy on a published
-#    binary, and no existing gate proved keypaste mcp itself reaches the bridge.
-KEYPASTE_BIN="$(keypaste_bin)"
-step "dispatch: keypaste mcp --help reaches the bridge"
-help_bridge="$("$KEYPASTE_BIN" mcp --help 2>&1)"
-case "$help_bridge" in "usage: keypaste mcp"*) ;;
-  *) die "keypaste mcp --help did not reach the bridge (got: $help_bridge)" ;; esac
+# 9. keypaste hands `keypaste mcp` to the bridge and `mcp serve`, `setup` and `policy` to its verbs
+#    (D-0418). Every help form prints the bridge's one usage on stdout, naming those verbs, and each
+#    verb answers as the command it is. A dispatch that sent every `mcp` to the bridge fails here; one
+#    that sent none fails every step above.
+readonly HOME_DIR="$WORK/home"
+mkdir -p "$HOME_DIR"
+help="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp --help)" || die "keypaste mcp --help exited non-zero"
+for word in --client-label --expose serve setup policy; do
+  case "$help" in *"$word"*) ;; *) die "keypaste mcp --help does not name $word: $help" ;; esac
+done
+for form in help -h; do
+  other="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp "$form")" || die "keypaste mcp $form exited non-zero"
+  [ "$other" = "$help" ] || die "keypaste mcp $form and keypaste mcp --help print different help"
+done
 
-step "dispatch: keypaste mcp policy --json reaches the CLI verb"
-policy_out="$("$KEYPASTE_BIN" mcp policy --json 2>/dev/null)"
-printf '%s' "$policy_out" | jq -e 'type == "array"' >/dev/null \
-  || die "keypaste mcp policy --json did not return a JSON array"
+for verb in agent setup; do
+  alias=serve
+  [ "$verb" = setup ] && alias=setup
+  aliased="$("$BIN_PATH" mcp "$alias" --help)" || die "keypaste mcp $alias --help exited non-zero"
+  direct="$("$BIN_PATH" "$verb" --help)" || die "keypaste $verb --help exited non-zero"
+  [ "$aliased" = "$direct" ] || die "keypaste mcp $alias --help did not reach keypaste $verb: $aliased"
+done
 
-step "dispatch: keypaste mcp serve --help reaches AgentCommand"
-serve_help="$("$KEYPASTE_BIN" mcp serve --help 2>&1)"
-case "$serve_help" in *"usage: keypaste agent"*) ;;
-  *) die "keypaste mcp serve --help did not reach AgentCommand (got: $serve_help)" ;; esac
+policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp policy --json)" || die "keypaste mcp policy --json exited non-zero"
+printf '%s' "$policies" | jq -e '. == []' >/dev/null \
+  || die "keypaste mcp policy --json printed '$policies' for a home with no clients.toml, not []"
 
 echo "ok: keypaste mcp speaks MCP over stdio, exposes two tools, denies both calls, audits them,"
 echo "    refuses a tool call that arrives before the initialize handshake, adds run only with --allow-run,"
-echo "    and the dispatch reaches both the bridge and the CLI verbs from the published binary"
+echo "    prints one help for every help form, and hands serve, setup and policy to the CLI's verbs"

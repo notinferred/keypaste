@@ -375,7 +375,7 @@ public sealed class AgentActivityViewModelTests
                 },
                 Token).AsTask();
 
-        /// <summary>Appends a prompted grant naming <paramref name="session"/>, as keypaste-mcp writes one.</summary>
+        /// <summary>Appends a prompted grant naming <paramref name="session"/>, as the bridge writes one.</summary>
         internal void Audit(string entry, string session)
         {
             Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(Fixture.Home), Clock, out var log, out var error), error);

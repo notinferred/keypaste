@@ -12,7 +12,7 @@ It needs a pty, so Linux or macOS. On Windows, build, capture in the SDK contain
 and render on the host:
 
   dotnet build keypaste.slnx -c Release
-  docker run --rm -v "${PWD}:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0.302 bash -c 'apt-get update -qq && apt-get install -y -qq python3 >/dev/null && python3 scripts/demo/capture-demo.py --home /home/you --keypaste "dotnet artifacts/bin/Keypaste.Cli/release/keypaste.dll" --keypaste-mcp "dotnet artifacts/bin/Keypaste.Mcp/release/keypaste-mcp.dll" --out artifacts/demo/tape.json'
+  docker run --rm -v "${PWD}:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0.302 bash -c 'apt-get update -qq && apt-get install -y -qq python3 >/dev/null && python3 scripts/demo/capture-demo.py --home /home/you --keypaste "dotnet artifacts/bin/Keypaste.Cli/release/keypaste.dll" --out artifacts/demo/tape.json'
   python scripts/demo/render-gif.py artifacts/demo/tape.json docs/demo/keypaste-demo.gif
 """
 import argparse
@@ -168,13 +168,11 @@ def request(request_id):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--keypaste", default="artifacts/bin/Keypaste.Cli/release/keypaste")
-    parser.add_argument("--keypaste-mcp", default="artifacts/bin/Keypaste.Mcp/release/keypaste-mcp")
     parser.add_argument("--home", help="an empty directory to use as HOME (default: a new temporary one)")
     parser.add_argument("--out", required=True)
     options = parser.parse_args()
 
     keypaste = shlex.split(options.keypaste)
-    keypaste_mcp = shlex.split(options.keypaste_mcp)
     home = options.home or tempfile.mkdtemp(prefix="keypaste-demo-")
     if os.path.exists(os.path.join(home, ".keypaste")):
         sys.exit(f"capture: {home} already has a .keypaste directory; use an empty HOME")
@@ -208,8 +206,8 @@ def main():
     agent.wait_for("Press Ctrl+C to stop.")
     time.sleep(1.6)
 
-    with open(os.path.join(home, "keypaste-mcp.stderr"), "wb") as mcp_stderr:
-        client = McpClient(tape, keypaste_mcp + ["--vault", vault, "--client-label", CLIENT], env, mcp_stderr)
+    with open(os.path.join(home, "bridge.stderr"), "wb") as mcp_stderr:
+        client = McpClient(tape, keypaste + ["mcp", "--vault", vault, "--client-label", CLIENT], env, mcp_stderr)
         client.call({
             "jsonrpc": "2.0",
             "id": 1,

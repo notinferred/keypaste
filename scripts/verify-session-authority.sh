@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # The desktop owns the vault it unlocks (U.1, V-U.1), across real processes: the shipped keypaste and
-# keypaste-mcp, and tests/Keypaste.AppDriver unlocking through the app's unlock screen and serving the
+# keypaste mcp, and tests/Keypaste.AppDriver unlocking through the app's unlock screen and serving the
 # vault as the app does.
 #
-# A real keypaste-mcp request reaches the app's session, is put to the person in the app's prompt, whose
+# A real keypaste mcp request reaches the app's session, is put to the person in the app's prompt, whose
 # refusal is audited naming that session. With the app locked the request is refused and audited. `keypaste agent` and a
 # second app on the same vault are each refused with a message naming the app, before any password is
 # asked for. Unlocking again starts a new session. A killed app leaves nothing holding the vault. The
@@ -24,7 +24,6 @@ DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
@@ -61,8 +60,8 @@ ask() {
       echo deny >&7
     fi
     sleep 3
-  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$out" 2>"$err" \
-    || die "keypaste-mcp exited non-zero"
+  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$out" 2>"$err" \
+    || die "keypaste mcp exited non-zero"
 }
 
 # The last two audit lines: the listing, then the request.
@@ -153,5 +152,5 @@ after_exit=$?
 set -e
 [ "$after_exit" -eq 0 ] || die "the vault stayed held after the app holding it was killed: $after"
 
-echo "ok: the app served its vault to a real keypaste-mcp under a named session, refused while locked,"
+echo "ok: the app served its vault to a real keypaste mcp under a named session, refused while locked,"
 echo "    refused keypaste agent and a second app by name before any password, and held nothing once killed"

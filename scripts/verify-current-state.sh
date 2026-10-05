@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The owning session answers from the vault as last saved (U.3, V-U.3): the shipped keypaste and
-# keypaste-mcp, and tests/Keypaste.AppDriver holding the vault as the app does, with --approving-prompt
+# keypaste mcp, and tests/Keypaste.AppDriver holding the vault as the app does, with --approving-prompt
 # standing in for a person who approves and edit/relocate acting through the app's entries screen.
 #
 # One bridge keeps one connection, so a grant it was given can be reused. A password edited in the app
@@ -29,7 +29,6 @@ DIE_FILES='HOLD_OUT OUT ERR'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
@@ -128,7 +127,7 @@ HOLD_PID="$(process_of)"
 FIRST="$(session_of)"
 
 exec 8>&-
-exec 8> >(exec 7>&-; exec "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
+exec 8> >(exec 7>&-; exec "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
 printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 

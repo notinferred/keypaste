@@ -30,7 +30,7 @@ public sealed class AgentActivityViewTests
 
         var connector = new ClientConnector(
             new InstalledRunner(),
-            () => new McpServerCommand(Path.Combine(fixture.Home, "keypaste-mcp"), []),
+            () => new McpServerCommand(Path.Combine(fixture.Home, "keypaste"), [McpServerLocator.BridgeArgument]),
             "nowhere",
             _ => null);
         using var model = new AgentActivityViewModel(authority, fixture.Home, new ManualClock(AppClock.Start), connector: connector);

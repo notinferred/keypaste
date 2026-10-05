@@ -25,6 +25,10 @@ on:
         description: Lets scripts/dev.sh find the run it dispatched
         type: string
         default: ''
+      relock:
+        description: Regenerate the lock files instead of building or testing; scripts/dev.sh --relock applies them
+        type: boolean
+        default: false
 
 run-name: dev ${{ github.ref_name }} ${{ inputs.target }} ${{ inputs.filter_class }} ${{ inputs.os }} ${{ inputs.nonce }}
 
@@ -165,7 +169,7 @@ jobs:
   checks:
     name: scripts and workflows
     needs: plan
-    if: needs.plan.outputs.checks != ''
+    if: needs.plan.outputs.checks != '' && !inputs.relock
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -201,7 +205,7 @@ jobs:
   test:
     name: test (${{ matrix.os }})
     needs: plan
-    if: needs.plan.outputs.os != '[]'
+    if: needs.plan.outputs.os != '[]' && !inputs.relock
     strategy:
       fail-fast: false
       matrix:
@@ -345,3 +349,41 @@ jobs:
           name: ${{ steps.pass.outputs.name }}
           path: ${{ runner.temp }}/pass.txt
           retention-days: 30
+
+  # A development machine has no SDK, so a changed dependency or RuntimeIdentifiers list gets its lock
+  # files here: the same SDK as ci.yml and app.yml restores every locked project against what it now declares.
+  relock:
+    name: regenerate lock files
+    if: inputs.relock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore against the declared dependencies and keep the lock files that changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in keypaste.slnx keypaste.app.slnx tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj; do
+            dotnet restore "$target" --force-evaluate
+          done
+          out="$RUNNER_TEMP/relock"
+          mkdir -p "$out"
+          git status --porcelain -- '*packages.lock.json' | sed 's/^...//' > "$out/changed.txt"
+          while IFS= read -r file; do
+            mkdir -p "$out/$(dirname "$file")"
+            cp "$file" "$out/$file"
+          done < "$out/changed.txt"
+          cat "$out/changed.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: relock
+          path: ${{ runner.temp }}/relock
+          retention-days: 7

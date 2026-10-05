@@ -3,84 +3,66 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// The dispatch that hands <c>keypaste mcp &lt;args&gt;</c> to the bridge must not spread the bridge
-/// dependency across the CLI (PRODUCT §3.9, D-0418).
+/// Only the CLI's <c>Program.cs</c> names the bridge or its SDK, so no verb, and no verb that opens a vault,
+/// can run the SDK's code (PRODUCT §3.9, D-0418, D-0419).
 /// </summary>
 /// <remarks>
-/// <para>
-/// Only <c>Program.cs</c> names <c>Keypaste.Mcp</c> or <c>ModelContextProtocol</c>. Any other CLI
-/// file that imported the bridge namespace would allow its types to reach the vault path, which the
-/// source-rule in <c>BridgeSourceRulesTests</c> cannot catch from the other side.
-/// </para>
-/// <para>
-/// The mutation that must fail the first test: adding <c>using Keypaste.Mcp;</c> to <c>CliApp.cs</c>.
-/// The mutation that must fail the second: deleting the <c>BridgeEntry.RunAsync</c> call from
-/// <c>Program.cs</c>, which would leave a dispatch that does nothing.
-/// </para>
+/// A text scan, in which a name in a comment counts too. <c>Program.cs</c> is exempt by its path; what it
+/// may do before it hands <c>keypaste mcp</c> to the bridge is held by the bridge's own source rule.
 /// </remarks>
 public sealed class CliDispatchSourceRulesTests
 {
+    private const string _dispatch = "Program.cs";
+
     private static readonly string[] _bridgeMarkers = ["Keypaste.Mcp", "ModelContextProtocol"];
 
     [Fact]
     public void Only_Program_cs_names_the_bridge_assembly()
     {
-        var offenders = new List<string>();
-        var cli = Path.Combine(RepoRoot(), "src", "Keypaste.Cli");
+        var offenders = Sources()
+            .Where(source => source.Name != _dispatch)
+            .SelectMany(source => Offenders(source.Name, source.Text))
+            .ToList();
 
-        foreach (var file in Directory.EnumerateFiles(cli, "*.cs", SearchOption.AllDirectories))
-        {
-            if (Path.GetFileName(file) == "Program.cs")
-            {
-                continue;
-            }
-
-            if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var text = File.ReadAllText(file);
-
-            foreach (var marker in _bridgeMarkers)
-            {
-                if (text.Contains(marker, StringComparison.Ordinal))
-                {
-                    offenders.Add($"{Path.GetFileName(file)}: {marker}");
-                }
-            }
-        }
-
-        Assert.Empty(offenders);
+        Assert.True(offenders.Count == 0, $"these CLI files name the bridge: {string.Join("; ", offenders)}");
     }
 
     [Fact]
-    public void Program_cs_calls_BridgeEntry_RunAsync()
+    public void The_scan_reads_every_cli_file_and_exempts_only_the_dispatch()
     {
-        var program = File.ReadAllText(Path.Combine(RepoRoot(), "src", "Keypaste.Cli", "Program.cs"));
-        Assert.Contains("BridgeEntry.RunAsync", program, StringComparison.Ordinal);
+        var names = Sources().Select(source => source.Name).ToList();
+
+        Assert.Contains(_dispatch, names);
+        Assert.NotEmpty(Offenders(_dispatch, Read(_dispatch)));
+        Assert.True(names.Count >= 60, $"only {names.Count} files were scanned");
     }
 
     [Fact]
-    public void Mutating_CliApp_cs_with_a_bridge_marker_is_caught()
+    public void A_verb_that_names_the_bridge_is_found()
+    {
+        var app = Read("CliApp.cs");
+        var agent = Read(Path.Combine("Commands", "AgentCommand.cs"));
+
+        Assert.Empty(Offenders("CliApp.cs", app));
+        Assert.NotEmpty(Offenders("CliApp.cs", "using Keypaste.Mcp;\n" + app));
+        Assert.Empty(Offenders("AgentCommand.cs", agent));
+        Assert.NotEmpty(Offenders("AgentCommand.cs", "using ModelContextProtocol.Server;\n" + agent));
+    }
+
+    private static IEnumerable<string> Offenders(string name, string text) =>
+        _bridgeMarkers.Where(marker => text.Contains(marker, StringComparison.Ordinal)).Select(marker => $"{name}: {marker}");
+
+    private static IEnumerable<(string Name, string Text)> Sources()
     {
         var cli = Path.Combine(RepoRoot(), "src", "Keypaste.Cli");
-        var appFile = Path.Combine(cli, "CliApp.cs");
-        var original = File.ReadAllText(appFile);
-        var mutated = original + "\n// using Keypaste.Mcp;";
 
-        var offenders = new List<string>();
-
-        foreach (var marker in _bridgeMarkers)
-        {
-            if (mutated.Contains(marker, StringComparison.Ordinal))
-            {
-                offenders.Add(marker);
-            }
-        }
-
-        Assert.NotEmpty(offenders);
+        return Directory.GetFiles(cli, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Select(path => (Path.GetRelativePath(cli, path), File.ReadAllText(path)));
     }
+
+    private static string Read(string relative) =>
+        File.ReadAllText(Path.Combine(RepoRoot(), "src", "Keypaste.Cli", relative));
 
     private static string RepoRoot()
     {

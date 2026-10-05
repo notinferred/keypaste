@@ -81,24 +81,24 @@ public sealed record McpClient(
 }
 
 /// <summary>How a client starts the bridge: an executable and any arguments that come before ours.</summary>
-/// <param name="Path">Absolute path to <c>keypaste-mcp</c>, or to the AppImage that carries it.</param>
+/// <param name="Path">Absolute path to <c>keypaste</c>, or to the AppImage that carries it.</param>
 /// <param name="Arguments">
-/// What selects the bridge inside that file: <c>mcp</c> for an AppImage, whose <c>AppRun</c>
-/// dispatches on it, and nothing for the bridge itself.
+/// What selects the bridge inside that file: <see cref="McpServerLocator.BridgeArgument"/>, which an
+/// AppImage's <c>AppRun</c> passes through to its <c>keypaste</c>.
 /// </param>
 public sealed record McpServerCommand(string Path, IReadOnlyList<string> Arguments);
 
 /// <summary>
 /// What keypaste asks a client to launch: the bridge, and the flags that bound it.
 /// </summary>
-/// <param name="Server">How to start <c>keypaste-mcp</c>.</param>
+/// <param name="Server">How to start <c>keypaste mcp</c>.</param>
 /// <param name="VaultPath">
 /// The absolute vault the bridge is pinned to with <c>--vault</c>, or null for none, so the bridge
 /// uses the vault the person chose (D-0389).
 /// </param>
 /// <param name="ClientLabel">What this client is called in the audit log.</param>
 /// <param name="Expose">
-/// Extra globs. Empty means the flag is omitted entirely, so <c>keypaste-mcp</c>'s own default of
+/// Extra globs. Empty means the flag is omitted entirely, so the bridge's own default of
 /// <c>env/**</c> applies — stated by absence rather than restated here, so there is one place a
 /// reader can learn what the default is.
 /// </param>

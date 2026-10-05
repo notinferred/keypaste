@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # The app starts, holds and ends the session authority without a terminal (4.4b, V-4.4b), across
-# real processes: the shipped keypaste and keypaste-mcp, and tests/Keypaste.AppDriver composing the
+# real processes: the shipped keypaste and keypaste mcp, and tests/Keypaste.AppDriver composing the
 # app's AppAuthority as launch does and printing the status that authority reports.
 #
 # Launched with no terminal process, the app reports the vault locked and a request is refused;
-# unlocking lets a real keypaste-mcp request reach the app's session. Locking and quitting each leave
+# unlocking lets a real keypaste mcp request reach the app's session. Locking and quitting each leave
 # the next request refused and nobody holding the vault. An app killed with a request waiting leaves no
 # endpoint answering, and a relaunch reports the vault locked, refuses until unlocked, and then serves
 # a new session on the same endpoint. With keypaste agent holding the vault first, the app's unlock is
@@ -31,7 +31,6 @@ DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR APP_OUT START_OUT'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 APP="$(resolve KEYPASTE_APP artifacts/bin/Keypaste.App/release/keypaste-app)"
 
@@ -101,8 +100,8 @@ ask() {
       printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}"
     fi
     sleep 3
-  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" 7>&- 9>&- \
-    || die "keypaste-mcp exited non-zero"
+  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" 7>&- 9>&- \
+    || die "keypaste mcp exited non-zero"
 }
 
 # Both calls of the last ask were refused, and audited as denials reaching no session.
@@ -139,7 +138,7 @@ start_request() {
   OUT="$1"
   ERR="$2"
   exec 8>&-
-  exec 8> >(exec 7>&- 9>&-; exec "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&- 9>&-; exec "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
   printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}" >&8
@@ -337,7 +336,7 @@ exec 6>&-
 wait_for '^shut down' "$APP_OUT"
 APP_PID=""
 
-echo "ok: launched locked and refusing, the app served a real keypaste-mcp once unlocked; lock and quit each left"
+echo "ok: launched locked and refusing, the app served a real keypaste mcp once unlocked; lock and quit each left"
 echo "    nobody answering or holding the vault; a killed app answered nothing and a relaunch refused until it"
 echo "    unlocked a new session on the same endpoint; keypaste agent holding the vault was named and kept answering;"
 echo "    and in one home a second keypaste-app at login showed nothing, a second one exited once the running app showed"

@@ -187,7 +187,7 @@ public static class AuditChainVerifier
     /// <returns>What was found. Never throws for an ordinary I/O failure.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
     /// <remarks>
-    /// Opened <see cref="FileShare.ReadWrite"/>, because a keypaste-mcp may be holding the log open
+    /// Opened <see cref="FileShare.ReadWrite"/>, because a bridge may be holding the log open
     /// for writing and on Windows any narrower share mode fails outright against it.
     /// </remarks>
     public static AuditChainReport Verify(string path, string? anchor = null)

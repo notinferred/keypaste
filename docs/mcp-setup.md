@@ -1,6 +1,6 @@
 # Connecting keypaste to Claude
 
-keypaste ships an MCP server, `keypaste-mcp`, that lets an AI agent see the names of things in your vault and ask you for one credential at a time.
+keypaste ships an MCP server, `keypaste mcp`, that lets an AI agent see the names of things in your vault and ask you for one credential at a time.
 
 The bridge holds no vault. It checks exposure and records access; the approver handles consent, grants and policy. Start the current terminal approver yourself:
 
@@ -12,7 +12,7 @@ Enter the master password and review requests in that terminal. Without the appr
 
 The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
 
-These instructions describe the CLI and MCP bridge in source, for the next release; the published `v0.3.0` asks `Approve? [y/N]` and keeps an approval for up to 300 seconds. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` or `KEYPASTE_VAULT` names, or with neither the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no vault named or chosen is refused. `keypaste setup` writes `--vault` only when you name a vault other than the chosen one, and a running bridge keeps the chosen vault it started with until its client restarts it. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
+These instructions describe the CLI and MCP bridge in source, for the next release; the published `v0.3.0` ships the bridge as its own `keypaste-mcp` binary, asks `Approve? [y/N]` and keeps an approval for up to 300 seconds. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` or `KEYPASTE_VAULT` names, or with neither the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no vault named or chosen is refused. `keypaste setup` writes `--vault` only when you name a vault other than the chosen one, and a running bridge keeps the chosen vault it started with until its client restarts it. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
 
 ## Before you start
 
@@ -22,7 +22,7 @@ Build the binary:
 dotnet build keypaste.slnx -c Release
 ```
 
-It lands at `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`keypaste-mcp.exe` on Windows). The CLI is under `artifacts/bin/Keypaste.Cli/release/`; make both built executables available on `PATH` for the examples below, or use their full paths. Published downloads are listed in [RELEASE](RELEASE.md).
+It lands at `artifacts/bin/Keypaste.Cli/release/keypaste` (`keypaste.exe` on Windows), which is the CLI and, run as `keypaste mcp`, the bridge; make it available on `PATH` for the examples below, or use its full path. Published downloads are listed in [RELEASE](RELEASE.md).
 
 ## The short way
 
@@ -35,7 +35,7 @@ keypaste setup --vault ~/vaults/personal.kdbx
 The command detects installed clients and configures Claude Code and Codex through their own commands. It prints configuration for Cursor and Claude Desktop to paste manually; those file formats have not been verified against real installs.
 
 ```
-keypaste-mcp   /home/you/.local/bin/keypaste-mcp
+keypaste mcp   /home/you/.local/bin/keypaste
 vault          /home/you/vaults/personal.kdbx
 exposure       env/** (the default; nothing else in the vault can even be named)
 
@@ -51,9 +51,9 @@ exposure       env/** (the default; nothing else in the vault can even be named)
 
 ## From the desktop app
 
-In source, the Agents screen has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `env/**`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste-mcp` path, `--client-label` and each `--expose`, and `--vault` only when the unlocked vault is not the chosen one. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
+In source, the Agents screen has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `env/**`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste` path and `mcp`, `--client-label` and each `--expose`, and `--vault` only when the unlocked vault is not the chosen one. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
 
-The app registers the `keypaste-mcp` beside it, or the first one on `PATH`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start the image file itself with `mcp`: moving or deleting the `.AppImage` breaks the registration until you connect again.
+The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start the image file itself with `mcp`: moving or deleting the `.AppImage` breaks the registration until you connect again.
 
 Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once, Allow for 1 hour or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove and Run it take keypaste out of the client and leave its other servers alone.
 
@@ -75,8 +75,9 @@ Open Claude menu → Settings → Developer → Edit Config, or edit the file di
 {
   "mcpServers": {
     "keypaste": {
-      "command": "/absolute/path/to/keypaste-mcp",
+      "command": "/absolute/path/to/keypaste",
       "args": [
+        "mcp",
         "--vault", "/absolute/path/to/vault.kdbx",
         "--client-label", "claude-desktop"
       ]
@@ -85,7 +86,7 @@ Open Claude menu → Settings → Developer → Edit Config, or edit the file di
 }
 ```
 
-On Windows the backslashes must be escaped: `"C:\\Users\\you\\keypaste-mcp.exe"`.
+On Windows the backslashes must be escaped: `"C:\\Users\\you\\keypaste.exe"`.
 
 Paths must be absolute. The client's working directory is not yours, and a relative path will resolve somewhere you did not intend.
 
@@ -97,7 +98,7 @@ Restart Claude Desktop. The server appears under the tools icon; if it does not,
 
 ```sh
 claude mcp add --transport stdio --scope project keypaste \
-  -- /absolute/path/to/keypaste-mcp \
+  -- /absolute/path/to/keypaste mcp \
      --vault /absolute/path/to/vault.kdbx \
      --client-label claude-code
 ```
@@ -108,8 +109,8 @@ claude mcp add --transport stdio --scope project keypaste \
 {
   "mcpServers": {
     "keypaste": {
-      "command": "/absolute/path/to/keypaste-mcp",
-      "args": ["--vault", "/absolute/path/to/vault.kdbx", "--client-label", "claude-code"]
+      "command": "/absolute/path/to/keypaste",
+      "args": ["mcp", "--vault", "/absolute/path/to/vault.kdbx", "--client-label", "claude-code"]
     }
   }
 }
@@ -123,7 +124,7 @@ Use `--scope local` instead if you would rather keep it to your own machine.
 
 `keypaste agent` opens the vault, so it is the process that needs the keyfile: add `--keyfile <path>` beside its `--vault`, or set `KEYPASTE_KEYFILE`.
 
-`keypaste-mcp` never opens a vault and never asks for a password, so its entry in a client's configuration takes no keyfile and `keypaste setup` does not write one. A client block that names a keyfile would record where your second factor is kept and change nothing about what the bridge can do.
+`keypaste mcp` never opens a vault and never asks for a password, so its entry in a client's configuration takes no keyfile and `keypaste setup` does not write one. A client block that names a keyfile would record where your second factor is kept and change nothing about what the bridge can do.
 
 ## What the agent may see
 
@@ -278,7 +279,7 @@ printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"probe","version":"1.0"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-  | keypaste-mcp --vault ~/vault.kdbx --audit-log /tmp/probe.jsonl
+  | keypaste mcp --vault ~/vault.kdbx --audit-log /tmp/probe.jsonl
 ```
 
 You should get two JSON lines back, the second listing `list_entry_names` and `request_credential`. CI runs a stricter version of exactly this on all three operating systems (`scripts/verify-mcp-stdio.sh`).
@@ -297,7 +298,7 @@ For protocol errors, inspect wrappers and shell profiles for text written to std
 
 ## FAQ
 
-Can the agent see my passwords? Each successful request returns one field of one entry under a human approval, its still-live cached grant, or a matching policy rule. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste-mcp` holds no vault, but it does receive and forward the released value.
+Can the agent see my passwords? Each successful request returns one field of one entry under a human approval, its still-live cached grant, or a matching policy rule. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste mcp` holds no vault, but it does receive and forward the released value.
 
 Can it see my entry names? Only the ones inside `--expose`, which defaults to `env/**`, and only while the terminal approver is running with its vault unlocked.
 

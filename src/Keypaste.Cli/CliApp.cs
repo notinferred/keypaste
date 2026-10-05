@@ -174,7 +174,7 @@ internal static class CliApp
         ]),
         ("AGENTS",
         [
-            ("mcp", "approve agents' requests here, or connect MCP clients"),
+            ("mcp", "the MCP server your AI clients start; mcp serve approves here"),
             ("grants", "list or revoke time-boxed access"),
             ("token", "create scoped, inject-only tokens"),
             ("log", "show the hash-chained activity log"),

@@ -1,3 +1,4 @@
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Cli.Commands;

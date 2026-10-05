@@ -39,7 +39,7 @@ internal sealed class FakeApprover : IAsyncDisposable
     internal FakeApprover()
     {
         _handler = new Handler(this);
-        PipeName = "keypaste-mcp-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        PipeName = "keypaste-bridge-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
     }
 
     /// <summary>The pipe the bridge will look for this on.</summary>

@@ -97,7 +97,7 @@ public readonly record struct AuditPosition(long Offset, int Line)
 /// drop a line from a table, which is visible and is counted.
 /// </para>
 /// <para>
-/// It opens <see cref="FileShare.ReadWrite"/>, because a keypaste-mcp may hold the log open for
+/// It opens <see cref="FileShare.ReadWrite"/>, because a bridge may hold the log open for
 /// writing and on Windows any narrower share mode fails outright against it.
 /// </para>
 /// </remarks>

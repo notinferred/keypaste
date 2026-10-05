@@ -46,7 +46,7 @@ public sealed class ClientPolicies
     /// <summary>The most rows a file may hold.</summary>
     public const int MaximumRows = 256;
 
-    /// <summary>The longest label, as <c>keypaste-mcp --client-label</c> accepts it.</summary>
+    /// <summary>The longest label, as <c>keypaste mcp --client-label</c> accepts it.</summary>
     public const int MaximumLabelLength = 64;
 
     private const string _section = "client";

@@ -5,7 +5,7 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>What connecting a client reaches outside the app: the client's own command, the bridge and a check.</summary>
 /// <param name="Runner">Runs each client's own command.</param>
-/// <param name="FindServer">Finds the <c>keypaste-mcp</c> a client should start, or null.</param>
+/// <param name="FindServer">Finds the <c>keypaste</c> a client should start as the bridge, or null.</param>
 /// <param name="Places">Where <paramref name="FindServer"/> looks, for a message that says so.</param>
 /// <param name="StartCheck">Starts the bridge a registration describes, or null when it cannot be started.</param>
 internal sealed record ClientConnector(

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# A lock is one transition across real processes (U.2, V-U.2): the shipped keypaste and keypaste-mcp,
+# A lock is one transition across real processes (U.2, V-U.2): the shipped keypaste and keypaste mcp,
 # and tests/Keypaste.AppDriver holding the vault as the app does, with --held-prompt putting a request
 # that needs a person in front of one who never answers.
 #
-# A real keypaste-mcp request waits at the app's session; a manual lock answers it as a vault-locked
+# A real keypaste mcp request waits at the app's session; a manual lock answers it as a vault-locked
 # denial, and its audit line names the session it reached. Unlocking again starts a session where the
 # same request waits again rather than being answered from anything before the lock. Quitting the app
 # with a request waiting answers it the same way. Where a signal can reach a native process, a request
@@ -26,7 +26,6 @@ DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
@@ -58,7 +57,7 @@ start_request() {
   ERR="$2"
   exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec 8> >(exec 7>&-; exec "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&-; exec "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
   printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lock probe\",\"ttl_seconds\":60}}}" >&8

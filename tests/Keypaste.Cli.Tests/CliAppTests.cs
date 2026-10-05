@@ -111,17 +111,6 @@ public sealed class CliAppTests
     }
 
     [Fact]
-    public void Mcp_Alone_PrintsItsUsage()
-    {
-        using var harness = new CliHarness();
-
-        Assert.Equal(CliApp.ExitUsageError, harness.Run("mcp"));
-        Assert.Empty(harness.Out);
-        Assert.StartsWith("usage: keypaste mcp <serve|setup|policy> [options]", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("your MCP client starts keypaste mcp", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void EveryVerbInHelp_Dispatches()
     {
         var verbs = GroupedHelp
@@ -134,7 +123,7 @@ public sealed class CliAppTests
 
         Assert.Equal(21, verbs.Count);
 
-        foreach (var verb in verbs)
+        foreach (var verb in verbs.Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
             using var harness = new CliHarness();
 
@@ -161,7 +150,7 @@ public sealed class CliAppTests
             "  env       import, export and diff .env profiles",
             "",
             "AGENTS",
-            "  mcp       approve agents' requests here, or connect MCP clients",
+            "  mcp       the MCP server your AI clients start; mcp serve approves here",
             "  grants    list or revoke time-boxed access",
             "  token     create scoped, inject-only tokens",
             "  log       show the hash-chained activity log",

@@ -17,7 +17,7 @@ namespace Keypaste.Cli.Tests;
 /// <para>
 /// <c>keypaste setup</c> deliberately has no keyfile, and
 /// <see cref="Setup_takes_no_keyfile_because_the_bridge_it_configures_opens_no_vault"/> holds it
-/// that way: setup writes a path into a client's configuration file for <c>keypaste-mcp</c>, which
+/// that way: setup writes a path into a client's configuration file for <c>keypaste mcp</c>, which
 /// holds no vault at all, so a keyfile there would record where the second factor lives and buy
 /// nothing.
 /// </para>

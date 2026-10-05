@@ -6,6 +6,7 @@ using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Processes;
 
@@ -56,6 +57,9 @@ internal sealed class CliHarness : IDisposable
     /// <summary>The directory commands run in, for <c>projects.json</c> inference and <c>.env.keypaste</c>.</summary>
     internal string WorkingDirectory { get; set; } = System.Environment.CurrentDirectory;
 
+    /// <summary>The running keypaste that <c>setup</c> registers; by default one in <see cref="Directory"/>.</summary>
+    internal string? ProcessPath { get; set; }
+
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
@@ -72,6 +76,7 @@ internal sealed class CliHarness : IDisposable
         ConsoleStyle = ConsoleStyle,
         Clock = Clock,
         WorkingDirectory = WorkingDirectory,
+        ProcessPath = ProcessPath ?? Path.Combine(Directory, McpServerLocator.ExecutableName),
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>

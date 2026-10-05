@@ -25,7 +25,7 @@ public sealed class McpClientSetupTests : IDisposable
         bool pinned = true)
     {
         Assert.True(McpServerRegistration.TryCreate(
-            server ?? new McpServerCommand(Path.Combine(_directory, "keypaste-mcp"), []),
+            server ?? new McpServerCommand(Path.Combine(_directory, "keypaste"), [McpServerLocator.BridgeArgument]),
             pinned ? Path.Combine(_directory, "vault.kdbx") : null,
             label,
             expose ?? [],
@@ -121,7 +121,7 @@ public sealed class McpClientSetupTests : IDisposable
     public void An_appimage_is_told_to_start_the_bridge_before_any_of_its_flags()
     {
         var image = Path.Combine(_directory, "keypaste.AppImage");
-        var line = Registration(server: new McpServerCommand(image, [McpServerLocator.AppImageArgument])).CommandLine();
+        var line = Registration(server: new McpServerCommand(image, [McpServerLocator.BridgeArgument])).CommandLine();
 
         Assert.Equal([image, "mcp", "--vault"], line.Take(3));
     }
@@ -131,7 +131,7 @@ public sealed class McpClientSetupTests : IDisposable
     {
         var add = McpClientSetup.Connect(Claude, Registration()).Commands[1].Arguments;
 
-        Assert.Equal(Path.Combine(_directory, "keypaste-mcp"), add[add.ToList().IndexOf("--") + 1]);
+        Assert.Equal([Path.Combine(_directory, "keypaste"), "mcp"], add.Skip(add.ToList().IndexOf("--") + 1).Take(2));
     }
 
     [Theory]
@@ -142,7 +142,7 @@ public sealed class McpClientSetupTests : IDisposable
     public void A_label_the_audit_log_would_rewrite_is_refused(string label)
     {
         Assert.False(McpServerRegistration.TryCreate(
-            new McpServerCommand("keypaste-mcp", []), "vault.kdbx", label, [], out _, out var error));
+            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), "vault.kdbx", label, [], out _, out var error));
         Assert.Contains("label", error, StringComparison.Ordinal);
     }
 
@@ -150,7 +150,7 @@ public sealed class McpClientSetupTests : IDisposable
     public void An_exposure_the_bridge_would_refuse_is_refused_before_anything_is_written()
     {
         Assert.False(McpServerRegistration.TryCreate(
-            new McpServerCommand("keypaste-mcp", []), "vault.kdbx", "claude-code", ["env/**", " "], out _, out var error));
+            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), "vault.kdbx", "claude-code", ["env/**", " "], out _, out var error));
         Assert.StartsWith("exposure: ", error, StringComparison.Ordinal);
     }
 
@@ -158,7 +158,7 @@ public sealed class McpClientSetupTests : IDisposable
     public void The_vault_path_is_made_absolute()
     {
         Assert.True(McpServerRegistration.TryCreate(
-            new McpServerCommand("keypaste-mcp", []), "vault.kdbx", "codex", [], out var registration, out _));
+            new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), "vault.kdbx", "codex", [], out var registration, out _));
         Assert.Equal(Path.GetFullPath("vault.kdbx"), registration.VaultPath);
     }
 
@@ -174,7 +174,7 @@ public sealed class McpClientSetupTests : IDisposable
 
         Assert.Equal(
             ["mcp", "add", "--scope", "user", "--transport", "stdio", "keypaste", "--",
-             registration.Server.Path, "--vault", registration.VaultPath!, "--client-label", "claude-code", "--expose", "env/**"],
+             registration.Server.Path, "mcp", "--vault", registration.VaultPath!, "--client-label", "claude-code", "--expose", "env/**"],
             add);
     }
 
@@ -185,7 +185,7 @@ public sealed class McpClientSetupTests : IDisposable
         var add = McpClientSetup.Connect(Claude, registration).Commands[1].Arguments;
 
         Assert.Null(registration.VaultPath);
-        Assert.Equal([registration.Server.Path, "--client-label", "claude-code"], registration.CommandLine());
+        Assert.Equal([registration.Server.Path, "mcp", "--client-label", "claude-code"], registration.CommandLine());
         Assert.DoesNotContain("--vault", add);
         Assert.DoesNotContain("--vault", string.Concat(McpClientSetup.Connect(Cursor, registration).PasteBlock!), StringComparison.Ordinal);
     }
@@ -193,9 +193,9 @@ public sealed class McpClientSetupTests : IDisposable
     [Fact]
     public void A_displayed_argument_with_a_space_is_quoted()
     {
-        var command = new McpClientCommand("claude", ["mcp", "add", "C:\\Program Files\\keypaste-mcp.exe"], MayFail: false);
+        var command = new McpClientCommand("claude", ["mcp", "add", "C:\\Program Files\\keypaste\\keypaste.exe"], MayFail: false);
 
-        Assert.Equal("claude mcp add \"C:\\Program Files\\keypaste-mcp.exe\"", command.Display);
+        Assert.Equal("claude mcp add \"C:\\Program Files\\keypaste\\keypaste.exe\"", command.Display);
     }
 
     [Fact]
@@ -209,6 +209,7 @@ public sealed class McpClientSetupTests : IDisposable
 
         File.WriteAllText(Path.Combine(beside, McpServerLocator.ExecutableName), "");
         Assert.Equal(Path.Combine(beside, McpServerLocator.ExecutableName), McpServerLocator.Find(beside, onPath)!.Path);
+        Assert.Equal(["mcp"], McpServerLocator.Find(beside, onPath)!.Arguments);
         Assert.Null(McpServerLocator.Find(Path.Combine(_directory, "nowhere"), null));
     }
 

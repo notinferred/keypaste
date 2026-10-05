@@ -2,7 +2,7 @@
 
 This demo uses two terminals to show a failed deploy, a credential request, approval and a successful retry, followed by its audit record. The recorded flow takes about sixty seconds.
 
-`keypaste agent` holds the vault and asks for approval. Your MCP client starts `keypaste-mcp`, which forwards requests without holding a vault. You start the approver yourself. Its unlock is independent of the desktop app, and locking that app does not stop this approver. The planned shared desktop session and native approval dialog are not part of this demo. [Approvals](approvals.md) explains what you authorize.
+`keypaste agent` holds the vault and asks for approval. Your MCP client starts `keypaste mcp`, which forwards requests without holding a vault. You start the approver yourself. Its unlock is independent of the desktop app, and locking that app does not stop this approver. The planned shared desktop session and native approval dialog are not part of this demo. [Approvals](approvals.md) explains what you authorize.
 
 The terminal output below was captured from real keypaste processes. Claude's actions and wording can vary between runs.
 
@@ -12,7 +12,7 @@ The terminal output below was captured from real keypaste processes. Claude's ac
 dotnet build keypaste.slnx -c Release
 ```
 
-The two binaries land at `artifacts/bin/Keypaste.Cli/release/keypaste` and `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`.exe` on Windows). Make these build directories available on `PATH`, or replace the commands below with their full paths; an older installed `keypaste` will otherwise still run. You also need Claude Code, and two terminals you can see at once. This page verifies the source build; [RELEASE](RELEASE.md) owns published availability.
+The binary lands at `artifacts/bin/Keypaste.Cli/release/keypaste` (`.exe` on Windows); `keypaste mcp` is its bridge. Make that build directory available on `PATH`, or replace the commands below with its full path; an older installed `keypaste` will otherwise still run. You also need Claude Code, and two terminals you can see at once. This page verifies the source build; [RELEASE](RELEASE.md) owns published availability.
 
 Use a disposable vault. The tool returns credentials as text and structured data, which Claude can display and retain in transcripts or session files. This demo uses a fake value.
 
@@ -48,7 +48,7 @@ This is a fake value shaped like a Stripe test key so the masked output is recog
 
 ```sh
 claude mcp add --transport stdio --scope local keypaste \
-  -- /absolute/path/to/keypaste-mcp \
+  -- /absolute/path/to/keypaste mcp \
      --vault /absolute/path/to/keypaste-demo.kdbx \
      --client-label claude-code
 ```
@@ -59,8 +59,8 @@ The equivalent by hand, in `.mcp.json`:
 {
   "mcpServers": {
     "keypaste": {
-      "command": "/absolute/path/to/keypaste-mcp",
-      "args": ["--vault", "/absolute/path/to/keypaste-demo.kdbx", "--client-label", "claude-code"]
+      "command": "/absolute/path/to/keypaste",
+      "args": ["mcp", "--vault", "/absolute/path/to/keypaste-demo.kdbx", "--client-label", "claude-code"]
     }
   }
 }

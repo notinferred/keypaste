@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// The app owns the vault it unlocks: a second owner is refused by name before the password is
-/// tried, and the unlocked vault is served to <c>keypaste-mcp</c> on its endpoint (U.1).
+/// tried, and the unlocked vault is served to <c>keypaste mcp</c> on its endpoint (U.1).
 /// </summary>
 public sealed class SessionOwnershipTests
 {

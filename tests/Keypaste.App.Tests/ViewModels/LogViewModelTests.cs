@@ -87,7 +87,7 @@ public sealed class LogViewModelTests : IDisposable
         Assert.Equal("1 record", model.Summary);
     }
 
-    /// <summary>A record keypaste-mcp appends while the window is open shows up on a refresh.</summary>
+    /// <summary>A record the bridge appends while the window is open shows up on a refresh.</summary>
     [Fact]
     public void Refresh_picks_up_an_appended_record()
     {

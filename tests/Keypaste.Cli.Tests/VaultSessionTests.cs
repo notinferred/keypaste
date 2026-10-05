@@ -1,3 +1,4 @@
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Xunit;

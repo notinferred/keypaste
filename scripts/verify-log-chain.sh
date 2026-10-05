@@ -3,7 +3,7 @@
 # just as importantly, that ordinary damage is not reported as tampering.
 #
 # The in-process tests build their files with the real writer too, but they never cross a process
-# boundary: the log is written by keypaste-mcp and read back by keypaste, two separate programs that
+# boundary: the log is written by keypaste mcp and read back by keypaste log, two separate processes that
 # have to agree byte for byte about what a record is. That agreement is the whole mitigation for
 # THREATS.md T-5, and this is the only place both halves are the shipped ones.
 #
@@ -17,7 +17,6 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='AUDIT'
 
-MCP_PATH="$(keypaste_mcp)"
 CLI_PATH="$(keypaste_bin)"
 
 WORK="$(mktemp -d)"
@@ -68,14 +67,14 @@ run_server() {
     done
 
     sleep 5
-  } | "$MCP_PATH" mcp --vault "$WORK/vault.kdbx" --audit-log "$AUDIT" --client-label ci-probe \
+  } | "$CLI_PATH" mcp --vault "$WORK/vault.kdbx" --audit-log "$AUDIT" --client-label ci-probe \
         >"$WORK/mcp-out.txt" 2>"$WORK/mcp-err.txt"
 }
 
 # ---------------------------------------------------------------------------
 # A real log, written by the real server over real pipes.
 # ---------------------------------------------------------------------------
-run_server STRIPE_KEY DB_URL || die "keypaste-mcp exited non-zero"
+run_server STRIPE_KEY DB_URL || die "keypaste mcp exited non-zero"
 
 [ -f "$AUDIT" ] || die "no audit log was written"
 records="$(grep -c . "$AUDIT")"
@@ -171,7 +170,7 @@ grep -q 'NOT IN THIS FILE' "$WORK/out.txt" || die "the missing anchor was not re
 
 # And the anchor has to mean "that record is here", not "those characters are somewhere in the file".
 # The entry argument is text the agent writes, so a hash planted there needs no file access at all.
-run_server "$anchor" || die "keypaste-mcp exited non-zero"
+run_server "$anchor" || die "keypaste mcp exited non-zero"
 grep -q "$anchor" "$AUDIT" || die "the planted anchor did not reach the log"
 expect 5 "an anchor planted in an entry name" "$CLI_PATH" log verify --audit-log "$AUDIT" --expect "$anchor"
 grep -q 'NOT IN THIS FILE' "$WORK/out.txt" || die "a planted hash was accepted as the anchored record"
@@ -195,7 +194,7 @@ grep -q 'interrupted write' "$WORK/out.txt" || die "an unfinished last line was 
 restore
 before="$(grep -c . "$AUDIT")"
 printf '\n' >>"$AUDIT"
-run_server RECOVERY_KEY || die "keypaste-mcp refused to start over a blank line in the log"
+run_server RECOVERY_KEY || die "keypaste mcp refused to start over a blank line in the log"
 
 after="$(grep -c . "$AUDIT")"
 [ "$after" -gt "$before" ] || die "the server started but wrote nothing after a blank line"

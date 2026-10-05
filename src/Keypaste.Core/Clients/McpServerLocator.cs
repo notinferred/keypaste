@@ -1,22 +1,22 @@
 namespace Keypaste.Core.Clients;
 
-/// <summary>Finds the <c>keypaste</c> binary a client should be told to start as <c>keypaste mcp</c>.</summary>
+/// <summary>Finds the <c>keypaste</c> binary the desktop tells a client to start as <c>keypaste mcp</c>.</summary>
 /// <remarks>
-/// Beside the running program first: the CLI and the app are released together, and a mismatched pair is a
-/// class of bug nobody would enjoy diagnosing. PATH is the fallback.
+/// Beside the app first: the packages carry the two together, and a mismatched pair is a class of bug nobody
+/// would enjoy diagnosing. PATH is the fallback. <c>keypaste setup</c> needs none of this: it registers itself.
 /// </remarks>
 public static class McpServerLocator
 {
     /// <summary>The CLI binary's file name, without the platform's extension.</summary>
     public const string FileName = "keypaste";
 
-    /// <summary>What the desktop AppImage's <c>AppRun</c> starts the bridge for.</summary>
-    public const string AppImageArgument = "mcp";
+    /// <summary>What selects the bridge: <c>keypaste mcp</c>, which the desktop AppImage's <c>AppRun</c> passes through.</summary>
+    public const string BridgeArgument = "mcp";
 
-    /// <summary>The bridge's file name on this platform.</summary>
+    /// <summary>The CLI binary's file name on this platform.</summary>
     public static string ExecutableName => OperatingSystem.IsWindows() ? FileName + ".exe" : FileName;
 
-    /// <summary>Finds the bridge beside <paramref name="besideDirectory"/>, then on PATH.</summary>
+    /// <summary>Finds <c>keypaste</c> beside <paramref name="besideDirectory"/>, then on PATH.</summary>
     /// <param name="besideDirectory">The running program's directory.</param>
     /// <param name="pathVariable">The PATH environment variable.</param>
     /// <returns>The bridge, or null when neither place has it.</returns>
@@ -26,7 +26,7 @@ public static class McpServerLocator
             && Path.Combine(besideDirectory, ExecutableName) is var beside
             && File.Exists(beside))
         {
-            return new McpServerCommand(Path.GetFullPath(beside), ["mcp"]);
+            return new McpServerCommand(Path.GetFullPath(beside), [BridgeArgument]);
         }
 
         foreach (var directory in (pathVariable ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
@@ -34,7 +34,7 @@ public static class McpServerLocator
             var candidate = Path.Combine(directory.Trim(), ExecutableName);
             if (File.Exists(candidate))
             {
-                return new McpServerCommand(Path.GetFullPath(candidate), ["mcp"]);
+                return new McpServerCommand(Path.GetFullPath(candidate), [BridgeArgument]);
             }
         }
 
@@ -47,7 +47,7 @@ public static class McpServerLocator
     /// <remarks>
     /// An AppImage is mounted at a new temporary path on every launch, so the bridge beside the app
     /// is gone as soon as the app exits. When the app is running from inside its image, the image
-    /// file itself is what a client is told to start, with <see cref="AppImageArgument"/> selecting
+    /// file itself is what a client is told to start, with <see cref="BridgeArgument"/> selecting
     /// the bridge; that path lasts as long as the person leaves the file where it is. The image's
     /// runtime sets <c>APPIMAGE</c> and <c>APPDIR</c>, and both must agree with where the app is
     /// actually running before either is believed.
@@ -66,7 +66,7 @@ public static class McpServerLocator
             && IsWithin(appDirectory, appDir)
             && File.Exists(Path.Combine(appDirectory, ExecutableName)))
         {
-            return new McpServerCommand(Path.GetFullPath(appImage), [AppImageArgument]);
+            return new McpServerCommand(Path.GetFullPath(appImage), [BridgeArgument]);
         }
 
         return Find(appDirectory, pathVariable);

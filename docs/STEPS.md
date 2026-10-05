@@ -14,6 +14,10 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
+- [ ] **F.50 — Let install.yml's Windows job reach the install check.** Needs: none.
+  - In every run since the schedule of 2026-09-21 (35608188051, 36442040660 and 37346630656), `install (windows-2025)` was cancelled at its 15-minute limit inside `verify-release-matrix.sh --with-public-origin`, before the install block ran; on 2026-09-16 (35047059579) the whole job took five minutes. The other three runners pass.
+  - Verify: the step's time on Windows is measured beside the other runners', its cause is named, and a run reaches and passes `verify-install.sh windows`.
+
 
 ## T1 — Everyday vault use and recovery
 
@@ -55,6 +59,10 @@ keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an 
 
 Every release still needs a person's answer or a rule they wrote, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
+- [ ] **F.49 — Find why a grant did not survive a large listing on Windows.** Needs: none.
+  - Observed once, in dev run 37337588072 at `30e338f` on `task/f48`, job `test (windows-2025)`: `LargeVaultListingTests.OnALargeVault_AGrantSurvivesAListing` recorded `prompt` where `grant-cache` was expected, so the second request was asked again. It passed on Linux and macOS in that run, and failed in none of the 40 failed runs before it.
+  - A listing exchange that returns no reply makes `ApproverConnection` drop the connection and reconnect, and a grant is scoped to the connection it was given on. Whether that happened, and why the reply was lost, is what to measure.
+  - Verify: an experiment whose outcome tells a listing reply over the frame budget from a pipe failure under load, and a regression kept in the tree.
 - [ ] **C.5b — Expose tagged projects to agents.** Needs: C.1b, C.5a1.
   - The default exposure becomes `env/**` plus `tag:env:*`, and `--expose` and policy rules accept tag selectors.
   - An entry reached only through a tag exposes only its env fields.
@@ -101,7 +109,6 @@ The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. E
 Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
 - [ ] **G.5 — Carry the CLI on PATH in every desktop install.** Needs: none.
-  - Every desktop payload gains the NativeAOT `keypaste`, and the macOS bundle and DMG checks require it as they require `keypaste-mcp`.
   - The MSI adds its folder to the per-user PATH and removes it on uninstall.
   - The AppImage dispatches `cli` as it does `mcp`.
   - Settings links the CLI into the terminal on Linux and macOS.
@@ -147,6 +154,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - The launch copy says what keypaste adds over Varlock's KeePass plugin, Strongbox MCP and 1Password Environments, and links the safe-agent guide (L.3).
   - The guides name only the phone apps R.1b's round-trip passed.
   - Published claims are checked against the published binaries (D-0036).
+  - The install blocks move from `keypaste-mcp` to `keypaste mcp`, and `verify-install.sh`'s bridge check moves with them ([F.48](steps/F.48.md)).
   - No announcement, message or signup mail is authorized by this row.
 - [ ] **R.1 — Accept the installed local product.** Needs: 4.7c2, L.1.
   - Repeat every R.1a act on clean Windows, macOS and Linux desktops, from public 0.5.0 bytes checked against their hashes and provenance.

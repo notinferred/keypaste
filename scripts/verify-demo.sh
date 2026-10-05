@@ -61,7 +61,6 @@ DIE_FILES='AGENT_ERR OUT ERR DIFF'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 
 WORK="$(mktemp -d)"
 readonly VAULT="$WORK/vault.kdbx"
@@ -170,7 +169,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"$REASON\",\"ttl_seconds\":900}}}"
     sleep 8
-  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
+  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
         >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
 
   grep -q '"id":1' "$out" || die "keypaste mcp never answered initialize"
@@ -318,7 +317,7 @@ grep -q "$SECRET" "$OUT" && die "keypaste log printed the credential"
 # ------------------------------------------------------- F. the options the page tells you to type
 "$CLI" agent --help >"$WORK/agent-help.txt" 2>&1 || true
 "$CLI" log --help   >"$WORK/log-help.txt"   2>&1 || true
-"$MCP" mcp --help   >"$WORK/mcp-help.txt"   2>&1 || true
+"$CLI" mcp --help   >"$WORK/mcp-help.txt"   2>&1 || true
 
 for opt in --vault --approver --approval-timeout --max-ttl; do
   grep -q -- "$opt" "$WORK/agent-help.txt" || die "keypaste agent no longer offers $opt, which $DOC tells you to type"

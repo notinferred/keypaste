@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proves the shipped run tool end to end, across two real processes: a real `keypaste agent` holds a
-# real vault and asks a person, and a real `keypaste-mcp --allow-run` starts the command with the
+# real vault and asks a person, and a real `keypaste mcp --allow-run` starts the command with the
 # approved value in its environment and returns its output scrubbed (D-0358, D-0359).
 #
 # NEGATIVE CONTROL: this script fails if the approved run does not return the command's exit code,
@@ -22,7 +22,6 @@ DIE_FILES='AGENT_ERR OUT ERR AUDIT'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 
 WORK="$(mktemp -d)"
 readonly VAULT="$WORK/vault.kdbx"
@@ -99,8 +98,8 @@ readonly DENIED
   call 4 "$DENIED"
   wait_for_reply 4 || true
   sleep 1
-} | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --allow-run \
-      >"$OUT" 2>"$ERR" || die "keypaste-mcp exited non-zero"
+} | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --allow-run \
+      >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero"
 
 for id in 2 3 4; do
   jq -se --argjson id "$id" 'any(.[]; .id == $id)' <"$OUT" >/dev/null || die "no answer to call $id"

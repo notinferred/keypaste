@@ -54,7 +54,7 @@ A person's cloud vault, team projects over an end-to-end relay, machine identiti
 
 Amendment of 2026-09-25 (D-0357): share links that open a limited number of times and scoped tokens are in scope. `keypaste share` encrypts one field or an entry's login locally and keypaste.com holds only ciphertext it cannot open, serving it once `SHARE_ENABLED` is set; a scoped token is a pre-approval the person creates for `keypaste run`, with a scope and an expiry, verified and audited by the vault's owner. §3 applies to both.
 
-Amendment of 2026-09-25 (D-0365): with `keypaste-mcp --allow-run`, MCP may also start one command the person approves, with the values in its environment and each value replaced in the output it returns (D-0358). This is not arbitrary shell execution: no shell starts it, and the person approves the exact program, arguments, directory, variable names and reason, or a grant of at most 15 minutes for that command line. Nothing enables `--allow-run` by default, and a command the agent can edit can still reveal a value (T-35).
+Amendment of 2026-09-25 (D-0365): with `keypaste mcp --allow-run`, MCP may also start one command the person approves, with the values in its environment and each value replaced in the output it returns (D-0358). This is not arbitrary shell execution: no shell starts it, and the person approves the exact program, arguments, directory, variable names and reason, or a grant of at most 15 minutes for that command line. Nothing enables `--allow-run` by default, and a command the agent can edit can still reveal a value (T-35).
 
 Under v1.8, share links, scoped tokens and `--allow-run` remain in scope as advanced features, reached outside the main screens.
 

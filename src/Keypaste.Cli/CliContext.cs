@@ -57,6 +57,9 @@ internal sealed class CliContext
     /// <summary>The directory the command was started in, which <c>projects.json</c> maps to a project.</summary>
     internal string WorkingDirectory { get; init; } = System.Environment.CurrentDirectory;
 
+    /// <summary>The running <c>keypaste</c>, which <c>setup</c> registers as the bridge.</summary>
+    internal string? ProcessPath { get; init; } = System.Environment.ProcessPath;
+
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the

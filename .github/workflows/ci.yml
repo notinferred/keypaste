@@ -382,7 +382,6 @@ jobs:
     timeout-minutes: 25
     env:
       KEYPASTE_BIN: artifacts/release/linux-x64/keypaste
-      KEYPASTE_MCP_BIN: artifacts/release/linux-x64/keypaste
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -418,7 +417,6 @@ jobs:
           # Verification scripts otherwise fall back to the JIT build when an override is missing.
           rm -rf artifacts/bin
           test -x "$KEYPASTE_BIN" || { echo "::error::no AOT cli binary"; exit 1; }
-          test -x "$KEYPASTE_MCP_BIN" || { echo "::error::no AOT keypaste binary (used as bridge)"; exit 1; }
           for stray in artifacts/release/linux-x64/*.dll artifacts/release/linux-x64/*.runtimeconfig.json; do
             [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not AOT"; exit 1; }
           done

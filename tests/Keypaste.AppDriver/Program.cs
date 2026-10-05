@@ -1164,7 +1164,7 @@ internal sealed class Driver(string home)
     /// </summary>
     /// <remarks>
     /// It uses the programs the app would: each client's own command on PATH, and the
-    /// <c>keypaste-mcp</c> the app finds. What the section says is printed as it changes, so the check
+    /// <c>keypaste mcp</c> the app finds. What the section says is printed as it changes, so the check
     /// can be started on one line and its prompt answered on the next.
     /// </remarks>
     private sealed class ConnectScreen(Driver driver, AppAuthority authority) : IDisposable

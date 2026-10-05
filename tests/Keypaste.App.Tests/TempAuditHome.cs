@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// A temporary <c>KEYPASTE_HOME</c>, with a real audit log written into it the way keypaste-mcp
+/// A temporary <c>KEYPASTE_HOME</c>, with a real audit log written into it the way the bridge
 /// writes one.
 /// </summary>
 /// <remarks>

@@ -12,12 +12,8 @@ namespace Keypaste.Mcp;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A hand-written parser rather than <c>Keypaste.Cli.CommandLine</c>. That looks like the kind of
-/// duplication docs/PRODUCT.md law 4.3 forbids and is not: the CLI's parser rejects a repeated option, which
-/// is exactly what <c>--expose</c> needs to allow, and widening it would change behaviour for five
-/// shipped verbs to serve one new caller. Two parsers for two different grammars is not two
-/// implementations of one rule — and every rule this configures (<see cref="EntryExposure"/>,
-/// <see cref="VaultLocation"/>, <see cref="KeypasteHome"/>) does live in the core.
+/// Read with <see cref="CommandLine"/>, the parser every verb uses, and every rule this configures
+/// (<see cref="EntryExposure"/>, <see cref="VaultLocation"/>, <see cref="KeypasteHome"/>) lives in the core.
 /// </para>
 /// <para>
 /// Anything malformed is fatal. A typo in <c>--expose</c> must never leave a <em>different</em>
@@ -30,10 +26,15 @@ internal sealed record ServerOptions
     internal const string Usage = """
         usage: keypaste mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
                             [--allow-run] [--audit-log <path>] [--approver <name>]
+               keypaste mcp serve | setup | policy [options]
 
         An MCP server that lets an AI agent ask for one credential, with your approval and a full
         audit trail. It speaks the protocol on stdin and stdout, so it is started by an MCP client
         rather than by you. See docs/mcp-setup.md.
+
+          serve    approve agents' requests in this terminal (same as keypaste agent)
+          setup    point this machine's AI clients at your vault (same as keypaste setup)
+          policy   show or set how each client is asked: session, ask or inject-only
 
           --vault <path>        which vault to expose, or set KEYPASTE_VAULT. Without either,
                                 the vault chosen in the keypaste app or with `keypaste use`
@@ -43,6 +44,7 @@ internal sealed record ServerOptions
                                 in its environment. A command can still reveal them.
           --audit-log <path>    where to append the audit trail, or set KEYPASTE_HOME
           --approver <name>     which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER
+          -h, --help            print this help
 
         Nothing is released unless a person says yes to that specific request, or a rule they wrote
         in advance covers it. Requests go to whichever keypaste process holds the vault unlocked:
@@ -50,6 +52,16 @@ internal sealed record ServerOptions
         can cause a master password prompt to appear. With nothing holding the vault, every request
         is denied. `keypaste policy ls` shows the standing rules, if there are any.
         """;
+
+    private static readonly OptionSpec[] _options =
+    [
+        new("vault", TakesValue: true),
+        new("expose", TakesValue: true, Repeats: true),
+        new("client-label", TakesValue: true),
+        new("allow-run", TakesValue: false),
+        new("audit-log", TakesValue: true),
+        new("approver", TakesValue: true),
+    ];
 
     /// <summary>The vault to ask about. Empty when none was configured, which is not fatal: every
     /// request is then refused, saying so.</summary>
@@ -103,80 +115,30 @@ internal sealed record ServerOptions
         ArgumentNullException.ThrowIfNull(argv);
 
         options = null;
-        error = string.Empty;
 
-        string? vault = null;
-        string? label = null;
-        string? auditPath = null;
-        string? approver = null;
-        var allowRun = false;
-        List<string> globs = [];
-
-        for (var i = 0; i < argv.Length; i++)
+        if (!CommandLine.TryParse(argv, 0, _options, out var line, out error))
         {
-            var argument = argv[i];
-
-            if (string.Equals(argument, "--help", StringComparison.Ordinal)
-                || string.Equals(argument, "-h", StringComparison.Ordinal))
-            {
-                options = Help();
-                return true;
-            }
-
-            if (string.Equals(argument, "--allow-run", StringComparison.Ordinal))
-            {
-                allowRun = true;
-                continue;
-            }
-
-            if (!TryTakeValue(argv, ref i, out var name, out var value, out error))
-            {
-                return false;
-            }
-
-            switch (name)
-            {
-                case "--vault":
-                    if (!Once(ref vault, value, name, out error))
-                    {
-                        return false;
-                    }
-
-                    break;
-
-                case "--client-label":
-                    if (!Once(ref label, value, name, out error))
-                    {
-                        return false;
-                    }
-
-                    break;
-
-                case "--audit-log":
-                    if (!Once(ref auditPath, value, name, out error))
-                    {
-                        return false;
-                    }
-
-                    break;
-
-                case "--expose":
-                    globs.Add(value);
-                    break;
-
-                case "--approver":
-                    if (!Once(ref approver, value, name, out error))
-                    {
-                        return false;
-                    }
-
-                    break;
-
-                default:
-                    error = $"unknown option '{name}'";
-                    return false;
-            }
+            return false;
         }
+
+        if (line.WantsHelp || line.Operands is ["help"])
+        {
+            options = Help();
+            return true;
+        }
+
+        if (line.Operands.Count > 0)
+        {
+            error = $"unexpected argument '{line.Operands[0]}'";
+            return false;
+        }
+
+        var vault = line.Value("vault");
+        var label = line.Value("client-label");
+        var auditPath = line.Value("audit-log");
+        var approver = line.Value("approver");
+        var allowRun = line.HasFlag("allow-run");
+        var globs = line.Values("expose");
 
         // No globs means the default, applied here and on purpose. EntryExposure itself treats an
         // empty set as "nothing", so "the user said nothing" can never collapse into "everything".
@@ -238,54 +200,4 @@ internal sealed record ServerOptions
         ApproverName = string.Empty,
         WantsHelp = true,
     };
-
-    private static bool Once(ref string? slot, string value, string name, out string error)
-    {
-        if (slot is not null)
-        {
-            error = $"{name} was given more than once";
-            return false;
-        }
-
-        slot = value;
-        error = string.Empty;
-        return true;
-    }
-
-    /// <summary>Reads <c>--name value</c> or <c>--name=value</c>.</summary>
-    private static bool TryTakeValue(
-        string[] argv,
-        ref int index,
-        out string name,
-        out string value,
-        out string error)
-    {
-        var argument = argv[index];
-        name = argument;
-        value = string.Empty;
-        error = string.Empty;
-
-        if (!argument.StartsWith("--", StringComparison.Ordinal))
-        {
-            error = $"unexpected argument '{argument}'";
-            return false;
-        }
-
-        var equals = argument.IndexOf('=', StringComparison.Ordinal);
-        if (equals >= 0)
-        {
-            name = argument[..equals];
-            value = argument[(equals + 1)..];
-            return true;
-        }
-
-        if (index + 1 >= argv.Length)
-        {
-            error = $"{name} needs a value";
-            return false;
-        }
-
-        value = argv[++index];
-        return true;
-    }
 }

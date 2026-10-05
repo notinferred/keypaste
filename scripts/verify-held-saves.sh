@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every CLI verb that saves takes the vault's claim (N.10, V-N.10), across real processes: the shipped
-# keypaste and keypaste-mcp, tests/Keypaste.AppDriver holding the vault as launch composes the app, and
+# keypaste and keypaste mcp, tests/Keypaste.AppDriver holding the vault as launch composes the app, and
 # `keypaste agent` answering in its terminal.
 #
 # While the app, then keypaste agent, holds the vault, add, rm, access, env set, env rm, env pull and
@@ -26,7 +26,6 @@ DIE_FILES='HOLD_OUT AGENT_ERR OUT ERR VERB_ERR'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
@@ -119,7 +118,7 @@ refuse_all() {
 # Opens a bridge labelled $1 and sets its reply files.
 bridge() {
   exec 8>&-
-  exec 8> >(exec 7>&- 9>&-; exec "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$1" >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&- 9>&-; exec "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$1" >"$OUT" 2>"$ERR")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-held-saves","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 }

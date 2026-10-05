@@ -155,7 +155,7 @@ cd keypaste
 dotnet build keypaste.slnx -c Release
 ```
 
-`keypaste` lands at `artifacts/bin/Keypaste.Cli/release/` and `keypaste-mcp` at `artifacts/bin/Keypaste.Mcp/release/` (`.exe` on Windows). This is also the only supported route on Intel Macs, on musl distributions such as Alpine, and on Windows on ARM.
+`keypaste` lands at `artifacts/bin/Keypaste.Cli/release/` (`.exe` on Windows), and in source it is also the MCP bridge, run as `keypaste mcp`. This is also the only supported route on Intel Macs, on musl distributions such as Alpine, and on Windows on ARM.
 
 ## Sixty seconds to a project with no `.env` in it
 
@@ -346,7 +346,7 @@ Each audit record includes its predecessor's hash. `keypaste log verify` checks 
 | --- | --- | --- |
 | `keypaste-core` | `src/Keypaste.Core` | shared vault library |
 | `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` |
-| `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp`, a stdio forwarding bridge |
+| `keypaste-mcp` | `src/Keypaste.Mcp` | the stdio forwarding bridge, inside `keypaste` as `keypaste mcp`; `v0.3.0` ships it as `keypaste-mcp` |
 | `keypaste-app` | `src/Keypaste.App` | desktop app; source builds and CI packages, no public release |
 
 ## Vault format
@@ -375,7 +375,7 @@ bash scripts/verify.sh
 
 The command runs the checks that the working tree's changes affect and logs each one it skips; `--all` runs everything. A full run validates workflows, restores locked dependencies, checks formatting and builds both solutions plus the separate CLI/desktop consistency project, exercises offline script fixtures and real CLI/MCP process interactions, then runs their Release tests. The PowerShell wrapper selects Git Bash. `--list` prints the selection and commands without executing them, and `--from <profile>` resumes after a failure. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns the final verification procedure. Other operating systems, NativeAOT and release installation retain their separate gates. To run the CLI after building, use `dotnet run --project src/Keypaste.Cli -c Release`.
 
-Builds treat warnings as errors and enforce code style. Declare dependencies in `Directory.Packages.props` and the project, then run `dotnet restore --force-evaluate` and commit updated lock files. Changes to `RuntimeIdentifiers` also require regenerated locks; otherwise `--locked-mode` fails with NU1004.
+Builds treat warnings as errors and enforce code style. Declare dependencies in `Directory.Packages.props` and the project, then regenerate the lock files with `bash scripts/dev.sh --relock`, which runs `dotnet restore --force-evaluate` on CI's SDK and writes the changed ones into your tree, and commit them. Changes to `RuntimeIdentifiers` also require regenerated locks; otherwise `--locked-mode` fails with NU1004.
 
 Do not pass `-r` to restore. It narrows the runtime identifier set and conflicts with lock files recording all four targets. The projects already declare their RIDs and `PublishAot=true`; restore with `dotnet restore --locked-mode` and select a RID only when publishing.
 

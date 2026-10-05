@@ -47,7 +47,7 @@ namespace Keypaste.Core.Audit;
 /// <b>Reading it while a server is running.</b> The file is opened <see cref="FileShare.ReadWrite"/>
 /// so it can be read live, but a reader has to grant the same courtesy back:
 /// <see cref="File.ReadAllLines(string)"/> and friends ask for <see cref="FileShare.Read"/>, which
-/// denies other <em>writers</em> and therefore fails outright on Windows while any keypaste-mcp
+/// denies other <em>writers</em> and therefore fails outright on Windows while any bridge
 /// holds the log. <c>keypaste log</c> opens with <see cref="FileShare.ReadWrite"/> or it would not
 /// work on the platform where people are most likely to have two clients running at once.
 /// </para>

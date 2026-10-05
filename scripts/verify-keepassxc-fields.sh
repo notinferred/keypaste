@@ -12,7 +12,7 @@
 # and after KeePassXC merges in a newer copy of the entry, keypaste reads KeePassXC's value and the
 # entry's history holds both values keypaste saved (F.27).
 # On a second vault KeePassXC made, `api/OpenAI` holds a password, a protected `OPENAI_API_KEY`,
-# `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste agent` and `keypaste-mcp` release
+# `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste agent` and `keypaste mcp` release
 # `OPENAI_API_KEY` alone and refuse the other names without asking anyone, and the `run` tool naming
 # its reference is asked about as the entry and the field. A rule naming the field releases it
 # unprompted while the password reaches a person, and a rule naming `Recovery codes` releases
@@ -31,7 +31,6 @@
 # Env:    KP_COMPAT_PASSWORD   master password for the vault         (required)
 #         KPXC_CLI             path to keepassxc-cli                 (default: PATH lookup)
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
-#         KEYPASTE_MCP_BIN     path to the keypaste-mcp binary       (default: the Release build)
 #         KEYPASTE_APP_DRIVER  path to tests/Keypaste.AppDriver      (default: the Release build)
 set -euo pipefail
 
@@ -46,7 +45,6 @@ require curl
 require node
 
 kp=$(keypaste_bin)
-mcp=$(keypaste_mcp)
 drv=$(app_driver)
 site=$(cd "$(dirname "${BASH_SOURCE[0]}")/../site" && pwd)
 wrangler="$site/node_modules/wrangler/bin/wrangler.js"
@@ -262,7 +260,7 @@ history=$(history_xml)
 grep -qF "$first" <<<"$history" || die "after the merge the history lost the first of the two values saved in one second"
 grep -qF "$saved" <<<"$history" || die "after the merge the history lost the second of the two values saved in one second"
 
-step "a real keypaste agent and keypaste-mcp release the env-named field KeePassXC wrote, and no other"
+step "a real keypaste agent and keypaste mcp release the env-named field KeePassXC wrote, and no other"
 openai="$dir/openai.kdbx"
 cat >"$dir/openai.xml" <<EOF
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
@@ -331,7 +329,7 @@ ask_field() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"api/OpenAI\",\"field\":\"$field\",\"reason\":\"fields gate\",\"ttl_seconds\":60}}}"
     sleep "$wait"
-  } | "$mcp" mcp --vault "$(native "$openai")" --expose 'api/**' --audit-log "$(native "$audit")" --approver "$pipe" \
+  } | "$kp" mcp --vault "$(native "$openai")" --expose 'api/**' --audit-log "$(native "$audit")" --approver "$pipe" \
         --client-label fields-probe >"$out" 2>"$dir/field-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/field-$id.err")"
   tr -d '\r' <"$out"
 }
@@ -358,7 +356,7 @@ run_dir=$(native "$(cd "$dir/project" && pwd -P)")
   jq -cn --arg dir "$run_dir" \
     '{jsonrpc:"2.0",id:7,method:"tools/call",params:{name:"run",arguments:{command:["sh","-c","printf %s \"$OPENAI_API_KEY\""],directory:$dir,env:{OPENAI_API_KEY:"kp:///api/OpenAI#OPENAI_API_KEY"},reason:"fields gate run"}}}'
   sleep 8
-} | "$mcp" mcp --vault "$(native "$openai")" --expose 'api/**' --allow-run --audit-log "$(native "$audit")" --approver "$pipe" \
+} | "$kp" mcp --vault "$(native "$openai")" --expose 'api/**' --allow-run --audit-log "$(native "$audit")" --approver "$pipe" \
       --client-label fields-probe >"$dir/run-tool.out" 2>"$dir/run-tool.err" || die "keypaste mcp exited non-zero: $(cat "$dir/run-tool.err")"
 jq -e 'select(.id == 7) | .result.isError == true' <"$dir/run-tool.out" >/dev/null || die "the denied run was not refused: $(cat "$dir/run-tool.out")"
 LC_ALL=C grep -Eq '^  injects +OPENAI_API_KEY +api/OpenAI .{1,3} OPENAI_API_KEY +inject only' "$agent_err" \
@@ -416,7 +414,7 @@ for value in "${others[@]}"; do
   grep -q "$value" "$dir/codes-run.out" "$dir/env-file.err" && die "'$value' reached the terminal through run --env-file"
 done
 
-step "a real keypaste-mcp asks the app's own prompt window on an untouched copy: Allow once releases the field alone, and the hour serves no other"
+step "a real keypaste mcp asks the app's own prompt window on an untouched copy: Allow once releases the field alone, and the hour serves no other"
 hold_out="$dir/hold.out"
 app_audit="$dir/app-audit.jsonl"
 DIE_FILES='hold_out bridge_out'
@@ -433,7 +431,7 @@ app_request() {
 app_prompt() {
   bridge_out="$dir/app-$1.out"
   exec 8>&-
-  exec 8> >(exec 7>&-; exec "$mcp" mcp --vault "$(native "$app_openai")" --expose 'api/**' --audit-log "$(native "$app_audit")" \
+  exec 8> >(exec 7>&-; exec "$kp" mcp --vault "$(native "$app_openai")" --expose 'api/**' --audit-log "$(native "$app_audit")" \
     --client-label fields-probe >"$bridge_out" 2>"$dir/app-$1.err")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"fields-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8

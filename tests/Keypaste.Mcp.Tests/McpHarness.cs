@@ -16,7 +16,7 @@ namespace Keypaste.Mcp.Tests;
 /// <para>
 /// Two anonymous pipes rather than a child process. That keeps the real JSON-RPC framing, the real
 /// <c>initialize</c> handshake, the real serializer and the real tool dispatch — everything except
-/// <c>StdioServerTransport</c> and <c>Main</c>, which is what
+/// <c>StdioServerTransport</c> and <c>BridgeEntry.RunAsync</c>, which is what
 /// <c>scripts/verify-mcp-stdio.sh</c> covers.
 /// </para>
 /// <para>
@@ -36,7 +36,7 @@ internal sealed class McpHarness : IAsyncDisposable
     /// </summary>
     internal const string ClientLabel = "test-label";
 
-    private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-mcp-tests-").FullName;
+    private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-bridge-tests-").FullName;
     private readonly List<IDisposable> _owned = [];
 
     private readonly ApproverConnection _approver;

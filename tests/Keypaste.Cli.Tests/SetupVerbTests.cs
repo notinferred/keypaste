@@ -1,3 +1,4 @@
+using Keypaste.Core.Clients;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -19,10 +20,6 @@ public sealed class SetupVerbTests
     {
         var harness = new CliHarness();
 
-        // setup looks for keypaste-mcp beside the running binary, which in a test is the test host.
-        // Passing --server-path is how the tests avoid depending on where that happens to be.
-        File.WriteAllText(ServerPath(harness), "not a real binary");
-
         foreach (var executable in installed)
         {
             harness.ProcessRunner.Installed.Add(executable);
@@ -34,7 +31,7 @@ public sealed class SetupVerbTests
     private static bool Adds(string call) => call.Contains("mcp add", StringComparison.Ordinal);
 
     private static string ServerPath(CliHarness harness) =>
-        Path.Combine(harness.Directory, "keypaste-mcp");
+        Path.Combine(harness.Directory, McpServerLocator.ExecutableName);
 
     private static int RunSetup(CliHarness harness, params string[] extra)
     {
@@ -42,7 +39,6 @@ public sealed class SetupVerbTests
         [
             "setup",
             "--vault", harness.VaultPath,
-            "--server-path", ServerPath(harness),
         ];
 
         return harness.Run([.. baseArgs, .. extra]);
@@ -59,6 +55,37 @@ public sealed class SetupVerbTests
         Assert.Contains("mcp add --scope user --transport stdio keypaste --", call, StringComparison.Ordinal);
         Assert.Contains("--client-label claude-code", call, StringComparison.Ordinal);
         Assert.Contains(harness.VaultPath, call, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The keypaste that runs setup is the bridge, so a client is told to start it as <c>keypaste mcp</c>,
+    /// with <c>mcp</c> before the bridge's own flags.
+    /// </summary>
+    [Fact]
+    public void The_running_keypaste_is_started_as_the_bridge()
+    {
+        using var harness = Wired("claude");
+
+        Assert.Equal(CliApp.ExitSuccess, RunSetup(harness, "--client", "claude-code"));
+
+        var call = Assert.Single(harness.ProcessRunner.RealCalls, Adds);
+        Assert.Contains($"-- {ServerPath(harness)} mcp --vault ", call, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Run through <c>dotnet</c>, the running program is not keypaste, and registering it would start the
+    /// wrong thing.
+    /// </summary>
+    [Fact]
+    public void Setup_run_through_dotnet_registers_nothing()
+    {
+        using var harness = Wired("claude");
+        harness.ProcessPath = Path.Combine(harness.Directory, "dotnet");
+
+        Assert.NotEqual(CliApp.ExitSuccess, RunSetup(harness, "--client", "claude-code"));
+
+        Assert.DoesNotContain(harness.ProcessRunner.RealCalls, Adds);
+        Assert.Contains("rather than through dotnet", harness.Err, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -169,7 +196,7 @@ public sealed class SetupVerbTests
     }
 
     /// <summary>
-    /// Omitted rather than restated: <c>keypaste-mcp</c> owns the default, so there is one place a
+    /// Omitted rather than restated: the bridge owns the default, so there is one place a
     /// reader can learn what it is.
     /// </summary>
     [Fact]
@@ -250,7 +277,7 @@ public sealed class SetupVerbTests
         var home = harness.Environment[Keypaste.Core.Audit.KeypasteHome.EnvironmentVariable];
         Keypaste.Core.Settings.ChosenVault.Choose(home, harness.VaultPath, onlyIfNone: false);
 
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code"));
 
         var call = Assert.Single(harness.ProcessRunner.RealCalls, Adds);
         Assert.DoesNotContain("--vault", call, StringComparison.Ordinal);
@@ -264,7 +291,7 @@ public sealed class SetupVerbTests
     {
         using var harness = Wired("claude");
 
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code"));
 
         Assert.DoesNotContain("--vault", Assert.Single(harness.ProcessRunner.RealCalls, Adds), StringComparison.Ordinal);
         Assert.Contains("vault          none chosen yet", harness.Out, StringComparison.Ordinal);
@@ -277,7 +304,7 @@ public sealed class SetupVerbTests
         using var harness = Wired("claude");
         harness.Environment[VaultLocator.EnvironmentVariable] = harness.VaultPath;
 
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code"));
 
         Assert.Contains($"--vault {harness.VaultPath}", Assert.Single(harness.ProcessRunner.RealCalls, Adds), StringComparison.Ordinal);
         Assert.EndsWith($"  keypaste agent --vault {harness.VaultPath}", harness.Out.TrimEnd(), StringComparison.Ordinal);
@@ -290,7 +317,7 @@ public sealed class SetupVerbTests
         Keypaste.Core.Settings.ChosenVault.Choose(harness.Environment[Keypaste.Core.Audit.KeypasteHome.EnvironmentVariable], harness.VaultPath, onlyIfNone: false);
         harness.Environment[VaultLocator.EnvironmentVariable] = harness.VaultPath;
 
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code"));
 
         Assert.DoesNotContain("--vault", Assert.Single(harness.ProcessRunner.RealCalls, Adds), StringComparison.Ordinal);
         Assert.EndsWith("  keypaste agent", harness.Out.TrimEnd(), StringComparison.Ordinal);
@@ -304,7 +331,7 @@ public sealed class SetupVerbTests
 
         Assert.Equal(
             CliApp.ExitSuccess,
-            harness.Run("setup", "--vault", harness.VaultPath, "--server-path", ServerPath(harness)));
+            harness.Run("setup", "--vault", harness.VaultPath));
 
         var call = Assert.Single(harness.ProcessRunner.RealCalls, Adds);
         Assert.Contains(Path.GetFullPath(harness.VaultPath), call, StringComparison.Ordinal);

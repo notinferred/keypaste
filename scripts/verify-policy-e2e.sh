@@ -37,7 +37,6 @@ DIE_FILES='AGENT_ERR OUT ERR'
 require jq
 
 CLI="$(keypaste_bin)"
-MCP="$(keypaste_mcp)"
 
 WORK="$(mktemp -d)"
 readonly VAULT="$WORK/vault.kdbx"
@@ -159,7 +158,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"$field\",\"reason\":\"ci policy probe\",\"ttl_seconds\":$ttl}}}"
     sleep 6
-  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" "$@" \
+  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" "$@" \
         >"$out" 2>"$WORK/mcp-stderr.txt" || die "keypaste mcp exited non-zero"
 }
 

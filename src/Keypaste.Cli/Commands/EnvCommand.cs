@@ -64,7 +64,7 @@ internal static class EnvCommand
     }
 
     /// <summary>The option every env verb takes to name a profile.</summary>
-    internal static readonly OptionSpec ProfileOption = new("profile", TakesValue: true, Short: 'p');
+    internal static readonly OptionSpec ProfileOption = new("profile", TakesValue: true, Alias: 'p');
 
     /// <summary>The option the env writers take to name the entry a key is written on or removed from.</summary>
     internal static readonly OptionSpec EntryOption = new("entry", TakesValue: true);

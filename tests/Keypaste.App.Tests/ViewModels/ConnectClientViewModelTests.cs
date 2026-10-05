@@ -21,7 +21,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
 {
     private const string _secret = "released-value-the-screen-must-never-hold";
 
-    private static readonly McpServerCommand _server = new(Path.Combine(Path.GetTempPath(), "keypaste-mcp"), []);
+    private static readonly McpServerCommand _server = new(Path.Combine(Path.GetTempPath(), "keypaste"), [McpServerLocator.BridgeArgument]);
 
     private readonly TempVault _fixture = new();
     private readonly AppVaultSession _session;

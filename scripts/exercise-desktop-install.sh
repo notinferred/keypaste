@@ -100,7 +100,7 @@ classify() {
     if [ "$(fact_of "$dir" vault_changed_by_edit)" != true ]; then result=contradiction; why='Save completed and the vault file did not change'
     elif [ -z "$readback" ]; then result=unreached; why='no CLI/MCP read of the saved username'
     elif [ "$readback" != "$nonce" ]; then result=contradiction; why="the app saved '$nonce' and the CLI/MCP read '$readback'"
-    else result=pass; why='the username saved in the app is the one keypaste-mcp released'
+    else result=pass; why='the username saved in the app is the one keypaste mcp released'
     fi
   fi
   emit edit
@@ -120,7 +120,7 @@ classify() {
   blocked=''
   [ "${results[install]}" = pass ] || blocked=install
   if judge agent-activity && judge request; then
-    if [ "$(fact_of "$dir" mcp_error)" != false ]; then result=contradiction; why='keypaste-mcp reported the approved request as an error'
+    if [ "$(fact_of "$dir" mcp_error)" != false ]; then result=contradiction; why='keypaste mcp reported the approved request as an error'
     elif [ "$(fact_of "$dir" audit_decision)" != granted ]; then result=contradiction; why="the audit records $(fact_of "$dir" audit_decision), not granted"
     elif [ "$(fact_of "$dir" audit_method)" != prompt ]; then result=contradiction; why="the audit records method $(fact_of "$dir" audit_method), not a person's prompt"
     else result=pass; why="a person approved at the terminal agent; the app showed: $(fact_of "$dir" agent_activity)"
@@ -175,9 +175,8 @@ cli() { printf '%s\n' "$MASTER" | "$KP" "$@" --vault "$VAULT_NATIVE" | tr -d '\r
 fixture() {
   local vault_dir
   KP="$(find "$CLI_DIR" -maxdepth 3 -type f \( -name keypaste -o -name keypaste.exe \) | head -n 1)"
-  MCP="$(find "$CLI_DIR" -maxdepth 3 -type f \( -name keypaste-mcp -o -name keypaste-mcp.exe \) | head -n 1)"
-  [ -n "$KP" ] && [ -n "$MCP" ] || { echo "no keypaste or keypaste-mcp under $CLI_DIR"; return 1; }
-  chmod +x "$KP" "$MCP" 2>/dev/null || true
+  [ -n "$KP" ] || { echo "no keypaste under $CLI_DIR"; return 1; }
+  chmod +x "$KP" 2>/dev/null || true
   "$KP" --version | tr -d '\r' | grep -qF "$VERSION" || { echo "the CLI is not $VERSION: $("$KP" --version)"; return 1; }
 
   HOME_DIR="$OUT/home"
@@ -341,7 +340,7 @@ approval() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_GROUP/$ENTRY_TITLE\",\"field\":\"username\",\"reason\":\"4.7b reads back the username the installed app saved\",\"ttl_seconds\":60}}}"
     sleep 10
-  } | "$MCP" --vault "$VAULT_NATIVE" --expose "$ENTRY_GROUP/**" --audit-log "$(native "$audit")" --approver "$pipe" \
+  } | "$KP" mcp --vault "$VAULT_NATIVE" --expose "$ENTRY_GROUP/**" --audit-log "$(native "$audit")" --approver "$pipe" \
       --client-label install-check > "$response" 2> "$OUT/mcp-stderr.txt" || true
   act request jq -e 'select(.id == 2) | .result' "$response" || true
 

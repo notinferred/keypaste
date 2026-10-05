@@ -361,7 +361,7 @@
           "Avalonia.Desktop": "[12.1.0, )",
           "Avalonia.Fonts.Inter": "[12.1.0, )",
           "Avalonia.Themes.Fluent": "[12.1.0, )",
-          "Keypaste.Core": "[0.3.1, )",
+          "Keypaste.Core": "[0.4.0, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
       },

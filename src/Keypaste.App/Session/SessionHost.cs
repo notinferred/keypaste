@@ -10,7 +10,7 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// Serves the unlocked vault on its endpoint while the session is unlocked, so a
-/// <c>keypaste-mcp</c> configured for that vault reaches this process (D-0309).
+/// <c>keypaste mcp</c> configured for that vault reaches this process (D-0309).
 /// </summary>
 /// <remarks>
 /// <para>

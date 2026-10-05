@@ -10,5 +10,5 @@ public sealed class PublisherMetadataTests
 {
     [Fact]
     public void It_is_published_as_the_project() =>
-        PublisherMetadata.IsThisProject(typeof(Program).Assembly);
+        PublisherMetadata.IsThisProject(typeof(BridgeEntry).Assembly);
 }

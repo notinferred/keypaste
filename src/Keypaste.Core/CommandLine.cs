@@ -1,23 +1,23 @@
-namespace Keypaste.Cli;
+namespace Keypaste.Core;
 
 /// <summary>Declares one option a verb accepts.</summary>
 /// <param name="Name">The long name, without the leading dashes.</param>
 /// <param name="TakesValue">Whether the option consumes a following value.</param>
-/// <param name="Short">The one-letter alias, written <c>-x</c>, or <c>'\0'</c> for none.</param>
+/// <param name="Alias">The one-letter alias, written <c>-x</c>, or <c>'\0'</c> for none.</param>
 /// <param name="Repeats">Whether the option may be given more than once, each value kept in order.</param>
-internal readonly record struct OptionSpec(string Name, bool TakesValue, char Short = '\0', bool Repeats = false);
+public readonly record struct OptionSpec(string Name, bool TakesValue, char Alias = '\0', bool Repeats = false);
 
 /// <summary>
-/// A hand-rolled parser for one verb's arguments.
+/// A hand-rolled parser for one command's arguments: each CLI verb's and the MCP bridge's.
 /// </summary>
 /// <remarks>
-/// Hand-rolled because <c>System.CommandLine</c> is a NuGet package and <c>src/</c> carries no
-/// dependencies (DECISIONS.md D-0004). It handles exactly what keypaste's five verbs need —
-/// long options with or without values, <c>--</c>, and positional operands — and deliberately
-/// does not grow into a framework. Short options are declared per verb, never bundled: <c>-x</c>
+/// Hand-rolled because <c>System.CommandLine</c> is a NuGet package and <c>Keypaste.Core</c> carries
+/// none (DECISIONS.md D-0004). It handles exactly what keypaste's commands need — long options with or
+/// without values, repeated where declared, <c>--</c>, and positional operands — and deliberately
+/// does not grow into a framework. Short options are declared per command, never bundled: <c>-x</c>
 /// is its long option's alias, and an undeclared one stays an operand.
 /// </remarks>
-internal sealed class CommandLine
+public sealed class CommandLine
 {
     private readonly Dictionary<string, string?> _options;
     private readonly Dictionary<string, List<string>> _values;
@@ -31,31 +31,34 @@ internal sealed class CommandLine
     }
 
     /// <summary>Positional arguments, in order.</summary>
-    internal IReadOnlyList<string> Operands => _operands;
+    public IReadOnlyList<string> Operands => _operands;
 
     /// <summary>Whether <c>--help</c> or <c>-h</c> was given.</summary>
-    internal bool WantsHelp => _options.ContainsKey("help");
+    public bool WantsHelp => _options.ContainsKey("help");
 
     /// <summary>Whether a valueless option was given.</summary>
-    internal bool HasFlag(string name) => _options.ContainsKey(name);
+    public bool HasFlag(string name) => _options.ContainsKey(name);
 
     /// <summary>The value of an option, or <see langword="null"/> if it was not given.</summary>
-    internal string? Value(string name) => _options.TryGetValue(name, out var value) ? value : null;
+    public string? Value(string name) => _options.TryGetValue(name, out var value) ? value : null;
 
     /// <summary>Every value an option was given, in order; empty if it was not given.</summary>
-    internal IReadOnlyList<string> Values(string name) => _values.TryGetValue(name, out var values) ? values : [];
+    public IReadOnlyList<string> Values(string name) => _values.TryGetValue(name, out var values) ? values : [];
 
     /// <summary>
     /// Parses <paramref name="args"/> from <paramref name="start"/> against <paramref name="spec"/>.
     /// </summary>
     /// <returns><see langword="false"/> with <paramref name="error"/> set on any malformed input.</returns>
-    internal static bool TryParse(
+    public static bool TryParse(
         string[] args,
         int start,
         IReadOnlyList<OptionSpec> spec,
         out CommandLine line,
         out string error)
     {
+        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(spec);
+
         Dictionary<string, string?> options = new(StringComparer.Ordinal);
         Dictionary<string, List<string>> values = new(StringComparer.Ordinal);
         List<string> operands = [];
@@ -172,7 +175,7 @@ internal sealed class CommandLine
     {
         foreach (var candidate in spec)
         {
-            if (candidate.Short != '\0' && candidate.Short == letter)
+            if (candidate.Alias != '\0' && candidate.Alias == letter)
             {
                 return candidate;
             }

@@ -4,7 +4,7 @@
 The top window replays keypaste agent's pseudo-terminal byte for byte, colour escapes included; the
 commands typed at its shell are animated at the tape's typing speed, and nothing a program did not
 print is drawn into a terminal body. The bottom window shows the scripted MCP client's calls and the
-text keypaste-mcp returned to it, verbatim. Keys the person pressed, which the approver does not
+text keypaste mcp returned to it, verbatim. Keys the person pressed, which the approver does not
 echo, are named in the window header while they take effect.
 
 Needs Pillow and ffmpeg on PATH.
@@ -356,7 +356,7 @@ def render(tape, output):
     painter = Painter(tape["columns"])
     windows = {
         "top": Window(painter, TOP_ROWS, "keypaste agent", cursor=True),
-        "bottom": Window(painter, BOTTOM_ROWS, "agent: a scripted MCP client, over stdio to keypaste-mcp", cursor=False),
+        "bottom": Window(painter, BOTTOM_ROWS, "agent: a scripted MCP client, over stdio to keypaste mcp", cursor=False),
     }
     height = MARGIN * 2 + GAP + windows["top"].height() + windows["bottom"].height()
     actions = timeline(tape)

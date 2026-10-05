@@ -181,7 +181,6 @@ jobs:
     env:
       VERSION: ${{ needs.guard.outputs.version }}
       KEYPASTE_BIN: artifacts/release/${{ matrix.rid }}/keypaste
-      KEYPASTE_MCP_BIN: artifacts/release/${{ matrix.rid }}/keypaste
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -223,10 +222,8 @@ jobs:
         run: |
           # Verification scripts otherwise fall back to the JIT build when an override is missing.
           rm -rf artifacts/bin
-          for n in keypaste; do
-            p="artifacts/release/${{ matrix.rid }}/$n"
-            [ -x "$p" ] || [ -x "$p.exe" ] || { echo "::error::no native $n"; exit 1; }
-          done
+          p="artifacts/release/${{ matrix.rid }}/keypaste"
+          [ -x "$p" ] || [ -x "$p.exe" ] || { echo "::error::no native keypaste"; exit 1; }
           for stray in artifacts/release/${{ matrix.rid }}/*.dll artifacts/release/${{ matrix.rid }}/*.runtimeconfig.json; do
             [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not an AOT binary"; exit 1; }
           done
@@ -356,12 +353,10 @@ jobs:
           out="artifacts/dist"; mkdir -p "$out"
           stage="artifacts/stage"; rm -rf "$stage"; mkdir -p "$stage"
           src="artifacts/release/${{ matrix.rid }}"
-          for n in keypaste; do
-            if   [ -f "$src/$n" ];     then cp "$src/$n"     "$stage/"
-            elif [ -f "$src/$n.exe" ]; then cp "$src/$n.exe" "$stage/"
-            else echo "::error::$n is missing from $src"; exit 1
-            fi
-          done
+          if   [ -f "$src/keypaste" ];     then cp "$src/keypaste"     "$stage/"
+          elif [ -f "$src/keypaste.exe" ]; then cp "$src/keypaste.exe" "$stage/"
+          else echo "::error::keypaste is missing from $src"; exit 1
+          fi
           cp LICENSE THIRD_PARTY_NOTICES.md "$stage"/
           name="keypaste-${VERSION}-${{ matrix.rid }}"
           if [ "${{ matrix.archive }}" = "zip" ]; then

@@ -8,7 +8,7 @@
 #   - a per-machine package, or a signature on a package the definition declares unsigned;
 #   - an administrative extraction whose files differ from the staged payload, whose binary reports
 #     another version than the payload's or fails --selftest, or whose binaries do not publish as keypaste;
-#   - an extraction with no keypaste-mcp.exe answering --help beside the app, which is what a client
+#   - an extraction with no keypaste.exe beside the app answering mcp --help, which is what a client
 #     connected from the app is told to start (2.6a).
 #
 # The extraction uses `msiexec /a`, which lays the files out without installing, registering or

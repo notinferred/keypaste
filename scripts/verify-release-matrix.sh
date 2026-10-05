@@ -1574,7 +1574,6 @@ cat > "$WORK/only-length.json" <<'ONLY'
   "schema": 1,
   "components": {
     "cli": {
-      "binaries": [],
       "projects": [],
       "runtime_identifiers": [],
       "declared_not_packaged": {},

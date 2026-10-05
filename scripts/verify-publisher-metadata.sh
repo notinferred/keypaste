@@ -139,7 +139,7 @@ for dir in "$@"; do
   [ -d "$dir" ] || die "not a directory: $dir"
 
   checked=0
-  for name in keypaste keypaste-mcp keypaste-app; do
+  for name in keypaste keypaste-app; do
     check_program "$dir" "$name"
   done
   check_library "$dir/Keypaste.Core.dll"
