@@ -201,7 +201,7 @@ internal static class SetupCommand
 
         var beside = Path.GetDirectoryName(Environment.ProcessPath);
         server = line.Value("server-path") is { Length: > 0 } explicitPath
-            ? File.Exists(Path.GetFullPath(explicitPath)) ? new McpServerCommand(Path.GetFullPath(explicitPath), []) : null
+            ? File.Exists(Path.GetFullPath(explicitPath)) ? new McpServerCommand(Path.GetFullPath(explicitPath), ["mcp"]) : null
             : McpServerLocator.Find(beside, context.Environment.Get("PATH"));
 
         if (server is null)
@@ -255,7 +255,7 @@ internal static class SetupCommand
 
     private static void WriteHeader(CliContext context, McpServerRegistration registration, string? chosen)
     {
-        context.Stdout.WriteLine($"keypaste-mcp   {registration.Server.Path}");
+        context.Stdout.WriteLine($"keypaste mcp   {registration.Server.Path}");
         context.Stdout.WriteLine(registration.VaultPath is { } pinned
             ? $"vault          {pinned}"
             : $"vault          {chosen ?? "none chosen yet"} (the chosen vault; the client's entry names none)");
@@ -282,7 +282,7 @@ internal static class SetupCommand
     private static void WriteNextStep(CliContext context, McpServerRegistration registration)
     {
         context.Stdout.WriteLine();
-        context.Stdout.WriteLine("Nothing is granted yet. keypaste-mcp holds no vault and decides nothing.");
+        context.Stdout.WriteLine("Nothing is granted yet. keypaste mcp holds no vault and decides nothing.");
         context.Stdout.WriteLine("Unlock the vault in the keypaste app, or start the process that decides in a terminal:");
         context.Stdout.WriteLine();
         context.Stdout.WriteLine(registration.VaultPath is { } pinned ? $"  keypaste agent --vault {pinned}" : "  keypaste agent");
@@ -304,7 +304,7 @@ internal static class SetupCommand
         writer.WriteLine();
         writer.WriteLine("  --vault <path>      pin the clients to this vault instead of the chosen one");
         writer.WriteLine("  --client <a,b>      only these, from: " + KnownClientIds());
-        writer.WriteLine("  --server-path <p>   where keypaste-mcp is, if not beside keypaste or on PATH");
+        writer.WriteLine("  --server-path <p>   where keypaste is, if not beside keypaste-app or on PATH");
         writer.WriteLine("  --label <name>      what the audit log calls the client (default: its id)");
         writer.WriteLine("  --expose <globs>    widen what may be named. Default is env/** and nothing else");
         writer.WriteLine("  --dry-run           print the exact commands and change nothing");

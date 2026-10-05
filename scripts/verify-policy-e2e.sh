@@ -159,8 +159,8 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"$field\",\"reason\":\"ci policy probe\",\"ttl_seconds\":$ttl}}}"
     sleep 6
-  } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" "$@" \
-        >"$out" 2>"$WORK/mcp-stderr.txt" || die "keypaste-mcp exited non-zero"
+  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" "$@" \
+        >"$out" 2>"$WORK/mcp-stderr.txt" || die "keypaste mcp exited non-zero"
 }
 
 # =============================================================== A: a rule that matches, no prompt

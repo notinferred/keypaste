@@ -129,8 +129,8 @@ host="$root/usr/bin/keypaste-app"
 "$host" --selftest || die "the unpacked keypaste-app failed --selftest"
 reported="$("$host" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the unpacked binary reports $reported, expected $binary_version"
-[ -x "$root/usr/bin/keypaste-mcp" ] || die "the image carries no keypaste-mcp for a connected client to start"
-case "$("$root/AppRun" mcp --help 2>&1)" in "usage: keypaste-mcp"*) ;; *) die "the image's AppRun does not start keypaste-mcp for mcp" ;; esac
+[ -x "$root/usr/bin/keypaste" ] || die "the image carries no keypaste binary for a connected client to start"
+case "$("$root/AppRun" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the image's AppRun does not start the bridge for mcp" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$root/usr/bin"
 
 echo "$(basename "$image"): keypaste $version, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files unpack byte-identical at offset $offset and pass --selftest."

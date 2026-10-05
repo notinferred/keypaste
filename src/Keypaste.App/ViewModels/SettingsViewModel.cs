@@ -285,7 +285,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
 #pragma warning disable CA1822
     internal string ChosenVaultRule =>
-        "An agent's app that is already running keeps the vault it started with until it restarts keypaste-mcp. " +
+        "An agent's app that is already running keeps the vault it started with until it restarts keypaste mcp. " +
         "A client connected with --vault keeps that vault.";
 #pragma warning restore CA1822
 

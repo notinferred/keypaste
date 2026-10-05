@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The MCP bridge is now part of the `keypaste` binary: `keypaste mcp` starts it, and `keypaste-mcp` is gone from the package. MCP client configurations that named `keypaste-mcp` need updating to `keypaste` with `["mcp"]` as arguments ([B.4b](docs/steps/B.4b.md)).
+
 Upgrade the bridge and `keypaste agent` together: they must be the same version. Approval prompts answer `d`, `o` or `h` instead of `y` or `n`. `env export` now writes `kp://` references by default and values only with `--dotenv`. `rm` moves entries to the vault's recycle bin, which saves the vault as KDBX 4.1; KeePass 2.48 and KeePassXC 2.7 or later open it. The desktop entries below ship with the first public desktop release, which is published together with this version ([RELEASE](docs/RELEASE.md)). Each entry that names a step links its record, which holds the full account.
 
 The desktop's Env profiles screen is now Projects, titled by its project and speaking of environments: each environment lists the entries tagged into it, Add entry tags another and Remove takes the tag off, each after naming the fields that join or leave, and every value shows the entry it lives on and the other environments that entry serves. Replacing or removing a key names every environment that reads its entry, Run's confirmation names the entries its values come from, and a tag that puts its entry in no project, such as `env:billing:Prod`, is listed ([C.4](docs/steps/C.4.md)).

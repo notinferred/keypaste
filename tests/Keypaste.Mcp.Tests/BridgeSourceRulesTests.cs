@@ -21,6 +21,8 @@ public sealed class BridgeSourceRulesTests
         "VaultKeyfile",
         "VaultCredentialSource",
         "VaultEntryNameLister",
+        "VaultLocator",
+        "VaultSession",
         "SecretInput",
         "KeePassInterop",
     ];

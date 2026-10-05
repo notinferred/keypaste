@@ -14,12 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-- [ ] **B.4b — Carry the MCP bridge in the CLI as `keypaste mcp`.** Needs: none.
-  - `Keypaste.Mcp` becomes a library the CLI enters through one method, dispatched before any code that opens a vault. `keypaste mcp` keeps `serve`, `setup`, `policy` and `help` and starts the bridge otherwise, with one answer to `keypaste mcp --help` ([B.4a](steps/B.4a.md) found the name taken).
-  - Source-rule tests with negative controls keep the dispatch's path into the bridge's entry method from reaching `VaultLocator`, `VaultSession` or `SecretInput`, and every other CLI file from naming `Keypaste.Mcp` or `ModelContextProtocol`, so no verb that opens a vault runs the SDK; `mcp serve`, `setup` and `policy` go to `CliApp.Run` and stay outside the first rule.
-  - A gate on the published `keypaste` proves that `mcp serve`, `mcp setup` and `mcp policy` reach their verbs and that `keypaste mcp --vault <path>` answers `initialize` as the bridge; a dispatch that takes every `mcp` argument fails it.
-  - A decision row supersedes D-0019's confinement of the MCP package to the bridge process, with PRODUCT §3.9's written justification for the SDK sharing the binary that reads the master password, and D-0334's separate payload binary. THREATS' scope follows, and T-9's account of the SDK's HTTP transports (F.31) extends to the one binary. The release definition, workflows, packaging, client catalog and gates name one binary; README's install blocks change at L.1.
-  - The trim baseline is unchanged. The lock files of `Keypaste.Cli`, `Keypaste.Cli.Tests` and `Keypaste.Consistency.Tests` gain the SDK's closure.
 
 ## T1 — Everyday vault use and recovery
 

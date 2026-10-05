@@ -8,9 +8,9 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary><c>keypaste mcp serve</c>, <c>setup</c> and <c>policy</c>: the agent verbs under the name the MCP world looks for.</summary>
 /// <remarks>
-/// <c>serve</c> and <c>setup</c> are aliases: the MCP server itself is <c>keypaste-mcp</c>, which the
-/// client starts, and <c>serve</c> is the terminal approver it talks to. <c>policy</c> reads and writes
-/// <c>clients.toml</c>, which the owner reads at each request, so it needs no vault and no owner (D-0360).
+/// <c>serve</c> and <c>setup</c> are aliases: <c>keypaste mcp</c> starts the MCP bridge, and <c>serve</c>
+/// is the terminal approver it talks to. <c>policy</c> reads and writes <c>clients.toml</c>, which the
+/// owner reads at each request, so it needs no vault and no owner (D-0360).
 /// </remarks>
 internal static class McpCommand
 {
@@ -50,7 +50,7 @@ internal static class McpCommand
         writer.WriteLine("  serve   approve agents' requests in this terminal (same as keypaste agent)");
         writer.WriteLine("  setup   point the AI clients on this machine at your vault (same as keypaste setup)");
         writer.WriteLine("  policy  how each MCP client is asked: keypaste mcp policy [<label> <session|ask|inject-only>]");
-        writer.WriteLine("the MCP server itself is keypaste-mcp; your MCP client starts it.");
+        writer.WriteLine("your MCP client starts keypaste mcp to reach the vault's owner.");
     }
 
     private static int Policy(string[] args, CliContext context)

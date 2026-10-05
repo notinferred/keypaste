@@ -28,7 +28,7 @@ namespace Keypaste.Mcp;
 internal sealed record ServerOptions
 {
     internal const string Usage = """
-        usage: keypaste-mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
+        usage: keypaste mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
                             [--allow-run] [--audit-log <path>] [--approver <name>]
 
         An MCP server that lets an AI agent ask for one credential, with your approval and a full

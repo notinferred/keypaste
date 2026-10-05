@@ -407,7 +407,7 @@ internal static class AgentCommand
         writer.WriteLine("                      [--approval-timeout <seconds>] [--max-ttl <seconds>]");
         writer.WriteLine("                      [--policy <path>]");
         writer.WriteLine();
-        writer.WriteLine("Unlocks your vault and waits. When an AI agent asks keypaste-mcp for a");
+        writer.WriteLine("Unlocks your vault and waits. When an AI agent asks keypaste mcp for a");
         writer.WriteLine("credential, the request appears here and nothing is released until you say yes.");
         writer.WriteLine("Leave this running in its own terminal; Ctrl+C locks the vault again.");
         writer.WriteLine();

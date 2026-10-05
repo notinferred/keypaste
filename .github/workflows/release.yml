@@ -181,7 +181,7 @@ jobs:
     env:
       VERSION: ${{ needs.guard.outputs.version }}
       KEYPASTE_BIN: artifacts/release/${{ matrix.rid }}/keypaste
-      KEYPASTE_MCP_BIN: artifacts/release/${{ matrix.rid }}/keypaste-mcp
+      KEYPASTE_MCP_BIN: artifacts/release/${{ matrix.rid }}/keypaste
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -205,7 +205,7 @@ jobs:
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
 
-      - name: Publish both binaries with NativeAOT
+      - name: Publish the CLI with NativeAOT
         shell: bash
         run: |
           args=(-c Release -r "${{ matrix.rid }}" --no-restore -o "artifacts/release/${{ matrix.rid }}")
@@ -213,18 +213,17 @@ jobs:
             args+=("-p:VersionSuffix=${{ needs.guard.outputs.suffix }}")
           fi
           dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj "${args[@]}" 2>&1 | tee /tmp/publish-cli.log
-          dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj "${args[@]}" 2>&1 | tee /tmp/publish-mcp.log
 
       - name: Verify the AOT trim diagnostics still match the baseline
         shell: bash
-        run: scripts/verify-aot-trim.sh /tmp/publish-cli.log /tmp/publish-mcp.log
+        run: scripts/verify-aot-trim.sh /tmp/publish-cli.log
 
       - name: Delete the JIT build and prove what is left is native
         shell: bash
         run: |
           # Verification scripts otherwise fall back to the JIT build when an override is missing.
           rm -rf artifacts/bin
-          for n in keypaste keypaste-mcp; do
+          for n in keypaste; do
             p="artifacts/release/${{ matrix.rid }}/$n"
             [ -x "$p" ] || [ -x "$p.exe" ] || { echo "::error::no native $n"; exit 1; }
           done
@@ -244,7 +243,7 @@ jobs:
         shell: bash
         run: scripts/verify-run-signals.sh
 
-      - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
+      - name: Verify keypaste mcp speaks MCP over stdio and audits every call
         shell: bash
         run: scripts/verify-mcp-stdio.sh
 
@@ -357,7 +356,7 @@ jobs:
           out="artifacts/dist"; mkdir -p "$out"
           stage="artifacts/stage"; rm -rf "$stage"; mkdir -p "$stage"
           src="artifacts/release/${{ matrix.rid }}"
-          for n in keypaste keypaste-mcp; do
+          for n in keypaste; do
             if   [ -f "$src/$n" ];     then cp "$src/$n"     "$stage/"
             elif [ -f "$src/$n.exe" ]; then cp "$src/$n.exe" "$stage/"
             else echo "::error::$n is missing from $src"; exit 1

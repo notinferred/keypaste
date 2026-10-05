@@ -256,8 +256,8 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"password\",\"reason\":\"projects gate\",\"ttl_seconds\":60}}}"
     sleep 8
-  } | "$mcp" --vault "$(native "$grouped")" --expose 'services/**' --expose 'env/**' --audit-log "$(native "$audit")" --approver "$pipe" \
-        --client-label projects-probe >"$out" 2>"$dir/ask-$id.err" || die "keypaste-mcp exited non-zero: $(cat "$dir/ask-$id.err")"
+  } | "$mcp" mcp --vault "$(native "$grouped")" --expose 'services/**' --expose 'env/**' --audit-log "$(native "$audit")" --approver "$pipe" \
+        --client-label projects-probe >"$out" 2>"$dir/ask-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/ask-$id.err")"
   tr -d '\r' <"$out"
 }
 granted() { jq -e --argjson id "$1" 'select(.id == $id) | .result.isError == false' >/dev/null; }

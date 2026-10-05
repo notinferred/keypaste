@@ -1,14 +1,14 @@
 namespace Keypaste.Core.Clients;
 
-/// <summary>Finds the <c>keypaste-mcp</c> a client should be told to start.</summary>
+/// <summary>Finds the <c>keypaste</c> binary a client should be told to start as <c>keypaste mcp</c>.</summary>
 /// <remarks>
-/// Beside the running program first: the two are released together, and a mismatched pair is a
+/// Beside the running program first: the CLI and the app are released together, and a mismatched pair is a
 /// class of bug nobody would enjoy diagnosing. PATH is the fallback.
 /// </remarks>
 public static class McpServerLocator
 {
-    /// <summary>The bridge's file name, without the platform's extension.</summary>
-    public const string FileName = "keypaste-mcp";
+    /// <summary>The CLI binary's file name, without the platform's extension.</summary>
+    public const string FileName = "keypaste";
 
     /// <summary>What the desktop AppImage's <c>AppRun</c> starts the bridge for.</summary>
     public const string AppImageArgument = "mcp";
@@ -26,7 +26,7 @@ public static class McpServerLocator
             && Path.Combine(besideDirectory, ExecutableName) is var beside
             && File.Exists(beside))
         {
-            return new McpServerCommand(Path.GetFullPath(beside), []);
+            return new McpServerCommand(Path.GetFullPath(beside), ["mcp"]);
         }
 
         foreach (var directory in (pathVariable ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
@@ -34,7 +34,7 @@ public static class McpServerLocator
             var candidate = Path.Combine(directory.Trim(), ExecutableName);
             if (File.Exists(candidate))
             {
-                return new McpServerCommand(Path.GetFullPath(candidate), []);
+                return new McpServerCommand(Path.GetFullPath(candidate), ["mcp"]);
             }
         }
 

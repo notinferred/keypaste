@@ -47,10 +47,10 @@ readonly ERR="$WORK/stderr.txt"
   # at its word: without this it shuts down before it has answered anything, and the gate sees an
   # empty stdout that looks like a protocol failure rather than a race in the harness.
   sleep 5
-} | "$BIN_PATH" --vault "$WORK/vault.kdbx" --audit-log "$AUDIT" --client-label ci-probe \
-      >"$OUT" 2>"$ERR" || die "keypaste-mcp exited non-zero"
+} | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --audit-log "$AUDIT" --client-label ci-probe \
+      >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero"
 
-[ -s "$OUT" ] || die "keypaste-mcp wrote nothing to stdout"
+[ -s "$OUT" ] || die "keypaste mcp wrote nothing to stdout"
 
 # 1. Everything on stdout is protocol. One stray println corrupts the stream for a real client,
 #    and the failure looks like the client is broken rather than like keypaste is.
@@ -123,7 +123,7 @@ NOINIT_OUT="$WORK/noinit-stdout.txt"
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
   sleep 3
-} | "$BIN_PATH" --vault "$WORK/noinit.kdbx" --audit-log "$NOINIT_AUDIT" --client-label ci-probe \
+} | "$BIN_PATH" mcp --vault "$WORK/noinit.kdbx" --audit-log "$NOINIT_AUDIT" --client-label ci-probe \
       >"$NOINIT_OUT" 2>/dev/null || true
 
 grep -q '"method":"not-initialized"' "$NOINIT_AUDIT" 2>/dev/null \
@@ -146,8 +146,8 @@ RUN_OUT="$WORK/run-stdout.txt"
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
   sleep 3
-} | "$BIN_PATH" --vault "$WORK/vault.kdbx" --audit-log "$WORK/run-audit.jsonl" --client-label ci-probe --allow-run \
-      >"$RUN_OUT" 2>/dev/null || die "keypaste-mcp --allow-run exited non-zero"
+} | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --audit-log "$WORK/run-audit.jsonl" --client-label ci-probe --allow-run \
+      >"$RUN_OUT" 2>/dev/null || die "keypaste mcp --allow-run exited non-zero"
 
 run_tools="$(jq -c 'select(.id == 2) | .result.tools' <"$RUN_OUT" | head -n 1)"
 [ "$(printf '%s' "$run_tools" | jq 'length')" = "3" ] || die "--allow-run did not list exactly 3 tools"
@@ -156,5 +156,25 @@ printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destr
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
   || die "a tool other than run lost its false hints"
 
-echo "ok: keypaste-mcp speaks MCP over stdio, exposes two tools, denies both calls, audits them,"
-echo "    refuses a tool call that arrives before the initialize handshake, and adds run only with --allow-run"
+# 9. The dispatch in keypaste's Program.cs reaches both sides: the bridge path and the verbs path.
+#    This is the gate B.4a noted was missing: no existing gate ran mcp serve/policy on a published
+#    binary, and no existing gate proved keypaste mcp itself reaches the bridge.
+KEYPASTE_BIN="$(keypaste_bin)"
+step "dispatch: keypaste mcp --help reaches the bridge"
+help_bridge="$("$KEYPASTE_BIN" mcp --help 2>&1)"
+case "$help_bridge" in "usage: keypaste mcp"*) ;;
+  *) die "keypaste mcp --help did not reach the bridge (got: $help_bridge)" ;; esac
+
+step "dispatch: keypaste mcp policy --json reaches the CLI verb"
+policy_out="$("$KEYPASTE_BIN" mcp policy --json 2>/dev/null)"
+printf '%s' "$policy_out" | jq -e 'type == "array"' >/dev/null \
+  || die "keypaste mcp policy --json did not return a JSON array"
+
+step "dispatch: keypaste mcp serve --help reaches AgentCommand"
+serve_help="$("$KEYPASTE_BIN" mcp serve --help 2>&1)"
+case "$serve_help" in *"usage: keypaste agent"*) ;;
+  *) die "keypaste mcp serve --help did not reach AgentCommand (got: $serve_help)" ;; esac
+
+echo "ok: keypaste mcp speaks MCP over stdio, exposes two tools, denies both calls, audits them,"
+echo "    refuses a tool call that arrives before the initialize handshake, adds run only with --allow-run,"
+echo "    and the dispatch reaches both the bridge and the CLI verbs from the published binary"

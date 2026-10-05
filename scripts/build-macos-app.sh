@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle release-targets.json declares.
 #
-# The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste-mcp it
+# The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste it
 # gives clients; the icon and licences go to Contents/Resources. Nothing is signed or notarized while the app's
 # signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool also accepts, and the
 # bundle is then checked as unzipped from that archive, including a --selftest started through LaunchServices.
@@ -23,7 +23,7 @@ jqr() { command jq -r "$@" | tr -d '\r'; }
 [ $# -eq 4 ] || die "usage: build-macos-app.sh <staged-payload-dir> <version> <binary-version> <out-dir>"
 payload="$1" version="$2" binary_version="$3" out="$4"
 [ "$(uname -s)" = Darwin ] || die "an app bundle is built and checked on macOS"
-for file in keypaste-app keypaste-mcp LICENSE THIRD_PARTY_NOTICES.md; do
+for file in keypaste-app keypaste LICENSE THIRD_PARTY_NOTICES.md; do
   [ -f "$payload/$file" ] || die "no $file in $payload"
 done
 
@@ -64,12 +64,12 @@ contents="$unzipped/keypaste.app/Contents"
 plist() { plutil -extract "$1" raw -o - "$contents/Info.plist"; }
 executable="$contents/MacOS/$(plist CFBundleExecutable)"
 [ -x "$executable" ] || die "$name names CFBundleExecutable $(plist CFBundleExecutable), which is not executable in Contents/MacOS"
-[ -x "$contents/MacOS/keypaste-mcp" ] || die "$name carries no executable keypaste-mcp"
+[ -x "$contents/MacOS/keypaste" ] || die "$name carries no executable keypaste"
 [ -f "$contents/Resources/$(plist CFBundleIconFile).icns" ] || die "$name names icon $(plist CFBundleIconFile) and carries no such .icns"
 
 reported="$("$executable" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the bundle's binary reports $reported, not $binary_version"
-case "$("$contents/MacOS/keypaste-mcp" --help 2>&1)" in "usage: keypaste-mcp"*) ;; *) die "the bundle's keypaste-mcp does not answer --help" ;; esac
+case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the bundle's keypaste does not answer mcp --help" ;; esac
 
 # LaunchServices, not a shell, reads Info.plist and starts the app from Finder or `open`; its exit code is not open's.
 : > "$work/launched"

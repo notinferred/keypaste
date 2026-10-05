@@ -119,7 +119,7 @@ refuse_all() {
 # Opens a bridge labelled $1 and sets its reply files.
 bridge() {
   exec 8>&-
-  exec 8> >(exec 7>&- 9>&-; exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$1" >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&- 9>&-; exec "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$1" >"$OUT" 2>"$ERR")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-held-saves","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 }

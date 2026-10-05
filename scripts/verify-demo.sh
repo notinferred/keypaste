@@ -170,10 +170,10 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"$REASON\",\"ttl_seconds\":900}}}"
     sleep 8
-  } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
-        >"$out" 2>"$err" || die "keypaste-mcp exited non-zero"
+  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
+        >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
 
-  grep -q '"id":1' "$out" || die "keypaste-mcp never answered initialize"
+  grep -q '"id":1' "$out" || die "keypaste mcp never answered initialize"
 }
 
 # ----------------------------------------------------------- B. the dialog, character for character
@@ -318,7 +318,7 @@ grep -q "$SECRET" "$OUT" && die "keypaste log printed the credential"
 # ------------------------------------------------------- F. the options the page tells you to type
 "$CLI" agent --help >"$WORK/agent-help.txt" 2>&1 || true
 "$CLI" log --help   >"$WORK/log-help.txt"   2>&1 || true
-"$MCP" --help       >"$WORK/mcp-help.txt"   2>&1 || true
+"$MCP" mcp --help   >"$WORK/mcp-help.txt"   2>&1 || true
 
 for opt in --vault --approver --approval-timeout --max-ttl; do
   grep -q -- "$opt" "$WORK/agent-help.txt" || die "keypaste agent no longer offers $opt, which $DOC tells you to type"
@@ -327,7 +327,7 @@ for opt in --since --denied --client; do
   grep -q -- "$opt" "$WORK/log-help.txt" || die "keypaste log no longer offers $opt, which $DOC mentions"
 done
 for opt in --vault --client-label --expose; do
-  grep -q -- "$opt" "$WORK/mcp-help.txt" || die "keypaste-mcp no longer offers $opt, which $DOC tells you to configure"
+  grep -q -- "$opt" "$WORK/mcp-help.txt" || die "keypaste mcp no longer offers $opt, which $DOC tells you to configure"
 done
 
 # The generator options README.md's "Generating one" section tells you to type, and the verb it

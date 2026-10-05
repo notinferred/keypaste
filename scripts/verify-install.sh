@@ -189,9 +189,7 @@ printed="$("$found" --version)"
 [ "$printed" = "$EXPECT" ] \
   || die "installed binary reports '$printed', the documentation installs '$EXPECT'"
 
-mcp="$(dirname "$found")/keypaste-mcp"
-[ -x "$mcp" ] || [ -x "$mcp.exe" ] || mcp="$(command -v keypaste-mcp 2>/dev/null || true)"
-[ -n "$mcp" ] || die "keypaste installed but keypaste-mcp did not; an MCP client needs both"
+case "$("$found" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "keypaste installed but does not answer mcp --help; an MCP client needs keypaste mcp" ;; esac
 
 # ---------------------------------------------------------------------------
 # It installed. Now make it do the two things the page says it is for, because "the binary starts"
@@ -242,7 +240,7 @@ exercise() {
 
 exercise "$found" "$SCRATCH/home"
 
-echo "the $OS install block works: keypaste $printed and keypaste-mcp, from a clean machine,"
+echo "the $OS install block works: keypaste $printed, from a clean machine,"
 echo "and the installed binary creates a vault and injects into a child process."
 
 [ "$NEGATIVE" = "--negative" ] || exit 0
@@ -270,8 +268,7 @@ cat > "$DECOY/payload/keypaste" <<'DEC'
 #!/usr/bin/env bash
 echo "9.9.9-decoy"
 DEC
-cp "$DECOY/payload/keypaste" "$DECOY/payload/keypaste-mcp"
-chmod +x "$DECOY/payload/keypaste" "$DECOY/payload/keypaste-mcp"
+chmod +x "$DECOY/payload/keypaste"
 tar -czf "$DECOY/decoy.tar.gz" -C "$DECOY/payload" .
 
 SHIM="$SCRATCH/shim"; mkdir -p "$SHIM"

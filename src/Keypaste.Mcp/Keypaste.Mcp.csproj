@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <RootNamespace>Keypaste.Mcp</RootNamespace>
-    <AssemblyName>keypaste-mcp</AssemblyName>
-    <!-- See Keypaste.Cli.csproj for why both of these are committed rather than passed at publish. -->
+    <!-- PublishAot keeps AOT analysis active when Keypaste.Cli references this library. -->
     <PublishAot>true</PublishAot>
-    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
     <!-- This project emits none today; the baseline gate is what keeps that true. -->
     <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
@@ -31,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Keypaste.Cli" />
     <InternalsVisibleTo Include="Keypaste.Mcp.Tests" />
     <InternalsVisibleTo Include="Keypaste.PoolStarver" />
   </ItemGroup>

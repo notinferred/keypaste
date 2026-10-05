@@ -68,7 +68,7 @@ run_server() {
     done
 
     sleep 5
-  } | "$MCP_PATH" --vault "$WORK/vault.kdbx" --audit-log "$AUDIT" --client-label ci-probe \
+  } | "$MCP_PATH" mcp --vault "$WORK/vault.kdbx" --audit-log "$AUDIT" --client-label ci-probe \
         >"$WORK/mcp-out.txt" 2>"$WORK/mcp-err.txt"
 }
 

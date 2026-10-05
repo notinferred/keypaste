@@ -31,7 +31,7 @@ internal static class Program
     internal const int ExitSuccess = 0;
     internal const int ExitRefusedToStart = 1;
 
-    private static async Task<int> Main(string[] args)
+    internal static async Task<int> Main(string[] args)
     {
         var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
 
@@ -44,7 +44,7 @@ internal static class Program
                 out var options,
                 out var error))
         {
-            await Console.Error.WriteLineAsync($"keypaste-mcp: {error}").ConfigureAwait(false);
+            await Console.Error.WriteLineAsync($"keypaste mcp: {error}").ConfigureAwait(false);
             await Console.Error.WriteLineAsync().ConfigureAwait(false);
             await Console.Error.WriteLineAsync(ServerOptions.Usage).ConfigureAwait(false);
             return ExitRefusedToStart;
@@ -60,7 +60,7 @@ internal static class Program
         // surfacing later as a mysterious per-call refusal (docs/PRODUCT.md laws 3.3 and 3.7).
         if (!AuditLog.TryOpen(options.AuditPath, TimeProvider.System, out var audit, out var auditError))
         {
-            await Console.Error.WriteLineAsync($"keypaste-mcp: {auditError}").ConfigureAwait(false);
+            await Console.Error.WriteLineAsync($"keypaste mcp: {auditError}").ConfigureAwait(false);
             return ExitRefusedToStart;
         }
 
@@ -69,7 +69,7 @@ internal static class Program
             if (audit.TightenedPermissions)
             {
                 await Console.Error
-                    .WriteLineAsync($"keypaste-mcp: tightened permissions on {audit.Path} to owner-only.")
+                    .WriteLineAsync($"keypaste mcp: tightened permissions on {audit.Path} to owner-only.")
                     .ConfigureAwait(false);
             }
 

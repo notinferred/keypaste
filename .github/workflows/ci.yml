@@ -222,7 +222,7 @@ jobs:
         shell: bash
         run: scripts/verify-run-signals.sh
 
-      - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
+      - name: Verify keypaste mcp speaks MCP over stdio and audits every call
         if: env.INTEGRATION == 'true'
         shell: bash
         run: scripts/verify-mcp-stdio.sh
@@ -382,7 +382,7 @@ jobs:
     timeout-minutes: 25
     env:
       KEYPASTE_BIN: artifacts/release/linux-x64/keypaste
-      KEYPASTE_MCP_BIN: artifacts/release/linux-x64/keypaste-mcp
+      KEYPASTE_MCP_BIN: artifacts/release/linux-x64/keypaste
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -403,16 +403,14 @@ jobs:
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
 
-      - name: Publish both binaries with NativeAOT
+      - name: Publish the CLI with NativeAOT
         run: |
           dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj -c Release -r linux-x64 \
             --no-restore -o artifacts/release/linux-x64 2>&1 | tee /tmp/publish-cli.log
-          dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj -c Release -r linux-x64 \
-            --no-restore -o artifacts/release/linux-x64 2>&1 | tee /tmp/publish-mcp.log
 
       - name: Verify the AOT trim diagnostics still match the baseline
         shell: bash
-        run: scripts/verify-aot-trim.sh /tmp/publish-cli.log /tmp/publish-mcp.log
+        run: scripts/verify-aot-trim.sh /tmp/publish-cli.log
 
       - name: Point the gates at the AOT binaries and prove they are AOT
         shell: bash
@@ -420,7 +418,7 @@ jobs:
           # Verification scripts otherwise fall back to the JIT build when an override is missing.
           rm -rf artifacts/bin
           test -x "$KEYPASTE_BIN" || { echo "::error::no AOT cli binary"; exit 1; }
-          test -x "$KEYPASTE_MCP_BIN" || { echo "::error::no AOT mcp binary"; exit 1; }
+          test -x "$KEYPASTE_MCP_BIN" || { echo "::error::no AOT keypaste binary (used as bridge)"; exit 1; }
           for stray in artifacts/release/linux-x64/*.dll artifacts/release/linux-x64/*.runtimeconfig.json; do
             [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not AOT"; exit 1; }
           done
@@ -435,7 +433,7 @@ jobs:
         shell: bash
         run: scripts/verify-run-signals.sh
 
-      - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
+      - name: Verify keypaste mcp speaks MCP over stdio and audits every call
         shell: bash
         run: scripts/verify-mcp-stdio.sh
 

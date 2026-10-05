@@ -27,7 +27,7 @@ resolve() {
   printf '%s' "$path"
 }
 keypaste_bin() { resolve KEYPASTE_BIN artifacts/bin/Keypaste.Cli/release/keypaste; }
-keypaste_mcp() { resolve KEYPASTE_MCP_BIN artifacts/bin/Keypaste.Mcp/release/keypaste-mcp; }
+keypaste_mcp() { resolve KEYPASTE_MCP_BIN artifacts/bin/Keypaste.Cli/release/keypaste; }
 app_driver() { resolve KEYPASTE_APP_DRIVER artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver; }
 vault_restorer() { resolve KEYPASTE_RESTORER artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer; }
 

@@ -110,9 +110,9 @@ diff <(listing "$payload") <(listing "$extracted") > "$work/payload.diff" \
 
 "$host" --selftest || die "the extracted keypaste-app.exe failed --selftest"
 expect "the extracted binary's version" "$("$host" --version | tr -d '[:space:]')" "$binary_version"
-bridge="$(dirname "$host")/keypaste-mcp.exe"
-[ -f "$bridge" ] || die "the extraction carries no keypaste-mcp.exe beside keypaste-app.exe for a connected client to start"
-case "$("$bridge" --help 2>&1)" in "usage: keypaste-mcp"*) ;; *) die "the extracted keypaste-mcp.exe does not answer --help" ;; esac
+bridge="$(dirname "$host")/keypaste.exe"
+[ -f "$bridge" ] || die "the extraction carries no keypaste.exe beside keypaste-app.exe for a connected client to start"
+case "$("$bridge" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the extracted keypaste.exe does not answer mcp --help" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$extracted"
 
 echo "$(basename "$msi"): keypaste $version, per-user, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files extract byte-identical and pass --selftest."

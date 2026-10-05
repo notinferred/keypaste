@@ -72,7 +72,7 @@ raise_prompt() {
   ERR="$WORK/$1-stderr.txt"
   exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec 8> >(exec 7>&-; exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&-; exec "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR")
   BRIDGE_PID=$!
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8

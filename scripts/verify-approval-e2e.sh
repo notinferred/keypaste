@@ -84,7 +84,7 @@ ERR="$WORK/no-agent-stderr.txt"
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci probe with no agent\",\"ttl_seconds\":60}}}"
   sleep 5
-} | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
+} | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
       >"$OUT" 2>"$ERR" || die "keypaste-mcp exited non-zero with no agent running"
 
 jq -e 'select(.id == 2) | .result.isError == true' <"$OUT" >/dev/null \
@@ -117,7 +117,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci approval probe\",\"ttl_seconds\":60}}}"
     sleep 8
-  } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
+  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
         >"$out" 2>"$err" || die "keypaste-mcp exited non-zero"
 }
 
@@ -157,7 +157,7 @@ ask_field() {
     jq -cn --argjson id "$id" --arg entry "$API_ENTRY" --arg field "$field" \
       '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci custom field probe",ttl_seconds:60}}}'
     sleep "$wait"
-  } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --expose 'api/**' \
+  } | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --expose 'api/**' \
         >"$out" 2>"$err" || die "keypaste-mcp exited non-zero"
 }
 
@@ -204,7 +204,7 @@ ERR="$WORK/run-stderr.txt"
   jq -cn --arg dir "$RUN_DIR" \
     '{jsonrpc:"2.0",id:9,method:"tools/call",params:{name:"run",arguments:{command:["sh","-c","printf %s \"$OPENAI_API_KEY\""],directory:$dir,env:{OPENAI_API_KEY:"kp:///api/OpenAI#OPENAI_API_KEY"},reason:"ci custom field run probe"}}}'
   sleep 8
-} | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --expose 'api/**' --allow-run \
+} | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --expose 'api/**' --allow-run \
       >"$OUT" 2>"$ERR" || die "keypaste-mcp exited non-zero"
 
 jq -e 'select(.id == 9) | .result.isError == true' <"$OUT" >/dev/null || die "a denied run was not refused"

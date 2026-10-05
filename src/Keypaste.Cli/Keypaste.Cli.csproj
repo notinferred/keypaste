@@ -37,6 +37,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
+    <ProjectReference Include="../Keypaste.Mcp/Keypaste.Mcp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

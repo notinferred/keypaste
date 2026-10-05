@@ -118,7 +118,7 @@ public sealed class CliAppTests
         Assert.Equal(CliApp.ExitUsageError, harness.Run("mcp"));
         Assert.Empty(harness.Out);
         Assert.StartsWith("usage: keypaste mcp <serve|setup|policy> [options]", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("the MCP server itself is keypaste-mcp", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("your MCP client starts keypaste mcp", harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]

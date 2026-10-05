@@ -215,7 +215,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
 
         await model.PreviewConnectCommand.ExecuteAsync();
 
-        Assert.Equal("keypaste-mcp was not found in the test's directory and on PATH, so there is nothing a client could start.", model.Message);
+        Assert.Equal("keypaste was not found in the test's directory and on PATH, so there is nothing a client could start.", model.Message);
         Assert.Empty(_runner.Calls);
     }
 

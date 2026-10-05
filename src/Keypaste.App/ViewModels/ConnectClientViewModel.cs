@@ -281,8 +281,8 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         var removing = plan.Action == McpSetupAction.Remove;
         Message = result.Status switch
         {
-            McpSetupStatus.Done when removing => $"Removed. {plan.Client.DisplayName} can no longer start keypaste-mcp for this vault.",
-            McpSetupStatus.Done => $"Connected. {plan.Client.DisplayName} starts keypaste-mcp for this vault; Check asks through it once.",
+            McpSetupStatus.Done when removing => $"Removed. {plan.Client.DisplayName} can no longer start keypaste mcp for this vault.",
+            McpSetupStatus.Done => $"Connected. {plan.Client.DisplayName} starts keypaste mcp for this vault; Check asks through it once.",
             McpSetupStatus.NotInstalled => $"{plan.Client.DisplayName} could not be started, so nothing was changed.",
             _ => $"{plan.Client.DisplayName} refused" + (result.ClientSaid is { } said ? $": {said}" : "."),
         };
@@ -304,7 +304,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             return;
         }
 
-        CheckMessage = "Starting keypaste-mcp as the client would…";
+        CheckMessage = "Starting keypaste mcp as the client would…";
         var check = await Task.Run(() => _connector.StartCheck(registration)).ConfigureAwait(true);
         if (check is null)
         {

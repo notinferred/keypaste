@@ -331,8 +331,8 @@ ask_field() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"api/OpenAI\",\"field\":\"$field\",\"reason\":\"fields gate\",\"ttl_seconds\":60}}}"
     sleep "$wait"
-  } | "$mcp" --vault "$(native "$openai")" --expose 'api/**' --audit-log "$(native "$audit")" --approver "$pipe" \
-        --client-label fields-probe >"$out" 2>"$dir/field-$id.err" || die "keypaste-mcp exited non-zero: $(cat "$dir/field-$id.err")"
+  } | "$mcp" mcp --vault "$(native "$openai")" --expose 'api/**' --audit-log "$(native "$audit")" --approver "$pipe" \
+        --client-label fields-probe >"$out" 2>"$dir/field-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/field-$id.err")"
   tr -d '\r' <"$out"
 }
 
@@ -358,8 +358,8 @@ run_dir=$(native "$(cd "$dir/project" && pwd -P)")
   jq -cn --arg dir "$run_dir" \
     '{jsonrpc:"2.0",id:7,method:"tools/call",params:{name:"run",arguments:{command:["sh","-c","printf %s \"$OPENAI_API_KEY\""],directory:$dir,env:{OPENAI_API_KEY:"kp:///api/OpenAI#OPENAI_API_KEY"},reason:"fields gate run"}}}'
   sleep 8
-} | "$mcp" --vault "$(native "$openai")" --expose 'api/**' --allow-run --audit-log "$(native "$audit")" --approver "$pipe" \
-      --client-label fields-probe >"$dir/run-tool.out" 2>"$dir/run-tool.err" || die "keypaste-mcp exited non-zero: $(cat "$dir/run-tool.err")"
+} | "$mcp" mcp --vault "$(native "$openai")" --expose 'api/**' --allow-run --audit-log "$(native "$audit")" --approver "$pipe" \
+      --client-label fields-probe >"$dir/run-tool.out" 2>"$dir/run-tool.err" || die "keypaste mcp exited non-zero: $(cat "$dir/run-tool.err")"
 jq -e 'select(.id == 7) | .result.isError == true' <"$dir/run-tool.out" >/dev/null || die "the denied run was not refused: $(cat "$dir/run-tool.out")"
 LC_ALL=C grep -Eq '^  injects +OPENAI_API_KEY +api/OpenAI .{1,3} OPENAI_API_KEY +inject only' "$agent_err" \
   || die "the run's prompt does not name api/OpenAI · OPENAI_API_KEY: $(cat "$agent_err")"
@@ -433,7 +433,7 @@ app_request() {
 app_prompt() {
   bridge_out="$dir/app-$1.out"
   exec 8>&-
-  exec 8> >(exec 7>&-; exec "$mcp" --vault "$(native "$app_openai")" --expose 'api/**' --audit-log "$(native "$app_audit")" \
+  exec 8> >(exec 7>&-; exec "$mcp" mcp --vault "$(native "$app_openai")" --expose 'api/**' --audit-log "$(native "$app_audit")" \
     --client-label fields-probe >"$bridge_out" 2>"$dir/app-$1.err")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"fields-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8

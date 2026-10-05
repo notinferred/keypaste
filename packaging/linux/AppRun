@@ -2,7 +2,6 @@
 here="$(dirname "$(readlink -f "$0")")"
 # A client connected from the app starts `<this AppImage> mcp`, because the mount path changes each launch.
 if [ "${1:-}" = mcp ]; then
-  shift
-  exec "$here/usr/bin/keypaste-mcp" "$@"
+  exec "$here/usr/bin/keypaste" "$@"
 fi
 exec "$here/usr/bin/keypaste-app" "$@"

@@ -99,7 +99,7 @@ readonly DENIED
   call 4 "$DENIED"
   wait_for_reply 4 || true
   sleep 1
-} | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --allow-run \
+} | "$MCP" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --allow-run \
       >"$OUT" 2>"$ERR" || die "keypaste-mcp exited non-zero"
 
 for id in 2 3 4; do
