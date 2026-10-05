@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Keypaste.Cli" />
+    <InternalsVisibleTo Include="keypaste" />
     <InternalsVisibleTo Include="Keypaste.Mcp.Tests" />
     <InternalsVisibleTo Include="Keypaste.PoolStarver" />
   </ItemGroup>
