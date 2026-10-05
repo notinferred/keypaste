@@ -150,6 +150,11 @@
         "resolved": "6.0.0",
         "contentHash": "GI4jcoi6eC9ZhNOQylIBaWOQjyGaR8T6N3tC1u8p3EXfndLCVNNWa+Zp+ocjvvS3kNBN09Zma2HXL0ezO0dRfw=="
       },
+      "Microsoft.Extensions.AI.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.5.2",
+        "contentHash": "Ei+YWV9Ybnps7pR1dgjlG29gelXEwZkhLVAcWmKe6HvXS6LNBYgSdWiY3Hk9OZXYtK34rv/NtLWBQYQGOBQYPQ=="
+      },
       "Microsoft.Extensions.Configuration": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -473,7 +478,8 @@
       "keypaste": {
         "type": "Project",
         "dependencies": {
-          "Keypaste.Core": "[0.3.1, )"
+          "Keypaste.Core": "[0.4.0, )",
+          "Keypaste.Mcp": "[0.4.0, )"
         }
       },
       "keypaste-app": {
@@ -483,7 +489,7 @@
           "Avalonia.Desktop": "[12.1.0, )",
           "Avalonia.Fonts.Inter": "[12.1.0, )",
           "Avalonia.Themes.Fluent": "[12.1.0, )",
-          "Keypaste.Core": "[0.3.1, )",
+          "Keypaste.Core": "[0.4.0, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
       },
@@ -491,6 +497,13 @@
         "type": "Project",
         "dependencies": {
           "KeePassLib": "[1.0.0, )"
+        }
+      },
+      "keypaste.mcp": {
+        "type": "Project",
+        "dependencies": {
+          "Keypaste.Core": "[0.4.0, )",
+          "ModelContextProtocol.Core": "[1.4.1, )"
         }
       },
       "Avalonia": {
@@ -534,6 +547,16 @@
         "contentHash": "MVi5L9HymnNm+gP2aNXNcyrP2iKGJWFubQ5Bv8/Przflxca1aIT9QBpTUV6c3olA9rLYFY7MJRR/C/BZaUhemQ==",
         "dependencies": {
           "Avalonia": "12.1.0"
+        }
+      },
+      "ModelContextProtocol.Core": {
+        "type": "CentralTransitive",
+        "requested": "[1.4.1, )",
+        "resolved": "1.4.1",
+        "contentHash": "G/hOBZkJsvF3MSy0sOvXdxca5uRe2Sb4xk7xRuTWNZI45khVBjOLo6nSzGilctIICavNVxbxUF908fLYI9RxkQ==",
+        "dependencies": {
+          "Microsoft.Extensions.AI.Abstractions": "10.5.2",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.7"
         }
       },
       "Yubico.YubiKey": {
