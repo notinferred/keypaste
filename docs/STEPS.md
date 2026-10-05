@@ -54,10 +54,6 @@ keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an 
 
 Every release still needs a person's answer or a rule they wrote, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.49 — Find why a grant did not survive a large listing on Windows.** Needs: none.
-  - Observed once, in dev run 37337588072 at `30e338f` on `task/f48`, job `test (windows-2025)`: `LargeVaultListingTests.OnALargeVault_AGrantSurvivesAListing` recorded `prompt` where `grant-cache` was expected, so the second request was asked again. It passed on Linux and macOS in that run, and failed in none of the 40 failed runs before it.
-  - A listing exchange that returns no reply makes `ApproverConnection` drop the connection and reconnect, and a grant is scoped to the connection it was given on. Whether that happened, and why the reply was lost, is what to measure.
-  - Verify: an experiment whose outcome tells a listing reply over the frame budget from a pipe failure under load, and a regression kept in the tree.
 - [ ] **C.5b — Expose tagged projects to agents.** Needs: C.1b, C.5a1.
   - The default exposure becomes `env/**` plus `tag:env:*`, and `--expose` and policy rules accept tag selectors.
   - An entry reached only through a tag exposes only its env fields.

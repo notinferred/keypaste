@@ -144,9 +144,12 @@ public sealed class ApproverListener : IDisposable
                     return;
                 }
 
-                // Not the stop token: a request a lock or a shutdown withdrew has its denial to
-                // deliver, and the bridge audits that rather than a reply that never came (D-0313).
-                using var delivery = new CancellationTokenSource(_deliveryBound);
+                // A reply is delivered for as long as its peer takes to read it, and a stop gives it one
+                // second more: a request a lock or a shutdown withdrew still has its denial to deliver,
+                // which the bridge audits rather than a reply that never came (D-0313, D-0420).
+                using var delivery = new CancellationTokenSource();
+                using var stopping = cancellationToken.Register(
+                    static state => ((CancellationTokenSource)state!).CancelAfter(_deliveryBound), delivery);
                 await framer.WriteAsync(reply, delivery.Token).ConfigureAwait(false);
             }
         }

@@ -385,7 +385,7 @@ internal sealed class SessionHost : IDisposable
 
             try
             {
-                // No time limit (D-0392): reads end on the stop token, each delivery is bounded (D-0315), and every handler must finish once withdrawn or stopped.
+                // No time limit (D-0392): reads end on the stop token, each delivery ends a second after it (D-0420), and every handler must finish once withdrawn or stopped.
                 _run.Wait();
             }
             catch (AggregateException)

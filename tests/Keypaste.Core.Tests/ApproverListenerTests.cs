@@ -192,6 +192,59 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>
+    /// A listing its bridge reads slowly is still delivered whole, and the connection keeps its grants.
+    /// </summary>
+    /// <remarks>
+    /// A full frame waits on the reader wherever the pipe holds less than a frame, as Windows' and macOS's do.
+    /// A bound on every delivery cut it after a second under load, and the bridge's reconnect then asked a
+    /// person again for what they had just approved (F.49).
+    /// </remarks>
+    [Fact]
+    public async Task AHugeListing_ReadSlowly_IsDeliveredAndTheConnectionSurvives()
+    {
+        var handler = new RecordingHandler { Names = Crowd(1000) };
+        await using var host = Host.Start(handler);
+        await using var pipe = new NamedPipeClientStream(
+            ".", host.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await pipe.ConnectAsync(Token);
+        using var framer = new MessageFramer(pipe, ownsStream: false);
+
+        await framer.WriteAsync(ApproverProtocol.Encode(new NamesRequest(["env/**"])), Token);
+        await handler.Listed.Task.WaitAsync(_connectTimeout, Token);
+        await Task.Delay(TimeSpan.FromSeconds(1.5), Token);
+
+        var listing = await framer.ReadAsync(Token);
+        Assert.NotNull(listing);
+        Assert.True(ApproverProtocol.TryDecode(listing, out NamesReply? reply));
+        Assert.False(reply.Complete);
+        Assert.NotEmpty(reply.Names);
+
+        await framer.WriteAsync(ApproverProtocol.Encode(Request()), Token);
+        Assert.NotNull(await framer.ReadAsync(Token));
+        Assert.Empty(handler.Disconnections);
+    }
+
+    /// <summary>
+    /// A reply nobody reads cannot hold a stopping listener: its delivery ends a second after the stop (D-0420).
+    /// </summary>
+    [Fact]
+    public async Task AReplyNobodyReads_EndsOneSecondAfterTheListenerStops()
+    {
+        var handler = new RecordingHandler { Names = Crowd(1000) };
+        var host = Host.Start(handler);
+        await using var pipe = new NamedPipeClientStream(
+            ".", host.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await pipe.ConnectAsync(Token);
+        using var framer = new MessageFramer(pipe, ownsStream: false);
+
+        await framer.WriteAsync(ApproverProtocol.Encode(new NamesRequest(["env/**"])), Token);
+        await handler.Listed.Task.WaitAsync(_connectTimeout, Token);
+
+        await host.DisposeAsync().AsTask().WaitAsync(_connectTimeout, Token);
+        Assert.Single(handler.Disconnections);
+    }
+
+    /// <summary>
     /// A release too large to send is answered with a refusal, and the connection lives.
     /// </summary>
     /// <remarks>
@@ -442,6 +495,8 @@ public sealed class ApproverListenerTests
 
         internal TaskCompletionSource Withdrawn { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        internal TaskCompletionSource Listed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         /// <summary>What the approver has to say. One ordinary entry unless a test says otherwise.</summary>
         internal IReadOnlyList<EntryName> Names { get; set; } = [new EntryName("env/dev", "STRIPE_KEY")];
 
@@ -454,6 +509,7 @@ public sealed class ApproverListenerTests
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
         {
             ConnectionIds.Add(connectionId);
+            Listed.TrySetResult();
 
             return ValueTask.FromResult(new NamesReply(true, Names, string.Empty, true));
         }
