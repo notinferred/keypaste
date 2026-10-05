@@ -14,11 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-- [ ] **F.50 — Let install.yml's Windows job reach the install check.** Needs: none.
-  - In every run since the schedule of 2026-09-21 (35608188051, 36442040660 and 37346630656), `install (windows-2025)` was cancelled at its 15-minute limit inside `verify-release-matrix.sh --with-public-origin`, before the install block ran; on 2026-09-16 (35047059579) the whole job took five minutes. The other three runners pass.
-  - Verify: the step's time on Windows is measured beside the other runners', its cause is named, and a run reaches and passes `verify-install.sh windows`.
-
-
 ## T1 — Everyday vault use and recovery
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
