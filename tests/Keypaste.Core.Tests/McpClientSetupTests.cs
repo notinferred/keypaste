@@ -242,7 +242,7 @@ public sealed class McpClientSetupTests : IDisposable
         var server = McpServerLocator.FindForDesktop(bin, image, Path.Combine(_directory, ".mount_other"), null)!;
 
         Assert.Equal(Path.Combine(bin, McpServerLocator.ExecutableName), server.Path);
-        Assert.Empty(server.Arguments);
+        Assert.Equal(["mcp"], server.Arguments);
     }
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
