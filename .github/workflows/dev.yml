@@ -1,6 +1,7 @@
 name: dev
 
 # K.6a: builds and tests a pushed branch so a development machine never has to; scripts/dev.sh dispatches it.
+# Each profile runs as its own job on each runner, so a run takes as long as its slowest job (F.52).
 
 on:
   workflow_dispatch:
@@ -35,8 +36,9 @@ run-name: dev ${{ github.ref_name }} ${{ inputs.target }} ${{ inputs.filter_clas
 permissions:
   contents: read
 
+# A new dispatch on a branch supersedes the run before it, whatever runners either asked for.
 concurrency:
-  group: dev-${{ github.ref }}-${{ inputs.os }}
+  group: dev-${{ github.ref }}-${{ inputs.relock }}
   cancel-in-progress: true
 
 env:
@@ -50,24 +52,30 @@ env:
 jobs:
   plan:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
+    # Reads the pass markers earlier runs left (D-0404).
+    permissions:
+      contents: read
+      actions: read
     outputs:
-      os: ${{ steps.plan.outputs.os }}
       backend: ${{ steps.plan.outputs.backend }}
       desktop: ${{ steps.plan.outputs.desktop }}
-      tests: ${{ steps.plan.outputs.tests }}
-      backend_filter: ${{ steps.plan.outputs.backend_filter }}
       desktop_filter: ${{ steps.plan.outputs.desktop_filter }}
-      gates: ${{ steps.plan.outputs.gates }}
+      desktop_os: ${{ steps.plan.outputs.desktop_os }}
+      gates_os: ${{ steps.plan.outputs.gates_os }}
+      integration_os: ${{ steps.plan.outputs.integration_os }}
+      compat_os: ${{ steps.plan.outputs.compat_os }}
+      format: ${{ steps.plan.outputs.format }}
+      tests: ${{ steps.plan.outputs.tests }}
       checks: ${{ steps.plan.outputs.checks }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          # auto compares the branch with origin/main.
+          # auto compares the branch with origin/main, and the markers' commits with this one.
           fetch-depth: 0
 
-      - name: Choose the projects, runners and gates
+      - name: Choose the jobs and their runners
         id: plan
         shell: bash
         env:
@@ -76,6 +84,7 @@ jobs:
           OS: ${{ inputs.os }}
           GATES: ${{ inputs.gates }}
           NONCE: ${{ inputs.nonce }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           for name in TARGET FILTER_CLASS OS GATES NONCE; do
@@ -98,71 +107,97 @@ jobs:
             both) integration=true compat=true ;;
             *) echo "::error::unknown gates $GATES"; exit 1 ;;
           esac
-          backend='' desktop='' backend_filter='' desktop_filter='' checks='' tests=true
+          # The requested runners less those whose marker already holds the mark.
+          unpassed() {
+            local runner list=''
+            for runner in $(jq -r '.[]' <<< "$os"); do
+              case " $passed " in *" $runner:$1 "*) ;; *) list="$list,\"$runner\"" ;; esac
+            done
+            echo "[${list#,}]"
+          }
+          # The entries of a plan's list whose runner, at the path given, was requested.
+          on_requested() { jq -c --argjson os "$os" "[.[] | select($1 as \$o | \$os | index(\$o))]"; }
+          passed='' backend='[]' desktop='' desktop_filter='' desktop_os='[]' gates_os='[]'
+          integration_os='[]' compat_os='[]' format=false tests=true checks=''
+          backend_tests='' backend_filter=''
           if [ -n "$FILTER_CLASS" ]; then
             case "$FILTER_CLASS" in
-              Keypaste.Core.Tests.*) backend=tests/Keypaste.Core.Tests backend_filter="$FILTER_CLASS" ;;
-              Keypaste.Cli.Tests.*) backend=tests/Keypaste.Cli.Tests backend_filter="$FILTER_CLASS" ;;
-              Keypaste.Mcp.Tests.*) backend=tests/Keypaste.Mcp.Tests backend_filter="$FILTER_CLASS" ;;
+              Keypaste.Core.Tests.*) backend_tests=tests/Keypaste.Core.Tests backend_filter="$FILTER_CLASS" ;;
+              Keypaste.Cli.Tests.*) backend_tests=tests/Keypaste.Cli.Tests backend_filter="$FILTER_CLASS" ;;
+              Keypaste.Mcp.Tests.*) backend_tests=tests/Keypaste.Mcp.Tests backend_filter="$FILTER_CLASS" ;;
               Keypaste.App.Tests.*) desktop=tests/Keypaste.App.Tests desktop_filter="$FILTER_CLASS" ;;
               Keypaste.Consistency.Tests.*) desktop=tests/Keypaste.Consistency.Tests desktop_filter="$FILTER_CLASS" ;;
               *) echo "::error::filter_class must begin with a test project's namespace, such as Keypaste.Core.Tests."; exit 1 ;;
             esac
           elif [ "$TARGET" = auto ]; then
-            bash scripts/verify.sh --since origin/main --plan > "$RUNNER_TEMP/plan"
+            # A job an earlier dispatch or CI run passed on the same inputs is not run again (D-0404, D-0423).
+            passed="$(bash scripts/lane-cache.sh | tr '\n' ' ')"
+            echo "already passed on these inputs: ${passed:-nothing}"
+            bash scripts/verify.sh --since origin/main --plan > "$RUNNER_TEMP/selected"
+            VERIFY_SATISFIED="$passed" bash scripts/verify.sh --since origin/main --plan > "$RUNNER_TEMP/plan"
             cat "$RUNNER_TEMP/plan"
-            lanes=" $(sed -n 's/^lanes=//p' "$RUNNER_TEMP/plan") "
-            planned_os="$(sed -n 's/^backend_os=//p' "$RUNNER_TEMP/plan")"
-            backend="$(sed -n 's/^backend_tests=//p' "$RUNNER_TEMP/plan")"
-            desktop="$(sed -n 's/^desktop_tests=//p' "$RUNNER_TEMP/plan")"
-            # The plan's filter narrows only its backend selection.
-            backend_filter="$(sed -n 's/^filter=//p' "$RUNNER_TEMP/plan")"
-            case "$lanes" in *" integration "*|*" pages "*) integration=true ;; esac
-            case "$lanes" in *" compat "*) compat=true ;; esac
+            read_plan() { sed -n "s/^$1=//p" "$RUNNER_TEMP/$2"; }
+            lanes=" $(read_plan lanes plan) "
+            backend="$(read_plan test_matrix plan | on_requested .os | jq -c '[.[] | {os, backend_tests, filter}]')"
+            integration_os="$(read_plan integration_matrix plan | on_requested .os | jq -c '[.[].os]')"
+            compat_os="$(read_plan compat_os plan | on_requested .)"
+            # Desktop marks are kept per runner here, where the plan keeps only Linux's for app.yml.
+            desktop="$(read_plan desktop_tests selected)"
+            [ -z "$desktop" ] || desktop_os="$(unpassed desktop.tests)"
+            [ "$(read_plan app_gates_os selected)" = '[]' ] || gates_os="$(unpassed desktop.gates)"
+            case "$lanes" in *" format "*) format=true ;; esac
             case "$lanes" in *" scripts "*) checks="$checks scripts" ;; esac
-            case "$lanes" in *" rules "*) checks="$checks workflows" ;; esac
+            # actionlint leaves no marker, so it follows every change to the rules' inputs.
+            case " $(read_plan lanes selected) " in *" rules "*) checks="$checks workflows" ;; esac
             checks="${checks# }"
             unrun=''
             for lane in aot appcompat markers package; do
               case "$lanes" in *" $lane "*) unrun="$unrun $lane" ;; esac
             done
             for label in windows-2025 macos-15; do
-              case "$planned_os" in *"\"$label\""*) case "$os" in *"\"$label\""*) ;; *) unrun="$unrun $label" ;; esac ;; esac
+              case "$(read_plan test_matrix plan)$(read_plan integration_matrix plan)$(read_plan compat_os plan)" in
+                *"\"$label\""*) case "$os" in *"\"$label\""*) ;; *) unrun="$unrun $label" ;; esac ;;
+              esac
             done
             [ -z "$unrun" ] || echo "::warning::the plan also selects$unrun, which this run leaves to ci.yml and app.yml"
           elif [ "$TARGET" = build ]; then
-            backend=all desktop=all tests=false
+            backend_tests=all desktop=all tests=false
           else
             for name in ${TARGET//,/ }; do
               case "$name" in
-                core) backend="$backend tests/Keypaste.Core.Tests" ;;
-                cli) backend="$backend tests/Keypaste.Cli.Tests" ;;
-                mcp) backend="$backend tests/Keypaste.Mcp.Tests" ;;
+                core) backend_tests="$backend_tests tests/Keypaste.Core.Tests" ;;
+                cli) backend_tests="$backend_tests tests/Keypaste.Cli.Tests" ;;
+                mcp) backend_tests="$backend_tests tests/Keypaste.Mcp.Tests" ;;
                 app) desktop="$desktop tests/Keypaste.App.Tests" ;;
                 consistency) desktop="$desktop tests/Keypaste.Consistency.Tests" ;;
                 *) echo "::error::target takes auto, build or a comma list of core, cli, mcp, app and consistency, not $name"; exit 1 ;;
               esac
             done
-            backend="${backend# }" desktop="${desktop# }"
+            backend_tests="${backend_tests# }" desktop="${desktop# }"
           fi
-          case "$integration:$compat" in
-            true:true) gates=both ;;
-            true:false) gates=integration ;;
-            false:true) gates=compat ;;
-            *) gates=none ;;
-          esac
-          if [ -z "$backend$desktop" ] && [ "$gates" = none ]; then
-            os='[]'
-            [ -n "$checks" ] || echo "::warning::nothing selected to build or test"
+          if [ "$TARGET" != auto ] || [ -n "$FILTER_CLASS" ]; then
+            if [ -n "$backend_tests" ]; then
+              backend="$(jq -cn --argjson os "$os" --arg tests "$backend_tests" --arg filter "$backend_filter" \
+                '[$os[] | {os: ., backend_tests: $tests, filter: $filter}]')"
+            fi
+            [ -z "$desktop" ] || desktop_os="$os"
+          fi
+          # --gates adds its gates on every requested runner to whatever the target selected.
+          if [ "$integration" = true ]; then integration_os="$os"; fi
+          if [ "$compat" = true ]; then compat_os="$os"; fi
+          if [ "$backend$desktop_os$gates_os$integration_os$compat_os" = '[][][][][]' ] && [ "$format" = false ] && [ -z "$checks" ]; then
+            echo "::warning::nothing selected to build or test"
           fi
           {
-            echo "os=$os"
             echo "backend=$backend"
             echo "desktop=$desktop"
-            echo "tests=$tests"
-            echo "backend_filter=$backend_filter"
             echo "desktop_filter=$desktop_filter"
-            echo "gates=$gates"
+            echo "desktop_os=$desktop_os"
+            echo "gates_os=$gates_os"
+            echo "integration_os=$integration_os"
+            echo "compat_os=$compat_os"
+            echo "format=$format"
+            echo "tests=$tests"
             echo "checks=$checks"
           } | tee -a "$GITHUB_OUTPUT"
 
@@ -202,48 +237,64 @@ jobs:
           path: ${{ runner.temp }}/pass.txt
           retention-days: 30
 
-  test:
-    name: test (${{ matrix.os }})
+  format:
     needs: plan
-    if: needs.plan.outputs.os != '[]' && !inputs.relock
+    if: needs.plan.outputs.format == 'true' && !inputs.relock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Check every project's format
+        run: bash scripts/verify.sh format
+
+      - name: Mark this job passed on these inputs
+        if: success()
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: pass--ubuntu-24.04--format
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
+  backend:
+    name: backend (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.backend != '[]' && !inputs.relock
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.plan.outputs.os) }}
+        include: ${{ fromJSON(needs.plan.outputs.backend) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 50
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
     env:
-      BACKEND: ${{ needs.plan.outputs.backend }}
-      DESKTOP: ${{ needs.plan.outputs.desktop }}
+      BACKEND: ${{ matrix.backend_tests }}
+      FILTER: ${{ matrix.filter }}
       TESTS: ${{ needs.plan.outputs.tests }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      # The solution files join the key so this cache never overwrites ci's or app's.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            *.slnx
-
-      - name: Install GNU timeout (macOS)
-        if: runner.os == 'macOS' && (needs.plan.outputs.desktop != '' || needs.plan.outputs.gates == 'integration' || needs.plan.outputs.gates == 'both')
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_CLEANUP: '1'
-        run: command -v gtimeout >/dev/null || brew install coreutils
 
       - name: Build and test the backend projects
-        if: needs.plan.outputs.backend != ''
-        env:
-          FILTER: ${{ needs.plan.outputs.backend_filter }}
         run: |
           set -euo pipefail
           set --
@@ -251,10 +302,66 @@ jobs:
           bash scripts/verify.sh backend --prepare-only "$@"
           if [ "$TESTS" = true ]; then bash scripts/verify.sh backend --test-only "$@" ${FILTER:+--filter-class "$FILTER"}; fi
 
-      - name: Build and test the desktop projects
-        if: needs.plan.outputs.desktop != ''
+      # The ci.yml lanes this runner ran in full, for ci.yml's pushes to skip on the same inputs (D-0404).
+      - name: Mark the lanes this runner passed on these inputs
+        id: pass
+        if: success() && env.TESTS == 'true'
         env:
-          FILTER: ${{ needs.plan.outputs.desktop_filter }}
+          RUNNER_LABEL: ${{ matrix.os }}
+        run: |
+          set -euo pipefail
+          lanes=()
+          if [ "$BACKEND" = all ] && [ -z "$FILTER" ]; then
+            lanes+=(core cli mcp rules)
+          else
+            for project in $BACKEND; do
+              case "$project:$FILTER" in
+                tests/Keypaste.Core.Tests:) lanes+=(core rules) ;;
+                tests/Keypaste.Core.Tests:Keypaste.Core.Tests.WorkflowRulesTests) lanes+=(rules) ;;
+                tests/Keypaste.Cli.Tests:) lanes+=(cli) ;;
+                tests/Keypaste.Mcp.Tests:) lanes+=(mcp) ;;
+              esac
+            done
+          fi
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+          if [ "${#lanes[@]}" -gt 0 ]; then
+            echo "name=pass--$RUNNER_LABEL--$(IFS=+; echo "${lanes[*]}")" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success() && steps.pass.outputs.name != ''
+        with:
+          name: ${{ steps.pass.outputs.name }}
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
+  desktop:
+    name: desktop (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.desktop_os != '[]' && !inputs.relock
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.desktop_os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      DESKTOP: ${{ needs.plan.outputs.desktop }}
+      FILTER: ${{ needs.plan.outputs.desktop_filter }}
+      TESTS: ${{ needs.plan.outputs.tests }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Build and test the desktop projects
         run: |
           set -euo pipefail
           set --
@@ -262,41 +369,162 @@ jobs:
           bash scripts/verify.sh desktop --prepare-only "$@"
           if [ "$TESTS" = true ]; then bash scripts/verify.sh desktop --test-only "$@" ${FILTER:+--filter-class "$FILTER"}; fi
 
+      # app.yml reads only Linux's mark; the others let the next dispatch here skip this job.
+      - name: Mark this job passed on these inputs
+        if: success() && env.TESTS == 'true' && env.DESKTOP == 'all' && env.FILTER == ''
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success() && env.TESTS == 'true' && env.DESKTOP == 'all' && env.FILTER == ''
+        with:
+          name: pass--${{ matrix.os }}--desktop.tests
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
+  desktop-gates:
+    name: desktop gates (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.gates_os != '[]' && !inputs.relock
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.gates_os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
+
+      - name: Drive the app, the CLI and an agent as real processes
+        run: bash scripts/verify.sh desktop-gates
+
+      - name: Mark this job passed on these inputs
+        if: success()
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: pass--${{ matrix.os }}--desktop.gates
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
+  integration:
+    name: integration (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.integration_os != '[]' && !inputs.relock
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.integration_os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
+
       - name: Run the integration gate
-        if: needs.plan.outputs.gates == 'integration' || needs.plan.outputs.gates == 'both'
+        run: bash scripts/verify.sh integration
+
+      # The demo check is the pages lane, which ci.yml runs on Linux alone.
+      - name: Mark the lanes this runner passed on these inputs
+        id: pass
+        if: success()
+        env:
+          RUNNER_LABEL: ${{ matrix.os }}
         run: |
           set -euo pipefail
-          bash scripts/verify.sh integration --prepare-only
-          bash scripts/verify.sh integration --test-only
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+          name="pass--$RUNNER_LABEL--integration"
+          if [ "$RUNNER_LABEL" = ubuntu-24.04 ]; then name="$name+pages"; fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: ${{ steps.pass.outputs.name }}
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
+  compat:
+    name: compat (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.compat_os != '[]' && !inputs.relock
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.compat_os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
 
       - name: Install keepassxc-cli (Linux)
-        if: runner.os == 'Linux' && (needs.plan.outputs.gates == 'compat' || needs.plan.outputs.gates == 'both')
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
         run: |
           bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install keepassxc-cli (macOS)
-        if: runner.os == 'macOS' && (needs.plan.outputs.gates == 'compat' || needs.plan.outputs.gates == 'both')
+        if: runner.os == 'macOS'
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: brew install --cask keepassxc
 
       - name: Install keepassxc-cli (Windows)
-        if: runner.os == 'Windows' && (needs.plan.outputs.gates == 'compat' || needs.plan.outputs.gates == 'both')
+        if: runner.os == 'Windows'
         run: |
           set -euo pipefail
           echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
 
-      # The same scripts as ci.yml's compat steps.
+      # The same scripts as ci.yml's compat job.
       - name: Run the KeePassXC compat gate
-        if: needs.plan.outputs.gates == 'compat' || needs.plan.outputs.gates == 'both'
         env:
           # KeePassXC's Windows console encoding can alter a non-ASCII master password.
           KP_COMPAT_PASSWORD: ci-master-pw
         run: |
           set -euo pipefail
-          dotnet restore keypaste.slnx --locked-mode
-          dotnet build keypaste.slnx --no-restore -c Release
+          bash scripts/verify.sh backend --prepare-only
           bash scripts/make-compat-fixture.sh artifacts/compat/gen.kdbx
           bash scripts/verify-keepassxc-compat.sh artifacts/compat/gen.kdbx
           bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx
@@ -313,40 +541,14 @@ jobs:
           bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
           bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
 
-      # The ci.yml lanes this runner ran in full, for ci.yml's pushes to skip on the same inputs (D-0404).
-      - name: Mark the lanes this runner passed on these inputs
-        id: pass
-        if: success() && needs.plan.outputs.tests == 'true'
-        env:
-          RUNNER_LABEL: ${{ matrix.os }}
-          FILTER: ${{ needs.plan.outputs.backend_filter }}
-          GATES: ${{ needs.plan.outputs.gates }}
-        run: |
-          set -euo pipefail
-          lanes=()
-          if [ "$BACKEND" = all ] && [ -z "$FILTER" ]; then
-            lanes+=(core cli mcp rules)
-          else
-            for project in $BACKEND; do
-              case "$project:$FILTER" in
-                tests/Keypaste.Core.Tests:) lanes+=(core rules) ;;
-                tests/Keypaste.Core.Tests:Keypaste.Core.Tests.WorkflowRulesTests) lanes+=(rules) ;;
-                tests/Keypaste.Cli.Tests:) lanes+=(cli) ;;
-                tests/Keypaste.Mcp.Tests:) lanes+=(mcp) ;;
-              esac
-            done
-          fi
-          case "$GATES" in integration | both) lanes+=(integration pages) ;; esac
-          case "$GATES" in compat | both) lanes+=(compat) ;; esac
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-          if [ "${#lanes[@]}" -gt 0 ]; then
-            echo "name=pass--$RUNNER_LABEL--$(IFS=+; echo "${lanes[*]}")" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Mark this job passed on these inputs
+        if: success()
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success() && steps.pass.outputs.name != ''
+        if: success()
         with:
-          name: ${{ steps.pass.outputs.name }}
+          name: pass--${{ matrix.os }}--compat
           path: ${{ runner.temp }}/pass.txt
           retention-days: 30
 

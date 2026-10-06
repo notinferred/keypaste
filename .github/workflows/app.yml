@@ -74,7 +74,8 @@ permissions:
 
 concurrency:
   group: app-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A branch's newer run supersedes its last; main and tags keep every verdict.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) }}
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -97,6 +98,7 @@ jobs:
     outputs:
       lanes: ${{ steps.plan.outputs.lanes }}
       desktop_tests: ${{ steps.plan.outputs.desktop_tests }}
+      gates_os: ${{ steps.plan.outputs.app_gates_os }}
       compat_os: ${{ steps.plan.outputs.app_compat_os }}
       firstrun_os: ${{ steps.plan.outputs.app_firstrun_os }}
       markers_os: ${{ steps.plan.outputs.app_markers_os }}
@@ -148,8 +150,9 @@ jobs:
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$n targets: $targets"
 
-  gate:
-    name: format + analyzers + tests
+  # ci.yml's format job checks this solution's format too, since ci.yml runs on every source change.
+  desktop:
+    name: desktop tests
     needs: scope
     if: needs.scope.outputs.desktop_tests != ''
     runs-on: ubuntu-24.04
@@ -159,16 +162,11 @@ jobs:
         with:
           persist-credentials: false
 
-      # The solution joins the key so this cache never overwrites ci.yml's.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            keypaste.app.slnx
 
-      - name: Restore, format, build and test desktop and consistency
+      - name: Restore, build and test desktop and consistency
         shell: bash
         env:
           DESKTOP_TESTS: ${{ needs.scope.outputs.desktop_tests }}
@@ -186,7 +184,43 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: success() && needs.scope.outputs.desktop_tests == 'all'
         with:
-          name: pass--ubuntu-24.04--desktop
+          name: pass--ubuntu-24.04--desktop.tests
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
+  # The app, the CLI and an agent as real processes: approvals, locks, saves and the session's lifecycle.
+  desktop-gates:
+    name: desktop gates (${{ matrix.os }})
+    needs: scope
+    if: needs.scope.outputs.gates_os != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.scope.outputs.gates_os) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore, build and drive the desktop gates
+        shell: bash
+        run: bash scripts/verify.sh desktop-gates
+
+      - name: Mark this job passed on these inputs
+        if: success()
+        shell: bash
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: pass--${{ matrix.os }}--desktop.gates
           path: ${{ runner.temp }}/pass.txt
           retention-days: 30
 
@@ -212,10 +246,6 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            keypaste.app.slnx
 
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
@@ -275,10 +305,6 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            keypaste.app.slnx
 
       - name: Install KeePassXC (Linux)
         if: runner.os == 'Linux'
@@ -343,10 +369,6 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            keypaste.app.slnx
 
       - name: Restore (locked) and build the observer
         shell: bash
@@ -403,11 +425,6 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            keypaste.app.slnx
-            release-targets.json
 
       - name: Restore (locked)
         run: dotnet restore keypaste.app.slnx --locked-mode
@@ -717,7 +734,7 @@ jobs:
   ok:
     name: app ok
     if: always()
-    needs: [scope, gate, compat, first-run, clipboard-markers, package]
+    needs: [scope, desktop, desktop-gates, compat, first-run, clipboard-markers, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

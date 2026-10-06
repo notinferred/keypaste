@@ -16,29 +16,31 @@ runs everything, and every skipped profile is logged with its reason. --all (or 
 everything. Hosted CI remains the full gate.
 
 --plan prints the CI selection as GITHUB_OUTPUT lines (lanes, backend_os, backend_tests,
-desktop_tests, filter) and runs nothing. With --since, no changed path or an unreadable range
-selects everything. VERIFY_CHANGED_PATHS, newline-separated, replaces the reading from git.
+desktop_tests, filter, and each job's runners) and runs nothing. With --since, no changed
+path or an unreadable range selects everything. VERIFY_CHANGED_PATHS, newline-separated, replaces the reading from git.
 
---from <profile> resumes at that profile after a failure, in the order
-workflows, scripts, backend, integration, desktop. A failed run names every failed
+--from <profile> resumes at that profile after a failure, in the order workflows, scripts,
+format, backend, integration, desktop, desktop-gates. A failed run names every failed
 profile, prints their held output and the command that resumes. scripts and workflows run
 beside the dotnet profiles; each profile's output is held in artifacts/verify/<profile>.log.
 
-workflows    Workflow syntax, expressions and embedded shell checks (pinned actionlint via Docker).
-scripts      Offline release/diagnostic fixtures and shell syntax, run in parallel; no build or
-             credentials. On Windows they run in a Linux container, where they take a tenth of
-             the time; VERIFY_SCRIPTS_NATIVE=1 keeps them in Git Bash.
-backend      Locked restore, format, Release build and backend tests.
-integration  Prepare the backend and exercise real CLI/MCP processes and the demo pages.
-desktop      The desktop solution AND the separate CLI/desktop consistency project.
-compat       Prepare the backend and the app driver, and verify creation, write-back, history, recovery, organization,
-             keyfiles, custom fields, project tags and every workflow on vaults KeePassXC made, through the CLI, the app and
-             the site's Worker on loopback, and
-             the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
-             Never selected automatically; run it by name.
+workflows      Workflow syntax, expressions and embedded shell checks (pinned actionlint via Docker).
+scripts        Offline release/diagnostic fixtures and shell syntax, run in parallel; no build or
+               credentials. On Windows they run in a Linux container, where they take a tenth of
+               the time; VERIFY_SCRIPTS_NATIVE=1 keeps them in Git Bash.
+format         dotnet format over both solutions and the consistency project; nothing builds.
+backend        Locked restore, Release build and backend tests.
+integration    Prepare the backend and exercise real CLI/MCP processes and the demo pages.
+desktop        Prepare the desktop solution and the consistency project, and run their tests.
+desktop-gates  Prepare as desktop does, and drive the app, the CLI and an agent as real processes.
+compat         Prepare the backend and the app driver, and verify creation, write-back, history, recovery, organization,
+               keyfiles, custom fields, project tags and every workflow on vaults KeePassXC made, through the CLI, the app and
+               the site's Worker on loopback, and
+               the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
+               Never selected automatically; run it by name.
 
---list prints the selection and commands without executing them. Backend, desktop and
-integration accept --prepare-only and --test-only for CI or a build already prepared by this
+--list prints the selection and commands without executing them. Backend, desktop, desktop-gates
+and integration accept --prepare-only and --test-only for CI or a build already prepared by this
 command. --project narrows backend or desktop to those test projects and the helpers they start,
 and --filter-class runs one test class in each.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
@@ -50,11 +52,11 @@ USAGE
 
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 
-sequence=(workflows scripts backend integration desktop)
-heavy=(scripts backend integration desktop)
+sequence=(workflows scripts format backend integration desktop desktop-gates)
+heavy=(scripts format backend integration desktop desktop-gates)
 docker_lane=(workflows scripts)
 # Both solutions build Keypaste.Core into one artifacts/ tree, so dotnet work never overlaps.
-dotnet_lane=(backend integration desktop)
+dotnet_lane=(format backend integration desktop desktop-gates)
 
 profile=''
 phase=all
@@ -96,7 +98,7 @@ while [ "$#" -gt 0 ]; do
       [ "$phase" = all ] || bad_usage 'choose only one phase'
       phase="${1#--}"
       ;;
-    all|backend|desktop|scripts|workflows|integration|compat)
+    all|format|backend|desktop|desktop-gates|scripts|workflows|integration|compat)
       [ -z "$profile" ] || bad_usage 'choose one profile'
       profile="$1"
       ;;
@@ -106,8 +108,8 @@ while [ "$#" -gt 0 ]; do
 done
 if [ "$profile" = all ]; then profile=''; everything=true; fi
 case "$phase:$profile" in
-  all:*|*:backend|*:desktop|*:integration) ;;
-  *) bad_usage 'phase selection is only supported for backend, desktop and integration' ;;
+  all:*|*:backend|*:desktop|*:desktop-gates|*:integration) ;;
+  *) bad_usage 'phase selection is only supported for backend, desktop, desktop-gates and integration' ;;
 esac
 if [ -n "$profile" ] && { [ "$everything" = true ] || [ -n "$from" ] || [ -n "$since" ] || [ "$plan" = true ]; }; then
   bad_usage '--all, --since, --from and --plan select among profiles; they cannot accompany a named one'
@@ -144,7 +146,6 @@ run() {
 
 prepare() {
   run dotnet restore "$1" --locked-mode
-  run dotnet format "$1" --no-restore --verify-no-changes --exclude third_party/
   run dotnet build "$1" --no-restore -c Release -warnaserror
 }
 
@@ -177,19 +178,13 @@ runtime_helpers() {
   esac
 }
 
-# dotnet format checks only the project it is given, so every project the build compiles is named.
 prepare_projects() {
   local dir helper project targets=()
   for dir in "${projects[@]}"; do
     targets+=("$dir")
     for helper in $(runtime_helpers "$dir"); do targets+=("$helper"); done
   done
-  read_project_graph
   for project in "${targets[@]}"; do run dotnet restore "$(project_file "$project")" --locked-mode; done
-  for project in $(dependencies_closure "${targets[@]}"); do
-    case "$project" in third_party/*) continue ;; esac
-    run dotnet format "$(project_file "$project")" --no-restore --verify-no-changes --exclude third_party/
-  done
   for project in "${targets[@]}"; do run dotnet build "$(project_file "$project")" --no-restore -c Release -warnaserror; done
 }
 test_projects() {
@@ -207,10 +202,10 @@ test_projects() {
 }
 
 prepare_backend() { prepare keypaste.slnx; }
+# The consistency project builds the CLI the desktop gates start beside the app.
 prepare_desktop() {
   prepare keypaste.app.slnx
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
-  prepare src/Keypaste.Mcp/Keypaste.Mcp.csproj
 }
 test_backend() {
   run_tests dotnet test keypaste.slnx --no-build -c Release
@@ -218,6 +213,8 @@ test_backend() {
 test_desktop() {
   run_tests dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
   run_tests dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
+}
+check_desktop_gates() {
   integration_script scripts/verify-session-authority.sh
   integration_script scripts/verify-lock-boundary.sh
   integration_script scripts/verify-current-state.sh
@@ -324,6 +321,15 @@ profile_workflows() {
 
 integration_script() { run "$timeout_command" --verbose --kill-after=10s 8m bash "$1"; }
 
+# dotnet format runs no build and reads only the projects it is given; Core is in both solutions.
+profile_format() {
+  local target
+  for target in keypaste.slnx keypaste.app.slnx tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj; do
+    run dotnet restore "$target" --locked-mode
+    run dotnet format "$target" --no-restore --verify-no-changes --exclude third_party/
+  done
+}
+
 check_integration() {
   integration_script scripts/verify-run-injection.sh
   case "$(uname -s)" in
@@ -351,11 +357,22 @@ profile_backend() {
 }
 profile_desktop() {
   if [ "$phase" != test-only ]; then
-    if [ "${#projects[@]}" -gt 0 ]; then prepare_projects; else prepare_desktop; fi
+    if [ "${#projects[@]}" -gt 0 ]; then
+      prepare_projects
+    else
+      prepare_desktop
+      if [ -n "$log_dir" ]; then : > "$log_dir/desktop.prepared"; fi
+    fi
   fi
   if [ "$phase" != prepare-only ]; then
     if [ "${#projects[@]}" -gt 0 ]; then test_projects; else test_desktop; fi
   fi
+}
+profile_desktop_gates() {
+  if [ "$phase" != test-only ] && { [ -z "$log_dir" ] || [ ! -e "$log_dir/desktop.prepared" ]; }; then
+    prepare_desktop
+  fi
+  if [ "$phase" != prepare-only ]; then check_desktop_gates; fi
 }
 profile_integration() {
   if [ "$phase" != test-only ] && [ "$backend_prepared" = false ] \
@@ -388,7 +405,7 @@ profile_compat() {
 
 # A lane is what hosted CI runs as one job; a local run maps lanes to profiles. Tests and scripts
 # read workflows, documents and the release definition, so those paths select the lanes that read them.
-all_lanes=(core cli mcp rules pages integration compat aot scripts desktop appcompat markers package)
+all_lanes=(format core cli mcp rules pages integration compat aot scripts desktop appcompat markers package)
 
 path_lanes() {
   case "$1" in
@@ -397,7 +414,7 @@ path_lanes() {
     src/*/*.csproj|tests/*/*.csproj|third_party/KeePassLib/*.csproj) echo scripts ;;
     src/*|tests/*|third_party/KeePassLib/*) echo unclaimed ;;
     third_party/eff-large-wordlist/*) echo core ;;
-    .github/workflows/ci.yml) echo core cli mcp rules pages integration compat aot scripts ;;
+    .github/workflows/ci.yml) echo format core cli mcp rules pages integration compat aot scripts ;;
     .github/workflows/app.yml) echo rules scripts desktop-all appcompat markers package ;;
     .github/*) echo rules scripts ;;
     scripts/lib/kpxc.sh) echo rules scripts compat aot appcompat ;;
@@ -537,27 +554,14 @@ dependents_closure() {
   echo "$found"
 }
 
-dependencies_closure() {
-  local found=" $* " grew=true dependent dependency
-  while [ "$grew" = true ]; do
-    grew=false
-    while read -r dependent dependency; do
-      [ -n "$dependency" ] || continue
-      case "$found" in *" $dependent "*) ;; *) continue ;; esac
-      case "$found" in *" $dependency "*) continue ;; esac
-      found="$found$dependency "
-      grew=true
-    done <<< "$project_edges"
-  done
-  echo "$found"
-}
-
 lanes_for_path() {
-  local fixed token project found=''
+  local fixed token project reached found=''
   fixed="$(path_lanes "$1")"
   if [ "$fixed" = everything ]; then echo everything; return; fi
   # shellcheck disable=SC2046
-  for project in $(dependents_closure $(owning_project "$1") $(linking_projects "$1")); do
+  reached="$(dependents_closure $(owning_project "$1") $(linking_projects "$1"))"
+  if [ -n "${reached// /}" ]; then found=' format'; fi
+  for project in $reached; do
     found="$found $(project_lanes "$project")"
   done
   for token in $fixed; do
@@ -574,8 +578,10 @@ profiles_for_lanes() {
   local lane
   for lane in "$@"; do
     case "$lane" in
+      format) echo format ;;
       core|cli|mcp|rules) echo backend ;;
       integration|pages) echo integration ;;
+      desktop-all) echo desktop desktop-gates ;;
       desktop-*) echo desktop ;;
       scripts) echo scripts ;;
     esac
@@ -600,7 +606,7 @@ selected=''
 select_everything() {
   local p
   selected=everything
-  for p in "${heavy[@]}"; do printf -v "why_$p" '%s' "$1"; done
+  for p in "${heavy[@]}"; do printf -v "why_${p//-/_}" '%s' "$1"; done
 }
 
 changed_count=0
@@ -634,9 +640,9 @@ select_profiles() {
     for p in $mapped; do
       case "$counted" in *" $p "*) continue ;; esac
       counted="$counted$p "
-      var="why_$p"
+      var="why_${p//-/_}"
       if [ -z "${!var:-}" ]; then printf -v "$var" '%s' "$path"; fi
-      var="hits_$p"
+      var="hits_${p//-/_}"
       printf -v "$var" '%s' "$(( ${!var:-0} + 1 ))"
     done
   done <<< "$changes"
@@ -654,11 +660,11 @@ has_lane() {
 
 # The runners each CI job marks a pass on, and whether an earlier trusted run already passed it there
 # on inputs this commit shares: VERIFY_SATISFIED holds runner:mark pairs from lane-cache.sh (D-0404,
-# D-0411). A mark is its lane's name, or the lane and the job for a lane app.yml splits into jobs.
+# D-0411). A mark is its lane's name, or the lane and the job for a lane split into jobs.
 lane_runners() {
   case "$1" in
     core|cli|mcp|integration|compat) echo ubuntu-24.04 windows-2025 macos-15 ;;
-    rules|pages|scripts|desktop) echo ubuntu-24.04 ;;
+    format|rules|pages|scripts|desktop.tests|desktop.gates) echo ubuntu-24.04 ;;
     aot) echo ubuntu-22.04 ;;
     appcompat.workflows) echo ubuntu-24.04 windows-2025 ;;
     appcompat.firstrun) echo ubuntu-24.04 windows-2025 macos-15 ;;
@@ -666,9 +672,11 @@ lane_runners() {
     package) { jq -r '.components.app.targets[].runner' release-targets.json 2>/dev/null || true; } | tr -d '\r' | tr '\n' ' ' ;;
   esac
 }
+# The desktop gates run only for a change that reaches past the desktop tests' own files.
 lane_marks() {
   case "$1" in
     appcompat) echo appcompat.workflows appcompat.firstrun ;;
+    desktop) if has_lane desktop-all; then echo desktop.tests desktop.gates; else echo desktop.tests; fi ;;
     *) echo "$1" ;;
   esac
 }
@@ -689,31 +697,42 @@ lane_in() {
   case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac
 }
 
-# One entry per runner the test job still needs, with that runner's own lanes and test projects.
-print_test_matrix() {
-  local runner lane lanes backend filter entries=''
-  for runner in ubuntu-24.04 windows-2025 macos-15; do
-    lanes=''
-    for lane in core cli mcp rules pages integration compat; do
-      has_lane "$lane" || continue
-      case " $(lane_runners "$lane") " in *" $runner "*) ;; *) continue ;; esac
-      is_satisfied "$runner" "$lane" && continue
-      lanes="$lanes $lane"
-    done
-    [ -n "$lanes" ] || continue
-    backend='' filter=''
-    if lane_in core "$lanes" && lane_in cli "$lanes" && lane_in mcp "$lanes"; then
-      backend=all
-    else
-      if lane_in core "$lanes" || lane_in rules "$lanes"; then backend=tests/Keypaste.Core.Tests; fi
-      if lane_in cli "$lanes"; then backend="$backend tests/Keypaste.Cli.Tests"; fi
-      if lane_in mcp "$lanes"; then backend="$backend tests/Keypaste.Mcp.Tests"; fi
-      backend="${backend# }"
-      if [ "$backend" = tests/Keypaste.Core.Tests ] && ! lane_in core "$lanes"; then filter=Keypaste.Core.Tests.WorkflowRulesTests; fi
-    fi
-    entries="$entries,{\"os\":\"$runner\",\"lanes\":\"$lanes \",\"backend_tests\":\"$backend\",\"filter\":\"$filter\"}"
+# A runner's lanes among those named that it still needs.
+runner_lanes() {
+  local runner="$1" lane lanes=''
+  shift
+  for lane in "$@"; do
+    has_lane "$lane" || continue
+    case " $(lane_runners "$lane") " in *" $runner "*) ;; *) continue ;; esac
+    is_satisfied "$runner" "$lane" && continue
+    lanes="$lanes $lane"
   done
-  printf 'test_matrix=[%s]\n' "${entries#,}"
+  echo "$lanes"
+}
+
+# Each backend job's runners, with that runner's own lanes and test projects, less what already passed.
+print_job_matrices() {
+  local runner lanes backend filter tests='' gates='' compat=''
+  for runner in ubuntu-24.04 windows-2025 macos-15; do
+    lanes="$(runner_lanes "$runner" core cli mcp rules)"
+    if [ -n "$lanes" ]; then
+      backend='' filter=''
+      if lane_in core "$lanes" && lane_in cli "$lanes" && lane_in mcp "$lanes"; then
+        backend=all
+      else
+        if lane_in core "$lanes" || lane_in rules "$lanes"; then backend=tests/Keypaste.Core.Tests; fi
+        if lane_in cli "$lanes"; then backend="$backend tests/Keypaste.Cli.Tests"; fi
+        if lane_in mcp "$lanes"; then backend="$backend tests/Keypaste.Mcp.Tests"; fi
+        backend="${backend# }"
+        if [ "$backend" = tests/Keypaste.Core.Tests ] && ! lane_in core "$lanes"; then filter=Keypaste.Core.Tests.WorkflowRulesTests; fi
+      fi
+      tests="$tests,{\"os\":\"$runner\",\"lanes\":\"$lanes \",\"backend_tests\":\"$backend\",\"filter\":\"$filter\"}"
+    fi
+    lanes="$(runner_lanes "$runner" integration pages)"
+    if [ -n "$lanes" ]; then gates="$gates,{\"os\":\"$runner\",\"lanes\":\"$lanes \"}"; fi
+    if [ -n "$(runner_lanes "$runner" compat)" ]; then compat="$compat,\"$runner\""; fi
+  done
+  printf 'test_matrix=[%s]\nintegration_matrix=[%s]\ncompat_os=[%s]\n' "${tests#,}" "${gates#,}" "${compat#,}"
 }
 
 print_plan() {
@@ -748,20 +767,22 @@ print_plan() {
     if has_lane desktop-consistency; then desktop="$desktop tests/Keypaste.Consistency.Tests"; fi
     desktop="${desktop# }"
   fi
-  lane_in desktop "$chosen" || desktop=''
+  if ! lane_in desktop "$chosen" || is_satisfied ubuntu-24.04 desktop.tests; then desktop=''; fi
   printf 'lanes=%s\nbackend_os=%s\nbackend_tests=%s\ndesktop_tests=%s\nfilter=%s\n' "$chosen" "$os" "$backend" "$desktop" "$filter"
-  print_test_matrix
+  print_job_matrices
   print_app_matrix
 }
 
 # The runners each app.yml job still needs. A package list jq could not read is "all", so a missing
 # tool never skips a release target.
 print_app_matrix() {
-  local job mark runner runners list
-  for job in compat:appcompat.workflows firstrun:appcompat.firstrun markers:markers package:package; do
+  local job mark lane runner runners list
+  for job in gates:desktop.gates compat:appcompat.workflows firstrun:appcompat.firstrun markers:markers package:package; do
     mark="${job#*:}"
+    lane="${mark%%.*}"
+    if [ "$mark" = desktop.gates ]; then lane=desktop-all; fi
     list=''
-    if has_lane "${mark%%.*}"; then
+    if has_lane "$lane"; then
       runners="$(lane_runners "$mark")"
       if [ -z "${runners// /}" ]; then
         printf 'app_%s_os=all\n' "${job%%:*}"
@@ -785,8 +806,8 @@ plan_profiles() {
   [ -n "$from" ] || reached=true
   for p in "${sequence[@]}"; do
     if [ "$p" = "$from" ]; then reached=true; fi
-    var="why_$p"; reason="${!var:-}"
-    var="hits_$p"; hits="${!var:-0}"
+    var="why_${p//-/_}"; reason="${!var:-}"
+    var="hits_${p//-/_}"; hits="${!var:-0}"
     if [ "$hits" -gt 1 ]; then reason="$reason and $((hits - 1)) more"; fi
     case "$p" in workflows) reason='always runs' ;; esac
     if [ -z "$reason" ]; then
@@ -818,7 +839,7 @@ require_for() {
   case "$1" in
     workflows) require_tools docker ;;
     scripts) if scripts_in_container; then require_tools docker; else require_tools git jq; fi ;;
-    integration) require_tools dotnet git jq; require_gnu_timeout ;;
+    integration|desktop-gates) require_tools dotnet git jq; require_gnu_timeout ;;
     compat)
       require_tools dotnet git
       command -v "${KPXC_CLI:-keepassxc-cli}" >/dev/null || { echo 'set KPXC_CLI to an installed keepassxc-cli' >&2; exit 1; }
@@ -828,15 +849,19 @@ require_for() {
 }
 
 execute_profile() {
-  local p="$1" start=$SECONDS code
-  if [ "$p" = integration ] && [ -e "$log_dir/backend.status" ] && [ ! -e "$log_dir/backend.prepared" ]; then
+  local p="$1" start=$SECONDS code built=''
+  case "$p" in
+    integration) built=backend ;;
+    desktop-gates) built=desktop ;;
+  esac
+  if [ -n "$built" ] && [ -e "$log_dir/$built.status" ] && [ ! -e "$log_dir/$built.prepared" ]; then
     echo blocked > "$log_dir/$p.status"
-    echo "verify: not run $p: backend did not build"
+    echo "verify: not run $p: $built did not build"
     return
   fi
   echo "verify: start $p"
   set +e
-  ( set -e; "profile_$p" ) > "$log_dir/$p.log" 2>&1
+  ( set -e; "profile_${p//-/_}" ) > "$log_dir/$p.log" 2>&1
   code=$?
   set -e
   echo "$code" > "$log_dir/$p.status"
@@ -865,13 +890,13 @@ run_selection() {
   plan_profiles
   if [ "${#planned[@]}" -eq 0 ]; then echo 'verify: nothing to run'; return; fi
   if [ "$list" = true ]; then
-    for p in "${planned[@]}"; do "profile_$p"; done
+    for p in "${planned[@]}"; do "profile_${p//-/_}"; done
     return
   fi
   for p in "${planned[@]}"; do require_for "$p"; done
   log_dir="${VERIFY_LOG_DIR:-artifacts/verify}"
   mkdir -p "$log_dir"
-  rm -f "$log_dir"/*.log "$log_dir"/*.status "$log_dir/backend.prepared"
+  rm -f "$log_dir"/*.log "$log_dir"/*.status "$log_dir"/*.prepared
 
   run_lane "${docker_lane[@]}" &
   run_lane "${dotnet_lane[@]}" &
@@ -908,5 +933,5 @@ if [ -z "$profile" ]; then
   exit 0
 fi
 if [ "$list" = false ]; then require_for "$profile"; fi
-"profile_$profile"
+"profile_${profile//-/_}"
 if [ "$list" = false ]; then printf 'Verification passed: %s (%s)\n' "$profile" "$phase"; fi

@@ -23,7 +23,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 head="${1:-HEAD}"
 repo="${GITHUB_REPOSITORY:-}"
 [ -n "$repo" ] || exit 0
-readonly PAGES="${LANE_CACHE_PAGES:-3}"
+readonly PAGES="${LANE_CACHE_PAGES:-6}"
 readonly NEWEST="${LANE_CACHE_COMMITS:-20}"
 
 markers=''

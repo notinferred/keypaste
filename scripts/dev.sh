@@ -4,11 +4,12 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/dev.sh [--class FQN] [--target T] [--os O] [--gates G]
+Usage: bash scripts/dev.sh [--class FQN] [--target T] [--os O] [--gates G] [--wait]
        bash scripts/dev.sh --relock
 
-Pushes the current branch, dispatches .github/workflows/dev.yml on it and waits for the verdict.
-Needs only git and gh; nothing builds on this machine.
+Pushes the current branch, dispatches .github/workflows/dev.yml on it and prints each job as it
+finishes. The first failed job ends the wait with its log; the run's other jobs carry on, and the
+next dispatch on the branch cancels them. Needs only git and gh; nothing builds on this machine.
 
 --class   a fully qualified test class; runs only it, in its own project
 --target  auto (default: what the branch changed against origin/main, including the gates,
@@ -16,6 +17,7 @@ Needs only git and gh; nothing builds on this machine.
           mcp, app, consistency
 --os      linux (default), windows, macos, linux+windows, linux+macos or all
 --gates   none (default), integration, compat or both; added to what auto selects
+--wait    wait for every job and print each failed one's log, rather than stopping at the first
 --relock  regenerate the lock files of the pushed commit with the CI SDK, build nothing, and write
           the ones that changed into this tree to review and commit
 USAGE
@@ -24,11 +26,12 @@ USAGE
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 die() { echo "dev: $1" >&2; exit 1; }
 
-class='' target=auto os=linux gates=none relock=false
+class='' target=auto os=linux gates=none relock=false wait_all=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
     --relock) relock=true ;;
+    --wait) wait_all=true ;;
     --class|--target|--os|--gates)
       [ "$#" -ge 2 ] || bad_usage "$1 needs a value"
       case "$1" in
@@ -68,10 +71,36 @@ read -r id head <<< "$run"
 [ "$head" = "$sha" ] || die "run $id tests $head, not HEAD $sha"
 gh run view "$id" --json url --jq .url
 
-if ! gh run watch "$id" --exit-status --interval 10 >/dev/null; then
-  gh run view "$id" || true
-  gh run view "$id" --log-failed | tail -n 200 || true
-  echo "dev: run $id failed after $((SECONDS - start))s. Exit code 8 from the test runner means the filter matched zero tests." >&2
+# The end of a finished job's log, without the timestamps or the runner's cleanup after the failure.
+job_log() {
+  gh api "repos/{owner}/{repo}/actions/jobs/$1/logs" 2>/dev/null \
+    | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' | sed '/^Post job cleanup\./,$d' | tail -n 150 || true
+}
+
+# Each poll prints the jobs that finished since the last; a job the plan skipped prints nothing.
+status='' seen=' ' failed=()
+while [ "$status" != completed ]; do
+  sleep 10
+  report="$(gh run view "$id" --json status,jobs --jq '.status, (.jobs[]
+    | select(.status == "completed" and .conclusion != "skipped")
+    | "\(.databaseId) \(.conclusion) \(try ((.completedAt | fromdateiso8601) - (.startedAt | fromdateiso8601)) catch 0) \(.name)")')" || continue
+  status="$(sed -n 1p <<<"$report")"
+  while read -r job conclusion seconds name; do
+    [ -n "$job" ] || continue
+    case "$seen" in *" $job "*) continue ;; esac
+    seen="$seen$job "
+    printf '%-9s %5ss  %s\n' "$conclusion" "$seconds" "$name"
+    if [ "$conclusion" != success ]; then failed+=("$job $name"); fi
+  done < <(sed 1d <<<"$report")
+  if [ "${#failed[@]}" -gt 0 ] && [ "$wait_all" = false ]; then break; fi
+done
+
+if [ "${#failed[@]}" -gt 0 ]; then
+  for entry in "${failed[@]}"; do
+    printf '\n==== %s ====\n' "${entry#* }"
+    job_log "${entry%% *}"
+  done
+  echo "dev: ${failed[0]#* } failed after $((SECONDS - start))s; run $id holds the rest. Exit code 8 from the test runner means the filter matched zero tests." >&2
   exit 1
 fi
 

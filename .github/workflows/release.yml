@@ -42,7 +42,6 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      # This job never restores packages, so enabling NuGet caching would fail on an absent cache.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
@@ -189,8 +188,6 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: '**/packages.lock.json'
 
       - name: Install the native toolchain (Linux)
         if: runner.os == 'Linux'
