@@ -174,7 +174,7 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"driver failed: {ex.GetType().Name}: {ex.Message}");
+            Console.Error.WriteLine($"driver failed: {ex}");
             return 3;
         }
     }

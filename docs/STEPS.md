@@ -14,11 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-- [ ] **F.51 — Find why the app driver crashed after a refused unlock on macOS.** Needs: none.
-  - Observed once, in dev run 37397846023 at `756cb89` on `task/v11`, job `test (macos-15)`, in `verify-session-lifecycle.sh`: with `keypaste agent` holding the vault, `Keypaste.AppDriver hold` printed the app's refusal naming the agent and its owner line, then failed with `NullReferenceException` and exit 3 where 1 was expected. It passed on Linux and Windows in that run and on the macOS rerun 37400993297, and failed in none of the 60 failed runs before it.
-  - After the refusal the driver disposes the unlock screen, the Connect section and the authority. It prints an exception's type and message but not where it was thrown, so the first experiment is to print that.
-  - Verify: the site named, a regression that fails as the observation did, and its repair.
-
 ## T1 — Everyday vault use and recovery
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
