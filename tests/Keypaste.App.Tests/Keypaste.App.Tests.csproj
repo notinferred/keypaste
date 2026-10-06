@@ -32,6 +32,8 @@
     <Compile Include="../Keypaste.Core.Tests/FakeShareServer.cs" Link="FakeShareServer.cs" />
     <!-- The channels the core's scripted bridge speaks over, which need no thread-pool worker (F.41). -->
     <Compile Include="../Keypaste.Core.Tests/ScriptedBridgeChannels.cs" Link="ScriptedBridgeChannels.cs" />
+    <!-- Another KeePass program's edit, as the core's lost-tag tests make one (V.11). -->
+    <Compile Include="../Keypaste.Core.Tests/ForeignEdit.cs" Link="ForeignEdit.cs" />
   </ItemGroup>
 
 </Project>

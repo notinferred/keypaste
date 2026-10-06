@@ -48,6 +48,13 @@
 # identical, and KeePassXC reads every tag, value and protection written. `keypaste run` resolves the
 # exported references to exactly dev's fields.
 #
+# A sixth vault KeePassXC makes from the first document has two versions KeePassXC itself writes through
+# a merge (V.11): Stripe loses env:billing while its password changes, and Database loses
+# env:billing:prod alone. The app's Settings › Recommendations, through tests/Keypaste.AppDriver, lists
+# Stripe's tag and not Database's, prints no value, keeps a dismissal across processes, and Restore tag
+# names what the tag reaches before putting it back; KeePassXC reads env:billing again, with one more
+# revision.
+#
 # NEGATIVE CONTROL: a corrupted expectation must fail the comparison the listing check rests on, a
 # child holding OLD_KEY must fail the one the runs rest on, and the hour must be honoured for an entry
 # no tag protects.
@@ -765,10 +772,60 @@ out=$(c4_run -p staging billing) || die "the staging run failed: $(cat "$dir/c4-
 out=$(c4_run web) || die "web's run failed: $(cat "$dir/c4-run.err")"
 [ "$out" = "stripe=unset mail=unset queue=unset new=unset imported=unset web=web-c4" ] || die "web's run gave the child: ${out}"
 
+step "V.11: KeePassXC drops env:billing from Stripe as its password changes, and env:billing:prod from Database alone"
+v11="$dir/v11.kdbx"
+seed '' >"$dir/v11.xml"
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/v11.xml")" "$(native "$v11")" \
+  || die "keepassxc-cli could not import the V.11 seed"
+stripe_was=$(revisions_at "$v11" services/Stripe)
+database_was=$(revisions_at "$v11" services/Database)
+kx export "$v11" -f xml | awk -v stripe="$(uuid stripe)" -v database="$(uuid database)" '
+  /<History>/ { inside = 1 }
+  !inside && /<UUID>/ { mine = index($0, "<UUID>" stripe "</UUID>") ? "stripe" : index($0, "<UUID>" database "</UUID>") ? "database" : mine }
+  mine == "stripe" && !inside { sub(/<Tags>[^<]*<\/Tags>/, "<Tags>finance</Tags>"); sub(/>stripe-login</, ">stripe-login-v11<") }
+  mine == "database" && !inside { sub(/<Tags>[^<]*<\/Tags>/, "<Tags></Tags>") }
+  mine != "" && !inside { sub(/<LastModificationTime>[^<]*</, "<LastModificationTime>2037-01-01T00:00:00Z<") }
+  /<\/History>/ { inside = 0 }
+  mine != "" && !inside && /<\/Entry>/ { mine = "" }
+  { print }' >"$dir/v11-newer.xml"
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/v11-newer.xml")" "$(native "$dir/v11-newer.kdbx")" \
+  || die "keepassxc-cli could not import the newer V.11 copy"
+printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$v11")" "$(native "$dir/v11-newer.kdbx")" >/dev/null \
+  || die "keepassxc-cli could not merge the newer V.11 copy"
+[ "$(tags "$v11" services/Stripe | paste -sd' ' -)" = finance ] || die "the merge left Stripe with the tags $(tags "$v11" services/Stripe | paste -sd' ' -)"
+[ -z "$(tags "$v11" services/Database)" ] || die "the merge left Database with the tags $(tags "$v11" services/Database | paste -sd' ' -)"
+[ "$(revisions_at "$v11" services/Stripe)" = $((stripe_was + 1)) ] || die "KeePassXC's merge did not keep Stripe's earlier version"
+[ "$(revisions_at "$v11" services/Database)" = $((database_was + 1)) ] || die "KeePassXC's merge did not keep Database's earlier version"
+
+step "V.11: Recommendations lists the tag dropped with the password change and not the one removed alone, and no value"
+said=$(drive tags-review "$(native "$v11")") || die "the review failed: ${said}"
+grep -qF 'stripe-login' <<<"$said" && die "the review printed a value: ${said}"
+[ "$(grep -c '^lost ' <<<"$said")" = 1 ] || die "the review did not list exactly one dropped tag: ${said}"
+grep -qx 'lost entry=services/Stripe tag=env:billing state=needs-review' <<<"$said" || die "the review did not list Stripe's env:billing: ${said}"
+grep -qx 'count 1' <<<"$said" || die "the review did not count one: ${said}"
+
+step "V.11: a dismissal is kept across processes, and Review again lists the tag again"
+said=$(drive tags-dismiss "$(native "$v11")" services/Stripe env:billing) || die "the dismissal failed: ${said}"
+said=$(drive tags-review "$(native "$v11")") || die "the review failed: ${said}"
+grep -qx 'lost entry=services/Stripe tag=env:billing state=dismissed' <<<"$said" || die "the dismissal was not kept: ${said}"
+grep -qx 'count 0' <<<"$said" || die "a dismissed tag is still counted: ${said}"
+said=$(drive tags-again "$(native "$v11")" services/Stripe env:billing) || die "Review again failed: ${said}"
+
+step "V.11: Restore tag names what env:billing reaches, and KeePassXC reads it back with one more revision"
+stripe_was=$(revisions_at "$v11" services/Stripe)
+said=$(drive tag-restore "$(native "$v11")" services/Stripe env:billing) || die "the restore failed: ${said}"
+grep -qF 'asked env:billing puts services/Stripe in billing/dev.' <<<"$said" || die "the restore did not name the environment first: ${said}"
+grep -qF 'asked Joining billing/dev: STRIPE_SECRET_KEY.' <<<"$said" || die "the restore did not name the field that joins first: ${said}"
+[ "$(tags "$v11" services/Stripe | paste -sd' ' -)" = "env:billing finance" ] || die "KeePassXC reads Stripe's tags as $(tags "$v11" services/Stripe | paste -sd' ' -)"
+[ "$(revisions_at "$v11" services/Stripe)" = $((stripe_was + 1)) ] || die "the restore did not add exactly one revision"
+[ "$(kx show "$v11" services/Stripe -a Password)" = stripe-login-v11 ] || die "the restore changed Stripe's password"
+said=$(drive tags-review "$(native "$v11")") || die "the review failed: ${said}"
+grep -qx 'count 0' <<<"$said" || die "a restored tag is still listed: ${said}"
+
 step "NEGATIVE CONTROL: the listing and run comparisons must be able to fail"
 [ "$listed" = "${expected}-CORRUPTED" ] && die "a deliberately corrupted expectation still matched — this gate is not gating"
 out=$(printf '%s\n' "$pw" | OLD_KEY=old-c1b "$kp" run billing --vault "$fields" -- "$child" -c "$probe" 2>"$dir/run.err" | tr -d '\r') \
   || die "keypaste run with OLD_KEY inherited failed: $(cat "$dir/run.err")"
 [ "$out" = "$dev_set" ] && die "a child holding OLD_KEY still matched the dev set — the run comparisons cannot see OLD_KEY"
 
-printf '\nPROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, and an untagged entry under env/ is neither a variable nor protected.\n'
+printf '\nPROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, and a tag KeePassXC dropped with another change is flagged and restored.\n'

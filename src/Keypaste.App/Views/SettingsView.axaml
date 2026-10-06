@@ -70,7 +70,8 @@
           <TextBlock Classes="subtitle" Text="Saved on this machine, and in force as soon as you change them." />
         </StackPanel>
 
-        <!-- Recommendations (C.2): keys left in notes, named by entry and key, never by value. No amber here. -->
+        <!-- Recommendations (C.2, V.11): keys left in notes, named by entry and key, never by value, and project
+             tags another app dropped. No amber here. -->
         <Panel IsVisible="{Binding HasRecommendations}">
         <Border Name="RecommendationsCard"
                 Classes="card filled settings"
@@ -86,12 +87,12 @@
             <Border Classes="settings-row">
               <TextBlock Classes="caption"
                          TextWrapping="Wrap"
-                         Text="Keys left in notes, checked on this machine when you unlock and after each save. Nothing changes until you choose." />
+                         Text="Keys left in notes and project tags another app dropped, checked on this machine when you unlock and after each save. Nothing changes until you choose." />
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding IsEmpty}">
-              <TextBlock Name="RecommendationsEmpty" Classes="caption" Text="No keys found in notes." />
+              <TextBlock Name="RecommendationsEmpty" Classes="caption" Text="No keys found in notes, and no project tags dropped." />
             </Border>
-            <ItemsControl Name="RecommendationRows" ItemsSource="{Binding Rows}" IsVisible="{Binding !IsEmpty}">
+            <ItemsControl Name="RecommendationRows" ItemsSource="{Binding Rows}" IsVisible="{Binding HasNoteKeys}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:RecommendationRow">
                   <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="20,12">
@@ -133,7 +134,7 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Border Classes="settings-row" IsVisible="{Binding !IsEmpty}">
+            <Border Classes="settings-row" IsVisible="{Binding HasNoteKeys}">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <TextBlock Grid.Column="0"
                            Classes="caption"
@@ -145,6 +146,54 @@
                 </StackPanel>
               </Grid>
             </Border>
+            <!-- V.11: a tag goes back only after the person has seen the environment and fields it reaches (D-0415). -->
+            <ItemsControl Name="LostTagRows" ItemsSource="{Binding LostTags}" IsVisible="{Binding HasLostTags}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LostTagRow">
+                  <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="20,12">
+                    <StackPanel Spacing="10">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
+                            AutomationProperties.Name="{Binding Description}">
+                        <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Name="LostTag"
+                                       Classes="mono"
+                                       FontSize="13"
+                                       Text="{Binding Tag}"
+                                       Foreground="{DynamicResource KpTextPrimary}"
+                                       VerticalAlignment="Center" />
+                            <Border Classes="chip outline state" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding StateLabel}" />
+                            </Border>
+                          </StackPanel>
+                          <TextBlock Classes="caption" Text="{Binding Where}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <Button Classes="sm" Content="Restore tag" IsVisible="{Binding NeedsReview}" Command="{Binding RestoreCommand}" />
+                          <Button Classes="sm ghost" Content="Dismiss" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                          <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                        </StackPanel>
+                      </Grid>
+                      <Border Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True">
+                        <StackPanel Spacing="10">
+                          <ItemsControl ItemsSource="{Binding Confirmation}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="sm" Content="Add tag" Command="{Binding ConfirmRestoreCommand}" />
+                            <Button Classes="sm ghost" Content="Cancel" Command="{Binding CancelRestoreCommand}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
             <Border Classes="settings-row" IsVisible="{Binding HasMessage}">
               <TextBlock Name="RecommendationsMessage"
                          Classes="caption"

@@ -820,6 +820,16 @@ internal sealed class KeePassInterop : IDisposable
         return Locate(name) is { } found ? [.. found.Entry.Tags] : null;
     }
 
+    /// <summary>Every live entry's lost project memberships, by the traversal <see cref="Collect"/> uses (V.11).</summary>
+    internal IReadOnlyList<LostProjectTag> ReadLostProjectTags()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<LostProjectTag> lost = [];
+        CollectLostProjectTags(_database.RootGroup, string.Empty, lost, Bin());
+        return lost;
+    }
+
     /// <summary>Every live entry carrying a tag of its own, by the traversal <see cref="Collect"/> uses.</summary>
     internal IReadOnlyList<EntryTags> ReadTags()
     {
@@ -2077,6 +2087,72 @@ internal sealed class KeePassInterop : IDisposable
                 CollectNotes(child, ChildPath(groupPath, child.Name), found, bin);
             }
         }
+    }
+
+    private static void CollectLostProjectTags(PwGroup group, string groupPath, List<LostProjectTag> lost, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            if (entry.History.UCount > 0)
+            {
+                LostProjectTags(entry, new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)), lost);
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectLostProjectTags(child, ChildPath(groupPath, child.Name), lost, bin);
+            }
+        }
+    }
+
+    /// <summary>Each membership a version held and the current one lacks, when the version after the last one holding it changed more than its tags.</summary>
+    private static void LostProjectTags(PwEntry entry, EntryName name, List<LostProjectTag> lost)
+    {
+        PwEntry[] versions = [.. Enumerable.Reverse(HistoryNewestFirst(entry)).Select(position => entry.History.GetAt(position)), entry];
+        var current = Memberships(entry.Tags);
+        Dictionary<(string Project, string Environment), (int Held, string Tag, bool Protects)> dropped = [];
+
+        for (var version = 0; version < versions.Length - 1; version++)
+        {
+            foreach (var tag in versions[version].Tags)
+            {
+                if (ProjectTag.Read(tag) is { Kind: ProjectTagKind.Member, Project: { } project, Environment: { } environment } read
+                    && !current.Contains((project, environment)))
+                {
+                    dropped[(project, environment)] = (version, tag, read.Protects);
+                }
+            }
+        }
+
+        foreach (var ((project, environment), (held, tag, protects)) in dropped)
+        {
+            var after = versions[held + 1];
+
+            if (ChangedMoreThanTags(versions[held], after))
+            {
+                lost.Add(new LostProjectTag(name, entry.Uuid.ToHexString(), tag, project, environment, protects, after.LastModificationTime.ToUniversalTime()));
+            }
+        }
+    }
+
+    private static HashSet<(string Project, string Environment)> Memberships(IEnumerable<string> tags) =>
+        [.. tags.Select(ProjectTag.Read)
+            .Where(read => read.Kind == ProjectTagKind.Member)
+            .Select(read => (read.Project!, read.Environment!))];
+
+    /// <summary>Whether two versions differ in anything but their tags, times and history.</summary>
+    private static bool ChangedMoreThanTags(PwEntry before, PwEntry after)
+    {
+        var retagged = before.CloneDeep();
+        retagged.Tags = [.. after.Tags];
+
+        return !retagged.EqualsEntry(
+            after,
+            PwCompareOptions.IgnoreParentGroup | PwCompareOptions.IgnoreTimes | PwCompareOptions.IgnoreHistory,
+            MemProtCmpMode.Full);
     }
 
     private static void CollectTags(PwGroup group, string groupPath, List<EntryTags> tagged, PwGroup? bin)

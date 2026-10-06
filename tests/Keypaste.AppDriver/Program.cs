@@ -85,6 +85,10 @@ internal static class Program
         "       notes-move <vault> <entry-path> [<key>...]\n" +
         "       notes-dismiss <vault> <entry-path> <key>\n" +
         "       notes-restore <vault> <entry-path> <key>\n" +
+        "       tags-review <vault>\n" +
+        "       tag-restore <vault> <entry-path> <tag>\n" +
+        "       tags-dismiss <vault> <entry-path> <tag>\n" +
+        "       tags-again <vault> <entry-path> <tag>\n" +
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
@@ -152,6 +156,10 @@ internal static class Program
                 ["notes-move", var vault, var entry, .. var keys] => await driver.MoveNoteKeysAsync(vault, entry, keys).ConfigureAwait(true),
                 ["notes-dismiss", var vault, var entry, var key] => await driver.DismissNoteKeyAsync(vault, entry, key).ConfigureAwait(true),
                 ["notes-restore", var vault, var entry, var key] => await driver.ReviewNoteKeyAgainAsync(vault, entry, key).ConfigureAwait(true),
+                ["tags-review", var vault] => await driver.ReviewLostTagsAsync(vault).ConfigureAwait(true),
+                ["tag-restore", var vault, var entry, var tag] => await driver.RestoreLostTagAsync(vault, entry, tag).ConfigureAwait(true),
+                ["tags-dismiss", var vault, var entry, var tag] => await driver.DismissLostTagAsync(vault, entry, tag).ConfigureAwait(true),
+                ["tags-again", var vault, var entry, var tag] => await driver.ReviewLostTagAgainAsync(vault, entry, tag).ConfigureAwait(true),
                 ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 ["launch"] => AppLaunch.Run(KeypasteHome.Resolve(home), []),
@@ -855,6 +863,60 @@ internal sealed class Driver(string home)
         {
             var row = list.Rows.SingleOrDefault(row => row.Entry == entry && row.Key == key && row.IsDismissed)
                 ?? throw new DriverException($"no dismissed finding for {key} on '{entry}'");
+
+            Press(row.ReviewAgainCommand, "Review again");
+            return list.Message.Length == 0 ? Did("restored") : Refused(list.Message);
+        });
+
+    /// <summary>Lists the project tags Settings › Recommendations found dropped: entry, tag and state, never a value (V.11).</summary>
+    internal Task<int> ReviewLostTagsAsync(string vault) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            foreach (var row in list.LostTags)
+            {
+                var state = row.IsDismissed ? "dismissed" : "needs-review";
+                Console.Out.WriteLine($"lost entry={row.Entry} tag={row.Tag} state={state}");
+            }
+
+            Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.NeedsReview}"));
+            return 0;
+        });
+
+    /// <summary>Presses Restore tag on one finding, prints what it was asked, and confirms.</summary>
+    internal Task<int> RestoreLostTagAsync(string vault, string entry, string tag) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            var row = list.LostTags.SingleOrDefault(row => row.Entry == entry && row.Tag == tag && row.NeedsReview)
+                ?? throw new DriverException($"no dropped {tag} needing review on '{entry}'");
+
+            Press(row.RestoreCommand, "Restore tag");
+
+            foreach (var line in row.Confirmation)
+            {
+                Console.Out.WriteLine($"asked {line}");
+            }
+
+            Press(row.ConfirmRestoreCommand, "Add tag");
+            return list.Message.StartsWith("Put ", StringComparison.Ordinal) ? Did(list.Message) : Refused(list.Message);
+        });
+
+    /// <summary>Presses Dismiss on one finding.</summary>
+    internal Task<int> DismissLostTagAsync(string vault, string entry, string tag) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            var row = list.LostTags.SingleOrDefault(row => row.Entry == entry && row.Tag == tag && row.NeedsReview)
+                ?? throw new DriverException($"no dropped {tag} needing review on '{entry}'");
+
+            Press(row.DismissCommand, "Dismiss");
+            return list.Message.Length == 0 ? Did("dismissed") : Refused(list.Message);
+        });
+
+    /// <summary>Presses Review again on one dismissed finding.</summary>
+    internal Task<int> ReviewLostTagAgainAsync(string vault, string entry, string tag) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            var row = list.LostTags.SingleOrDefault(row => row.Entry == entry && row.Tag == tag && row.IsDismissed)
+                ?? throw new DriverException($"no dismissed {tag} on '{entry}'");
 
             Press(row.ReviewAgainCommand, "Review again");
             return list.Message.Length == 0 ? Did("restored") : Refused(list.Message);

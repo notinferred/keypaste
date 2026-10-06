@@ -5,8 +5,8 @@ namespace Keypaste.Core.Recommendations;
 /// <summary>One dismissed recommendation: which vault, which entry and which key, never a value.</summary>
 /// <param name="Vault">The vault's non-secret identity (<see cref="Ownership.VaultIdentity.Key"/>).</param>
 /// <param name="Entry">The entry's KDBX identifier as hex, which survives a rename.</param>
-/// <param name="Kind">The kind of recommendation, <c>note-key</c> for a key in notes.</param>
-/// <param name="Key">The field the finding names.</param>
+/// <param name="Kind">The kind of recommendation: <see cref="RecommendationDismissals.NoteKey"/> or <see cref="RecommendationDismissals.LostProjectTag"/>.</param>
+/// <param name="Key">The field a key in notes names, or a lost tag with when it was lost (<see cref="LostProjectTag.Key"/>).</param>
 public sealed record Dismissal(string Vault, string Entry, string Kind, string Key);
 
 /// <summary>
@@ -21,6 +21,9 @@ public static class RecommendationDismissals
 {
     /// <summary>The kind a key left in notes is dismissed under.</summary>
     public const string NoteKey = "note-key";
+
+    /// <summary>The kind a project tag an entry lost is dismissed under (V.11).</summary>
+    public const string LostProjectTag = "lost-project-tag";
 
     /// <summary>The largest file read, in bytes.</summary>
     public const int MaximumBytes = 256 * 1024;

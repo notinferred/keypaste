@@ -1869,6 +1869,17 @@ public sealed class Vault : IDisposable
             },
             _ => touched ?? VaultEdit.Of());
 
+    /// <summary>Every live entry's lost project memberships, for <see cref="LostProjectTagCheck"/>.</summary>
+    internal IReadOnlyList<LostProjectTag> ReadLostProjectTags()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        lock (_state)
+        {
+            return _interop.ReadLostProjectTags();
+        }
+    }
+
     /// <summary>Every live entry with notes, for <see cref="NoteKeyCheck"/>.</summary>
     internal IReadOnlyList<EntryNotes> ReadNotes()
     {

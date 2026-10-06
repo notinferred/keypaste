@@ -6,7 +6,7 @@ using Keypaste.Core.Recommendations;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>Settings › Recommendations: keys left in notes, for review (C.2, D-0372).</summary>
+/// <summary>Settings › Recommendations: keys left in notes (C.2, D-0372) and project tags another app dropped (V.11), for review.</summary>
 /// <remarks>
 /// <para>
 /// Owned by the shell for one unlock, because the Settings screen is rebuilt on every visit. It is
@@ -28,6 +28,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
     private readonly List<Dismissal> _dismissals;
     private IReadOnlyList<RecommendationRow> _rows = [];
+    private IReadOnlyList<LostTagRow> _lostTags = [];
     private string _message = string.Empty;
     private bool _disposed;
 
@@ -56,14 +57,34 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
             {
                 Raise(nameof(NeedsReview));
                 Raise(nameof(IsEmpty));
+                Raise(nameof(HasNoteKeys));
+            }
+        }
+    }
+
+    /// <summary>Every project tag an entry lost in another app: those needing review first, then those dismissed.</summary>
+    internal IReadOnlyList<LostTagRow> LostTags
+    {
+        get => _lostTags;
+        private set
+        {
+            if (Set(ref _lostTags, value))
+            {
+                Raise(nameof(NeedsReview));
+                Raise(nameof(IsEmpty));
+                Raise(nameof(HasLostTags));
             }
         }
     }
 
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
-    internal int NeedsReview => _rows.Count(row => !row.IsDismissed);
+    internal int NeedsReview => _rows.Count(row => !row.IsDismissed) + _lostTags.Count(row => !row.IsDismissed);
 
-    internal bool IsEmpty => _rows.Count == 0;
+    internal bool IsEmpty => _rows.Count == 0 && _lostTags.Count == 0;
+
+    internal bool HasNoteKeys => _rows.Count > 0;
+
+    internal bool HasLostTags => _lostTags.Count > 0;
 
     /// <summary>What the last act did or why it was refused, or empty.</summary>
     internal string Message
@@ -84,12 +105,13 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
     internal RelayCommand SelectAllCommand { get; }
 
-    /// <summary>Checks the open vault's notes again.</summary>
+    /// <summary>Checks the open vault's notes and tags again.</summary>
     internal void Check()
     {
         if (_disposed || _session.Unlocked is not { } vault)
         {
             Rows = [];
+            LostTags = [];
             return;
         }
 
@@ -102,6 +124,68 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
             .ToList();
 
         Rows = rows;
+        LostTags = [.. LostProjectTagCheck.Scan(vault)
+            .Select(finding => new LostTagRow(this, finding, IsDismissed(vaultKey, finding)))
+            .OrderBy(row => row.IsDismissed)
+            .ThenBy(row => row.Entry, StringComparer.Ordinal)
+            .ThenBy(row => row.Tag, StringComparer.Ordinal)];
+    }
+
+    /// <summary>Shows what putting a lost tag back does, before it is written (D-0415).</summary>
+    internal void AskRestore(LostTagRow row)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            Message = "The vault is locked.";
+            return;
+        }
+
+        try
+        {
+            row.Confirmation = ProjectTagChange.Preview(vault, row.Finding.Entry, [row.Finding.Tag], adding: true)?.Describe() ?? [];
+            Message = string.Empty;
+        }
+        catch (VaultException e)
+        {
+            Message = e.Message;
+        }
+    }
+
+    /// <summary>Puts a lost tag back on its entry, in one revision, and saves.</summary>
+    internal void Restore(LostTagRow row)
+    {
+        row.Confirmation = [];
+
+        if (_session.Unlocked is not { } vault)
+        {
+            Message = "The vault is locked.";
+            return;
+        }
+
+        try
+        {
+            if (!vault.AddTag(row.Finding.Entry, row.Finding.Tag))
+            {
+                Message = $"{row.Entry} already has {row.Tag}.";
+                Check();
+                return;
+            }
+
+            vault.Save();
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            Message = "Something else changed this vault since you opened it. Reload to see it, then restore the tag again.";
+            return;
+        }
+        catch (VaultException e)
+        {
+            Message = e.Message;
+            return;
+        }
+
+        Message = $"Put {row.Tag} back on {row.Entry}. The entry as it was stays in its history.";
+        Check();
     }
 
     /// <summary>Moves the given findings into protected fields and saves.</summary>
@@ -174,6 +258,26 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         Check();
     }
 
+    internal void Dismiss(LostTagRow row)
+    {
+        var dismissal = new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.LostProjectTag, row.Finding.Key);
+
+        if (!_dismissals.Contains(dismissal))
+        {
+            _dismissals.Add(dismissal);
+        }
+
+        Message = Remember();
+        Check();
+    }
+
+    internal void ReviewAgain(LostTagRow row)
+    {
+        _dismissals.Remove(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.LostProjectTag, row.Finding.Key));
+        Message = Remember();
+        Check();
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -183,6 +287,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         Rows = [];
+        LostTags = [];
         _check.Dispose();
     }
 
@@ -211,6 +316,9 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
     private bool IsDismissed(string vaultKey, NoteKeyFinding finding) =>
         _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.NoteKey, finding.Field));
+
+    private bool IsDismissed(string vaultKey, LostProjectTag finding) =>
+        _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.LostProjectTag, finding.Key));
 
     private string VaultKey() => _session.Identity?.Key ?? string.Empty;
 
