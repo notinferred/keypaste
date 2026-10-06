@@ -23,14 +23,14 @@ public sealed class McpConnectionCheckTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task It_introduces_itself_before_listing_and_asks_for_the_chosen_entry_with_its_fixed_reason()
+    public async Task It_introduces_itself_before_listing_and_asks_for_the_chosen_entrys_listed_field_with_its_fixed_reason()
     {
         await using var bridge = new ScriptedBridge();
         await using var check = bridge.Check();
 
         var listing = await check.ListAsync(Token);
         Assert.Null(listing.Problem);
-        Assert.Equal([new McpListedEntry("k1_first", "env/ci/DEPLOY_KEY"), new McpListedEntry("k1_second", "env/ci/OTHER")], listing.Entries);
+        Assert.Equal([new McpListedEntry("k1_first", "env/ci/DEPLOY_KEY", "password"), new McpListedEntry("k1_second", "env/ci/OTHER", "OTHER_TOKEN")], listing.Entries);
 
         await check.RequestAsync(listing.Entries[1], Token);
 
@@ -41,7 +41,7 @@ public sealed class McpConnectionCheckTests
         var request = bridge.Received[3]["params"]!;
         Assert.Equal("request_credential", (string?)request["name"]);
         Assert.Equal("k1_second", (string?)request["arguments"]!["entry"]);
-        Assert.Equal("password", (string?)request["arguments"]!["field"]);
+        Assert.Equal("OTHER_TOKEN", (string?)request["arguments"]!["field"]);
         Assert.Equal(McpConnectionCheck.Reason, (string?)request["arguments"]!["reason"]);
         Assert.Equal(60, (int?)request["arguments"]!["ttl_seconds"]);
     }
@@ -121,7 +121,7 @@ public sealed class McpConnectionCheckTests
         using var bridge = new SilentBridge(clock, McpConnectionCheck.RequestTimeout);
         await using var check = new McpConnectionCheck(bridge.ToBridge, bridge.FromBridge, clock);
 
-        var answer = await bridge.Watch(check.RequestAsync(new McpListedEntry("k1_first", "env/ci/DEPLOY_KEY"), Token));
+        var answer = await bridge.Watch(check.RequestAsync(new McpListedEntry("k1_first", "env/ci/DEPLOY_KEY", "password"), Token));
 
         Assert.Equal("tools/call", bridge.Method);
         Assert.True(bridge.PendingAtTheLastSecond);
@@ -238,8 +238,9 @@ public sealed class McpConnectionCheckTests
                 {
                     ["vault"] = "open",
                     ["entries"] = new JsonArray(
-                        new JsonObject { ["handle"] = "k1_first", ["group"] = "env/ci", ["name"] = "DEPLOY_KEY", ["altered"] = false },
-                        new JsonObject { ["handle"] = "k1_second", ["group"] = "env/ci", ["name"] = "OTHER", ["altered"] = false }),
+                        new JsonObject { ["handle"] = "k1_first", ["group"] = "env/ci", ["name"] = "DEPLOY_KEY", ["fields"] = new JsonArray("username", "password"), ["tags"] = new JsonArray(), ["altered"] = false },
+                        new JsonObject { ["handle"] = "k1_second", ["group"] = "env/ci", ["name"] = "OTHER", ["fields"] = new JsonArray("OTHER_TOKEN"), ["tags"] = new JsonArray("env:ci"), ["altered"] = false },
+                        new JsonObject { ["handle"] = "k1_empty", ["group"] = "env/ci", ["name"] = "EMPTY", ["fields"] = new JsonArray(), ["tags"] = new JsonArray("env:ci"), ["altered"] = false }),
                 },
             },
             _ when Deny => Refusal("keypaste: DENIED. A person refused this request.\nDo not retry."),

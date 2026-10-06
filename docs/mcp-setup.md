@@ -37,7 +37,7 @@ The command detects installed clients and configures Claude Code and Codex throu
 ```
 keypaste mcp   /home/you/.local/bin/keypaste
 vault          /home/you/vaults/personal.kdbx
-exposure       env/** (the default; nothing else in the vault can even be named)
+exposure       tag:env:* (the default: the variables of tagged entries, and nothing else)
 
   claude-code      configured
   codex            configured
@@ -51,7 +51,7 @@ exposure       env/** (the default; nothing else in the vault can even be named)
 
 ## From the desktop app
 
-In source, the Agents screen has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `env/**`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste` path and `mcp`, `--client-label` and each `--expose`, and `--vault` only when the unlocked vault is not the chosen one. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
+In source, the Agents screen has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `tag:env:*`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste` path and `mcp`, `--client-label` and each `--expose`, and `--vault` only when the unlocked vault is not the chosen one. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
 
 The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start the image file itself with `mcp`: moving or deleting the `.AppImage` breaks the registration until you connect again.
 
@@ -146,7 +146,7 @@ Patterns match the group path and the entry title as two separate things, so `*`
 
 ## The tools
 
-`list_entry_names` takes no arguments and returns only exposed group paths and entry names. It cannot return usernames, passwords, URLs or notes, or widen exposure.
+`list_entry_names` takes no arguments and returns, for each exposed entry, its group path and name, the fields that may be asked for and its project tags. It cannot return a value or widen exposure.
 
 `request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field. The person chooses whether an approval is reused; `--max-ttl` sets how long, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
 
@@ -300,7 +300,7 @@ For protocol errors, inspect wrappers and shell profiles for text written to std
 
 Can the agent see my passwords? Each successful request returns one field of one entry under a human approval, its still-live cached grant, or a matching policy rule. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste mcp` holds no vault, but it does receive and forward the released value.
 
-Can it see my entry names? Only the ones inside `--expose`, which defaults to `env/**`, and only while the terminal approver is running with its vault unlocked.
+Can it see my entry names? Only the ones inside `--expose`, which defaults to `tag:env:*`, the entries tagged into a project, and only while the terminal approver is running with its vault unlocked. Through a tag it reaches only an entry's project variables, never its password; a pattern naming a group, such as `--expose 'services/**'`, reaches whole entries.
 
 Can it change my vault? The current MCP surface only lists names and requests values; it cannot add, edit or delete entries. Desktop and CLI editing are separate workflows.
 
@@ -314,4 +314,4 @@ Does anything leave my machine? The keypaste bridge uses local stdio and local I
 
 A client can claim another client's name, but authorization does not use that name. Policy matches the configured `--client-label`; the agent cannot change that label, although another local program can launch a bridge with the same arguments. [THREATS.md](../THREATS.md) T-3 and T-14 describe the boundary.
 
-Should I point this at my personal vault? The default exposure is `env/**`; only entries inside it are available through this bridge. Review that subtree, any policy rules and the client's retention behavior before using real credentials. An approval permits cached reuse on the same connection until expiry, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.
+Should I point this at my personal vault? The default exposure is `tag:env:*`; only the project variables of tagged entries are available through this bridge. Review those entries, any policy rules and the client's retention behavior before using real credentials. An approval permits cached reuse on the same connection until expiry, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.

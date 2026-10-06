@@ -50,6 +50,25 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Read from the open vault, as <see cref="RequiresLiveApproval"/> reads them: a field is
+    /// released only after a read of the saved file, which refuses a tag not yet saved.
+    /// </remarks>
+    public IReadOnlyList<string> Tags(EntryName name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        try
+        {
+            return _unlockedVault()?.Tags(name) ?? [];
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return [];
+        }
+    }
+
+    /// <inheritdoc/>
     public bool TryResolve(
         string entryArgument,
         [NotNullWhen(true)] out EntryName? name,

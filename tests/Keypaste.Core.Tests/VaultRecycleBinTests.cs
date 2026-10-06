@@ -272,7 +272,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
         Assert.True(EntryExposure.TryCreate(["**"], out var exposure, out _));
         Assert.True(lister.TryList(exposure!, out var before, out _));
-        Assert.Contains(before!, name => name == _token);
+        Assert.Contains(before!, entry => entry.Name == _token);
 
         Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
         vault.Save();

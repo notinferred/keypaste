@@ -1,3 +1,4 @@
+using Keypaste.Core;
 using Xunit;
 
 namespace Keypaste.Mcp.Tests;
@@ -17,6 +18,23 @@ public sealed class ServerOptionsTests
         Assert.False(plain!.AllowRun);
         Assert.True(allowed!.AllowRun);
         Assert.NotNull(allowed.VaultKey);
+    }
+
+    /// <summary>D-0422: a bridge nobody widened reaches the variables of tagged entries, and nothing by place.</summary>
+    [Fact]
+    public void WithNoExpose_TheExposureIsEveryProjectsVariables()
+    {
+        Assert.True(Parse(out var options, out _, "--vault", "v.kdbx"));
+
+        Assert.Equal([EntryExposure.DefaultGlob], options!.Exposure.Globs);
+        Assert.Equal("tag:env:*", EntryExposure.DefaultGlob);
+    }
+
+    [Fact]
+    public void AMalformedTagSelector_IsRefusedAtStartup()
+    {
+        Assert.False(Parse(out _, out var error, "--expose", "tag:team"));
+        Assert.StartsWith("--expose:", error, StringComparison.Ordinal);
     }
 
     [Theory]

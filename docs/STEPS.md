@@ -52,11 +52,6 @@ keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an 
 
 Every release still needs a person's answer or a rule they wrote, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **C.5b — Expose tagged projects to agents.** Needs: C.1b, C.5a1.
-  - The default exposure becomes `env/**` plus `tag:env:*`, and `--expose` and policy rules accept tag selectors.
-  - An entry reached only through a tag exposes only its env fields.
-  - Listings carry field names and project tags, never a value.
-  - THREATS gains T-38: one secret shared by two environments.
 - [ ] **G.2 — Connect every AI tool on this machine.** Needs: G.1.
   - `keypaste setup` and the app connect Claude Code, Codex, VS Code and Gemini CLI through their own commands.
   - Cursor, Claude Desktop and Windsurf are connected by a verified edit of their configuration file, with a backup.

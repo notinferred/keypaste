@@ -197,14 +197,16 @@ public sealed class AgentPolicyTests : IDisposable
             return true;
         }
 
-        public bool TryList(EntryExposure exposure, [NotNullWhen(true)] out IReadOnlyList<EntryName>? names, out CredentialFailure failure)
+        public bool TryList(EntryExposure exposure, [NotNullWhen(true)] out IReadOnlyList<ListedEntry>? names, out CredentialFailure failure)
         {
-            names = [_name];
+            names = [new ListedEntry(_name, ["password"], _tags)];
             failure = CredentialFailure.None;
             return true;
         }
 
         public bool RequiresLiveApproval(EntryName name) => EnvProfileNames.RequiresLiveApproval(_tags);
+
+        public IReadOnlyList<string> Tags(EntryName name) => _tags;
     }
 
     // internal, not private: .editorconfig applies the _camelCase field rule to private consts too.

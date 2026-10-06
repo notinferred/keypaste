@@ -60,7 +60,7 @@ ask() {
       echo deny >&7
     fi
     sleep 3
-  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$out" 2>"$err" \
+  } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$out" 2>"$err" \
     || die "keypaste mcp exited non-zero"
 }
 

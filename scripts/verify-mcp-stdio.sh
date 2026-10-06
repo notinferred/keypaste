@@ -47,7 +47,7 @@ readonly ERR="$WORK/stderr.txt"
   # at its word: without this it shuts down before it has answered anything, and the gate sees an
   # empty stdout that looks like a protocol failure rather than a race in the harness.
   sleep 5
-} | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --audit-log "$AUDIT" --client-label ci-probe \
+} | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe \
       >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero"
 
 [ -s "$OUT" ] || die "keypaste mcp wrote nothing to stdout"

@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0422 | 2026-10-06 | Agents' default exposure is `tag:env:*`; a `tag:env:<project>[:<environment>]` selector reaches, per entry, only the variable-named custom fields of entries with a matching project tag, a place pattern the whole entry, and a listing names each entry's fields and project tags, never a value ([C.5b](docs/steps/C.5b.md)) | D-0021's `env/**` default, and D-0022's listing of names alone |
 | D-0421 | 2026-10-05 | Recommendations lists a project environment an entry's history holds and its current version lacks only when the version that dropped it changed more than its tags, so a tag edit in any app that keeps tags is not flagged; a dismissal is keyed by the tag and when it was lost ([V.11](docs/steps/V.11.md)) | — |
 | D-0420 | 2026-10-05 | The approver delivers a reply for as long as its peer takes to read it, and once its listener stops each delivery has one second more, so a lock or quit still ends ([F.49](docs/steps/F.49.md)) | D-0315's one-second bound on every delivery |
 | D-0419 | 2026-10-05 | `ModelContextProtocol.Core` and its closure may share the `keypaste` binary that reads the master password because none has a module initializer, no CLI file but `Program.cs` names the bridge or SDK, and the bridge's path names no vault or password type, each held by a test with a control; this is PRODUCT §3.9's written justification ([F.48](docs/steps/F.48.md)) | — |

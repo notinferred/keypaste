@@ -180,12 +180,14 @@ public sealed class EntryActivity
     /// or it has been released, is covered by a grant or is waiting on a person (N.5).
     /// </summary>
     /// <param name="entry">The entry.</param>
+    /// <param name="tags">The entry's own tags, which a <c>tag:</c> pattern reads.</param>
     /// <returns>Whether the Agent access card belongs on its pane.</returns>
-    public bool AgentsCanSee(EntryName entry)
+    public bool AgentsCanSee(EntryName entry, IReadOnlyList<string> tags)
     {
         ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(tags);
 
-        if (_reach.Any(exposure => exposure.Allows(entry)))
+        if (_reach.Any(exposure => exposure.Reach(entry, tags) != ExposureReach.None))
         {
             return true;
         }

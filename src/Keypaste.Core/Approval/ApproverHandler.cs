@@ -106,6 +106,12 @@ public sealed class ApproverHandler
     /// <remarks>For the release paths beside this one, so a run naming the entry is held to the same rule (D-0371).</remarks>
     public bool RequiresLiveApproval(EntryName name) => _requiresLiveApproval(name);
 
+    /// <summary>An entry's own tags, as the exposure and the policy read them.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>Its tags, or none when they cannot be read.</returns>
+    /// <remarks>For the release paths beside this one, so a run is held to the exposure's reach as a credential request is (D-0422).</remarks>
+    public IReadOnlyList<string> Tags(EntryName name) => _source.Tags(name);
+
     /// <summary>The policy a bridge with this label is held to now.</summary>
     /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>
     /// <param name="policy">Its policy, when the file could be used.</param>
@@ -201,12 +207,20 @@ public sealed class ApproverHandler
             };
         }
 
-        if (!exposure.Allows(name))
+        // The re-check that makes handles safe. The bridge can test a path against its globs
+        // before forwarding, but it cannot resolve a handle or read a tag without the vault, so
+        // without this a handle would be the way around the exposure rule.
+        var tags = _source.Tags(name);
+        var reach = exposure.Reach(name, tags);
+
+        if (reach == ExposureReach.None)
         {
-            // The re-check that makes handles safe. The bridge can test a path against its globs
-            // before forwarding, but it cannot resolve a handle without the vault, so without this
-            // a handle would be the way around the exposure rule.
             return Refused(AuditMethod.OutOfScope, "the entry is outside this bridge's configured exposure");
+        }
+
+        if (!EntryExposure.Permits(reach, request.Field))
+        {
+            return Refused(AuditMethod.OutOfScope, "this bridge reaches the entry through a project tag, which exposes only its project variables");
         }
 
         var handle = EntryHandle.For(name);
@@ -258,7 +272,7 @@ public sealed class ApproverHandler
 
         if (!liveOnly)
         {
-            var outcome = _policy.Evaluate(request.ClientLabel, name, request.Field);
+            var outcome = _policy.Evaluate(request.ClientLabel, name, tags, request.Field);
 
             if (outcome.Kind == PolicyOutcomeKind.RateLimited)
             {

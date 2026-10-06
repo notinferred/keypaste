@@ -287,11 +287,13 @@ public static class ApproverProtocol
             writer.WriteEndArray();
         });
 
-    private static void WriteName(Utf8JsonWriter writer, EntryName name)
+    private static void WriteName(Utf8JsonWriter writer, ListedEntry entry)
     {
         writer.WriteStartObject();
-        writer.WriteString("group", name.GroupPath);
-        writer.WriteString("title", name.Title);
+        writer.WriteString("group", entry.Name.GroupPath);
+        writer.WriteString("title", entry.Name.Title);
+        WriteStrings(writer, "fields", entry.Fields);
+        WriteStrings(writer, "tags", entry.Tags);
         writer.WriteEndObject();
     }
 
@@ -652,18 +654,20 @@ public static class ApproverProtocol
                 return false;
             }
 
-            var decoded = new List<EntryName>(names.GetArrayLength());
+            var decoded = new List<ListedEntry>(names.GetArrayLength());
 
             foreach (var element in names.EnumerateArray())
             {
                 if (element.ValueKind != JsonValueKind.Object
                     || !TryString(element, "group", out var group)
-                    || !TryString(element, "title", out var title))
+                    || !TryString(element, "title", out var title)
+                    || !TryStrings(element, "fields", out var fields)
+                    || !TryStrings(element, "tags", out var tags))
                 {
                     return false;
                 }
 
-                decoded.Add(new EntryName(group, title));
+                decoded.Add(new ListedEntry(new EntryName(group, title), fields, tags));
             }
 
             reply = new NamesReply(

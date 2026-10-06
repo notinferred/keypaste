@@ -95,7 +95,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Extra globs, comma-separated; empty leaves the bridge's default of <c>env/**</c>.</summary>
+    /// <summary>Extra globs, comma-separated; empty leaves the bridge's default of <c>tag:env:*</c>.</summary>
     internal string Exposure
     {
         get => _exposure;
@@ -369,7 +369,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         Raise(nameof(IsPicking));
         AskCommand.RaiseCanExecuteChanged();
 
-        CheckMessage = $"Asking for the password of {entry.Name}. Answer in the prompt window.";
+        CheckMessage = $"Asking for {Shown(entry.Field)} of {entry.Name}. Answer in the prompt window.";
 
         McpCheckAnswer answer;
         try
@@ -383,12 +383,14 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
         await EndCheckAsync(answer.Outcome switch
         {
-            McpCheckOutcome.Granted => $"Connected: you approved {entry.Name}, and the password was released to the check, which discarded it unread. "
+            McpCheckOutcome.Granted => $"Connected: you approved {entry.Name}, and {Shown(entry.Field)} was released to the check, which discarded it unread. "
                 + "The audit record is in this session's history below.",
             McpCheckOutcome.Denied => $"Connected: the request for {entry.Name} reached you and was refused. {answer.Said}",
             _ => $"The check failed: {answer.Said}",
         }).ConfigureAwait(true);
     }
+
+    private static string Shown(string field) => field == "password" ? "the password" : field;
 
     private void SetCheck(McpConnectionCheck? check)
     {

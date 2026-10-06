@@ -53,7 +53,7 @@ public sealed class SessionAuthorityTests : IDisposable
 
         Assert.NotNull(reply);
         Assert.True(reply.VaultUnlocked);
-        Assert.Equal([new EntryName("env/dev", "STRIPE_KEY")], reply.Names);
+        Assert.Equal([new EntryName("env/dev", "STRIPE_KEY")], reply.Names.Select(entry => entry.Name));
         Assert.Equal("session-one", reply.Session);
     }
 

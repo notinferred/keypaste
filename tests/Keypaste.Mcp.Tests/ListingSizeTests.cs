@@ -31,14 +31,14 @@ public sealed class ListingSizeTests
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
-    /// <summary>Names shaped as an ordinary vault's are: seventy-six encoded bytes each.</summary>
-    private static IReadOnlyList<EntryName> Crowd(int count, string group = "env/dev/services") =>
+    /// <summary>Names shaped as an ordinary vault's are: ninety-eight encoded bytes each, with no fields or tags.</summary>
+    private static IReadOnlyList<ListedEntry> Crowd(int count, string group = "env/dev/services") =>
         [.. Enumerable.Range(0, count)
-            .Select(i => new EntryName(group, $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"))];
+            .Select(i => new ListedEntry(new EntryName(group, $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"), [], []))];
 
     /// <summary>Stands up an approver holding the given names, and a bridge pointed at it.</summary>
     private static async Task<(FakeApprover Approver, McpHarness Harness, McpClient Client)> ConnectedAsync(
-        IReadOnlyList<EntryName> names,
+        IReadOnlyList<ListedEntry> names,
         string exposure = "env/**")
     {
         var approver = new FakeApprover { Names = new NamesReply(true, names, string.Empty, true) };
@@ -139,7 +139,7 @@ public sealed class ListingSizeTests
     public async Task ExactlyAThousandNamesInScope_IsNotReportedAsTruncated()
     {
         var (approver, harness, client) = await ConnectedAsync(
-            [.. Enumerable.Range(0, 1000).Select(i => new EntryName("env/dev", $"KEY_{i:D4}"))]);
+            [.. Enumerable.Range(0, 1000).Select(i => new ListedEntry(new EntryName("env/dev", $"KEY_{i:D4}"), [], []))]);
 
         await using var _ = approver;
         await using var __ = harness;
@@ -185,7 +185,7 @@ public sealed class ListingSizeTests
     [Fact]
     public async Task ASingleEnormousName_LeavesAnEmptyButHonestListing()
     {
-        var enormous = new EntryName("env/dev", new string('A', 100_000));
+        var enormous = new ListedEntry(new EntryName("env/dev", new string('A', 100_000)), [], []);
         var (approver, harness, client) = await ConnectedAsync([enormous]);
 
         await using var _ = approver;

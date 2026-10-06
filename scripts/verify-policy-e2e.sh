@@ -149,16 +149,18 @@ start_agent() {
 # under `set -e` that would abort the run instead of reporting a count of nothing.
 prompts_drawn() { grep -c 'an agent is asking for a credential' "$AGENT_ERR" 2>/dev/null || true; }
 
+# Without an --expose of its own, a bridge here is exposed to env/**, where $ENTRY lives.
 ask() {
-  local id="$1" entry="$2" field="$3" out="$4" ttl="$5"
+  local id="$1" entry="$2" field="$3" out="$4" ttl="$5" expose=(--expose 'env/**')
   shift 5
+  case " $* " in *" --expose "*) expose=() ;; esac
 
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"$field\",\"reason\":\"ci policy probe\",\"ttl_seconds\":$ttl}}}"
     sleep 6
-  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" "$@" \
+  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" ${expose[@]+"${expose[@]}"} "$@" \
         >"$out" 2>"$WORK/mcp-stderr.txt" || die "keypaste mcp exited non-zero"
 }
 

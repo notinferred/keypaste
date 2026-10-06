@@ -20,8 +20,8 @@ public sealed class MessageFramerTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private static EntryName Astral(int runes) =>
-        new("env/dev", string.Concat(Enumerable.Repeat("\U000E0041", runes)));
+    private static ListedEntry Astral(int runes) =>
+        new(new EntryName("env/dev", string.Concat(Enumerable.Repeat("\U000E0041", runes))), [], []);
 
     private static CredentialReply Released(string value) => new()
     {
@@ -33,10 +33,10 @@ public sealed class MessageFramerTests
         Value = value,
     };
 
-    /// <summary>Ordinary names, encoding to seventy-six bytes each. See <see cref="ApproverProtocolTests"/>.</summary>
-    private static IReadOnlyList<EntryName> Ordinary(int count) =>
+    /// <summary>Ordinary names with no fields or tags, encoding to ninety-eight bytes each. See <see cref="ApproverProtocolTests"/>.</summary>
+    private static IReadOnlyList<ListedEntry> Ordinary(int count) =>
         [.. Enumerable.Range(0, count)
-            .Select(i => new EntryName("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"))];
+            .Select(i => new ListedEntry(new EntryName("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"), [], []))];
 
     [Fact]
     public async Task AFrameAtTheLimit_IsSent()

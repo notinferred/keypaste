@@ -3,37 +3,37 @@ using System.Diagnostics.CodeAnalysis;
 namespace Keypaste.Core.Approval;
 
 /// <summary>
-/// The names an agent may be shown. Yields <see cref="EntryName"/> and has nowhere to put anything
-/// else.
+/// The entries an agent may be shown. Yields <see cref="ListedEntry"/>, which holds only names, and
+/// has nowhere to put anything else.
 /// </summary>
 /// <remarks>
 /// <para>
 /// A separate interface from <see cref="ICredentialSource"/>, and that separation is the whole
-/// point (DECISIONS.md D-0022). Everything reachable through here is a group path and a title, so
-/// no implementation — including this one — can return a password through the listing path even by
-/// mistake. Fusing the two into a single "vault access" abstraction would give the listing path the
+/// point (DECISIONS.md D-0022). Everything reachable through here is a group path, a title, field
+/// names and project tags, so no implementation — including this one — can return a password
+/// through the listing path even by mistake. Fusing the two into a single "vault access" abstraction would give the listing path the
 /// ability to return a secret, which is the single change most likely to turn
 /// <c>list_entry_names</c> into an exfiltration tool (THREATS.md T-8).
 /// </para>
 /// <para>
 /// The exposure is applied <em>here</em> rather than by the caller, so there is no arrangement of
-/// callers in which a name outside it is ever produced.
+/// callers in which an entry outside it, or a field beyond its reach, is ever produced.
 /// </para>
 /// </remarks>
 public interface IEntryNameLister
 {
-    /// <summary>The names inside an exposure.</summary>
+    /// <summary>The entries inside an exposure, each with the fields its reach covers.</summary>
     /// <param name="exposure">What may be named.</param>
-    /// <param name="names">The raw, unsanitized names. Sanitizing belongs to whoever renders them.</param>
+    /// <param name="names">The raw, unsanitized entries. Sanitizing belongs to whoever renders them.</param>
     /// <param name="failure">Why there are none, when there are none.</param>
     /// <returns><see langword="true"/> when the vault could be read, even if nothing matched.</returns>
     bool TryList(
         EntryExposure exposure,
-        [NotNullWhen(true)] out IReadOnlyList<EntryName>? names,
+        [NotNullWhen(true)] out IReadOnlyList<ListedEntry>? names,
         out CredentialFailure failure);
 }
 
-/// <summary>Lists the names in an unlocked vault that lie inside an exposure.</summary>
+/// <summary>Lists the entries in an unlocked vault that lie inside an exposure.</summary>
 /// <param name="unlockedVault">
 /// The vault currently unlocked in this process, or <see langword="null"/> when none is.
 /// </param>
@@ -50,8 +50,7 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
     /// </para>
     /// <para>
     /// <b>It sits deliberately above the most names any frame could hold.</b> The smallest possible
-    /// element is twenty-three bytes, so no frame carries more than about two thousand seven
-    /// hundred. A cap below that would drop names the encoder never sees, and the encoder would then
+    /// element is forty-five bytes, so no frame carries more than about one thousand four hundred. A cap below that would drop names the encoder never sees, and the encoder would then
     /// report as complete a listing that was not — which is the defect this replaced, moved one
     /// layer up. <c>ApproverProtocolTests.NoFrameCanHoldMoreNamesThanTheListersCap</c> keeps the two
     /// numbers apart.
@@ -65,7 +64,7 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
     /// <inheritdoc/>
     public bool TryList(
         EntryExposure exposure,
-        [NotNullWhen(true)] out IReadOnlyList<EntryName>? names,
+        [NotNullWhen(true)] out IReadOnlyList<ListedEntry>? names,
         out CredentialFailure failure)
     {
         ArgumentNullException.ThrowIfNull(exposure);
@@ -82,8 +81,8 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
 
         try
         {
-            var matched = new List<EntryName>();
-            var state = vault.ReadSaved(out var entries);
+            var matched = new List<ListedEntry>();
+            var state = vault.ReadSavedListing(out var entries);
 
             if (entries is null)
             {
@@ -93,14 +92,14 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
 
             foreach (var entry in entries)
             {
-                var name = EntryName.Of(entry);
+                var reach = exposure.Reach(entry.Name, entry.Tags);
 
-                if (!exposure.Allows(name))
+                if (reach == ExposureReach.None)
                 {
                     continue;
                 }
 
-                matched.Add(name);
+                matched.Add(entry.Within(reach));
 
                 if (matched.Count == MaximumNames)
                 {

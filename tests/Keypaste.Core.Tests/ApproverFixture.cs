@@ -67,7 +67,7 @@ internal sealed class ApproverFixture : IDisposable
     }
 }
 
-/// <summary>A vault with two entries, one inside the default exposure and one well outside it.</summary>
+/// <summary>A vault with two entries, one under <c>env/</c> and one well outside it, untagged unless a test tags them.</summary>
 internal sealed class FakeSource : ICredentialSource, IEntryNameLister
 {
     private static readonly EntryName[] _entries =
@@ -93,7 +93,12 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
     /// <summary>The entries asked about live every time, as a protecting tag would make them.</summary>
     internal HashSet<EntryName> Protected { get; } = [];
 
+    /// <summary>Each entry's own tags, which a <c>tag:</c> exposure reads.</summary>
+    internal Dictionary<EntryName, string[]> Tagged { get; } = [];
+
     public bool RequiresLiveApproval(EntryName name) => Protected.Contains(name);
+
+    public IReadOnlyList<string> Tags(EntryName name) => Tagged.TryGetValue(name, out var tags) ? tags : [];
 
     public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
     {
@@ -142,7 +147,7 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
         return true;
     }
 
-    public bool TryList(EntryExposure exposure, [NotNullWhen(true)] out IReadOnlyList<EntryName>? names, out CredentialFailure failure)
+    public bool TryList(EntryExposure exposure, [NotNullWhen(true)] out IReadOnlyList<ListedEntry>? names, out CredentialFailure failure)
     {
         names = null;
 
@@ -153,7 +158,14 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
         }
 
         During?.Invoke();
-        names = [.. _entries.Where(exposure.Allows)];
+        names =
+        [
+            .. _entries
+                .Select(name => new ListedEntry(name, ["password", "STRIPE_SECRET_KEY"], Tags(name)))
+                .Select(entry => (Entry: entry, Reach: exposure.Reach(entry.Name, entry.Tags)))
+                .Where(listed => listed.Reach != ExposureReach.None)
+                .Select(listed => listed.Entry.Within(listed.Reach)),
+        ];
         failure = CredentialFailure.None;
         return true;
     }

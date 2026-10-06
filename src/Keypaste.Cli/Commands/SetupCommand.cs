@@ -257,7 +257,7 @@ internal static class SetupCommand
             ? $"vault          {pinned}"
             : $"vault          {chosen ?? "none chosen yet"} (the chosen vault; the client's entry names none)");
         context.Stdout.WriteLine(registration.Expose.Count == 0
-            ? "exposure       env/** (the default; nothing else in the vault can even be named)"
+            ? $"exposure       {EntryExposure.DefaultGlob} (the default: the variables of tagged entries, and nothing else)"
             : $"exposure       {string.Join(", ", registration.Expose)}");
 
         if (registration.VaultPath is null && chosen is null)
@@ -302,7 +302,7 @@ internal static class SetupCommand
         writer.WriteLine("  --vault <path>      pin the clients to this vault instead of the chosen one");
         writer.WriteLine("  --client <a,b>      only these, from: " + KnownClientIds());
         writer.WriteLine("  --label <name>      what the audit log calls the client (default: its id)");
-        writer.WriteLine("  --expose <globs>    widen what may be named. Default is env/** and nothing else");
+        writer.WriteLine($"  --expose <globs>    widen what may be named. Default is {EntryExposure.DefaultGlob} and nothing else");
         writer.WriteLine("  --dry-run           print the exact commands and change nothing");
         writer.WriteLine("  --remove            take keypaste out again, leaving everything else alone");
         writer.WriteLine();

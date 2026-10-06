@@ -113,7 +113,7 @@ public sealed class SessionOwnershipTests
 
             var listing = await client.ListAsync(Listing(fixture.Path_, attached.Session!), Token);
             Assert.NotNull(listing);
-            Assert.Equal([new EntryName(string.Empty, "example")], listing.Names);
+            Assert.Equal([new EntryName(string.Empty, "example")], listing.Names.Select(entry => entry.Name));
             Assert.Equal(session.SessionId, listing.Session);
         }
 

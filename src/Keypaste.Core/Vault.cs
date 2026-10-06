@@ -711,6 +711,28 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>Every live entry as a listing names it, but only while this vault holds exactly what its file holds; no value is read.</summary>
+    /// <param name="listing">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    public SavedRead ReadSavedListing(out IReadOnlyList<ListedEntry>? listing)
+    {
+        listing = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            listing = _interop.ReadListing();
+            return SavedRead.Current;
+        }
+    }
+
     /// <summary>One custom field's value, but only while this vault holds exactly what its file holds.</summary>
     /// <param name="name">The entry.</param>
     /// <param name="field">The custom field's name, matched exactly.</param>

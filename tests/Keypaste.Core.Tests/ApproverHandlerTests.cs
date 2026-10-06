@@ -403,7 +403,56 @@ public sealed class ApproverHandlerTests
         var reply = await fixture.Handler.ListAsync(new NamesRequest(["env/**"]), "conn-1", Token);
 
         Assert.True(reply.VaultUnlocked);
-        Assert.Equal([new EntryName("env/dev", "STRIPE_KEY")], reply.Names);
+        Assert.Equal([new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password", "STRIPE_SECRET_KEY"], [])], reply.Names);
+    }
+
+    /// <summary>D-0422: a tag lists its entry with only the variables it reaches, and an untagged entry not at all.</summary>
+    [Fact]
+    public async Task ListingThroughATag_YieldsTheTaggedEntryWithItsVariablesOnly()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Source.Tagged[new EntryName("personal", "bank")] = ["env:billing:prod"];
+
+        var reply = await fixture.Handler.ListAsync(new NamesRequest([EntryExposure.DefaultGlob]), "conn-1", Token);
+
+        Assert.Equal([new ListedEntry(new EntryName("personal", "bank"), ["STRIPE_SECRET_KEY"], ["env:billing:prod"])], reply.Names);
+    }
+
+    /// <summary>
+    /// D-0422: an entry a tag reaches releases a project variable after a person says yes, and its
+    /// password is refused before anybody is asked.
+    /// </summary>
+    [Fact]
+    public async Task ATaggedEntry_ReleasesAVariable_AndNeverItsPassword()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Source.Tagged[new EntryName("personal", "bank")] = ["env:billing"];
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        var password = await fixture.Handler.RequestAsync(Request("personal/bank", "password", 900, EntryExposure.DefaultGlob), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.OutOfScope, password.Method);
+        Assert.Null(password.Value);
+        Assert.Equal(0, fixture.Channel.Asked);
+
+        var variable = await fixture.Handler.RequestAsync(Request("personal/bank", "STRIPE_SECRET_KEY", 900, EntryExposure.DefaultGlob), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Granted, variable.Decision);
+        Assert.Equal(Sentinel, variable.Value, StringComparer.Ordinal);
+        Assert.Equal(1, fixture.Channel.Asked);
+    }
+
+    /// <summary>An untagged entry under <c>env/</c> is an ordinary entry (D-0416), so the default reaches none of it.</summary>
+    [Fact]
+    public async Task AnUntaggedEntryUnderEnv_IsOutsideTheDefault()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        var reply = await fixture.Handler.RequestAsync(Request("env/dev/STRIPE_KEY", "STRIPE_SECRET_KEY", 900, EntryExposure.DefaultGlob), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.OutOfScope, reply.Method);
+        Assert.Equal(0, fixture.Channel.Asked);
     }
 
     [Fact]

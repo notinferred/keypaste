@@ -83,7 +83,7 @@ ERR="$WORK/no-agent-stderr.txt"
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci probe with no agent\",\"ttl_seconds\":60}}}"
   sleep 5
-} | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
+} | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
       >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero with no agent running"
 
 jq -e 'select(.id == 2) | .result.isError == true' <"$OUT" >/dev/null \
@@ -116,7 +116,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci approval probe\",\"ttl_seconds\":60}}}"
     sleep 8
-  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
+  } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe \
         >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
 }
 

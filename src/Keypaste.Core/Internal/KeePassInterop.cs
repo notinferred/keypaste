@@ -173,6 +173,15 @@ internal sealed class KeePassInterop : IDisposable
 
     private static readonly Lazy<bool> _readsXmlKeyfiles = new(ProbeXmlKeyfiles);
 
+    // The standard fields an agent may ask for, under the names it uses, in CredentialFields.All order.
+    private static readonly KeyValuePair<string, string>[] _standardFields =
+    [
+        new("password", PwDefs.PasswordField),
+        new("username", PwDefs.UserNameField),
+        new("url", PwDefs.UrlField),
+        new("notes", PwDefs.NotesField),
+    ];
+
     /// <summary>Whether this build's keyfile loader reads a KeePass XML keyfile's key.</summary>
     /// <remarks>
     /// <c>KcpKeyFile</c> keys with the SHA-256 of the file whenever its XML parse throws, which is
@@ -651,8 +660,8 @@ internal sealed class KeePassInterop : IDisposable
         string parentPath = PathOf(parent) ?? string.Empty;
 
         // Both directions of the same rule: a root group cannot become the env root, and the env
-        // root cannot stop being it. Either silently moves a whole subtree into or out of the
-        // bridge's default exposure (EntryExposure.DefaultGlob).
+        // root cannot stop being it. Either silently moves a whole subtree into or out of where
+        // keypaste writes a project's home entries (D-0413).
         if (IsReserved(parentPath, name)
             || (parentPath.Length == 0
                 && string.Equals(located.Group.Name, EnvConvention.RootGroup, StringComparison.Ordinal)))
@@ -838,6 +847,16 @@ internal sealed class KeePassInterop : IDisposable
         List<EntryTags> tagged = [];
         CollectTags(_database.RootGroup, string.Empty, tagged, Bin());
         return tagged;
+    }
+
+    /// <summary>Every live entry as a listing names it, by the traversal <see cref="Collect"/> uses; no value is read.</summary>
+    internal IReadOnlyList<ListedEntry> ReadListing()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<ListedEntry> listed = [];
+        CollectListing(_database.RootGroup, string.Empty, listed, Bin());
+        return listed;
     }
 
     /// <summary>Every live entry with its own tags, and the variable fields of each one a project tag names, by the traversal <see cref="Collect"/> uses.</summary>
@@ -1137,8 +1156,8 @@ internal sealed class KeePassInterop : IDisposable
     /// The bin is asked for directly rather than looked for among the siblings, because it is
     /// excluded from every traversal: a sibling scan would happily make a second group of its name
     /// that KeePassXC then draws as two trash cans. Creating <c>env</c> through this surface is
-    /// refused while a home entry's write still makes it (D-0413): it is the group the bridge's
-    /// default exposure names, not a folder somebody chose to make.
+    /// refused while a home entry's write still makes it (D-0413): it is the group keypaste writes
+    /// home entries under, not a folder somebody chose to make.
     /// </remarks>
     private bool IsReserved(string parentGroupPath, string name)
     {
@@ -2170,6 +2189,34 @@ internal sealed class KeePassInterop : IDisposable
             if (!ReferenceEquals(child, bin))
             {
                 CollectTags(child, ChildPath(groupPath, child.Name), tagged, bin);
+            }
+        }
+    }
+
+    private static void CollectListing(PwGroup group, string groupPath, List<ListedEntry> listed, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            // Emptiness is read from the length KeePassLib keeps, so no value is decrypted.
+            List<string> fields =
+            [
+                .. _standardFields.Where(field => entry.Strings.Get(field.Value) is { IsEmpty: false }).Select(field => field.Key),
+                .. entry.Strings.Select(field => field.Key)
+                    .Where(key => !PwDefs.IsStandardField(key) && Approval.CredentialFields.IsCustom(key))
+                    .Order(StringComparer.Ordinal),
+            ];
+
+            listed.Add(new ListedEntry(
+                new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)),
+                fields,
+                [.. entry.Tags.Where(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member)]));
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectListing(child, ChildPath(groupPath, child.Name), listed, bin);
             }
         }
     }

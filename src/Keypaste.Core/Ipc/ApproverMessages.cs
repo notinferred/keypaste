@@ -99,9 +99,9 @@ public sealed record NamesRequest(IReadOnlyList<string> Exposure)
     public string Session { get; init; } = string.Empty;
 }
 
-/// <summary>The names the approver is willing to have shown, or why there are none.</summary>
+/// <summary>The entries the approver is willing to have shown, or why there are none.</summary>
 /// <param name="VaultUnlocked">Whether a vault was open at all.</param>
-/// <param name="Names">The raw, unsanitized names inside the exposure. Sanitizing is the bridge's job.</param>
+/// <param name="Names">The raw, unsanitized entries inside the exposure, each with the fields its reach covers and its project tags. Sanitizing is the bridge's job.</param>
 /// <param name="Reason">Why the list is empty, when it is. keypaste's own words, not an agent's.</param>
 /// <param name="Complete">Whether these are all the names there were.</param>
 /// <remarks>
@@ -118,7 +118,7 @@ public sealed record NamesRequest(IReadOnlyList<string> Exposure)
 /// </remarks>
 public sealed record NamesReply(
     bool VaultUnlocked,
-    IReadOnlyList<EntryName> Names,
+    IReadOnlyList<ListedEntry> Names,
     string Reason,
     bool Complete)
 {

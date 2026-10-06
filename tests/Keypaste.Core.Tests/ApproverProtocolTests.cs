@@ -101,7 +101,11 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void ANamesReplySurvivesTheRoundTrip()
     {
-        var reply = new NamesReply(true, [new EntryName("env/dev", "STRIPE_KEY"), new EntryName("", "LOOSE")], "", true);
+        var reply = new NamesReply(
+            true,
+            [new ListedEntry(new EntryName("services", "Stripe"), ["password", "STRIPE_SECRET_KEY"], ["env:billing", "env:billing:prod"]), Listed(new EntryName("", "LOOSE"))],
+            "",
+            true);
 
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out NamesReply? decoded));
 
@@ -135,9 +139,11 @@ public sealed class ApproverProtocolTests
         Assert.Equal(request.Exposure, decoded.Exposure);
     }
 
-    /// <summary>An ordinary name, encoding to seventy-six bytes with its separating comma.</summary>
-    private static EntryName Ordinary(int i) =>
-        new("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}");
+    /// <summary>An ordinary entry with no fields or tags, encoding to ninety-eight bytes with its separating comma.</summary>
+    private static ListedEntry Ordinary(int i) =>
+        Listed(new("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"));
+
+    private static ListedEntry Listed(EntryName name) => new(name, [], []);
 
     /// <summary>A title made of astral runes, each costing twelve encoded bytes.</summary>
     /// <remarks>
@@ -146,14 +152,14 @@ public sealed class ApproverProtocolTests
     /// in UTF-8 is twelve on the wire, and the budget is spent at a few dozen names rather than a
     /// thousand. Escaping, not length, is what makes a count-based cap unable to do this job.
     /// </remarks>
-    private static EntryName Astral(int runes) =>
-        new("env/dev", string.Concat(Enumerable.Repeat("\U000E0041", runes)));
+    private static ListedEntry Astral(int runes) =>
+        Listed(new("env/dev", string.Concat(Enumerable.Repeat("\U000E0041", runes))));
 
     /// <summary>
-    /// The reproduced case: a thousand ordinary names, which cost 76,060 bytes to encode whole.
+    /// The reproduced case: a thousand ordinary names, which cost 98,060 bytes to encode whole.
     /// </summary>
     /// <remarks>
-    /// The sixty-one byte envelope plus a thousand seventy-five byte elements and their nine hundred
+    /// The sixty-one byte envelope plus a thousand ninety-seven byte elements and their nine hundred
     /// and ninety-nine commas. That is over <see cref="MessageFramer.MaximumPayloadBytes"/>, so
     /// before this bound existed the write threw, <see cref="ApproverListener"/> swallowed it, and
     /// the connection went down carrying its grants with it.
@@ -246,7 +252,7 @@ public sealed class ApproverProtocolTests
     {
         var smallest = new NamesReply(
             true,
-            [.. Enumerable.Repeat(new EntryName(string.Empty, string.Empty), VaultEntryNameLister.MaximumNames)],
+            [.. Enumerable.Repeat(Listed(new EntryName(string.Empty, string.Empty)), VaultEntryNameLister.MaximumNames)],
             string.Empty,
             true);
 
@@ -268,7 +274,7 @@ public sealed class ApproverProtocolTests
     [InlineData("\u202E")]
     public void NamesThatEscapeToSixBytesEach_StillFitOneFrame(string hostile)
     {
-        var name = new EntryName("env/dev", string.Concat(Enumerable.Repeat(hostile, 128)));
+        var name = Listed(new EntryName("env/dev", string.Concat(Enumerable.Repeat(hostile, 128))));
         var frame = ApproverProtocol.Encode(new NamesReply(true, [.. Enumerable.Repeat(name, 500)], string.Empty, true));
 
         Assert.True(frame.Length <= MessageFramer.MaximumPayloadBytes);
@@ -363,7 +369,7 @@ public sealed class ApproverProtocolTests
                      ApproverProtocol.Encode(Request(hostile)),
                      ApproverProtocol.Encode(Granted() with { Reason = hostile }),
                      ApproverProtocol.Encode(Granted(hostile + new string('n', 100_000))),
-                     ApproverProtocol.Encode(new NamesReply(true, [new EntryName(hostile, hostile)], hostile, true)),
+                     ApproverProtocol.Encode(new NamesReply(true, [new ListedEntry(new EntryName(hostile, hostile), [hostile], [hostile])], hostile, true)),
                  })
         {
             Assert.DoesNotContain((byte)'\n', frame);

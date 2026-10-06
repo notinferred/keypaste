@@ -7,7 +7,8 @@ namespace Keypaste.Core.Clients;
 /// <summary>An entry the bridge listed, as the check can ask for it.</summary>
 /// <param name="Handle">The bridge's opaque handle, which is what the request names.</param>
 /// <param name="Name">The group path and title as the bridge sanitized them, for a person to read.</param>
-public sealed record McpListedEntry(string Handle, string Name);
+/// <param name="Field">The field the check asks for: <c>password</c> when the listing names it, otherwise the first field it names (D-0422).</param>
+public sealed record McpListedEntry(string Handle, string Name, string Field);
 
 /// <summary>What the bridge's listing returned.</summary>
 /// <param name="Entries">The exposed entries, empty when the listing was refused or failed.</param>
@@ -61,9 +62,6 @@ public sealed class McpConnectionCheck : IAsyncDisposable
 
     /// <summary>The reason the prompt shows the person for the check's request.</summary>
     public const string Reason = "Connection check from the keypaste app. The value is discarded unread.";
-
-    /// <summary>The field the check asks for.</summary>
-    public const string Field = "password";
 
     /// <summary>The lifetime the check asks for. Its grant ends with the check's bridge anyway.</summary>
     public const int TtlSeconds = 60;
@@ -204,7 +202,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
         }
     }
 
-    /// <summary>Asks for <see cref="Field"/> of <paramref name="entry"/>, which a person decides.</summary>
+    /// <summary>Asks for the listed field of <paramref name="entry"/>, which a person decides.</summary>
     public async Task<McpCheckAnswer> RequestAsync(McpListedEntry entry, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -220,7 +218,7 @@ public sealed class McpConnectionCheck : IAsyncDisposable
                 writer =>
                 {
                     writer.WriteString("entry", entry.Handle);
-                    writer.WriteString("field", Field);
+                    writer.WriteString("field", entry.Field);
                     writer.WriteString("reason", Reason);
                     writer.WriteNumber("ttl_seconds", TtlSeconds);
                 },
@@ -497,8 +495,18 @@ public sealed class McpConnectionCheck : IAsyncDisposable
                     continue;
                 }
 
+                // An entry listed with no field has nothing the check could ask for.
+                var fields = entry.TryGetProperty("fields", out var named) && named.ValueKind == JsonValueKind.Array
+                    ? named.EnumerateArray().Where(field => field.ValueKind == JsonValueKind.String).Select(field => field.GetString()!).ToList()
+                    : [];
+                var field = fields.Contains("password") ? "password" : fields.FirstOrDefault();
+                if (field is null)
+                {
+                    continue;
+                }
+
                 var group = Text(entry, "group");
-                entries.Add(new McpListedEntry(handle, group.Length == 0 ? name : group + "/" + name));
+                entries.Add(new McpListedEntry(handle, group.Length == 0 ? name : group + "/" + name, field));
             }
         }
 

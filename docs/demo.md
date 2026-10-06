@@ -50,7 +50,8 @@ This is a fake value shaped like a Stripe test key so the masked output is recog
 claude mcp add --transport stdio --scope local keypaste \
   -- /absolute/path/to/keypaste mcp \
      --vault /absolute/path/to/keypaste-demo.kdbx \
-     --client-label claude-code
+     --client-label claude-code \
+     --expose 'env/**'
 ```
 
 The equivalent by hand, in `.mcp.json`:
@@ -60,13 +61,13 @@ The equivalent by hand, in `.mcp.json`:
   "mcpServers": {
     "keypaste": {
       "command": "/absolute/path/to/keypaste",
-      "args": ["mcp", "--vault", "/absolute/path/to/keypaste-demo.kdbx", "--client-label", "claude-code"]
+      "args": ["mcp", "--vault", "/absolute/path/to/keypaste-demo.kdbx", "--client-label", "claude-code", "--expose", "env/**"]
     }
   }
 }
 ```
 
-`--scope local` applies only to this machine. Without explicit `--expose`, only `env/**` is available. The master password is entered in the approver, never in client configuration; see [Connecting keypaste to Claude](mcp-setup.md).
+`--scope local` applies only to this machine. `--expose 'env/**'` makes the demo's entry available; in source, a bridge without `--expose` reaches only the project variables of tagged entries (`tag:env:*`). The master password is entered in the approver, never in client configuration; see [Connecting keypaste to Claude](mcp-setup.md).
 
 Work in a small scratch project rather than a real one. Copy `scripts/demo/deploy.sh` from this repository into it; that is the deploy Claude will run.
 
@@ -236,7 +237,7 @@ Repeat the credential request on the same MCP connection while its approval rema
 |---|---|
 | `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste agent` from starting on it; lock the vault in the app first. |
 | Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read env/demo/STRIPE_KEY`. |
-| `DENIED. That entry is outside what this server was configured to expose` | The entry is not under `env/`. The default exposure is `env/**` and approval cannot widen it. |
+| `DENIED. That entry is outside what this server was configured to expose` | The entry is not under `env/`, which the demo's `--expose 'env/**'` names, and approval cannot widen it. |
 | The dialog never appears | Your MCP client is running somewhere you are not looking. The approval prompt is that terminal: `v0.3.0` has no native dialog. |
 | The server shows as failed to start | Check the absolute executable path and permissions, then whether `~/.keypaste` is writable for auditing. |
 

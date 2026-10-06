@@ -30,6 +30,11 @@
 # asked once only. A scoped token's run of the dev set is audited with its source entries, and its
 # staging set is refused because a member is also tagged env:billing:prod.
 #
+# A copy of the third vault, held by its own `keypaste agent`, is asked through a `keypaste mcp` on the
+# default exposure (C.5b): the listing names the three tagged entries with their variables and project
+# tags and no untagged one, STRIPE_SECRET_KEY is released, Stripe's password is refused before anyone
+# is asked, and billing's dev set runs from entries under services/.
+#
 # A fourth vault KeePassXC makes from the same document takes the writers (C.1c). `env set` of a tagged
 # key changes it on its own entry; a new key with no --entry creates env/billing/.env, tagged env:billing
 # and holding it protected; `env pull` of a .env touching keys on two entries adds one revision to each;
@@ -390,6 +395,80 @@ refused placeholder 'DATABASE_URL holds the KeePass placeholder {PASSWORD}, whic
 custom="<Entry><UUID>$(uuid fcustom)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Custom</Value></String><String><Key>Password</Key><Value ProtectInMemory=\"True\">custom-login-c1b</Value></String><String><Key>PASSWORD</Key><Value ProtectInMemory=\"True\">custom-field-c1b</Value></String></Entry>"
 refused standard-name 'PASSWORD is a custom field named like a standard one, which keypaste never releases (services/Custom)' \
   "$custom" 'db-c1b' ''
+
+step "C.5b: under the default exposure an agent lists the tagged entries with their variables and tags, gets a variable, never a password, and runs billing from services/"
+exposed="$dir/exposed.kdbx"
+make_fields exposed '' 'db-c1b' ''
+expose_pipe="keypaste-exposed-$$-$(date +%s)"
+expose_err="$dir/exposed-agent.err"
+expose_audit="$dir/exposed-audit.jsonl"
+expose_out="$dir/exposed.out"
+trap 'cleanup; kill "${expose_pid:-}" 2>/dev/null || true' EXIT
+# The hour for STRIPE_SECRET_KEY, then once for the run; the password is refused before anyone is asked.
+printf '%s\nh\no\n' "$pw" | "$kp" agent --vault "$(native "$exposed")" --approver "$expose_pipe" --approval-timeout 30 \
+  >/dev/null 2>"$expose_err" &
+expose_pid=$!
+for _ in $(seq 1 100); do
+  grep -q 'listening on' "$expose_err" && break
+  kill -0 "$expose_pid" 2>/dev/null || die "keypaste agent exited before it listened: $(cat "$expose_err")"
+  sleep 0.2
+done
+grep -q 'listening on' "$expose_err" || die "keypaste agent never started listening on the exposed vault"
+
+replied() { # waits for the answer to one id
+  for _ in $(seq 1 300); do
+    jq -se --argjson id "$1" 'any(.[]; .id == $id)' <"$expose_out" >/dev/null 2>&1 && return 0
+    sleep 0.2
+  done
+  return 1
+}
+credential() {
+  jq -cn --argjson id "$1" --arg field "$2" \
+    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:"services/Stripe",field:$field,reason:"C.5b gate",ttl_seconds:60}}}'
+}
+: >"$expose_out"
+{
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"exposed-probe","version":"1.0.0"}}}'
+  replied 1 || true
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
+  replied 2 || true
+  credential 3 STRIPE_SECRET_KEY
+  replied 3 || true
+  credential 4 password
+  replied 4 || true
+  jq -cn --arg dir "$(native "$(cd "$dir" && pwd -P)")" \
+    '{jsonrpc:"2.0",id:5,method:"tools/call",params:{name:"run",arguments:{command:["sh","-c","printf %s \"${STRIPE_SECRET_KEY:+stripe}${DATABASE_URL:+ db}${SHARED_KEY:+ shared}\""],directory:$dir,project:"billing",reason:"C.5b gate"}}}'
+  replied 5 || true
+} | "$kp" mcp --vault "$(native "$exposed")" --audit-log "$(native "$expose_audit")" --approver "$expose_pipe" \
+      --client-label exposed-probe --allow-run >"$expose_out" 2>"$dir/exposed-mcp.err" \
+  || die "keypaste mcp exited non-zero: $(cat "$dir/exposed-mcp.err")"
+tr -d '\r' <"$expose_out" >"$expose_out.lf"
+
+listing=$(jq -sc 'map(select(.id == 2))[0].result.structuredContent.entries' <"$expose_out.lf")
+[ "$(jq -c 'map(.name) | sort' <<<"$listing")" = '["Database","Shared","Stripe"]' ] \
+  || die "the default did not list exactly the tagged entries: ${listing}"
+jq -e 'any(.[]; .name == "Stripe" and .group == "services" and .fields == ["STRIPE_SECRET_KEY"] and .tags == ["env:billing"])' <<<"$listing" >/dev/null \
+  || die "Stripe was not listed with STRIPE_SECRET_KEY alone and env:billing: ${listing}"
+grep -qF -- '-c1b' <<<"$listing" && die "the listing carried a value: ${listing}"
+jq -se 'any(.[]; .id == 3 and .result.isError == false)' <"$expose_out.lf" >/dev/null \
+  || die "the tagged entry's variable was not released: $(cat "$expose_out.lf")"
+grep -qF 'stripe-c1b' "$expose_out.lf" || die "the released variable is not stripe-c1b"
+jq -se 'any(.[]; .id == 4 and .result.isError == true)' <"$expose_out.lf" >/dev/null || die "the tagged entry's password was not refused"
+grep -qF 'stripe-login-c1b' "$expose_out.lf" && die "the tagged entry's password was released"
+jq -se 'any(.[]; .id == 5 and .result.isError == false and .result.structuredContent.stdout == "stripe db")' <"$expose_out.lf" >/dev/null \
+  || die "billing's dev run did not get exactly its tagged fields: $(jq -sc 'map(select(.id == 5))' <"$expose_out.lf")"
+jq -e -s '[.[] | select(.tool == "request_credential")] | .[0].decision == "granted" and .[1].method == "out-of-scope"' <"$expose_audit" >/dev/null \
+  || die "the audit log does not show the variable granted and the password out of scope: $(cat "$expose_audit")"
+jq -e -s 'any(.[]; .tool == "run" and .decision == "granted" and (.entries | sort) == ["services/Database", "services/Stripe"])' <"$expose_audit" >/dev/null \
+  || die "the run's audit line does not name the two services entries: $(cat "$expose_audit")"
+[ "$(tr -d '\r' <"$expose_err" | grep -c 'an agent is asking for a credential')" = 1 ] \
+  || die "keypaste agent was not asked exactly once for a credential: $(cat "$expose_err")"
+[ "$(tr -d '\r' <"$expose_err" | grep -c 'an agent wants to run a command')" = 1 ] \
+  || die "keypaste agent was not asked exactly once to run: $(cat "$expose_err")"
+kill "$expose_pid" 2>/dev/null || true
+wait "$expose_pid" 2>/dev/null || true
+trap cleanup EXIT
 
 step "C.1b: a token scoped to billing's dev and staging sets, made before an agent holds the vault"
 token=$(printf '%s\n' "$pw" | "$kp" token create gate-ci --scope 'read:billing/dev/*,read:billing/staging/*' --vault "$(native "$fields")" 2>"$dir/token.err" | tr -d '\r') \

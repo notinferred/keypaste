@@ -98,9 +98,9 @@ public sealed record McpServerCommand(string Path, IReadOnlyList<string> Argumen
 /// </param>
 /// <param name="ClientLabel">What this client is called in the audit log.</param>
 /// <param name="Expose">
-/// Extra globs. Empty means the flag is omitted entirely, so the bridge's own default of
-/// <c>env/**</c> applies — stated by absence rather than restated here, so there is one place a
-/// reader can learn what the default is.
+/// Extra globs. Empty means the flag is omitted entirely, so the bridge's own default
+/// (<see cref="EntryExposure.DefaultGlob"/>) applies — stated by absence rather than restated here,
+/// so there is one place a reader can learn what the default is.
 /// </param>
 public sealed record McpServerRegistration(
     McpServerCommand Server,

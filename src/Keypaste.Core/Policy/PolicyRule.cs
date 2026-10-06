@@ -231,9 +231,10 @@ public sealed class PolicyRule
     /// <summary>Whether this rule covers a request, before any limit is applied.</summary>
     /// <param name="clientLabel">The operator's label for the asking bridge, or null if it set none.</param>
     /// <param name="name">The resolved, unsanitized entry name.</param>
+    /// <param name="tags">The entry's own tags, which a <c>tag:</c> pattern in <c>entries</c> reads.</param>
     /// <param name="field">The field asked for.</param>
-    /// <returns><see langword="true"/> if all three match.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="field"/> is null.</exception>
+    /// <returns><see langword="true"/> if all three match and the pattern's reach covers the field.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/>, <paramref name="tags"/> or <paramref name="field"/> is null.</exception>
     /// <remarks>
     /// <b>A bridge with no label matches no rule, including one written <c>"*"</c>.</b> The star
     /// means "any client the operator gave a name to", not "any client at all" — a rule is a standing
@@ -246,9 +247,10 @@ public sealed class PolicyRule
     /// <c>keypaste policy ls</c> could explain.
     /// </para>
     /// </remarks>
-    public bool Matches(string? clientLabel, EntryName name, string field)
+    public bool Matches(string? clientLabel, EntryName name, IReadOnlyList<string> tags, string field)
     {
         ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(tags);
         ArgumentNullException.ThrowIfNull(field);
 
         if (clientLabel is not { Length: > 0 })
@@ -266,7 +268,7 @@ public sealed class PolicyRule
         {
             if (string.Equals(candidate, field, StringComparison.Ordinal))
             {
-                return Scope.Allows(name);
+                return Scope.Permits(name, tags, field);
             }
         }
 

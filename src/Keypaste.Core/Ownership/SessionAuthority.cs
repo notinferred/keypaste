@@ -499,9 +499,9 @@ public sealed class SessionAuthority : IApproverHandler
             shown = [.. perKey.Distinct(StringComparer.Ordinal)];
 
             // Exposure first, so a set outside it is refused as out of scope whatever its size (T-4).
-            if (entries.Any(entry => !exposure.Allows(entry.Name)))
+            if (entries.Any(entry => !exposure.Permits(entry.Name, _inner.Tags(entry.Name), entry.Field)))
             {
-                (refused, refusedMethod) = ("a variable's entry is outside this bridge's configured exposure", AuditMethod.OutOfScope);
+                (refused, refusedMethod) = ("a variable's entry or field is outside this bridge's configured exposure", AuditMethod.OutOfScope);
                 return false;
             }
 

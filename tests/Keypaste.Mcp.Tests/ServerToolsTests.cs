@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Tests;
@@ -244,6 +245,30 @@ public sealed class ServerToolsTests
             Assert.StartsWith("k1_", entry.GetProperty("handle").GetString(), StringComparison.Ordinal);
             Assert.Equal("env/dev", entry.GetProperty("group").GetString());
         }
+    }
+
+    /// <summary>
+    /// D-0422 at the bridge: under the default a tagged entry is listed with its project variables
+    /// and tags, never its password, and an untagged one under <c>env/</c> is not listed at all.
+    /// </summary>
+    [Fact]
+    public async Task ListEntryNames_UnderTheDefault_ShowsTaggedEntriesWithTheirVariablesAndTags()
+    {
+        await using var harness = new McpHarness();
+        harness.Source
+            .With("services", "Stripe", ["password", "STRIPE_SECRET_KEY"], ["env:billing", "env:billing:prod"])
+            .With("env/dev", "LOOSE", ["password"], []);
+
+        var client = await harness.StartAsync("--expose", EntryExposure.DefaultGlob);
+        var result = await CallAsync(client, ToolText.ListToolName);
+
+        var text = TextOf(result);
+        Assert.Contains("Stripe  fields: STRIPE_SECRET_KEY  tags: env:billing, env:billing:prod", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("LOOSE", text, StringComparison.Ordinal);
+
+        var entry = Assert.Single(result.StructuredContent!.Value.GetProperty("entries").EnumerateArray());
+        Assert.Equal(["STRIPE_SECRET_KEY"], entry.GetProperty("fields").EnumerateArray().Select(field => field.GetString()!));
+        Assert.Equal(["env:billing", "env:billing:prod"], entry.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()!));
     }
 
     /// <summary>
@@ -595,6 +620,30 @@ public sealed class ServerToolsTests
         Assert.True(result.IsError);
         Assert.Contains("password", text, StringComparison.Ordinal);
         Assert.DoesNotContain("totp", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// D-0422 at the bridge, which cannot read tags: under the default it refuses a standard field
+    /// itself and forwards a project variable for the owner to decide by the entry's tags.
+    /// </summary>
+    [Fact]
+    public async Task UnderTheDefault_APasswordNeverReachesTheApprover_AndAVariableDoes()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync("--expose", EntryExposure.DefaultGlob);
+
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "services/Stripe"));
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "services/Stripe", field: "STRIPE_SECRET_KEY"));
+
+        var lines = harness.AuditLines();
+        Assert.Equal(2, lines.Length);
+
+        using var first = JsonDocument.Parse(lines[0]);
+        Assert.Equal("out-of-scope", first.RootElement.GetProperty("method").GetString());
+
+        var forwarded = Assert.Single(harness.Approver.Received);
+        Assert.Equal("STRIPE_SECRET_KEY", forwarded.Field, StringComparer.Ordinal);
     }
 
     /// <summary>

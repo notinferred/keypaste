@@ -124,9 +124,13 @@ internal sealed class McpHarness : IAsyncDisposable
     /// Starts the server with the given arguments and hands back its streams, for a client other
     /// than the SDK's to speak over.
     /// </summary>
+    /// <remarks>
+    /// Arguments naming no <c>--expose</c> get <c>env/**</c>, the place these tests' entries sit in;
+    /// a test of the default exposure names it.
+    /// </remarks>
     internal HarnessChannels Serve(params string[] argv)
     {
-        var arguments = argv
+        var arguments = (argv.Contains("--expose") ? argv : ["--expose", "env/**", .. argv])
             .Concat(["--vault", VaultPath, "--audit-log", AuditPath, "--client-label", ClientLabel])
             .ToArray();
 
@@ -257,7 +261,7 @@ internal sealed class McpHarness : IAsyncDisposable
 /// </remarks>
 internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
 {
-    private readonly List<EntryName> _names = [];
+    private readonly List<ListedEntry> _names = [];
 
     /// <summary>How the fake vault answers. Locked by default, like the real one.</summary>
     internal VaultAvailability Availability { get; set; } = VaultAvailability.Locked;
@@ -283,9 +287,11 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
     /// </summary>
     internal bool Throw { get; set; }
 
-    internal FakeEntryNameSource With(string groupPath, string title)
+    internal FakeEntryNameSource With(string groupPath, string title) => With(groupPath, title, ["password"], []);
+
+    internal FakeEntryNameSource With(string groupPath, string title, string[] fields, string[] tags)
     {
-        _names.Add(new EntryName(groupPath, title));
+        _names.Add(new ListedEntry(new EntryName(groupPath, title), fields, tags));
         Availability = VaultAvailability.Available;
         return this;
     }

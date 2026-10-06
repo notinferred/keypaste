@@ -376,6 +376,8 @@ public sealed class ConnectClientViewModelTests : IDisposable
                                 ["handle"] = $"k1_{i}",
                                 ["group"] = name[..name.LastIndexOf('/')],
                                 ["name"] = name[(name.LastIndexOf('/') + 1)..],
+                                ["fields"] = new JsonArray("password"),
+                                ["tags"] = new JsonArray(),
                             })]),
                         },
                     },

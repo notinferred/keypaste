@@ -14,7 +14,7 @@ public sealed class PolicyGateTests
     [Fact]
     public void ARuleThatCoversTheRequest_Grants()
     {
-        var outcome = Gate(cap: "20").Evaluate("claude-code", _covered, "password");
+        var outcome = Gate(cap: "20").Evaluate("claude-code", _covered, [], "password");
 
         Assert.Equal(PolicyOutcomeKind.Granted, outcome.Kind);
         Assert.Equal("allow#1", outcome.Rule!.Id);
@@ -25,7 +25,7 @@ public sealed class PolicyGateTests
     [InlineData(null, "no label at all")]
     public void ARequestFromAnotherClient_MatchesNoRule(string? label, string what)
     {
-        var outcome = Gate(cap: "20").Evaluate(label, _covered, "password");
+        var outcome = Gate(cap: "20").Evaluate(label, _covered, [], "password");
 
         Assert.True(outcome.Kind == PolicyOutcomeKind.NoRule, what);
     }
@@ -33,15 +33,15 @@ public sealed class PolicyGateTests
     [Fact]
     public void ARequestOutsideEveryPattern_MatchesNoRule()
     {
-        Assert.Equal(PolicyOutcomeKind.NoRule, Gate(cap: "20").Evaluate("claude-code", _uncovered, "password").Kind);
-        Assert.Equal(PolicyOutcomeKind.NoRule, Gate(cap: "20").Evaluate("claude-code", _covered, "username").Kind);
+        Assert.Equal(PolicyOutcomeKind.NoRule, Gate(cap: "20").Evaluate("claude-code", _uncovered, [], "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.NoRule, Gate(cap: "20").Evaluate("claude-code", _covered, [], "username").Kind);
     }
 
     [Fact]
     public void AGateOverNoRules_PreAuthorizesNothing()
     {
         Assert.True(PolicyGate.None.IsEmpty);
-        Assert.Equal(PolicyOutcomeKind.NoRule, PolicyGate.None.Evaluate("claude-code", _covered, "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.NoRule, PolicyGate.None.Evaluate("claude-code", _covered, [], "password").Kind);
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class PolicyGateTests
 
         for (var i = 0; i < 200; i++)
         {
-            Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, "password").Kind);
+            Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
         }
     }
 
@@ -62,10 +62,10 @@ public sealed class PolicyGateTests
 
         for (var i = 0; i < 3; i++)
         {
-            Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, "password").Kind);
+            Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
         }
 
-        var spent = gate.Evaluate("claude-code", _covered, "password");
+        var spent = gate.Evaluate("claude-code", _covered, [], "password");
 
         Assert.Equal(PolicyOutcomeKind.RateLimited, spent.Kind);
         Assert.Equal("allow#1", spent.Rule!.Id);
@@ -81,19 +81,19 @@ public sealed class PolicyGateTests
         var clock = new ManualClock();
         var gate = Gate(cap: "2", clock);
 
-        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
         clock.Advance(TimeSpan.FromMinutes(30));
-        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, "password").Kind);
-        Assert.Equal(PolicyOutcomeKind.RateLimited, gate.Evaluate("claude-code", _covered, "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.RateLimited, gate.Evaluate("claude-code", _covered, [], "password").Kind);
 
         // One second short of an hour after the first release, and it is still spent.
         clock.Advance(TimeSpan.FromMinutes(30) - TimeSpan.FromSeconds(1));
-        Assert.Equal(PolicyOutcomeKind.RateLimited, gate.Evaluate("claude-code", _covered, "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.RateLimited, gate.Evaluate("claude-code", _covered, [], "password").Kind);
 
         // An hour exactly, and the first one comes back — but only the first.
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, "password").Kind);
-        Assert.Equal(PolicyOutcomeKind.RateLimited, gate.Evaluate("claude-code", _covered, "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.RateLimited, gate.Evaluate("claude-code", _covered, [], "password").Kind);
     }
 
     /// <summary>
@@ -106,10 +106,10 @@ public sealed class PolicyGateTests
     {
         var gate = Gate(cap: "1", entries: "[\"env/**\"]");
 
-        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
         Assert.Equal(
             PolicyOutcomeKind.RateLimited,
-            gate.Evaluate("claude-code", new EntryName("env/test", "OTHER_KEY"), "password").Kind);
+            gate.Evaluate("claude-code", new EntryName("env/test", "OTHER_KEY"), [], "password").Kind);
     }
 
     /// <summary>
@@ -136,9 +136,9 @@ public sealed class PolicyGateTests
 
         var gate = new PolicyGate(Document(Text), new ManualClock());
 
-        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, "password").Kind);
+        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
 
-        var second = gate.Evaluate("claude-code", _covered, "password");
+        var second = gate.Evaluate("claude-code", _covered, [], "password");
 
         Assert.Equal(PolicyOutcomeKind.RateLimited, second.Kind);
         Assert.Equal(1, second.Rule!.Ordinal);
@@ -152,13 +152,13 @@ public sealed class PolicyGateTests
 
         Assert.Equal(0, gate.Spent(rule));
 
-        gate.Evaluate("claude-code", _uncovered, "password");
-        gate.Evaluate("other-client", _covered, "password");
-        gate.Evaluate("claude-code", _covered, "username");
+        gate.Evaluate("claude-code", _uncovered, [], "password");
+        gate.Evaluate("other-client", _covered, [], "password");
+        gate.Evaluate("claude-code", _covered, [], "username");
 
         Assert.Equal(0, gate.Spent(rule));
 
-        gate.Evaluate("claude-code", _covered, "password");
+        gate.Evaluate("claude-code", _covered, [], "password");
 
         Assert.Equal(1, gate.Spent(rule));
     }
@@ -169,8 +169,8 @@ public sealed class PolicyGateTests
         Assert.Throws<ArgumentNullException>(() => new PolicyGate(null!, new ManualClock()));
         Assert.Throws<ArgumentNullException>(() => new PolicyGate(PolicyDocument.None, null!));
         Assert.Throws<ArgumentNullException>(() => new PolicyRateLimiter(null!));
-        Assert.Throws<ArgumentNullException>(() => PolicyGate.None.Evaluate("c", null!, "password"));
-        Assert.Throws<ArgumentNullException>(() => PolicyGate.None.Evaluate("c", _covered, null!));
+        Assert.Throws<ArgumentNullException>(() => PolicyGate.None.Evaluate("c", null!, [], "password"));
+        Assert.Throws<ArgumentNullException>(() => PolicyGate.None.Evaluate("c", _covered, [], null!));
         Assert.Throws<ArgumentNullException>(() => PolicyGate.None.Spent(null!));
     }
 

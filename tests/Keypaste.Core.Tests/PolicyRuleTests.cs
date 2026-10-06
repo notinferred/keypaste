@@ -57,8 +57,8 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid.Replace("env/dev/**", "env/dev*", StringComparison.Ordinal));
 
-        Assert.True(rule.Matches("claude-code", new EntryName("env", "devops_ROOT_TOKEN"), "password"));
-        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password"));
+        Assert.True(rule.Matches("claude-code", new EntryName("env", "devops_ROOT_TOKEN"), [], "password"));
+        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "STRIPE_KEY"), [], "password"));
 
         var (group, title) = PolicyText.Halves("env/dev*");
         Assert.Equal("env", group);
@@ -70,9 +70,9 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid);
 
-        Assert.True(rule.Matches("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password"));
-        Assert.True(rule.Matches("claude-code", new EntryName("env/dev/eu", "STRIPE_KEY"), "password"));
-        Assert.False(rule.Matches("claude-code", new EntryName("env", "STRIPE_KEY"), "password"));
+        Assert.True(rule.Matches("claude-code", new EntryName("env/dev", "STRIPE_KEY"), [], "password"));
+        Assert.True(rule.Matches("claude-code", new EntryName("env/dev/eu", "STRIPE_KEY"), [], "password"));
+        Assert.False(rule.Matches("claude-code", new EntryName("env", "STRIPE_KEY"), [], "password"));
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public sealed class PolicyRuleTests
 
         foreach (var name in Names())
         {
-            Assert.Equal(exposure.Allows(name), rule.Matches("claude-code", name, "password"));
+            Assert.Equal(exposure.Reach(name, []) != ExposureReach.None, rule.Matches("claude-code", name, [], "password"));
         }
     }
 
@@ -109,7 +109,7 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid.Replace("env/dev/**", "env/prod/**", StringComparison.Ordinal));
 
-        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "../../prod/ROOT_TOKEN"), "password"));
+        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "../../prod/ROOT_TOKEN"), [], "password"));
     }
 
     [Fact]
@@ -117,9 +117,9 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid);
 
-        Assert.False(rule.Matches("claude-code", new EntryName("ENV/DEV", "STRIPE_KEY"), "password"));
-        Assert.False(rule.Matches("CLAUDE-CODE", new EntryName("env/dev", "STRIPE_KEY"), "password"));
-        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "Password"));
+        Assert.False(rule.Matches("claude-code", new EntryName("ENV/DEV", "STRIPE_KEY"), [], "password"));
+        Assert.False(rule.Matches("CLAUDE-CODE", new EntryName("env/dev", "STRIPE_KEY"), [], "password"));
+        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "STRIPE_KEY"), [], "Password"));
     }
 
     [Fact]
@@ -127,8 +127,8 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid);
 
-        Assert.True(rule.Matches("claude-code", new EntryName("env/dev", "K"), "password"));
-        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "K"), "username"));
+        Assert.True(rule.Matches("claude-code", new EntryName("env/dev", "K"), [], "password"));
+        Assert.False(rule.Matches("claude-code", new EntryName("env/dev", "K"), [], "username"));
     }
 
     /// <summary>
@@ -141,9 +141,24 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid.Replace("\"claude-code\"", "\"*\"", StringComparison.Ordinal));
 
-        Assert.True(rule.Matches("anything-at-all", new EntryName("env/dev", "K"), "password"));
-        Assert.False(rule.Matches(null, new EntryName("env/dev", "K"), "password"));
-        Assert.False(rule.Matches(string.Empty, new EntryName("env/dev", "K"), "password"));
+        Assert.True(rule.Matches("anything-at-all", new EntryName("env/dev", "K"), [], "password"));
+        Assert.False(rule.Matches(null, new EntryName("env/dev", "K"), [], "password"));
+        Assert.False(rule.Matches(string.Empty, new EntryName("env/dev", "K"), [], "password"));
+    }
+
+    /// <summary>A rule's <c>tag:</c> pattern reaches an entry's project variables, never its password (D-0422).</summary>
+    [Fact]
+    public void ARuleThroughATag_ReleasesOnlyProjectVariables()
+    {
+        var rule = Only(Valid
+            .Replace("[\"env/dev/**\"]", "[\"tag:env:billing\"]", StringComparison.Ordinal)
+            .Replace("[\"password\"]", "[\"password\", \"STRIPE_SECRET_KEY\"]", StringComparison.Ordinal));
+        var entry = new EntryName("services", "Stripe");
+
+        Assert.True(rule.Matches("claude-code", entry, ["env:billing:prod"], "STRIPE_SECRET_KEY"));
+        Assert.False(rule.Matches("claude-code", entry, ["env:billing:prod"], "password"));
+        Assert.False(rule.Matches("claude-code", entry, ["env:web"], "STRIPE_SECRET_KEY"));
+        Assert.False(rule.Matches("claude-code", entry, [], "STRIPE_SECRET_KEY"));
     }
 
     [Fact]
@@ -151,8 +166,8 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid);
 
-        Assert.False(rule.Matches(null, new EntryName("env/dev", "K"), "password"));
-        Assert.False(rule.Matches("other-client", new EntryName("env/dev", "K"), "password"));
+        Assert.False(rule.Matches(null, new EntryName("env/dev", "K"), [], "password"));
+        Assert.False(rule.Matches("other-client", new EntryName("env/dev", "K"), [], "password"));
     }
 
     [Fact]
@@ -174,10 +189,10 @@ public sealed class PolicyRuleTests
 
         var document = Document(Text);
 
-        Assert.True(document.TryMatch("claude-code", new EntryName("env/dev", "K"), "password", out var first));
+        Assert.True(document.TryMatch("claude-code", new EntryName("env/dev", "K"), [], "password", out var first));
         Assert.Equal(1, first.Ordinal);
 
-        Assert.True(document.TryMatch("claude-code", new EntryName("env/test", "K"), "password", out var second));
+        Assert.True(document.TryMatch("claude-code", new EntryName("env/test", "K"), [], "password", out var second));
         Assert.Equal(2, second.Ordinal);
     }
 
@@ -285,7 +300,7 @@ public sealed class PolicyRuleTests
     public void ARuleWithNoPatternsCannotBeBuiltAtAll_SoNoneAllowsNothing()
     {
         Assert.Empty(PolicyDocument.None.Rules);
-        Assert.False(PolicyDocument.None.TryMatch("claude-code", new EntryName("env/dev", "K"), "password", out var rule));
+        Assert.False(PolicyDocument.None.TryMatch("claude-code", new EntryName("env/dev", "K"), [], "password", out var rule));
         Assert.Null(rule);
     }
 
@@ -301,8 +316,8 @@ public sealed class PolicyRuleTests
     {
         var rule = Only(Valid);
 
-        Assert.Throws<ArgumentNullException>(() => rule.Matches("x", null!, "password"));
-        Assert.Throws<ArgumentNullException>(() => rule.Matches("x", new EntryName("env", "K"), null!));
+        Assert.Throws<ArgumentNullException>(() => rule.Matches("x", null!, [], "password"));
+        Assert.Throws<ArgumentNullException>(() => rule.Matches("x", new EntryName("env", "K"), [], null!));
     }
 
     private static IEnumerable<EntryName> Names() =>

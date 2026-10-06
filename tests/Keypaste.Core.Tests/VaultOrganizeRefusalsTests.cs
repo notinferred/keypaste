@@ -370,9 +370,8 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     // ---------------------------------------------------------------- reserved names
 
     /// <summary>
-    /// <c>env</c> at the root is where keypaste puts projects' home entries, and the whole subtree
-    /// falls under <see cref="EntryExposure.Default"/> with nobody having written a glob. Renaming a
-    /// group to it would expose that group's entries to agents, and renaming it away would hide them.
+    /// <c>env</c> at the root is where keypaste puts projects' home entries (D-0413). Renaming a group
+    /// to it would mix that group's entries into theirs, and renaming it away would strand them.
     /// </summary>
     [Fact]
     public void TheEnvRootGroup_CanBeNeitherMadeNorRenamedNorReplaced()

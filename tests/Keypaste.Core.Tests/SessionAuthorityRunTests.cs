@@ -334,6 +334,39 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(0, _fixture.Channel.Asked);
     }
 
+    /// <summary>
+    /// D-0422: under the default, a project runs whatever group its tagged entries sit in, and a
+    /// reference to a tagged entry's password is refused unasked, as C.1b's limit left it.
+    /// </summary>
+    [Fact]
+    public async Task UnderTheDefault_ATaggedProjectRunsFromAnyGroup_AndATaggedEntrysPasswordDoesNot()
+    {
+        var sentry = new EntryName("services", "Sentry");
+        _vault.AddEntry(new VaultEntry { GroupPath = sentry.GroupPath, Title = sentry.Title, Password = "sentry-password" });
+        Assert.True(_vault.SetFields(sentry, [new FieldWrite("SENTRY_DSN", "https://dsn.example")]));
+        Assert.True(_vault.AddTag(sentry, "env:acme-api"));
+        _vault.Save();
+
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this, vaultSource: true);
+        await using var client = await AttachedAsync(owner);
+
+        var set = await client.ReleaseRunAsync(Run() with { Exposure = [EntryExposure.DefaultGlob] }, Token);
+
+        Assert.NotNull(set);
+        Assert.Equal(EnvOutcome.Resolved, set.Set.Outcome);
+        Assert.Contains(new EnvVariable("SENTRY_DSN", "https://dsn.example"), set.Set.Variables);
+        Assert.Contains("services/Sentry", set.Entries!);
+
+        var password = await client.ReleaseRunAsync(
+            References(("P", "kp:///services/Sentry#password")) with { Exposure = [EntryExposure.DefaultGlob] },
+            Token);
+
+        AssertNothingReleased(password);
+        Assert.Equal(AuditMethod.OutOfScope, password!.Method);
+        Assert.Equal(1, _fixture.Channel.Asked);
+    }
+
     [Fact]
     public async Task AMissingProjectAndAnOutOfScopeOne_LookTheSameToTheAgent()
     {

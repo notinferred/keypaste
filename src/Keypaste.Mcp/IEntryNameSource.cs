@@ -40,7 +40,7 @@ internal enum VaultAvailability
 
 /// <summary>What the vault had to say when asked for its entry names.</summary>
 /// <param name="Availability">Whether there was anything to say.</param>
-/// <param name="Names">The names, unsanitized and unfiltered. Empty unless available.</param>
+/// <param name="Names">The entries with their field names and project tags, unsanitized and unfiltered. Empty unless available.</param>
 /// <param name="Reason">A human-readable explanation, used when the answer is a refusal.</param>
 /// <param name="Complete">Whether these are all the names there were.</param>
 /// <remarks>
@@ -50,7 +50,7 @@ internal enum VaultAvailability
 /// </remarks>
 internal sealed record EntryNameListing(
     VaultAvailability Availability,
-    IReadOnlyList<EntryName> Names,
+    IReadOnlyList<ListedEntry> Names,
     string Reason,
     bool Complete)
 {

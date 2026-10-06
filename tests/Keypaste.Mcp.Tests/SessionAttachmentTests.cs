@@ -67,7 +67,7 @@ public sealed class SessionAttachmentTests
     {
         await using var approver = new FakeApprover();
         approver.Session = "session-one";
-        approver.Names = new NamesReply(true, [new EntryName("env/dev", "STRIPE_KEY")], string.Empty, true);
+        approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
         approver.Start();
 
         var (source, connection) = Source(approver);
@@ -84,7 +84,7 @@ public sealed class SessionAttachmentTests
     {
         await using var approver = new FakeApprover();
         approver.AttachRefusal = AttachReply.Refused(AuditMethod.NoSession, "another vault");
-        approver.Names = new NamesReply(true, [new EntryName("env/dev", "STRIPE_KEY")], string.Empty, true);
+        approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
         approver.Start();
 
         var (source, connection) = Source(approver);

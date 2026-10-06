@@ -465,7 +465,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         var now = _session.Clock.GetUtcNow();
         var access = activity.Access(Name);
-        ShowsAgentAccess = activity.AgentsCanSee(Name);
+        ShowsAgentAccess = activity.AgentsCanSee(Name, [.. _tags.Select(chip => chip.Tag)]);
         AgentAccess = access;
         AgentAccessSummary = UseText.Summary(access);
         LastUsedText = UseText.LastUsed(access.Use, now);

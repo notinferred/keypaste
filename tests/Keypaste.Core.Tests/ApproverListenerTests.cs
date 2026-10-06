@@ -77,7 +77,7 @@ public sealed class ApproverListenerTests
 
         Assert.NotNull(reply);
         Assert.True(reply.VaultUnlocked);
-        Assert.Equal([new EntryName("env/dev", "STRIPE_KEY")], reply.Names);
+        Assert.Equal([new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], reply.Names);
     }
 
     /// <summary>
@@ -139,9 +139,9 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>Names shaped as an ordinary vault's are, and far more of them than one frame holds.</summary>
-    private static IReadOnlyList<EntryName> Crowd(int count) =>
+    private static IReadOnlyList<ListedEntry> Crowd(int count) =>
         [.. Enumerable.Range(0, count)
-            .Select(i => new EntryName("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"))];
+            .Select(i => new ListedEntry(new EntryName("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"), [], []))];
 
     /// <summary>
     /// A vault with more names than one frame can carry is answered, and the connection lives.
@@ -498,7 +498,7 @@ public sealed class ApproverListenerTests
         internal TaskCompletionSource Listed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>What the approver has to say. One ordinary entry unless a test says otherwise.</summary>
-        internal IReadOnlyList<EntryName> Names { get; set; } = [new EntryName("env/dev", "STRIPE_KEY")];
+        internal IReadOnlyList<ListedEntry> Names { get; set; } = [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])];
 
         /// <summary>What a release carries. Settable so a test can hand back a field no frame holds.</summary>
         internal string Value { get; set; } = Sentinel;

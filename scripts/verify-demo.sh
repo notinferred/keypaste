@@ -169,7 +169,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"$REASON\",\"ttl_seconds\":900}}}"
     sleep 8
-  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
+  } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
         >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
 
   grep -q '"id":1' "$out" || die "keypaste mcp never answered initialize"

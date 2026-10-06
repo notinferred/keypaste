@@ -110,6 +110,11 @@ printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add env/ci/DEPLOY_KEY --vault "$V
   || die "could not store the test credential"
 printf '%s\n%s\n' "$MASTER" "$OTHER_SECRET" | "$CLI" add env/other/TOKEN --vault "$VAULT" >/dev/null \
   || die "could not store the second credential"
+# Two projects, whose tagged entries are what a bridge with the default exposure lists (C.5b).
+for project in alpha beta; do
+  printf '%s\n' "$MASTER" | "$CLI" env set "$project" "$(printf '%s' "$project" | tr a-z A-Z)_KEY=$OTHER_SECRET" --vault "$VAULT" >/dev/null 2>&1 \
+    || die "could not store project ${project}'s variable"
+done
 
 exec 7>&-
 exec 7> >(PATH="$CLIENT_PATH" KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
@@ -173,14 +178,16 @@ case "$(last_message)" in Connected.*) ;; *) die "reconnecting failed: $(last_me
 [ "$(registered)" = "$(last_preview | sed -n 2p | sed 's/.*keypaste -- //')" ] || die "the reconnection is not what the preview showed"
 clean_config
 
+# The default exposure lists the two projects' tagged entries, not the untagged ones, and asks for a variable.
 say '^check-entry n=2' check
-grep -qx 'check-entry n=1 env/ci/DEPLOY_KEY' "$HOLD_OUT" || die "the picker does not list the first entry"
-grep -qx 'check-entry n=2 env/other/TOKEN' "$HOLD_OUT" || die "the picker does not list the second entry"
+grep -qx 'check-entry n=1 env/alpha/.env' "$HOLD_OUT" || die "the picker does not list the first tagged entry"
+grep -qx 'check-entry n=2 env/beta/.env' "$HOLD_OUT" || die "the picker does not list the second tagged entry"
+grep -q '^check-entry n=3' "$HOLD_OUT" && die "the picker lists an entry the default exposure does not reach"
 say '^prompt client' pick 2
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=env/other/TOKEN" || die "the prompt is not for the picked entry"
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=env/beta/.env field=BETA_KEY" || die "the prompt is not for the picked entry's variable"
 say '^check end' deny
 case "$(last_check)" in
-  "Connected: the request for env/other/TOKEN reached you and was refused."*) ;;
+  "Connected: the request for env/beta/.env reached you and was refused."*) ;;
   *) die "the check did not report the refusal: $(last_check)" ;;
 esac
 last_audit --arg s "$FIRST" --arg l "$LABEL" '.decision == "denied" and .method == "prompt" and .session == $s and .client.label == $l' \
@@ -206,5 +213,6 @@ echo "ok: the first unlock chose the vault and the CLI reached the app without -
 echo "    nothing, Connect registered exactly the command shown with no vault in it, the check raised the app's"
 echo "    prompt through that bridge and the audit file holds its prompted grant under the app's session and the"
 echo "    chosen label; with another vault chosen Connect pinned this one and its bridge still reached the app,"
-echo "    the picker asked for the chosen entry, and removal left the client listing no keypaste, with no"
+echo "    its default exposure listed only the tagged entries and the picker asked for the chosen one's variable,"
+echo "    and removal left the client listing no keypaste, with no"
 echo "    secret or session in its configuration"

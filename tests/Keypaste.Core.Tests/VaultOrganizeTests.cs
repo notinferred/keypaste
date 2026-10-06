@@ -366,12 +366,13 @@ public sealed class VaultOrganizeTests : IDisposable
     public void AnExposure_MatchesAMovedEntryAtItsNewPathAndNotItsOld()
     {
         using var vault = Seeded(NewVaultPath());
+        Assert.True(EntryExposure.TryCreate(["env/**"], out var exposure, out _));
 
-        Assert.True(EntryExposure.Default.Allows(_token));
+        Assert.Equal(ExposureReach.Entry, exposure.Reach(_token, []));
 
         Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(_token, "keys", out var moved));
 
-        Assert.False(EntryExposure.Default.Allows(moved!));
+        Assert.Equal(ExposureReach.None, exposure.Reach(moved!, []));
         Assert.Equal(new EntryName("keys", "TOKEN"), EntryName.Of(vault.Find("keys/TOKEN")!));
     }
 
@@ -389,8 +390,8 @@ public sealed class VaultOrganizeTests : IDisposable
         var granted = Rule("env/dev/**");
         var abandoned = Rule("env/billing/**");
 
-        Assert.False(granted.Matches("claude-code", _token, "password"));
-        Assert.True(abandoned.Matches("claude-code", _token, "password"));
+        Assert.False(granted.Matches("claude-code", _token, [], "password"));
+        Assert.True(abandoned.Matches("claude-code", _token, [], "password"));
 
         Assert.Equal(GroupOutcome.Renamed, vault.RenameGroup("env/billing", "dev", out _));
 
@@ -400,8 +401,8 @@ public sealed class VaultOrganizeTests : IDisposable
             .ToList();
 
         Assert.Equal(2, names.Count);
-        Assert.All(names, name => Assert.True(granted.Matches("claude-code", name, "password")));
-        Assert.All(names, name => Assert.False(abandoned.Matches("claude-code", name, "password")));
+        Assert.All(names, name => Assert.True(granted.Matches("claude-code", name, [], "password")));
+        Assert.All(names, name => Assert.False(abandoned.Matches("claude-code", name, [], "password")));
     }
 
     // ---------------------------------------------------------------- helpers

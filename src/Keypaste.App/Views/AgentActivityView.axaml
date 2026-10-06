@@ -95,11 +95,11 @@
                 <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Label}" AutomationProperties.Name="Label" />
                 <TextBox Grid.Row="1" Grid.Column="2" Classes="mono"
                          Text="{Binding Exposure}"
-                         PlaceholderText="env/**"
+                         PlaceholderText="tag:env:*"
                          AutomationProperties.Name="Exposure" />
               </Grid>
               <TextBlock Classes="caption" Margin="0,-6,0,0"
-                         Text="Exposure is which entry names the client may list: env/** unless you name others. Separate patterns with commas." />
+                         Text="Exposure is which entries the client may list: tag:env:*, the variables of entries tagged into a project, unless you name others. Separate patterns with commas." />
 
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Content="Preview connect" Command="{Binding PreviewConnectCommand}" />

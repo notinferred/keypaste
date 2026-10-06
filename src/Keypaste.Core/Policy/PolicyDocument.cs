@@ -71,22 +71,25 @@ public sealed class PolicyDocument
     /// <summary>Finds the first rule covering a request.</summary>
     /// <param name="clientLabel">The operator's label for the asking bridge, or null if it set none.</param>
     /// <param name="name">The resolved, unsanitized entry name.</param>
+    /// <param name="tags">The entry's own tags.</param>
     /// <param name="field">The field asked for.</param>
     /// <param name="rule">The rule, when one covers it.</param>
     /// <returns><see langword="true"/> if a rule covers the request.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="field"/> is null.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/>, <paramref name="tags"/> or <paramref name="field"/> is null.</exception>
     public bool TryMatch(
         string? clientLabel,
         EntryName name,
+        IReadOnlyList<string> tags,
         string field,
         [NotNullWhen(true)] out PolicyRule? rule)
     {
         ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(tags);
         ArgumentNullException.ThrowIfNull(field);
 
         foreach (var candidate in _rules)
         {
-            if (candidate.Matches(clientLabel, name, field))
+            if (candidate.Matches(clientLabel, name, tags, field))
             {
                 rule = candidate;
                 return true;

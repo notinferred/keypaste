@@ -60,4 +60,9 @@ public interface ICredentialSource
     /// <returns><see langword="true"/> for an entry in a protected environment.</returns>
     /// <remarks>The entry's own tags decide (D-0371); its path never does (D-0416).</remarks>
     bool RequiresLiveApproval(EntryName name);
+
+    /// <summary>The entry's own tags, which decide what a <c>tag:</c> exposure reaches (D-0422).</summary>
+    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
+    /// <returns>Its tags, or none when they cannot be read, so a tag reaches nothing it cannot be shown to carry.</returns>
+    IReadOnlyList<string> Tags(EntryName name);
 }

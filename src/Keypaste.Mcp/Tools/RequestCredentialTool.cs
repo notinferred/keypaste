@@ -168,10 +168,10 @@ internal sealed class RequestCredentialTool(
             return Invalid(problem.Argument, problem.Rule);
         }
 
-        // A path can be checked here without opening anything. A handle cannot — resolving one needs
-        // the vault — so it is checked again by the approver after it resolves, which is the only
-        // place that check can happen and the reason a handle is not a way around the exposure.
-        if (EntryHandle.Classify(entry) == EntryAddressKind.Path && !InScope(entry))
+        // A path can be checked here without opening anything. A handle or a tag cannot — reading
+        // either needs the vault — so it is checked again by the approver after it resolves, which
+        // is the only place that check can happen and the reason a handle is not a way around the exposure.
+        if (EntryHandle.Classify(entry) == EntryAddressKind.Path && !InScope(entry, field))
         {
             return new Verdict(
                 AuditDecision.Denied,
@@ -251,8 +251,8 @@ internal sealed class RequestCredentialTool(
             Session: reply.Session);
     }
 
-    /// <summary>Whether a path-shaped argument names something this server may discuss.</summary>
-    private bool InScope(string entry)
+    /// <summary>Whether a path-shaped argument names something this server may ask about; the owner decides by the entry's tags.</summary>
+    private bool InScope(string entry, string field)
     {
         var separator = entry.LastIndexOf('/');
 
@@ -260,7 +260,7 @@ internal sealed class RequestCredentialTool(
             ? new EntryName(string.Empty, entry)
             : new EntryName(entry[..separator], entry[(separator + 1)..]);
 
-        return options.Exposure.Allows(name);
+        return options.Exposure.MayPermit(name, field);
     }
 
     private static Verdict Invalid(string field, string rule) =>

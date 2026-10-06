@@ -1,18 +1,39 @@
 using System.Diagnostics.CodeAnalysis;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Core;
 
+/// <summary>How much of one entry an exposure lets a bridge reach.</summary>
+public enum ExposureReach
+{
+    /// <summary>Nothing: the entry cannot be named.</summary>
+    None = 0,
+
+    /// <summary>Its custom fields named like environment variables, through a project tag alone (D-0422).</summary>
+    ProjectFields = 1,
+
+    /// <summary>The whole entry, through a pattern naming its place.</summary>
+    Entry = 2,
+}
+
 /// <summary>
-/// The set of entry names a bridge is permitted to talk about at all.
+/// The set of entries a bridge is permitted to talk about at all, and how much of each.
 /// </summary>
 /// <remarks>
 /// <para>
 /// docs/PRODUCT.md law 3.2 says the default is deny. That is usually read as being about credentials, but
 /// entry names are themselves an asset — a complete inventory of a personal vault is what turns a
 /// vague request into a targeted one, even with no secret attached (law 3.5, THREATS.md T-4). So
-/// the listing surface gets the same treatment: <see cref="Default"/> covers the environment
-/// variables the product is actually about, and anything wider has to be written down by a human in
-/// the MCP client's configuration.
+/// the listing surface gets the same treatment: <see cref="Default"/> covers the project variables
+/// the product is actually about, and anything wider has to be written down by a human in the MCP
+/// client's configuration.
+/// </para>
+/// <para>
+/// <b>A pattern starting <c>tag:</c> selects entries by project membership</b>, read from their own
+/// tags as <see cref="ProjectTag"/> reads them, and reaches only their custom fields named like
+/// environment variables; any other pattern names a place and reaches the whole entry (D-0422).
+/// Reach is decided per entry, so an entry tagged into two environments is reached through either
+/// (THREATS.md T-38).
 /// </para>
 /// <para>
 /// <b>Globs match the group path and the title as two separate values</b>, never the joined
@@ -47,11 +68,15 @@ public sealed class EntryExposure
     /// <summary>A title pattern that constrains nothing.</summary>
     internal const string AnyTitle = "*";
 
+    /// <summary>What starts a pattern that selects entries by project tag rather than by place.</summary>
+    public const string TagSelectorPrefix = "tag:";
+
     /// <summary>
-    /// The one glob in force when nobody widened the exposure. Public because a front end has to be
-    /// able to say "no <c>--expose</c> was given, so use this" without spelling out the string.
+    /// The one pattern in force when nobody widened the exposure: every project's variables. Public
+    /// because a front end has to be able to say "no <c>--expose</c> was given, so use this" without
+    /// spelling out the string.
     /// </summary>
-    public const string DefaultGlob = EnvConvention.RootGroup + "/" + DoubleStar;
+    public const string DefaultGlob = TagSelectorPrefix + ProjectTag.Prefix + "*";
 
     /// <summary>
     /// The wildcard character itself. <c>internal</c> rather than <c>private</c> because the
@@ -63,15 +88,17 @@ public sealed class EntryExposure
     private static readonly string[] _defaultGlobs = [DefaultGlob];
 
     private readonly Rule[] _rules;
+    private readonly Selector[] _selectors;
 
-    private EntryExposure(string[] globs, Rule[] rules)
+    private EntryExposure(string[] globs, Rule[] rules, Selector[] selectors)
     {
         Globs = globs;
         _rules = rules;
+        _selectors = selectors;
     }
 
     /// <summary>
-    /// What a server exposes when nobody said otherwise: the <c>env</c> subtree and nothing else.
+    /// What a server exposes when nobody said otherwise: the variables of every project, and nothing else.
     /// </summary>
     public static EntryExposure Default { get; } = Create(_defaultGlobs);
 
@@ -110,7 +137,8 @@ public sealed class EntryExposure
         }
 
         var accepted = new string[globs.Count];
-        var rules = new Rule[globs.Count];
+        List<Rule> rules = [];
+        List<Selector> selectors = [];
 
         for (var i = 0; i < globs.Count; i++)
         {
@@ -137,45 +165,100 @@ public sealed class EntryExposure
                 }
             }
 
+            // Any case, so a selector written TAG:env:x is refused rather than read as a place.
+            if (glob.StartsWith(TagSelectorPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!Selector.TryParse(glob, out var selector))
+                {
+                    error = $"pattern {i + 1} is a tag selector, which is {TagSelectorPrefix}{ProjectTag.Prefix}<project> or {TagSelectorPrefix}{ProjectTag.Prefix}<project>:<environment>";
+                    return false;
+                }
+
+                selectors.Add(selector);
+            }
+            else
+            {
+                rules.Add(Rule.Parse(glob));
+            }
+
             accepted[i] = glob;
-            rules[i] = Rule.Parse(glob);
         }
 
-        exposure = new EntryExposure(accepted, rules);
+        exposure = new EntryExposure(accepted, [.. rules], [.. selectors]);
         error = string.Empty;
         return true;
     }
 
-    /// <summary>Whether this exposure permits an entry name to be mentioned at all.</summary>
+    /// <summary>How much of an entry this exposure reaches.</summary>
     /// <param name="name">The real, unsanitized name.</param>
-    /// <returns><see langword="true"/> if any glob matches.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    /// <param name="tags">The entry's own tags, never its group's.</param>
+    /// <returns><see cref="ExposureReach.Entry"/> when a place pattern matches, otherwise <see cref="ExposureReach.ProjectFields"/> when a selector matches one of its project tags.</returns>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
     /// <remarks>
-    /// An exposure built from no globs allows nothing. That is deliberate: "no patterns were given"
+    /// An exposure built from no globs reaches nothing. That is deliberate: "no patterns were given"
     /// must never collapse into "everything is allowed", so applying <see cref="Default"/> is
-    /// something a caller does on purpose. A reserved group is never allowed, whatever the globs
+    /// something a caller does on purpose. A reserved group is never reached, whatever the globs
     /// say, <c>**</c> included: its entries are keypaste's own records (<see cref="ReservedGroups"/>).
+    /// A malformed project tag adds the entry to no project, so no selector reaches it.
     /// </remarks>
-    public bool Allows(EntryName name)
+    public ExposureReach Reach(EntryName name, IEnumerable<string> tags)
     {
         ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(tags);
 
         if (ReservedGroups.IsReserved(name.GroupPath))
         {
-            return false;
+            return ExposureReach.None;
         }
 
         var segments = Split(name.GroupPath);
 
-        foreach (var rule in _rules)
+        if (_rules.Any(rule => MatchSegments(rule.Group, 0, segments, 0) && MatchOne(rule.Title, name.Title)))
         {
-            if (MatchSegments(rule.Group, 0, segments, 0) && MatchOne(rule.Title, name.Title))
-            {
-                return true;
-            }
+            return ExposureReach.Entry;
         }
 
-        return false;
+        return _selectors.Length > 0
+            && tags.Select(ProjectTag.Read).Any(tag => tag.Kind == ProjectTagKind.Member
+                && _selectors.Any(selector => selector.Matches(tag.Project!, tag.Environment!)))
+            ? ExposureReach.ProjectFields
+            : ExposureReach.None;
+    }
+
+    /// <summary>Whether this exposure lets one field of an entry be asked for.</summary>
+    /// <param name="name">The real, unsanitized name.</param>
+    /// <param name="tags">The entry's own tags.</param>
+    /// <param name="field">The field asked for.</param>
+    /// <returns><see langword="true"/> when the entry is reached and the reach covers the field.</returns>
+    public bool Permits(EntryName name, IEnumerable<string> tags, string field) => Permits(Reach(name, tags), field);
+
+    /// <summary>Whether a reach covers a field: the whole entry covers any, a project tag only a custom field named like a variable.</summary>
+    /// <param name="reach">The reach.</param>
+    /// <param name="field">The field.</param>
+    /// <returns><see langword="true"/> when the field may be asked for.</returns>
+    public static bool Permits(ExposureReach reach, string field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+
+        return reach switch
+        {
+            ExposureReach.Entry => true,
+            ExposureReach.ProjectFields => CredentialFields.IsCustom(field),
+            _ => false,
+        };
+    }
+
+    /// <summary>Whether a bridge, which cannot read tags, may forward a request for this field of this entry.</summary>
+    /// <param name="name">The name as the agent wrote it.</param>
+    /// <param name="field">The field asked for.</param>
+    /// <returns><see langword="false"/> only when the owner would refuse it whatever the entry's tags.</returns>
+    public bool MayPermit(EntryName name, string field)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+
+        return Reach(name, []) == ExposureReach.Entry
+            || (_selectors.Length > 0 && !ReservedGroups.IsReserved(name.GroupPath) && CredentialFields.IsCustom(field));
     }
 
     private static EntryExposure Create(string[] globs)
@@ -270,6 +353,36 @@ public sealed class EntryExposure
         }
 
         return p == pattern.Length;
+    }
+
+    /// <summary>One parsed tag selector: a pattern for the project and, when given, one for the environment.</summary>
+    private readonly record struct Selector(string Project, string? Environment)
+    {
+        /// <summary>Reads <c>tag:env:&lt;project&gt;[:&lt;environment&gt;]</c>; an omitted environment is any.</summary>
+        internal static bool TryParse(string glob, out Selector selector)
+        {
+            selector = default;
+
+            const string prefix = TagSelectorPrefix + ProjectTag.Prefix;
+
+            if (!glob.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var parts = glob[prefix.Length..].Split(':');
+
+            if (parts.Length > 2 || parts.Any(part => part.Length == 0))
+            {
+                return false;
+            }
+
+            selector = new Selector(parts[0], parts.Length == 2 ? parts[1] : null);
+            return true;
+        }
+
+        internal bool Matches(string project, string environment) =>
+            MatchOne(Project, project) && (Environment is null || MatchOne(Environment, environment));
     }
 
     /// <summary>One parsed glob: a pattern for the group path, and one for the title.</summary>

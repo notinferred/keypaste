@@ -137,11 +137,20 @@ public sealed class EntryActivityTests
         var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [bridge]);
         var released = Build(audit: [Line("personal/github", 300)]);
 
-        Assert.False(nothing.AgentsCanSee(_stripe));
-        Assert.False(nothing.AgentsCanSee(_github));
-        Assert.True(reached.AgentsCanSee(_stripe));
-        Assert.False(reached.AgentsCanSee(_github));
-        Assert.True(released.AgentsCanSee(_github));
+        Assert.False(nothing.AgentsCanSee(_stripe, []));
+        Assert.False(nothing.AgentsCanSee(_github, []));
+        Assert.True(reached.AgentsCanSee(_stripe, []));
+        Assert.False(reached.AgentsCanSee(_github, []));
+        Assert.True(released.AgentsCanSee(_github, []));
+    }
+
+    [Fact]
+    public void AgentsCanSee_AnEntryTheDefaultReachesByItsProjectTag()
+    {
+        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [EntryExposure.Default]);
+
+        Assert.True(reached.AgentsCanSee(_github, ["env:acme-api"]));
+        Assert.False(reached.AgentsCanSee(_github, ["personal"]));
     }
 
     [Fact]

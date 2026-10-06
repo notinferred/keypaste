@@ -136,7 +136,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             new EntryName("env/dev", "STRIPE_KEY"),
             [new FieldWrite("OPENAI_API_KEY", SentinelApiKey), new FieldWrite("Recovery codes", SentinelRecovery)]));
 
-        // Outside the default env/** exposure, so nothing this server can be asked should ever
+        // Outside the env/** exposure these tests run with, so nothing this server can be asked should ever
         // reach it. Planted somewhere it could genuinely leak, which is the whole point.
         _vault.AddEntry(new VaultEntry
         {

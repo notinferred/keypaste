@@ -38,7 +38,9 @@ internal sealed record ServerOptions
 
           --vault <path>        which vault to expose, or set KEYPASTE_VAULT. Without either,
                                 the vault chosen in the keypaste app or with `keypaste use`
-          --expose <glob>       what may be named, repeatable. Defaults to env/**
+          --expose <glob>       what may be named, repeatable: a group/title glob reaches whole
+                                entries, tag:env:<project>[:<environment>] the variables of
+                                entries tagged into it. Defaults to tag:env:*
           --client-label <name> what to call this client in the audit log and in clients.toml
           --allow-run           offer the run tool: start a command you approve with secrets
                                 in its environment. A command can still reveal them.

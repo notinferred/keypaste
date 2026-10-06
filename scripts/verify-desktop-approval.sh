@@ -63,15 +63,14 @@ request() {
 }
 
 # Starts a bridge whose standard input stays open, asks for the credential, and waits for the prompt.
-# The field, entry and exposure default to the password of $ENTRY under the bridge's default exposure.
+# The field, entry and exposure default to the password of $ENTRY under env/**.
 raise_prompt() {
-  local field="${2:-password}" entry="${3:-$ENTRY}" expose=()
-  [ -z "${4:-}" ] || expose=(--expose "$4")
+  local field="${2:-password}" entry="${3:-$ENTRY}" expose=(--expose "${4:-env/**}")
   OUT="$WORK/$1-stdout.txt"
   ERR="$WORK/$1-stderr.txt"
   exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec 8> >(exec 7>&-; exec "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR")
+  exec 8> >(exec 7>&-; exec "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" "${expose[@]}" >"$OUT" 2>"$ERR")
   BRIDGE_PID=$!
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8

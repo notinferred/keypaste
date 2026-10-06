@@ -5,10 +5,10 @@ namespace Keypaste.Core;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the only type that crosses the boundary between an unlocked vault and the MCP bridge.
-/// It has two members and no others, deliberately: no implementation of the listing seam can return
-/// a password, a user name, a URL, or notes through it, because there is nowhere to put one. That is
-/// a structural guarantee rather than a promise, and it is checkable by reading this file.
+/// It has two members and no others, deliberately: nothing that names an entry to the MCP bridge
+/// can return a password, a user name, a URL, or notes through it, because there is nowhere to put
+/// one. That is a structural guarantee rather than a promise, and it is checkable by reading this
+/// file; <see cref="ListedEntry"/> adds only more names.
 /// </para>
 /// <para>
 /// It is deliberately <em>not</em> <see cref="VaultEntry"/> with the secret fields blanked. A type

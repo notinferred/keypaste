@@ -204,7 +204,7 @@ public sealed class PolicyLoaderTests : IDisposable
         {
             Assert.Empty(load.Rules.Rules);
             Assert.False(load.HasRules);
-            Assert.False(load.Rules.TryMatch("claude-code", new EntryName("env/dev", "K"), "password", out _));
+            Assert.False(load.Rules.TryMatch("claude-code", new EntryName("env/dev", "K"), [], "password", out _));
         }
     }
 

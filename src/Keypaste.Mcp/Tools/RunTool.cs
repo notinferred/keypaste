@@ -139,20 +139,21 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             return Finish(client, line, Invalid(programProblem.Argument, programProblem.Rule), null);
         }
 
-        // Every reference is checked by name before anybody is asked, an env reference by its set's
-        // name and key; the owner applies the exposure again to the entries it resolves.
+        // An entry reference is checked by name before anybody is asked. An env reference names a
+        // project's set, whose entries only the owner can find, so the owner applies the exposure
+        // to each entry and field it resolves, as it does for every reference.
         foreach (var reference in call.References ?? [])
         {
             _ = KpReferences.TryParse(reference.Reference, out var parsed, out _);
 
-            var entry = parsed switch
+            var forwarded = parsed switch
             {
-                EnvReference env => new EntryName(EnvProfileNames.SetName(env.Project, env.Profile), env.Key),
-                EntryReference named => named.Entry,
-                _ => null,
+                EnvReference => true,
+                EntryReference named => options.Exposure.MayPermit(named.Entry, named.Field),
+                _ => false,
             };
 
-            if (entry is null || !options.Exposure.Allows(entry))
+            if (!forwarded)
             {
                 return Finish(client, line, Verdict.Denied(AuditMethod.OutOfScope, "a reference is outside this server's configured exposure"), null);
             }

@@ -9,8 +9,8 @@ using ModelContextProtocol.Server;
 namespace Keypaste.Mcp.Tools;
 
 /// <summary>
-/// Returns entry titles and group paths, and nothing else, for the part of the vault the user chose
-/// to expose.
+/// Returns entry titles, group paths, the fields that may be asked for and project tags, never a
+/// value, for the part of the vault the user chose to expose.
 /// </summary>
 /// <remarks>
 /// The names come from <c>keypaste agent</c> over the approver socket
@@ -106,12 +106,14 @@ internal sealed class ListEntryNamesTool(
         // The exposure is applied twice on purpose: two things enforcing one rule that cannot
         // disagree (THREATS.md T-4). A second *cap* is deliberately absent — that was two things
         // authoring one claim, and this side's was wrong in both directions.
-        var exposed = new List<EntryName>();
-        foreach (var name in listing.Names)
+        var exposed = new List<ListedEntry>();
+        foreach (var entry in listing.Names)
         {
-            if (options.Exposure.Allows(name))
+            var reach = options.Exposure.Reach(entry.Name, entry.Tags);
+
+            if (reach != ExposureReach.None)
             {
-                exposed.Add(name);
+                exposed.Add(entry.Within(reach));
             }
         }
 
@@ -164,7 +166,7 @@ internal sealed class ListEntryNamesTool(
     /// keeps keypaste's own trusted fields separate from the untrusted names.
     /// </summary>
     private static CallToolResult Render(
-        List<EntryName> names,
+        List<ListedEntry> names,
         bool truncated,
         IReadOnlyList<string> globs)
     {
@@ -179,12 +181,21 @@ internal sealed class ListEntryNamesTool(
         text.Append("keypaste: ").Append(names.Count).Append(truncated ? " entry names — not all of them" : " entries")
             .Append(", exposed by: ").AppendLine(string.Join(", ", globs));
 
-        var rows = new List<(string Handle, string Group, string Name, bool Altered)>(names.Count);
-        foreach (var name in names)
+        var rows = new List<Row>(names.Count);
+        foreach (var entry in names)
         {
-            var group = EntryNameSanitizer.SanitizePath(name.GroupPath);
-            var title = EntryNameSanitizer.Sanitize(name.Title);
-            rows.Add((EntryHandle.For(name), group.Text, title.Text, group.WasAltered || title.WasAltered));
+            var group = EntryNameSanitizer.SanitizePath(entry.Name.GroupPath);
+            var title = EntryNameSanitizer.Sanitize(entry.Name.Title);
+            var fields = entry.Fields.Select(field => EntryNameSanitizer.Sanitize(field)).ToList();
+            var tags = entry.Tags.Select(tag => EntryNameSanitizer.Sanitize(tag)).ToList();
+
+            rows.Add(new Row(
+                EntryHandle.For(entry.Name),
+                group.Text,
+                title.Text,
+                [.. fields.Select(field => field.Text)],
+                [.. tags.Select(tag => tag.Text)],
+                group.WasAltered || title.WasAltered || fields.Any(field => field.WasAltered) || tags.Any(tag => tag.WasAltered)));
         }
 
         text.AppendLine(
@@ -196,7 +207,19 @@ internal sealed class ListEntryNamesTool(
         {
             // Handle first: the easiest thing for a model to copy should be the address that is
             // unambiguous, not the display name that is lossy.
-            text.Append(row.Handle).Append("  ").Append(row.Group).Append("  ").AppendLine(row.Name);
+            text.Append(row.Handle).Append("  ").Append(row.Group).Append("  ").Append(row.Name);
+
+            if (row.Fields.Count > 0)
+            {
+                text.Append("  fields: ").Append(string.Join(", ", row.Fields));
+            }
+
+            if (row.Tags.Count > 0)
+            {
+                text.Append("  tags: ").Append(string.Join(", ", row.Tags));
+            }
+
+            text.AppendLine();
         }
 
         text.Append("--- END UNTRUSTED ENTRY NAMES ").Append(nonce).AppendLine(" ---");
@@ -217,9 +240,7 @@ internal sealed class ListEntryNamesTool(
         };
     }
 
-    private static JsonElement Structured(
-        List<(string Handle, string Group, string Name, bool Altered)> rows,
-        bool truncated)
+    private static JsonElement Structured(List<Row> rows, bool truncated)
     {
         using var buffer = new MemoryStream(512);
 
@@ -237,6 +258,8 @@ internal sealed class ListEntryNamesTool(
                 writer.WriteString("handle", row.Handle);
                 writer.WriteString("group", row.Group);
                 writer.WriteString("name", row.Name);
+                WriteStrings(writer, "fields", row.Fields);
+                WriteStrings(writer, "tags", row.Tags);
                 writer.WriteBoolean("altered", row.Altered);
                 writer.WriteEndObject();
             }
@@ -248,4 +271,19 @@ internal sealed class ListEntryNamesTool(
         using var document = JsonDocument.Parse(buffer.ToArray());
         return document.RootElement.Clone();
     }
+
+    private static void WriteStrings(Utf8JsonWriter writer, string name, IReadOnlyList<string> values)
+    {
+        writer.WriteStartArray(name);
+
+        foreach (var value in values)
+        {
+            writer.WriteStringValue(value);
+        }
+
+        writer.WriteEndArray();
+    }
+
+    /// <summary>One entry as the reply shows it, every string sanitized.</summary>
+    private sealed record Row(string Handle, string Group, string Name, IReadOnlyList<string> Fields, IReadOnlyList<string> Tags, bool Altered);
 }

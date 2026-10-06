@@ -329,7 +329,7 @@ public sealed class ApproverHandlerPolicyTests
         var reply = await fixture.Handler.ListAsync(new NamesRequest(["env/**"]), "conn-1", Token);
 
         Assert.True(reply.VaultUnlocked);
-        Assert.Equal("STRIPE_KEY", Assert.Single(reply.Names).Title);
+        Assert.Equal("STRIPE_KEY", Assert.Single(reply.Names).Name.Title);
     }
 
     [Fact]

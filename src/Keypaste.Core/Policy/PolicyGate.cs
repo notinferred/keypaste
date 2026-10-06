@@ -72,9 +72,10 @@ public sealed class PolicyGate
     /// <summary>Decides whether a request is already authorized, and spends the allowance if it is.</summary>
     /// <param name="clientLabel">The operator's label for the asking bridge, or null if it set none.</param>
     /// <param name="name">The resolved, unsanitized entry name.</param>
+    /// <param name="tags">The entry's own tags.</param>
     /// <param name="field">The field asked for.</param>
     /// <returns>The answer, and the rule that gave it.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="field"/> is null.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/>, <paramref name="tags"/> or <paramref name="field"/> is null.</exception>
     /// <remarks>
     /// <b>A rate-limited request does not fall through to the next rule.</b> The first rule matching
     /// on client, entry and field decides; retrying against rule 2 would let anyone defeat a cap by
@@ -84,12 +85,13 @@ public sealed class PolicyGate
     /// point at which the answer can still be "no". Everything after it is the release itself.
     /// </para>
     /// </remarks>
-    public PolicyOutcome Evaluate(string? clientLabel, EntryName name, string field)
+    public PolicyOutcome Evaluate(string? clientLabel, EntryName name, IReadOnlyList<string> tags, string field)
     {
         ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(tags);
         ArgumentNullException.ThrowIfNull(field);
 
-        if (!Document.TryMatch(clientLabel, name, field, out var rule))
+        if (!Document.TryMatch(clientLabel, name, tags, field, out var rule))
         {
             return PolicyOutcome.NoRule;
         }

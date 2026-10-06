@@ -200,7 +200,7 @@ public sealed class ConcurrentRequestsTests
     public async Task AListingWhileARequestIsOpen_IsBusyAndIsRecorded()
     {
         await using var approver = new FakeApprover();
-        approver.Names = new NamesReply(true, [new EntryName("env/dev", "STRIPE_KEY")], string.Empty, true);
+        approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
         approver.Hold = true;
         approver.StartApproving();
 
