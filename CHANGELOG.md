@@ -4,7 +4,7 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
-On macOS and Linux a save now replaces the vault in one step, so a crash or power loss while saving can no longer leave nothing at the vault's path. keypaste also notices another program's save that lands while a vault is being opened or just after keypaste saves it, and refuses to save over a vault file that has been moved or deleted, instead of quietly writing over the other change ([F.53](docs/steps/F.53.md)).
+On macOS and Linux a save now replaces the vault in one step, so a crash or power loss while saving can no longer leave nothing at the vault's path. keypaste also notices another program's save that lands while a vault is being opened or just after keypaste saves it, instead of quietly writing over it on its next save ([F.53](docs/steps/F.53.md)).
 
 Upgrade the bridge and `keypaste agent` together: they must be the same version. Approval prompts answer `d`, `o` or `h` instead of `y` or `n`. `env export` now writes `kp://` references by default and values only with `--dotenv`. `rm` moves entries to the vault's recycle bin, which saves the vault as KDBX 4.1; KeePass 2.48 and KeePassXC 2.7 or later open it. The desktop entries below ship with the first public desktop release, which is published together with this version ([RELEASE](docs/RELEASE.md)). Each entry that names a step links its record, which holds the full account.
 

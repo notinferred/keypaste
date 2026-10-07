@@ -1276,10 +1276,8 @@ public sealed class Vault : IDisposable
     /// A detector, not a lock: a write landing between this call and the one that follows it is still
     /// lost, and closing that window needs a file lock KDBX does not define.
     /// <see langword="false"/> for a vault from <see cref="Create"/> that has never been saved and for
-    /// a file that exists but could not be read — see <see cref="SourceSnapshot.Digest"/>, and D-0017
-    /// for the transient-failure absorption that depends on it. A file that is gone has changed:
-    /// something moved or deleted it, or is between deleting and renaming its own save, and writing a
-    /// fresh vault at the path would discard whatever it puts there.
+    /// a file that could not be read at all — see <see cref="SourceSnapshot.Digest"/>, and D-0017 for
+    /// the transient-failure absorption that depends on it.
     /// On Windows a file another process holds open for writing cannot be read, so a save racing a
     /// concurrent writer narrowly is not detected here. <b>The retry is not what saves that case —
     /// it used to be what lost it.</b> The replace fails, and a retry that merely outlasted the
@@ -1292,14 +1290,9 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_stamp is not { } stamp)
-        {
-            return false;
-        }
-
-        return SourceSnapshot.Digest(Path) is { } current
-            ? !stamp.AsSpan().SequenceEqual(current)
-            : !File.Exists(Path);
+        return _stamp is { } stamp
+            && SourceSnapshot.Digest(Path) is { } current
+            && !stamp.AsSpan().SequenceEqual(current);
     }
 
     /// <summary>Writes the vault to <see cref="Path"/>, encrypted, unless something else wrote

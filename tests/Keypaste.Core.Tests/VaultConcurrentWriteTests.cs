@@ -235,29 +235,6 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         Assert.Null(reopened.Find("a-later-edit"));
     }
 
-    /// <summary>
-    /// A vault whose file has gone is not written fresh at its path.
-    /// </summary>
-    /// <remarks>
-    /// Whatever moved or deleted it, or is between deleting the file and renaming its own save over
-    /// the name, would lose what it puts there. An unreadable file that is still present stays
-    /// unchanged, so a scanner holding it for a moment does not raise a conflict (D-0017).
-    /// </remarks>
-    [Fact]
-    public void A_save_after_the_file_has_gone_is_refused()
-    {
-        var path = NewVault();
-
-        using var vault = Vault.Open(path, MasterPassword);
-        File.Move(path, path + ".moved");
-
-        vault.AddEntry(new VaultEntry { Title = "late", Password = "late" });
-
-        Assert.True(vault.HasFileChangedSinceOpen());
-        Assert.Throws<VaultChangedOnDiskException>(vault.Save);
-        Assert.False(File.Exists(path));
-    }
-
     private string NewVault([System.Runtime.CompilerServices.CallerMemberName] string name = "")
     {
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;
