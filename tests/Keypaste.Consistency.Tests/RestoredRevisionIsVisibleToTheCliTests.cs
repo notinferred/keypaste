@@ -3,7 +3,6 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Cli;
-using Keypaste.Core;
 using Xunit;
 
 namespace Keypaste.Consistency.Tests;
@@ -21,10 +20,9 @@ namespace Keypaste.Consistency.Tests;
 /// </para>
 /// <para>
 /// <b>The mutations that must make this file fail:</b> a restore that never saves, which every
-/// in-memory assertion elsewhere would still pass; one that restores a different index than the row
-/// it was pressed for; one that writes the displaced value away instead of into history (D-0014);
-/// and one that rebuilds the entry rather than editing it, which changes its UUID and takes its
-/// history with it.
+/// in-memory assertion elsewhere would still pass, and one that restores a different index than the
+/// row it was pressed for. The displaced value kept in history (D-0014) and the entry's UUID are
+/// asserted on the reopened file by <c>EntryHistoryTests</c> and <c>VaultHistoryTests</c>.
 /// </para>
 /// </remarks>
 public sealed class RestoredRevisionIsVisibleToTheCliTests
@@ -51,41 +49,6 @@ public sealed class RestoredRevisionIsVisibleToTheCliTests
         Assert.Null(screen.Model.Error);
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
         Assert.Equal(_oldest, fixture.Cli.Out.Trim());
-    }
-
-    /// <summary>
-    /// The restore costs one history item, keeps every earlier value, and keeps the entry.
-    /// </summary>
-    /// <remarks>
-    /// The UUID is read through <c>Vault.EntryUuid</c> because no CLI verb prints one; the listing
-    /// beside it is the part a person could check. A delete-and-re-add fails both — a new UUID, and
-    /// a history that starts again.
-    /// </remarks>
-    [Fact]
-    public void A_restore_costs_one_history_item_and_keeps_the_entry()
-    {
-        // Two entries, because the UUID comparison below needs something to differ from.
-        using var fixture = new VaultFixture(("github", _oldest), ("seed", "seed-password"));
-        using var screen = Entries(fixture);
-
-        var detail = Select(screen, "github");
-        Replace(detail, _middle);
-        Replace(detail, _current);
-
-        var before = UuidOf(fixture, "github");
-        Assert.Equal(2, HistoryOf(fixture, "github").Count);
-
-        Restore(detail, oldest: true);
-
-        var after = HistoryOf(fixture, "github");
-        Assert.Equal(3, after.Count);
-        Assert.Equal([_current, _middle, _oldest], after.Select(revision => revision.Fields.Password));
-
-        Assert.Equal(before, UuidOf(fixture, "github"));
-
-        // The anti-vacuity half: a UUID that had regressed to a constant would pass the line above
-        // for every entry in every vault.
-        Assert.NotEqual(before, UuidOf(fixture, "seed"));
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("ls"));
         Assert.Single(
@@ -157,23 +120,6 @@ public sealed class RestoredRevisionIsVisibleToTheCliTests
         var history = detail.History;
         history.Selected = oldest ? history.Rows[^1] : history.Rows[0];
         history.RestoreCommand.Execute(null);
-    }
-
-    /// <summary>One entry's history, read from the file rather than from the open session.</summary>
-    private static IReadOnlyList<EntryRevision> HistoryOf(VaultFixture fixture, string title)
-    {
-        using var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master);
-        var found = vault.ReadEntries().Single(entry => entry.Title == title);
-
-        return vault.ReadHistory(EntryName.Of(found))!;
-    }
-
-    private static string? UuidOf(VaultFixture fixture, string title)
-    {
-        using var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master);
-        var found = vault.ReadEntries().Single(entry => entry.Title == title);
-
-        return vault.EntryUuid(EntryName.Of(found));
     }
 
     private static Screen Entries(VaultFixture fixture)

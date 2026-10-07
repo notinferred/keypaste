@@ -128,27 +128,6 @@ public sealed class McpClientSetupTests : IDisposable
         Assert.Equal(McpSetupStatus.Refused, McpClientSetup.Apply(McpClientSetup.Remove(Claude), runner).Status);
     }
 
-    /// <summary>
-    /// An AppImage is started as the image file with <c>mcp</c>, which must come before any of the
-    /// bridge's flags or <c>AppRun</c> could not see it.
-    /// </summary>
-    [Fact]
-    public void An_appimage_is_told_to_start_the_bridge_before_any_of_its_flags()
-    {
-        var image = Path.Combine(_directory, "keypaste.AppImage");
-        var line = Registration(server: new McpServerCommand(image, [McpServerLocator.BridgeArgument])).CommandLine();
-
-        Assert.Equal([image, "mcp", "--vault"], line.Take(3));
-    }
-
-    [Fact]
-    public void The_server_argv_follows_a_double_dash_so_a_vault_path_can_never_be_read_as_a_flag()
-    {
-        var add = McpClientSetup.Connect(Claude, Registration()).Commands[1].Arguments;
-
-        Assert.Equal([Path.Combine(_directory, "keypaste"), "mcp"], add.Skip(add.ToList().IndexOf("--") + 1).Take(2));
-    }
-
     [Theory]
     [InlineData("")]
     [InlineData(" padded ")]

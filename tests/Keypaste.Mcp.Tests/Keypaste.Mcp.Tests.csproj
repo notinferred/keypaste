@@ -9,34 +9,16 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
-    <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/Keypaste.Mcp/Keypaste.Mcp.csproj" />
   </ItemGroup>
 
-  <!--
-    Compiled in rather than copied, for the reason Keypaste.Consistency.Tests gives about
-    CliHarness.cs: one statement of who publishes this project, checked in every front end's
-    own suite.
-  -->
   <ItemGroup>
-    <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
     <!-- A project's variables written as env set writes them, for fixtures. -->
     <Compile Include="../Keypaste.Core.Tests/ProjectVariables.cs" Link="ProjectVariables.cs" />
-  </ItemGroup>
-
-  <!--
-    F.9's instrument, compiled into both assemblies that hold one of the four overrunning waits.
-    It is one file rather than two because the two halves have to agree on the timeline format:
-    the producer correlation is read by merging what these two processes wrote, and a second copy
-    that drifted by one field would make that merge silently wrong rather than red.
-  -->
-  <ItemGroup>
-    <Compile Include="../Keypaste.Core.Tests/PoolSnapshot.cs" Link="PoolSnapshot.cs" />
     <Compile Include="../Keypaste.Core.Tests/Reporter.cs" Link="Reporter.cs" />
-    <Compile Include="../Keypaste.Core.Tests/PoolTimelineGuardTests.cs" Link="PoolTimelineGuardTests.cs" />
   </ItemGroup>
 
   <!-- The child an agent's run starts in the capture tests: built beside these tests, never referenced. -->

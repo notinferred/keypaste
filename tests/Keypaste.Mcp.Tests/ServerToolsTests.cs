@@ -2,7 +2,6 @@ using System.Text.Json;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -123,9 +122,7 @@ public sealed class ServerToolsTests
 
         var parked = client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token).AsTask();
 
-        PoolTimeline.Mark("entered-enter", "pool thread " + Thread.CurrentThread.IsThreadPoolThread);
         var entered = harness.Source.Entered.Wait(TimeSpan.FromSeconds(10), Token);
-        PoolTimeline.Mark("entered-exit");
 
         Assert.True(entered, "the first call never reached the tool, so nothing was raced against anything");
 

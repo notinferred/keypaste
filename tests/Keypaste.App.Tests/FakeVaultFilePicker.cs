@@ -46,10 +46,14 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
         return Task.FromResult(NewPath);
     }
 
+    /// <summary>What happens while the export picker is open, such as a lock.</summary>
+    internal Action? WhileExportOpen { get; set; }
+
     public Task<string?> PickExportDestinationAsync(string suggestedName)
     {
         ExportCalls++;
         SuggestedExportName = suggestedName;
+        WhileExportOpen?.Invoke();
         return Task.FromResult(ExportPath);
     }
 

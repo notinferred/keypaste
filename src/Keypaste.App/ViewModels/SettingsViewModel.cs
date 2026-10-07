@@ -362,9 +362,15 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
         try
         {
+            // A vault unlocked while the picker was open is not the one the person chose to copy.
             var write = await Task.Run(() => _session.Write(
                 vault =>
                 {
+                    if (!string.Equals(vault.Path, path, StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+
                     vault.ExportTo(destination);
                     return true;
                 },
@@ -372,9 +378,9 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
             Message = write.Outcome switch
             {
-                WriteOutcome.NothingToSave => $"An encrypted copy is at {destination}. It opens with this vault's master password.",
+                WriteOutcome.NothingToSave when write.Value => $"An encrypted copy is at {destination}. It opens with this vault's master password.",
+                WriteOutcome.NothingToSave or WriteOutcome.Locked => "The vault locked before the copy was made. Nothing was written.",
                 WriteOutcome.ChangedOnDisk => "The vault file changed since it was unlocked. Reload to see it, then export.",
-                WriteOutcome.Locked => "The vault locked before the copy was made. Nothing was written.",
                 _ => write.Reason!,
             };
         }

@@ -138,10 +138,6 @@ internal static class CliApp
             case "import":
                 return ImportCommand.Execute(args, context);
 
-            case "hello":
-                context.Stdout.WriteLine(CoreInfo.Hello());
-                return ExitSuccess;
-
             case "version":
             case "--version":
                 context.Stdout.WriteLine(CoreInfo.Version);

@@ -403,22 +403,7 @@ public sealed class VaultRecycleBinTests : IDisposable
         });
     }
 
-    /// <summary>
-    /// <see cref="RestoreOutcome.RestoredToRoot"/> — the group an entry came from no longer exists
-    /// — is proved in <c>scripts/verify-keepassxc-recyclebin.sh</c> rather than here, because
-    /// arranging it honestly means another program removing the group. keypaste has no
-    /// delete-group operation (V.5a owns group work), and a test-only one would be a vault
-    /// mutation this step does not own. The gate uses <c>keepassxc-cli rmdir</c>, which is the
-    /// real way a vault arrives in that state.
-    /// </summary>
-    [Fact]
-    public void ARestoreToTheRoot_IsProvedByTheCompatibilityGate()
-    {
-        var gate = RepoFile("scripts/verify-keepassxc-recyclebin.sh");
-
-        Assert.Contains("rmdir", gate, StringComparison.Ordinal);
-        Assert.Contains("restored root", gate, StringComparison.Ordinal);
-    }
+    // RestoredToRoot needs another program to remove the group, so verify-keepassxc-recyclebin.sh proves it with keepassxc-cli rmdir.
 
     [Fact]
     public void RestoreRecycled_OnAnIdNothingAnswersTo_IsRefusedAndWritesNothing()
@@ -642,20 +627,6 @@ public sealed class VaultRecycleBinTests : IDisposable
         }
 
         return vault;
-    }
-
-    /// <summary>Reads a file from the repository, walking up to the solution that names it.</summary>
-    private static string RepoFile(string relativePath)
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null && !File.Exists(System.IO.Path.Combine(directory.FullName, "keypaste.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        Assert.NotNull(directory);
-        return File.ReadAllText(System.IO.Path.Combine(directory!.FullName, relativePath));
     }
 
     /// <summary>

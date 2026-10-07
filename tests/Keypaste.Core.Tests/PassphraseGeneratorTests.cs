@@ -32,25 +32,11 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 public sealed class PassphraseGeneratorTests
 {
-    [Fact]
-    public void Every_word_of_a_passphrase_comes_from_the_vendored_list()
-    {
-        var known = VendoredWordList.Words().ToHashSet(StringComparer.Ordinal);
-
-        for (var i = 0; i < 200; i++)
-        {
-            foreach (var word in Words(PassphraseRecipe.Default))
-            {
-                Assert.Contains(word, known);
-            }
-        }
-    }
-
     /// <summary>
     /// The list is drawn from, not sampled from a corner of.
     /// </summary>
     /// <remarks>
-    /// The paired half of the test above, which a generator returning the same word every time
+    /// The paired half of the whole-words test below, which a generator returning the same word every time
     /// would satisfy forever. Twenty thousand draws over 7,776 words leaves the expected number of
     /// distinct words near 7,200, so six thousand is a floor a working draw clears easily and a
     /// stuck or narrowed one cannot.

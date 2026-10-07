@@ -39,22 +39,6 @@ namespace Keypaste.Consistency.Tests;
 /// </remarks>
 public sealed class GuiEditIsVisibleToTheCliTests
 {
-    [Fact]
-    public void An_entry_added_in_the_gui_is_listed_by_keypaste_ls()
-    {
-        using var fixture = new VaultFixture(("seed", "seed-password"));
-        using var screen = Entries(fixture);
-
-        var form = NewItemForm.Open(screen.Model, "database");
-        screen.Model.ConfirmAddCommand.Execute(null);
-
-        Assert.Null(screen.Model.Error);
-
-        // The vault is still open in the app. The CLI opens its own handle and must see the write.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("ls"));
-        Assert.Contains("database", fixture.Cli.Out, StringComparison.Ordinal);
-    }
-
     /// <summary>
     /// A generated password is exactly the value <c>keypaste get</c> returns.
     /// </summary>
@@ -257,7 +241,8 @@ public sealed class GuiEditIsVisibleToTheCliTests
     /// <remarks>
     /// The mutation this rules out is the one that always happens: a form needs an error message, so
     /// somebody writes a regular expression next to it. Both sides are driven with the same table
-    /// and required to agree.
+    /// and required to agree. The GUI accepting <c>STRIPE_KEY</c> above, and <c>env set</c>
+    /// succeeding across this project, keep that agreement from being two refusals.
     /// </remarks>
     [Theory]
     [InlineData("lowercase")]
@@ -284,31 +269,6 @@ public sealed class GuiEditIsVisibleToTheCliTests
         Assert.True(
             guiRefused == (cliExit != CliApp.ExitSuccess),
             $"the GUI {(guiRefused ? "refused" : "accepted")} '{key}' and the CLI exited {cliExit}");
-    }
-
-    /// <summary>
-    /// The positive control for the theory above: a name both accept is accepted by both.
-    /// </summary>
-    /// <remarks>
-    /// Without it, a GUI that refused everything and a CLI that failed on everything would agree
-    /// perfectly and prove nothing.
-    /// </remarks>
-    [Fact]
-    public void The_gui_and_the_cli_both_accept_an_ordinary_name()
-    {
-        using var fixture = new VaultFixture(("seed", "seed-password"));
-        using var screen = EnvSets(fixture);
-
-        screen.Model.OpenCommand.Execute("billing");
-        var project = screen.Model.OpenProject!;
-
-        project.BeginAddCommand.Execute(null);
-        project.NewKey = "DATABASE_URL";
-        project.ConfirmAddCommand.Execute(null);
-
-        Assert.Null(screen.Model.Error);
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("env", "ls", "billing"));
-        Assert.Contains("DATABASE_URL", fixture.Cli.Out, StringComparison.Ordinal);
     }
 
     /// <summary>

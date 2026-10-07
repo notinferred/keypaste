@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using Keypaste.Core.Internal;
 using Xunit;
 
@@ -152,24 +151,13 @@ public sealed class VaultSaveTests : IDisposable
 
         Directory.Delete(home, recursive: true);
 
-        using var watch = PoolSnapshot.Watch("a doomed save's whole retry budget");
-        PoolTimeline.Mark("save-enter", "doomed");
-
         var started = Environment.TickCount64;
         var timing = SaveTimings.Of(() => Assert.Throws<VaultException>(vault.Save));
         var elapsed = Environment.TickCount64 - started;
 
-        SaveTimings.Mark("doomed", timing);
-        PoolTimeline.Mark("save-exit", elapsed.ToString(CultureInfo.InvariantCulture));
-
-        // Reported only once the comparison has already failed: Assert.True evaluates its message
-        // eagerly, and this one reads the pool.
-        if (elapsed >= 5_000)
-        {
-            Assert.Fail(
-                $"a doomed save took {elapsed}ms; retrying must stay bounded. {SaveTimings.Describe(timing)}" +
-                $"{Environment.NewLine}{watch.Report()}");
-        }
+        Assert.True(
+            elapsed < 5_000,
+            $"a doomed save took {elapsed}ms; retrying must stay bounded. {SaveTimings.Describe(timing)}");
     }
 
     /// <summary>
@@ -203,9 +191,6 @@ public sealed class VaultSaveTests : IDisposable
         var slept = new List<long>();
         var attempts = 0;
 
-        using var watch = PoolSnapshot.Watch("a doomed save, attempt by attempt");
-        PoolTimeline.Mark("save-enter", "budget");
-
         var lastResumed = Stopwatch.GetTimestamp();
 
         var timing = SaveTimings.Of(() => Assert.Throws<VaultException>(() => vault.SaveWaiting(attempt =>
@@ -220,19 +205,6 @@ public sealed class VaultSaveTests : IDisposable
             lastResumed = Stopwatch.GetTimestamp();
         })));
 
-        SaveTimings.Mark("budget", timing);
-
-        // Attempt by attempt rather than summed, because only the first work interval contains
-        // acquiring the process-wide save gate. `work 4100/9/8/...` is a save that queued behind
-        // another save in this process and `work 40/38/41/...` is one whose every attempt got
-        // slower; those are different findings with different repairs and a sum cannot tell them
-        // apart. Slash-separated: the detail is written into a JSON string field.
-        PoolTimeline.Mark(
-            "save-exit",
-            string.Create(
-                CultureInfo.InvariantCulture,
-                $"attempts {attempts}; work {EachOf(work)}; slept {EachOf(slept)}"));
-
         // The budget is the sleeps. Their sum is arithmetic on two shipped constants and cannot
         // drift with the machine; the work is what the machine decides, and it is the reading this
         // test exists to produce.
@@ -244,7 +216,7 @@ public sealed class VaultSaveTests : IDisposable
         {
             Assert.Fail(
                 $"the sleeps alone took {slept.Sum()}ms against {budget}ms asked for, over {attempts} attempts; " +
-                $"the work between them took {work.Sum()}ms. {SaveTimings.Describe(timing)}{Environment.NewLine}{watch.Report()}");
+                $"the work between them took {work.Sum()}ms. {SaveTimings.Describe(timing)}");
         }
     }
 
@@ -259,12 +231,6 @@ public sealed class VaultSaveTests : IDisposable
         Assert.True(KeePassInterop.SaveAttempts >= 3, "one retry is not enough to ride out a scanner");
         Assert.True(KeePassInterop.SaveRetryDelayMilliseconds >= 25, "an immediate retry hits the same lock");
     }
-
-    /// <summary>
-    /// The measurements of one save, in the order they were taken, for the timeline's detail field.
-    /// </summary>
-    private static string EachOf(List<long> milliseconds) =>
-        string.Join('/', milliseconds.Select(m => m.ToString(CultureInfo.InvariantCulture)));
 
     /// <summary>A save that works still works, and the file is readable afterwards.</summary>
     [Fact]

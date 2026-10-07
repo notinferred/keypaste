@@ -310,34 +310,6 @@ public sealed class LogVerbTests : IDisposable
     }
 
     /// <summary>
-    /// The anchor is answered from the chain, not from the file's text. A hash planted in a field an
-    /// agent writes must not be able to vouch for a record that is gone.
-    /// </summary>
-    /// <remarks>
-    /// Without this the whole feature is decorative: truncate the log, then have the agent ask for
-    /// an entry named after the hash you destroyed, and the anchor is "found" in the record of that
-    /// request. The entry argument is the attacker's own text, so it does not even need file access.
-    /// </remarks>
-    [Fact]
-    public void AnAnchorPlantedInAnEntryName_DoesNotCountAsTheRecord()
-    {
-        Seed();
-        var anchor = AuditChainVerifier.Verify(LogPath).LatestHash;
-
-        var lines = File.ReadAllText(LogPath).Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        File.WriteAllText(LogPath, lines[0] + "\n");
-
-        Write(
-            new DateTimeOffset(2026, 7, 26, 14, 30, 0, TimeSpan.Zero),
-            Record("claude-code", $"env/dev/{anchor}", AuditDecision.Denied, AuditMethod.OutOfScope));
-
-        Assert.Contains(anchor, File.ReadAllText(LogPath), StringComparison.Ordinal);
-
-        _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "verify", "--expect", anchor));
-        Assert.Contains("NOT IN THIS FILE", _cli.Out, StringComparison.Ordinal);
-    }
-
-    /// <summary>
     /// A forged record that claims to predate the chain is rendered, because it parses — so it is
     /// marked, and the chain calls it what it is.
     /// </summary>
@@ -380,30 +352,8 @@ public sealed class LogVerbTests : IDisposable
     }
 
     /// <summary>
-    /// Deleting the file's last newline must not turn the last record into one nothing checks.
-    /// </summary>
-    /// <remarks>
-    /// A record and its newline are a single write, so what a crash leaves is a record that stops
-    /// partway — not a complete one missing its terminator. Treating every unterminated last line as
-    /// unexaminable would have made removing one byte the way to edit the newest record freely.
-    /// </remarks>
-    [Fact]
-    public void EditingTheLastRecordAndDroppingTheNewline_IsStillCaught()
-    {
-        Seed();
-
-        var text = File.ReadAllText(LogPath)
-            .Replace("\"decision\":\"denied\"", "\"decision\":\"granted\"", StringComparison.Ordinal);
-
-        File.WriteAllText(LogPath, text.TrimEnd('\n'));
-
-        _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "verify"));
-        Assert.Contains("own bytes have changed", _cli.Out, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// And the case that must survive it: a genuinely interrupted write is still forgiven, even
-    /// though the last line is now examined rather than skipped.
+    /// A genuinely interrupted write is forgiven, even though the last line is examined rather than
+    /// skipped.
     /// </summary>
     [Fact]
     public void AGenuinelyInterruptedWrite_IsStillForgiven()

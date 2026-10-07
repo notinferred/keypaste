@@ -280,17 +280,6 @@ public sealed class KeyfileOptionTests
     // ---------------------------------------------------------------------------------------
 
     [Fact]
-    public void The_usage_text_names_the_keyfile_option_and_its_variable()
-    {
-        using var harness = new CliHarness();
-
-        harness.Run("--help");
-
-        Assert.Contains("--keyfile <path>", harness.Out, StringComparison.Ordinal);
-        Assert.Contains(VaultLocation.KeyfileEnvironmentVariable, harness.Out, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void The_agent_usage_names_the_keyfile_option()
     {
         using var harness = new CliHarness();

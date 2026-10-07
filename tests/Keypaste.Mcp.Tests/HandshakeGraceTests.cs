@@ -1,4 +1,3 @@
-using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Mcp.Tests;
@@ -44,13 +43,11 @@ public sealed class HandshakeGraceTests
         var grace = TimeSpan.FromMilliseconds(120);
         var started = TimeProvider.System.GetTimestamp();
 
-        PoolTimeline.Mark("grace-enter");
         var complete = await McpAudit.AwaitCompletionAsync(
             () => false,
             grace,
             TimeProvider.System,
             TestContext.Current.CancellationToken);
-        PoolTimeline.Mark("grace-exit");
 
         Assert.False(complete);
 

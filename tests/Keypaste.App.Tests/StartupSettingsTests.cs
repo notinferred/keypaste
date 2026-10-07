@@ -30,19 +30,9 @@ namespace Keypaste.App.Tests;
 /// </remarks>
 public sealed class StartupSettingsTests
 {
-    [Fact]
-    public Task A_saved_timeout_is_the_one_a_fresh_session_locks_on() => Started(fixture =>
-    {
-        Save(fixture, AppSettings.Default with { IdleTimeoutSeconds = 60 });
-
-        using var session = Compose(fixture, new ManualClock(AppClock.Start));
-
-        Assert.Equal(TimeSpan.FromMinutes(1), session.IdleTimeout);
-    });
-
     /// <summary>
-    /// The property agreeing is not the claim. A one-minute fixture has to actually lock at one
-    /// minute, with a real vault open and the clock moved past it.
+    /// A saved one-minute timeout actually locks a fresh session at one minute, with a real vault
+    /// open and the clock moved past it, rather than only being what its property reports.
     /// </summary>
     [Fact]
     public Task A_one_minute_fixture_locks_at_one_minute() => Started(fixture =>

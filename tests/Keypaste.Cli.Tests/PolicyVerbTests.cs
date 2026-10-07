@@ -187,14 +187,6 @@ public sealed class PolicyVerbTests : IDisposable
         Assert.Contains("keypaste reads and never writes", _cli.Out, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void TheVerbIsListedInTheTopLevelUsage()
-    {
-        _cli.Run("help");
-
-        Assert.Contains("  policy    show the standing rules that skip the prompt", _cli.Out, StringComparison.Ordinal);
-    }
-
     private int Run(string? policy)
     {
         var path = Write(policy);

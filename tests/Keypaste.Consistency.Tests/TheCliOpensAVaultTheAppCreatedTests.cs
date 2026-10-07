@@ -36,30 +36,6 @@ public sealed class TheCliOpensAVaultTheAppCreatedTests : IDisposable
     private readonly AppVaultSession _session = new(TimeProvider.System);
     private readonly StubPicker _picker = new();
 
-    [Fact]
-    public async Task Keypaste_ls_opens_the_vault_the_app_created_with_the_same_password()
-    {
-        await CreateThroughTheApp();
-
-        Assert.True(File.Exists(_cli.VaultPath), "the app reported success without writing the file");
-
-        _cli.Prompt.Interactive = false;
-        _cli.Prompt.Enqueue(_master);
-
-        var exit = _cli.Run("ls", "--vault", _cli.VaultPath);
-
-        _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Empty(_cli.Out.Trim());
-    }
-
-    /// <summary>
-    /// The control that keeps the test above honest.
-    /// </summary>
-    /// <remarks>
-    /// Without it, a create that quietly protected the vault with some other password would still
-    /// pass — every assertion above would hold for a vault whose master password is anything at all,
-    /// as long as the harness happened to supply it.
-    /// </remarks>
     /// <summary>The app chooses the first vault it creates, and the CLI then opens it with no flag (G.1).</summary>
     [Fact]
     public async Task The_cli_uses_the_vault_the_app_chose_without_a_flag()
@@ -74,6 +50,10 @@ public sealed class TheCliOpensAVaultTheAppCreatedTests : IDisposable
         Assert.Equal(_cli.VaultPath, _cli.Out.Trim());
     }
 
+    /// <summary>
+    /// The control that keeps the other tests honest: without it, a create that quietly protected the
+    /// vault with some other password would still pass them, as long as the harness supplied it.
+    /// </summary>
     [Fact]
     public async Task Another_password_does_not_open_it()
     {

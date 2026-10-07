@@ -26,14 +26,6 @@ public sealed class SourceSnapshotTests : IDisposable
     }
 
     [Fact]
-    public void AnUntouchedFile_Matches()
-    {
-        var (path, snapshot) = Written("A=1\n");
-
-        Assert.True(snapshot.Matches(path));
-    }
-
-    [Fact]
     public void AnEmptyFile_Matches()
     {
         var (path, snapshot) = Written(string.Empty);

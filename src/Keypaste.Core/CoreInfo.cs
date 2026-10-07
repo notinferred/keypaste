@@ -2,18 +2,11 @@ using System.Reflection;
 
 namespace Keypaste.Core;
 
-/// <summary>
-/// Identity and liveness information for keypaste-core. Contains no vault logic itself —
-/// this type exists to prove the core-to-frontend wiring and will not grow.
-/// </summary>
+/// <summary>Identity of the loaded keypaste-core assembly.</summary>
 public static class CoreInfo
 {
     /// <summary>Gets the version of the loaded keypaste-core assembly.</summary>
     public static string Version { get; } = ReadVersion();
-
-    /// <summary>Returns a greeting identifying the loaded keypaste-core assembly.</summary>
-    /// <returns>A human-readable greeting including <see cref="Version"/>.</returns>
-    public static string Hello() => $"keypaste-core {Version} — loaded.";
 
     private static string ReadVersion()
     {

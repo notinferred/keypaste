@@ -160,15 +160,6 @@ public sealed class GenerateCommandTests
         Assert.Contains("32", harness.Out, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void TheTopLevelUsage_ListsTheVerb()
-    {
-        using var harness = new CliHarness();
-
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("help"));
-        Assert.Contains("  generate  print a passphrase (--words N); it is not stored", harness.Out, StringComparison.Ordinal);
-    }
-
     /// <summary>
     /// Two invocations do not print the same passphrase.
     /// </summary>

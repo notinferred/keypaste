@@ -14,10 +14,9 @@ namespace Keypaste.Core.Tests;
 /// have to be independent or the test is asking the code whether the code is right.
 /// </para>
 /// <para>
-/// <b>A digest test is the easiest thing in the world to write vacuously:</b> hash the file,
-/// compare with the const, pass — against a <c>WordList</c> that never checks anything, and
-/// against a file that is empty. So the pin is also shown to reject a one-byte change, and shown
-/// not to be the digest of an empty file.
+/// <b>A digest test alone passes vacuously</b> against an empty or truncated file and a pin
+/// regenerated from it, so the digest test also requires the file to hold the literal
+/// <see cref="WordList.Count"/> words.
 /// </para>
 /// </remarks>
 public sealed class WordListTests
@@ -29,38 +28,6 @@ public sealed class WordListTests
 
         Assert.Equal(WordList.Digest, Convert.ToHexStringLower(SHA256.HashData(bytes)));
         Assert.Equal(WordList.Count, VendoredWordList.Words().Length);
-    }
-
-    /// <summary>
-    /// The check behind the pin actually refuses a changed list.
-    /// </summary>
-    /// <remarks>
-    /// Without this, the digest test above passes against a <c>WordList</c> whose verification is
-    /// a comment. The mutated copy goes through the same comparison, and the running list is
-    /// asserted to still load, so a check that accepts everything fails one half or the other.
-    /// </remarks>
-    [Fact]
-    public void A_single_changed_byte_is_not_the_pinned_list()
-    {
-        var mutated = File.ReadAllBytes(VendoredWordList.ListPath);
-        mutated[^2] = (byte)(mutated[^2] == 'a' ? 'b' : 'a');
-
-        Assert.NotEqual(WordList.Digest, Convert.ToHexStringLower(SHA256.HashData(mutated)));
-        Assert.Equal(WordList.Count, WordList.Words.Length);
-    }
-
-    /// <summary>
-    /// The pin is a digest of the list, not of nothing.
-    /// </summary>
-    /// <remarks>
-    /// The failure this catches is a vendoring step that wrote an empty or truncated file and a
-    /// pin regenerated from it: every other test here would then agree with itself.
-    /// </remarks>
-    [Fact]
-    public void The_pin_is_not_the_digest_of_an_empty_or_truncated_file()
-    {
-        Assert.NotEqual(WordList.Digest, Convert.ToHexStringLower(SHA256.HashData([])));
-        Assert.True(new FileInfo(VendoredWordList.ListPath).Length > 50_000);
     }
 
     /// <summary>

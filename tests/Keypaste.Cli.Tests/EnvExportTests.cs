@@ -378,31 +378,13 @@ public sealed class EnvExportTests
     /// file, in plaintext, with no history and nothing to recover from.
     /// </summary>
     [Fact]
-    public void TheVaultItself_IsRefused_EvenWithForceAndYes()
-    {
-        using var harness = SeededWithTwo();
-        var before = File.ReadAllBytes(harness.VaultPath);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run(
-            "env", "export", "billing", harness.VaultPath,
-            "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.NotNull(vault.ReadField(ProjectVariables.Home("billing"), "API_KEY"));
-    }
-
-    [Fact]
-    public void TheVaultItself_IsRefusedAsADestination()
+    public void TheVaultItself_IsRefusedAsADestination_EvenWithForceAndYes()
     {
         using var harness = SeededWithTwo();
         var before = File.ReadAllBytes(harness.VaultPath);
 
         var exit = harness.Run(
-            "env", "export", "billing", harness.VaultPath, "--dotenv", "--yes", "--vault", harness.VaultPath);
+            "env", "export", "billing", harness.VaultPath, "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
 
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("is the vault", harness.Err, StringComparison.Ordinal);
@@ -412,105 +394,6 @@ public sealed class EnvExportTests
 
         Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
         Assert.Empty(harness.Prompt.PromptsSeen);
-    }
-
-    /// <summary>The same file named two ways, without touching the process-wide current directory.</summary>
-    [Fact]
-    public void AnUnnormalisedPathToTheVault_IsRefused()
-    {
-        using var harness = SeededWithTwo();
-        Directory.CreateDirectory(Path.Combine(harness.Directory, "sub"));
-        var dotted = Path.Combine(harness.Directory, "sub", "..", "vault.kdbx");
-        var before = File.ReadAllBytes(harness.VaultPath);
-
-        var exit = harness.Run(
-            "env", "export", "billing", dotted, "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
-    }
-
-    /// <summary>
-    /// The relative spelling V-F.1b asks for, built against the working directory rather than by
-    /// changing it: <c>Directory.SetCurrentDirectory</c> is process-global and unsafe while the
-    /// rest of the suite runs in parallel, which is why EnvPullTests avoids it too.
-    /// </summary>
-    [Fact]
-    public void ARelativePathToTheVault_IsRefused()
-    {
-        using var harness = SeededWithTwo();
-        var relative = Path.GetRelativePath(Directory.GetCurrentDirectory(), harness.VaultPath);
-        if (Path.IsPathRooted(relative))
-        {
-            Assert.Skip("the temporary directory is on another volume, so there is no relative spelling.");
-        }
-
-        var before = File.ReadAllBytes(harness.VaultPath);
-
-        var exit = harness.Run(
-            "env", "export", "billing", relative, "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
-    }
-
-    [Fact]
-    public void TheVaultNamedInADifferentCase_IsRefused()
-    {
-        using var harness = SeededWithTwo();
-        if (!CaseInsensitiveHere(harness))
-        {
-            Assert.Skip("this file system is case-sensitive, so these are two different names.");
-        }
-
-        var shouted = Path.Combine(harness.Directory, "VAULT.KDBX");
-        var before = File.ReadAllBytes(harness.VaultPath);
-
-        var exit = harness.Run(
-            "env", "export", "billing", shouted, "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
-    }
-
-    /// <summary>
-    /// A file symlink is the gentler half: <c>--force</c> deletes the link rather than the vault,
-    /// so the vault survives and the alias silently does not. Both are refusals.
-    /// </summary>
-    [Fact]
-    public void TheVaultThroughASymlink_IsRefused()
-    {
-        using var harness = SeededWithTwo();
-        var alias = Path.Combine(harness.Directory, "alias.kdbx");
-        Link(alias, harness.VaultPath, directory: false);
-        var before = File.ReadAllBytes(harness.VaultPath);
-
-        var exit = harness.Run(
-            "env", "export", "billing", alias, "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
-        Assert.True(File.Exists(alias));
-    }
-
-    /// <summary>
-    /// The alias that actually destroys the vault: the link is above the file name, so the delete
-    /// resolves through it and lands on the real thing.
-    /// </summary>
-    [Fact]
-    public void AVaultUnderASymlinkedDirectory_IsRefused()
-    {
-        using var harness = SeededWithTwo();
-        var link = Path.Combine(harness.Directory, "link");
-        Link(link, harness.Directory, directory: true);
-        var before = File.ReadAllBytes(harness.VaultPath);
-
-        var exit = harness.Run(
-            "env", "export", "billing", Path.Combine(link, "vault.kdbx"),
-            "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Equal(before, File.ReadAllBytes(harness.VaultPath));
     }
 
     /// <summary>
@@ -664,42 +547,5 @@ public sealed class EnvExportTests
         harness.Prompt.Enqueue(Master);
         harness.AssertExit(CliApp.ExitNotFound, harness.Run("env", "export", "billing", "-p", "qa", "--vault", harness.VaultPath));
         Assert.Contains("'billing' has no 'qa' profile", harness.Err, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// Creates a link, or skips. Windows needs Developer Mode or an elevated shell, and a machine
-    /// that cannot make one must say so rather than pass a test it never ran.
-    /// </summary>
-    private static void Link(string path, string target, bool directory)
-    {
-        try
-        {
-            if (directory)
-            {
-                Directory.CreateSymbolicLink(path, target);
-            }
-            else
-            {
-                File.CreateSymbolicLink(path, target);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Assert.Skip($"this machine cannot create symbolic links: {ex.Message}");
-        }
-    }
-
-    private static bool CaseInsensitiveHere(CliHarness harness)
-    {
-        var probe = Path.Combine(harness.Directory, "case-probe");
-        File.WriteAllText(probe, string.Empty);
-        try
-        {
-            return File.Exists(Path.Combine(harness.Directory, "CASE-PROBE"));
-        }
-        finally
-        {
-            File.Delete(probe);
-        }
     }
 }

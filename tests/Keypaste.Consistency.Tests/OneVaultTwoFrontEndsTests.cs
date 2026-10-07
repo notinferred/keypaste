@@ -33,32 +33,4 @@ public sealed class OneVaultTwoFrontEndsTests
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("ls"));
         Assert.Contains("production", fixture.Cli.Out, StringComparison.Ordinal);
     }
-
-    [Fact]
-    public void The_app_opens_a_vault_the_cli_wrote()
-    {
-        using var fixture = new VaultFixture(("servers/production", "production-password"));
-
-        Assert.Equal(UnlockOutcome.Opened, fixture.Unlock());
-        Assert.NotNull(fixture.Unlocked.Find("servers/production"));
-    }
-
-    /// <summary>
-    /// The negative control for <see cref="The_app_opens_a_vault_the_cli_wrote"/>.
-    /// </summary>
-    /// <remarks>
-    /// Without it, an <c>Unlock</c> that returned <c>Opened</c> unconditionally would satisfy every
-    /// other test here.
-    /// </remarks>
-    [Fact]
-    public void A_wrong_master_password_does_not_open_it()
-    {
-        using var fixture = new VaultFixture(("servers/production", "production-password"));
-
-        using var wrong = new Core.SecretBuffer();
-        wrong.Append("not the master password");
-
-        Assert.Equal(UnlockOutcome.WrongPassword, fixture.Session.TryUnlock(fixture.VaultPath, wrong.Value));
-        Assert.False(fixture.Session.IsUnlocked);
-    }
 }

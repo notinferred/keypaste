@@ -37,6 +37,31 @@ public sealed class VaultExportTests
     }
 
     [Fact]
+    public async Task A_vault_unlocked_while_the_picker_was_open_is_not_copied_in_its_place()
+    {
+        using var fixture = new TempVault();
+        using var other = new TempVault();
+        using var session = Unlocked(fixture);
+        var picker = new FakeVaultFilePicker
+        {
+            ExportPath = Path.Combine(fixture.Home, "elsewhere.kdbx"),
+            WhileExportOpen = () =>
+            {
+                session.Lock(VaultLockReason.Manual);
+                using var master = TempVault.Secret(TempVault.Password);
+                Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(other.Path_, master.Value));
+            },
+        };
+        using var model = Screen(session, fixture, picker);
+
+        await model.ExportAsync();
+
+        Assert.Equal(1, picker.ExportCalls);
+        Assert.False(File.Exists(picker.ExportPath));
+        Assert.Equal("The vault locked before the copy was made. Nothing was written.", model.Message);
+    }
+
+    [Fact]
     public async Task The_suggested_name_is_dated_and_is_not_one_a_backup_would_have()
     {
         using var fixture = new TempVault();

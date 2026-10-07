@@ -314,16 +314,6 @@ public sealed class AccessCommandTests
         Assert.Empty(harness.Prompt.PromptsSeen);
     }
 
-    [Fact]
-    public void The_verb_is_listed_in_the_usage()
-    {
-        using var harness = new CliHarness();
-
-        harness.Run("help");
-
-        Assert.Contains("access", harness.Out, StringComparison.Ordinal);
-    }
-
     private static CliHarness Seeded()
     {
         var harness = new CliHarness();
