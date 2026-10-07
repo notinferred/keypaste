@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A crash while the app saves project mappings or dismissed recommendations no longer leaves a torn file, a vault `keypaste import` adds while the unlock screen is open is no longer dropped from Recent, and a policy rule's hourly limit is no longer reset by moving the clock forward ([F.59](docs/steps/F.59.md)).
+
 `keypaste add` and `set` now refuse the entry titles the app refuses, `env pull` refuses a file over its size limit before reading it, and `keypaste agent` withdraws its grants when the vault is edited, as the app does. A remembered vault path `recent.toml` or `app.toml` cannot hold is now left out instead of making the whole file unreadable, and the app refuses to export a profile with no variables, as the CLI does ([F.55](docs/steps/F.55.md)).
 
 When you refuse a request, the same field, or the same secrets for a run, is now refused for a minute whichever agent or connection asks, so an agent cannot reconnect to ask you again. Each `keypaste run --session` release, and each refusal of a valid request, now appears in `keypaste log`, and a run is refused if its line cannot be written ([F.54](docs/steps/F.54.md)).

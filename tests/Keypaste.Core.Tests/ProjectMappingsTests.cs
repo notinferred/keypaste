@@ -45,6 +45,22 @@ public sealed class ProjectMappingsTests : IDisposable
     }
 
     [Fact]
+    public void Saving_replaces_the_file_owner_only_and_leaves_nothing_beside_it()
+    {
+        var mapping = new ProjectMapping(Path.Combine(_directory, "a.kdbx"), "dev", _directory, "make");
+
+        Assert.True(ProjectMappings.Save(File_, [mapping]));
+        Assert.True(ProjectMappings.Save(File_, [mapping with { Command = "make test" }]));
+
+        Assert.Equal([File_], Directory.GetFiles(Path.GetDirectoryName(File_)!));
+
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(File_));
+        }
+    }
+
+    [Fact]
     public void A_file_that_cannot_be_read_is_reported_and_left_as_it_is()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(File_)!);

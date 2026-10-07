@@ -58,7 +58,7 @@ public sealed class PolicyRateLimiter
             return true;
         }
 
-        var now = _clock.GetUtcNow();
+        var now = _clock.GetTimestamp();
 
         lock (_gate)
         {
@@ -68,7 +68,7 @@ public sealed class PolicyRateLimiter
                 _windows[rule.Id] = window;
             }
 
-            return window.TryUse(now);
+            return window.TryUse(now, HourBefore(now));
         }
     }
 
@@ -80,48 +80,48 @@ public sealed class PolicyRateLimiter
     {
         ArgumentNullException.ThrowIfNull(rule);
 
-        var now = _clock.GetUtcNow();
+        var now = _clock.GetTimestamp();
 
         lock (_gate)
         {
-            return _windows.TryGetValue(rule.Id, out var window) ? window.Spent(now) : 0;
+            return _windows.TryGetValue(rule.Id, out var window) ? window.Spent(HourBefore(now)) : 0;
         }
     }
 
-    /// <summary>The timestamps of one rule's last N releases, as a ring.</summary>
+    private long HourBefore(long timestamp) => timestamp - (_clock.TimestampFrequency * 3600);
+
+    /// <summary>The monotonic timestamps of one rule's last N releases, as a ring.</summary>
     private sealed class Window(int capacity)
     {
-        private readonly long[] _ticks = new long[capacity];
+        private readonly long[] _stamps = new long[capacity];
         private int _oldest;
         private int _count;
 
-        internal bool TryUse(DateTimeOffset now)
+        internal bool TryUse(long now, long horizon)
         {
-            Forget(now);
+            Forget(horizon);
 
-            if (_count == _ticks.Length)
+            if (_count == _stamps.Length)
             {
                 return false;
             }
 
-            _ticks[(_oldest + _count) % _ticks.Length] = now.UtcTicks;
+            _stamps[(_oldest + _count) % _stamps.Length] = now;
             _count++;
             return true;
         }
 
-        internal int Spent(DateTimeOffset now)
+        internal int Spent(long horizon)
         {
-            Forget(now);
+            Forget(horizon);
             return _count;
         }
 
-        private void Forget(DateTimeOffset now)
+        private void Forget(long horizon)
         {
-            var horizon = now.UtcTicks - TimeSpan.TicksPerHour;
-
-            while (_count > 0 && _ticks[_oldest] <= horizon)
+            while (_count > 0 && _stamps[_oldest] <= horizon)
             {
-                _oldest = (_oldest + 1) % _ticks.Length;
+                _oldest = (_oldest + 1) % _stamps.Length;
                 _count--;
             }
         }

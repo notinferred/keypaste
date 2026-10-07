@@ -24,6 +24,22 @@ public sealed class RecommendationDismissalsTests : IDisposable
     }
 
     [Fact]
+    public void Saving_replaces_the_file_owner_only_and_leaves_nothing_beside_it()
+    {
+        var path = Path.Combine(_directory, "recommendations.json");
+
+        Assert.True(RecommendationDismissals.Save(path, [new Dismissal("v", "e", RecommendationDismissals.NoteKey, "A")]));
+        Assert.True(RecommendationDismissals.Save(path, [new Dismissal("v", "e", RecommendationDismissals.NoteKey, "B")]));
+
+        Assert.Equal([path], Directory.GetFiles(_directory));
+
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
+        }
+    }
+
+    [Fact]
     public void A_missing_file_dismisses_nothing_and_can_be_written()
     {
         Assert.True(RecommendationDismissals.TryLoad(Path.Combine(_directory, "absent.json"), out var read));

@@ -86,6 +86,30 @@ public sealed class FirstRunTests : IDisposable
     }
 
     [Fact]
+    public async Task A_vault_another_writer_remembered_survives_this_screen_forgetting_and_remembering_others()
+    {
+        var first = MakeVault("first.kdbx");
+        var second = MakeVault("second.kdbx");
+        var added = MakeVault("added.kdbx");
+        var recent = KeypasteHome.RecentPath(_home.Path);
+        RecentVaults.Save(recent, [new RecentVault(first, DateTimeOffset.UtcNow), new RecentVault(second, DateTimeOffset.UtcNow)]);
+
+        using var model = NewModel(Ini);
+        RecentVaults.Save(recent, RecentVaults.Remember(RecentVaults.Load(recent), added, DateTimeOffset.UtcNow));
+
+        model.Forget(second);
+
+        Assert.Equal([added, first], RecentVaults.Load(recent).Select(vault => vault.Path).Order(StringComparer.Ordinal));
+
+        model.SelectedRecent = model.Recent.Single(item => item.Path == first);
+        Type(model, TempVault.Password);
+        await model.UnlockAsync();
+
+        Assert.Equal(1, _unlocked);
+        Assert.Equal([added, first], RecentVaults.Load(recent).Select(vault => vault.Path).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void A_database_that_is_not_a_vault_is_refused_where_it_is_chosen()
     {
         var imposter = Path.Combine(_files.Path, "imposter.kdbx");

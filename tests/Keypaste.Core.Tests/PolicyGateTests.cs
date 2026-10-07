@@ -98,6 +98,23 @@ public sealed class PolicyGateTests
     }
 
     /// <summary>
+    /// The hour is counted on the monotonic clock, so setting the wall clock forward does not give
+    /// the allowance back.
+    /// </summary>
+    [Fact]
+    public void SteppingTheWallClockForward_DoesNotGiveTheAllowanceBack()
+    {
+        var clock = new ManualClock();
+        var gate = Gate(cap: "1", clock);
+
+        Assert.Equal(PolicyOutcomeKind.Granted, gate.Evaluate("claude-code", _covered, [], "password").Kind);
+
+        clock.AdvanceWallOnly(TimeSpan.FromHours(1));
+
+        Assert.Equal(PolicyOutcomeKind.RateLimited, gate.Evaluate("claude-code", _covered, [], "password").Kind);
+    }
+
+    /// <summary>
     /// The allowance belongs to the rule, not to whoever is asking. Counting per connection would
     /// mean a client could reset its own quota by spawning a fresh bridge, and a quota the
     /// constrained party can reset is not a quota (THREATS.md T-14).

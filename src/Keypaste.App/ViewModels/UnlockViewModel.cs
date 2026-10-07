@@ -735,8 +735,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        _remembered = RecentVaults.Forget(_remembered, path);
-        RecentVaults.Save(KeypasteHome.RecentPath(_home), _remembered);
+        var recent = KeypasteHome.RecentPath(_home);
+        _remembered = RecentVaults.Forget(RecentVaults.Load(recent), path);
+        RecentVaults.Save(recent, _remembered);
 
         if (_selectedPath is not null && string.Equals(_selectedPath, System.IO.Path.GetFullPath(path), PathIdentity.Comparison))
         {
@@ -1087,8 +1088,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
     private void Remember(string path, string? keyfile, int? hardwareKeySlot = null)
     {
-        _remembered = RecentVaults.Remember(_remembered, path, DateTimeOffset.UtcNow, keyfile, hardwareKeySlot);
-        RecentVaults.Save(KeypasteHome.RecentPath(_home), _remembered);
+        var recent = KeypasteHome.RecentPath(_home);
+        _remembered = RecentVaults.Remember(RecentVaults.Load(recent), path, DateTimeOffset.UtcNow, keyfile, hardwareKeySlot);
+        RecentVaults.Save(recent, _remembered);
         _chosenNotice = ChosenVault.Choose(_home, path, onlyIfNone: true) == ChooseOutcome.Chosen ? ChosenNotice : null;
         Project();
     }

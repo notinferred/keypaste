@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.Projects;
 
@@ -185,13 +186,7 @@ public static class ProjectMappings
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllBytes(path, buffer.ToArray());
-
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-
+            AtomicFile.Write(path, buffer.ToArray());
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
