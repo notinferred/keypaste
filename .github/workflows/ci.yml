@@ -48,7 +48,7 @@ on:
       - 'site/.node-version'
   pull_request:
   workflow_dispatch:
-  # The weekly full run, beside dispatches: pushes to main run only what their commits select.
+  # Weekly, so a runner image or upstream change shows without a commit.
   schedule:
     - cron: '17 4 * * 1'
 
@@ -57,8 +57,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  # Release tags require a completed verdict for each commit on main.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Release tags require a completed verdict for each commit on main; a branch's newer run supersedes its last.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) }}
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -67,56 +67,9 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  # A pull request runs the lanes its diff from the merge base can break, and a push to main the lanes
-  # its own commits can (D-0403). A dispatch and the schedule run every lane, and only those, or a
-  # tag's own run, count toward a release.
-  scope:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    # Reads the pass markers earlier runs left (D-0404).
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      lanes: ${{ steps.plan.outputs.lanes }}
-      backend_os: ${{ steps.plan.outputs.backend_os }}
-      backend_tests: ${{ steps.plan.outputs.backend_tests }}
-      filter: ${{ steps.plan.outputs.filter }}
-      test_matrix: ${{ steps.plan.outputs.test_matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Choose the lanes this change can break
-        id: plan
-        shell: bash
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE: ${{ github.base_ref }}
-          BEFORE: ${{ github.event.before }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          since=''
-          if [ "$EVENT" = pull_request ]; then
-            since="origin/$BASE"
-          elif [ "$EVENT" = push ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            since="$BEFORE"
-          fi
-          if [ -z "$since" ]; then
-            bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # A lane a trusted run already passed on these exact inputs is not run again; a dispatch or the schedule never skips.
-          passed="$(bash scripts/lane-cache.sh | tr '\n' ' ')"
-          echo "already passed on these inputs: ${passed:-nothing}"
-          VERIFY_SATISFIED="$passed" bash scripts/verify.sh --since "$since" --plan | tee -a "$GITHUB_OUTPUT"
-
+  # Every run runs every job; a dispatch, the schedule or a tag's own run counts toward a release (D-0403, D-0423).
   checks:
     name: scripts + workflows
-    needs: scope
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -131,45 +84,94 @@ jobs:
         run: bash scripts/verify.sh workflows
 
       - name: Run the offline script fixtures
-        if: contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
         shell: bash
         run: bash scripts/verify.sh scripts
 
       - name: Verify the release destination check fails closed against the real aws CLI
-        if: contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
 
-      - name: Mark the script fixtures passed on these inputs
-        if: success() && contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success() && contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
+  # dotnet format reports what the build cannot, import order and this. qualification, once for every project.
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          name: pass--ubuntu-24.04--scripts
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Check every project's format
+        shell: bash
+        run: bash scripts/verify.sh format
 
   test:
     name: test (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.test_matrix != '[]'
     strategy:
       fail-fast: false
-      # Each runner carries its own lanes, less those an earlier run already passed there (D-0404).
       matrix:
-        include: ${{ fromJSON(needs.scope.outputs.test_matrix) }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Build and test the backend solution
+        shell: bash
+        run: bash scripts/verify.sh backend
+
+      - name: Verify the Windows PowerShell launcher selects Git Bash
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/verify.ps1 --list
+
+  # Real CLI, agent and bridge processes, and the demo pages against what the binaries print.
+  integration:
+    name: integration (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
+
+      - name: Run the integration gate
+        shell: bash
+        run: bash scripts/verify.sh integration
+
+  compat:
+    name: compat (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     env:
-      LANES: ${{ matrix.lanes }}
-      BACKEND_TESTS: ${{ matrix.backend_tests }}
-      FILTER: ${{ matrix.filter }}
-      INTEGRATION: ${{ contains(matrix.lanes, ' integration ') }}
-      PAGES: ${{ contains(matrix.lanes, ' pages ') }}
-      COMPAT: ${{ contains(matrix.lanes, ' compat ') }}
       # KeePassXC's Windows console encoding can alter a non-ASCII master password.
       KP_COMPAT_PASSWORD: ci-master-pw
     steps:
@@ -177,155 +179,74 @@ jobs:
         with:
           persist-credentials: false
 
-      # The solution joins the key so this cache never overwrites app.yml's.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            keypaste.slnx
 
-      # The process gates start the CLI and the bridge, so they need the whole solution built.
-      - name: Restore, format and build once
+      - name: Restore and build the backend solution
         shell: bash
-        run: |
-          set -euo pipefail
-          set --
-          if [ "$BACKEND_TESTS" != all ] && [ "$INTEGRATION$PAGES$COMPAT" = falsefalsefalse ]; then
-            for p in $BACKEND_TESTS; do set -- "$@" --project "$p"; done
-          fi
-          bash scripts/verify.sh backend --prepare-only "$@"
-
-      - name: Test
-        if: env.BACKEND_TESTS != ''
-        shell: bash
-        run: |
-          set -euo pipefail
-          set --
-          if [ "$BACKEND_TESTS" != all ]; then for p in $BACKEND_TESTS; do set -- "$@" --project "$p"; done; fi
-          bash scripts/verify.sh backend --test-only "$@" ${FILTER:+--filter-class "$FILTER"}
-
-      - name: Verify the Windows PowerShell launcher selects Git Bash
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: ./scripts/verify.ps1 --list
-
-      - name: Verify run injects a variable and writes nothing to disk
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-run-injection.sh
-
-      # The Unix signal verifier has no Windows equivalent; SECURITY.md records that coverage gap.
-      - name: Verify run forwards signals and exit codes
-        if: env.INTEGRATION == 'true' && runner.os != 'Windows'
-        shell: bash
-        run: scripts/verify-run-signals.sh
-
-      - name: Verify keypaste mcp speaks MCP over stdio and audits every call
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-mcp-stdio.sh
-
-      - name: Verify a person can approve and refuse across two real processes
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-approval-e2e.sh
-
-      - name: Verify the run tool approves, reuses and denies across a real owner and bridge
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        timeout-minutes: 8
-        run: scripts/verify-mcp-run.sh
-
-      # A surviving agent process can hold the step open after its assertions finish.
-      - name: Verify a policy rule grants without a prompt, and only inside its pattern
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        timeout-minutes: 8
-        run: scripts/verify-policy-e2e.sh
-
-      - name: Verify the audit chain catches tampering and forgives a crash
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-log-chain.sh
-
-      - name: Verify the demo page still matches what the binaries print
-        if: env.INTEGRATION == 'true' || env.PAGES == 'true'
-        shell: bash
-        timeout-minutes: 8
-        run: scripts/verify-demo.sh
+        run: bash scripts/verify.sh backend --prepare-only
 
       # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
-      # A stalled apt mirror otherwise holds the leg for its whole limit.
+      # A stalled apt mirror otherwise holds the job for its whole limit.
       - name: Install keepassxc-cli (Linux)
-        if: env.COMPAT == 'true' && runner.os == 'Linux'
+        if: runner.os == 'Linux'
         timeout-minutes: 10
         run: |
           bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install keepassxc-cli (macOS)
-        if: env.COMPAT == 'true' && runner.os == 'macOS'
+        if: runner.os == 'macOS'
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: brew install --cask keepassxc
 
       - name: Install keepassxc-cli (Windows)
-        if: env.COMPAT == 'true' && runner.os == 'Windows'
+        if: runner.os == 'Windows'
         shell: bash
         run: |
           set -euo pipefail
           echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
 
       - name: Generate the fixture vault with the keypaste binary
-        if: env.COMPAT == 'true'
         shell: bash
         run: scripts/make-compat-fixture.sh artifacts/compat/gen.kdbx
 
       - name: Verify it opens in real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: scripts/verify-keepassxc-compat.sh artifacts/compat/gen.kdbx
 
       - name: Verify the write-back round trip through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx
 
       - name: Verify a restored revision and its history through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-history.sh artifacts/compat/history.kdbx
 
       - name: Verify reversible deletion and recovery through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/recyclebin.kdbx
 
       - name: Verify run refuses an expired or misnamed entry KeePassXC made
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-run.sh artifacts/compat/run
 
       - name: Verify the backup a save keeps, a restore and an export through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-backup.sh artifacts/compat/backup.kdbx
 
       - name: Verify renaming and moving through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-organize.sh artifacts/compat/organize.kdbx
 
       - name: Verify importing a KeePassXC vault through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-import.sh artifacts/compat/import
 
       # The fields and projects gates ask the app's own prompt window, held by the app driver.
       - name: Restore (locked) and build the app driver
-        if: env.COMPAT == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -334,49 +255,24 @@ jobs:
 
       # The fields gate shares through the site's Worker, run on loopback by wrangler.
       - name: Install the site's locked packages
-        if: env.COMPAT == 'true'
         shell: bash
         timeout-minutes: 10
         run: npm ci --prefix site --no-audit --no-fund
 
       - name: Verify custom fields through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
 
       - name: Verify project tags and their protection through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
 
       - name: Verify opening a keyfile-protected vault through real KeePassXC
-        if: env.COMPAT == 'true'
         shell: bash
         run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
 
-      - name: Mark this runner's lanes passed on these inputs
-        id: pass
-        if: success()
-        shell: bash
-        env:
-          RUNNER_LABEL: ${{ matrix.os }}
-        run: |
-          set -euo pipefail
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-          read -r -a ran <<< "$LANES"
-          echo "name=pass--$RUNNER_LABEL--$(IFS=+; echo "${ran[*]}")" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: ${{ steps.pass.outputs.name }}
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   aot:
     name: aot publish (linux-x64)
-    needs: scope
-    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' aot ')
     # NativeAOT inherits the build machine's glibc floor, which must match release.yml.
     runs-on: ubuntu-22.04
     timeout-minutes: 25
@@ -390,10 +286,6 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: |
-            **/packages.lock.json
-            keypaste.slnx
 
       - name: Install the native toolchain
         run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
@@ -463,23 +355,11 @@ jobs:
           scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
           scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
 
-      - name: Mark the AOT lane passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--ubuntu-22.04--aot
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
   ok:
     name: ci ok
     if: always()
-    needs: [scope, checks, test, aot]
+    needs: [checks, format, test, integration, compat, aot]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

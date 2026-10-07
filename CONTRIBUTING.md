@@ -14,7 +14,7 @@ Write self-documenting code with clear names and structure. Default to no commen
 
 ## Verification and commits
 
-Implementation needs no local SDK: commit on a branch and run `bash scripts/dev.sh`, which pushes it and has GitHub build and test what the branch's commits can affect. With the pinned SDK, `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash runs the checks the working tree's changes affect; `--all` runs backend, desktop, consistency, script and process checks together. An explicit documents-only or no-build instruction limits that work: review the wording, links and source evidence without building, running tests or starting delivery tasks. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
+Implementation needs no local SDK: commit on a branch and run `bash scripts/dev.sh`, which pushes it, opens a draft pull request and follows GitHub's checks on it. With the pinned SDK, `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash runs the backend, desktop, consistency, format, script and process checks together. An explicit documents-only or no-build instruction limits that work: review the wording, links and source evidence without building, running tests or starting delivery tasks. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
 
 Sign off every commit, including maintainer and agent commits:
 
