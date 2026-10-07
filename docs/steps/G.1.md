@@ -23,10 +23,6 @@ The row was not detailed when selected, so it was expanded against the code befo
 ## Decisions
 
 - D-0389 in [DECISIONS](../../DECISIONS.md): the resolution order and where the choice lives.
-- `app.toml`'s reader moved from `TomlLimits.Policy` to `TomlLimits.Paths`, the limits `recent.toml` uses, since it now holds a path.
-- `DesktopPreferences.Update` writes the chosen vault as the file has it, or as this run last knew it when the file cannot be read, so a preference saved in a running app keeps a choice made behind it by `keypaste use` or the first unlock.
-- A bridge reads the choice once, at startup, like its other configuration.
-- `AppSettings.TryLoad` reports a file that exists and does not parse, and `ChosenVault.Choose` then writes nothing (D-0028).
 
 ## Limits and follow-ups
 

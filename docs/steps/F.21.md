@@ -8,10 +8,6 @@ Observed in [F.2b3a](F.2b3a.md) on Windows 10 at `15b2c47`: with a credential re
 
 Amendment, on the founder's direction on 2026-09-24: `app.yml` runs the desktop tests on `ubuntu-24.04` only, and `ci.yml`'s three-OS job builds `keypaste.slnx`, which holds no app tests, so no workflow runs them on Windows or macOS. The Verify became `app.yml` on Linux plus a local Windows run. macOS was not run.
 
-## What changed for users
-
-Closing the desktop's main window now quits the app even while an agent's request waits in its prompt window. The request is refused as `vault-locked`, the prompt closes and the process exits. Before, the prompt kept the process running with the vault unlocked and served, and Approve on it still released the value.
-
 ## Evidence
 
 **Mechanism.** Avalonia's `ClassicDesktopStyleApplicationLifetime` defaults to `ShutdownMode.OnLastWindowClose`. With `WindowApprovalChannel`'s prompt open, closing `MainWindow` was not the last close, so the lifetime raised no `ShutdownRequested` and `App.OnShutdownRequested`, which ends the authority, never ran. Launch now sets `ShutdownMode.OnMainWindowClose`, whose shutdown closes the remaining unowned windows without letting them cancel.
@@ -27,8 +23,6 @@ Closing the desktop's main window now quits the app even while an agent's reques
 ## Decisions
 
 D-0343: closing the main window quits the app whatever other window is open.
-
-`App.Launch` holds what `OnFrameworkInitializationCompleted` composed, so a test runs launch's composition; `App.Authority` exposes the authority it built. `OnShutdownRequested` calls `Shutdown` on the lifetime `Launch` was given rather than on `ApplicationLifetime`.
 
 ## Limits and follow-ups
 

@@ -4,21 +4,9 @@ Completed 2026-09-23 on `main` above `e8c6bf3`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** choose the process that owns the unlocked vault in the desktop journey and record the choice as a decision, then implement its authenticated local attachment. The vault-free `keypaste-mcp` bridge reaches the owner only over a per-user endpoint that names the vault and session on every operation, and no master password or key crosses it. A second owner of the same vault, and a terminal `keypaste agent` and the desktop both claiming it, are refused by name rather than resolved silently. Standalone CLI verbs keep an explicit unlock of their own outside the desktop journey rather than a hidden second session. Traces to PRODUCT §2.
-
 **Verify (V-U.1):** a real `keypaste-mcp` request against the unlocked desktop reaches the owning process, is answered from its vault and names the session it reached. The same request with the app locked, with a stale session identifier and from a client presenting no valid attachment is refused. Starting `keypaste agent` on the vault the app owns, and a second app instance on it, are each refused with a message naming the owner, and neither opens the vault. A capture of the attachment traffic carries no password or key. A mocked endpoint, or a listener that only accepts connections, does not pass.
 
 The plan was approved by the founder as written; there was no amendment.
-
-## What changed for users
-
-The desktop app owns the vault it unlocks (D-0309). While a vault is unlocked, the app serves it on a pipe derived from the user, keypaste's home and the vault, so a `keypaste-mcp` configured with `--vault` for that vault reaches the app. The app answers `list_entry_names` under the bridge's exposure. It refuses every credential request, because it has nowhere to ask a person until STEPS 4.4, and it consults no policy rule. Locking the app stops serving the vault. Agent Activity now says which of those is true, read from what the app serves rather than from whether some pipe accepts a connection.
-
-One vault has one owner. The app and `keypaste agent` each take a claim on the vault before the password is read, and a second owner is refused with "this vault is already unlocked in the keypaste desktop app (process N). Lock it there first", or the same naming `keypaste agent`. It never prompts and never opens the vault. The claim is an open file handle under `~/.keypaste/sessions`, so a killed holder leaves the vault free. `keypaste run`, `get` and the other CLI verbs take no claim and unlock explicitly as before.
-
-The approver protocol is now version 2 (D-0310). A bridge attaches before every request, naming its vault; the owner answers with the session it minted at unlock; and each request names both. The owner refuses, as `no-session`, a request from an unattached connection, one naming another vault and one from a session that has ended. The audit line of a request that reached a session names it in a new `session` field. A request whose reply was lost is retried under the session it was first sent in, never a later one. A bridge with no `--vault` is refused, and a v0.3.0 bridge and this approver, or the reverse, cannot talk.
-
-The agent-facing refusals changed where they had become untrue. "No keypaste agent is running" now reads "Nobody can approve this right now: no keypaste agent holds this vault unlocked" and says the app cannot approve yet. The locked refusal no longer says an agent is running. There are two new refusals, for `no-session` and for a bridge with no vault. `keypaste agent` prints the session it serves on its `listening on` line.
 
 ## Evidence
 
@@ -59,12 +47,11 @@ The first run of the agent mutation showed the gate had no bound on the agent it
 
 ## Decisions
 
-The ledger rows from this step, which constrain later work, are in [DECISIONS](../../DECISIONS.md): D-0309 and D-0310. The rules below bind only this step's code.
+The ledger rows from this step, which constrain later work, are in [DECISIONS](../../DECISIONS.md): D-0309 and D-0310. The rule below binds only this step's code.
 
 | id | date | decision | supersedes |
 |---|---|---|---|
 | D-0311 | 2026-09-23 | Until 4.4, the app's authority answers listings and refuses every credential request through a channel with nowhere to ask and `PolicyGate.None`, so no rule releases anything from the app without its prompt | — |
-| D-0312 | 2026-09-23 | The bridge attaches before every request, so an idle connection learns of a new session before sending anything; a request whose reply was lost is retried once under the session it was first sent in | v1's reconnect-and-retry to whatever answered |
 
 ## Limits and follow-ups
 

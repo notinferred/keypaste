@@ -9,9 +9,8 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>One remembered vault, as the unlock screen shows it.</summary>
 /// <remarks>
-/// The list shows <see cref="Name"/> and puts <see cref="Path"/> in a tooltip. the Ideas table in DECISIONS.md's screenshot
-/// strategy puts this app beside classic KeePass in marketing shots, and a screenshot should not
-/// publish somebody's directory layout.
+/// The list shows <see cref="Name"/> and puts <see cref="Path"/> in a tooltip, because a screenshot
+/// should not publish somebody's directory layout.
 /// </remarks>
 internal sealed class RecentVaultItem(string path, bool exists)
 {

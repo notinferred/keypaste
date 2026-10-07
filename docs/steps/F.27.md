@@ -39,7 +39,7 @@ KeePassXC's `Merger::mergeHistory` keys the merged history the same way in 2.7.6
 
 ## Decisions
 
-D-0387. Every edit, `UpdateEntry`, `SetFields`, `RemoveField`, `MoveToFields`, `AddTag`, `RemoveTags`, a rename and `RestoreRevision`, goes through `MarkEdited`: after `Touch`, an entry whose second is not later than its previous time and every revision it keeps is set to the next whole second. A new entry, a move and a deletion are unchanged.
+D-0387.
 
 ## Limits and follow-ups
 

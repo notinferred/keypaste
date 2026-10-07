@@ -6,14 +6,6 @@ Completed 2026-09-28 on `main` above `d85deb5`, source only. [PRODUCT](../PRODUC
 
 The row was opened on 2026-09-28, when `bash scripts/verify.sh` failed its `scripts` profile before the PRODUCT v1.8 commit. It was selected the same day, before `main` is pushed.
 
-**Build:** On local `main` at `d2ced03`, `bash scripts/verify.sh` fails `verify-provenance.sh --selftest`. The case `app-genuine-staged-directory` expects "all 4 assets" (`verify-provenance.sh:283`). Since `2348d54` added the macOS `keypaste.app` zip to the app component, the staged directory holds 6. `ci.yml` and `release.yml` run the same self-test, so both fail once `main` is pushed.
-
-**Verify (V-F.24):** the self-test accepts the genuine staged directory at the definition's current asset count, and still refuses one missing an asset.
-
-## What changed for users
-
-Nothing. Only the self-test changed.
-
 ## Evidence
 
 **Mechanism.** The self-test builds the staged desktop directory from the release definition (`release-completion.sh --component app names`). Since `2348d54`, the definition names three packages, the Windows MSI, the Linux AppImage and the macOS app zip, each with its checksum. `verify-provenance.sh` verified all six and said "all 6 assets", while the case still looked for the hard-coded "all 4 assets".

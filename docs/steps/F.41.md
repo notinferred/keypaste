@@ -42,7 +42,7 @@ Each of the six returned no entries and "the bridge did not answer within 10 sec
 
 ## Decisions
 
-None in the ledger. Binding these two classes only: their scripted bridges need no thread-pool worker to answer, which their regressions hold.
+None.
 
 ## Limits and follow-ups
 

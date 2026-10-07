@@ -4,19 +4,15 @@ Completed 2026-09-24 on `main` above `15b2c47`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-F.2b3 was selected as the next row in track order, since no code task was ready. Its Build: a person runs the app from an `app.yml` artifact at a named commit, with a disposable vault and a `keypaste-mcp` configured for it, on a real Windows 10 or 11 desktop and a real Linux X11 or XWayland desktop, and records each act. The acts are minimizing from the title bar with minimize-lock on, with it off and after a restart; closing the window while a request waits in the prompt window; sleeping past the idle timeout and waking; and a request arriving while another application has focus. Its Verify requires every act on both desktops, `vault-locked` for a request waiting when the window closes, the unlock screen and a refused request after waking past the timeout, and the prompt over the other window with focus on Deny, and it excludes observations from a runner or `Keypaste.AppDriver`.
+F.2b3 was selected as the next row in track order, since no code task was ready.
 
 Amendments, each on the founder's direction on 2026-09-24:
 
 - The observation was made on Windows only. F.2b3 was split: this record holds the Windows observations, and [STEPS](../STEPS.md) keeps F.2b3b for what they did not settle. That is the close act after F.21's repair, the sleep act, and every act on Linux.
-- The founder declined the sleep act and directed the rest to be checked without them. The focus act and a sleep attempt were then driven by the observer's own UI Automation on the same desktop, which the Verify above excludes. They are recorded here as machine-driven.
+- The founder declined the sleep act and directed the rest to be checked without them. The focus act and a sleep attempt were then driven by the observer's own UI Automation on the same desktop, which the row's Verify excludes. They are recorded here as machine-driven.
 - The founder asked for the write-up even where unverified.
 
 The artifact had to be built at a named commit first. The founder had the four unpushed commits E.1a to F.17 redated into 18:00–06:00 and pushed. That push found F.19 and F.20, and F.19 was repaired first.
-
-## What changed for users
-
-Nothing. This step observed and changed no code.
 
 ## Evidence
 

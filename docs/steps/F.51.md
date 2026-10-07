@@ -28,7 +28,7 @@ Dev 37433423880 passed `verify-session-lifecycle.sh`, `verify-lock-boundary.sh`,
 
 ## Decisions
 
-None. How the driver holds its display binds only the driver.
+None.
 
 ## Limits and follow-ups
 

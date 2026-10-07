@@ -10,8 +10,7 @@
 # What it holds:
 #   - a commit with every required gate green is accepted, and it is the ONLY shape that is;
 #   - a missing app run, a red app run and a commit with neither run each refuse;
-#   - a green run triggered by a pull request does not count, nor does a push to main, which runs
-#     only the lanes its commits select (D-0403);
+#   - a green run triggered by a pull request or a push to main does not count (D-0403);
 #   - the required set is read from release-targets.json, so a component with its own gate is
 #     required without an edit here, and the release workflow never requires itself;
 #   - an empty or malformed reply refuses rather than counting as zero and passing something.

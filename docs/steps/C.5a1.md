@@ -41,7 +41,6 @@ The app lane has not passed whole on macOS: in 36732809941 F.28 stopped the desk
 ## Decisions
 
 - D-0388: what leaves by name is the four standard fields or an env-named custom field that is no standard name, and `request_credential` reads a custom field from the saved file only after an Allow or a rule.
-- Binding only this step's code: `Vault.ReadSavedField` reads one custom field under `ReadSaved`'s saved-state check, so no custom field is answered from an unsaved or overwritten copy.
 
 ## Limits and follow-ups
 

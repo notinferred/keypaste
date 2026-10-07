@@ -70,7 +70,7 @@ The probes in this list were temporary test code, removed before the squash; the
 
 ## Decisions
 
-None: the repair binds only this test class and its helper.
+None.
 
 ## Limits and follow-ups
 

@@ -4,19 +4,9 @@ Completed 2026-09-29 on `main` above `8192987`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** the Advanced card on Settings, which already opens the activity log and share links (N.1a1), opens two more screens. One is Scoped tokens, holding New token, its one-time copy and Revoke, moved from Agents. The other is Diagnostics, holding the facts now on Settings' own page. The log's hash check, Verify chain and Copy hash, is offered on the activity log only; Agents › History shows the records, still marking an unverified one, without it. Each client card's choice of Session grants up to 1h, Ask every time or Inject only, the `*` card's included, moves from a dropdown on the card to the card's menu. Nothing is removed. The keypaste-design skill applies. Traces to PRODUCT §5.8.
-
 **Verify (V-N.1b):** a driver through the app's launch composition (D-0342) reaches the following. From Settings' Advanced card: minting, copying and revoking a scoped token, the log's check and the diagnostics facts. From a client card's menu on Agents: changing its choice, which `clients.toml` then holds. By their automation trees, Agents' first level and History carry no token control, no hash check and no choice dropdown, and Settings' own page carries Advanced's Open rows but none of the controls or facts behind them. Every frame of the drive passes N.1a2's amber check. A control left reachable only from its old place, or removed, leaves the row open.
 
 The row was corrected against the code before it was built (`8192987`). Settings › Advanced is a card of Open rows, not a screen. History and the activity log are one view. Agents had no per-app menu, and the `*` card needed one too. The per-app menu bullet moved to here from N.3.
-
-## What changed for users
-
-- **Settings › Advanced has four rows:** Activity log, Share links, Scoped tokens and Diagnostics, each opening a screen with Back to Settings.
-- **Scoped tokens is its own screen.** It lists the vault's tokens by name, prefix, scope, mode and expiry. New token is the screen's primary. The form's Create token, then the minted token's Copy, take that place while each is shown, and Revoke still asks first. Agents no longer lists tokens.
-- **Diagnostics is its own screen.** It holds the vault, keypaste's home, `KEYPASTE_HOME` and the version, and Settings' own page no longer does.
-- **A client's policy is chosen from its card's ⋯ menu.** The card shows the policy it holds as text, and its menu offers Session grants up to 1h, Ask every time and Inject only, with the held one checked. The menu closes on a choice, Escape or a press elsewhere, and opens with focus on its first choice. A client with no label has its ⋯ disabled, with the hint to start its bridge with `--client-label`. The `*` card, Every other client, has the same menu.
-- **History leaves the hash check to the activity log.** History still marks a row the chain does not vouch for, and its notes now say "The activity log in Settings › Advanced says why", where they said Verify chain. The same sentence replaced a stale pointer to "the Activity screen" in Agents' own history note.
 
 ## Evidence
 
@@ -58,12 +48,7 @@ Local, Windows 10 Pro 19045, on `main` above `8192987` with the step's changes u
 
 ## Decisions
 
-[D-0380](../../DECISIONS.md) records the new homes. These bind only this step's code:
-
-- **The card's menu is drawn in the window's own tree,** on a canvas lifted above the card's content, with the open card's container lifted above the cards after it. A flyout would be a separate top level, which neither the amber check nor the driver sees.
-- **The menu styles are shared.** The ⋯ toggle, the menu and its items moved from the Items screen's local styles into the theme, so both screens draw one menu.
-- **The token screen's actions are plainly primary.** On Agents they had yielded to a waiting request. Scoped tokens shows no request, and its three primaries are never shown together.
-- **Diagnostics holds its own view model.** It reads the session's vault path, the home and the version, which Settings' view model no longer carries.
+[D-0380](../../DECISIONS.md) records the new homes.
 
 ## Limits and follow-ups
 

@@ -40,7 +40,7 @@ Completed 2026-09-30 on `task/k6b`, source only; runs ci 36735736913 and app 367
 
 ## Decisions
 
-D-0384. Binding only this step's code: the KeePassXC compat gate is a set of named steps in each `test (os)` leg, sharing its build; a leg builds the whole backend solution whenever integration, pages or compat run, because those start the CLI and bridge binaries, and otherwise only the test projects the plan names; the NuGet cache key adds `keypaste.slnx` in `ci.yml`, `keypaste.app.slnx` in `app.yml` and `release-targets.json` for the package job.
+D-0384.
 
 ## Limits and follow-ups
 

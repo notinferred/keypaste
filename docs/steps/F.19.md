@@ -6,15 +6,7 @@ Completed 2026-09-24 on `main` above `f51fe5d`, source only. [PRODUCT](../PRODUC
 
 The row was opened and selected on 2026-09-24 when the push of E.1a to F.17 turned `ci.yml` red on `main`, before F.2b3's observation could start.
 
-**Build:** ci run 36040583797 at `f51fe5d`, `keepassxc compat (ubuntu-24.04)`, failed [verify-keepassxc-run.sh](../../scripts/verify-keepassxc-run.sh) with "the vault KeePassXC made carries no expiry" directly after `tr: write error: Broken pipe`; macOS and Windows passed the same commit. Match the expiry against the export held whole rather than a pipe `grep -q` can close, and give the gate's other pipelines the same shape where they end in an early-exiting reader. Traces to PRODUCT §4.5.
-
-**Verify (V-F.19):** the gate passes in all three `keepassxc compat` jobs at the repair commit, and still fails, naming the expiry, when the fixture carries no expiry.
-
 Amendment: the row as drafted made the negative control write only EXPIRED with `<Expires>False</Expires>`. VALID also expires (in 2999), so that fixture still carries an expiry, and the gate then fails later, at the naming check. The check asks whether KeePassXC kept any expiry, so the control writes both with `False`.
-
-## What changed for users
-
-Nothing. Only the gate changed.
 
 ## Evidence
 

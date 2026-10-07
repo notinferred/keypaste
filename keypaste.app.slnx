@@ -1,10 +1,9 @@
 <!--
   The desktop app's solution, deliberately separate from keypaste.slnx.
 
-  ci.yml restores and builds keypaste.slnx in eight jobs (gate, test x3, compat x3, aot). Putting
-  Keypaste.App in that solution would make every backend push restore roughly twenty Avalonia
-  packages for a GUI those jobs do not test — the cost CLAUDE.md asks about before a workflow is
-  added. app.yml builds this solution instead, gated on paths.
+  ci.yml restores and builds keypaste.slnx in each of its backend jobs. Putting Keypaste.App in
+  that solution would make every one of them restore roughly twenty Avalonia packages for a GUI
+  those jobs do not test. app.yml builds this solution instead, gated on paths.
 
   Keypaste.Core appears in both solutions. That is fine: a solution is a view, not ownership.
   The cost is that the two files have to stay in step, and a project missing from either is a red

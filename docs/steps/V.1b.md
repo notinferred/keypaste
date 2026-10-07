@@ -4,23 +4,9 @@ Completed 2026-09-22 on `e5d739c`, source only. [PRODUCT](../PRODUCT.md) and [ST
 
 ## Scope as selected
 
-**Build:** desktop controls that choose an existing keyfile when unlocking and creating, and change the master password or keyfile through V.1a's core operation behind a confirmation that says what the change costs the backups already taken. The unlock screen's restore prompt accepts the keyfile a backup was made under. No hosted recovery claim.
-
 **Verify (V-V.1b):** through the app change a fixture's password and its keyfile, lock, reopen with the new secret and be refused with the old. Restore a backup made under the earlier password and keyfile from the unlock screen and land in it. A wrong current secret, a cancelled confirmation and a failed save leave the vault byte-identical. Each new master-password field holds to D-0099. A view model asserting over a mocked change does not pass.
 
 The founder decided two questions during planning on 2026-09-22. D-0285 had left the first to this step: the desktop remembers each vault's keyfile location, as KeePassXC does (D-0295). The second follows KeePassXC too: the app stays unlocked after an access change (D-0296).
-
-## What changed for users
-
-The desktop opens a vault that needs a keyfile. Keyfile… under the password chooses one, and all four KeePass forms work, including a vault a keyfile alone opens with the password left empty. A file that is missing, empty, unreadable, a vault, or an XML keyfile this build cannot read is refused the moment it is chosen, before any password is spent on it. A refusal after that names both factors when a keyfile was given. A vault keyed to an ordinary file opens with a notice in the app that editing that file loses the vault. The app remembers where the keyfile each vault opened with is, beside the vault's path in `recent.toml`, and offers it at the next unlock. No keyfile stops using it for one unlock. Nothing records the keyfile's contents, and the CLI still records nothing.
-
-Create takes an optional keyfile you already have and makes a vault that needs the password and the keyfile. keypaste still makes no keyfile and no vault a keyfile alone opens, and it refuses an ordinary file that would be keyed by its bytes, writing nothing.
-
-Settings has a Master password and keyfile section. It states what the vault opens with now. It asks for the current master password even though the vault is open, and checks it against the file on disk before anything is written. It offers a new password, adding or replacing a keyfile, and stopping using the keyfile, alone or together. Change… shows what the vault will open with afterwards and what the change costs: the vault as it was is kept in `<vault>.backups`, and that copy and every earlier one still open with the old password and keyfile, so delete them if those were exposed. Attaching a keyfile adds a reminder to keep a copy of it away from the vault. After the change the app stays where it was, on the changed vault, which it has reopened under the new factors. The next unlock needs the new ones, and the recent list offers the new keyfile. Each of these leaves the vault file and its backups untouched: a wrong current password, Leave access as it is, mismatched new passwords, a refused keyfile, a vault changed on disk since it was unlocked, and a save that fails. Every password typed into the form is cleared on every outcome, on cancel and on lock.
-
-The restore panel on the unlock screen takes the keyfile a backup was made under. It starts with the one the unlock screen had chosen, and it can be changed or dropped. A restored vault opens with that keyfile, and the app remembers it.
-
-There are now seven master-password fields: the three new ones in Settings join unlock, create's pair and the restore panel's. None of them takes a paste.
 
 ## Evidence
 
@@ -42,12 +28,7 @@ Verification: `./scripts/verify.ps1` on the finished tree passed workflows, scri
 
 ## Decisions
 
-Ledger rows from this step, which constrain later work, stay in [DECISIONS](../../DECISIONS.md): D-0295, D-0296, D-0297. The rows below bind only this step's code and remain in force unless a later decision supersedes them.
-
-| id | date | decision | supersedes |
-|---|---|---|---|
-| D-0298 | 2026-09-22 | The Settings access form has no idle expiry of its own: it lives in the unlocked shell, so idleness locks the session and the lock disposes it, zeroing its three buffers; the restore panel keeps its expiry because the locked screen has no lock to rely on | — |
-| D-0299 | 2026-09-22 | Starting a create clears the keyfile the selected vault would use and cancelling brings the remembered one back, so a vault's keyfile is never carried silently into a new vault; the unlock screen, the create form and the restore panel each say what they will use | — |
+Ledger rows from this step, which constrain later work, stay in [DECISIONS](../../DECISIONS.md): D-0295, D-0296, D-0297.
 
 ## Limits and follow-ups
 

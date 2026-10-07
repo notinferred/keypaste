@@ -2,17 +2,11 @@
 
 This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.11 (D-0416). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
-This file holds open work only. Finishing a task removes it from here and adds its record under [steps](steps/README.md). No row is authorized by appearing here: the founder selects what is built, and an instruction to build the next task takes the first ready code row of ROADMAP's current milestone, in track order. No backlog item is automatically eligible.
-
-## Selection and evidence
-
-No open row is detailed: each names a bounded outcome and the dependencies its own implementation or verifier needs, and is detailed when it is selected, against the code as it then is. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
-
-Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
+This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
 ## K and B — Build infrastructure
 
-These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
+These rows serve every track: a development machine builds nothing, and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
 ## T1 — Everyday vault use and recovery
 
@@ -265,23 +259,5 @@ PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, and v1.10 (
 - [ ] **X.16 — Sync opted-in projects to hosting platforms from the server.** Needs: X.13.
 
 ## Completion
-
-A finished task has its bounded behavior, an executed verifier and evidence naming the tested source/version. Implemented, Packaged, Published and Installation-verified stay separate. Reader-only fixtures prove a reader; they cannot prove a writer, running producer, native interaction or public release. Completed rows in [steps](steps/README.md) are historical evidence at their original scope, not blanket acceptance of the product's tracks.
-
-The source of prior plans is Git. No completed row is extended to cover new requirements. Publication, service operation, customer contact and optional work require explicit task selection and applicable authorization.
-
-Open IDs that changed meaning under v1.8:
-
-- V.7 splits into V.7a (core and CLI) and V.7b (the app).
-- R.1a, 4.7c2, L.1 and R.1 cover three desktops and version 0.5.0.
-- 4.7a2 is the macOS DMG, since the internal bundle exists.
-- 4.7e installs and preserves the macOS candidate; its publication moved into 4.7c2.
-- P.3b splits into P.3b1 (same-entry placeholders) and P.3b2 (cross-entry references, in BACKLOG).
-- 3.5a/b, 3.7a–c, 4.10a/b, 8.1, 8.3a, 1.4a/b, 9.1a–f, 9.2a/b and V.9 return from BACKLOG with their original meaning.
-- P.1 moves from "Later vault features" to T6.
-
-Under v1.9, X.1–X.9 and L.2 are new IDs; L.2 split into L.2a, completed, and L.2b. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired. Under v1.10, X.10–X.16 and T11 are new, and N.16, V.11, L.3 and R.1b were added on 2026-10-02.
-
-The [rescope record](steps/rescope-2026-09-19.md) keeps the v1.7 continuity notes.
 
 The [current release matrix](RELEASE.md#current-distribution--2026-09-07) owns public availability: a completed source step does not mean the behavior is in the current download.

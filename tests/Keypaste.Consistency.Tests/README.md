@@ -1,22 +1,12 @@
 # Keypaste.Consistency.Tests
 
-This project references both front ends. Tests edit a vault through desktop view models, then invoke the CLI implementation through `CliApp.Run` to inspect the saved file. They verify shared core behavior. They do not establish a shared unlock session: the current app and CLI open vaults independently. Downloaded executables, native GUI rendering, installation and the planned desktop session each need their own evidence.
+This project references both front ends. Tests edit a vault through desktop view models, then invoke the CLI implementation through `CliApp.Run` to inspect the saved file.
 
 ## Why it is in neither solution
 
 Putting it in `keypaste.slnx` would bring Avalonia into ordinary backend restores. Putting it in `keypaste.app.slnx` would bring the CLI's AOT compiler packs into ordinary desktop restores: `PublishAot` and four `RuntimeIdentifiers` are restore-time inputs (D-0040).
 
 A measurement on 2026-07-28 found desktop restore size increased from 2091 MB to 2580 MB when the CLI joined the solution. That historical measurement explains the separation; it is not a current benchmark.
-
-`.github/workflows/app.yml` uses the shared `desktop` verification profile to restore, format, build and run this project and the desktop solution on every run whose changes can reach them, including changes to `Keypaste.Core`, and packages on three operating systems beside that gate. Its YAML owns the exact triggers.
-
-From the repository root, run the same desktop and consistency checks locally:
-
-```sh
-bash scripts/verify.sh desktop
-```
-
-In PowerShell, use `./scripts/verify.ps1 desktop`. A change under this project or `src/` selects the `desktop` profile in the default run too; [CLAUDE.md](../../CLAUDE.md#local-verification-and-delivery) owns local verification requirements.
 
 ## What must stay true
 

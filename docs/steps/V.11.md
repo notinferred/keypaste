@@ -35,9 +35,6 @@ The row was expanded at selection against the code as it was. The founder chose 
 ## Decisions
 
 - D-0421: only a version that changed more than tags is flagged, and a dismissal is keyed by the tag and when it was lost.
-- Binding only this step's code:
-  - Two versions are compared with KeePassLib's `EqualsEntry` over a copy of the earlier one given the later one's tags, ignoring times, history and the parent group. So strings and their protection, attachments, auto-type, icon, colours, expiry and custom data all count as a change.
-  - Restore re-adds the tag through `AddTag` rather than `RestoreRevision`, which would undo every later edit.
 
 ## Limits and follow-ups
 

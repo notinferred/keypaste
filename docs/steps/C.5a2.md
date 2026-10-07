@@ -31,7 +31,6 @@ Each check below runs on the `api/OpenAI` entry KeePassXC imported, whose passwo
 ## Decisions
 
 - D-0399: the fields gate shares through the site's own Worker under `wrangler dev` on loopback without its Hyperdrive bindings, and the compat lane installs `site/`'s locked packages and needs Node 22.
-- Binding only this step's gate: the app's half runs on a copy of the KeePassXC vault taken before any keypaste process opens it, and the share runs last because it saves a share record into the vault.
 
 ## Limits and follow-ups
 

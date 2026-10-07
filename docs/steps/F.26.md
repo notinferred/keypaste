@@ -13,12 +13,6 @@ The founder asked for the fix on 2026-09-29, after N.2's record reported the fai
 
 The same job passed on `windows-2025` in all three, and on `ubuntu-24.04` at `c23574f`, before C.2.
 
-**Verify, set for this step:** the workflows gate passes on `ubuntu-24.04` with the notes step and N.4's templates step, and still passes on Windows.
-
-## What changed for users
-
-Nothing. Only the gate changed.
-
 ## Evidence
 
 **Mechanism.** The gate's `kx` wrapper ends in `tr -d '\r'`. C.2's `revisions()` piped `kx export` into an `awk` that `exit`s once it has counted the entry's revisions, and the notes step piped another export into `grep -qF`. Both readers can close the pipe before the export is written. On Linux, where the vault's XML export, with its attachments, is larger than the pipe buffer, `tr` then fails on the closed pipe; under `pipefail` the pipeline fails, and `set -e` ends the gate at `listed=$(revisions …)`. On Windows the same pipeline returned 0.
