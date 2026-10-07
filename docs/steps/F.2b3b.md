@@ -4,17 +4,11 @@ Completed 2026-09-24 on `main` above F.21, source only. [PRODUCT](../PRODUCT.md)
 
 ## Scope as selected
 
-Build: as [F.2b3a](F.2b3a.md) did on Windows, run the app from an `app.yml` artifact at a named commit, with a disposable vault and a `keypaste-mcp` configured for it, and record each act. On a real Windows 10 or 11 desktop: closing the main window through the window manager while a request waits in the prompt window. On a real Linux X11 or XWayland desktop: that act, minimizing from the title bar with minimize-lock on, with it off and after a restart, and a request arriving while another application has focus. Each result names the OS, version and build, the session type and window manager, the commit, and the audit lines the act produced. A window manager that reports no minimize is recorded, and `MinimizeLock.IsSupported` then omits the checkbox there, with a test. Verify: the record holds every act with the source SHA. Closing the main window with a request waiting leaves `vault-locked` for it in the audit log. On Linux the prompt appears over the other window with focus on Deny. An act that could not be made is recorded as unobserved, which leaves the row open.
-
 Amendments, each on the founder's direction on 2026-09-24:
 
 - Sleeping past the idle timeout was removed from the acts on both desktops; U.2's tests carry it.
 - Acts may be made by the observer's own automation (D-0342). Every act here was.
 - The Linux desktop was an Xfce session in the WSL Ubuntu on the Windows machine, chosen over a virtual machine.
-
-## What changed for users
-
-Nothing. This step observed and changed no code.
 
 ## Evidence
 

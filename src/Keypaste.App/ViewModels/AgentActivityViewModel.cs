@@ -18,8 +18,9 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// <b>History is read from the audit file the bridge wrote</b>, kept to the records naming
 /// this session and rendered by <see cref="AuditText"/> as the activity log reads the whole file
-/// (D-0331). A log that is missing or unreadable is said to be unavailable, never shown as a
-/// session in which nothing happened.
+/// (D-0331). A log that is missing is a session with no records yet, as the activity log reads it;
+/// one that cannot be read is said to be unavailable, never shown as a session in which nothing
+/// happened.
 /// </para>
 /// <para>
 /// It re-reads the authority every second so the lifetimes count down, and re-reads the file only

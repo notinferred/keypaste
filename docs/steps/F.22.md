@@ -8,10 +8,6 @@ Observed in [F.2b3b](F.2b3b.md) on Linux under xfwm4 at `8fde202`: in the main w
 
 The founder selected it on 2026-09-24, directing it fixed at once. Amendment: at the 720 px minimum width the group tree (180 px), the entry's pane (320 px) and their dividers leave no room for the list, so no arrangement of the toolbar makes that size whole while the tree stays reachable, and an open entry cannot be closed to bring a hidden tree back. The minimum became 960 px (D-0344), and "minimum size" in the Build and Verify reads as that.
 
-## What changed for users
-
-With an entry open, the Entries screen no longer overlaps. The search box and the Add, Organize and Delete buttons run across the list and the entry's pane rather than the list alone, the entry's pane starts below them, and the two dividers sit between the panes rather than over the list and the pane's fields. The main window can no longer be made narrower than 960 px.
-
 ## Evidence
 
 **Mechanism.** The toolbar sat in the list's star column. With the tree at 180 px and the pane at 320 px, that column was about 180 px wide in the default window, narrower than Add, Organize and Delete, so the search box's star column got nothing and the buttons overflowed into the pane. Separately, both divider columns were fixed at 1 px while each divider asked for 12 px of margin on either side, so the panes met and each line was drawn inside the next pane.

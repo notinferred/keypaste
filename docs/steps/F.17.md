@@ -4,15 +4,7 @@ Completed 2026-09-24 on `8f1f157`, source only. [PRODUCT](../PRODUCT.md) and [ST
 
 ## Scope as selected
 
-**Build:** on `ubuntu-24.04`, app run 35891535300 at `0a6b05e` failed `A_shell_field_never_draws_what_is_typed(name: "ReplacementEnvValue")` with "TextBlockAutomationPeer.GetHelpText exposes the fixture password"; runs 35891973017 at `4f1b3a9` and 35892763909 at `0a6b05e` passed, and a Windows run with `Q` in the temp path did not reproduce it. App run 35953567143 at `530b6b8` failed the `AccessConfirmPassword` case in attempt 1 and the `ReplacementPassword` case in attempt 2 with the same message; the peer is the shell's vault-path tooltip (`ShellView.axaml`). The one-character value is always `Q`, and `Directory.CreateTempSubdirectory` names the fixture's directory with six characters from `[A-Za-z0-9]` on Linux, so about one fixture path in ten contains it; the probe tests that first. A probe on a branch, dispatched with `gh workflow run --ref`, repeats that case with the identical desktop test command on `ubuntu-24.04`. On a failure it records which element's peer answered, the whole help text and where it was bound from, and whether the matched text is the typed value or a `Q` that was already on screen, such as in a path or a label. A short preflight first runs the case a handful of times to size the repetitions. The probe is deleted once the diagnosis closes and its result kept in the record, per [diagnostics](../diagnostics.md).
-
-**Verify (V-F.17):** the record names the source SHA, runner, command, repetitions and failure count. For the observed failure it names the element, property and text, and says whether a value typed into a secret field reached the automation tree. If one did, a repair row with a regression that fails on the recorded input is added to STEPS. If the sweep matched text that was never typed, the sweep's sentinel is changed so it cannot occur in the rest of the window, with a test that fails on the recorded text. A run that simply passes, or a conclusion with no recorded failing observation, leaves the row open with its next experiment named.
-
 No amendment. On the founder's choice, the probe ran as a cut-down `app.yml` on the `f17-probe` branch, which put nothing on `main`.
-
-## What changed for users
-
-Nothing. No typed value reached the automation tree. The test had matched the vault's path, which the app shows by design, and only the test changed.
 
 ## Evidence
 
@@ -53,7 +45,7 @@ The probe branches `f17-probe` and `f17-repair-check` were deleted after their e
 
 ## Decisions
 
-None. The sentinel binds only this test.
+None.
 
 ## Limits and follow-ups
 

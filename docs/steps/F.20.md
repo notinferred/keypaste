@@ -48,7 +48,7 @@ Each probe iteration recorded whether the channel's token was cancelled when `Sh
 
 ## Decisions
 
-None in the ledger. Binding this code: the prompt's show job reads its token as well as the request, so a withdrawal counts from when it is requested rather than from when its callback runs.
+None.
 
 ## Limits and follow-ups
 

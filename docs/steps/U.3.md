@@ -4,25 +4,11 @@ Completed 2026-09-23 on `main` above `d285bb8`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** the authority U.1 establishes serves every read, release and launch from the vault as last saved, not from the snapshot the unlock produced. An app edit, deletion, move or rename, access change or exposure change invalidates the grants and policy-derived releases naming the affected entry before the next release. Before releasing, the authority compares the file on disk with what it last read or wrote; an external change refuses the release, invalidates the vault's grants and requires a reload or re-unlock the person starts. It never overwrites, merges or keeps serving the old snapshot. Traces to PRODUCT §2.
-
 **Verify (V-U.3):** through a real `keypaste-mcp` request against the owning session, a password edited in the app is the next value released; a granted entry deleted, moved or made unexposed is refused on the next request rather than served from its grant; after an access change no earlier grant releases anything. A KeePassXC or CLI save between two requests makes the second refuse and name the change, the file keeps the external writer's bytes, and nothing is released until a reload. A cache cleared only in a view model, or a check made after the value was released, does not pass.
 
 The founder approved the plan as written. One part of it was dropped while building: the plan had `AppVaultSession.Swap` announce a change to every entry after an access change. `Vault.ChangeAccess` already does that before it writes, and a grant given between that write and the swap holds the same value, so the second announcement changed nothing a test could observe and was removed.
 
-There is no launch through the session yet (E.1a), so "launch" had nothing to apply to. Exposure is carried by each request and checked before any grant is looked up, so an exposure change already refused a granted entry; the gate and tests cover it through a move out of `env/**`.
-
-## What changed for users
-
-The process holding a vault, the desktop app or `keypaste agent`, now answers agents only while its open vault holds exactly what the file holds (D-0317). Every listing, resolution and read takes the vault's state lock and checks two things: that no change made in the process is still unsaved, and that the file's SHA-256 is what this vault last read or wrote. Otherwise:
-
-- **Another program saved the file**, such as KeePassXC or the CLI. Credential requests and listings are refused as the new audit method `vault-changed`, whose reason says another program changed the file. Every grant in the session is zeroed at that moment. The refusal lasts until the person locks and unlocks the app or restarts the agent. The agent's terminal says to restart it. Nothing is written: the app's own save was already refused over an external change, and still is.
-- **A change made in the process is not saved yet**, or a write is in progress. The request is refused as `vault-changed` with a reason saying so, and grants are kept. The app saves each edit as it makes it, so this lasts only as long as a save, unless the save failed.
-- **The file cannot be read.** The request is refused as `failed`, and nothing is taken as unchanged.
-
-Every change to an open vault now reports the entries it touched before it is saved: an edit or history restore, an add, a delete, a restore from the trash, a rename, a move, and a group rename, which reports every entry beneath the group. Moves and renames report both the old and the new name. An access change reports everything. The app's session zeroes every connection's grants for those entries (D-0318). A password changed in the app is therefore the next value an agent receives, after asking again, and a name reused by another entry is asked about again rather than answered from the old grant. Policy releases were never cached and now read the saved file.
-
-The bridge audits a refused listing as `vault-changed` too. A names reply can now carry the refusal's method, an optional field that decodes an unknown value as `failed`. Absent, it still reads as locked, so the protocol version is unchanged.
+There is no launch through the session yet (E.1a), so the row's "launch" had nothing to apply to. Exposure is carried by each request and checked before any grant is looked up, so an exposure change already refused a granted entry; the gate and tests cover it through a move out of `env/**`.
 
 ## Evidence
 
@@ -73,12 +59,7 @@ The script touched each restored file so an incremental build could not keep a m
 
 ## Decisions
 
-[DECISIONS](../../DECISIONS.md) holds D-0317 and D-0318. These rows bind only this step's code:
-
-| id | date | decision | supersedes |
-|---|---|---|---|
-| D-0319 | 2026-09-23 | An external save and an unsaved change are both audited as `vault-changed`, with reasons that tell them apart. Only the external save zeroes grants. An unreadable file is `failed`, and a names reply carries an optional refusal method rather than a new protocol version | — |
-| D-0320 | 2026-09-23 | `Keypaste.AppDriver hold --approving-prompt` passes a channel that approves every request, and its `edit`, `delete` and `relocate` lines act through the entries screen. The shipped app still passes the one with nowhere to ask (D-0311, D-0316) | — |
+[DECISIONS](../../DECISIONS.md) holds D-0317 and D-0318.
 
 ## Limits and follow-ups
 

@@ -40,7 +40,7 @@ The second attempt's successful move took 10–52 ms. In all 48 iterations the w
 
 ## Decisions
 
-None in the ledger. Binding only this test: a refused attempt's hold is bounded by what the gate covers outside the attempt, never by the attempt's duration against a sleep, and the waiting save is judged by the holder it names, not by how long it waited.
+None.
 
 ## Limits and follow-ups
 

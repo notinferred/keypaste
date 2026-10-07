@@ -4,19 +4,7 @@ Completed 2026-09-23 on `49e055c`, source only. [PRODUCT](../PRODUCT.md) and [ST
 
 ## Scope as selected
 
-**Build:** the entry pane reveals the selected entry's current password while its control is held, as history and env values already do, with copy and clear behaving the same on every secret surface and every secret input carrying an accessible name that does not vary with its content. More generator recipes remain optional.
-
-**Verify (V-V.10):** hold and release on the rendered control shows and removes the value, and lock, navigation and losing the pointer end it. The window's automation surface while the value is shown equals the surface at rest and carries none of its characters. Copy and clear are exercised on each secret surface against the real clipboard seam. A view-model flag without the drawn control does not pass.
-
 The founder decided one question during planning on 2026-09-23. A history revision could be revealed but not copied, and KeePassXC's History tab (Show, Restore, Delete, Delete all) copies nothing either. The founder chose to add Copy to revisions anyway, so all three secret surfaces copy and clear alike (D-0300).
-
-## What changed for users
-
-The entry pane's password is dots until you hold it. Pressing shows the current password and releasing hides it, and so do dragging off, switching screens, selecting another entry and locking. The value is read from the open vault at the press, as Copy reads it. Copy is unchanged.
-
-A revision selected under Show history now has a Copy button beside its held password. It puts that revision's password on the clipboard with the same twenty-second clear, Clear now and lock behaviour as the current password and env values. If the entry changed since the list was read, the copy is refused, the list is read again and nothing reaches the clipboard.
-
-Each of the eleven masked fields (four on the unlock screen, three in Settings, two on Entries and two on Env Sets) is announced to assistive technology by its purpose, such as "Master password" or "New value". The name comes from the field's placeholder and does not change as characters are typed. Before, these fields had no accessible name.
 
 ## Evidence
 
@@ -38,11 +26,7 @@ Verification: `./scripts/verify.ps1` on the finished tree ran workflows, scripts
 
 ## Decisions
 
-Ledger rows from this step, which constrain later work, stay in [DECISIONS](../../DECISIONS.md): D-0300 and D-0301. The rule below binds only this step's code.
-
-| id | date | decision | supersedes |
-|---|---|---|---|
-| D-0302 | 2026-09-23 | The pane is its own `IRevealSource` and takes no reveal slot, because it has one current password and pointer capture already keeps a second hold off it; a revision's hold keeps its slot in `EntryHistoryViewModel` | — |
+Ledger rows from this step, which constrain later work, stay in [DECISIONS](../../DECISIONS.md): D-0300 and D-0301.
 
 ## Limits and follow-ups
 

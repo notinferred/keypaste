@@ -4,36 +4,12 @@ Completed 2026-09-23 on `main` above `62eca07`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** in the authority U.1 establishes, one lock transition serves a manual lock, the idle timeout, an expired sleep/resume and shutdown. It cancels every pending approval, clears cached and policy-derived grants, and refuses any read, release or launch that has not already delivered, including one racing the lock. Agent requests are not activity for the idle deadline. A later unlock starts with no request, grant or capability from before it. Values already delivered stay outside control, and the guides say so. Traces to PRODUCT §2.
-
 **Verify (V-U.2):** with a real `keypaste-mcp` request pending at the owning session, each kind of lock denies it and the audit log records the denial. A grant and a matching policy rule in force before a lock release nothing after re-unlock until asked again. A request arriving during the lock transition is refused rather than answered from the old vault. A steady stream of agent requests does not move the idle lock. A lock flag checked in a view model, or a lock taken before any request exists, does not pass.
 
-The founder approved the plan with two choices, recorded here because the Build text left them open:
+The founder approved the plan with two choices, recorded here because the row's Build left them open:
 
 - **The agent's lock is shutdown only.** `keypaste agent` gets no idle lock. Ctrl+C, SIGTERM and SIGHUP take the common transition.
 - **A driver-held prompt stands in for approval in the app.** Until 4.4 the app refuses every credential request at once, so no request can wait at it. `SessionHost` now takes an approval channel. The app passes the one with nowhere to ask, so D-0311 stands. `Keypaste.AppDriver hold --held-prompt` passes one that never answers, so a real request waits at the real app session while the gate locks it.
-
-## What changed for users
-
-Every lock of the process holding a vault is now one transition (D-0313). On the desktop that means:
-
-- manual lock, idle lock, minimize lock and a lock after an access change;
-- a vault replaced by another unlock;
-- quitting.
-
-For `keypaste agent` it means Ctrl+C, SIGTERM and closing its terminal.
-
-The transition ends the unlock's lifetime before the vault is disposed. A request waiting for a person is withdrawn, and the agent's terminal prints its "withdrawn before you answered" notice. The bridge receives a `vault-locked` denial naming the session it reached, and audits it as such. Grants belong to the lifetime and are zeroed with it. A release that had not committed when the lock came is refused, whether it was prompted, from a grant or from a policy rule, and its value is never sent. The next unlock is a new lifetime with no grant, cooldown or waiting request from before.
-
-Before this step, a lock stopped the app's listener and cancelled the connection. The bridge got no reply and audited whatever its retry met. The agent's Ctrl+C stopped the listener without denying anything waiting, and SIGTERM killed it outright.
-
-An agent's request is not activity: it never moves the idle deadline. The app now checks that deadline on every agent request. After the machine slept past the timeout, a request that arrives before anybody activates the window is refused as locked, and it locks the app. Activation and input still re-check the deadline as before. There is still no platform power hook.
-
-Quitting the app locks the session before its endpoint stops, so a waiting request is answered as a lock rather than dropped.
-
-The listener now delivers a reply it has already computed within one second, even when it is stopping, so a lock's denial reaches the bridge.
-
-Values already delivered to a client, a child process or a clipboard stay outside keypaste's control. FEATURES, the desktop guide and THREATS say so.
 
 ## Evidence
 

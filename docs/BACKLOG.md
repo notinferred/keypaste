@@ -25,8 +25,6 @@ These are retained feature ideas, not discarded features or promises for the fir
 | GitHub Release mirrors | Homebrew, Scoop and winget are committed after 0.5.0 (3.7a–c). A mirror is a separate channel, though the MCP Registry's hosting rule may require a copy of one file (G.6c). The current download origin remains authoritative. | — |
 | Fleet deployment and service scale | No operated service or fleet requirement establishes these needs today. Measure a real bottleneck or deployment request first. | S.1, S.2, S.4, S.5 |
 
-Complete KeePassXC parity is withdrawn as an objective. Individual capabilities above may be selected for their value; P.0/P.9's exhaustive parity contract and certification gate are removed rather than deferred. The former Working proposition → Pilot ready → Paid release → Expansion → Scale sequence is replaced by the product tracks in [ROADMAP](../ROADMAP.md). No backlog item inherits an obligation to recreate it.
-
 ## Smaller possibilities
 
 | Idea | Boundary for reconsideration |
@@ -63,5 +61,3 @@ These observations were previously in DECISIONS. They are not completed fixes or
 | The process gates spend most of their time in fixed waits: `sleep` holding an agent's input open, and the real 45-second approval window ([F.52](steps/F.52.md)) | Measure each gate's waits against its runtime, and establish which can wait on the output it expects (`wait_for`) without changing what the approval, policy and session gates prove. |
 | Core.Tests and Cli.Tests take 5 to 7 minutes on Windows and macOS against about 2.5 on Linux ([F.52](steps/F.52.md)) | Record each test's duration on all three runners and name what dominates, keeping the KDF parameters the tests forbid lowering. |
 | An access change that adds a hardware key asked it twice once on `windows-2025` ([F.53](steps/F.53.md)) | Whether a transient save retry explains it, which asks the key again per attempt; if so the test should count attempts rather than assume one. |
-
-Generic UX-score infrastructure, a document describing document alignment, mandatory marketing per task/milestone, a second maintainer's organization before one exists, and enterprise assurance without a customer requirement are removed. They do not complete the selected user journey. Specific usability observations, release evidence and security tests remain part of each relevant track.

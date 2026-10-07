@@ -3,6 +3,17 @@ using System.Runtime.ExceptionServices;
 
 namespace Keypaste.Cli.Tests;
 
+/// <summary>
+/// Records the stack of every first-chance null reference in a CLI test process, for a test that
+/// reports only the message after the CLI turned the exception into an error.
+/// </summary>
+/// <remarks>
+/// Off unless <c>KEYPASTE_TEST_EXCEPTION_TRACE</c> names a directory; then each test process writes
+/// <c>cli-null-reference-&lt;pid&gt;.log</c> there, with exception types and stacks but no messages or
+/// argument values. Run the whole suite with it set, so startup and concurrency stay as they were.
+/// Writing is best effort: an empty file means no stack was recorded, a missing one that tracing did
+/// not start. It is test code and never ships.
+/// </remarks>
 internal static class ExceptionTrace
 {
     private static readonly Lock _gate = new();

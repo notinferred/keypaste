@@ -4,23 +4,7 @@ Completed 2026-09-29 on `main` above `6972419`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-`scripts/exercise-desktop-install.sh` invokes "Add variable" on Env profiles and "Check again" on Agents, and neither label is in the app's views, so its variable and agent-status acts fail before they reach what they check. The exercise names controls the app has and records each act's result, per [diagnostics](../diagnostics.md).
-
-Found during N.1a1 and filed then. The founder directed on 2026-09-29 that work found in these steps is finished rather than left on new rows, so it was built in the same session as N.7.
-
-## What changed for users
-
-A screen reader announced every button whose content is an icon beside text, or an icon alone, as "Avalonia.Controls.StackPanel" or "Keypaste.App.Controls.KpIcon". It read each item row as "EntryRow { Title = github, … }": Avalonia names a control by its content's type when the content is not text.
-
-Every such button now has a name:
-
-- the name is its label, or its tooltip when it is an icon alone, across Items, Agents, Env profiles, Settings, Trash, Sharing, the dialogs and the lock screen;
-- the three Copy buttons say what they copy: password, username or token;
-- the title bar's lock button is "Lock now";
-- the new key's field is "New key";
-- an item row is read by its title.
-
-The installed-app exercise drives the app by these names.
+The stale exercise was found during N.1a1 and filed then. The founder directed on 2026-09-29 that work found in these steps is finished rather than left on new rows, so it was built in the same session as N.7.
 
 ## Evidence
 
@@ -66,10 +50,7 @@ The second test in that class visits Items with an item and both menus open, the
 
 ## Decisions
 
-No ledger row. These bind only this step's code:
-
-- The drivers find controls by accessible name and control type only, so every control the exercise acts on carries a name a screen reader would also use.
-- The unlock screen's only automation names are literal button labels, listed in `MaskedInputAutomationTests`. A new one is added there on purpose; a binding is never one.
+None.
 
 ## Limits and follow-ups
 

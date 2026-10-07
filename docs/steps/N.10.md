@@ -4,14 +4,6 @@ Completed 2026-09-29 on `main` above `6dd2468`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** `add`, `rm`, `access`, `env set`, `env rm`, `env pull` and `import`, the verbs that still save inside a `VaultSession.Open` body, open the vault through `OpenHeld`, as `set`, `rotate`, `field rm` and `env tag` already do. `import`'s own claim moves onto `OpenHeld`, and `import --dry-run` still reads without the claim.
-
-While the app or `keypaste agent` holds the vault, each is refused before its password is read. The refusal names the holder, its process and the next step:
-- for the app, make the change there or run `keypaste lock` and try again;
-- for `keypaste agent`, run `keypaste lock` and try again.
-
-A rule test over `src/Keypaste.Cli` holds that `VaultSession.Open` is called only by verbs that never save. Traces to PRODUCT §2 and T2.
-
 **Verify (V-N.10):** with the app, through `Keypaste.AppDriver hold`, and then `keypaste agent` holding a vault, each of the seven verbs is refused naming the holder's process and the next step. With stdin closed it reports the holder rather than a missing password, and with the right answers piped the vault's bytes and backup count are unchanged. The holder then answers an agent request instead of refusing it as `vault-changed`. With nothing holding the vault each verb saves as before. The rule test fails on a copy that adds a save through `Open`. A refusal shown only against a claim the test takes itself does not pass.
 
 The row was corrected against the code before it was built (`8192987`):
@@ -20,17 +12,6 @@ The row was corrected against the code before it was built (`8192987`):
 - a piped CLI prints no password prompt, so "no prompt on stderr" became the closed-stdin check above.
 
 **Founder direction while building.** The founder asked that all three steps be built before anything more was tested. N.1b and N.12 were each verified as they finished; this step's code, its tests and its gate were written first and then run with the whole tree.
-
-## What changed for users
-
-- **Seven more verbs wait for the vault's owner.** `add`, `rm`, `access`, `env set`, `env rm`, `env pull` and `import` join `set`, `rotate`, `field rm`, `env tag`, `share` and `token`. While the desktop app or `keypaste agent` holds the vault, each is refused before it asks for any password. Before, each saved behind the holder, whose copy then refused agents as `vault-changed` until it was unlocked again.
-- **The refusal says what to do.**
-  - Under the app: `keypaste: this vault is already unlocked in the keypaste desktop app (process N). Make the change there, or run `keypaste lock` and try again.`
-  - Under `keypaste agent`: `… in keypaste agent (process N). Run `keypaste lock` and try again.`
-  - Under another saving command: `this vault is in use by a keypaste command (process N). Try again when it finishes.`
-- **Scripts that saved while the app was unlocked now stop.** A script that ran `keypaste env set` with the app open now gets that refusal; N.11 is what would let the app approve such an edit instead.
-- **`import --dry-run` still reads a held vault,** and saves nothing.
-- **`access` no longer tells you to restart a running `keypaste agent`,** since it is refused while one holds the vault.
 
 ## Evidence
 
@@ -62,12 +43,7 @@ It runs in the desktop profile and in `app.yml`. [verify-current-state.sh](../..
 
 ## Decisions
 
-[D-0382](../../DECISIONS.md) records the rule. These bind only this step's code:
-
-- **The claim is taken in one place.** `OpenHeld` and its generic form, which runs `import`'s source step between the claim and the vault's password, both go through `Held`. `HeldRefusal` words the refusal by the holder's kind and keeps the claim's own sentence when nothing is known of it.
-- **The driver's hold can be locked from outside, as the app can.** `Keypaste.AppDriver hold` passes `AppAuthority.RequestLock` as launch does, so a gate's `keypaste lock` reaches it.
-- **`VaultClaim`'s wording is unchanged,** so the app's and the agent's refusal of a second owner, and the gates that read it, say what they said.
-- **The rule test is a text scan within one file.** A save moved into another class would pass it; the verbs keep their writes in their own files.
+[D-0382](../../DECISIONS.md) records the rule.
 
 ## Limits and follow-ups
 

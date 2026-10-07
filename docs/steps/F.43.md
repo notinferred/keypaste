@@ -26,7 +26,7 @@ Every upgrade run used the published CLI/MCP 0.3.0 on `windows-2025` and `ubuntu
 
 ## Decisions
 
-No ledger row: 4.7d's rule is kept. Its check still requires `app.toml` byte-identical across every transition. G.1's write does not reach the upgrade gate: the gate runs the installed app only with `--version` and `--selftest`, whose vault is made in a temporary directory through `VaultCreation` without reaching `ChosenVault.Choose` or `DesktopPreferences.Update`, the only code that writes `app.toml`, and the fixture is made by CLI 0.3.0, which predates G.1. The baseline is hashed at the end of `fixture()`, after every use before the upgrade, so only a transition can change the file; a gate that adds app use before an upgrade takes its baseline after that use. Comparing parsed settings would pass an upgrade that rewrote the file in another form. RELEASE ("recording the user data's hashes across every transition") and desktop.md ("untouched by an upgrade") already say this.
+None. 4.7d's rule is kept: its check still requires `app.toml` byte-identical across every transition.
 
 ## Limits and follow-ups
 

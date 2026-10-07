@@ -31,7 +31,7 @@ Neither the origin's answer nor the fixtures depend on the runner, and ci.yml's 
 
 ## Decisions
 
-None. Where the origin check runs binds only this workflow.
+None.
 
 ## Limits and follow-ups
 

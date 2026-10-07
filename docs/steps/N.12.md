@@ -4,27 +4,12 @@ Completed 2026-09-29 on `main` above `bee0d1c`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** a secret the desktop copies carries three more markers in the same clipboard item as the Windows formats:
-- `org.nspasteboard.ConcealedType` and `org.nspasteboard.TransientType`, which macOS pasteboard managers honour;
-- `x-kde-passwordManagerHint` holding `secret`, which KDE's Klipper honours.
-
-No marker's content is the secret. A copy that is not a secret, such as a `keypaste run` command, carries none. T-19 and SECURITY say what each marker asks and that none stops a process reading the clipboard, and O-0019 is answered. The CLI's `pbcopy`, `wl-copy` and `xclip` writes are unchanged, and that limit is stated. Traces to PRODUCT §3.
-
 **Verify (V-N.12):** `AvaloniaClipboard` hands the platform one item holding the text and every marker for a secret, and no marker for plain text. On a macOS runner, after the app's composition copies a secret, the general pasteboard's item lists both nspasteboard types beside the text, and none after the clear. The bundled `keypaste.app` on a Mac gives the same read. On a Linux runner with an X11 clipboard, `xclip -selection clipboard -o -t TARGETS` lists `x-kde-passwordManagerHint`, whose content reads `secret`. A marker shown only in the source, with no platform read of what the clipboard offered, does not pass.
 
 **Amendment, 2026-09-29.** The bundled app's read on a Mac was added to the Verify in `8192987`, without a founder request, when the founder said a Mac was available. Asked about Mac chores, the founder did not take it up.
 - **Where the check went.** The read moves to docs/desktop.md's checklist as item 54, where the Windows Clipboard History check already is. There it is observed with R.1a's installed macOS package, which a person installs on a Mac anyway.
 - **Why the runner stands in.** The runner's read goes through the same Avalonia native pasteboard code the bundle uses. An undeclared type is still written, because Avalonia asks macOS for an exported type by name.
 - **What the founder can do.** Restore the clause, and N.12's record stays as it is; the check becomes a new row.
-
-## What changed for users
-
-- **A copied secret asks macOS pasteboard managers to skip it.** A password, env value, history password, custom field or token the desktop copies is marked concealed and transient, which asks managers that follow nspasteboard.org, such as Maccy, to leave it out of their history. The markers hold no content, so a manager that stores what it skips does not keep the value either.
-- **A copied secret asks KDE's Klipper to skip it.** The same item carries `x-kde-passwordManagerHint` holding `secret`.
-- **A copied run command is left for them to keep.** It holds no secret, and it may be useful in history.
-- **Not the CLI.** `keypaste get` on macOS and Linux copies through `pbcopy`, `wl-copy` or `xclip`, one type per call, and carries none of these markers.
-
-None of this is in a download: the desktop has no public release.
 
 ## Evidence
 
@@ -62,12 +47,7 @@ The row's `xclip -o -t TARGETS` reads the PRIMARY selection. The app writes CLIP
 
 ## Decisions
 
-[D-0381](../../DECISIONS.md) answers O-0019. These bind only this step's code:
-
-- **The nspasteboard types are empty.** nspasteboard.org reads them for presence. KeePassXC puts the secret itself in ConcealedType, which a manager that stores the items it skips would keep.
-- **The markers are one list,** each name with the bytes it holds, set on the one item in the one `SetDataAsync` call that already carried the Windows formats.
-- **The platform read uses the minimize observer,** the one helper that already runs the app's composition on a real backend. Its new scenario reads nothing: the script, outside the process, reads the clipboard.
-- **The job runs with every desktop push,** since an Avalonia upgrade is what would silently drop a marker. It uploads nothing: its readings are in its log.
+[D-0381](../../DECISIONS.md) answers O-0019.
 
 ## Limits and follow-ups
 

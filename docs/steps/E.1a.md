@@ -4,18 +4,7 @@ Completed 2026-09-24 on `main` above `d01299b`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** one core resolution reads a selected env set as the vault's owner holds it saved (`Vault.ReadSaved`, D-0317) and commits only while the requesting lifetime is live (D-0313). It checks every entry under `env/<project>` before any value leaves: a name `EnvConvention` accepts, an entry that has not expired, and one outside the recycle bin. A set with any unusable entry is refused whole, naming each key and why without its value; nothing is ever injected partially. Standalone `keypaste run` uses the same resolution and refusal with its own unlock, and its exit codes and signal behaviour stay as documented. Expiry is read through `Internal/KeePassInterop.cs`, since `VaultEntry` does not carry it yet. Traces to PRODUCT §§1.4, 2 and 3.4.
-
-**Verify (V-E.1a):** `keypaste run` against a vault KeePassXC made, holding an expired entry, a recycled entry and an invalid name in one set, exits non-zero naming each, starts no child and prints no value. Removing them lets the next run inject exactly the set. Through the app's session, a resolution waiting when a lock comes, and one after another program saves the file, both release nothing, and an edit made in the app is the next value resolved. A check made only in the CLI or the view, or one made after values were read into the child's environment, does not pass.
-
 **Founder amendment, made while planning:** a recycled entry is left out of the set, not refused. The recycle bin is already outside every traversal (D-0248), so an entry KeePassXC deleted from `env/<project>` is no longer part of it, and refusing the set because the bin holds a former member would make deleting a variable break its project until the bin was emptied. The gate proves the recycled value never reaches the child and is never named; the refusal names the expired entry and the invalid name.
-
-## What changed for users
-
-- **`keypaste run` refuses an expired entry.** A set holding an entry whose expiry is at or before now exits 2 with `keypaste run: 'env/<project>' cannot be used, so nothing was started:`, then one line per entry, such as `OLD expired 2020-01-02 03:04:05Z` or `BAD-NAME is not a valid environment variable name: '-' is not allowed`, and `Fix or remove them in KeePassXC or the app, then run again.` No child starts and no value is printed. An expiry in the future does not refuse.
-- **One list of everything wrong.** Unexportable names, names differing only in case, a name more than one entry has and an untitled entry are listed together with expired entries, each with its reason. An untitled entry used to be skipped and now refuses the set, because the Build requires every entry to have a name `EnvConvention` accepts. A duplicated name used to end the run with the vault's own error before the other checks ran.
-- **Unchanged:** exit 3 for a project that does not exist, an empty project still runs with nothing added, the PATH warning, the child's exit code, 126 and 127, and signal forwarding. A recycled entry is still left out.
-- **The app's session can resolve a set.** `AppVaultSession.Environments` resolves a project from the vault as its file holds it and releases it only while the unlock that asked is live. A confirmation it is given sees names only; after it answers the set is read again, so an edit saved meanwhile is what leaves, a file another program saved is refused, a set whose names changed is refused, and a lock while it waits or before the commit releases nothing. No screen or command uses it yet: E.1b and E.1c do.
 
 ## Evidence
 
@@ -42,11 +31,7 @@ Completed 2026-09-24 on `main` above `d01299b`, source only. [PRODUCT](../PRODUC
 
 ## Decisions
 
-[DECISIONS](../../DECISIONS.md) holds D-0337. This row binds only this step's code:
-
-| id | date | decision | supersedes |
-|---|---|---|---|
-| D-0338 | 2026-09-24 | `VaultEntry.Expires` is read from the file as UTC and never written by `AddEntry` or `UpdateEntry`, so an update keeps the expiry KeePassXC set; the internal `SetExpiryUnchecked` test seam is keypaste's only writer of it | `VaultEntry` carrying no expiry |
+[DECISIONS](../../DECISIONS.md) holds D-0337.
 
 ## Limits and follow-ups
 

@@ -4,13 +4,7 @@ Completed 2026-09-24 on `main` above `c5fa7b1`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-Opened by [F.22](F.22.md), whose `app.yml` run 36084643134 at `019f3bf` on `f21`, `ubuntu-24.04`, failed `AgentActivityViewModelTests.The_request_in_front_of_a_person_is_listed_and_counts_down` at line 43: the request was still open 10 seconds after the manual clock passed its 45-second window, the test's first failure in the 30 `app.yml` runs before it. The row asked for a branch probe repeating the class with the identical desktop test command and recording, in each failing iteration, whether the gate's deadline fired and whether the reply was written, per [diagnostics](../diagnostics.md).
-
-Amendment, on the founder's direction on 2026-09-24 that the failure be fixed as part of finishing F.22 rather than left open: the mechanism was found by reading the gate and reproduced deterministically in-process, so no branch probe ran, and the repair was made in the same step.
-
-## What changed for users
-
-Nothing a person can see. The 45 seconds a person has to answer a request now start the moment the gate asks, before the prompt is put up, rather than once the call that puts it up has returned.
+Amendment, on the founder's direction on 2026-09-24 that the Agent Activity failure in [F.22](F.22.md)'s run 36084643134 be fixed as part of finishing F.22 rather than left open: the mechanism was found by reading the gate and reproduced deterministically in-process, so no branch probe ran, and the repair was made in the same step.
 
 ## Evidence
 
@@ -28,7 +22,7 @@ Nothing a person can see. The 45 seconds a person has to answer a request now st
 
 ## Decisions
 
-The window is created before the channel is asked; it binds only `ApprovalGate`, and the regression holds it.
+None.
 
 ## Limits and follow-ups
 

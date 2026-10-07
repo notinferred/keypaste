@@ -36,10 +36,6 @@ After the first pass, the founder asked why the change added code. The second pa
   - What this does not bound: it is no process boundary, so a compromised pinned version would ship inside the vault's binary. The content-hash pin and the `--locked-mode` restore fix the code to the reviewed 1.4.1 package (THREATS T-9).
   - It is accepted because, by B.4a's measurements, the single binary is 14 to 16% smaller than the two it replaces, and every desktop package, which carries the CLI anyway, ships one artifact instead of two.
 - D-0334 is rewritten for one binary, with its wording archived. D-0358 names `keypaste mcp --allow-run`.
-- Binding only this step's code:
-  - The CLI's `CommandLine` moved to Core and the bridge parses with it. Its old reason for a parser of its own, that repeated options were refused, stopped being true at V.7a.
-  - `keypaste setup` registers the `keypaste` that runs it, and `--server-path` is gone.
-  - `verify-install.sh` keeps the 0.3.0 check until L.1 moves the install blocks.
 
 ## Limits and follow-ups
 

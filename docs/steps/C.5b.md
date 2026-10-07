@@ -30,11 +30,6 @@ The row was written before D-0416, which left `env/**` reaching only ordinary un
 
 - D-0422: the default is `tag:env:*`, a selector reaches per entry only the variable-named fields of entries with a matching project tag, and a listing names each entry's fields and project tags.
 - T-38 records one secret shared by two environments; T-1 and T-4 are rewritten to the listing and exposure as they now are.
-- Binding only this step's code:
-  - The bridge cannot read tags, so `EntryExposure.MayPermit` forwards a path-shaped request a tag might reach and refuses one no tag could; an env reference in `run` names a project's set, so the bridge forwards it and the owner checks every entry and field it resolves.
-  - A listing names a standard field only when it holds something, read from the length KeePassLib keeps, and names only member tags.
-  - `ListedEntry` compares its field and tag lists by value.
-  - The app's connection check asks for `password` when the listing names it and otherwise the first field it names, and does not offer an entry listed with none.
 
 ## Limits and follow-ups
 

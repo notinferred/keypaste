@@ -25,7 +25,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <c>Notes</c> through the name rule, which replaces ten structural characters and every control
 /// character with a space, so <c>https://example.test/path?a=b#c</c> reached the screen as
 /// <c>https: example.test path?a=b#c</c>, a note's line breaks and brackets were flattened, and a
-/// Windows login lost its backslash (docs/ui-review.md).
+/// Windows login lost its backslash.
 /// </para>
 /// </remarks>
 public sealed class FaithfulFieldRenderingTests : IDisposable

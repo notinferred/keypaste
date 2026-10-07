@@ -4,8 +4,6 @@ Completed 2026-09-29 on `main` above `856b407`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** the app follows [BRAND](../BRAND.md) as amended on 2026-09-28. With no theme chosen, `AppSettings.Default` and `App.axaml` follow the system's light or dark setting, as it changes; Light or Dark chosen in Settings still wins. Titles and headings, the item title in its pane among them, use Instrument Sans at BRAND's sizes, and keys, values, references, paths, commands and timestamps stay Fragment Mono. The copy on the main screens and in the prompts follows BRAND's voice without dropping what T-2's evidence relies on. The first line of `keypaste --help` carries PRODUCT §1's positioning within 80 columns. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
-
 **Verify (V-N.7):** with no `app.toml`, a frame captured under a light platform setting has the light app background and one under a dark setting the dark background, and a choice in Settings overrides either. `ScreenRenderer` renders every screen in both palettes, and each frame has one amber element. The rendered item title and headings use Instrument Sans, and a key and a value Fragment Mono. `CliAppTests` pins the new help line, which fits 80 columns. A palette shown only in a token file does not pass.
 
 "One amber element" is read as D-0375 reads it: at most one, the view's primary action or live signal where it has one.
@@ -31,34 +29,6 @@ Completed 2026-09-29 on `main` above `856b407`, source only. [PRODUCT](../PRODUC
   - **How.** [outline-brand-marks.py](../../scripts/outline-brand-marks.py) now outlines each mark at its own weight, unites the tracked letters into one outline, since the app and the icon rasterizer fill even-odd, and draws the dot as geometry. It also rewrites the wordmark inline in `site/public/index.html`, `s/index.html`, `thanks/index.html` and `site/src/worker.js`, and stops if one no longer carries it. [render-app-icon.py](../../scripts/render-app-icon.py) redrew the `.ico`, the PNG, the Linux SVG and the `.icns`.
   - **Evidence.** Two runs of the outline script left every file byte-identical. Pillow decoded the `.ico` at nine sizes from 16 to 256 px and the `.icns` at 128 to 1024 px. `ScreenRenderer`, `BrandMarksTests` and `AmberElementsTests` passed 12 of 12 in both palettes. Four README screenshots were matched to the frames they came from and replaced; `approval-prompt.png` carries no mark. `bash scripts/verify.sh` passed workflows, scripts, backend, integration and desktop, the desktop suite 835 of 838 with the renderer's 3 skipped.
   - **Limits.** Headless rendering only: the icons were not seen in a real taskbar, Dock or launcher. The prototypes in `docs/design/design/` still draw the monogram.
-
-## What changed for users
-
-- **New marks everywhere.** The desktop's sidebar carries the wordmark "keypaste." alone and its lock screen the icon "k." alone. The same marks, in Hepta Slab with an amber dot, are used for:
-  - the app icon on Windows, macOS and Linux;
-  - keypaste.com's header, footer, share viewer and favicon;
-  - the README.
-- **The app follows the system.** With no theme chosen, it starts in the light or dark palette the operating system uses and switches when the system does. Light or Dark in Settings still wins, and choosing System again follows the system again.
-- **Status colours read on light.** Green, red and blue text is darker on the light palette (`#007840`, `#B02A2D`, `#296898`), at 4.85:1 or more on every light surface. Before, it was 1.7–2.4:1, now that light is what a light system gets. Examples are "Not opened yet", "missing" and a refusal. keypaste.com's light palette uses the same values.
-- **Titles are words.** An item's title is Instrument Sans: 22/600 in its pane and 13.5/500 in the list. An env variable's key stays Fragment Mono in both places. Keys, values, `kp://` references, paths, commands and times are still mono.
-- **Amber marks one thing on every screen,** in both palettes, where N.1a2 held only the screens its journey passed through:
-  - a checked box, a chosen option and a switch that is on are drawn in the text colour;
-  - Items' "+ New" is ordinary while a form in the view shows its own primary: a new item, an edit, a rotate or a field;
-  - on Agents, the connect, token and run forms' buttons are ordinary while a request waits;
-  - the unlock screen's Unlock is ordinary while a YubiKey waits for a touch, whose waiting dot is then the signal; the recent vault's icon and the key-file and USB icons are grey;
-  - in the prompt windows, the countdown, its dot and the note that part of the reason was removed are grey, since the answer to allow is the prompt's one amber element;
-  - Env profiles' notices, protected-profile shield, cell notes and problems are secondary text, and the launch confirmation card is neutral;
-  - an unverified row in the activity log has a red bar, and an unread reason a grey triangle;
-  - a share link opened but still opening is blue;
-  - the notice after a restore is a neutral card, and Trash's "comes back at the root" is secondary text;
-  - the import dialog's switch and the share dialog's passphrase check are drawn in the text colour.
-- **Calmer copy.**
-  - Agents' subtitle now reads "Apps and tokens that can ask for a secret. Each request waits for your answer, or uses one you gave for a set time.", replacing "MCP clients and tokens that can ask for secrets. Every request goes through you or a grant."
-  - The empty pane now reads "Choose an item to see it here.", replacing "Choose a secret to see it here."
-  - The prompts' copy already met BRAND's voice and is unchanged, so every element T-2's evidence relies on is where it was.
-- **The CLI says what keypaste is.** The first line of `keypaste --help` reads `keypaste <version> · a simple, local password manager on your KeePass file`. That is 70 columns with a release version and 76 with an `-rc.NN` suffix; PRODUCT §1's fuller sentence would be 85.
-
-None of this is in a download: the desktop has no public release, and keypaste.com changes when `main` is next pushed.
 
 ## Evidence
 
@@ -117,14 +87,7 @@ keypaste.com's home page was served locally and captured in headless Edge with t
 
 ## Decisions
 
-No ledger row. The theme default and the marks are BRAND's, and each colour change applies D-0375. These bind only this step's code:
-
-- **System maps to an explicit Light or Dark variant,** taken from the platform's colour values and updated on their change event.
-  - Avalonia's own Default variant, which `ApplyTheme` used before, had a defect: after Light or Dark had been requested and System was chosen again, it left the app with no variant at all, so the window fell back to white in either palette.
-  - The theme test above caught it.
-- **A prompt window's waiting dot is grey,** since the prompt is itself the waiting request and its allow answer is its amber element. The waiting dot on the unlock screen and in the title bar stays amber.
-- **The marks are geometry, not text.** The app draws the generated outlines, so no mark face is vendored. `BrandMark` and `BrandWordmark` keep their proportions: a set Width or Height gives the other.
-- **Light status values sit at oklch lightness 0.50.** The site's 0.55 measured 4.25:1 for ok on the light background.
+No ledger row. The theme default and the marks are BRAND's, and each colour change applies D-0375.
 
 ## Limits and follow-ups
 

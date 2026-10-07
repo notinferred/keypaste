@@ -4,34 +4,12 @@ Completed 2026-09-28 on `main` above `c23574f`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** core lists an entry's custom fields by name and protected flag, never by value, and reads one value when asked. It sets one or several fields of one entry as a single edit that makes one history revision and reports what it touched through `Edited` (D-0318), and it removes a field. A new field is written protected unless `--plain` asks otherwise; an existing field keeps its flag.
-
-These names are refused: empty names, names with control characters or edge whitespace, standard field names in any case, and KeePassXC's own attributes (`otp`, `TOTP Seed`, `TOTP Settings`, `_EXEC_CMD`, `KP2A_URL*`, `KPEX_*`, `KPXC_*`). Fields with those names stay readable and untouched. `UpdateEntry` never writes custom fields, and the `Vault.AddProtectedFieldUnchecked` test seam is removed.
-
-The CLI gains `get <entry> --field <name>`, `set <entry> --field <name>`, `field ls <entry> [--json]` and `field rm <entry> <name>`. A new `verify-keepassxc-fields.sh` joins the compatibility matrix and the workflows gate gains a field step; secret-path tests are mandatory. Traces to PRODUCT §§1, 2, 4.5 and 4.6.
-
-**Verify (V-V.7a):** the vault is one KeePassXC made by importing XML. The shipped CLI sets a protected field and changes a plain one. Real KeePassXC reads both with `show -a`, and its XML export marks exactly the protected one. The entry keeps its other field, tag, attachment and `otp`, and the header still says KDBX 4.0.
-
-After `keepassxc-cli merge` brings in a newer copy of the entry, `keypaste get --field` prints KeePassXC's value and history holds the old one. Setting three fields makes one revision. `--field otp`, `--field Password` and `--field password` are refused, and the file stays byte-identical. `field ls` and `ls` output contain none of the sentinel values.
-
-A core-only test does not pass, and neither does a vault keypaste wrote standing in for KeePassXC's side.
-
 The founder selected V.7a together with C.1a and V.7b on 2026-09-28 and approved a plan that settled what the row left open:
 
 - "Stay readable" means `get --field` reads any custom field that exists, KeePassXC's attributes included; `set --field` and `field rm` refuse every listed name. `get --field` refuses a standard name, which plain `get` reads.
 - KeePassXC's attribute names are matched ignoring case, as standard names are.
 - `--field` may be given several times on `set`, and only there, so three fields are one command and one revision.
 - `set --field` writes to an entry that exists and does not create one; `--plain` naming a field that already exists is refused rather than ignored; `--field` with the generate flags is refused.
-
-## What changed for users
-
-An entry's custom fields can now be managed from the terminal. `keypaste set <entry> --field <name>` asks for the value, hidden and twice when a person is typing or once per line from a pipe, and writes it onto an entry that already exists. `--field` can be given several times, and every value is asked for in turn and written in one edit, so KeePassXC shows one history revision for the lot. A new field is protected, as a password is, unless `--plain` is given; a field that already exists keeps the protection it had, and `--plain` naming one is refused with nothing written.
-
-`keypaste get <entry> --field <name>` copies one field's value to the clipboard, cleared after twenty seconds as a password is, or prints it with `--reveal`. It reads any custom field, including the ones KeePassXC keeps for itself such as `otp`. `keypaste field ls <entry>` names the entry's custom fields, each marked protected or plain and KeePassXC's own marked read-only, and never prints a value; `--json` gives the same as `name`, `protected` and `readonly`. `keypaste field rm <entry> <name>` removes one, and the value stays in the entry's history.
-
-keypaste will not write a field with an empty name, a control character or surrounding spaces, a standard field's name in any case (`password` and `URL` included), or one of KeePassXC's own attributes: `otp`, `TOTP Seed`, `TOTP Settings`, `_EXEC_CMD` and names starting `KP2A_URL`, `KPEX_` or `KPXC_`. Such a command is refused before the vault is opened, so the file is untouched. Fields KeePassXC wrote under any of those names are listed and kept as they were.
-
-Nothing else about an entry changes when a field is written: its password, other fields, tags, attachments, custom data and history stay as they were. Editing an entry's password or notes, from either front end, still never touches its custom fields. The desktop does not show custom fields yet (V.7b), and agents still receive only the password, username, URL or notes (C.5a). This is source only; the published CLI is unchanged.
 
 ## Evidence
 
@@ -53,7 +31,7 @@ Hosted CI has not run. When `main` is pushed, the `ci.yml` compatibility job run
 
 ## Decisions
 
-D-0369 in [DECISIONS](../../DECISIONS.md). The choices the plan settled are under Scope as selected; none binds later work beyond what D-0369 records.
+D-0369 in [DECISIONS](../../DECISIONS.md).
 
 ## Limits and follow-ups
 

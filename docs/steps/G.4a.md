@@ -29,7 +29,7 @@ Dev runs, each `dev.sh`'s dispatch of `dev.yml`:
 
 ## Decisions
 
-D-0385, D-0386. Binding only this step: the switch reads the login entry itself each time Settings opens, so an entry removed in System Settings or the registry, or turned off in Windows' Startup apps, reads as off, and an entry naming another copy of the app reads as off until switched on again, which rewrites it. The Windows tray uses `keypaste.ico` and the others the 256-pixel PNG.
+D-0385, D-0386.
 
 ## Limits and follow-ups
 

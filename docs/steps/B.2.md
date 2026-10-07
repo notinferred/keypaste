@@ -30,12 +30,7 @@ None.
 
 ## Decisions
 
-None in the ledger. Binding only this step's code:
-
-- `IsolatedHome` runs as a module initializer, which takes no arguments, so its temporary-directory prefix comes from the name of the assembly compiling it instead of a parameter. The prefixes stay `keypaste-app-tests-home-` and `keypaste-consistency-tests-home-`.
-- A linked helper keeps the namespace of the project that owns it, and each consumer imports that namespace with a `using` directive; neither a shared namespace nor a global using was added.
-- `AppClock.Start` in App.Tests names the app suite's starting instant. `ManualClock`'s own default stays the one the core tests were written against.
-- `ManualClock`'s class comment is shortened to the three constraints it records, and no longer points at the deleted App.Tests copy.
+None.
 
 ## Limits and follow-ups
 

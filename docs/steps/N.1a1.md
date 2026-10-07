@@ -4,8 +4,6 @@ Completed 2026-09-29 on `main` above `202b24e`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-N.1a's **Build**: the sidebar becomes Items, with the project rows beneath it, and Agents, with Trash and Settings in the footer, on Ctrl/Cmd+1–4. Activity becomes Agents › History, and the full log moves to Settings › Advanced. Env profiles is reached from the project rows and from the Items "+" menu, which also holds New project and Import .env. Sharing becomes an item's Share… action, with its links listed in Settings › Advanced. Import .kdbx moves to "+", the first run and the macOS File menu. The always-visible MCP server card goes, and the Agents row shows a count and a dot. The title-bar search becomes the only search and shows its scope. Traces to PRODUCT §§1 and 5.8.
-
 N.1a's **Verify (V-N.1a)**: a driver works through the app's launch composition (D-0342). From the four places it reaches an item found by search, a project's variables, the agent history, revoking a grant, the full log and its check, creating and revoking a share link, and a KDBX import. The sidebar's automation tree lists exactly the four places and the project rows. The MCP card and the second search box are absent. `EntriesViewLayoutTests` holds at 960 px, and each captured frame has one amber element.
 
 The founder selected N.1a with C.2 and N.7 on 2026-09-29 and approved a plan that split it, as its estimate ran past PRODUCT §6.3's two weeks: this child builds everything but the last clause, and N.1a2 builds the amber check, with N.1a closing when N.1a2 does. The plan settled what the row left open:
@@ -14,20 +12,6 @@ The founder selected N.1a with C.2 and N.7 on 2026-09-29 and approved a plan tha
 - The project rows stay on the legacy `env/` groups until C.4 moves the rows and the project page to tags together; a tag-only project today would open a page that writes the legacy layout.
 - The Agents row's dot means this app is answering agents for the vault, which is what the card's "running" meant; a waiting request already has its own prompt window and raises the count.
 - Settings › Advanced holds only the activity log and the share links; the rest of N.1b's list stays where it is.
-
-## What changed for users
-
-The sidebar now reads Items, then each env project's row beneath it, then Agents, with Trash and Settings at the foot, and `Ctrl/Cmd+1` to `4` go to those four places in that order. Every other screen sits under one of them and draws a Back button to it: a project's Env profiles under Items, History under Agents, and the activity log and share links under Settings › Advanced.
-
-Items' "New" button opens a menu of New item, New project, Import .env (into the project in view, or the first one, or a new one when there is none) and Import .kdbx. An empty vault's Items screen offers Import .kdbx beside New item, and on macOS it is also under File. The list's own filter box is gone: the titlebar's search is the only search, reads "Search all items" or "Search in this group", and shows the group as a chip with a button that widens it to every item again. "All entries" reads "All items", and the list's empty notes say items.
-
-An item's ⋯ menu has Share…, which opens the link form as a dialog over Items, with the item fixed; Create and copy link closes it with the usual toast, and Cancel or Escape closes it with nothing made. Settings › Advanced lists the links under Share links with their status and Revoke, and says how many may still open.
-
-Agents has a History button, which shows the activity log held to agents' and tokens' records, with no filter to widen it; Settings › Advanced › Activity log is the whole log with its filters and chain check. The MCP server card and the Import .kdbx row are gone from the sidebar: the Agents row carries the grants-and-waiting count, in the same muted style as every count, and a dot that is green while the app answers agents, and its tooltip says how many clients are attached.
-
-Found and fixed on the way: Settings › Recommendations' "Needs review" chip was drawn in mono, because the chip's style outranked the text's own font; it is now sans.
-
-None of this is in a download: the desktop has no public release.
 
 ## Evidence
 

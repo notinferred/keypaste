@@ -4,30 +4,10 @@ Completed 2026-09-28 on `main` above `a398212`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** the item pane lists an entry's custom fields by name, with protected ones masked. It reveals one while held and copies through the one clearing countdown (D-0300). It adds a field (a name, a masked value and a protected switch), changes a value, switches protection and removes a field, each through core with history. KeePassXC's own attributes are shown read-only.
-
-Tags appear as chips that can be added and removed, and a project tag shows its environment and a protected mark. T-22's automation sweep, D-0303's drawn-frame check and the workflows gate's AppDriver half cover the new commands, and the keypaste-design skill applies. Traces to PRODUCT §§1, 2, 4.6 and 5.2.
-
-**Verify (V-V.7b):** in the app, on a vault KeePassXC made, a person adds a protected field, changes another, removes a third, and adds and removes a tag. Real KeePassXC reads the values, the protection and the tags, and still finds the attachment, custom data and `otp`. The file stays KDBX 4.0.
-
-The automation surface carries no field value while typing, while a reveal is held or at rest. A drawn frame shows a value only while it is held.
-
-A view-model-only check does not pass, and neither does KeePassXC reading what core wrote without the app.
-
 The founder selected V.7b together with V.7a and C.1a on 2026-09-28 and approved a plan that settled what the row left open:
 
-- Every custom-field value is masked at rest, plain ones included, because the Verify allows no field value on the automation surface at rest, and KeePassXC leaves new attributes unprotected by default. Every value copies through the countdown.
+- Every custom-field value is masked at rest, plain ones included, because the row's Verify allows no field value on the automation surface at rest, and KeePassXC leaves new attributes unprotected by default. Every value copies through the countdown.
 - KeePassXC's own attributes, such as `otp`, can be held and copied, as `get --field` reads them (V.7a); they offer nothing that changes them.
-
-## What changed for users
-
-Selecting an entry in the desktop now shows its custom fields below its notes. Each row gives the field's name and says whether it is protected, plain or KeePassXC's own. The value is a fixed row of dots until you hold the eye beside it or the value itself; releasing, dragging off, switching screens, selecting another entry or locking hides it again, and Copy puts it on the clipboard with the same twenty-second clear as a password. This is true of plain fields too: KeePassXC leaves a new attribute unprotected unless asked, so a plain field is as likely as a protected one to hold an API key.
-
-Add field opens a form with a name, a masked value you type or paste, and a Protected switch that starts on. Replace opens a masked field for a new value, which keeps the field's protection. The shield switches a field between protected and plain without touching its value. Remove asks first and says the value stays in the entry's history. Each of these is one change, saved at once, and one revision in the entry's history; a name keypaste will not write, such as `otp` or `Password`, or one the entry already has, is refused with a sentence and nothing is written. KeePassXC's own attributes, such as `otp`, can be held and copied but offer no Replace, shield or Remove. If another program saved the vault since it was opened, the change is refused and the pane says to lock and unlock first, as the password edit does.
-
-Tags are chips below the fields, each with a remove button, and a box adds one. A project tag reads as its project and environment, such as `billing · prod`, with a shield when every agent request for the entry is asked about; a tag that starts `env:` and breaks the grammar is drawn as written with a warning mark, its tip saying why it puts the entry in no project, and still carries the shield when it protects. Adding a tag the entry already has, or one KeePass would split, is refused with a sentence.
-
-None of this is in a download: the desktop has no public release.
 
 ## Evidence
 
@@ -45,7 +25,7 @@ Hosted CI has not run; `app.yml` runs the workflows gate on Ubuntu and Windows w
 
 ## Decisions
 
-None in the ledger. The two choices under Scope as selected bind only this pane.
+None.
 
 ## Limits and follow-ups
 

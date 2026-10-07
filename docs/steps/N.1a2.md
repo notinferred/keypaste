@@ -4,26 +4,7 @@ Completed 2026-09-29 on `main` above `19dcf99`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** a test-side detector counts the amber elements in a frame the app drew: connected regions of the accent's hue and saturation, on the topmost surface only, outside the marks, a selected row's inset bar and the focus ring. The screens N.1a1's journey passes through are brought to at most one, the view's primary action or live signal (BRAND rule 4): selected sidebar and list icons, thin progress bars and link buttons leave amber, a row's in-use dot turns blue, and Agents' Connect client is primary only while nothing is waiting. Traces to PRODUCT §§1 and 5.8.
-
-**Verify (V-N.1a2):** differential tests show the detector counting two primaries as two, amber mono text as one in both themes, a tint or a selected row as none, and a dialog's primary over a backdrop as one. Every frame of N.1a1's journey then holds at most one amber element, and where the view has a primary action or live signal it is that element. A rule asserted over styles or tokens rather than drawn frames does not pass.
-
-This is the last clause of N.1a's Verify, "each captured frame has one amber element", as the plan the founder approved on 2026-09-29 read it: at most one, and the view's primary action or live signal where it has one. Read as exactly one, it would put amber on Trash, Settings and the logs, which have no primary action, against BRAND rule 4.
-
-## What changed for users
-
-Amber now marks one thing on a screen: its main action, such as Items' "+ New", Import in the import dialog, Create and copy link in Share…, or Connect client on Agents, or something live, such as a waiting request's countdown.
-
-- A selected row keeps its faint amber tint and bar, but its icon, like the selected sidebar row's and group's, is drawn in the text colour: an icon is amber only while its object is live, as BRAND says.
-- Link-style buttons such as Clear now, Choose… and Restore are drawn in the text colour.
-- The thin bars that count a grant's or the clipboard's time down are grey; the time in words beside them says the same.
-- An entry's "in use" dot is blue rather than amber, since several can be in use at once, and a search result's matched-field note, such as "username", is secondary text.
-- On Agents, the section icons are grey, a grant's time left is secondary text, and Connect client is the screen's primary button while nothing is waiting.
-- A project's selected profile is underlined in the text colour, and the import dialog's file icon is grey.
-
-The rest of the app's amber, on the lock screen, the prompts, notices and the other screens N.1a's journey does not pass through, is N.7's to settle.
-
-None of this is in a download: the desktop has no public release.
+N.1a2 builds the last clause of N.1a's Verify, "each captured frame has one amber element", as the plan the founder approved on 2026-09-29 read it: at most one, and the view's primary action or live signal where it has one. Read as exactly one, it would put amber on Trash, Settings and the logs, which have no primary action, against BRAND rule 4.
 
 ## Evidence
 

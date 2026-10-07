@@ -4,10 +4,6 @@ Completed 2026-09-29 on `main` above `b5d8eac`, source only. [PRODUCT](../PRODUC
 
 ## Scope as selected
 
-**Build:** a local check runs in the process holding the vault, on unlock and after each save. It reads the notes of every entry outside the recycle bin and keypaste's reserved group, and finds single-line `KEY=value` and `export KEY=value` assignments whose key is env-named, and values that match a short, documented list of well-known token prefixes kept in core. Each finding names its entry and its key, or the token kind, and never holds or shows the value. Findings appear only under Settings › Recommendations, with a quiet count on Settings; each starts as needing review, and no main screen shows a banner.
-
-Moving a finding, or all selected ones, does one edit with one revision: it writes the values as protected fields named by their keys and removes exactly those lines from the notes. The previous notes stay in history. The move is refused, with the reason, when a field already holds a different value or the notes changed since the check. A dismissed finding is remembered on this machine by entry and key, never by value. The decision narrows D-0278: search still never reads notes, and the check's results leave only through this list. Traces to PRODUCT §§1, 2, 3.4 and 5.8.
-
 **Verify (V-C.2):** on a vault KeePassXC made, one entry's notes hold `STRIPE_SECRET_KEY=sk_test_1`, `export OPENAI_API_KEY=sk-proj-2`, a GitHub token on a line of its own, a PEM block and a sentence, and another's a sentence only. After unlocking, Settings › Recommendations lists the first entry's three findings as needing review and not the second entry, the Settings row shows the count, no first-level screen shows a banner, and no value appears in the automation tree or a drawn frame. Moving them leaves protected fields holding exactly those values in one revision, notes holding only the PEM block and the sentence, and a revision holding the old notes, which real KeePassXC reads. A dismissal survives a lock and unlock, editing the notes between the check and the move refuses the move, and a search for `sk_test_1` still finds nothing. A parser tested only on strings does not pass.
 
 The founder selected C.2 together with N.1a and N.7 on 2026-09-29 and approved a plan that settled what the row left open:
@@ -18,19 +14,9 @@ The founder selected C.2 together with N.1a and N.7 on 2026-09-29 and approved a
 - A dismissed finding stays listed as Dismissed, uncounted, with Review again, so a mistaken dismissal can be undone.
 - Dismissals are kept by vault identity, entry UUID and key, so no title reaches `~/.keypaste`.
 
-## What changed for users
-
-When the desktop unlocks a vault, and after every save, it reads the notes of each entry outside the recycle bin and keypaste's own group and looks for two things: a line such as `STRIPE_SECRET_KEY=sk_test_1` or `export OPENAI_API_KEY=…` whose key is upper-case and could name an environment variable, and a line that is exactly one token from GitHub, GitLab, Stripe, Anthropic, OpenAI, AWS (an access key ID), Slack or npm. Lines inside a PEM block are left alone, and a key name keypaste will not write, such as `PASSWORD` or `KPXC_…`, is not reported.
-
-Settings now opens with a Recommendations card. Each finding reads as its key in mono, or the token kind and the field it would become, then "in the notes of" the entry, and a Needs review mark. The Settings row in the sidebar shows how many need review, in the same muted style as the other counts; nothing appears on Secrets, Agents or any other screen, and there is no banner or toast.
-
-Move to a field, or Select all and Move selected, writes each value to a protected field named by its key and takes exactly that line out of the notes, as one change and one revision per entry; the notes as they were stay in the entry's history. If the notes changed after they were checked, the entry already has that field with a different value, or the notes set the same key twice, nothing is moved and the card says why and what to do. Dismiss moves a finding to the bottom as Dismissed and stops counting it, on this machine, across locks and restarts; Review again brings it back. Dismissals are kept in `~/.keypaste/recommendations.json` by vault, entry identifier and key name, with no titles or values; if that file cannot be read, nothing counts as dismissed and the file is left as it is.
-
-Search still never reads notes, so searching for a value left in notes finds nothing.
+## What changed
 
 Found and fixed on the way: after a change of master password, keyfile or YubiKey in Settings, the app replaces its open vault, and the title bar's "saved" status stopped following later saves because the shell still listened to the vault it had replaced. The session now forwards saves from whichever vault is open, and the title bar and Recommendations both follow them.
-
-None of this is in a download: the desktop has no public release.
 
 ## Evidence
 

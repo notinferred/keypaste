@@ -1,8 +1,8 @@
 # Step records
 
-Each completed [STEPS](../STEPS.md) task gets one record here, named by its ID, written when its verifier passes and not revised afterwards. A record holds what the step did: the amendments to its row as selected, its evidence, the decisions that bind only its own code, and its limits and follow-ups. What changed for users is CHANGELOG's. That detail does not go into the base documents: STEPS keeps open work, [DECISIONS](../../DECISIONS.md) keeps decisions that constrain later work, and [CHANGELOG](../../CHANGELOG.md) keeps one short entry per user-visible change linking here.
+Each completed [STEPS](../STEPS.md) task gets one record here, named by its ID, written when its verifier passes.
 
-Records begin with V.3a. Earlier steps have an evidence row below, with their history in Git and the [decision archive](../decisions-archive.md). A correction to finished work is a new STEPS row with its own record. The [rescope of 2026-09-19](rescope-2026-09-19.md) records what left the plan and how retained IDs changed meaning.
+Records begin with V.3a. Earlier steps have an evidence row below, with their history in Git and the [decision archive](../decisions-archive.md). The [rescope of 2026-09-19](rescope-2026-09-19.md) records what left the plan and how retained IDs changed meaning.
 
 ## Record template
 
@@ -18,7 +18,7 @@ Changes to the row as selected, with the decision that made each; the row itself
 Tests and gates by name, counts, runs and source SHAs.
 
 ## Decisions
-Ledger rows by ID; rows binding only this step's code in full.
+Ledger rows by ID.
 
 ## Limits and follow-ups
 Gaps, defects found and their STEPS rows, BACKLOG options.

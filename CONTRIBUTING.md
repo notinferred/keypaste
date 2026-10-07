@@ -2,19 +2,17 @@
 
 ## Changes and review
 
-Read [PRODUCT](docs/PRODUCT.md) for scope and security laws, [STEPS](docs/STEPS.md) for the active build plan, the [code map](docs/ARCHITECTURE.md) for where things are, and [CLAUDE.md](CLAUDE.md) for writing rules, document ownership and what a finished step records. Product scope changes require dated founder re-ratification; proposals do not override the current requirements. The active plan covers the local vault, one unlock session, native MCP approvals, project env use and desktop delivery. [BACKLOG](docs/BACKLOG.md) preserves optional ideas; its rows are not instructions to build them.
+Read [PRODUCT](docs/PRODUCT.md) for scope and security laws, [STEPS](docs/STEPS.md) for the active build plan, the [code map](docs/ARCHITECTURE.md) for where things are, and [CLAUDE.md](CLAUDE.md) for writing rules, document ownership and what a finished step records. Product scope changes require dated founder re-ratification; proposals do not override the current requirements. [BACKLOG](docs/BACKLOG.md) preserves optional ideas; its rows are not instructions to build them.
 
 Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. New secret-path dependencies require written justification, pinned versions and lock files regenerated with `dotnet restore --force-evaluate`, which `bash scripts/dev.sh --relock` runs on CI's SDK.
 
 Use KDBX4 through the vendored library. Do not implement cryptography. Only `src/Keypaste.Core/Internal/KeePassInterop.cs` may reference KeePassLib types outside `third_party/KeePassLib`; application code uses the core boundary. Every KDBX file keypaste writes must open in real KeePassXC. CI permanently checks compatibility in both directions.
 
-Write self-documenting code with clear names and structure. Default to no comments; use one line only for a non-obvious constraint or decision the code cannot express. Do not repeat code, tests or documents. Write concise, connected prose without hard wrapping, redundant recaps or excessive formatting.
-
-`scripts/verify-demo.sh` checks README, launch, demo, KeePass/agent essay and site transcripts against the built binaries. These pages trigger backend CI on pushes to `main`, and a pull request that changes one runs the Linux build and the demo check. Consult [RELEASE](docs/RELEASE.md) before changing published installation claims.
+`scripts/verify-demo.sh` checks README, launch, demo, KeePass/agent essay and site transcripts against the built binaries. These pages trigger backend CI on pushes to `main`. Consult [RELEASE](docs/RELEASE.md) before changing published installation claims.
 
 ## Verification and commits
 
-Implementation needs no local SDK: commit on a branch and run `bash scripts/dev.sh`, which pushes it, opens a draft pull request and follows GitHub's checks on it. With the pinned SDK, `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash runs the backend, desktop, consistency, format, script and process checks together. An explicit documents-only or no-build instruction limits that work: review the wording, links and source evidence without building, running tests or starting delivery tasks. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
+Implementation needs no local SDK: commit on a branch and run `bash scripts/dev.sh`, which pushes it, opens a draft pull request and follows GitHub's checks on it. With the pinned SDK, `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash runs the backend, desktop, consistency, format, script and process checks together; `bash scripts/verify.sh --help` lists its profiles and prerequisites.
 
 Sign off every commit, including maintainer and agent commits:
 

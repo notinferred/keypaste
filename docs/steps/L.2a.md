@@ -24,8 +24,7 @@ The founder selected L.2 ahead of L.1 ("finish everything else, the website, pro
 
 ## Decisions
 
-- D-0402: `site/web` is a separate project, built by wrangler's build step. The fields gate stays apart from it, and Cloudflare's build of each commit gates the content pages.
-- Binding only this step: Mermaid stays on 11.x because astro-mermaid 2.1.0 accepts `^10 || ^11`. Competitor pages carry no prices, versions or dates, and the comparison overview names the month its facts were checked, October 2026.
+D-0402: `site/web` is a separate project, built by wrangler's build step. The fields gate stays apart from it, and Cloudflare's build of each commit gates the content pages.
 
 ## Limits and follow-ups
 

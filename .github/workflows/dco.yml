@@ -6,8 +6,7 @@ name: dco
 # protection, where "a red build blocks the merge" is a habit because nothing consults a check.
 #
 # WHAT IT COSTS ON EVERY PUSH: nothing. There is no `push` trigger. A pull request already pays
-# for ci.yml, and this adds one bash step of a few seconds to that. CLAUDE.md says to ask what a
-# workflow costs on every push before adding it, and this is the answer.
+# for ci.yml, and this adds one bash step of a few seconds to that.
 #
 # IT CHECKS ONLY THE COMMITS THE PULL REQUEST ADDS. Sign-off began at D-0055; the history before
 # it is unsigned and rewriting it is not on the table (see H-0003 for what rewriting this history

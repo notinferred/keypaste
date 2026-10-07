@@ -21,7 +21,7 @@ namespace Keypaste.Core;
 /// zero-width characters, the Unicode tag block, private use, and the line and paragraph separators.
 /// That is the protection <c>HostileNameRenderingTests</c> asserts over these same fields, and it is
 /// unchanged. What comes back is the difference between a URL a person can read and
-/// <c>https: example.test path</c>, which is what the app drew before (docs/ui-review.md).
+/// <c>https: example.test path</c>, which is what the app drew before.
 /// </para>
 /// <para>
 /// <b>It removes mechanism, not meaning</b>, exactly as <see cref="EntryNameSanitizer"/> says of

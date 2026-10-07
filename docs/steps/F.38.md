@@ -38,7 +38,7 @@ Dev runs, each a dispatch of `dev.yml` with `dev.sh`'s inputs, `auto` selecting 
 
 ## Decisions
 
-D-0397. Binding only this step: the claim is `sessions/app.lock` beside the vaults' claims and the endpoint `keypaste-app-` and sixteen hex characters of SHA-256 over the user's profile and the canonical home; the listener keeps one pipe instance at a time, which on Windows refuses a pipe of that name somebody else created, and answers a start with one byte, which a peer gets a second to read, since a Windows pipe write waits for its reader; a waiting start tries the pipe in 250-millisecond attempts and the claim between them; `App` owns the listener and stops it on Quit, on a shutdown request and when it is disposed, and `Program.Run` owns the claim for the lifetime of the app.
+D-0397.
 
 ## Limits and follow-ups
 
