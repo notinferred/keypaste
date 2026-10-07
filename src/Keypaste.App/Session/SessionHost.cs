@@ -346,7 +346,7 @@ internal sealed class SessionHost : IDisposable
                 PolicyGate.None,
                 clients: new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)));
 
-            // Opened when a token first arrives, so an unlock creates no log; one that cannot be opened refuses every token.
+            // Opened when a token or a run first arrives, so an unlock creates no log; one that cannot be opened refuses them.
             var audit = new Lazy<AuditLog?>(() =>
                 AuditLog.TryOpen(KeypasteHome.AuditPath(session.Home), TimeProvider.System, out var opened, out _) ? opened : null);
 

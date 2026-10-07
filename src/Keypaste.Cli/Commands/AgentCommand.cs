@@ -32,10 +32,10 @@ namespace Keypaste.Cli.Commands;
 /// opened (D-0309).
 /// </para>
 /// <para>
-/// <b>It writes audit lines for scoped tokens and nothing else.</b> The bridge records what
-/// agents asked for (DECISIONS.md D-0020); a <c>keypaste run --token</c> is recorded here, by the
-/// owner that verified it, because the runner is the side that could skip it. A log that cannot be
-/// opened refuses every token and nothing else. What this process prints is for the person
+/// <b>It writes audit lines for runs and nothing else.</b> The bridge records what agents asked for
+/// (DECISIONS.md D-0020); a <c>keypaste run --token</c> or <c>run --session</c> is recorded here, by the
+/// owner that decided it, because the runner is the side that could skip it. A log that cannot be
+/// opened refuses every token and every run's release and nothing else. What this process prints is for the person
 /// watching it, not the record.
 /// </para>
 /// <para>
@@ -258,7 +258,7 @@ internal static class AgentCommand
             return audit;
         }
 
-        context.Stderr.WriteLine($"keypaste: tokens are refused: {error}");
+        context.Stderr.WriteLine($"keypaste: tokens and runs are refused: {error}");
         return null;
     }
 

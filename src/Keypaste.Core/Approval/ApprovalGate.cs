@@ -99,7 +99,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKey, new Asked(prompt, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync([cooldownKey], new Asked(prompt, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
@@ -120,28 +120,31 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKey, new Asked(null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync([cooldownKey], new Asked(null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>Asks a human about an agent's run, under the same window, slot and cooldown.</summary>
-    /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
+    /// <param name="cooldownKeys">
+    /// Each identity under which a refusal holds the next run back: a run cooling under any of them is
+    /// refused unasked, and a refusal cools all of them.
+    /// </param>
     /// <param name="prompt">What the human is shown.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>The answer, which is a denial unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="cooldownKeys"/> or <paramref name="prompt"/> is null.</exception>
     public ValueTask<ApprovalAnswer> AskAsync(
-        string cooldownKey,
+        IReadOnlyList<string> cooldownKeys,
         RunPrompt prompt,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(cooldownKey);
+        ArgumentNullException.ThrowIfNull(cooldownKeys);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKey, new Asked(null, prompt, null), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync(cooldownKeys, new Asked(null, prompt, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     private async ValueTask<ApprovalAnswer> AskThroughAsync(
-        string cooldownKey,
+        IReadOnlyList<string> cooldownKeys,
         Asked listed,
         Func<CancellationToken, ValueTask<ApprovalAnswer>> ask,
         CancellationToken cancellationToken)
@@ -153,7 +156,7 @@ public sealed class ApprovalGate : IDisposable
             return ApprovalAnswer.Cancelled;
         }
 
-        if (InCooldown(cooldownKey))
+        if (cooldownKeys.Any(InCooldown))
         {
             return ApprovalAnswer.Cooldown;
         }
@@ -173,7 +176,10 @@ public sealed class ApprovalGate : IDisposable
 
             if (answer == ApprovalAnswer.Denied)
             {
-                _cooldowns[cooldownKey] = Deadline.Starting(_clock, Limits.DenialCooldown);
+                foreach (var cooldownKey in cooldownKeys)
+                {
+                    _cooldowns[cooldownKey] = Deadline.Starting(_clock, Limits.DenialCooldown);
+                }
             }
 
             return answer;

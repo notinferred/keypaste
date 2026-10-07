@@ -711,6 +711,27 @@ public sealed class ApproverHandlerTests
         Assert.Equal(1, fixture.Channel.Asked);
     }
 
+    /// <summary>
+    /// A refusal holds back the same field of the same entry whichever connection asks next, so an
+    /// agent that reconnects or starts another bridge is refused without a second prompt (T-11).
+    /// </summary>
+    [Fact]
+    public async Task ADenial_CoolsTheSameFieldDownForAnotherConnection()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Denied;
+
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        var reconnected = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
+
+        Assert.Equal(AuditMethod.Cooldown, reconnected.Method);
+        Assert.Equal(AuditDecision.Granted, otherField.Decision);
+        Assert.Equal(2, fixture.Channel.Asked);
+    }
+
     private static ApproverHandler LiveOnly(ApproverFixture fixture) =>
         new(fixture.Source, fixture.Source, fixture.Gate, fixture.Grants, fixture.Policy, fixture.Narration.Add, _ => true);
 

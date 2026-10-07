@@ -338,6 +338,7 @@ public sealed class SessionAuthority : IApproverHandler
             "\u0002", .. request.FileLines ?? []]);
         var fileLines = (request.FileLines ?? []).Select(ShownLine).ToList();
         var answer = ApprovalAnswer.NoChannel;
+        var fromGrant = false;
 
         var resolver = new SessionEnvResolver(
             () => ReferenceEquals(Live(), admitted) ? admitted : null,
@@ -360,6 +361,7 @@ public sealed class SessionAuthority : IApproverHandler
                 {
                     environments.Narrate?.Invoke(
                         $"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` from a timed grant ({(int)remaining.TotalSeconds}s left)");
+                    fromGrant = true;
                     return true;
                 }
 
@@ -384,7 +386,23 @@ public sealed class SessionAuthority : IApproverHandler
             },
             cancellationToken).ConfigureAwait(false);
 
-        var reply = Deliverable(new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal));
+        var method = resolved.Outcome switch
+        {
+            EnvOutcome.Resolved => fromGrant ? AuditMethod.GrantCache : AuditMethod.Prompt,
+            EnvOutcome.Declined => answer.ToAuditMethod(),
+            EnvOutcome.Locked => AuditMethod.VaultLocked,
+            EnvOutcome.ChangedOnDisk or EnvOutcome.ChangedWhileAsked => AuditMethod.VaultChanged,
+            EnvOutcome.Invalid => AuditMethod.InvalidRequest,
+            _ => AuditMethod.OutOfScope,
+        };
+        var reply = Audited(
+            environments.Audit,
+            request.Project,
+            request.Profile,
+            new AuditClient("keypaste run --session", CoreInfo.Version, null),
+            method,
+            request.Session,
+            Deliverable(new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal)));
 
         Settled(environments, admitted, reply.Set, GrantSummary.EnvClient, "run --session");
 
@@ -481,9 +499,10 @@ public sealed class SessionAuthority : IApproverHandler
             : ["refs", .. request.References!.Select(reference => reference.Name + "=" + reference.Reference)];
         var runKey = string.Join('\0', ["run", connectionId, request.Directory, request.Program, .. request.Command, "\u0001", .. mode]);
 
-        // A denial cools every run of this connection down, not only this argv: another argument or a
-        // space is not a new question (T-11).
-        var cooldownKey = "run\0" + connectionId;
+        // A denial cools down every run of this connection, and every run asking for these secrets
+        // whichever connection asks: another argument, a space, another project from the same agent or
+        // the same secrets from a new bridge is not a new question (T-11).
+        string[] cooldownKeys = ["run\0" + connectionId, string.Join('\0', ["run", .. mode])];
 
         var answer = ApprovalAnswer.NoChannel;
         var method = AuditMethod.Prompt;
@@ -539,7 +558,7 @@ public sealed class SessionAuthority : IApproverHandler
                 grantSeconds,
                 onceOnly);
 
-            answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
+            answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();
@@ -768,7 +787,15 @@ public sealed class SessionAuthority : IApproverHandler
             _ => Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, "the token is not valid for this vault"),
         };
 
-        var audited = Audited(environments.Audit, request, info, Deliverable(reply));
+        var audited = Audited(
+            environments.Audit,
+            request.Project,
+            request.Profile,
+            new AuditClient("keypaste run --token", CoreInfo.Version, null),
+            AuditMethod.Token,
+            request.Session,
+            Deliverable(reply),
+            said => info is null ? said : TokenAuditReason.Format(info.Id, EntryNameSanitizer.Sanitize(info.Name).Text, said));
 
         if (audited.Set.Outcome == EnvOutcome.Resolved && info is not null)
         {
@@ -850,8 +877,17 @@ public sealed class SessionAuthority : IApproverHandler
         return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
     }
 
-    /// <summary>The reply, once its audit line is written; a release whose line cannot be written becomes a refusal.</summary>
-    private EnvReply Audited(Func<AuditLog?>? audit, TokenEnvRequest request, TokenInfo? info, EnvReply reply)
+    /// <summary>A run's env reply, once its audit line is written; a release whose line cannot be written becomes a refusal.</summary>
+    /// <remarks>The owner writes these lines itself, because a run has no bridge to write them (T-30, T-32).</remarks>
+    private EnvReply Audited(
+        Func<AuditLog?>? audit,
+        string project,
+        string profile,
+        AuditClient client,
+        AuditMethod method,
+        string session,
+        EnvReply reply,
+        Func<string, string>? reason = null)
     {
         var released = reply.Set.Outcome == EnvOutcome.Resolved;
         var said = released
@@ -861,17 +897,17 @@ public sealed class SessionAuthority : IApproverHandler
         var record = new AuditRecord
         {
             Tool = "run",
-            Client = new AuditClient("keypaste run --token", CoreInfo.Version, null),
+            Client = client,
             Args = new AuditArgs
             {
                 Entry = EntryNameSanitizer.SanitizePath(
-                    $"{EnvConvention.RootGroup}/{request.Project}/{request.Profile}",
+                    $"{EnvConvention.RootGroup}/{project}/{profile}",
                     maximumLength: AuditArgs.EntryLength).Text,
             },
             Decision = released ? AuditDecision.Granted : AuditDecision.Denied,
-            Method = AuditMethod.Token,
-            Reason = info is null ? said : TokenAuditReason.Format(info.Id, EntryNameSanitizer.Sanitize(info.Name).Text, said),
-            Session = request.Session,
+            Method = method,
+            Reason = reason?.Invoke(said) ?? said,
+            Session = session,
             Vault = _vault.Key,
             Entries = released ? EntriesOf(reply.Set) : null,
         };
@@ -889,7 +925,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         return written || !released
             ? reply
-            : Refused(request.Project, request.Profile, EnvOutcome.Unreadable, "the audit log could not be written");
+            : Refused(project, profile, EnvOutcome.Unreadable, "the audit log could not be written");
     }
 
     /// <inheritdoc/>

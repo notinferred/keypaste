@@ -303,6 +303,38 @@ public sealed class ApproverListenerTests
     /// unlocked vault, so it is the last process in keypaste that may be taken down by something
     /// somebody sent it.
     /// </summary>
+    /// <summary>
+    /// A process opening connections it never uses cannot exhaust the approver: one over the cap is
+    /// closed as soon as it connects, those already served keep working, and a place freed by a
+    /// hang-up is served again.
+    /// </summary>
+    [Fact]
+    public async Task AConnectionOverTheCap_IsClosedAndTheOthersAreServed()
+    {
+        var handler = new RecordingHandler();
+        await using var host = Host.Start(handler, maxConnections: 2);
+
+        await using var first = await ConnectAsync(host.PipeName);
+        var second = await ConnectAsync(host.PipeName);
+        Assert.NotNull(await first.ListAsync(new NamesRequest(["env/**"]), Token));
+        Assert.NotNull(await second.ListAsync(new NamesRequest(["env/**"]), Token));
+
+        await using (var third = new NamedPipeClientStream(
+            ".", host.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
+        {
+            await third.ConnectAsync(Token);
+            Assert.Equal(0, await third.ReadAsync(new byte[1], Token));
+        }
+
+        Assert.NotNull(await first.RequestAsync(Request(), Token));
+
+        await second.DisposeAsync();
+        await handler.Gone.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+
+        await using var fourth = await ConnectAsync(host.PipeName);
+        Assert.NotNull(await fourth.ListAsync(new NamesRequest(["env/**"]), Token));
+    }
+
     [Fact]
     public async Task AGarbageFrame_CostsThatConnectionAndNoOther()
     {
@@ -446,14 +478,14 @@ public sealed class ApproverListenerTests
 
         internal string PipeName { get; }
 
-        internal static Host Start(IApproverHandler handler)
+        internal static Host Start(IApproverHandler handler, int maxConnections = ApproverListener.MaxConnections)
         {
             var name = UniqueName();
 
             // No readiness probe: the listener binds in its constructor, so by the time this
             // returns the pipe exists. A probe would also have cost a connection and a
             // disconnection, which the counts in these tests would then have had to explain away.
-            return new Host(name, new ApproverListener(name, handler));
+            return new Host(name, new ApproverListener(name, handler, maxConnections));
         }
 
         public async ValueTask DisposeAsync()
