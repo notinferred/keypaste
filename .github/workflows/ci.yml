@@ -48,7 +48,7 @@ on:
       - 'site/.node-version'
   pull_request:
   workflow_dispatch:
-  # The weekly full run, beside dispatches: pushes to main run only what their commits select.
+  # Weekly, so a runner image or upstream change shows without a commit.
   schedule:
     - cron: '17 4 * * 1'
 
@@ -67,58 +67,9 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  # A pull request runs the lanes its diff from the merge base can break, and a push to main the lanes
-  # its own commits can (D-0403). A dispatch and the schedule run every lane, and only those, or a
-  # tag's own run, count toward a release.
-  scope:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    # Reads the pass markers earlier runs left (D-0404).
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      lanes: ${{ steps.plan.outputs.lanes }}
-      backend_os: ${{ steps.plan.outputs.backend_os }}
-      backend_tests: ${{ steps.plan.outputs.backend_tests }}
-      filter: ${{ steps.plan.outputs.filter }}
-      test_matrix: ${{ steps.plan.outputs.test_matrix }}
-      integration_matrix: ${{ steps.plan.outputs.integration_matrix }}
-      compat_os: ${{ steps.plan.outputs.compat_os }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Choose the lanes this change can break
-        id: plan
-        shell: bash
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE: ${{ github.base_ref }}
-          BEFORE: ${{ github.event.before }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          since=''
-          if [ "$EVENT" = pull_request ]; then
-            since="origin/$BASE"
-          elif [ "$EVENT" = push ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            since="$BEFORE"
-          fi
-          if [ -z "$since" ]; then
-            bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # A lane a trusted run already passed on these exact inputs is not run again; a dispatch or the schedule never skips.
-          passed="$(bash scripts/lane-cache.sh | tr '\n' ' ')"
-          echo "already passed on these inputs: ${passed:-nothing}"
-          VERIFY_SATISFIED="$passed" bash scripts/verify.sh --since "$since" --plan | tee -a "$GITHUB_OUTPUT"
-
+  # Every run runs every job; a dispatch, the schedule or a tag's own run counts toward a release (D-0403, D-0423).
   checks:
     name: scripts + workflows
-    needs: scope
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -133,32 +84,15 @@ jobs:
         run: bash scripts/verify.sh workflows
 
       - name: Run the offline script fixtures
-        if: contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
         shell: bash
         run: bash scripts/verify.sh scripts
 
       - name: Verify the release destination check fails closed against the real aws CLI
-        if: contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
 
-      - name: Mark the script fixtures passed on these inputs
-        if: success() && contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success() && contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
-        with:
-          name: pass--ubuntu-24.04--scripts
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
-  # dotnet format reads every project and reports what the build cannot: import order and this.
-  # qualification. It runs once, beside the builds, rather than in each runner's (F.52).
+  # dotnet format reports what the build cannot, import order and this. qualification, once for every project.
   format:
-    needs: scope
-    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' format ')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -174,33 +108,14 @@ jobs:
         shell: bash
         run: bash scripts/verify.sh format
 
-      - name: Mark the format lane passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--ubuntu-24.04--format
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   test:
     name: test (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.test_matrix != '[]'
     strategy:
       fail-fast: false
-      # Each runner carries its own lanes, less those an earlier run already passed there (D-0404).
       matrix:
-        include: ${{ fromJSON(needs.scope.outputs.test_matrix) }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    env:
-      LANES: ${{ matrix.lanes }}
-      BACKEND_TESTS: ${{ matrix.backend_tests }}
-      FILTER: ${{ matrix.filter }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -210,61 +125,24 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Restore and build the test projects
+      - name: Build and test the backend solution
         shell: bash
-        run: |
-          set -euo pipefail
-          set --
-          if [ "$BACKEND_TESTS" != all ]; then for p in $BACKEND_TESTS; do set -- "$@" --project "$p"; done; fi
-          bash scripts/verify.sh backend --prepare-only "$@"
-
-      - name: Test
-        shell: bash
-        run: |
-          set -euo pipefail
-          set --
-          if [ "$BACKEND_TESTS" != all ]; then for p in $BACKEND_TESTS; do set -- "$@" --project "$p"; done; fi
-          bash scripts/verify.sh backend --test-only "$@" ${FILTER:+--filter-class "$FILTER"}
+        run: bash scripts/verify.sh backend
 
       - name: Verify the Windows PowerShell launcher selects Git Bash
         if: runner.os == 'Windows'
         shell: powershell
         run: ./scripts/verify.ps1 --list
 
-      - name: Mark this runner's lanes passed on these inputs
-        id: pass
-        if: success()
-        shell: bash
-        env:
-          RUNNER_LABEL: ${{ matrix.os }}
-        run: |
-          set -euo pipefail
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-          read -r -a ran <<< "$$LANES"
-          echo "name=pass--$RUNNER_LABEL--$(IFS=+; echo "${ran[*]}")" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: ${{ steps.pass.outputs.name }}
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
-  # The process gates start the CLI and the bridge, so they build the whole backend solution.
+  # Real CLI, agent and bridge processes, and the demo pages against what the binaries print.
   integration:
     name: integration (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.integration_matrix != '[]'
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.scope.outputs.integration_matrix) }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    env:
-      LANES: ${{ matrix.lanes }}
-      INTEGRATION: ${{ contains(matrix.lanes, ' integration ') }}
-      PAGES: ${{ contains(matrix.lanes, ' pages ') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -274,82 +152,23 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Restore and build the backend solution
-        shell: bash
-        run: bash scripts/verify.sh backend --prepare-only
-
-      - name: Verify run injects a variable and writes nothing to disk
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-run-injection.sh
-
-      # The Unix signal verifier has no Windows equivalent; SECURITY.md records that coverage gap.
-      - name: Verify run forwards signals and exit codes
-        if: env.INTEGRATION == 'true' && runner.os != 'Windows'
-        shell: bash
-        run: scripts/verify-run-signals.sh
-
-      - name: Verify keypaste mcp speaks MCP over stdio and audits every call
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-mcp-stdio.sh
-
-      - name: Verify a person can approve and refuse across two real processes
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-approval-e2e.sh
-
-      - name: Verify the run tool approves, reuses and denies across a real owner and bridge
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        timeout-minutes: 8
-        run: scripts/verify-mcp-run.sh
-
-      # A surviving agent process can hold the step open after its assertions finish.
-      - name: Verify a policy rule grants without a prompt, and only inside its pattern
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        timeout-minutes: 8
-        run: scripts/verify-policy-e2e.sh
-
-      - name: Verify the audit chain catches tampering and forgives a crash
-        if: env.INTEGRATION == 'true'
-        shell: bash
-        run: scripts/verify-log-chain.sh
-
-      - name: Verify the demo page still matches what the binaries print
-        if: env.INTEGRATION == 'true' || env.PAGES == 'true'
-        shell: bash
-        timeout-minutes: 8
-        run: scripts/verify-demo.sh
-
-      - name: Mark this runner's lanes passed on these inputs
-        id: pass
-        if: success()
-        shell: bash
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
         env:
-          RUNNER_LABEL: ${{ matrix.os }}
-        run: |
-          set -euo pipefail
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-          read -r -a ran <<< "$$LANES"
-          echo "name=pass--$RUNNER_LABEL--$(IFS=+; echo "${ran[*]}")" >> "$GITHUB_OUTPUT"
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: ${{ steps.pass.outputs.name }}
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
+      - name: Run the integration gate
+        shell: bash
+        run: bash scripts/verify.sh integration
 
   compat:
     name: compat (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.compat_os != '[]'
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.scope.outputs.compat_os) }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -452,22 +271,8 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
 
-      - name: Mark the compat lane passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--${{ matrix.os }}--compat
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   aot:
     name: aot publish (linux-x64)
-    needs: scope
-    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' aot ')
     # NativeAOT inherits the build machine's glibc floor, which must match release.yml.
     runs-on: ubuntu-22.04
     timeout-minutes: 25
@@ -550,23 +355,11 @@ jobs:
           scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
           scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
 
-      - name: Mark the AOT lane passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--ubuntu-22.04--aot
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
   ok:
     name: ci ok
     if: always()
-    needs: [scope, checks, format, test, integration, compat, aot]
+    needs: [checks, format, test, integration, compat, aot]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

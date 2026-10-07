@@ -86,56 +86,20 @@ env:
   MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
-  # A pull request runs the lanes its diff from the merge base can break; every other event runs all of them.
-  # A push to main or a pull request then skips each job a trusted run already passed on these exact inputs;
-  # a dispatch or a tag never skips (D-0411).
-  scope:
+  # Every run runs every job; a dispatch or a tag's own run counts toward a release (D-0403, D-0423).
+  targets:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      actions: read
+    timeout-minutes: 5
     outputs:
-      lanes: ${{ steps.plan.outputs.lanes }}
-      desktop_tests: ${{ steps.plan.outputs.desktop_tests }}
-      gates_os: ${{ steps.plan.outputs.app_gates_os }}
-      compat_os: ${{ steps.plan.outputs.app_compat_os }}
-      firstrun_os: ${{ steps.plan.outputs.app_firstrun_os }}
-      markers_os: ${{ steps.plan.outputs.app_markers_os }}
       targets: ${{ steps.targets.outputs.targets }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          fetch-depth: 0
 
-      - name: Choose the lanes this change can break
-        id: plan
-        shell: bash
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE: ${{ github.base_ref }}
-          REF: ${{ github.ref }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          passed=''
-          if [ "$EVENT" = pull_request ] || { [ "$EVENT" = push ] && [ "$REF" = refs/heads/main ]; }; then
-            passed="$(bash scripts/lane-cache.sh | tr '\n' ' ')"
-            echo "already passed on these inputs: ${passed:-nothing}"
-          fi
-          if [ "$EVENT" = pull_request ]; then
-            VERIFY_SATISFIED="$passed" bash scripts/verify.sh --since "origin/$BASE" --plan | tee -a "$GITHUB_OUTPUT"
-          else
-            VERIFY_SATISFIED="$passed" bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
-          fi
-
-      # GitHub reports an empty package matrix as a successful skipped job.
       - name: Resolve the desktop targets this workflow packages
         id: targets
         shell: bash
-        env:
-          STILL_NEEDED: ${{ steps.plan.outputs.app_package_os }}
         run: |
           set -euo pipefail
           n="$(jq -r '.components.app.targets | length' release-targets.json)"
@@ -144,19 +108,18 @@ jobs:
           esac
           [ "$n" -ge 1 ] || { echo "::error::release-targets.json packages no app targets"; exit 1; }
           targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0), appimage: ([.packages[]? | select(.kind == "appimage")] | length > 0), bundle: ([.packages[]? | select(.kind == "app-bundle")] | length > 0), dmg: ([.packages[]? | select(.kind == "dmg")] | length > 0)}]' release-targets.json)"
-          if [ -n "$STILL_NEEDED" ] && [ "$STILL_NEEDED" != all ]; then
-            targets="$(jq -c --argjson keep "$STILL_NEEDED" '[.[] | select(.os as $os | $keep | index($os))]' <<<"$targets")"
-          fi
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$n targets: $targets"
 
   # ci.yml's format job checks this solution's format too, since ci.yml runs on every source change.
   desktop:
-    name: desktop tests
-    needs: scope
-    if: needs.scope.outputs.desktop_tests != ''
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    name: desktop tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -168,37 +131,18 @@ jobs:
 
       - name: Restore, build and test desktop and consistency
         shell: bash
-        env:
-          DESKTOP_TESTS: ${{ needs.scope.outputs.desktop_tests }}
-        run: |
-          set -euo pipefail
-          set --
-          if [ "$DESKTOP_TESTS" != all ]; then for p in $DESKTOP_TESTS; do set -- "$@" --project "$p"; done; fi
-          bash scripts/verify.sh desktop "$@"
-
-      - name: Mark this job passed on these inputs
-        if: success() && needs.scope.outputs.desktop_tests == 'all'
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success() && needs.scope.outputs.desktop_tests == 'all'
-        with:
-          name: pass--ubuntu-24.04--desktop.tests
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
+        run: bash scripts/verify.sh desktop
 
   # The app, the CLI and an agent as real processes: approvals, locks, saves and the session's lifecycle.
+  # macOS runs them under its stock bash 3.2 (D-0398).
   desktop-gates:
     name: desktop gates (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.gates_os != '[]'
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.scope.outputs.gates_os) }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -208,31 +152,24 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
+
       - name: Restore, build and drive the desktop gates
         shell: bash
         run: bash scripts/verify.sh desktop-gates
 
-      - name: Mark this job passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--${{ matrix.os }}--desktop.gates
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   # The supported workflows on vaults KeePassXC made, through the CLI and the app's screens (9.4, D-0307).
   compat:
     name: keepassxc workflows (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.compat_os != '[]'
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.scope.outputs.compat_os) }}
+        os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
@@ -272,27 +209,13 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-workflows.sh artifacts/compat/workflows
 
-      - name: Mark this job passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--${{ matrix.os }}--appcompat.workflows
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   # The first run offers the databases real KeePassXC last opened, found where KeePassXC keeps them (N.2).
   first-run:
     name: keepassxc first run (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.firstrun_os != '[]'
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.scope.outputs.firstrun_os) }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
@@ -336,29 +259,15 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-first-run.sh artifacts/compat/first-run
 
-      - name: Mark this job passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--${{ matrix.os }}--appcompat.firstrun
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   # What the platform clipboard offers after the app copies a secret, after its clear and after a
   # plain copy: the nspasteboard.org types on macOS, Klipper's hint on X11 (N.12). The readings go to
   # the log, since nothing in this workflow uploads before the installer is signed.
   clipboard-markers:
     name: clipboard markers (${{ matrix.os }})
-    needs: scope
-    if: needs.scope.outputs.markers_os != '[]'
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(needs.scope.outputs.markers_os) }}
+        os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -391,26 +300,13 @@ jobs:
         shell: bash
         run: bash scripts/verify-clipboard-markers.sh "$PWD/artifacts/bin/Keypaste.MinimizeObserver/release/Keypaste.MinimizeObserver" clipboard-markers
 
-      - name: Mark this job passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--${{ matrix.os }}--markers
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   package:
     name: publish + selftest (${{ matrix.os }})
-    needs: scope
-    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' package ') && needs.scope.outputs.targets != '[]'
+    needs: targets
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.scope.outputs.targets) }}
+        include: ${{ fromJSON(needs.targets.outputs.targets) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
@@ -718,23 +614,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Mark this job passed on these inputs
-        if: success()
-        shell: bash
-        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: success()
-        with:
-          name: pass--${{ matrix.os }}--package
-          path: ${{ runner.temp }}/pass.txt
-          retention-days: 30
-
   # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
   ok:
     name: app ok
     if: always()
-    needs: [scope, desktop, desktop-gates, compat, first-run, clipboard-markers, package]
+    needs: [targets, desktop, desktop-gates, compat, first-run, clipboard-markers, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

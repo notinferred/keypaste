@@ -918,11 +918,6 @@ PROJECTS
 # The steps of a workflow, one per NUL-free record, split on a step's leading dash.
 workflow_steps() { code_of "$1" | awk '/^      - / { if (step != "") printf "%s\035", step; step = "" } { step = step $0 " " } END { printf "%s\035", step }'; }
 
-# A pass marker uploads nothing but the commit hash its job wrote to the runner's temp folder (D-0404, D-0411).
-is_pass_marker() {
-  case "$1" in *"uses: actions/upload-artifact"*"name: pass--"*'path: ${{ runner.temp }}/pass.txt '*) return 0 ;; *) return 1 ;; esac
-}
-
 # A Windows build signs only through sign-windows.sh, which reads the policy from the definition;
 # a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation (3.6b, D-0204).
 validate_signing() {
@@ -957,7 +952,7 @@ validate_signing() {
         case "$step" in *"name: Package and hash"*) [ "$packaged" -gt 0 ] || packaged="$index" ;; esac
         case "$step" in
           *"uses: actions/upload-artifact"* | *"uses: actions/attest-build-provenance"*)
-            is_pass_marker "$step" || [ "$published" -gt 0 ] || published="$index" ;;
+            [ "$published" -gt 0 ] || published="$index" ;;
         esac
         case "$step" in *"uses: azure/login@"*) ;; *) continue ;; esac
         logins=$((logins + 1))
@@ -990,7 +985,6 @@ validate_signing() {
           while IFS= read -r -d $'\035' step; do
             case "$step" in
               *"uses: actions/upload-artifact"* | *"uses: actions/attest-build-provenance"*)
-                is_pass_marker "$step" && continue
                 case "$step" in
                   *"steps.rehearsal.outputs.trusted == ''"*) ;;
                   *) note "$workflow can upload or attest a rehearsal-signed file: $(printf '%s' "$step" | sed -E 's/ +/ /g' | cut -c1-80)" ;;
@@ -1427,12 +1421,6 @@ cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
 
 sed_inplace "s/ \&\& steps.rehearsal.outputs.trusted == ''//" "$FAKE/.github/workflows/app.yml"
 expect_repo_refusal "rehearsal-reaches-attestation" "can upload or attest a rehearsal-signed file" \
-  "$FAKE/release-targets.json" "$FAKE"
-cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
-
-# A pass marker is exempt only because it uploads the commit hash; the same name over the installer is refused.
-sed_inplace 's|          path: ${{ runner.temp }}/pass.txt|          path: artifacts/dist/*|' "$FAKE/.github/workflows/app.yml"
-expect_repo_refusal "marker-uploads-the-installer" "can upload or attest a rehearsal-signed file" \
   "$FAKE/release-targets.json" "$FAKE"
 cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
 
