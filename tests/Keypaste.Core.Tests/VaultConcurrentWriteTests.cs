@@ -203,6 +203,61 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         Assert.Null(Record.Exception(vault.Save));
     }
 
+    /// <summary>
+    /// A write landing straight after this vault's save is another program's, not this vault's own.
+    /// </summary>
+    /// <remarks>
+    /// Stamped by reading the file back after the save, the vault took that write for its own state,
+    /// and its next save reverted it. The stamp is the digest of the bytes the save wrote.
+    /// </remarks>
+    [Fact]
+    public void A_write_landing_straight_after_a_save_is_not_taken_for_its_own()
+    {
+        var path = NewVault();
+
+        using var first = Vault.Open(path, MasterPassword);
+        using var second = Vault.Open(path, MasterPassword);
+
+        first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
+        first.SaveWaiting(null, afterReplacing: () =>
+        {
+            second.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
+            second.SaveOverwriting();
+        });
+
+        Assert.True(first.HasFileChangedSinceOpen());
+
+        first.AddEntry(new VaultEntry { Title = "a-later-edit", Password = "third" });
+        Assert.Throws<VaultChangedOnDiskException>(first.Save);
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        Assert.NotNull(reopened.Find("from-the-terminal"));
+        Assert.Null(reopened.Find("a-later-edit"));
+    }
+
+    /// <summary>
+    /// A vault whose file has gone is not written fresh at its path.
+    /// </summary>
+    /// <remarks>
+    /// Whatever moved or deleted it, or is between deleting the file and renaming its own save over
+    /// the name, would lose what it puts there. An unreadable file that is still present stays
+    /// unchanged, so a scanner holding it for a moment does not raise a conflict (D-0017).
+    /// </remarks>
+    [Fact]
+    public void A_save_after_the_file_has_gone_is_refused()
+    {
+        var path = NewVault();
+
+        using var vault = Vault.Open(path, MasterPassword);
+        File.Move(path, path + ".moved");
+
+        vault.AddEntry(new VaultEntry { Title = "late", Password = "late" });
+
+        Assert.True(vault.HasFileChangedSinceOpen());
+        Assert.Throws<VaultChangedOnDiskException>(vault.Save);
+        Assert.False(File.Exists(path));
+    }
+
     private string NewVault([System.Runtime.CompilerServices.CallerMemberName] string name = "")
     {
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;

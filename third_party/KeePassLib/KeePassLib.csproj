@@ -45,10 +45,13 @@
                          folds a hardware key's challenge-response answer into the key the
                          way KeePassXC does: into the KDF input from KDBX 4, into the final
                          key for KDBX 3.1. Upstream KeePass has no such key.
+      KEYPASTE_ATOMIC_REPLACE
+                         commits a save with one rename over the vault where upstream deletes
+                         the vault and then renames, so no moment leaves nothing at its path.
 
-      All four are grep-able markers. Every site they guard is listed in UPSTREAM.md.
+      All five are grep-able markers. Every site they guard is listed in UPSTREAM.md.
     -->
-    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE</DefineConstants>
+    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE;KEYPASTE_ATOMIC_REPLACE</DefineConstants>
 
     <!--
       docs/PRODUCT.md §3.9: dependencies on the secret path are minimised. This project has

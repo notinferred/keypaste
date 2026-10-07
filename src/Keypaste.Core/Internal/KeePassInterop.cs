@@ -36,6 +36,7 @@ internal sealed class KeePassInterop : IDisposable
     private readonly PwDatabase _database;
     private bool _disposed;
     private bool _readOnly;
+    private byte[]? _written;
 
     // KdfPool fills its static list without synchronization; the runtime runs this once and holds concurrent first callers until it returns (F.11).
     static KeePassInterop() => _ = KdfPool.Engines.Count();
@@ -353,6 +354,7 @@ internal sealed class KeePassInterop : IDisposable
                 transaction.CommitWrite();
             }
 
+            _written = SHA256.HashData(bytes);
             change.Committed = true;
             _database.Modified = false;
         }
@@ -1409,6 +1411,13 @@ internal sealed class KeePassInterop : IDisposable
     /// </summary>
     internal bool UsesFileTransactions => _database.UseFileTransactions;
 
+    /// <summary>The SHA-256 of the bytes the last successful save wrote, or null before one has.</summary>
+    /// <remarks>
+    /// Hashed as they were written rather than read back afterwards, so a write another program lands
+    /// on the path straight after this save is a change on disk and not this vault's own state.
+    /// </remarks>
+    internal byte[]? WrittenDigest => _written;
+
     /// <summary>KeePassLib's unsaved-changes flag. A test seam.</summary>
     internal bool Modified
     {
@@ -1639,9 +1648,10 @@ internal sealed class KeePassInterop : IDisposable
     /// is brief (D-0119). A detector, not a lock.
     /// </para>
     /// <para>
-    /// Retrying is otherwise safe precisely because the write is transactional. A failed commit
-    /// leaves the original file untouched, so a second attempt starts from the same place as the
-    /// first, and a save that never succeeds reports exactly what it reported before.
+    /// Retrying is otherwise safe because the commit is one replacing move: Transactional NTFS where
+    /// it works, and a single rename over the vault everywhere else (<c>KEYPASTE_ATOMIC_REPLACE</c>). A
+    /// failed commit leaves the original file untouched, so a second attempt starts from the same place
+    /// as the first, and a save that never succeeds reports exactly what it reported before.
     /// </para>
     /// <para>
     /// <b>The retry schedule bounds the sleeps and nothing else.</b> A caller waits for the
@@ -1758,6 +1768,7 @@ internal sealed class KeePassInterop : IDisposable
                 if (keyChange is null)
                 {
                     _database.Save(null);
+                    _written = _database.HashOfFileOnDisk is { } hash ? [.. hash] : null;
                 }
                 else
                 {

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+On macOS and Linux a save now replaces the vault in one step, so a crash or power loss while saving can no longer leave nothing at the vault's path. keypaste also notices another program's save that lands while a vault is being opened or just after keypaste saves it, and refuses to save over a vault file that has been moved or deleted, instead of quietly writing over the other change ([F.53](docs/steps/F.53.md)).
+
 Upgrade the bridge and `keypaste agent` together: they must be the same version. Approval prompts answer `d`, `o` or `h` instead of `y` or `n`. `env export` now writes `kp://` references by default and values only with `--dotenv`. `rm` moves entries to the vault's recycle bin, which saves the vault as KDBX 4.1; KeePass 2.48 and KeePassXC 2.7 or later open it. The desktop entries below ship with the first public desktop release, which is published together with this version ([RELEASE](docs/RELEASE.md)). Each entry that names a step links its record, which holds the full account.
 
 An MCP bridge started without `--expose` now reaches the project variables of entries tagged into a project, wherever they sit, and not an untagged entry under `env/`; `--expose` and policy rules take `tag:env:<project>` and `tag:env:<project>:<environment>`, which reach only those variables, never a password. `list_entry_names` names each entry's fields and project tags, and a bridge configured for the old default needs `--expose 'env/**'` to keep it ([C.5b](docs/steps/C.5b.md)).

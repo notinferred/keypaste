@@ -276,6 +276,50 @@ public sealed class HardwareKeyVaultTests : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// A save landing while the key is derived leaves the vault changed on disk.
+    /// </summary>
+    /// <remarks>
+    /// The file is digested before it is read, as a reload does. Digested after the open, the vault
+    /// stamped the new file with the contents of the old one, and its next save reverted the other
+    /// write. The landing write renames over the vault, as savers do; Windows refuses that while the
+    /// file is open for reading, so the race cannot be staged there.
+    /// </remarks>
+    [Fact]
+    public void A_save_landing_while_the_key_is_derived_is_seen()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Windows refuses to rename over a file that is open for reading, so the write cannot land mid-open.");
+        }
+
+        var device = new SoftwareYubiKey(_secret);
+        var path = HardwareKeyVault("vault.kdbx", device);
+        var before = File.ReadAllBytes(path);
+
+        using (var writerKey = new HardwareKey(device, 2))
+        using (var writer = Vault.Open(path, _master, null, writerKey))
+        {
+            writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
+            writer.Save();
+        }
+
+        var landed = Path.Combine(_directory, "landed.kdbx");
+        File.Move(path, landed);
+        File.WriteAllBytes(path, before);
+
+        using var key = new HardwareKey(new Landing(device, () => File.Move(landed, path, overwrite: true)), 2);
+        using var vault = Vault.Open(path, _master, null, key);
+
+        Assert.Equal("value", Assert.Single(vault.ReadEntries()).Password);
+        Assert.True(vault.HasFileChangedSinceOpen());
+        Assert.Throws<VaultChangedOnDiskException>(vault.Save);
+
+        using var readerKey = new HardwareKey(device, 2);
+        using var reopened = Vault.Open(path, _master, null, readerKey);
+        Assert.Equal("external", Assert.Single(reopened.ReadEntries()).Password);
+    }
+
     private string HardwareKeyVault(string name, SoftwareYubiKey device)
     {
         var path = Path.Combine(_directory, name);
@@ -284,5 +328,19 @@ public sealed class HardwareKeyVaultTests : IDisposable
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;
+    }
+
+    /// <summary>A key that runs another program's save the first time it is asked, during the key derivation.</summary>
+    private sealed class Landing(IChallengeResponseDevice device, Action land) : IChallengeResponseDevice
+    {
+        private Action? _land = land;
+
+        public IReadOnlyList<HardwareKeyInfo> Find() => device.Find();
+
+        public byte[] Respond(int slot, byte[] challenge, Action touchNeeded, CancellationToken cancellationToken)
+        {
+            Interlocked.Exchange(ref _land, null)?.Invoke();
+            return device.Respond(slot, challenge, touchNeeded, cancellationToken);
+        }
     }
 }

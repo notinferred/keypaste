@@ -82,6 +82,12 @@ public sealed class VaultClaim : IDisposable
         refusal = null;
         holder = null;
 
+        if (FileLocking.IsDisabled)
+        {
+            refusal = FileLocking.Refusal;
+            return false;
+        }
+
         var vault = VaultIdentity.Of(home, vaultPath);
         var directory = Path.Combine(home, DirectoryName);
         var lockPath = Path.Combine(directory, vault.Key + ".lock");

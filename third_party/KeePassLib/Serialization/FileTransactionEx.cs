@@ -252,8 +252,17 @@ namespace KeePassLib.Serialization
 
 			if(!TxfMove())
 			{
+#if KEYPASTE_ATOMIC_REPLACE
+				if(m_iocBase.IsLocalFile() && m_iocTemp.IsLocalFile())
+					File.Move(m_iocTemp.Path, m_iocBase.Path, true);
+				else
+				{
+#endif
 				if(bBaseExists) IOConnection.DeleteFile(m_iocBase);
 				IOConnection.RenameFile(m_iocTemp, m_iocBase);
+#if KEYPASTE_ATOMIC_REPLACE
+				}
+#endif
 			}
 			else { Debug.Assert(pbSec != null); } // TxF success => NTFS => has ACL
 
