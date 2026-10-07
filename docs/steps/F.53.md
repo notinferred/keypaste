@@ -1,6 +1,6 @@
 # F.53 — Save the vault in one rename and stamp what was written
 
-Completed 2026-10-07 at `01eedc0` on `task/f53`: ci 37627277189 (its Windows test job passed on a rerun, see Limits) and app 37627277202 ran every job green on pull request #11. The integrated commit differs from that tree in this record and in `scripts/dev.sh`, which no CI job runs beyond its syntax check.
+Completed 2026-10-07 at `01eedc0` on `task/f53`: ci 37627277189 (its Windows test job passed on a rerun, see Limits) and app 37627277202 ran every job green on its pull request. The integrated commit differs from that tree in this record and in `scripts/dev.sh`, which no CI job runs beyond its syntax check.
 
 It had no STEPS row: the founder asked on 2026-10-07 for keypaste to be audited against the founder's engineering references and the findings fixed, and chose this group first (D-0424).
 
@@ -15,7 +15,7 @@ It had no STEPS row: the founder asked on 2026-10-07 for keypaste to be audited 
 - A vault's stamp after a save is the SHA-256 KeePassLib computed over the bytes it wrote (`PwDatabase.HashOfFileOnDisk`, or the verified bytes of an access change), not a read of the file afterwards.
 - `Vault.Open` digests the file before the key is derived, as `Reload` already did.
 - `FileLocking` reads `System.IO.DisableFileLocking` and `DOTNET_SYSTEM_IO_DISABLEFILELOCKING` as the runtime does; `VaultClaim.TryAcquire` and `AuditLog.TryAppend` refuse while it is off.
-- `scripts/dev.sh` waits up to 30 s for a failed job's log, which GitHub publishes a few seconds after the job ends; pull request #11's first failure printed an empty log.
+- `scripts/dev.sh` waits up to 30 s for a failed job's log, which GitHub publishes a few seconds after the job ends; the pull request's first failure printed an empty log.
 
 ## Evidence
 

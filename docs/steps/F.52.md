@@ -24,15 +24,15 @@ It had no STEPS row. On 2026-10-06 the founder asked for CI and testing to be au
 | | Before | After |
 |---|---|---|
 | Every check, Linux | dev 37478702958: one serial job, 1182 s | dev 37489140641: 361 s, longest job 296 s |
-| Every check, three runners | dev 37478702958 1743 s, then ci 37438294611 18 min and app 37438298130 10 min | PR #10: ci 713 s and app 490 s at once; `dev.sh` green in 728 s |
+| Every check, three runners | dev 37478702958 1743 s, then ci 37438294611 18 min and app 37438298130 10 min | the pull request's runs: ci 713 s and app 490 s at once; `dev.sh` green in 728 s |
 | One test class | — | dev 37609347187: green in 82 s |
 | `dotnet format` per Linux run | about 205 s in five calls, before every build | 162 s once, in its own job |
 
-- PR #10 ran 31 jobs. The longest, `test (windows-2025)`, ran 605 s after waiting 104 s for a runner: 31 jobs exceed a free account's 20 concurrent jobs and 5 macOS jobs, and `integration (macos-15)` waited 307 s.
+- The pull request's run had 31 jobs. The longest, `test (windows-2025)`, ran 605 s after waiting 104 s for a runner: 31 jobs exceed a free account's 20 concurrent jobs and 5 macOS jobs, and `integration (macos-15)` waited 307 s.
 - The desktop gates passed under macOS's bash 3.2 in 327 s and on Windows in 430 s; App.Tests passed on Windows in 454 s and macOS in 474 s.
 - Dev 37609499808, a misspelt class: `dev.sh` printed the job's log ending in `Exit code: 8` 72 s after dispatch and exited 1 while the run went on.
 - Dev 37489140641's scripts job failed on shellcheck SC2100, which read `lane=desktop-all` as arithmetic; quoting the value fixed it.
-- In PR #10's checks job, `verify-release-matrix.sh` passed without the marker case and actionlint passed over the three rewritten workflows.
+- In the pull request's checks job, `verify-release-matrix.sh` passed without the marker case and actionlint passed over the three rewritten workflows.
 
 ## Decisions
 
@@ -41,7 +41,7 @@ D-0423.
 ## Limits and follow-ups
 
 - The time to all green is set by Core.Tests and Cli.Tests on Windows and macOS, 5 to 7 minutes against about 2.5 on Linux. Of the process gates' roughly 7 minutes, about 5 are fixed waits. Both are BACKLOG investigation candidates.
-- A full run queues behind GitHub's concurrency limits; about 100 s of PR #10's 728 s was waiting for runners.
+- A full run queues behind GitHub's concurrency limits; about 100 s of the pull request's 728 s was waiting for runners.
 - Nothing is cached, so each Windows job restores in about 50 s.
 - A release still needs a ci and app dispatch at the commit, since `require-green-gates.sh` is unchanged, though every push to `main` now runs every job.
 - A documents-only push to a pull request runs every job.
