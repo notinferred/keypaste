@@ -4,7 +4,7 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
-When you refuse a request, the same field, or the same secrets for a run, is now refused for a minute whichever agent or connection asks, so an agent cannot reconnect to ask you again. Each `keypaste run --session` release or refusal now appears in `keypaste log`, and a run is refused if its line cannot be written ([F.54](docs/steps/F.54.md)).
+When you refuse a request, the same field, or the same secrets for a run, is now refused for a minute whichever agent or connection asks, so an agent cannot reconnect to ask you again. Each `keypaste run --session` release, and each refusal of a valid request, now appears in `keypaste log`, and a run is refused if its line cannot be written ([F.54](docs/steps/F.54.md)).
 
 On macOS and Linux a save now replaces the vault in one step, so a crash or power loss while saving can no longer leave nothing at the vault's path. keypaste also notices another program's save that lands while a vault is being opened or just after keypaste saves it, instead of quietly writing over it on its next save ([F.53](docs/steps/F.53.md)).
 

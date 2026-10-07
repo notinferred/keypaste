@@ -339,6 +339,7 @@ public sealed class SessionAuthority : IApproverHandler
         var fileLines = (request.FileLines ?? []).Select(ShownLine).ToList();
         var answer = ApprovalAnswer.NoChannel;
         var fromGrant = false;
+        string? refused = null;
 
         var resolver = new SessionEnvResolver(
             () => ReferenceEquals(Live(), admitted) ? admitted : null,
@@ -351,6 +352,13 @@ public sealed class SessionAuthority : IApproverHandler
             request.Keys,
             async (preview, withdrawn) =>
             {
+                // Checked before anybody is asked, so a person never approves a set its audit line cannot record.
+                if (AuditedLength([.. EntriesOf(preview).Select(entry => ApprovalPrompt.Shown(entry.Name)).Distinct(StringComparer.Ordinal)]) > MaximumAuditedEntriesBytes)
+                {
+                    refused = "the run names more entries than one audit line can record";
+                    return false;
+                }
+
                 // A set holding a member of a protected environment is asked about live: no timed grant is offered or used.
                 var grantSeconds = preview.RequiresLiveApproval ? 0 : EnvGrantCache.GrantSeconds(environments.Gate.Limits);
                 var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { GrantSeconds = grantSeconds, FileLines = fileLines };
@@ -386,14 +394,21 @@ public sealed class SessionAuthority : IApproverHandler
             },
             cancellationToken).ConfigureAwait(false);
 
-        var method = resolved.Outcome switch
+        var delivered = refused is not null
+            ? Refused(request.Project, request.Profile, EnvOutcome.Invalid, refused)
+            : Deliverable(new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal));
+
+        // As the run path records them; an approval the runner hung up on before it was used is a cancellation.
+        var method = delivered.Set.Outcome switch
         {
             EnvOutcome.Resolved => fromGrant ? AuditMethod.GrantCache : AuditMethod.Prompt,
-            EnvOutcome.Declined => answer.ToAuditMethod(),
+            EnvOutcome.Declined => answer.Releases() ? AuditMethod.Cancelled : answer.ToAuditMethod(),
+            EnvOutcome.NoProject or EnvOutcome.NoProfile or EnvOutcome.Unusable or EnvOutcome.Unauthorized => AuditMethod.OutOfScope,
+            EnvOutcome.Unsaved or EnvOutcome.ChangedOnDisk or EnvOutcome.ChangedWhileAsked => AuditMethod.VaultChanged,
             EnvOutcome.Locked => AuditMethod.VaultLocked,
-            EnvOutcome.ChangedOnDisk or EnvOutcome.ChangedWhileAsked => AuditMethod.VaultChanged,
+            EnvOutcome.TooLarge => AuditMethod.Undeliverable,
             EnvOutcome.Invalid => AuditMethod.InvalidRequest,
-            _ => AuditMethod.OutOfScope,
+            _ => AuditMethod.Failed,
         };
         var reply = Audited(
             environments.Audit,
@@ -402,7 +417,7 @@ public sealed class SessionAuthority : IApproverHandler
             new AuditClient("keypaste run --session", CoreInfo.Version, null),
             method,
             request.Session,
-            Deliverable(new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal)));
+            delivered);
 
         Settled(environments, admitted, reply.Set, GrantSummary.EnvClient, "run --session");
 
@@ -499,11 +514,6 @@ public sealed class SessionAuthority : IApproverHandler
             : ["refs", .. request.References!.Select(reference => reference.Name + "=" + reference.Reference)];
         var runKey = string.Join('\0', ["run", connectionId, request.Directory, request.Program, .. request.Command, "\u0001", .. mode]);
 
-        // A denial cools down every run of this connection, and every run asking for these secrets
-        // whichever connection asks: another argument, a space, another project from the same agent or
-        // the same secrets from a new bridge is not a new question (T-11).
-        string[] cooldownKeys = ["run\0" + connectionId, string.Join('\0', ["run", .. mode])];
-
         var answer = ApprovalAnswer.NoChannel;
         var method = AuditMethod.Prompt;
         var granted = 0;
@@ -558,7 +568,14 @@ public sealed class SessionAuthority : IApproverHandler
                 grantSeconds,
                 onceOnly);
 
-            answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
+            // A denial cools down every run of this connection, and every run asking for these secrets
+            // whichever connection asks and however it names them: another argument, another project
+            // from the same agent, or the same entries' fields from a new bridge is not a new question (T-11).
+            var secrets = entries.Select(entry => EntryHandle.For(entry.Name) + "|" + entry.Field)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal);
+            answer = await environments.Gate.AskAsync(["run\0" + connectionId, string.Join('\0', ["run", .. secrets])], prompt, withdrawn)
+                .ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();

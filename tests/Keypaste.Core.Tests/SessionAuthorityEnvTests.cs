@@ -133,6 +133,35 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.DoesNotContain(_token2, text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A set naming more entries than one audit line can record is refused before anybody is asked, so
+    /// a person never approves a release that is then refused for want of its line.
+    /// </summary>
+    [Fact]
+    public async Task A_run_whose_entries_would_not_fit_its_audit_line_is_refused_unasked()
+    {
+        foreach (var i in Enumerable.Range(0, 30))
+        {
+            var wide = new EntryName("env/wide", $"KEY_{i}_" + new string('W', 70));
+            _vault.AddEntry(new VaultEntry { GroupPath = wide.GroupPath, Title = wide.Title });
+            Assert.True(_vault.SetFields(wide, [new FieldWrite(wide.Title, $"w{i}")]));
+            Assert.True(_vault.AddTag(wide, "env:wide"));
+        }
+
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseEnvAsync(Request("session-one", project: "wide"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Invalid, reply.Set.Outcome);
+        Assert.Equal("the run names more entries than one audit line can record", reply.Reason);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Equal("invalid-request", Assert.Single(AuditLines()).GetProperty("method").GetString());
+    }
+
     /// <summary>No record, no release: a set whose audit line cannot be written is refused whole.</summary>
     [Fact]
     public async Task A_run_whose_audit_line_cannot_be_written_releases_nothing()
