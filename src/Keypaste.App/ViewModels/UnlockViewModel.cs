@@ -73,7 +73,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private bool _busy;
     private bool _creating;
     private bool _restoreOnly;
-    private int _backups;
+    private bool _hasBackups;
     private RestoreBackupViewModel? _restore;
     private string? _notice;
     private string? _chosenNotice;
@@ -114,6 +114,51 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         SwitchSlotCommand = new RelayCommand(() => HardwareKeySlot = _hardwareKeySlot == 1 ? 2 : 1, () => !_busy && _hardwareKeySlot is not null);
         ClearHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = null, () => !_busy && _hardwareKeySlot is not null);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
+
+        DependsOn(nameof(Heading), nameof(SelectedPath), nameof(IsRestoreOnly), nameof(SelectedName), nameof(IsHandOff));
+        DependsOn(nameof(IsHandOff), nameof(SelectedPath));
+        DependsOn(nameof(Subtitle), nameof(IsHandOff));
+        DependsOn(nameof(WelcomeSubtitle), nameof(OffersKeePassXc));
+        DependsOn(nameof(OffersKeePassXc), nameof(SelectedPath), nameof(KeePassXc));
+        DependsOn(nameof(OffersOpenFirst), nameof(SelectedPath), nameof(KeePassXc));
+        DependsOn(nameof(CreateHeading), nameof(NewVaultName));
+        DependsOn(nameof(ShowsRecent), nameof(Recent), nameof(SelectedPath));
+        DependsOn(nameof(HasRecent), nameof(Recent));
+        DependsOn(nameof(HasNoRecent), nameof(Recent));
+        DependsOn(nameof(IsRestoring), nameof(Restore));
+        DependsOn(nameof(OffersRestore), nameof(HasBackups), nameof(IsOpening));
+        DependsOn(nameof(CanTypePassword), nameof(SelectedPath), nameof(IsRestoreOnly));
+        DependsOn(nameof(KeyfileName), nameof(KeyfilePath));
+        DependsOn(nameof(HasKeyfile), nameof(KeyfilePath));
+        DependsOn(nameof(ShowsHardwareKey), nameof(MoreOptions), nameof(HardwareKeySlot));
+        DependsOn(nameof(OffersMoreOptions), nameof(ShowsHardwareKey));
+        DependsOn(nameof(UsesHardwareKey), nameof(HardwareKeySlot));
+        DependsOn(nameof(HardwareKeyLabel), nameof(HardwareKeySlot));
+        DependsOn(nameof(OtherSlotLabel), nameof(HardwareKeySlot));
+        DependsOn(nameof(IsOpening), nameof(IsCreating), nameof(Restore));
+        DependsOn(nameof(NewVaultName), nameof(NewVaultPath));
+        DependsOn(nameof(SelectedName), nameof(SelectedPath));
+        DependsOn(nameof(HasSelection), nameof(SelectedPath));
+        DependsOn(nameof(HasMessage), nameof(Message));
+        DependsOn(nameof(IsError), nameof(Failed), nameof(HasMessage));
+        DependsOn(nameof(HasNote), nameof(HasMessage), nameof(Failed));
+        DependsOn(nameof(HasLooseError), nameof(IsError), nameof(IsOpening), nameof(HasSelection));
+        DependsOn(nameof(HasOwner), nameof(Owner));
+        DependsOn(UnlockCommand, nameof(Busy), nameof(CanTypePassword), nameof(MaskedLength), nameof(KeyfilePath), nameof(HardwareKeySlot));
+        DependsOn(BrowseCommand, nameof(Busy), nameof(IsOpening));
+        DependsOn(StartCreateCommand, nameof(Busy));
+        DependsOn(CreateCommand, nameof(Busy), nameof(IsCreating), nameof(NewVaultPath), nameof(NewMaskedLength));
+        DependsOn(CancelCreateCommand, nameof(Busy));
+        DependsOn(StartRestoreCommand, nameof(Busy), nameof(HasBackups), nameof(IsOpening));
+        DependsOn(CloseRestoreCommand, nameof(Restore));
+        DependsOn(ChooseKeyfileCommand, nameof(Busy));
+        DependsOn(ClearKeyfileCommand, nameof(Busy), nameof(KeyfilePath));
+        DependsOn(ShowMoreOptionsCommand, nameof(MoreOptions));
+        DependsOn(UseHardwareKeyCommand, nameof(Busy), nameof(HardwareKeySlot));
+        DependsOn(SwitchSlotCommand, nameof(Busy), nameof(HardwareKeySlot));
+        DependsOn(ClearHardwareKeyCommand, nameof(Busy), nameof(HardwareKeySlot));
+        DependsOn(CancelTouchCommand, nameof(IsWaitingForTouch));
+
         _session.WaitingForTouch += OnWaitingForTouch;
         Reload();
         LockNote = lockedBy is { } reason ? DescribeLock(reason, session.Clock.GetLocalNow(), session.IdleTimeout) : string.Empty;
@@ -216,25 +261,17 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal RestoreBackupViewModel? Restore
     {
         get => _restore;
-        private set
-        {
-            if (Set(ref _restore, value))
-            {
-                Raise(nameof(IsRestoring));
-                Raise(nameof(IsOpening));
-                Raise(nameof(OffersRestore));
-                Raise(nameof(HasLooseError));
-                StartRestoreCommand.RaiseCanExecuteChanged();
-                CloseRestoreCommand.RaiseCanExecuteChanged();
-                BrowseCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _restore, value);
     }
 
     internal bool IsRestoring => _restore is not null;
 
     /// <summary>Whether the selected vault has backups V.4a's saves left beside it.</summary>
-    internal bool HasBackups => _backups > 0;
+    internal bool HasBackups
+    {
+        get => _hasBackups;
+        private set => Set(ref _hasBackups, value);
+    }
 
     /// <summary>Whether the quiet "Restore a backup" action shows under the unlock controls.</summary>
     internal bool OffersRestore => HasBackups && IsOpening;
@@ -243,7 +280,11 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// Whether the selection is a path with no readable vault at it, chosen only because it has
     /// backups. There is nothing to unlock, so the password field and the button stay off.
     /// </summary>
-    internal bool IsRestoreOnly => _restoreOnly;
+    internal bool IsRestoreOnly
+    {
+        get => _restoreOnly;
+        private set => Set(ref _restoreOnly, value);
+    }
 
     internal bool CanTypePassword => _selectedPath is not null && !_restoreOnly;
 
@@ -277,16 +318,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal string? KeyfilePath
     {
         get => _keyfilePath;
-        private set
-        {
-            if (Set(ref _keyfilePath, value))
-            {
-                Raise(nameof(KeyfileName));
-                Raise(nameof(HasKeyfile));
-                UnlockCommand.RaiseCanExecuteChanged();
-                ClearKeyfileCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _keyfilePath, value);
     }
 
     /// <summary>The keyfile's name. The full path is a tooltip, as a vault's is.</summary>
@@ -305,15 +337,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal bool MoreOptions
     {
         get => _moreOptions;
-        private set
-        {
-            if (Set(ref _moreOptions, value))
-            {
-                Raise(nameof(ShowsHardwareKey));
-                Raise(nameof(OffersMoreOptions));
-                ShowMoreOptionsCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _moreOptions, value);
     }
 
     /// <summary>
@@ -344,21 +368,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal int? HardwareKeySlot
     {
         get => _hardwareKeySlot;
-        private set
-        {
-            if (Set(ref _hardwareKeySlot, value))
-            {
-                Raise(nameof(UsesHardwareKey));
-                Raise(nameof(ShowsHardwareKey));
-                Raise(nameof(OffersMoreOptions));
-                Raise(nameof(HardwareKeyLabel));
-                Raise(nameof(OtherSlotLabel));
-                UnlockCommand.RaiseCanExecuteChanged();
-                UseHardwareKeyCommand.RaiseCanExecuteChanged();
-                SwitchSlotCommand.RaiseCanExecuteChanged();
-                ClearHardwareKeyCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _hardwareKeySlot, value);
     }
 
     internal bool UsesHardwareKey => _hardwareKeySlot is not null;
@@ -371,30 +381,14 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal bool IsWaitingForTouch
     {
         get => _waitingForTouch;
-        private set
-        {
-            if (Set(ref _waitingForTouch, value))
-            {
-                CancelTouchCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _waitingForTouch, value);
     }
 
     /// <summary>Whether the create fields are showing instead of the unlock ones.</summary>
     internal bool IsCreating
     {
         get => _creating;
-        private set
-        {
-            if (Set(ref _creating, value))
-            {
-                Raise(nameof(IsOpening));
-                Raise(nameof(OffersRestore));
-                Raise(nameof(HasLooseError));
-                StartRestoreCommand.RaiseCanExecuteChanged();
-                BrowseCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _creating, value);
     }
 
     /// <summary>The other half of <see cref="IsCreating"/>, for the open controls' visibility.</summary>
@@ -402,7 +396,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>The file name the new vault will have, for the heading.</summary>
     internal string NewVaultName =>
-        _newVaultPath is null ? string.Empty : System.IO.Path.GetFileName(_newVaultPath);
+        NewVaultPath is null ? string.Empty : System.IO.Path.GetFileName(NewVaultPath);
 
     /// <summary>How many characters are in the new-password field.</summary>
     internal int NewMaskedLength => _new.Length;
@@ -424,16 +418,6 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 KeyfilePath = RememberedKeyfile(value);
                 HardwareKeySlot = OffersHardwareKey ? Remembered(value)?.HardwareKeySlot : null;
                 Look();
-                Raise(nameof(SelectedName));
-                Raise(nameof(HasSelection));
-                Raise(nameof(Heading));
-                Raise(nameof(IsHandOff));
-                Raise(nameof(Subtitle));
-                Raise(nameof(ShowsRecent));
-                Raise(nameof(OffersKeePassXc));
-                Raise(nameof(OffersOpenFirst));
-                Raise(nameof(WelcomeSubtitle));
-                RaiseMessage();
             }
         }
     }
@@ -476,10 +460,10 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal bool HasMessage => _message.Length > 0;
 
     /// <summary>Whether <see cref="Message"/> says something was refused or failed, which the screen draws in red.</summary>
-    internal bool IsError => _failed && HasMessage;
+    internal bool IsError => Failed && HasMessage;
 
     /// <summary>A note, drawn in the quiet slot below the form.</summary>
-    internal bool HasNote => HasMessage && !_failed;
+    internal bool HasNote => HasMessage && !Failed;
 
     /// <summary>A refusal with no field to sit under: nothing is selected, so there is no password field.</summary>
     internal bool HasLooseError => IsError && IsOpening && !HasSelection;
@@ -491,13 +475,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal string Owner
     {
         get => _owner;
-        private set
-        {
-            if (Set(ref _owner, value))
-            {
-                Raise(nameof(HasOwner));
-            }
-        }
+        private set => Set(ref _owner, value);
     }
 
     internal bool HasOwner => _owner.Length > 0;
@@ -506,19 +484,19 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal bool Busy
     {
         get => _busy;
-        private set
-        {
-            if (Set(ref _busy, value))
-            {
-                UnlockCommand.RaiseCanExecuteChanged();
-                BrowseCommand.RaiseCanExecuteChanged();
-                ChooseKeyfileCommand.RaiseCanExecuteChanged();
-                ClearKeyfileCommand.RaiseCanExecuteChanged();
-                UseHardwareKeyCommand.RaiseCanExecuteChanged();
-                SwitchSlotCommand.RaiseCanExecuteChanged();
-                ClearHardwareKeyCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _busy, value);
+    }
+
+    private bool Failed
+    {
+        get => _failed;
+        set => Set(ref _failed, value);
+    }
+
+    private string? NewVaultPath
+    {
+        get => _newVaultPath;
+        set => Set(ref _newVaultPath, value);
     }
 
     // A keyfile or a hardware key alone is a whole answer: KeePassXC makes vaults with no password (D-0282).
@@ -527,7 +505,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
     // The confirmation is not required to be non-empty here: an empty one that does not match is
     // VaultCreation's refusal to make, not a reason to grey out the button and explain nothing.
-    private bool CanCreate => !_busy && _creating && _newVaultPath is not null && _new.Length > 0;
+    private bool CanCreate => !_busy && _creating && NewVaultPath is not null && _new.Length > 0;
 
     /// <summary>Appends one typed character.</summary>
     internal void Type(char c)
@@ -593,7 +571,6 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         edit();
         Raise(nameof(NewMaskedLength));
         Raise(nameof(ConfirmMaskedLength));
-        CreateCommand.RaiseCanExecuteChanged();
 
         if (HasMessage)
         {
@@ -651,8 +628,6 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         _handOffPath = _selectedPath;
         Raise(nameof(IsHandOff));
-        Raise(nameof(Heading));
-        Raise(nameof(Subtitle));
         return true;
     }
 
@@ -681,19 +656,11 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         return true;
     }
 
-    /// <summary>Reads what the selection is: whether anything can be unlocked, and how many backups it has.</summary>
+    /// <summary>Reads what the selection is: whether anything can be unlocked, and whether it has backups.</summary>
     private void Look()
     {
-        _backups = _selectedPath is { } path ? VaultBackups.List(path).Count : 0;
-        _restoreOnly = _selectedPath is { } selected && !(File.Exists(selected) && KdbxHeader.IsVaultFile(selected));
-
-        Raise(nameof(HasBackups));
-        Raise(nameof(OffersRestore));
-        Raise(nameof(IsRestoreOnly));
-        Raise(nameof(Heading));
-        Raise(nameof(CanTypePassword));
-        UnlockCommand.RaiseCanExecuteChanged();
-        StartRestoreCommand.RaiseCanExecuteChanged();
+        HasBackups = _selectedPath is { } path && VaultBackups.List(path).Count > 0;
+        IsRestoreOnly = _selectedPath is { } selected && !(File.Exists(selected) && KdbxHeader.IsVaultFile(selected));
     }
 
     /// <summary>Drops a restore that is waiting on a confirmation, as a minimize does to an open vault.</summary>
@@ -898,13 +865,10 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _newVaultPath = full;
+        NewVaultPath = full;
         Message = string.Empty;
         KeyfilePath = null;
-        Raise(nameof(NewVaultName));
-        Raise(nameof(CreateHeading));
         IsCreating = true;
-        CreateCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>
@@ -961,10 +925,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         if (!_disposed)
         {
             ResetCreation();
-            _newVaultPath = null;
+            NewVaultPath = null;
             Message = string.Empty;
             KeyfilePath = RememberedKeyfile(_selectedPath);
-            Raise(nameof(NewVaultName));
             IsCreating = false;
         }
 
@@ -1151,9 +1114,6 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         {
             KeePassXc = [.. KeePassXcDatabases.Read(_keePassXcConfig).Select(path => new KeePassXcDatabaseItem(path))];
             Raise(nameof(KeePassXc));
-            Raise(nameof(OffersKeePassXc));
-            Raise(nameof(OffersOpenFirst));
-            Raise(nameof(WelcomeSubtitle));
         }
     }
 
@@ -1161,36 +1121,19 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     {
         Recent = [.. _remembered.Select(vault => new RecentVaultItem(vault.Path, File.Exists(vault.Path)))];
         Raise(nameof(Recent));
-        Raise(nameof(HasRecent));
-        Raise(nameof(HasNoRecent));
-        Raise(nameof(ShowsRecent));
     }
 
     private void Fail(string text) => Say(text, failed: true);
 
     private void Say(string text, bool failed)
     {
-        var changed = Set(ref _message, text, nameof(Message));
-
-        if (changed || _failed != failed)
-        {
-            _failed = failed;
-            RaiseMessage();
-        }
-    }
-
-    private void RaiseMessage()
-    {
-        Raise(nameof(HasMessage));
-        Raise(nameof(IsError));
-        Raise(nameof(HasNote));
-        Raise(nameof(HasLooseError));
+        Failed = failed;
+        Set(ref _message, text, nameof(Message));
     }
 
     private void AfterTyping()
     {
         Raise(nameof(MaskedLength));
-        UnlockCommand.RaiseCanExecuteChanged();
 
         if (HasMessage)
         {
@@ -1210,7 +1153,6 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _master.Dispose();
         _master = new SecretBuffer();
         Raise(nameof(MaskedLength));
-        UnlockCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>
@@ -1228,7 +1170,6 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _confirm = new SecretBuffer();
         Raise(nameof(NewMaskedLength));
         Raise(nameof(ConfirmMaskedLength));
-        CreateCommand.RaiseCanExecuteChanged();
     }
 
     public void Dispose()

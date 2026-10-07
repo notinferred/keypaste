@@ -1,5 +1,6 @@
 using Keypaste.Cli.Output;
 using Keypaste.Core;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -94,8 +95,8 @@ internal static class ListCommand
         {
             // Groups and entries are collected separately because a group holding no entries is
             // invisible in an entry listing, and KeePassXC lists it.
-            var groups = vault.ReadGroupPaths().Where(group => !ReservedGroups.IsReserved(group)).ToList();
-            var entries = vault.ReadEntries().Where(entry => !ReservedGroups.IsReserved(entry.GroupPath)).ToList();
+            var groups = vault.ReadGroupPaths();
+            var entries = vault.ReadEntries();
 
             if (json)
             {
@@ -149,7 +150,7 @@ internal static class ListCommand
 
     /// <summary>The listing as one JSON array, in the text listing's order.</summary>
     /// <remarks>Raw names, not scrubbed ones: a parser needs what the vault holds, and the encoder escapes every control and non-ASCII character.</remarks>
-    private static void WriteJson(List<string> groups, List<VaultEntry> entries, CliContext context)
+    private static void WriteJson(IReadOnlyList<string> groups, IReadOnlyList<VaultEntry> entries, CliContext context)
     {
         var items = groups
             .Select(group => (Key: group + "/", Entry: (VaultEntry?)null, Path: group))

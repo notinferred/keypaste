@@ -62,6 +62,15 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         AskRevokeCommand = new RelayCommand<ScopedTokenRow>(row => Confirm(row?.Id), row => row is not null);
         CancelRevokeCommand = new RelayCommand(() => Confirm(null));
         SetExpiryCommand = new RelayCommand<string>(chosen => Expiry = chosen!);
+
+        DependsOn(nameof(HasFormError), nameof(FormError));
+        DependsOn(nameof(HasMessage), nameof(Message));
+        DependsOn(nameof(HasMinted), nameof(Minted));
+        DependsOn(nameof(HasNoRows), nameof(Rows));
+        DependsOn(nameof(CanOpenForm), nameof(IsFormOpen), nameof(Minted));
+        DependsOn(OpenFormCommand, nameof(CanOpenForm));
+        DependsOn(CopyMintedCommand, nameof(Minted));
+
         Refresh();
     }
 
@@ -79,7 +88,6 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
             if (Set(ref _isFormOpen, value))
             {
                 FormError = string.Empty;
-                RaiseCanOpenForm();
             }
         }
     }
@@ -115,13 +123,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     internal string FormError
     {
         get => _formError;
-        private set
-        {
-            if (Set(ref _formError, value))
-            {
-                Raise(nameof(HasFormError));
-            }
-        }
+        private set => Set(ref _formError, value);
     }
 
     internal bool HasFormError => _formError.Length > 0;
@@ -130,13 +132,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     internal string Message
     {
         get => _message;
-        private set
-        {
-            if (Set(ref _message, value))
-            {
-                Raise(nameof(HasMessage));
-            }
-        }
+        private set => Set(ref _message, value);
     }
 
     internal bool HasMessage => _message.Length > 0;
@@ -176,13 +172,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<ScopedTokenRow> Rows
     {
         get => _rows;
-        private set
-        {
-            if (Set(ref _rows, value))
-            {
-                Raise(nameof(HasNoRows));
-            }
-        }
+        private set => Set(ref _rows, value);
     }
 
     /// <summary>Reads the vault's tokens again.</summary>
@@ -217,7 +207,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(scopes);
 
-        if (_session.Unlocked is not { } vault)
+        if (!_session.IsUnlocked)
         {
             return (false, null, "The vault is locked.");
         }
@@ -227,21 +217,32 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
             return (false, null, scopeError);
         }
 
-        var store = new TokenStore(vault);
+        var write = _session.Write(
+            vault =>
+            {
+                var store = new TokenStore(vault);
+                var made = store.TryCreate(name, parsed, ttl, allowProd, _session.Clock.GetUtcNow(), out var info, out var token, out var error);
+                return (Store: store, Made: made, Info: info, Token: token, Error: error);
+            },
+            created => created.Made);
 
-        if (!store.TryCreate(name, parsed, ttl, allowProd, _session.Clock.GetUtcNow(), out var info, out var token, out var error))
+        if (write.Outcome == WriteOutcome.NothingToSave)
         {
-            return (false, null, error);
+            return (false, null, write.Value.Error);
         }
 
-        if (!TrySave(vault, out var saveError))
+        if (write.Problem("try again") is { } problem)
         {
-            store.RevokeId(info.Id);
-            return (false, null, saveError);
+            if (write.Unwritten)
+            {
+                write.Value.Store.RevokeId(write.Value.Info!.Id);
+            }
+
+            return (false, null, problem);
         }
 
         Refresh();
-        return (true, token, $"Copy {info.Prefix} now: it is shown once and keypaste keeps only a verifier.");
+        return (true, write.Value.Token, $"Copy {write.Value.Info!.Prefix} now: it is shown once and keypaste keeps only a verifier.");
     }
 
     /// <summary>Deletes a token for good and saves the vault.</summary>
@@ -251,18 +252,8 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     {
         ArgumentNullException.ThrowIfNull(row);
 
-        if (_session.Unlocked is not { } vault)
-        {
-            return "The vault is locked.";
-        }
-
-        if (!new TokenStore(vault).RevokeId(row.Id))
-        {
-            Refresh();
-            return "That token is no longer in the vault.";
-        }
-
-        var failure = TrySave(vault, out var error) ? null : error;
+        var write = _session.Write(vault => new TokenStore(vault).RevokeId(row.Id), revoked => revoked);
+        var failure = write.Outcome == WriteOutcome.NothingToSave ? "That token is no longer in the vault." : write.Problem("try again");
         Refresh();
         return failure;
     }
@@ -331,40 +322,10 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     private void SetMinted(MintedToken? minted)
     {
         _minted?.Forget();
-        _minted = minted;
-        Raise(nameof(Minted));
-        Raise(nameof(HasMinted));
-        CopyMintedCommand.RaiseCanExecuteChanged();
-        RaiseCanOpenForm();
-    }
-
-    private void RaiseCanOpenForm()
-    {
-        Raise(nameof(CanOpenForm));
-        OpenFormCommand.RaiseCanExecuteChanged();
+        Set(ref _minted, minted, nameof(Minted));
     }
 
     private void Confirm(string? id) => Rows = [.. _rows.Select(row => row with { IsConfirming = row.Id == id })];
-
-    private static bool TrySave(Vault vault, out string error)
-    {
-        try
-        {
-            vault.Save();
-            error = string.Empty;
-            return true;
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            error = "Something else changed this vault since you opened it. Reload to see it, then try again.";
-            return false;
-        }
-        catch (VaultException e)
-        {
-            error = e.Message;
-            return false;
-        }
-    }
 
     private static string Remaining(TokenInfo info, DateTimeOffset now)
     {

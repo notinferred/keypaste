@@ -1,6 +1,6 @@
 using System.Buffers;
 
-namespace Keypaste.Core.Ipc;
+namespace Keypaste.Core.Infrastructure;
 
 /// <summary>
 /// Newline-delimited frames over a duplex stream, with a hard ceiling on how big one can be.

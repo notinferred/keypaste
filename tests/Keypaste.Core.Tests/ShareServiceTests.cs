@@ -20,6 +20,36 @@ public sealed class ShareServiceTests : IDisposable
         return new ShareStore(vault).List().Count;
     }
 
+    /// <summary>The rules a front end checks its flags against are the ones a request is refused by (F.55).</summary>
+    [Fact]
+    public void The_front_end_checks_are_the_requests_rules()
+    {
+        Assert.True(ShareService.IsValidTtl(ShareService.MinimumTtl));
+        Assert.False(ShareService.IsValidTtl(ShareService.MinimumTtl + TimeSpan.FromMilliseconds(500)));
+        Assert.False(ShareService.IsValidTtl(ShareService.MaximumTtl + TimeSpan.FromSeconds(1)));
+        Assert.True(ShareService.IsValidViews(ShareService.MaximumViews));
+        Assert.False(ShareService.IsValidViews(0));
+        Assert.True(ShareService.IsValidRecipient(null));
+        Assert.False(ShareService.IsValidRecipient(new string('x', ShareService.MaximumRecipientLength + 1)));
+        Assert.True(ShareService.IsValidPassphrase(new string('a', ShareService.MinimumPassphraseLength)));
+        Assert.False(ShareService.IsValidPassphrase(new string('a', ShareService.MinimumPassphraseLength - 1)));
+        Assert.Equal(
+            "a link lasts from 5 minutes to 7 days",
+            ShareService.Validate(ShareFixture.Request() with { Ttl = ShareService.MinimumTtl + TimeSpan.FromMilliseconds(500) }));
+    }
+
+    [Fact]
+    public void The_transport_follows_no_redirect_and_keeps_no_cookie()
+    {
+        using var transport = ShareClient.CreateTransport();
+
+        var sockets = Assert.IsType<SocketsHttpHandler>(transport);
+        Assert.False(sockets.AllowAutoRedirect);
+        Assert.False(sockets.UseCookies);
+        Assert.Equal(DecompressionMethods.None, sockets.AutomaticDecompression);
+        Assert.Equal(TimeSpan.FromSeconds(10), sockets.ConnectTimeout);
+    }
+
     [Fact]
     public async Task Create_UploadsStoresAudits_InThatOrder()
     {

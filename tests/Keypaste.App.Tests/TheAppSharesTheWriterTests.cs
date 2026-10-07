@@ -55,6 +55,8 @@ namespace Keypaste.App.Tests;
 /// </remarks>
 public sealed class TheAppSharesTheWriterTests
 {
+    private static readonly string[] _appProjects = ["Keypaste.App", "Keypaste.Mvvm"];
+
     /// <summary>
     /// No code in the app writes a vault file itself.
     /// </summary>
@@ -81,9 +83,10 @@ public sealed class TheAppSharesTheWriterTests
         ];
 
         var offenders = new List<string>();
-        var app = Path.Combine(RepoRoot(), "src", "Keypaste.App");
+        var files = _appProjects.SelectMany(project => Directory.EnumerateFiles(
+            Path.Combine(RepoRoot(), "src", project), "*.cs", SearchOption.AllDirectories));
 
-        foreach (var file in Directory.EnumerateFiles(app, "*.cs", SearchOption.AllDirectories))
+        foreach (var file in files)
         {
             var text = File.ReadAllText(file);
 
@@ -100,27 +103,27 @@ public sealed class TheAppSharesTheWriterTests
     }
 
     /// <summary>
-    /// The app references the core and nothing else of this repository's own code.
+    /// The app references the core and its bindings, and the bindings reference nothing.
     /// </summary>
     /// <remarks>
     /// The foundation the argument rests on: there is no second route to a KDBX writer because there
-    /// is no second project to reach one through. One line, and without it every sentence above is
-    /// an assurance rather than a check.
+    /// is no second project to reach one through. Keypaste.Mvvm is scanned with the app above and
+    /// reaches no project at all. Without this every sentence above is an assurance rather than a check.
     /// </remarks>
     [Fact]
-    public void The_app_references_only_the_core()
+    public void The_app_references_only_the_core_and_its_bindings()
     {
-        var csproj = Path.Combine(RepoRoot(), "src", "Keypaste.App", "Keypaste.App.csproj");
+        Assert.Equal(["Keypaste.Core", "Keypaste.Mvvm"], ProjectReferences("Keypaste.App"));
+        Assert.Empty(ProjectReferences("Keypaste.Mvvm"));
+    }
 
-        var referenced = XDocument.Load(csproj)
+    private static string[] ProjectReferences(string project) =>
+        XDocument.Load(Path.Combine(RepoRoot(), "src", project, $"{project}.csproj"))
             .Descendants("ProjectReference")
             .Select(reference => Path.GetFileNameWithoutExtension(
                 reference.Attribute("Include")!.Value.Replace('\\', '/')))
             .Order(StringComparer.Ordinal)
             .ToArray();
-
-        Assert.Equal(["Keypaste.Core"], referenced);
-    }
 
     private static string RepoRoot()
     {

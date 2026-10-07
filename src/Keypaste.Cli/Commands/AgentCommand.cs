@@ -5,6 +5,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
@@ -149,59 +150,43 @@ internal static class AgentCommand
         void Narrate(string line) => console.WriteLine($"keypaste: {line}");
 
         using var lifetime = new SessionLifetime();
-        using var grants = new GrantCache(TimeProvider.System);
-        lifetime.Own(grants);
-        using var envGrants = new EnvGrantCache(TimeProvider.System);
-        lifetime.Own(envGrants);
-        using var gate = new ApprovalGate(
-            new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
-            TimeProvider.System,
-            limits);
-
-        var handler = new ApproverHandler(
-            new VaultCredentialSource(() => vault),
-            new VaultEntryNameLister(() => vault),
-            gate,
-            grants,
-            new PolicyGate(policy.Rules, TimeProvider.System),
-            Narrate,
-            clients: clients);
-
         using var audit = OpenAudit(context);
-
         using var stop = new CancellationTokenSource();
 
-        // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
-        var authority = new SessionAuthority(
-            claim.Vault,
-            () => lifetime,
-            handler,
-            new SessionEnvironments(
-                gate,
-                asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
-                TimeProvider.System,
-                envGrants,
-                Narrate,
-                () => audit),
-            lockNow: () => Stop(lifetime, stop));
-
-        ApproverListener? listener = null;
+        SessionServer server;
 
         try
         {
-            try
+            // Binding happens here, so a name somebody else already holds is a startup failure
+            // rather than a server that looks up and never accepts anything.
+            server = SessionServer.Listen(pipeName, new SessionServerOptions
             {
-                // Binding happens here, so a name somebody else already holds is a startup failure
-                // rather than a server that looks up and never accepts anything.
-                listener = new ApproverListener(pipeName, authority);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                console.WriteLine($"keypaste: could not listen on '{pipeName}': {ex.Message}");
-                console.WriteLine("keypaste: another keypaste process may be listening on that name.");
-                return CliApp.ExitInternalError;
-            }
+                Vault = claim.Vault,
+                Lifetime = lifetime,
+                CurrentLifetime = () => lifetime,
+                UnlockedFor = asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
+                Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
+                Limits = limits,
+                Policy = new PolicyGate(policy.Rules, TimeProvider.System),
+                Clients = clients,
+                Audit = () => audit,
+                WatchEdits = edited => vault.Edited += edited,
+                UnwatchEdits = edited => vault.Edited -= edited,
 
+                // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
+                LockNow = () => Stop(lifetime, stop),
+                Narrate = Narrate,
+            });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            console.WriteLine($"keypaste: could not listen on '{pipeName}': {ex.Message}");
+            console.WriteLine("keypaste: another keypaste process may be listening on that name.");
+            return CliApp.ExitInternalError;
+        }
+
+        using (server)
+        {
             // A signal ends the lifetime and then stops the listener, rather than ending the
             // process, so a waiting request is answered as locked, the vault is disposed and the
             // grants are zeroed on the way out instead of being abandoned mid-flight.
@@ -213,7 +198,7 @@ internal static class AgentCommand
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
-                listener.RunAsync(stop.Token).GetAwaiter().GetResult();
+                server.RunAsync(stop.Token).GetAwaiter().GetResult();
             }
             finally
             {
@@ -222,10 +207,6 @@ internal static class AgentCommand
                     signal.Dispose();
                 }
             }
-        }
-        finally
-        {
-            listener?.Dispose();
         }
 
         console.WriteLine("keypaste: the agent has stopped. The vault is locked and every grant is gone.");

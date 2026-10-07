@@ -55,6 +55,18 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         CancelCommand = new RelayCommand(Cancel, () => _pending is not null);
         CheckCommand = new AsyncRelayCommand(CheckAsync, () => _registered is not null && !IsChecking);
         AskCommand = new AsyncRelayCommand(AskAsync, () => _check is not null && _checkEntry is not null && _checkEntries.Count > 0);
+
+        DependsOn(nameof(HasPreview), nameof(Preview));
+        DependsOn(nameof(HasMessage), nameof(Message));
+        DependsOn(nameof(IsPicking), nameof(CheckEntries), nameof(IsChecking));
+        DependsOn(nameof(HasCheckMessage), nameof(CheckMessage));
+        DependsOn(nameof(NeedsRegistration), nameof(Registered));
+        DependsOn(PreviewConnectCommand, nameof(IsChecking));
+        DependsOn(PreviewRemoveCommand, nameof(IsChecking));
+        DependsOn(ConfirmCommand, nameof(Pending));
+        DependsOn(CancelCommand, nameof(Pending));
+        DependsOn(CheckCommand, nameof(Registered), nameof(IsChecking));
+        DependsOn(AskCommand, nameof(IsChecking), nameof(SelectedCheckEntry), nameof(CheckEntries));
     }
 
     /// <summary>Every client keypaste knows how to connect; an instance property because a binding needs one.</summary>
@@ -120,13 +132,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     internal string Message
     {
         get => _message;
-        private set
-        {
-            if (Set(ref _message, value))
-            {
-                Raise(nameof(HasMessage));
-            }
-        }
+        private set => Set(ref _message, value);
     }
 
     internal bool HasMessage => _message.Length > 0;
@@ -139,26 +145,14 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     internal McpListedEntry? SelectedCheckEntry
     {
         get => _checkEntry;
-        set
-        {
-            if (Set(ref _checkEntry, value))
-            {
-                AskCommand.RaiseCanExecuteChanged();
-            }
-        }
+        set => Set(ref _checkEntry, value);
     }
 
     /// <summary>What the check found, never a value.</summary>
     internal string CheckMessage
     {
         get => _checkMessage;
-        private set
-        {
-            if (Set(ref _checkMessage, value))
-            {
-                Raise(nameof(HasCheckMessage));
-            }
-        }
+        private set => Set(ref _checkMessage, value);
     }
 
     internal bool HasCheckMessage => _checkMessage.Length > 0;
@@ -169,13 +163,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     internal McpServerRegistration? Registered
     {
         get => _registered;
-        private set
-        {
-            if (Set(ref _registered, value))
-            {
-                Raise(nameof(NeedsRegistration));
-            }
-        }
+        private set => Set(ref _registered, value);
     }
 
     /// <summary>Whether Check waits for a Connect or a shown block to start from.</summary>
@@ -194,6 +182,12 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     /// <summary>Asks for the entry picked from the check's listing.</summary>
     internal AsyncRelayCommand AskCommand { get; }
+
+    private McpSetupPlan? Pending
+    {
+        get => _pending;
+        set => Set(ref _pending, value);
+    }
 
     private async Task PreviewConnectAsync()
     {
@@ -238,7 +232,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _pending = plan;
+        Pending = plan;
         _pendingRegistration = registration;
         Show(plan, $"Connect runs these commands. The first removes any earlier keypaste entry from {_client.DisplayName}; "
             + "the second adds this vault. No password, keyfile or session goes into its configuration.");
@@ -262,7 +256,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _pending = plan;
+        Pending = plan;
         Show(plan, $"Remove runs this command, which takes keypaste out of {_client.DisplayName} and leaves its other servers alone.");
     }
 
@@ -288,7 +282,6 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         };
 
         Registered = result.Status == McpSetupStatus.Done && !removing ? registration : null;
-        CheckCommand.RaiseCanExecuteChanged();
     }
 
     private void Cancel()
@@ -348,7 +341,6 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             default:
                 _checkEntries = listing.Entries;
                 Raise(nameof(CheckEntries));
-                Raise(nameof(IsPicking));
                 SelectedCheckEntry = listing.Entries[0];
                 CheckMessage = $"The bridge lists {listing.Entries.Count} entries. Pick the one to ask for.";
                 return;
@@ -366,8 +358,6 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
         _checkEntries = [];
         Raise(nameof(CheckEntries));
-        Raise(nameof(IsPicking));
-        AskCommand.RaiseCanExecuteChanged();
 
         CheckMessage = $"Asking for {Shown(entry.Field)} of {entry.Name}. Answer in the prompt window.";
 
@@ -396,11 +386,6 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     {
         _check = check;
         Raise(nameof(IsChecking));
-        Raise(nameof(IsPicking));
-        CheckCommand.RaiseCanExecuteChanged();
-        PreviewConnectCommand.RaiseCanExecuteChanged();
-        PreviewRemoveCommand.RaiseCanExecuteChanged();
-        AskCommand.RaiseCanExecuteChanged();
     }
 
     private async Task EndCheckAsync(string message)
@@ -420,25 +405,19 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         _preview = plan.Display;
         _previewNote = note;
         Raise(nameof(Preview));
-        Raise(nameof(HasPreview));
         Raise(nameof(PreviewNote));
-        ConfirmCommand.RaiseCanExecuteChanged();
-        CancelCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>Drops a plan that was shown but not confirmed, so an edit can never run an old preview.</summary>
     private void Forget()
     {
-        _pending = null;
+        Pending = null;
         _pendingRegistration = null;
         _preview = string.Empty;
         _previewNote = string.Empty;
         Message = string.Empty;
         Raise(nameof(Preview));
-        Raise(nameof(HasPreview));
         Raise(nameof(PreviewNote));
-        ConfirmCommand.RaiseCanExecuteChanged();
-        CancelCommand.RaiseCanExecuteChanged();
     }
 
     public void Dispose()

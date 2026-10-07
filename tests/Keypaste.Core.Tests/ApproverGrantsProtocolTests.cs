@@ -1,4 +1,5 @@
 using System.Text;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Xunit;
 

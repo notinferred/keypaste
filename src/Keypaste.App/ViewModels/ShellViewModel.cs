@@ -131,6 +131,30 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && _import is null);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
 
+        DependsOn(nameof(HasNotice), nameof(Notice));
+        DependsOn(nameof(HasVaultChanged), nameof(VaultChanged));
+        DependsOn(CancelTouchCommand, nameof(IsWaitingForTouch));
+        DependsOn(nameof(HasProjects), nameof(Projects));
+        DependsOn(nameof(HasShare), nameof(Share));
+        DependsOn(ShareCommand, nameof(Share));
+        DependsOn(nameof(HasImport), nameof(Import));
+        DependsOn(ImportCommand, nameof(Import));
+        DependsOn(nameof(VaultStatusOk), nameof(VaultStatusTone));
+        DependsOn(nameof(VaultStatusAccent), nameof(VaultStatusTone));
+        DependsOn(nameof(VaultStatusDanger), nameof(VaultStatusTone));
+        DependsOn(nameof(HasToast), nameof(Toast));
+        DependsOn(nameof(CurrentTitle), nameof(Current));
+        DependsOn(nameof(ShowsHeader), nameof(Current));
+        DependsOn(nameof(HasBack), nameof(Current));
+        DependsOn(nameof(BackTitle), nameof(Current));
+        DependsOn(BackCommand, nameof(HasBack));
+        DependsOn(nameof(SelectedMain), nameof(Current));
+        DependsOn(nameof(SelectedFooter), nameof(Current));
+        DependsOn(nameof(SearchScope), nameof(Content));
+        DependsOn(nameof(HasSearchScope), nameof(SearchScope));
+        DependsOn(nameof(SearchPlaceholder), nameof(SearchScope));
+        DependsOn(nameof(HasCountdown), nameof(Countdown));
+
         FoldCommand = new RelayCommand<object>(row => Fold(row, open: null));
         MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity, IsExpandable = d.Kind == DestinationKind.Entries })];
         FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
@@ -175,13 +199,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal string? Notice
     {
         get => _notice;
-        private set
-        {
-            if (Set(ref _notice, value))
-            {
-                Raise(nameof(HasNotice));
-            }
-        }
+        private set => Set(ref _notice, value);
     }
 
     internal bool HasNotice => _notice is not null;
@@ -192,13 +210,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal string? VaultChanged
     {
         get => _vaultChanged;
-        private set
-        {
-            if (Set(ref _vaultChanged, value))
-            {
-                Raise(nameof(HasVaultChanged));
-            }
-        }
+        private set => Set(ref _vaultChanged, value);
     }
 
     internal bool HasVaultChanged => _vaultChanged is not null;
@@ -210,13 +222,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal bool IsWaitingForTouch
     {
         get => _waitingForTouch;
-        private set
-        {
-            if (Set(ref _waitingForTouch, value))
-            {
-                CancelTouchCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _waitingForTouch, value);
     }
 
     /// <summary>Stops waiting for the YubiKey, so the save fails and writes nothing.</summary>
@@ -366,7 +372,6 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
             _projects = value;
             Raise();
-            Raise(nameof(HasProjects));
             RebuildSidebar();
         }
     }
@@ -439,14 +444,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal SharingViewModel? Share
     {
         get => _share;
-        private set
-        {
-            if (Set(ref _share, value))
-            {
-                Raise(nameof(HasShare));
-                ShareCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _share, value);
     }
 
     internal bool HasShare => _share is not null;
@@ -458,14 +456,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal KdbxImportViewModel? Import
     {
         get => _import;
-        private set
-        {
-            if (Set(ref _import, value))
-            {
-                Raise(nameof(HasImport));
-                ImportCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _import, value);
     }
 
     internal bool HasImport => _import is not null;
@@ -534,15 +525,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal StatusTone VaultStatusTone
     {
         get => _vaultStatusTone;
-        private set
-        {
-            if (Set(ref _vaultStatusTone, value))
-            {
-                Raise(nameof(VaultStatusOk));
-                Raise(nameof(VaultStatusAccent));
-                Raise(nameof(VaultStatusDanger));
-            }
-        }
+        private set => Set(ref _vaultStatusTone, value);
     }
 
     internal bool VaultStatusOk => _vaultStatusTone == StatusTone.Ok;
@@ -632,13 +615,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal string? Toast
     {
         get => _toast;
-        private set
-        {
-            if (Set(ref _toast, value))
-            {
-                Raise(nameof(HasToast));
-            }
-        }
+        private set => Set(ref _toast, value);
     }
 
     internal bool HasToast => _toast is not null;
@@ -677,14 +654,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
                     _openProject = null;
                 }
 
-                Raise(nameof(CurrentTitle));
-                Raise(nameof(ShowsHeader));
-                Raise(nameof(HasBack));
-                Raise(nameof(BackTitle));
-                BackCommand.RaiseCanExecuteChanged();
                 Show(value);
-                Raise(nameof(SelectedMain));
-                Raise(nameof(SelectedFooter));
                 Raise(nameof(SelectedSidebarRow));
             }
         }
@@ -712,13 +682,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal string Countdown
     {
         get => _countdown;
-        private set
-        {
-            if (Set(ref _countdown, value))
-            {
-                Raise(nameof(HasCountdown));
-            }
-        }
+        private set => Set(ref _countdown, value);
     }
 
     internal bool HasCountdown => _countdown.Length > 0;
@@ -774,7 +738,6 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             entries.PropertyChanged += OnEntriesChanged;
         }
 
-        RaiseScope();
         Count();
     }
 
@@ -797,20 +760,13 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     {
         if (e.PropertyName == nameof(EntriesViewModel.SearchScope))
         {
-            RaiseScope();
+            Raise(nameof(SearchScope));
         }
 
         if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
         {
             Raise(nameof(SelectedSidebarRow));
         }
-    }
-
-    private void RaiseScope()
-    {
-        Raise(nameof(SearchScope));
-        Raise(nameof(HasSearchScope));
-        Raise(nameof(SearchPlaceholder));
     }
 
     /// <summary>How share links reach their server; the shell makes one when none is given.</summary>
@@ -820,18 +776,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The entry that opens the app at login, which Settings turns on and off; none where the platform has no per-user one.</summary>
     internal ILoginItem? LoginItem { get; init; }
 
-    private SocketsHttpHandler? _ownShareTransport;
+    private HttpMessageHandler? _ownShareTransport;
 
     private SharingViewModel Sharing(string? what = null, Action? cancel = null)
     {
         var resolved = ShareEndpoint.TryResolve(null, Environment.GetEnvironmentVariable(ShareEndpoint.EnvironmentVariable), out var endpoint, out _);
-        var transport = ShareTransport ?? (_ownShareTransport ??= new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            AutomaticDecompression = System.Net.DecompressionMethods.None,
-            ConnectTimeout = TimeSpan.FromSeconds(10),
-        });
+        var transport = ShareTransport ?? (_ownShareTransport ??= ShareClient.CreateTransport());
         var auditPath = Core.Audit.KeypasteHome.AuditPath(Home);
         var service = new ShareService(
             new ShareClient(transport, endpoint ?? ShareEndpoint.Default),
@@ -1018,8 +968,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         try
         {
-            // keypaste's own records, share links among them, are not secrets the Secrets list shows.
-            total = vault.ReadEntries().Count(entry => !ReservedGroups.IsReserved(entry.GroupPath));
+            total = vault.ReadEntries().Count;
             projects = ProjectCatalog.Read(vault).Projects;
             groups = GroupNode.Flatten(vault.ReadGroupPaths());
         }

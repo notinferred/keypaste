@@ -143,6 +143,7 @@ for dir in "$@"; do
     check_program "$dir" "$name"
   done
   check_library "$dir/Keypaste.Core.dll"
+  check_library "$dir/Keypaste.Mvvm.dll"
   check_vendored "$dir/KeePassLib.dll"
 
   # Zero would mean the staging directory moved and every assertion above was vacuously satisfied.

@@ -80,7 +80,7 @@ internal sealed class ShareFixture : IDisposable
     internal string EverythingOnDisk()
     {
         using var vault = Open();
-        return string.Join("\n", vault.ReadEntries().Select(e => string.Join("|", e.GroupPath, e.Title, e.Username, e.Password, e.Url, e.Notes)));
+        return string.Join("\n", vault.ReadEntries(includeReserved: true).Select(e => string.Join("|", e.GroupPath, e.Title, e.Username, e.Password, e.Url, e.Notes)));
     }
 
     private AuditLog? OpenAudit()

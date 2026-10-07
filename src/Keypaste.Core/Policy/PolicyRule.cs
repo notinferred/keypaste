@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.Policy;
 

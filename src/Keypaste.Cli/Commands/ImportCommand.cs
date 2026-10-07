@@ -3,6 +3,7 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Import;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Recent;
 
 namespace Keypaste.Cli.Commands;

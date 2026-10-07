@@ -1,4 +1,4 @@
-using Keypaste.Core.Policy;
+using Keypaste.Core.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Core.Tests;

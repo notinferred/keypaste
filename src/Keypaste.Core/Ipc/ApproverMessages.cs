@@ -405,10 +405,28 @@ public sealed record TokenEnvRequest(string Token, string Project, string Profil
     public override string ToString() => $"TokenEnvRequest {{ Project = {Project}, Profile = {Profile}, Token = <redacted> }}";
 }
 
-/// <summary>One variable of an agent's run named by a <c>kp://</c> reference.</summary>
-/// <param name="Name">The variable name the command sees.</param>
-/// <param name="Reference">The reference, as the agent wrote it.</param>
-public sealed record RunReference(string Name, string Reference);
+/// <summary>One variable of an agent's run named by a <c>kp://</c> reference, parsed once when it is made.</summary>
+public sealed record RunReference
+{
+    /// <summary>Makes the variable and parses its reference.</summary>
+    /// <param name="name">The variable name the command sees.</param>
+    /// <param name="reference">The reference, as the agent wrote it.</param>
+    public RunReference(string name, string reference)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Reference = reference ?? throw new ArgumentNullException(nameof(reference));
+        Parsed = KpReferences.TryParse(reference, out var parsed, out _) ? parsed : null;
+    }
+
+    /// <summary>The variable name the command sees.</summary>
+    public string Name { get; }
+
+    /// <summary>The reference, as the agent wrote it: what is sent and shown.</summary>
+    public string Reference { get; }
+
+    /// <summary>What <see cref="Reference"/> names, or null when it is not a reference <see cref="KpReferences.TryParse"/> accepts.</summary>
+    public KpReference? Parsed { get; }
+}
 
 /// <summary>
 /// Asks the owner to release approved secrets for a command an agent's bridge will start with them in

@@ -37,6 +37,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private string _username;
     private string _url;
     private string _notes;
+    private int _passwordLength;
     private bool _isEditing;
     private string _draftUsername = string.Empty;
     private string _draftUrl = string.Empty;
@@ -103,18 +104,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         CopyReferenceCommand = new AsyncRelayCommand(CopyReferenceAsync, () => Reference is not null);
         OpenUrlCommand = new AsyncRelayCommand(OpenUrlAsync, () => OpensUrl);
         CopyUrlCommand = new AsyncRelayCommand(CopyUrlAsync, () => Url.Length > 0);
-        PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName is nameof(IsEditing) or nameof(IsConfirmingRotate) or nameof(IsAddingField) or nameof(IsReplacingField))
-            {
-                Raise(nameof(HasOwnPrimary));
-            }
-
-            if (e.PropertyName == nameof(IsEditing))
-            {
-                Raise(nameof(TakesWholeView));
-            }
-        };
         History.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(EntryHistoryViewModel.IsOpen))
@@ -139,6 +128,51 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(() => PendingTagChange = null, () => PendingTagChange is not null);
 
+        DependsOn(nameof(HasFields), nameof(Fields));
+        DependsOn(nameof(HasTags), nameof(Tags));
+        DependsOn(nameof(IsReplacingField), nameof(ReplacingField));
+        DependsOn(nameof(ReplaceFieldPrompt), nameof(ReplacingField));
+        DependsOn(nameof(HasOwnPrimary), nameof(IsEditing), nameof(IsConfirmingRotate), nameof(IsAddingField), nameof(IsReplacingField));
+        DependsOn(nameof(TakesWholeView), nameof(IsEditing));
+        DependsOn(nameof(IsRemovingField), nameof(RemovingField));
+        DependsOn(nameof(RemoveFieldPrompt), nameof(RemovingField));
+        DependsOn(nameof(IsConfirmingTagChange), nameof(PendingTagChange));
+        DependsOn(nameof(TagChangeLines), nameof(PendingTagChange));
+        DependsOn(nameof(TagChangeAction), nameof(PendingTagChange));
+        DependsOn(nameof(ShowsAgentAccessSummary), nameof(AgentLines));
+        DependsOn(nameof(HasBeenUsed), nameof(LastUsedText));
+        DependsOn(nameof(KindLabel), nameof(Kind));
+        DependsOn(nameof(Location), nameof(KindLabel), nameof(GroupPath));
+        DependsOn(nameof(OpensUrl), nameof(Url));
+        DependsOn(nameof(ShowsUrlNote), nameof(Url), nameof(OpensUrl));
+        DependsOn(nameof(ShowsNotes), nameof(Notes));
+        DependsOn(nameof(HasReference), nameof(Reference));
+        DependsOn(nameof(DisplayUsername), nameof(Username));
+        DependsOn(nameof(DisplayUrl), nameof(Url));
+        DependsOn(nameof(DisplayNotes), nameof(Notes));
+        DependsOn(nameof(MaskedLength), nameof(PasswordLength));
+        DependsOn(nameof(PasswordMask), nameof(PasswordLength));
+        DependsOn(CopyPasswordCommand, nameof(PasswordLength));
+        DependsOn(CopyUsernameCommand, nameof(Username));
+        DependsOn(OpenUrlCommand, nameof(OpensUrl));
+        DependsOn(CopyUrlCommand, nameof(Url));
+        DependsOn(EditCommand, nameof(IsEditing));
+        DependsOn(CancelCommand, nameof(IsEditing));
+        DependsOn(SaveCommand, nameof(IsEditing));
+        DependsOn(RotateCommand, nameof(IsConfirmingRotate), nameof(IsEditing));
+        DependsOn(ConfirmRotateCommand, nameof(IsConfirmingRotate));
+        DependsOn(CancelRotateCommand, nameof(IsConfirmingRotate));
+        DependsOn(BeginAddFieldCommand, nameof(IsAddingField));
+        DependsOn(ConfirmAddFieldCommand, nameof(IsAddingField), nameof(DraftFieldName));
+        DependsOn(CancelAddFieldCommand, nameof(IsAddingField));
+        DependsOn(ConfirmReplaceFieldCommand, nameof(ReplacingField));
+        DependsOn(CancelReplaceFieldCommand, nameof(ReplacingField));
+        DependsOn(ConfirmRemoveFieldCommand, nameof(RemovingField));
+        DependsOn(CancelRemoveFieldCommand, nameof(RemovingField));
+        DependsOn(AddTagCommand, nameof(DraftTag));
+        DependsOn(ConfirmTagChangeCommand, nameof(PendingTagChange));
+        DependsOn(CancelTagChangeCommand, nameof(PendingTagChange));
+
         ReadTimes();
         ReadFieldsAndTags();
     }
@@ -150,13 +184,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal IReadOnlyList<EntryFieldRow> Fields
     {
         get => _fields;
-        private set
-        {
-            if (Set(ref _fields, value))
-            {
-                Raise(nameof(HasFields));
-            }
-        }
+        private set => Set(ref _fields, value);
     }
 
     internal bool HasFields => _fields.Count > 0;
@@ -165,13 +193,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal IReadOnlyList<EntryTagChip> Tags
     {
         get => _tags;
-        private set
-        {
-            if (Set(ref _tags, value))
-            {
-                Raise(nameof(HasTags));
-            }
-        }
+        private set => Set(ref _tags, value);
     }
 
     internal bool HasTags => _tags.Count > 0;
@@ -185,27 +207,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal bool IsAddingField
     {
         get => _isAddingField;
-        private set
-        {
-            if (Set(ref _isAddingField, value))
-            {
-                BeginAddFieldCommand.RaiseCanExecuteChanged();
-                ConfirmAddFieldCommand.RaiseCanExecuteChanged();
-                CancelAddFieldCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _isAddingField, value);
     }
 
     internal string DraftFieldName
     {
         get => _draftFieldName;
-        set
-        {
-            if (Set(ref _draftFieldName, value))
-            {
-                ConfirmAddFieldCommand.RaiseCanExecuteChanged();
-            }
-        }
+        set => Set(ref _draftFieldName, value);
     }
 
     /// <summary>Whether the new field is protected; on unless the person turns it off.</summary>
@@ -224,10 +232,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             if (Set(ref _replacingField, value))
             {
                 ReplacementFieldValue.Clear();
-                Raise(nameof(IsReplacingField));
-                Raise(nameof(ReplaceFieldPrompt));
-                ConfirmReplaceFieldCommand.RaiseCanExecuteChanged();
-                CancelReplaceFieldCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -246,16 +250,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal EntryFieldRow? RemovingField
     {
         get => _removingField;
-        private set
-        {
-            if (Set(ref _removingField, value))
-            {
-                Raise(nameof(IsRemovingField));
-                Raise(nameof(RemoveFieldPrompt));
-                ConfirmRemoveFieldCommand.RaiseCanExecuteChanged();
-                CancelRemoveFieldCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _removingField, value);
     }
 
     internal bool IsRemovingField => _removingField is not null;
@@ -266,13 +261,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal string DraftTag
     {
         get => _draftTag;
-        set
-        {
-            if (Set(ref _draftTag, value))
-            {
-                AddTagCommand.RaiseCanExecuteChanged();
-            }
-        }
+        set => Set(ref _draftTag, value);
     }
 
     internal RelayCommand BeginAddFieldCommand { get; }
@@ -295,17 +284,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal ProjectTagChange? PendingTagChange
     {
         get => _pendingTagChange;
-        private set
-        {
-            if (Set(ref _pendingTagChange, value))
-            {
-                Raise(nameof(IsConfirmingTagChange));
-                Raise(nameof(TagChangeLines));
-                Raise(nameof(TagChangeAction));
-                ConfirmTagChangeCommand.RaiseCanExecuteChanged();
-                CancelTagChangeCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _pendingTagChange, value);
     }
 
     internal bool IsConfirmingTagChange => _pendingTagChange is not null;
@@ -378,15 +357,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal bool IsConfirmingRotate
     {
         get => _isConfirmingRotate;
-        private set
-        {
-            if (Set(ref _isConfirmingRotate, value))
-            {
-                RotateCommand.RaiseCanExecuteChanged();
-                ConfirmRotateCommand.RaiseCanExecuteChanged();
-                CancelRotateCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _isConfirmingRotate, value);
     }
 
     /// <summary>What the confirm row asks; an instance property because a binding needs one.</summary>
@@ -440,13 +411,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal string LastUsedText
     {
         get => _lastUsedText;
-        private set
-        {
-            if (Set(ref _lastUsedText, value))
-            {
-                Raise(nameof(HasBeenUsed));
-            }
-        }
+        private set => Set(ref _lastUsedText, value);
     }
 
     /// <summary>Whether an agent ever received it, which is when the card says when.</summary>
@@ -476,27 +441,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal IReadOnlyList<string> AgentLines
     {
         get => _agentLines;
-        private set
-        {
-            if (Set(ref _agentLines, value))
-            {
-                Raise(nameof(ShowsAgentAccessSummary));
-            }
-        }
+        private set => Set(ref _agentLines, value);
     }
 
     /// <summary>What sort of entry this is.</summary>
     internal EntryKind Kind
     {
         get => _kind;
-        private set
-        {
-            if (Set(ref _kind, value))
-            {
-                Raise(nameof(KindLabel));
-                Raise(nameof(Location));
-            }
-        }
+        private set => Set(ref _kind, value);
     }
 
     internal string KindLabel => EntryKinds.Label(_kind);
@@ -608,43 +560,19 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal string Username
     {
         get => _username;
-        private set
-        {
-            if (Set(ref _username, value))
-            {
-                Raise(nameof(DisplayUsername));
-                CopyUsernameCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _username, value);
     }
 
     internal string Url
     {
         get => _url;
-        private set
-        {
-            if (Set(ref _url, value))
-            {
-                Raise(nameof(DisplayUrl));
-                Raise(nameof(OpensUrl));
-                Raise(nameof(ShowsUrlNote));
-                OpenUrlCommand.RaiseCanExecuteChanged();
-                CopyUrlCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _url, value);
     }
 
     internal string Notes
     {
         get => _notes;
-        private set
-        {
-            if (Set(ref _notes, value))
-            {
-                Raise(nameof(DisplayNotes));
-                Raise(nameof(ShowsNotes));
-            }
-        }
+        private set => Set(ref _notes, value);
     }
 
     /// <summary>
@@ -655,7 +583,11 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <see cref="Controls.MaskedInput.MaskedLength"/> makes. It is a disclosure, and a small one:
     /// it is visible to anyone who can already see that an entry exists.
     /// </remarks>
-    internal int PasswordLength { get; private set; }
+    internal int PasswordLength
+    {
+        get => _passwordLength;
+        private set => Set(ref _passwordLength, value);
+    }
 
     /// <summary>The dots the detail pane shows where the password would be.</summary>
     internal string PasswordMask => new('•', Math.Min(PasswordLength, 24));
@@ -681,15 +613,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal bool IsEditing
     {
         get => _isEditing;
-        private set
-        {
-            if (Set(ref _isEditing, value))
-            {
-                EditCommand.RaiseCanExecuteChanged();
-                CancelCommand.RaiseCanExecuteChanged();
-                SaveCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _isEditing, value);
     }
 
     internal string DraftUsername
@@ -746,10 +670,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
         Kind = EntryKinds.Of(entry);
-        Raise(nameof(PasswordLength));
-        Raise(nameof(MaskedLength));
-        Raise(nameof(PasswordMask));
-        CopyPasswordCommand.RaiseCanExecuteChanged();
         ReadFieldsAndTags();
     }
 
@@ -817,14 +737,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         History.Dispose();
 
         Raise(nameof(Reference));
-        Raise(nameof(HasReference));
-        Raise(nameof(Location));
         Raise(nameof(KdbxEntry));
         Raise(nameof(Title));
         Raise(nameof(GroupPath));
         Raise(nameof(Path));
-        Raise(nameof(MaskedLength));
-        Raise(nameof(PasswordMask));
     }
 
     /// <summary>Picks up what a restore left, and tells the screen which entry it left it on.</summary>
@@ -922,30 +838,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     {
         IsConfirmingRotate = false;
 
-        if (_session.Unlocked is not { } vault)
-        {
-            Report("The vault is locked.");
-            return;
-        }
+        var write = _session.Write(vault => EntryRotation.Rotate(vault, Name, SecretRecipe.Default), outcome => outcome == RotateOutcome.Rotated);
+        var problem = write.Outcome == WriteOutcome.NothingToSave
+            ? $"'{_entryPath}' could not be rotated here."
+            : write.Problem("make your change again");
 
-        try
+        if (problem is not null)
         {
-            if (EntryRotation.Rotate(vault, Name, SecretRecipe.Default) != RotateOutcome.Rotated)
-            {
-                Report($"'{_entryPath}' could not be rotated here.");
-                return;
-            }
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Report("Something else changed this vault since you opened it. Reload to see it, then make your change again.");
-            return;
-        }
-        catch (VaultException e)
-        {
-            Report(e.Message);
+            Report(problem);
             return;
         }
 
@@ -979,30 +879,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <returns>Whether the change was saved.</returns>
     private bool Write(Func<Vault, bool> change, string? unchanged)
     {
-        if (_session.Unlocked is not { } vault)
-        {
-            Report("The vault is locked.");
-            return false;
-        }
+        var write = _session.Write(change, changed => changed);
+        var problem = write.Outcome == WriteOutcome.NothingToSave
+            ? unchanged ?? $"'{_entryPath}' is no longer in this vault."
+            : write.Problem("make your change again");
 
-        try
+        if (problem is not null)
         {
-            if (!change(vault))
-            {
-                Report(unchanged ?? $"'{_entryPath}' is no longer in this vault.");
-                return false;
-            }
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Report("Something else changed this vault since you opened it. Reload to see it, then make your change again.");
-            return false;
-        }
-        catch (VaultException e)
-        {
-            Report(e.Message);
+            Report(problem);
             return false;
         }
 
@@ -1042,13 +926,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             return;
         }
 
-        if (Fields.Any(field => string.Equals(field.Name, name, StringComparison.Ordinal)))
-        {
-            Report($"This entry already has {EntryNameSanitizer.Sanitize(name).Text}. Replace its value instead.");
-            return;
-        }
-
-        if (Write(vault => vault.SetFields(Name, [new FieldWrite(name, NewFieldValue.Compose(), NewFieldProtected)]), null))
+        if (Write(vault => vault.AddField(Name, new FieldWrite(name, NewFieldValue.Compose(), NewFieldProtected)), null))
         {
             IsAddingField = false;
             NewFieldValue.Clear();
@@ -1160,49 +1038,43 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     private void SaveEdit()
     {
-        if (_session.Unlocked is not { } vault)
-        {
-            Report("The vault is locked.");
-            return;
-        }
-
-        try
-        {
-            if (vault.Find(Name) is not { } existing)
+        var write = _session.Write(
+            vault =>
             {
-                Report($"'{_entryPath}' is no longer in this vault.");
-                return;
-            }
+                if (vault.Find(Name) is not { } existing)
+                {
+                    return false;
+                }
 
-            // An untouched password is carried across rather than read and written back, which
-            // would put it in a local for no reason. A replacement is applied in the same
-            // UpdateEntry as the field edits, so the whole change costs one history item rather
-            // than two (D-0014).
-            // Title and GroupPath come across too, so the read has to be the identity one — `UpdateEntry`
-            // locates by them, and an `existing` from the wrong entry writes the draft into that entry.
-            var updated = existing with
-            {
-                Username = DraftUsername,
-                Url = DraftUrl,
-                Notes = DraftNotes,
-            };
+                // An untouched password is carried across rather than read and written back, which
+                // would put it in a local for no reason. A replacement is applied in the same
+                // UpdateEntry as the field edits, so the whole change costs one history item rather
+                // than two (D-0014).
+                // Title and GroupPath come across too, so the read has to be the identity one — `UpdateEntry`
+                // locates by them, and an `existing` from the wrong entry writes the draft into that entry.
+                var updated = existing with
+                {
+                    Username = DraftUsername,
+                    Url = DraftUrl,
+                    Notes = DraftNotes,
+                };
 
-            if (NewPassword.HasValue)
-            {
-                updated = updated with { Password = NewPassword.Compose() };
-            }
+                if (NewPassword.HasValue)
+                {
+                    updated = updated with { Password = NewPassword.Compose() };
+                }
 
-            vault.UpdateEntry(updated);
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
+                vault.UpdateEntry(updated);
+                return true;
+            },
+            updated => updated);
+        var problem = write.Outcome == WriteOutcome.NothingToSave
+            ? $"'{_entryPath}' is no longer in this vault."
+            : write.Problem("make your change again");
+
+        if (problem is not null)
         {
-            Report("Something else changed this vault since you opened it. Reload to see it, then make your change again.");
-            return;
-        }
-        catch (VaultException e)
-        {
-            Report(e.Message);
+            Report(problem);
             return;
         }
 

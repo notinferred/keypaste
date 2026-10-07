@@ -247,6 +247,22 @@ public sealed class AppSettingsTests : IDisposable
         Assert.True(File.Exists(nested));
     }
 
+    /// <summary>
+    /// The reader takes no escapes, so a vault path holding a quote would have made the whole file unreadable and
+    /// cost every preference in it.
+    /// </summary>
+    [Fact]
+    public void A_vault_path_the_file_cannot_hold_is_left_out_and_every_preference_kept()
+    {
+        var unrecordable = Path.Combine(_directory, "say \"hi\".kdbx");
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Theme = AppTheme.Dark, Vault = unrecordable }));
+
+        Assert.True(AppSettings.TryLoad(SettingsFile, out var read));
+        Assert.Equal(AppTheme.Dark, read.Theme);
+        Assert.Null(read.Vault);
+    }
+
     [Fact]
     public void The_file_it_writes_is_readable_only_by_its_owner()
     {

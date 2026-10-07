@@ -151,6 +151,37 @@ public sealed class NewItemTests : IDisposable
         Assert.False(form.ShowsPassword || form.ShowsHost || form.ShowsKey || form.ShowsUrl);
     }
 
+    [Fact]
+    public void A_choice_announces_the_fields_and_the_button_that_read_it()
+    {
+        var form = NewItemForm.Open(_entries);
+        var raised = new List<string>();
+        form.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        var asked = 0;
+        form.AddTagCommand.CanExecuteChanged += (_, _) => asked++;
+
+        form.Template = ItemTemplate.ApiKey;
+
+        string[] shown =
+        [
+            nameof(NewItemViewModel.Template),
+            nameof(NewItemViewModel.SelectedTemplate),
+            nameof(NewItemViewModel.ShowsUsername),
+            nameof(NewItemViewModel.ShowsPassword),
+            nameof(NewItemViewModel.ShowsUrl),
+            nameof(NewItemViewModel.ShowsHost),
+            nameof(NewItemViewModel.ShowsKey),
+        ];
+        Assert.Equal(shown.Order(StringComparer.Ordinal), raised.Order(StringComparer.Ordinal));
+
+        form.DraftTag = "a,b";
+        form.AddTagCommand.Execute(null);
+
+        Assert.Equal(1, asked);
+        Assert.Contains(nameof(NewItemViewModel.HasError), raised);
+        Assert.True(form.HasError);
+    }
+
     [Theory]
     [InlineData("github", "otp", "is already in that group")]
     [InlineData("", "OPENAI_API_KEY", "An item needs a title.")]

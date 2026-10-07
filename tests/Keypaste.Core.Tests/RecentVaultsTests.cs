@@ -1,3 +1,4 @@
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Recent;
 using Xunit;
 
@@ -199,6 +200,65 @@ public sealed class RecentVaultsTests : IDisposable
         var only = Assert.Single(RecentVaults.Load(RecentFile));
         Assert.Equal(Path.GetFullPath(vault), only.Path);
         Assert.Null(only.KeyfilePath);
+    }
+
+    /// <summary>
+    /// The reader takes no escapes and refuses a file it cannot read whole, so one such path written into it would
+    /// have emptied the list on the next read and the save after it. On Unix a backslash is part of a file name and
+    /// was written as a slash, remembering another file.
+    /// </summary>
+    [Fact]
+    public void A_path_the_file_cannot_hold_is_left_out_and_every_other_vault_kept()
+    {
+        var when = new DateTimeOffset(2026, 7, 28, 9, 12, 44, TimeSpan.Zero);
+        var first = Path.Combine(_directory, "first.kdbx");
+        var last = Path.Combine(_directory, "last.kdbx");
+        List<string> unwritable =
+        [
+            Path.Combine(_directory, "say \"hi\".kdbx"),
+            Path.Combine(_directory, "bell\u0007.kdbx"),
+            Path.Combine(_directory, new string('v', TomlLimits.Paths.StringLength) + ".kdbx"),
+        ];
+
+        if (!OperatingSystem.IsWindows())
+        {
+            unwritable.Add(Path.Combine(_directory, "back\\slash.kdbx"));
+        }
+
+        List<RecentVault> vaults = [new(first, when), .. unwritable.Select(path => new RecentVault(path, when)), new(last, when)];
+
+        Assert.True(RecentVaults.Save(RecentFile, vaults));
+
+        Assert.True(Toml.TryParse(File.ReadAllText(RecentFile), TomlLimits.Paths, out _, out var error), error);
+        Assert.Equal([Path.GetFullPath(first), Path.GetFullPath(last)], RecentVaults.Load(RecentFile).Select(vault => vault.Path));
+    }
+
+    [Fact]
+    public void A_keyfile_the_file_cannot_hold_is_left_out_and_its_vault_kept()
+    {
+        var vault = Path.Combine(_directory, "keyed.kdbx");
+
+        Assert.True(RecentVaults.Save(RecentFile, [new RecentVault(vault, DateTimeOffset.UtcNow, Path.Combine(_directory, "key \"1\".key"))]));
+
+        var only = Assert.Single(RecentVaults.Load(RecentFile));
+        Assert.Equal(Path.GetFullPath(vault), only.Path);
+        Assert.Null(only.KeyfilePath);
+    }
+
+    /// <summary>A full list of the longest paths the file holds, keyfiles included, stays under its byte ceiling.</summary>
+    [Fact]
+    public void A_full_list_of_the_longest_paths_still_reads_back_whole()
+    {
+        var name = new string('é', TomlLimits.Paths.StringLength - _directory.Length - 16);
+        var vaults = Enumerable
+            .Range(0, RecentVaults.Capacity)
+            .Select(i => new RecentVault(
+                Path.Combine(_directory, $"{name}{i:00}.kdbx"), DateTimeOffset.UtcNow, Path.Combine(_directory, $"{name}{i:00}.key"), 1))
+            .ToList();
+
+        Assert.True(RecentVaults.Save(RecentFile, vaults));
+
+        Assert.Equal(vaults.Select(vault => Path.GetFullPath(vault.KeyfilePath!)), RecentVaults.Load(RecentFile).Select(vault => vault.KeyfilePath ?? string.Empty));
     }
 
     [Fact]

@@ -252,16 +252,8 @@ internal sealed class RequestCredentialTool(
     }
 
     /// <summary>Whether a path-shaped argument names something this server may ask about; the owner decides by the entry's tags.</summary>
-    private bool InScope(string entry, string field)
-    {
-        var separator = entry.LastIndexOf('/');
-
-        var name = separator < 0
-            ? new EntryName(string.Empty, entry)
-            : new EntryName(entry[..separator], entry[(separator + 1)..]);
-
-        return options.Exposure.MayPermit(name, field);
-    }
+    private bool InScope(string entry, string field) =>
+        options.Exposure.MayPermit(EntryName.Parse(entry), field);
 
     private static Verdict Invalid(string field, string rule) =>
         new(

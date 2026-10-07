@@ -100,6 +100,41 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(CancelTagChange, () => PendingTagChange is not null);
 
+        DependsOn(nameof(Count), nameof(Variables));
+        DependsOn(nameof(Summary), nameof(Count));
+        DependsOn(nameof(RunCommand), nameof(SelectedProfile));
+        DependsOn(nameof(HasRows), nameof(Rows));
+        DependsOn(nameof(SelectedIsProtected), nameof(SelectedProfile));
+        DependsOn(nameof(ReferencePreview), nameof(SelectedProfile));
+        DependsOn(nameof(ReferenceLines), nameof(ReferencePreview));
+        DependsOn(nameof(RevealedKey), nameof(Revealed));
+        DependsOn(nameof(RemovePrompt), nameof(Removing));
+        DependsOn(nameof(IsRemoving), nameof(Removing));
+        DependsOn(nameof(ReplacePrompt), nameof(Replacing));
+        DependsOn(nameof(IsReplacing), nameof(Replacing));
+        DependsOn(nameof(IsAddingEntry), nameof(AddingEntryTo));
+        DependsOn(nameof(AddEntryTitle), nameof(AddingEntryTo));
+        DependsOn(nameof(EntryCandidates), nameof(EntryFilter), nameof(Candidates));
+        DependsOn(nameof(CandidateNote), nameof(EntryFilter), nameof(Candidates));
+        DependsOn(nameof(IsConfirmingTagChange), nameof(PendingTagChange));
+        DependsOn(nameof(TagChangeLines), nameof(PendingTagChange));
+        DependsOn(nameof(TagChangeAdds), nameof(PendingTagChange));
+        DependsOn(nameof(TagChangeAction), nameof(PendingTagChange));
+        DependsOn(nameof(TagChangeCancel), nameof(TagChangeAdds));
+        DependsOn(BeginAddCommand, nameof(IsAdding));
+        DependsOn(CancelAddCommand, nameof(IsAdding));
+        DependsOn(ConfirmAddCommand, nameof(IsAdding));
+        DependsOn(ConfirmRemoveCommand, nameof(Removing));
+        DependsOn(CancelRemoveCommand, nameof(Removing));
+        DependsOn(ConfirmReplaceCommand, nameof(Replacing));
+        DependsOn(CancelReplaceCommand, nameof(Replacing));
+        DependsOn(BeginAddProfileCommand, nameof(IsAddingProfile));
+        DependsOn(ConfirmAddProfileCommand, nameof(IsAddingProfile));
+        DependsOn(CancelAddProfileCommand, nameof(IsAddingProfile));
+        DependsOn(CancelAddEntryCommand, nameof(IsAddingEntry));
+        DependsOn(ConfirmTagChangeCommand, nameof(PendingTagChange));
+        DependsOn(CancelTagChangeCommand, nameof(PendingTagChange));
+
         Import = new EnvImportViewModel(session, name, picker, report, _announce, imported ?? Reload);
         Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(), report, _announce);
         Launch.PropertyChanged += OnLaunchChanged;
@@ -132,14 +167,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<EnvVariableRow> Variables
     {
         get => _variables;
-        private set
-        {
-            if (Set(ref _variables, value))
-            {
-                Raise(nameof(Count));
-                Raise(nameof(Summary));
-            }
-        }
+        private set => Set(ref _variables, value);
     }
 
     /// <summary>How many variables this project holds.</summary>
@@ -176,13 +204,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<EnvKeyRow> Rows
     {
         get => _rows;
-        private set
-        {
-            if (Set(ref _rows, value))
-            {
-                Raise(nameof(HasRows));
-            }
-        }
+        private set => Set(ref _rows, value);
     }
 
     internal bool HasRows => _rows.Count > 0;
@@ -194,15 +216,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal bool IsAddingProfile
     {
         get => _isAddingProfile;
-        private set
-        {
-            if (Set(ref _isAddingProfile, value))
-            {
-                BeginAddProfileCommand.RaiseCanExecuteChanged();
-                ConfirmAddProfileCommand.RaiseCanExecuteChanged();
-                CancelAddProfileCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _isAddingProfile, value);
     }
 
     /// <summary>The name of the profile being started.</summary>
@@ -244,11 +258,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
             if (Set(ref _selectedProfile, value))
             {
-                Raise(nameof(SelectedIsProtected));
                 Import.Profile = value;
                 Launch.Profile = value;
-                _revealed = null;
-                Raise(nameof(RevealedKey));
+                Revealed = null;
                 Removing = null;
                 CancelReplace();
                 CloseEntryForms();
@@ -281,11 +293,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
 
         var target = Path.GetFullPath(path);
+        var overVault = $"{target} is a vault, so nothing was written. Choose another file.";
 
-        if ((_session.VaultPath is { } vaultPath && PathIdentity.SameFile(vaultPath, target))
-            || (File.Exists(target) && KdbxHeader.IsVaultFile(target)))
+        if (VaultOverwriteRule.Check(vault.Path, target) != VaultOverwrite.None)
         {
-            return $"{target} is a vault, so nothing was written. Choose another file.";
+            return overVault;
         }
 
         if (File.Exists(target) && !replace)
@@ -293,30 +305,20 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return $"{target} already exists, so nothing was written. Replace it to overwrite it.";
         }
 
-        var listing = EnvResolution.List(vault, Name, SelectedProfile);
+        var export = EnvReferenceExport.Run(vault, Name, SelectedProfile, target, replace);
+        written = export.Outcome == EnvReferenceExportOutcome.Written;
 
-        if (listing.Sources.GroupBy(source => source.Key, StringComparer.Ordinal).FirstOrDefault(key => key.Count() > 1) is { } repeated)
+        return export.Outcome switch
         {
-            var entries = string.Join(", ", repeated.Select(source => ApprovalPrompt.Shown(source.Entry)));
-            return $"{EntryNameSanitizer.Sanitize(repeated.Key).Text} is on more than one entry ({entries}), so nothing was written.";
-        }
-
-        var variables = listing.Variables;
-
-        if (!EnvNameRules.TryCheck(variables, out var names))
-        {
-            return $"{DisplayName}/{SelectedProfile} {names}";
-        }
-
-        var text = EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)], Path.GetFileName(target));
-
-        if (!EnvReferenceFile.TryWrite(target, text, replace, out var writeError))
-        {
-            return $"{target} could not be written: {writeError}";
-        }
-
-        written = true;
-        return $"Wrote {(variables.Count == 1 ? "1 reference" : $"{variables.Count} references")} to {target}. It holds no value and is safe to commit.";
+            EnvReferenceExportOutcome.Written =>
+                $"Wrote {(export.Count == 1 ? "1 reference" : $"{export.Count} references")} to {target}. It holds no value and is safe to commit.",
+            EnvReferenceExportOutcome.NoProject or EnvReferenceExportOutcome.NoProfile =>
+                $"{DisplayName}/{SelectedProfile} has no variables yet, so nothing was written.",
+            EnvReferenceExportOutcome.Refused =>
+                $"{EntryNameSanitizer.SanitizeProse(export.Problem, 1024).Text.TrimEnd('.')}. Nothing was written.",
+            EnvReferenceExportOutcome.OverVault => overVault,
+            _ => $"{target} could not be written: {export.Problem}",
+        };
     }
 
     /// <summary>Which variable is revealed right now, by name. Never its value.</summary>
@@ -324,22 +326,19 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// Exposed so a test can assert that revealing is single and transient without reaching into a
     /// control. A key is already on screen; a value is what must not be.
     /// </remarks>
-    internal string? RevealedKey => _revealed?.Key;
+    internal string? RevealedKey => Revealed?.Key;
+
+    private EnvVariableRow? Revealed
+    {
+        get => _revealed;
+        set => Set(ref _revealed, value);
+    }
 
     /// <summary>The variable a confirmation is pending for, or null.</summary>
     internal EnvVariableRow? Removing
     {
         get => _removing;
-        private set
-        {
-            if (Set(ref _removing, value))
-            {
-                Raise(nameof(RemovePrompt));
-                Raise(nameof(IsRemoving));
-                ConfirmRemoveCommand.RaiseCanExecuteChanged();
-                CancelRemoveCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _removing, value);
     }
 
     internal bool IsRemoving => _removing is not null;
@@ -354,16 +353,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal EnvVariableRow? Replacing
     {
         get => _replacing;
-        private set
-        {
-            if (Set(ref _replacing, value))
-            {
-                Raise(nameof(ReplacePrompt));
-                Raise(nameof(IsReplacing));
-                ConfirmReplaceCommand.RaiseCanExecuteChanged();
-                CancelReplaceCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _replacing, value);
     }
 
     internal bool IsReplacing => _replacing is not null;
@@ -446,15 +436,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal bool IsAdding
     {
         get => _isAdding;
-        private set
-        {
-            if (Set(ref _isAdding, value))
-            {
-                BeginAddCommand.RaiseCanExecuteChanged();
-                CancelAddCommand.RaiseCanExecuteChanged();
-                ConfirmAddCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _isAdding, value);
     }
 
     /// <summary>The name of the variable being added.</summary>
@@ -498,9 +480,15 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Whether the form that tags an entry into an environment is open.</summary>
-    internal bool IsAddingEntry => _addingEntryTo is not null;
+    internal bool IsAddingEntry => AddingEntryTo is not null;
 
-    internal string AddEntryTitle => _addingEntryTo is { } environment
+    private string? AddingEntryTo
+    {
+        get => _addingEntryTo;
+        set => Set(ref _addingEntryTo, value);
+    }
+
+    internal string AddEntryTitle => AddingEntryTo is { } environment
         ? $"Add an entry to {EntryNameSanitizer.Sanitize(environment).Text}"
         : string.Empty;
 
@@ -508,14 +496,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal string EntryFilter
     {
         get => _entryFilter;
-        set
-        {
-            if (Set(ref _entryFilter, value))
-            {
-                Raise(nameof(EntryCandidates));
-                Raise(nameof(CandidateNote));
-            }
-        }
+        set => Set(ref _entryFilter, value);
     }
 
     /// <summary>
@@ -523,6 +504,12 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// environment, one in the recycle bin or one of keypaste's own.
     /// </summary>
     internal IReadOnlyList<EnvEntryCandidate> EntryCandidates => [.. Matching().Take(_shownCandidates)];
+
+    private IReadOnlyList<EnvEntryCandidate> Candidates
+    {
+        get => _candidates;
+        set => Set(ref _candidates, value);
+    }
 
     /// <summary>What the add form says under its list: that nothing matches, or how many more the filter hides.</summary>
     internal string CandidateNote
@@ -556,19 +543,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal ProjectTagChange? PendingTagChange
     {
         get => _tagChange;
-        private set
-        {
-            if (Set(ref _tagChange, value))
-            {
-                Raise(nameof(IsConfirmingTagChange));
-                Raise(nameof(TagChangeLines));
-                Raise(nameof(TagChangeAdds));
-                Raise(nameof(TagChangeAction));
-                Raise(nameof(TagChangeCancel));
-                ConfirmTagChangeCommand.RaiseCanExecuteChanged();
-                CancelTagChangeCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _tagChange, value);
     }
 
     internal bool IsConfirmingTagChange => _tagChange is not null;
@@ -614,7 +589,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             ReplacementValue.Clear();
             IsAdding = false;
             Replacing = null;
-            RaiseProfileText();
+            Raise(nameof(ReferencePreview));
             return;
         }
 
@@ -657,7 +632,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         Layout();
         ListEnvironments(vault);
-        RaiseProfileText();
+        Raise(nameof(ReferencePreview));
     }
 
     /// <summary>The entries tagged into one of this project's environments.</summary>
@@ -809,22 +784,10 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void RaiseProfileText()
-    {
-        Raise(nameof(ReferencePreview));
-        Raise(nameof(ReferenceLines));
-        Raise(nameof(RunCommand));
-    }
-
     /// <summary>Hands a row its value, and takes it away from whichever row had it.</summary>
     internal string? Reveal(EnvVariableRow row)
     {
-        if (!ReferenceEquals(_revealed, row))
-        {
-            _revealed = row;
-            Raise(nameof(RevealedKey));
-        }
-
+        Revealed = row;
         return Read(row);
     }
 
@@ -833,8 +796,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         if (ReferenceEquals(_revealed, row))
         {
-            _revealed = null;
-            Raise(nameof(RevealedKey));
+            Revealed = null;
         }
     }
 
@@ -925,7 +887,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     private void ConfirmAdd()
     {
-        if (_session.Unlocked is not { } vault)
+        if (!_session.IsUnlocked)
         {
             _report("The vault is locked.");
             return;
@@ -939,50 +901,40 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var value = string.Empty;
+        string value;
 
-        try
+        if (GenerateValue)
         {
-            if (GenerateValue)
+            if (Generator.Recipe is not { } recipe)
             {
-                if (Generator.Recipe is not { } recipe)
-                {
-                    _report(Generator.Error ?? string.Empty);
-                    return;
-                }
-
-                using var buffer = new SecretBuffer();
-                PasswordGenerator.Append(recipe, buffer);
-                value = new string(buffer.Value);
-            }
-            else
-            {
-                value = NewValue.Compose();
-            }
-
-            // Core's rules, not ones written next to this message: keypaste env set refuses the same
-            // names and entries for the same reasons, and the two must not drift.
-            var plan = new EnvStore(vault).Set(Name, SelectedProfile, key, value, NewEntry?.Entry);
-
-            if (plan.Refusal is { } refusal)
-            {
-                _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
+                _report(Generator.Error ?? string.Empty);
                 return;
             }
 
-            if (plan.WritesAnything)
-            {
-                vault.Save();
-            }
+            using var buffer = new SecretBuffer();
+            PasswordGenerator.Append(recipe, buffer);
+            value = new string(buffer.Value);
         }
-        catch (VaultChangedOnDiskException)
+        else
         {
-            _report("Something else changed this vault since you opened it. Reload to see it, then add this again.");
+            value = NewValue.Compose();
+        }
+
+        // Core's rules, not ones written next to this message: keypaste env set refuses the same
+        // names and entries for the same reasons, and the two must not drift.
+        var write = _session.Write(
+            vault => new EnvStore(vault).Set(Name, SelectedProfile, key, value, NewEntry?.Entry),
+            plan => plan.Refusal is null && plan.WritesAnything);
+
+        if (write.Value?.Refusal is { } refusal)
+        {
+            _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
             return;
         }
-        catch (VaultException e)
+
+        if (write.Problem("add this again") is { } problem)
         {
-            _report(e.Message);
+            _report(problem);
             return;
         }
 
@@ -1003,7 +955,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
+        if (_session.Unlocked is not { } open)
         {
             _report("The vault is locked.");
             return;
@@ -1011,7 +963,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         // Something may have removed it while this form was open; writing it elsewhere would be a
         // new key the person did not ask for.
-        if (!EnvResolution.List(vault, Name, SelectedProfile).Sources.Contains(row.Source))
+        if (!EnvResolution.List(open, Name, SelectedProfile).Sources.Contains(row.Source))
         {
             _report($"{row.DisplayKey} is no longer on {ApprovalPrompt.Shown(row.Source.Entry)}, so nothing was written.");
             CancelReplaceQuietly();
@@ -1020,30 +972,19 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
 
         var value = ReplacementValue.Compose();
+        var write = _session.Write(
+            vault => new EnvStore(vault).Set(Name, SelectedProfile, row.Key, value, row.Source.Entry),
+            plan => plan.Refusal is null && plan.WritesAnything);
 
-        try
+        if (write.Value?.Refusal is { } refusal)
         {
-            var plan = new EnvStore(vault).Set(Name, SelectedProfile, row.Key, value, row.Source.Entry);
-
-            if (plan.Refusal is { } refusal)
-            {
-                _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
-                return;
-            }
-
-            if (plan.WritesAnything)
-            {
-                vault.Save();
-            }
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            _report("Something else changed this vault since you opened it. Reload to see it, then replace this again.");
+            _report(EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
             return;
         }
-        catch (VaultException e)
+
+        if (write.Problem("replace this again") is { } problem)
         {
-            _report(e.Message);
+            _report(problem);
             return;
         }
 
@@ -1068,40 +1009,27 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
+        var write = _session.Write(
+            vault => new EnvStore(vault).Remove(Name, SelectedProfile, row.Key, row.Source.Entry),
+            removal => removal.Outcome is not (EnvRemoveOutcome.NothingMatched or EnvRemoveOutcome.Ambiguous or EnvRemoveOutcome.Refused));
+
+        if (write.Value is { Outcome: EnvRemoveOutcome.NothingMatched })
         {
-            _report("The vault is locked.");
+            _report($"{row.DisplayKey} is not in {DisplayName} any more.");
+            Removing = null;
+            Reload();
             return;
         }
 
-        try
+        if (write.Value is { Outcome: EnvRemoveOutcome.Ambiguous or EnvRemoveOutcome.Refused } refused)
         {
-            var removal = new EnvStore(vault).Remove(Name, SelectedProfile, row.Key, row.Source.Entry);
-
-            if (removal.Outcome == EnvRemoveOutcome.NothingMatched)
-            {
-                _report($"{row.DisplayKey} is not in {DisplayName} any more.");
-                Removing = null;
-                Reload();
-                return;
-            }
-
-            if (removal.Outcome is EnvRemoveOutcome.Ambiguous or EnvRemoveOutcome.Refused)
-            {
-                _report(EntryNameSanitizer.SanitizeProse(removal.Refusal, 1024).Text);
-                return;
-            }
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            _report("Something else changed this vault since you opened it. Reload to see it, then remove this again.");
+            _report(EntryNameSanitizer.SanitizeProse(refused.Refusal, 1024).Text);
             return;
         }
-        catch (VaultException e)
+
+        if (write.Problem("remove this again") is { } problem)
         {
-            _report(e.Message);
+            _report(problem);
             return;
         }
 
@@ -1128,20 +1056,18 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         PendingTagChange = null;
 
         var members = MembersOf(environment).ToHashSet();
-        _candidates =
+        Candidates =
         [
             .. vault.ReadEntries()
-                .Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))
                 .Select(EntryName.Of)
                 .Distinct()
                 .Where(entry => !members.Contains(entry))
                 .Select(entry => new EnvEntryCandidate(entry, ApprovalPrompt.Shown(entry)))
                 .OrderBy(candidate => candidate.Display, StringComparer.Ordinal),
         ];
-        _chosenEntry = null;
-        _entryFilter = string.Empty;
-        _addingEntryTo = environment;
-        RaiseEntryForm();
+        ChosenEntry = null;
+        EntryFilter = string.Empty;
+        AddingEntryTo = environment;
         _report(null);
     }
 
@@ -1160,22 +1086,10 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _addingEntryTo = null;
-        _candidates = [];
-        _chosenEntry = null;
-        _entryFilter = string.Empty;
-        RaiseEntryForm();
-    }
-
-    private void RaiseEntryForm()
-    {
-        Raise(nameof(IsAddingEntry));
-        Raise(nameof(AddEntryTitle));
-        Raise(nameof(EntryFilter));
-        Raise(nameof(EntryCandidates));
-        Raise(nameof(CandidateNote));
-        Raise(nameof(ChosenEntry));
-        CancelAddEntryCommand.RaiseCanExecuteChanged();
+        AddingEntryTo = null;
+        Candidates = [];
+        ChosenEntry = null;
+        EntryFilter = string.Empty;
     }
 
     private IEnumerable<EnvEntryCandidate> Matching()
@@ -1183,8 +1097,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         var filter = _entryFilter.Trim();
 
         return filter.Length == 0
-            ? _candidates
-            : _candidates.Where(candidate => candidate.Display.Contains(filter, StringComparison.OrdinalIgnoreCase));
+            ? Candidates
+            : Candidates.Where(candidate => candidate.Display.Contains(filter, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Says what tagging the chosen entry into the environment does; nothing is written until it is confirmed.</summary>
@@ -1265,8 +1179,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private void CancelTagChange()
     {
         PendingTagChange = null;
-        _chosenEntry = null;
-        Raise(nameof(ChosenEntry));
+        ChosenEntry = null;
         _report(null);
     }
 
@@ -1277,37 +1190,25 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
-        {
-            _report("The vault is locked.");
-            return;
-        }
-
         var entry = ApprovalPrompt.Shown(change.Entry);
         var environment = EntryNameSanitizer.SanitizePath(change.Environment ?? string.Empty).Text;
+        var write = _session.Write(
+            vault => change.Adding ? vault.AddTag(change.Entry, change.Tags[0]) : vault.RemoveTags(change.Entry, change.Tags),
+            changed => changed);
 
-        try
+        if (write.Outcome == WriteOutcome.NothingToSave)
         {
-            if (!(change.Adding ? vault.AddTag(change.Entry, change.Tags[0]) : vault.RemoveTags(change.Entry, change.Tags)))
-            {
-                _report(change.Adding
-                    ? $"{entry} is already in {environment} or no longer in this vault, so nothing was written."
-                    : $"{entry} is no longer in {environment}, so nothing was written.");
-                CloseEntryForms();
-                Reload();
-                return;
-            }
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            _report("Something else changed this vault since you opened it. Reload to see it, then make this change again.");
+            _report(change.Adding
+                ? $"{entry} is already in {environment} or no longer in this vault, so nothing was written."
+                : $"{entry} is no longer in {environment}, so nothing was written.");
+            CloseEntryForms();
+            Reload();
             return;
         }
-        catch (VaultException e)
+
+        if (write.Problem("make this change again") is { } problem)
         {
-            _report(e.Message);
+            _report(problem);
             return;
         }
 

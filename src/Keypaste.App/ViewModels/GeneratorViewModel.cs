@@ -34,19 +34,18 @@ internal sealed class GeneratorViewModel : ObservableObject
     private int _wordCount = PasswordGenerator.DefaultWords;
     private string _separator = PasswordGenerator.DefaultSeparator.ToString();
 
+    internal GeneratorViewModel()
+    {
+        DependsOn(nameof(UseCharacters), nameof(UseWords));
+        DependsOn(nameof(Strength), nameof(UseWords), nameof(WordCount));
+        DependsOn(nameof(Error), nameof(UseWords), nameof(WordCount), nameof(Separator));
+    }
+
     /// <summary>Whether to draw words from the list rather than characters from an alphabet.</summary>
     internal bool UseWords
     {
         get => _useWords;
-        set
-        {
-            if (Set(ref _useWords, value))
-            {
-                Raise(nameof(UseCharacters));
-                Raise(nameof(Strength));
-                Raise(nameof(Error));
-            }
-        }
+        set => Set(ref _useWords, value);
     }
 
     /// <summary>The other half of the pair, so one binding can drive two radio buttons.</summary>
@@ -60,27 +59,14 @@ internal sealed class GeneratorViewModel : ObservableObject
     internal int WordCount
     {
         get => _wordCount;
-        set
-        {
-            if (Set(ref _wordCount, value))
-            {
-                Raise(nameof(Strength));
-                Raise(nameof(Error));
-            }
-        }
+        set => Set(ref _wordCount, value);
     }
 
     /// <summary>What goes between the words, as the box holds it.</summary>
     internal string Separator
     {
         get => _separator;
-        set
-        {
-            if (Set(ref _separator, value ?? string.Empty))
-            {
-                Raise(nameof(Error));
-            }
-        }
+        set => Set(ref _separator, value ?? string.Empty);
     }
 
     /// <summary>The fewest words the generator will produce.</summary>

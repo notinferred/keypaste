@@ -20,6 +20,11 @@ internal sealed class ClientCardRow : ObservableObject
         _policy = policy;
         Choices = [.. Enum.GetValues<ClientPolicy>().Select(choice => new PolicyChoice(this, choice))];
 
+        DependsOn(nameof(MenuLayer), nameof(IsMenuOpen));
+        DependsOn(nameof(PolicyText), nameof(Policy));
+        DependsOn(nameof(Explanation), nameof(Policy));
+        DependsOn(nameof(HasExplanation), nameof(Explanation));
+
         if (card is null)
         {
             Label = ClientPolicies.AnyClient;
@@ -88,13 +93,7 @@ internal sealed class ClientCardRow : ObservableObject
     internal bool IsMenuOpen
     {
         get => _isMenuOpen;
-        set
-        {
-            if (Set(ref _isMenuOpen, value))
-            {
-                Raise(nameof(MenuLayer));
-            }
-        }
+        set => Set(ref _isMenuOpen, value);
     }
 
     /// <summary>Lifts the card while its menu is open, so the menu draws over the cards after it.</summary>
@@ -117,15 +116,7 @@ internal sealed class ClientCardRow : ObservableObject
     internal string PolicyText => Words(_policy);
 
     /// <summary>Shows the policy the file now holds.</summary>
-    internal void Held(ClientPolicy policy)
-    {
-        if (Set(ref _policy, policy, nameof(Policy)))
-        {
-            Raise(nameof(PolicyText));
-            Raise(nameof(Explanation));
-            Raise(nameof(HasExplanation));
-        }
-    }
+    internal void Held(ClientPolicy policy) => Set(ref _policy, policy, nameof(Policy));
 
     internal static string Words(ClientPolicy policy) => ClientPolicies.Describe(policy).Split(':')[0];
 

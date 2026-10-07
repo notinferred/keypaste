@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -52,16 +53,17 @@ internal static class AddCommand
         var target = line.Operands[0];
         var groupFlag = line.Value("group");
 
-        var slash = target.LastIndexOf('/');
-        if (slash >= 0 && groupFlag is not null)
+        var pathNamesGroup = target.Contains('/', StringComparison.Ordinal);
+        if (pathNamesGroup && groupFlag is not null)
         {
             context.Stderr.WriteLine(
                 "keypaste add: give the group in the entry path or with --group, not both");
             return CliApp.ExitUsageError;
         }
 
-        var title = slash < 0 ? target : target[(slash + 1)..];
-        var groupPath = WrittenGroup.Normalize(slash < 0 ? groupFlag ?? string.Empty : target[..slash]);
+        var typed = EntryName.Parse(target);
+        var title = typed.Title;
+        var groupPath = WrittenGroup.Normalize(pathNamesGroup ? typed.GroupPath : groupFlag ?? string.Empty);
 
         if (title.Length == 0)
         {
@@ -69,10 +71,11 @@ internal static class AddCommand
             return CliApp.ExitUsageError;
         }
 
-        if (ReservedGroups.IsReserved(groupPath))
+        if (!Vault.IsCreatable(new EntryName(groupPath, title), out var refusal))
         {
-            var shown = EntryNameSanitizer.SanitizePath(groupPath + "/" + title).Text;
-            context.Stderr.WriteLine($"keypaste add: {shown} is keypaste's own group; it cannot be written here");
+            context.Stderr.WriteLine(ReservedGroups.IsReserved(groupPath)
+                ? $"keypaste add: {EntryNameSanitizer.SanitizePath(groupPath + "/" + title).Text} is keypaste's own group; it cannot be written here"
+                : $"keypaste add: {refusal}");
             return CliApp.ExitUsageError;
         }
 
@@ -117,7 +120,7 @@ internal static class AddCommand
                 return CliApp.ExitUsageError;
             }
 
-            vault.AddEntry(new VaultEntry
+            vault.CreateEntryAtPath(new VaultEntry
             {
                 Title = title,
                 Username = username,

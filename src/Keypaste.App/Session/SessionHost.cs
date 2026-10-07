@@ -1,4 +1,3 @@
-using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -273,54 +272,34 @@ internal sealed class SessionHost : IDisposable
     /// <summary>One listener and what it answers with, for one unlock.</summary>
     private sealed class Hosted : IDisposable
     {
-        private readonly ApproverListener _listener;
-        private readonly SessionAuthority _authority;
-        private readonly ApprovalGate _approvals;
-        private readonly AppVaultSession _session;
-        private readonly GrantCache _grants;
-        private readonly EnvGrantCache _envGrants;
+        private readonly SessionServer _server;
         private readonly Lazy<AuditLog?> _audit;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
 
-        private Hosted(
-            ApproverListener listener,
-            SessionAuthority authority,
-            ApprovalGate approvals,
-            AppVaultSession session,
-            GrantCache grants,
-            EnvGrantCache envGrants,
-            Lazy<AuditLog?> audit)
+        private Hosted(SessionServer server, Lazy<AuditLog?> audit)
         {
-            _listener = listener;
-            _authority = authority;
-            _approvals = approvals;
-            _session = session;
-            _grants = grants;
-            _envGrants = envGrants;
+            _server = server;
             _audit = audit;
-
-            // An edit in the app withdraws the grants naming what it touched before it is saved (D-0318).
-            _session.Edited += OnEdited;
-            _run = listener.RunAsync(_stop.Token);
+            _run = server.RunAsync(_stop.Token);
         }
 
         /// <summary>The session the authority answers under while the listener still accepts, or null.</summary>
-        internal string? Serving => _run.IsCompleted ? null : _authority.Serving;
+        internal string? Serving => _run.IsCompleted ? null : _server.Authority.Serving;
 
-        internal ApproverActivity Activity => _run.IsCompleted ? ApproverActivity.None : _authority.Activity;
+        internal ApproverActivity Activity => _run.IsCompleted ? ApproverActivity.None : _server.Authority.Activity;
 
-        internal IReadOnlyList<ConnectedClient> Clients => _run.IsCompleted ? [] : _authority.Clients;
+        internal IReadOnlyList<ConnectedClient> Clients => _run.IsCompleted ? [] : _server.Authority.Clients;
 
-        internal IReadOnlyList<ReleaseSeen> Released => _authority.Released;
+        internal IReadOnlyList<ReleaseSeen> Released => _server.Authority.Released;
 
-        internal void RevokeClient(string label) => _authority.RevokeClient(label);
+        internal void RevokeClient(string label) => _server.Authority.RevokeClient(label);
 
-        internal void Revoke(GrantKey key) => _authority.Revoke(key);
+        internal void Revoke(GrantKey key) => _server.Authority.Revoke(key);
 
-        internal void RevokeEnvGrant(string key) => _authority.RevokeEnvGrant(key);
+        internal void RevokeEnvGrant(string key) => _server.Authority.RevokeEnvGrant(key);
 
-        internal void RevokeAll() => _authority.RevokeAll();
+        internal void RevokeAll() => _server.Authority.RevokeAll();
 
         internal static Hosted? TryStart(
             string pipe,
@@ -331,56 +310,40 @@ internal sealed class SessionHost : IDisposable
             Action? requestLock,
             out string? failure)
         {
-            // Owned by the lifetime, which zeroes it when a lock ends it (D-0313).
-#pragma warning disable CA2000
-            var grants = lifetime.Own(new GrantCache(session.Clock));
-            var envGrants = lifetime.Own(new EnvGrantCache(session.Clock));
-#pragma warning restore CA2000
-            var approvals = new ApprovalGate(channel, session.Clock, ApprovalLimits.Default);
-
-            var handler = new ApproverHandler(
-                new VaultCredentialSource(() => session.UnlockedFor(lifetime)),
-                new VaultEntryNameLister(() => session.UnlockedFor(lifetime)),
-                approvals,
-                grants,
-                PolicyGate.None,
-                clients: new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)));
-
             // Opened when a token or a run first arrives, so an unlock creates no log; one that cannot be opened refuses them.
             var audit = new Lazy<AuditLog?>(() =>
                 AuditLog.TryOpen(KeypasteHome.AuditPath(session.Home), TimeProvider.System, out var opened, out _) ? opened : null);
 
-            var authority = new SessionAuthority(
-                vault,
-                () => session.Lifetime,
-                handler,
-                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock, envGrants, Audit: () => audit.Value),
-                requestLock,
-                session.Clock);
-
             try
             {
-                var listener = new ApproverListener(pipe, authority);
+                var server = SessionServer.Listen(pipe, new SessionServerOptions
+                {
+                    Vault = vault,
+                    Lifetime = lifetime,
+                    CurrentLifetime = () => session.Lifetime,
+                    UnlockedFor = session.UnlockedFor,
+                    Channel = channel,
+                    Policy = PolicyGate.None,
+                    Clients = new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)),
+                    Audit = () => audit.Value,
+                    WatchEdits = edited => session.Edited += edited,
+                    UnwatchEdits = edited => session.Edited -= edited,
+                    LockNow = requestLock,
+                    Clock = session.Clock,
+                });
+
                 failure = null;
-                return new Hosted(listener, authority, approvals, session, grants, envGrants, audit);
+                return new Hosted(server, audit);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                approvals.Dispose();
                 failure = $"keypaste could not listen for agents: {ex.Message}";
                 return null;
             }
         }
 
-        private void OnEdited(object? sender, VaultEdit edit)
-        {
-            _grants.RevokeEntries(edit);
-            _envGrants.RevokeEntries(edit);
-        }
-
         public void Dispose()
         {
-            _session.Edited -= OnEdited;
             _stop.Cancel();
 
             try
@@ -393,8 +356,7 @@ internal sealed class SessionHost : IDisposable
                 // Stopping is the answer either way; a connection that faulted has already ended.
             }
 
-            _listener.Dispose();
-            _approvals.Dispose();
+            _server.Dispose();
             if (_audit.IsValueCreated)
             {
                 _audit.Value?.Dispose();

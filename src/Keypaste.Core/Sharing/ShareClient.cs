@@ -66,6 +66,16 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
     /// <summary>How long one exchange may take, from sending the request to reading the last body byte.</summary>
     internal TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>The transport every front end speaks to a share server over, owned and disposed by the caller.</summary>
+    /// <returns>A handler that follows no redirect, keeps no cookie, decompresses nothing and gives a connection 10 seconds.</returns>
+    public static HttpMessageHandler CreateTransport() => new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        UseCookies = false,
+        AutomaticDecompression = DecompressionMethods.None,
+        ConnectTimeout = TimeSpan.FromSeconds(10),
+    };
+
     /// <summary>A client for another endpoint over the same transport.</summary>
     public ShareClient WithEndpoint(Uri other) => new(_handler, other) { Timeout = Timeout };
 

@@ -62,13 +62,24 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         ChooseCommand = new AsyncRelayCommand(ChooseAsync, () => _picker is not null);
         ConfirmCommand = new RelayCommand(Confirm, () => IsPreviewing);
         CancelCommand = new RelayCommand(Clear, () => IsPreviewing);
+
+        DependsOn(nameof(IsPreviewing), nameof(Document));
+        DependsOn(nameof(HasNotes), nameof(Notes));
+        DependsOn(ConfirmCommand, nameof(IsPreviewing));
+        DependsOn(CancelCommand, nameof(IsPreviewing));
     }
 
     /// <summary>The profile a file is previewed for; the preview's own profile is what Import writes to.</summary>
     internal string Profile { get; set; } = EnvProfileNames.Default;
 
     /// <summary>Whether a file is read and waiting on Import.</summary>
-    internal bool IsPreviewing => _document is not null;
+    internal bool IsPreviewing => Document is not null;
+
+    private DotEnvDocument? Document
+    {
+        get => _document;
+        set => Set(ref _document, value);
+    }
 
     /// <summary>The file being previewed.</summary>
     internal string Source
@@ -88,13 +99,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
     internal string Notes
     {
         get => _notes;
-        private set
-        {
-            if (Set(ref _notes, value))
-            {
-                Raise(nameof(HasNotes));
-            }
-        }
+        private set => Set(ref _notes, value);
     }
 
     internal bool HasNotes => _notes.Length > 0;
@@ -129,21 +134,14 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
             return;
         }
 
-        byte[] bytes;
-
-        try
+        if (!DotEnvFile.TryRead(path, out var bytes, out var failure, out var readError))
         {
-            if (new FileInfo(path).Length > DotEnv.MaximumBytes)
+            _report(failure switch
             {
-                _report($"{path} is larger than a .env file can be, so nothing was imported.");
-                return;
-            }
-
-            bytes = File.ReadAllBytes(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            _report($"{path} could not be read: {ex.Message}");
+                DotEnvFileFailure.Missing => $"There is no file at {path}, so nothing was imported.",
+                DotEnvFileFailure.TooLarge => $"{path} is larger than a .env file can be, so nothing was imported.",
+                _ => $"{path} could not be read: {readError}",
+            });
             return;
         }
 
@@ -180,13 +178,12 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _document = document;
         _planned = plan.Environment;
         _previewed = plan.Keys;
         Source = path;
         Rows = [.. plan.Keys.Select(key => $"{EntryNameSanitizer.Sanitize(key.Key).Text}  {Describe(key, plan)}")];
         Notes = NotesOf(document);
-        RaisePreviewing();
+        Document = document;
     }
 
     private void Confirm()
@@ -196,76 +193,64 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
-        {
-            _report("The vault is locked.");
-            Clear();
-            return;
-        }
-
-        try
-        {
-            var store = new EnvStore(vault);
-            var plan = EnvImport.Plan(store, _project, _planned, document);
-
-            // The preview is what the person agreed to. A project that changed since is shown again.
-            if (plan.Refusal is not null || !plan.Keys.SequenceEqual(_previewed))
+        var write = _session.Write(
+            vault =>
             {
-                _report("The project changed since this preview, so nothing was imported. Choose the file again.");
+                var store = new EnvStore(vault);
+                var plan = EnvImport.Plan(store, _project, _planned, document);
+
+                // The preview is what the person agreed to. A project that changed since is shown again.
+                var stale = plan.Refusal is not null || !plan.Keys.SequenceEqual(_previewed);
+                var rejection = !stale && plan.WritesAnything && !store.TryApply(plan, out var reason) ? reason : null;
+                return (Plan: plan, Stale: stale, Rejection: rejection);
+            },
+            import => !import.Stale && import.Plan.WritesAnything && import.Rejection is null);
+
+        switch (write.Outcome)
+        {
+            case WriteOutcome.Locked:
+                _report("The vault is locked.");
                 Clear();
                 return;
-            }
 
-            if (!plan.WritesAnything)
-            {
-                _announce($"{Where} already matches the file; nothing was written.");
+            case WriteOutcome.NothingToSave:
+                if (write.Value.Stale)
+                {
+                    _report("The project changed since this preview, so nothing was imported. Choose the file again.");
+                }
+                else if (write.Value.Rejection is { } rejection)
+                {
+                    // Checked before anybody was asked, so nothing has been saved. Say so and stop.
+                    _report($"{rejection} Nothing was imported.");
+                }
+                else
+                {
+                    _announce($"{Where} already matches the file; nothing was written.");
+                }
+
                 Clear();
                 return;
-            }
 
-            if (!store.TryApply(plan, out var rejection))
-            {
-                // Checked before anybody was asked, so nothing has been saved. Say so and stop.
-                _report($"{rejection} Nothing was imported.");
+            case WriteOutcome.Saved:
+                var written = write.Value.Plan.Created.Count + write.Value.Plan.Updated.Count;
+                _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}. {Source} is still there.");
                 Clear();
+                _imported();
                 return;
-            }
 
-            vault.Save();
-
-            var written = plan.Created.Count + plan.Updated.Count;
-            _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}. {Source} is still there.");
+            default:
+                _report(write.Problem("import again"));
+                return;
         }
-        catch (VaultChangedOnDiskException)
-        {
-            _report("Something else changed this vault since you opened it. Reload to see it, then import again.");
-            return;
-        }
-        catch (VaultException e)
-        {
-            _report(e.Message);
-            return;
-        }
-
-        Clear();
-        _imported();
     }
 
     private void Clear()
     {
-        _document = null;
+        Document = null;
         _previewed = [];
         Source = string.Empty;
         Rows = [];
         Notes = string.Empty;
-        RaisePreviewing();
-    }
-
-    private void RaisePreviewing()
-    {
-        Raise(nameof(IsPreviewing));
-        ConfirmCommand.RaiseCanExecuteChanged();
-        CancelCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>The project and environment imported into, as the screen names them.</summary>

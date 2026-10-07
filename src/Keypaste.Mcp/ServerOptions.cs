@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 

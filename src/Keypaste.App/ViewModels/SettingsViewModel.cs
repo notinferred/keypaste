@@ -78,6 +78,10 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         OpenScopedTokensCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Tokens), () => open is not null);
         OpenDiagnosticsCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Diagnostics), () => open is not null);
         ShareLinksNote = ShareLinksNoteOf(session);
+
+        DependsOn(nameof(HasMessage), nameof(Message));
+        DependsOn(nameof(ChosenVaultText), nameof(IsThisVaultChosen));
+        DependsOn(UseThisVaultCommand, nameof(IsThisVaultChosen));
     }
 
     /// <summary>Settings › Advanced: the whole activity log, with its hash check.</summary>
@@ -328,13 +332,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     internal string Message
     {
         get => _message;
-        private set
-        {
-            if (Set(ref _message, value))
-            {
-                Raise(nameof(HasMessage));
-            }
-        }
+        private set => Set(ref _message, value);
     }
 
     internal bool HasMessage => _message.Length > 0;
@@ -346,12 +344,12 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     /// </remarks>
     internal async Task ExportAsync()
     {
-        if (_exporting || _picker is null || _session.Unlocked is not { } vault)
+        if (_exporting || _picker is null || _session.VaultPath is not { } path)
         {
             return;
         }
 
-        var stem = Path.GetFileNameWithoutExtension(vault.Path);
+        var stem = Path.GetFileNameWithoutExtension(path);
         var today = _session.Clock.GetLocalNow().ToString("yyyyMMdd", CultureInfo.InvariantCulture);
 
         if (await _picker.PickExportDestinationAsync($"{stem}-copy-{today}.kdbx").ConfigureAwait(true) is not { } destination)
@@ -364,20 +362,21 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
         try
         {
-            await Task.Run(() => vault.ExportTo(destination)).ConfigureAwait(true);
-            Message = $"An encrypted copy is at {destination}. It opens with this vault's master password.";
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Message = "The vault file changed since it was unlocked. Reload to see it, then export.";
-        }
-        catch (VaultException e)
-        {
-            Message = e.Message;
-        }
-        catch (ObjectDisposedException)
-        {
-            Message = "The vault locked before the copy was made. Nothing was written.";
+            var write = await Task.Run(() => _session.Write(
+                vault =>
+                {
+                    vault.ExportTo(destination);
+                    return true;
+                },
+                _ => false)).ConfigureAwait(true);
+
+            Message = write.Outcome switch
+            {
+                WriteOutcome.NothingToSave => $"An encrypted copy is at {destination}. It opens with this vault's master password.",
+                WriteOutcome.ChangedOnDisk => "The vault file changed since it was unlocked. Reload to see it, then export.",
+                WriteOutcome.Locked => "The vault locked before the copy was made. Nothing was written.",
+                _ => write.Reason!,
+            };
         }
         finally
         {
@@ -407,9 +406,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
             _ => $"{KeypasteHome.SettingsPath(_home)} could not be written, so nothing changed.",
         };
 
-        Raise(nameof(ChosenVaultText));
         Raise(nameof(IsThisVaultChosen));
-        UseThisVaultCommand.RaiseCanExecuteChanged();
     }
 
     private void ForgetAll()

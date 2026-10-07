@@ -9,6 +9,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Recent;
+using Keypaste.Mvvm;
 
 namespace Keypaste.AppDriver;
 

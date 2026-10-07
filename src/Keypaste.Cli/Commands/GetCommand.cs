@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Core;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

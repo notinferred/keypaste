@@ -9,7 +9,7 @@
 set -euo pipefail
 
 readonly TIMESTAMP_URL='http://timestamp.acs.microsoft.com'
-readonly FIRST_PARTY='keypaste.exe keypaste-app.exe keypaste-app.dll Keypaste.Core.dll KeePassLib.dll'
+readonly FIRST_PARTY='keypaste.exe keypaste-app.exe keypaste-app.dll Keypaste.Core.dll Keypaste.Mvvm.dll KeePassLib.dll'
 readonly IDENTITY_VARS='KEYPASTE_SIGNING_ENDPOINT KEYPASTE_SIGNING_ACCOUNT KEYPASTE_SIGNING_PROFILE KEYPASTE_SIGNING_CLIENT_ID KEYPASTE_SIGNING_TENANT_ID'
 DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
 

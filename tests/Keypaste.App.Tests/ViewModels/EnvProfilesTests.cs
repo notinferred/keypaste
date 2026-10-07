@@ -218,7 +218,7 @@ public sealed class EnvProfilesTests : IDisposable
         File.Delete(path);
 
         Assert.Equal(
-            "STRIPE_KEY is on more than one entry (services/Stripe, services/Twin), so nothing was written.",
+            "STRIPE_KEY is on more than one entry (services/Stripe, services/Twin). Nothing was written.",
             project.ExportReferences(path));
         Assert.False(File.Exists(path));
     }

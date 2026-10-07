@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
-namespace Keypaste.Core.Policy;
+namespace Keypaste.Core.Infrastructure;
 
 /// <summary>Which of the three shapes a <see cref="TomlValue"/> holds.</summary>
 public enum TomlValueKind
@@ -187,13 +187,13 @@ public sealed record TomlLimits
     /// </summary>
     /// <remarks>
     /// The line length has to clear the string length plus the key and the quotes, and the byte
-    /// ceiling has to clear ten of those lines with their section headers and timestamps.
+    /// ceiling has to clear ten sections of two such lines at three UTF-8 bytes a character.
     /// </remarks>
     public static TomlLimits Paths { get; } = Policy with
     {
         StringLength = 4096,
         LineLength = 4200,
-        Bytes = 64 * 1024,
+        Bytes = 256 * 1024,
     };
 }
 
@@ -213,8 +213,8 @@ public sealed record TomlLimits
 /// at all (docs/PRODUCT.md law 3.9, DECISIONS.md D-0004 and D-0019), and because the strictness is the
 /// point rather than a limitation: a policy file is an authorization document, so a construct
 /// keypaste would have to guess the meaning of is one it must refuse. The same argument produced
-/// <see cref="DotEnv"/>, <see cref="Keypaste.Core.Ipc.MessageFramer"/> and the CLI's own
-/// argument parser.
+/// the <c>.env</c> reader, <see cref="MessageFramer"/> and <see cref="CommandLine"/>.
+/// <see cref="TomlWriter"/> writes what this reads.
 /// </para>
 /// <para>
 /// <b>There is no branch here that skips a line it did not classify.</b> Every line takes exactly
@@ -223,7 +223,7 @@ public sealed record TomlLimits
 /// fully understand" a property of the shape of the code rather than a promise about it.
 /// </para>
 /// <para>
-/// <b>One problem is reported, not a list.</b> <see cref="DotEnv"/> collects every problem because
+/// <b>One problem is reported, not a list.</b> The <c>.env</c> reader collects every problem because
 /// the user is triaging an import and wants to fix the file in one pass. A policy file is used whole
 /// or ignored whole, so the first thing wrong is the only thing that changes the outcome — and a
 /// list of problems invites a caller to filter it, which is exactly what this stage forbids.
@@ -447,7 +447,7 @@ public static class Toml
     /// <summary>Collapses CRLF to LF so no rule below has to mention a carriage return.</summary>
     private static string Normalize(string text)
     {
-        if (text.StartsWith(DotEnv.ByteOrderMark))
+        if (text.StartsWith('﻿'))
         {
             text = text[1..];
         }
@@ -628,11 +628,9 @@ public static class Toml
 
     /// <summary>Reads a double-quoted string, which may not span lines and carries no escapes.</summary>
     /// <remarks>
-    /// A backslash is refused rather than interpreted. Nothing a policy file holds — a glob, a field
-    /// name, a client label — can legitimately contain one; <see cref="EntryExposure"/> already
-    /// rejects it inside a pattern, and an escape sequence is a second way to write a character,
-    /// which on a file whose whole job is to be read literally is a way to write one thing and mean
-    /// another.
+    /// A backslash is refused rather than interpreted: an escape sequence is a second way to write a
+    /// character, which on a file whose whole job is to be read literally is a way to write one thing
+    /// and mean another.
     /// </remarks>
     private static bool TryReadString(
         string line,

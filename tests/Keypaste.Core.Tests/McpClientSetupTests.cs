@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Processes;
 using Xunit;
@@ -92,6 +93,20 @@ public sealed class McpClientSetupTests : IDisposable
 
         Assert.Equal("\"keypaste\": {", plan.PasteBlock![0]);
         Assert.Contains("\"--client-label\", \"cursor\"", plan.Display, StringComparison.Ordinal);
+    }
+
+    /// <summary>The block is pasted into a JSON file, so a path holding a control character, a quote or a backslash must still make valid JSON naming it exactly.</summary>
+    [Fact]
+    public void A_block_to_paste_is_json_that_names_every_path_exactly()
+    {
+        var server = new McpServerCommand(Path.Combine(_directory, "ke\u0001y\"pa\\ste\tbin"), [McpServerLocator.BridgeArgument]);
+        var registration = Registration(label: "cursor", server: server);
+
+        using var json = JsonDocument.Parse("{" + string.Join('\n', McpClientSetup.Connect(Cursor, registration).PasteBlock!) + "}");
+        var entry = json.RootElement.GetProperty(McpClientCatalog.ServerName);
+
+        Assert.Equal(server.Path, entry.GetProperty("command").GetString());
+        Assert.Equal(registration.CommandLine().Skip(1), entry.GetProperty("args").EnumerateArray().Select(argument => argument.GetString() ?? string.Empty));
     }
 
     [Fact]

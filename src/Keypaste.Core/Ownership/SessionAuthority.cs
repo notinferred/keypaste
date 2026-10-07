@@ -494,14 +494,12 @@ public sealed class SessionAuthority : IApproverHandler
 
             foreach (var (reference, index) in references.Select((reference, index) => (reference, index)))
             {
-                _ = KpReferences.TryParse(reference.Reference, out var parsed, out _);
-
-                if (parsed is EntryReference { Entry: var named } && ReservedGroups.IsReserved(named.GroupPath))
+                if (reference.Parsed is EntryReference { Entry: var named } && ReservedGroups.IsReserved(named.GroupPath))
                 {
                     return Refuse(EnvOutcome.Unauthorized, AuditMethod.OutOfScope, "a reference names a group keypaste keeps for itself", session: request.Session);
                 }
 
-                lines.Add(new ReferenceLine(reference.Name, parsed, null, index + 1));
+                lines.Add(new ReferenceLine(reference.Name, reference.Parsed, null, index + 1));
             }
 
             document = new EnvReferenceDocument(lines, []);

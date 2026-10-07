@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 
 namespace Keypaste.Core.Clients;
 
@@ -195,10 +197,9 @@ public sealed record McpServerRegistration(
         ];
     }
 
+    // Relaxed so a path's non-ASCII letters stay readable in the block a person pastes; it is never embedded in HTML.
     private static string JsonQuote(string value) =>
-        "\""
-        + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)
-        + "\"";
+        "\"" + JsonEncodedText.Encode(value, JavaScriptEncoder.UnsafeRelaxedJsonEscaping).Value + "\"";
 }
 
 /// <summary>Every client keypaste knows about, and nothing about this machine.</summary>

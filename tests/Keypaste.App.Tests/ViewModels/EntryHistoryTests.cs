@@ -368,6 +368,28 @@ public sealed class EntryHistoryTests : IDisposable
     }
 
     [Fact]
+    public void Opening_choosing_and_holding_announce_what_reads_them()
+    {
+        using var context = New();
+        var history = Select("servers/production", context);
+        var raised = new List<string>();
+        history.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        var asked = 0;
+        history.RestoreCommand.CanExecuteChanged += (_, _) => asked++;
+
+        history.ToggleCommand.Execute(null);
+        history.Selected = history.Rows[0];
+        Assert.Equal("v2", history.Rows[0].Reveal());
+
+        Assert.Equal(1, asked);
+        Assert.True(history.RestoreCommand.CanExecute(null));
+        Assert.Contains(nameof(EntryHistoryViewModel.ToggleLabel), raised);
+        Assert.Contains(nameof(EntryHistoryViewModel.ShowsEmptyNote), raised);
+        Assert.Contains(nameof(EntryHistoryViewModel.HasSelection), raised);
+        Assert.Contains(nameof(EntryHistoryViewModel.RevealedWhen), raised);
+    }
+
+    [Fact]
     public void Restoring_with_the_vault_locked_says_so()
     {
         using var context = New();

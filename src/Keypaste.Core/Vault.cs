@@ -277,12 +277,77 @@ public sealed class Vault : IDisposable
 
     /// <summary>Adds an entry, creating any groups <see cref="VaultEntry.GroupPath"/> names that do
     /// not exist yet. Call <see cref="Save"/> to persist it.</summary>
+    /// <remarks>
+    /// Checks no name, so it writes what KeePassXC could, keypaste's own records included. A person's new
+    /// entry goes through <see cref="CreateEntry(VaultEntry, IReadOnlyList{FieldWrite}, IReadOnlyList{string})"/>
+    /// or <see cref="CreateEntryAtPath"/>, which refuse what <see cref="IsCreatable"/> refuses.
+    /// </remarks>
     public void AddEntry(VaultEntry entry)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entry);
 
         Change(() => _interop.AddEntry(entry), VaultEdit.Of(EntryName.Of(entry)));
+    }
+
+    /// <summary>Whether keypaste creates an entry with this name for a person: a title <see cref="VaultNameRules"/> accepts, outside keypaste's own groups.</summary>
+    /// <param name="name">The new entry's name.</param>
+    /// <param name="error">Why it is refused, as a sentence, or empty.</param>
+    /// <returns><see langword="true"/> when the name may be created.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    public static bool IsCreatable(EntryName name, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        if (!VaultNameRules.IsValidTitle(name.Title, out error))
+        {
+            error = Refused(error).Message;
+            return false;
+        }
+
+        if (ReservedGroups.IsReserved(name.GroupPath))
+        {
+            error = "keypaste keeps that group for itself. Choose another.";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Creates an entry where a typed path puts it, creating any group the path names that does not
+    /// exist yet, with no custom field or tag. Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="entry">The entry's standard fields and the group it goes in.</param>
+    /// <remarks>
+    /// The name is refused as <see cref="IsCreatable"/> refuses it, and so is a name an entry in that group
+    /// already has. A path another entry already answers to is allowed, as KeePassXC allows it, and from
+    /// then on <see cref="Find(string)"/> refuses that path until one is renamed.
+    /// </remarks>
+    /// <exception cref="VaultException">The name is refused, or an entry already has it. Nothing is changed.</exception>
+    public void CreateEntryAtPath(VaultEntry entry)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(entry);
+
+        var name = EntryName.Of(entry);
+
+        if (!IsCreatable(name, out string error))
+        {
+            throw new VaultException(error);
+        }
+
+        Change(
+            () =>
+            {
+                if (_interop.FindEntry(name) is not null)
+                {
+                    throw new VaultException($"'{entry.Title}' is already in that group. Choose another title.");
+                }
+
+                _interop.AddEntry(entry);
+            },
+            VaultEdit.Of(name));
     }
 
     /// <summary>
@@ -293,9 +358,9 @@ public sealed class Vault : IDisposable
     /// <param name="fields">Its custom fields, each named once and holding a value; a field is protected unless its write says otherwise.</param>
     /// <param name="tags">Its tags, each named once.</param>
     /// <remarks>
-    /// Every check runs before anything is written: the title and field names by
-    /// <see cref="VaultNameRules"/> and <see cref="FieldNameRules"/>, the tags by <see cref="TagRules"/>,
-    /// and the group is not keypaste's own. The entry's own name may not be taken in its group.
+    /// Every check runs before anything is written: the name by <see cref="IsCreatable"/>, the field
+    /// names by <see cref="FieldNameRules"/> and the tags by <see cref="TagRules"/>. The entry's own name
+    /// may not be taken in its group, and neither may the path it joins to.
     /// </remarks>
     /// <exception cref="VaultException">Any of those is refused, or the group does not exist or names more than one. Nothing is changed.</exception>
     public void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags)
@@ -305,14 +370,9 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(tags);
 
-        if (!VaultNameRules.IsValidTitle(entry.Title, out string error))
+        if (!IsCreatable(EntryName.Of(entry), out string error))
         {
-            throw Refused(error);
-        }
-
-        if (ReservedGroups.IsReserved(entry.GroupPath))
-        {
-            throw new VaultException("keypaste keeps that group for itself. Choose another.");
+            throw new VaultException(error);
         }
 
         CheckNew(fields, tags);
@@ -474,6 +534,26 @@ public sealed class Vault : IDisposable
         }
 
         return Change(() => _interop.SetFields(name, writes) > 0, written => written ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>Adds one custom field the entry does not have yet, as <see cref="SetFields"/> writes one. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="write">The new field.</param>
+    /// <returns><see langword="true"/> if the entry was found and written.</returns>
+    /// <remarks>Adding refuses a name the entry already has, where <see cref="SetFields"/> replaces its value: they are different acts a person asks for.</remarks>
+    /// <exception cref="VaultException">The entry already has that field, or <see cref="SetFields"/> refuses the write. Nothing is changed.</exception>
+    public bool AddField(EntryName name, FieldWrite write)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(write);
+
+        if (Fields(name) is { } current && current.Any(field => string.Equals(field.Name, write.Name, StringComparison.Ordinal)))
+        {
+            throw new VaultException($"This entry already has {EntryNameSanitizer.Sanitize(write.Name).Text}. Replace its value instead.");
+        }
+
+        return SetFields(name, [write]);
     }
 
     /// <summary>Removes one custom field as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
@@ -657,15 +737,18 @@ public sealed class Vault : IDisposable
         return Change(() => _interop.RestoreRevision(name, index) > 0, restored => restored ? VaultEdit.Of(name) : null);
     }
 
-    /// <summary>Every entry in the vault, depth-first from the root group.</summary>
-    public IReadOnlyList<VaultEntry> ReadEntries()
+    /// <summary>Every entry in the vault outside keypaste's own groups, depth-first from the root group.</summary>
+    /// <param name="includeReserved">Whether entries in <see cref="ReservedGroups"/> are read too, for keypaste's own record stores.</param>
+    public IReadOnlyList<VaultEntry> ReadEntries(bool includeReserved = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.ReadEntries();
+        var entries = _interop.ReadEntries();
+
+        return includeReserved ? entries : [.. entries.Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))];
     }
 
-    /// <summary>Every entry, but only while this vault holds exactly what its file holds.</summary>
+    /// <summary>Every entry, keypaste's own records included, but only while this vault holds exactly what its file holds.</summary>
     /// <param name="entries">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
     /// <returns>Whether the vault matches its file, and if not, why.</returns>
     /// <remarks>
@@ -684,7 +767,7 @@ public sealed class Vault : IDisposable
 
     /// <summary><see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/>, with every group path read from the same state.</summary>
     /// <param name="entries">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
-    /// <param name="groupPaths">The group paths, as <see cref="ReadGroupPaths"/> reports them, under the same condition.</param>
+    /// <param name="groupPaths">Every group path, keypaste's own included, under the same condition.</param>
     /// <returns>Whether the vault matches its file, and if not, why.</returns>
     public SavedRead ReadSaved(out IReadOnlyList<VaultEntry>? entries, out IReadOnlyList<string>? groupPaths)
     {
@@ -824,12 +907,15 @@ public sealed class Vault : IDisposable
     /// <see cref="ReadEntries"/> (D-0248).
     /// </para>
     /// </remarks>
-    public IReadOnlyList<EntryMatch> Search(string query)
+    /// <param name="includeReserved">Whether entries in <see cref="ReservedGroups"/> are found too.</param>
+    public IReadOnlyList<EntryMatch> Search(string query, bool includeReserved = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(query);
 
-        return _interop.Search(query.Trim());
+        var matches = _interop.Search(query.Trim());
+
+        return includeReserved ? matches : [.. matches.Where(match => !ReservedGroups.IsReserved(match.Name.GroupPath))];
     }
 
     /// <summary>Finds the one entry with this group path and title, or <see langword="null"/>.</summary>
@@ -863,16 +949,19 @@ public sealed class Vault : IDisposable
         return ResolveByPath(entryPath);
     }
 
-    /// <summary>Every group path in the vault except the root, slash-separated.</summary>
+    /// <summary>Every group path in the vault except the root and keypaste's own groups, slash-separated.</summary>
+    /// <param name="includeReserved">Whether <see cref="ReservedGroups"/> are read too.</param>
     /// <remarks>
     /// Groups holding no entries appear here and nowhere in <see cref="ReadEntries"/>, so a listing
     /// that wants to match KeePassXC's view of the same file needs both.
     /// </remarks>
-    public IReadOnlyList<string> ReadGroupPaths()
+    public IReadOnlyList<string> ReadGroupPaths(bool includeReserved = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.ReadGroupPaths();
+        var groups = _interop.ReadGroupPaths();
+
+        return includeReserved ? groups : [.. groups.Where(group => !ReservedGroups.IsReserved(group))];
     }
 
     /// <summary>Whether a master password is one of the factors this vault opens with.</summary>

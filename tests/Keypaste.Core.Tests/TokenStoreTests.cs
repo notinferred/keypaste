@@ -38,7 +38,7 @@ public sealed class TokenStoreTests : IDisposable
 
         Assert.True(TokenSecret.TryParse(token, out var id, out var secret));
         var secretText = Base64Url.EncodeToString(secret);
-        var entry = Assert.Single(_vault.ReadEntries(), e => e.GroupPath == ReservedGroups.Tokens);
+        var entry = Assert.Single(_vault.ReadEntries(includeReserved: true), e => e.GroupPath == ReservedGroups.Tokens);
 
         Assert.Equal(info.Id, entry.Title);
         Assert.Equal("ci", entry.Username);
@@ -249,7 +249,7 @@ public sealed class TokenStoreTests : IDisposable
 
         Assert.Equal(["alpha", "ci"], listed.Select(info => info.Name));
 
-        foreach (var entry in _vault.ReadEntries().Where(e => e.GroupPath == ReservedGroups.Tokens))
+        foreach (var entry in _vault.ReadEntries(includeReserved: true).Where(e => e.GroupPath == ReservedGroups.Tokens))
         {
             Assert.All(listed, info => Assert.DoesNotContain(entry.Password, info.ToString(), StringComparison.Ordinal));
             Assert.All(listed, info => Assert.DoesNotContain(entry.Password, info.Prefix, StringComparison.Ordinal));

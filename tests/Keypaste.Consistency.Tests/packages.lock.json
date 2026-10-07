@@ -490,6 +490,7 @@
           "Avalonia.Fonts.Inter": "[12.1.0, )",
           "Avalonia.Themes.Fluent": "[12.1.0, )",
           "Keypaste.Core": "[0.4.0, )",
+          "Keypaste.Mvvm": "[0.4.0, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
       },
@@ -505,6 +506,9 @@
           "Keypaste.Core": "[0.4.0, )",
           "ModelContextProtocol.Core": "[1.4.1, )"
         }
+      },
+      "keypaste.mvvm": {
+        "type": "Project"
       },
       "Avalonia": {
         "type": "CentralTransitive",

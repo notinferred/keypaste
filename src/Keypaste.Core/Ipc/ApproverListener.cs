@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Pipes;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
 

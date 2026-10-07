@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -119,28 +120,25 @@ internal static class EnvPullCommand
         document = null!;
         source = null!;
 
-        if (!File.Exists(sourcePath))
+        if (!DotEnvFile.TryRead(sourcePath, out var bytes, out var failure, out var readError))
         {
-            context.Stderr.WriteLine($"keypaste env pull: no file at '{sourcePath}'");
-            exit = CliApp.ExitNotFound;
-            return false;
-        }
+            switch (failure)
+            {
+                case DotEnvFileFailure.Missing:
+                    context.Stderr.WriteLine($"keypaste env pull: no file at '{sourcePath}'");
+                    exit = CliApp.ExitNotFound;
+                    break;
 
-        byte[] bytes;
-        try
-        {
-            bytes = File.ReadAllBytes(sourcePath);
-        }
-        catch (IOException ex)
-        {
-            context.Stderr.WriteLine($"keypaste env pull: could not read '{sourcePath}': {ex.Message}");
-            exit = CliApp.ExitInternalError;
-            return false;
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            context.Stderr.WriteLine($"keypaste env pull: could not read '{sourcePath}': {ex.Message}");
-            exit = CliApp.ExitInternalError;
+                case DotEnvFileFailure.TooLarge:
+                    exit = Fail(context, $"'{sourcePath}': {readError}");
+                    break;
+
+                default:
+                    context.Stderr.WriteLine($"keypaste env pull: could not read '{sourcePath}': {readError}");
+                    exit = CliApp.ExitInternalError;
+                    break;
+            }
+
             return false;
         }
 

@@ -262,19 +262,46 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
         return rows;
     }
 
-    private static string? Validate(ShareRequest request)
+    /// <summary>Whether a link may last this long: <see cref="MinimumTtl"/> to <see cref="MaximumTtl"/>, in whole seconds, which is what the server is sent.</summary>
+    /// <param name="ttl">How long the link would open for.</param>
+    /// <returns><see langword="true"/> when a share may be made for that long.</returns>
+    public static bool IsValidTtl(TimeSpan ttl) =>
+        ttl >= MinimumTtl && ttl <= MaximumTtl && ttl.Ticks % TimeSpan.TicksPerSecond == 0;
+
+    /// <summary>Whether a link may open this many times: 1 to <see cref="MaximumViews"/>.</summary>
+    /// <param name="views">How many times it would open.</param>
+    /// <returns><see langword="true"/> when a share may carry that many views.</returns>
+    public static bool IsValidViews(int views) => views is >= 1 and <= MaximumViews;
+
+    /// <summary>Whether a recipient label is short enough to keep: none, or at most <see cref="MaximumRecipientLength"/> characters.</summary>
+    /// <param name="recipient">The label, or null.</param>
+    /// <returns><see langword="true"/> when the label may be kept.</returns>
+    public static bool IsValidRecipient(string? recipient) => recipient is not { Length: > MaximumRecipientLength };
+
+    /// <summary>Whether a passphrase may seal a share: at least <see cref="MinimumPassphraseLength"/> characters that <see cref="ShareCrypto.AcceptsPassphrase"/> accepts.</summary>
+    /// <param name="passphrase">The passphrase.</param>
+    /// <returns><see langword="true"/> when a share may be sealed under it.</returns>
+    public static bool IsValidPassphrase(ReadOnlySpan<char> passphrase) =>
+        passphrase.Length >= MinimumPassphraseLength && ShareCrypto.AcceptsPassphrase(passphrase);
+
+    /// <summary>What is wrong with a request before the vault is read, or null when nothing is.</summary>
+    /// <param name="request">The request.</param>
+    /// <returns>The reason it would be refused, or null.</returns>
+    public static string? Validate(ShareRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         if (!IsShareable(request.Field))
         {
             return $"'{request.Field}' is not a field that can be shared";
         }
 
-        if (request.Views is < 1 or > MaximumViews)
+        if (!IsValidViews(request.Views))
         {
             return $"a link opens 1 to {MaximumViews} times";
         }
 
-        if (request.Ttl < MinimumTtl || request.Ttl > MaximumTtl || request.Ttl.Ticks % TimeSpan.TicksPerSecond != 0)
+        if (!IsValidTtl(request.Ttl))
         {
             return "a link lasts from 5 minutes to 7 days";
         }
@@ -284,9 +311,9 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return PassphraseLengthRule;
         }
 
-        return request.Recipient is { Length: > MaximumRecipientLength }
-            ? $"a recipient label has at most {MaximumRecipientLength} characters"
-            : null;
+        return IsValidRecipient(request.Recipient)
+            ? null
+            : $"a recipient label has at most {MaximumRecipientLength} characters";
     }
 
     /// <summary>The fields to seal, each under its name, or null when a custom field's saved read found the vault changed.</summary>

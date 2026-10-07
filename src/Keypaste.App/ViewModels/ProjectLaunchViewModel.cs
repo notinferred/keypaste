@@ -71,6 +71,12 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         ConfirmLaunchCommand = new RelayCommand(() => _answer?.TrySetResult(true), () => IsConfirming);
         CancelLaunchCommand = new RelayCommand(() => _answer?.TrySetResult(false), () => IsConfirming);
 
+        DependsOn(nameof(IsMapped), nameof(Mapping));
+        DependsOn(RunProjectCommand, nameof(IsMapped), nameof(IsConfirming));
+        DependsOn(OpenTerminalCommand, nameof(IsMapped), nameof(IsConfirming));
+        DependsOn(ConfirmLaunchCommand, nameof(IsConfirming));
+        DependsOn(CancelLaunchCommand, nameof(IsConfirming));
+
         if (ProjectMappings.TryLoad(MappingsPath, out var mappings)
             && _session.VaultPath is { } vault
             && ProjectMappings.Find(mappings, vault, project) is { } mapping)
@@ -99,15 +105,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
     internal ProjectMapping? Mapping
     {
         get => _mapping;
-        private set
-        {
-            if (Set(ref _mapping, value))
-            {
-                Raise(nameof(IsMapped));
-                RunProjectCommand.RaiseCanExecuteChanged();
-                OpenTerminalCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _mapping, value);
     }
 
     internal bool IsMapped => _mapping is not null;
@@ -309,7 +307,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
             : "From " + string.Join(", ", preview.Sources.Select(source => source.Entry).Distinct().Select(ApprovalPrompt.Shown));
 
         _answer = answer;
-        RaiseConfirming();
+        Raise(nameof(IsConfirming));
 
         return await answer.Task.ConfigureAwait(true);
     }
@@ -322,16 +320,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         ConfirmDirectory = string.Empty;
         ConfirmKeys = string.Empty;
         ConfirmSources = string.Empty;
-        RaiseConfirming();
-    }
-
-    private void RaiseConfirming()
-    {
         Raise(nameof(IsConfirming));
-        ConfirmLaunchCommand.RaiseCanExecuteChanged();
-        CancelLaunchCommand.RaiseCanExecuteChanged();
-        RunProjectCommand.RaiseCanExecuteChanged();
-        OpenTerminalCommand.RaiseCanExecuteChanged();
     }
 
     private static string Refused(EnvResolved resolved) => resolved.Outcome switch

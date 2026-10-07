@@ -24,6 +24,9 @@ internal sealed class LostTagRow : ObservableObject
         CancelRestoreCommand = new RelayCommand(() => Confirmation = []);
         DismissCommand = new RelayCommand(() => owner.Dismiss(this));
         ReviewAgainCommand = new RelayCommand(() => owner.ReviewAgain(this));
+
+        DependsOn(nameof(IsConfirming), nameof(Confirmation));
+        DependsOn(nameof(NeedsReview), nameof(IsConfirming));
     }
 
     internal LostProjectTag Finding { get; }
@@ -51,14 +54,7 @@ internal sealed class LostTagRow : ObservableObject
     internal IReadOnlyList<string> Confirmation
     {
         get => _confirmation;
-        set
-        {
-            if (Set(ref _confirmation, value))
-            {
-                Raise(nameof(IsConfirming));
-                Raise(nameof(NeedsReview));
-            }
-        }
+        set => Set(ref _confirmation, value);
     }
 
     internal bool IsConfirming => _confirmation.Count > 0;

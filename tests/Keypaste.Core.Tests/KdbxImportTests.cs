@@ -180,7 +180,7 @@ public sealed class KdbxImportTests : IDisposable
         var titles = target.Search(string.Empty).Select(match => match.Name.Title).ToList();
         Assert.DoesNotContain("Deleted", titles);
         Assert.DoesNotContain("planted", titles);
-        Assert.DoesNotContain(target.ReadGroupPaths(), path => path.Contains(ReservedGroups.Root, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(target.ReadGroupPaths(includeReserved: true), path => path.Contains(ReservedGroups.Root, StringComparison.OrdinalIgnoreCase));
         Assert.Empty(target.ReadRecycled());
     }
 
@@ -358,7 +358,7 @@ public sealed class KdbxImportTests : IDisposable
         var edited = byDefault with { Rows = [.. byDefault.Rows.Select(row => row with { Destination = ReservedGroups.Tokens })] };
         Assert.Contains(opened.Check(target, edited), problem => problem.Blocks);
         Assert.Throws<VaultException>(() => opened.ApplyTo(target, edited));
-        Assert.DoesNotContain(target.ReadGroupPaths(), ReservedGroups.IsReserved);
+        Assert.DoesNotContain(target.ReadGroupPaths(includeReserved: true), ReservedGroups.IsReserved);
     }
 
     /// <summary>Importing into <c>env</c> applies only what any other group applies: no variable-name rule (D-0416).</summary>

@@ -144,9 +144,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         // to each entry and field it resolves, as it does for every reference.
         foreach (var reference in call.References ?? [])
         {
-            _ = KpReferences.TryParse(reference.Reference, out var parsed, out _);
-
-            var forwarded = parsed switch
+            var forwarded = reference.Parsed switch
             {
                 EnvReference => true,
                 EntryReference named => options.Exposure.MayPermit(named.Entry, named.Field),

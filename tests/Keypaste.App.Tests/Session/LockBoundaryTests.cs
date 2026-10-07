@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using Keypaste.App.Session;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;

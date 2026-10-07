@@ -421,6 +421,9 @@
         "dependencies": {
           "KeePassLib": "[1.0.0, )"
         }
+      },
+      "keypaste.mvvm": {
+        "type": "Project"
       }
     },
     "net10.0/linux-arm64": {

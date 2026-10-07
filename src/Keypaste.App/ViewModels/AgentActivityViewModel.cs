@@ -88,6 +88,21 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         RevokeCommand = new RelayCommand<ActivityRow>(Revoke, row => row?.Id is not null);
         RevokeAllCommand = new RelayCommand(RevokeAll, () => _grants.Count > 0);
 
+        DependsOn(nameof(HasClientsProblem), nameof(ClientsProblem));
+        DependsOn(nameof(ConnectIsPrimary), nameof(HasWaiting), nameof(IsConnectOpen));
+        DependsOn(nameof(FormsArePrimary), nameof(HasWaiting));
+        DependsOn(nameof(IsServing), nameof(Serving));
+        DependsOn(nameof(IsAvailable), nameof(Unavailable));
+        DependsOn(nameof(IsUnavailable), nameof(IsAvailable));
+        DependsOn(nameof(NothingWaiting), nameof(IsAvailable), nameof(Waiting));
+        DependsOn(nameof(HasWaiting), nameof(Waiting));
+        DependsOn(nameof(NoGrants), nameof(IsAvailable), nameof(Grants));
+        DependsOn(nameof(HasGrants), nameof(Grants));
+        DependsOn(nameof(HasHistory), nameof(History));
+        DependsOn(nameof(HasHistoryMessage), nameof(HistoryMessage));
+        DependsOn(ResetClientsCommand, nameof(ClientsProblem));
+        DependsOn(RevokeAllCommand, nameof(Grants));
+
         Refresh();
 
         _timer = _clock.CreateTimer(_ => _post(Tick), null, _tick, _tick);
@@ -106,14 +121,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal string ClientsProblem
     {
         get => _clientsProblem;
-        private set
-        {
-            if (Set(ref _clientsProblem, value))
-            {
-                Raise(nameof(HasClientsProblem));
-                ResetClientsCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _clientsProblem, value);
     }
 
     internal bool HasClientsProblem => _clientsProblem.Length > 0;
@@ -125,13 +133,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal bool IsConnectOpen
     {
         get => _isConnectOpen;
-        set
-        {
-            if (Set(ref _isConnectOpen, value && Connect is not null))
-            {
-                Raise(nameof(ConnectIsPrimary));
-            }
-        }
+        set => Set(ref _isConnectOpen, value && Connect is not null);
     }
 
     /// <summary>
@@ -161,13 +163,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal string Serving
     {
         get => _serving;
-        private set
-        {
-            if (Set(ref _serving, value))
-            {
-                Raise(nameof(IsServing));
-            }
-        }
+        private set => Set(ref _serving, value);
     }
 
     internal bool IsServing => _serving.Length > 0;
@@ -176,14 +172,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal string Unavailable
     {
         get => _unavailable;
-        private set
-        {
-            if (Set(ref _unavailable, value))
-            {
-                Raise(nameof(IsAvailable));
-                Raise(nameof(IsUnavailable));
-            }
-        }
+        private set => Set(ref _unavailable, value);
     }
 
     internal bool IsAvailable => _unavailable.Length == 0;
@@ -289,14 +278,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         }
 
         Raise(nameof(Waiting));
-        Raise(nameof(NothingWaiting));
-        Raise(nameof(HasWaiting));
-        Raise(nameof(ConnectIsPrimary));
-        Raise(nameof(FormsArePrimary));
         Raise(nameof(Grants));
-        Raise(nameof(NoGrants));
-        Raise(nameof(HasGrants));
-        RevokeAllCommand.RaiseCanExecuteChanged();
 
         ReadHistory(session, forceHistory);
         ReadClients(forceHistory);
@@ -451,9 +433,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _historyMessage = message;
         Raise(nameof(HistoryHeading));
         Raise(nameof(History));
-        Raise(nameof(HasHistory));
         Raise(nameof(HistoryMessage));
-        Raise(nameof(HasHistoryMessage));
     }
 
     private void Revoke(ActivityRow? row)

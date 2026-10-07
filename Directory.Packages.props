@@ -37,9 +37,8 @@
 
        Avalonia.Diagnostics is deliberately absent. It has no 12.x release, and a runtime
        visual-tree inspector attached to a process holding an unlocked vault is not something to
-       ship even in Debug. CommunityToolkit.Mvvm is absent for the reason D-0028 gave for writing a
-       TOML parser by hand: sixty lines of INotifyPropertyChanged is not a dependency's worth of
-       work. -->
+       ship even in Debug. CommunityToolkit.Mvvm is absent: the bindings are
+       hand-written in src/Keypaste.Mvvm (D-0427). -->
   <ItemGroup Label="Desktop app">
     <PackageVersion Include="Avalonia" Version="12.1.0" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />

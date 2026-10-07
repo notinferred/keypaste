@@ -123,6 +123,9 @@ public static class DotEnv
     /// </remarks>
     public const int MaximumBytes = 1024 * 1024;
 
+    /// <summary>What a file larger than <see cref="MaximumBytes"/> is told.</summary>
+    internal const string TooLargeError = "the file is larger than 1024 KiB, which is not a .env file";
+
     internal const char ByteOrderMark = '\uFEFF';
 
     /// <summary>Decodes the bytes of a <c>.env</c> file to text.</summary>
@@ -144,7 +147,7 @@ public static class DotEnv
 
         if (bytes.Length > MaximumBytes)
         {
-            error = $"the file is larger than {MaximumBytes / 1024} KiB, which is not a .env file";
+            error = TooLargeError;
             return false;
         }
 

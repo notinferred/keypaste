@@ -59,6 +59,18 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
         ConfirmPurgeCommand = new RelayCommand(Purge, () => IsConfirmingPurge);
         CancelPurgeCommand = new RelayCommand(() => IsConfirmingPurge = false, () => IsConfirmingPurge);
 
+        DependsOn(nameof(IsEmpty), nameof(Rows));
+        DependsOn(nameof(AwaitsSelection), nameof(Rows), nameof(Selected));
+        DependsOn(nameof(PurgePrompt), nameof(Selected));
+        DependsOn(nameof(Note), nameof(RecyclesDeletedEntries));
+        DependsOn(nameof(EmptyNote), nameof(RecyclesDeletedEntries));
+        DependsOn(nameof(HasNotice), nameof(Notice));
+        DependsOn(nameof(HasError), nameof(Error));
+        DependsOn(RestoreCommand, nameof(Selected), nameof(IsConfirmingPurge));
+        DependsOn(PurgeCommand, nameof(Selected), nameof(IsConfirmingPurge));
+        DependsOn(ConfirmPurgeCommand, nameof(IsConfirmingPurge));
+        DependsOn(CancelPurgeCommand, nameof(IsConfirmingPurge));
+
         Load();
     }
 
@@ -66,14 +78,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<TrashRow> Rows
     {
         get => _rows;
-        private set
-        {
-            if (Set(ref _rows, value))
-            {
-                Raise(nameof(IsEmpty));
-                Raise(nameof(AwaitsSelection));
-            }
-        }
+        private set => Set(ref _rows, value);
     }
 
     /// <summary>The row a restore or a permanent deletion would act on, or null.</summary>
@@ -82,18 +87,12 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
         get => _selected;
         set
         {
-            if (!Set(ref _selected, value))
-            {
-                return;
-            }
-
             // A confirmation is armed for one row. Moving the selection while it is showing would
             // leave the button pointing at an entry nobody agreed to erase.
-            IsConfirmingPurge = false;
-            Raise(nameof(PurgePrompt));
-            Raise(nameof(AwaitsSelection));
-            RestoreCommand.RaiseCanExecuteChanged();
-            PurgeCommand.RaiseCanExecuteChanged();
+            if (Set(ref _selected, value))
+            {
+                IsConfirmingPurge = false;
+            }
         }
     }
 
@@ -131,17 +130,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     internal bool IsConfirmingPurge
     {
         get => _isConfirmingPurge;
-        private set
-        {
-            if (Set(ref _isConfirmingPurge, value))
-            {
-                RestoreCommand.RaiseCanExecuteChanged();
-                PurgeCommand.RaiseCanExecuteChanged();
-                ConfirmPurgeCommand.RaiseCanExecuteChanged();
-                CancelPurgeCommand.RaiseCanExecuteChanged();
-                Raise(nameof(PurgePrompt));
-            }
-        }
+        private set => Set(ref _isConfirmingPurge, value);
     }
 
     /// <summary>What that confirmation asks.</summary>
@@ -153,13 +142,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     internal string? Notice
     {
         get => _notice;
-        private set
-        {
-            if (Set(ref _notice, value))
-            {
-                Raise(nameof(HasNotice));
-            }
-        }
+        private set => Set(ref _notice, value);
     }
 
     internal bool HasNotice => _notice is not null;
@@ -168,13 +151,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     internal string? Error
     {
         get => _error;
-        private set
-        {
-            if (Set(ref _error, value))
-            {
-                Raise(nameof(HasError));
-            }
-        }
+        private set => Set(ref _error, value);
     }
 
     internal bool HasError => _error is not null;
@@ -213,8 +190,6 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
         Selected = wanted is { } id ? Rows.FirstOrDefault(row => row.Id == id) : null;
 
         Raise(nameof(RecyclesDeletedEntries));
-        Raise(nameof(Note));
-        Raise(nameof(EmptyNote));
     }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>
@@ -234,35 +209,17 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
+        var write = _session.Write(
+            vault => vault.RestoreRecycled(row.Id),
+            outcome => outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot);
+
+        if (write.Problem("restore this again") is { } problem)
         {
-            Report(null, "The vault is locked.");
+            Report(null, problem);
             return;
         }
 
-        RestoreOutcome outcome;
-
-        try
-        {
-            outcome = vault.RestoreRecycled(row.Id);
-
-            if (outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot)
-            {
-                vault.Save();
-            }
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Report(null, "Something else changed this vault since you opened it. Reload to see it, then restore this again.");
-            return;
-        }
-        catch (VaultException e)
-        {
-            Report(null, e.Message);
-            return;
-        }
-
-        switch (outcome)
+        switch (write.Value)
         {
             case RestoreOutcome.Restored:
                 Report($"{row.DisplayTitle} is back in {row.Where}.", null);
@@ -294,35 +251,15 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
+        var write = _session.Write(vault => vault.PurgeRecycled(row.Id), removed => removed);
+
+        if (write.Problem("delete this for good again") is { } problem)
         {
-            Report(null, "The vault is locked.");
+            Report(null, problem);
             return;
         }
 
-        bool removed;
-
-        try
-        {
-            removed = vault.PurgeRecycled(row.Id);
-
-            if (removed)
-            {
-                vault.Save();
-            }
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Report(null, "Something else changed this vault since you opened it. Reload to see it, then delete this for good again.");
-            return;
-        }
-        catch (VaultException e)
-        {
-            Report(null, e.Message);
-            return;
-        }
-
-        if (removed)
+        if (write.Value)
         {
             Report($"{row.DisplayTitle} and its history are gone.", null);
         }

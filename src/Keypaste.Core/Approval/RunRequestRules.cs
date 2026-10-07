@@ -236,7 +236,7 @@ public static class RunRequestRules
                     return new("env", "names must be environment variable names");
                 }
 
-                if (!KpReferences.TryParse(reference.Reference, out _, out _))
+                if (reference.Parsed is null)
                 {
                     return new("env", "values must be kp:// references to an env value or an entry");
                 }

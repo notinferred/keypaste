@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Xunit;
 

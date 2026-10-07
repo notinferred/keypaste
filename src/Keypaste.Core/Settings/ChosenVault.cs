@@ -63,9 +63,7 @@ public static class ChosenVault
             }
         }
 
-        // This file's strings hold no quote, control character or backslash, so such a path is not
-        // recorded rather than recorded as something else; Windows' backslashes are written as slashes.
-        if (full.Any(c => c == '"' || char.IsControl(c) || (c == '\\' && !OperatingSystem.IsWindows())))
+        if (!AppSettings.CanRecord(full))
         {
             return ChooseOutcome.Unrecordable;
         }

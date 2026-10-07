@@ -235,6 +235,30 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.DoesNotContain(Fields(), field => field.Name == "LATE");
     }
 
+    /// <summary>A form announces the lines and buttons that read it, or a binding keeps a stale prompt or a live button.</summary>
+    [Fact]
+    public void Opening_a_form_announces_the_lines_and_buttons_that_read_it()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        var raised = new List<string>();
+        detail.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        var asked = new List<string>();
+        detail.RotateCommand.CanExecuteChanged += (_, _) => asked.Add("rotate");
+        detail.SaveCommand.CanExecuteChanged += (_, _) => asked.Add("save");
+        detail.ConfirmReplaceFieldCommand.CanExecuteChanged += (_, _) => asked.Add("replace");
+
+        detail.EditCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "PIN").ReplaceCommand.Execute(null);
+
+        Assert.Equal(["replace", "rotate", "save"], asked.Order(StringComparer.Ordinal));
+        Assert.False(detail.RotateCommand.CanExecute(null));
+        Assert.Contains(nameof(EntryDetailViewModel.HasOwnPrimary), raised);
+        Assert.Contains(nameof(EntryDetailViewModel.TakesWholeView), raised);
+        Assert.Contains(nameof(EntryDetailViewModel.IsReplacingField), raised);
+        Assert.Contains(nameof(EntryDetailViewModel.ReplaceFieldPrompt), raised);
+    }
+
     [Fact]
     public async Task Copying_a_field_goes_through_the_countdown_under_its_name()
     {

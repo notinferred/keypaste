@@ -211,7 +211,7 @@ public sealed class TokenVerbTests : IDisposable
 
         using (var vault = Vault.Open(_harness.VaultPath, Master))
         {
-            var entry = Assert.Single(vault.ReadEntries(), entry => entry.GroupPath == ReservedGroups.Tokens);
+            var entry = Assert.Single(vault.ReadEntries(includeReserved: true), entry => entry.GroupPath == ReservedGroups.Tokens);
             vault.SetExpiryUnchecked(EntryName.Of(entry), expires);
             vault.Save();
         }
@@ -415,7 +415,7 @@ public sealed class TokenVerbTests : IDisposable
     private void AssertNoSecretOrVerifier(string token)
     {
         using var vault = Vault.Open(_harness.VaultPath, Master);
-        var verifiers = vault.ReadEntries().Where(entry => entry.GroupPath == ReservedGroups.Tokens).Select(entry => entry.Password).ToList();
+        var verifiers = vault.ReadEntries(includeReserved: true).Where(entry => entry.GroupPath == ReservedGroups.Tokens).Select(entry => entry.Password).ToList();
 
         Assert.NotEmpty(verifiers);
         Assert.DoesNotContain(token[13..], _harness.Out + _harness.Err, StringComparison.Ordinal);

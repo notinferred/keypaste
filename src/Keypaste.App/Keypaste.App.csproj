@@ -44,6 +44,11 @@
 
   <ItemGroup>
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
+    <ProjectReference Include="../Keypaste.Mvvm/Keypaste.Mvvm.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Keypaste.Mvvm" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -53,9 +54,8 @@ internal static class RotateCommand
             return CliApp.ExitUsageError;
         }
 
-        var target = line.Operands[0];
-        var slash = target.LastIndexOf('/');
-        var name = new EntryName(WrittenGroup.Normalize(slash < 0 ? string.Empty : target[..slash]), target[(slash + 1)..]);
+        var typed = EntryName.Parse(line.Operands[0]);
+        var name = new EntryName(WrittenGroup.Normalize(typed.GroupPath), typed.Title);
         var entryPath = name.GroupPath.Length == 0 ? name.Title : name.GroupPath + "/" + name.Title;
 
         if (ReservedGroups.IsReserved(name.GroupPath))

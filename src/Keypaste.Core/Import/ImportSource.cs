@@ -78,7 +78,7 @@ public sealed class ImportSource : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(target);
 
-        var groups = target.ReadGroupPaths().ToHashSet(StringComparer.Ordinal);
+        var groups = target.ReadGroupPaths(includeReserved: true).ToHashSet(StringComparer.Ordinal);
         var intoGroup = into ?? DefaultInto(groups);
         List<ImportRow> rows = [];
 
@@ -141,7 +141,7 @@ public sealed class ImportSource : IDisposable
     }
 
     private static Dictionary<string, List<string>> Titles(Vault target) =>
-        target.Search(string.Empty).GroupBy(match => match.Name.GroupPath, StringComparer.Ordinal)
+        target.Search(string.Empty, includeReserved: true).GroupBy(match => match.Name.GroupPath, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.Select(match => match.Name.Title).ToList(), StringComparer.Ordinal);
 
     /// <summary>What stops a plan, or is worth saying about it, against the vault it would change.</summary>
@@ -161,7 +161,7 @@ public sealed class ImportSource : IDisposable
             problems.Add(new ImportProblem(-1, "that is the vault you are importing into", Blocks: true));
         }
 
-        var groupCounts = target.ReadGroupPaths().CountBy(path => path, StringComparer.Ordinal)
+        var groupCounts = target.ReadGroupPaths(includeReserved: true).CountBy(path => path, StringComparer.Ordinal)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         var titles = Titles(target);
 

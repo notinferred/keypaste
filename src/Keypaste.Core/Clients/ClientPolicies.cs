@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using Keypaste.Core.Policy;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.Clients;
 
@@ -62,9 +62,9 @@ public sealed class ClientPolicies
 
     private static readonly string[] _header =
     [
-        "# keypaste: how each MCP client is asked, by the --client-label its bridge was started with.",
-        "# \"*\" is every other client. policy: \"session\" (Session grants up to 1h), \"ask\" (Ask every time),",
-        "# \"inject-only\" (Inject only: keypaste never hands it a value; only commands you approve can read the values).",
+        "keypaste: how each MCP client is asked, by the --client-label its bridge was started with.",
+        "\"*\" is every other client. policy: \"session\" (Session grants up to 1h), \"ask\" (Ask every time),",
+        "\"inject-only\" (Inject only: keypaste never hands it a value; only commands you approve can read the values).",
     ];
 
     private ClientPolicies(IReadOnlyList<ClientPolicyRow> rows)
@@ -130,21 +130,19 @@ public sealed class ClientPolicies
     /// <returns>The header comment and one <c>[[client]]</c> table per row.</returns>
     public string Format()
     {
-        var text = new StringBuilder();
+        var writer = new TomlWriter(_limits);
 
         foreach (var line in _header)
         {
-            text.Append(line).Append('\n');
+            writer.Comment(line);
         }
 
         foreach (var row in Rows)
         {
-            text.Append("[[").Append(_section).Append("]]\n")
-                .Append(_labelKey).Append(" = \"").Append(row.Label).Append("\"\n")
-                .Append(_policyKey).Append(" = \"").Append(Wire(row.Policy)).Append("\"\n");
+            writer.Table(_section).Text(_labelKey, row.Label).Text(_policyKey, Wire(row.Policy));
         }
 
-        return text.ToString();
+        return writer.ToString();
     }
 
     /// <summary>Reads a file's bytes.</summary>
@@ -252,44 +250,19 @@ public sealed class ClientPolicies
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(policies);
 
-        var full = Path.GetFullPath(path);
-        var staged = full + "." + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4)) + ".tmp";
-
         try
         {
-            if (Path.GetDirectoryName(full) is { Length: > 0 } directory)
+            if (Path.GetDirectoryName(Path.GetFullPath(path)) is { Length: > 0 } directory)
             {
                 Directory.CreateDirectory(directory);
             }
 
-            var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
-
-            if (!OperatingSystem.IsWindows())
-            {
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            }
-
-            using (var stream = new FileStream(staged, options))
-            {
-                stream.Write(Encoding.UTF8.GetBytes(policies.Format()));
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(staged, full, overwrite: true);
+            AtomicFile.Write(path, Encoding.UTF8.GetBytes(policies.Format()));
             error = string.Empty;
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            try
-            {
-                File.Delete(staged);
-            }
-            catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
-            {
-                // The staged file is only ever a whole copy of what failed to land; leaving it costs nothing.
-            }
-
             error = ex.Message;
             return false;
         }

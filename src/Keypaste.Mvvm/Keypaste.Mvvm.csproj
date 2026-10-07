@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Keypaste.Mvvm</RootNamespace>
+    <AssemblyName>Keypaste.Mvvm</AssemblyName>
+    <Description>keypaste's hand-written bindings: property change notification, dependents and commands for the desktop's view models.</Description>
+    <!-- A RID-specific publish of Keypaste.App reaches this project through ProjectReference, as it reaches Keypaste.Core. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- No PackageReference: Directory.Packages.props says why CommunityToolkit.Mvvm is absent. -->
+
+</Project>

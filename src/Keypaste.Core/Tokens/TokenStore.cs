@@ -96,7 +96,7 @@ public sealed class TokenStore(Vault vault)
     /// <summary>Every token the open vault holds, by name.</summary>
     /// <returns>The tokens that read back whole; a damaged entry is not listed.</returns>
     public IReadOnlyList<TokenInfo> List() =>
-        [.. Entries(_vault.ReadEntries())
+        [.. Entries(_vault.ReadEntries(includeReserved: true))
             .Select(entry => TryRead(entry, out var info) ? info : null)
             .OfType<TokenInfo>()
             .OrderBy(info => info.Name, StringComparer.Ordinal)];
@@ -150,7 +150,7 @@ public sealed class TokenStore(Vault vault)
             return false;
         }
 
-        var entries = Entries(_vault.ReadEntries()).ToList();
+        var entries = Entries(_vault.ReadEntries(includeReserved: true)).ToList();
 
         if (entries.Any(entry => string.Equals(entry.Username, name, StringComparison.Ordinal)))
         {
@@ -196,7 +196,7 @@ public sealed class TokenStore(Vault vault)
     {
         ArgumentNullException.ThrowIfNull(nameOrId);
 
-        var entries = Entries(_vault.ReadEntries()).ToList();
+        var entries = Entries(_vault.ReadEntries(includeReserved: true)).ToList();
         var named = entries.Where(entry => string.Equals(entry.Username, nameOrId, StringComparison.Ordinal)).ToList();
 
         return Delete(named.Count > 0 ? named : WithId(entries, nameOrId));
@@ -209,7 +209,7 @@ public sealed class TokenStore(Vault vault)
     {
         ArgumentNullException.ThrowIfNull(id);
 
-        return Delete(WithId(Entries(_vault.ReadEntries()), id));
+        return Delete(WithId(Entries(_vault.ReadEntries(includeReserved: true)), id));
     }
 
     private static List<VaultEntry> WithId(IEnumerable<VaultEntry> entries, string id) =>

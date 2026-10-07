@@ -1,4 +1,4 @@
-namespace Keypaste.Core;
+namespace Keypaste.Core.Infrastructure;
 
 /// <summary>Declares one option a verb accepts.</summary>
 /// <param name="Name">The long name, without the leading dashes.</param>

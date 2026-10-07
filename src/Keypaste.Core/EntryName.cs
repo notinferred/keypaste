@@ -43,4 +43,23 @@ public sealed record EntryName(string GroupPath, string Title)
 
         return new EntryName(entry.GroupPath, entry.Title);
     }
+
+    /// <summary>The name a typed path, <c>group/path/title</c>, gives an entry keypaste writes.</summary>
+    /// <param name="path">The path as a person or an agent typed it.</param>
+    /// <returns>The text after the last slash as the title, in the group the text before it names, or in the root group when there is no slash.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
+    /// <remarks>
+    /// A title another program wrote may itself hold a slash (<see cref="VaultNameRules"/> refuses one only
+    /// on write), so a path is not an identity: <see cref="Vault.Find(string)"/> resolves one by the whole
+    /// of it, and a title containing a slash is reached by its path or by an <see cref="EntryName"/> built
+    /// from both parts, never by this split.
+    /// </remarks>
+    public static EntryName Parse(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        var slash = path.LastIndexOf('/');
+
+        return slash < 0 ? new EntryName(string.Empty, path) : new EntryName(path[..slash], path[(slash + 1)..]);
+    }
 }

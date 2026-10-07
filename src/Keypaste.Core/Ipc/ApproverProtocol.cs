@@ -1,8 +1,9 @@
-using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
 
@@ -11,10 +12,12 @@ namespace Keypaste.Core.Ipc;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="Utf8JsonWriter"/> to write and <see cref="JsonDocument"/> to read, never
-/// <see cref="JsonSerializer"/>. That is not a style preference: reflection-based serialization
-/// trips IL2026 and IL3050 under the trim and AOT analyzers this repository builds with, which was
-/// demonstrated with a negative control rather than assumed (DECISIONS.md D-0019).
+/// <see cref="ApproverJsonContext"/>'s generated serializer to write and <see cref="JsonDocument"/>
+/// to read, never reflection-based serialization, which trips IL2026 and IL3050 under the trim and
+/// AOT analyzers this repository builds with (DECISIONS.md D-0019). Reading stays on the document
+/// because a frame is read by rules the serializer does not express: a member sent as null is
+/// refused where its absence is accepted, a mistyped optional member reads as absent, a null array
+/// element is refused, and a property named twice anywhere in the frame refuses it.
 /// </para>
 /// <para>
 /// <b>Every read is a <c>Try</c>.</b> A malformed frame is a refusal, never an exception: the peer
@@ -91,14 +94,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", NamesKind);
-            writer.WriteString("vault", request.Vault);
-            writer.WriteString("session", request.Session);
-            WriteStrings(writer, "exposure", request.Exposure);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new NamesRequestFrame(request), Wire.NamesRequestFrame);
     }
 
     /// <summary>Encodes a request to attach to a vault's session.</summary>
@@ -109,24 +105,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", AttachKind);
-            writer.WriteString("vault", request.Vault);
-
-            if (request.Client is { } client)
-            {
-                WriteOptional(writer, "client_name", client.Name);
-                WriteOptional(writer, "client_version", client.Version);
-                WriteOptional(writer, "client_label", client.Label);
-            }
-
-            if (request.Exposure is { } exposure)
-            {
-                WriteStrings(writer, "exposure", exposure);
-            }
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new AttachRequestFrame(request), Wire.AttachRequestFrame);
     }
 
     /// <summary>Encodes the answer to an attach request.</summary>
@@ -137,18 +116,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", AttachKind);
-            WriteOptional(writer, "session", reply.Session);
-            if (reply.Refusal is { } refusal)
-            {
-                writer.WriteNumber("method", (int)refusal);
-            }
-
-            writer.WriteString("reason", reply.Reason);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new AttachReplyFrame(reply), Wire.AttachReplyFrame);
     }
 
     /// <summary>Encodes a credential request.</summary>
@@ -159,21 +127,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", CredentialKind);
-            writer.WriteString("vault", request.Vault);
-            writer.WriteString("session", request.Session);
-            writer.WriteString("entry", request.Entry);
-            writer.WriteString("field", request.Field);
-            writer.WriteString("reason", request.Reason);
-            writer.WriteNumber("ttl_seconds", request.TtlSeconds);
-            WriteStrings(writer, "exposure", request.Exposure);
-            WriteOptional(writer, "client", request.ClientName);
-            WriteOptional(writer, "client_version", request.ClientVersion);
-            WriteOptional(writer, "client_label", request.ClientLabel);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new CredentialRequestFrame(request), Wire.CredentialRequestFrame);
     }
 
     /// <summary>Encodes a reply carrying entry names, bounded to what one frame can carry.</summary>
@@ -191,10 +145,10 @@ public static class ApproverProtocol
     /// </para>
     /// <para>
     /// <b>The bound is bytes, and it is measured here because only here knows what a name costs.</b>
-    /// <see cref="Utf8JsonWriter"/>'s default encoder escapes every non-ASCII UTF-16 code unit to
-    /// <c>\uXXXX</c>, so one astral rune is twelve bytes on the wire and a hundred short names can
-    /// overflow where a thousand long ones would not. Any count outside this writer reimplements
-    /// that escaping policy, and the day the two disagree by one byte the connection dies again.
+    /// The default encoder escapes every non-ASCII UTF-16 code unit to <c>\uXXXX</c>, so one astral
+    /// rune is twelve bytes on the wire and a hundred short names can overflow where a thousand long
+    /// ones would not. Any count outside the serializer that writes the frame reimplements that
+    /// escaping policy, and the day the two disagree by one byte the connection dies again.
     /// </para>
     /// <para>
     /// Names are dropped from the end and dropped whole. Shortening one would hand the bridge a
@@ -206,49 +160,35 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        var kept = Fit(reply);
-        var frame = WriteNames(reply, kept, reply.Complete && kept == reply.Names.Count);
+        var rows = reply.Names.Select(entry => new NameRow(entry)).ToList();
+        var kept = Fit(WriteNames(reply, [], false).Length, rows, Wire.NameRow);
+        var frame = WriteNames(reply, rows.Take(kept), reply.Complete && kept == rows.Count);
 
         // Belt and braces. Everything above says this cannot happen; this is what stops an error in
         // that reasoning costing a connection and its grants rather than a listing (law 3.7).
         return frame.Length <= MessageFramer.MaximumPayloadBytes
             ? frame
-            : WriteNames(new NamesReply(reply.VaultUnlocked, [], Undersized, false) { Session = reply.Session, Refusal = reply.Refusal }, 0, false);
+            : WriteNames(reply with { Reason = Undersized }, [], false);
     }
 
-    /// <summary>How many of a reply's names fit one frame.</summary>
+    /// <summary>How many of a reply's rows fit one frame beside its envelope.</summary>
     /// <remarks>
-    /// Counted before anything is written, because <see cref="Utf8JsonWriter"/> is forward-only and
-    /// cannot take an element back. The envelope is measured by encoding it with no names and the
-    /// <c>false</c> spelling of <c>complete</c> — the longer of the two, and the only one a
-    /// truncated reply carries — so a reply that turns out to be complete is a byte under its own
-    /// budget rather than a byte over. Each element is then measured on its own, which is exact
-    /// because default encoding is context-free: an object encodes to identical bytes standalone and
-    /// nested in an array.
+    /// Counted before the frame is written, because a row once written cannot be taken back. The
+    /// envelope is measured with no rows and the <c>false</c> spelling of <c>complete</c>, the longer
+    /// of the two and the only one a truncated reply carries, so a reply that turns out to be complete
+    /// is a byte under its own budget rather than a byte over. Each row is then measured on its own,
+    /// which is exact because default encoding is context-free: an object encodes to identical bytes
+    /// standalone and nested in an array.
     /// </remarks>
-    private static int Fit(NamesReply reply)
+    private static int Fit<T>(int envelope, IEnumerable<T> rows, JsonTypeInfo<T> row)
     {
-        var budget = MessageFramer.MaximumPayloadBytes - WriteNames(reply, 0, false).Length;
-
-        if (budget < 0)
-        {
-            return 0;
-        }
-
-        var buffer = new ArrayBufferWriter<byte>(256);
-        using var writer = new Utf8JsonWriter(buffer);
-
+        var budget = MessageFramer.MaximumPayloadBytes - envelope;
         var used = 0;
         var kept = 0;
 
-        foreach (var name in reply.Names)
+        foreach (var item in rows)
         {
-            buffer.Clear();
-            writer.Reset(buffer);
-            WriteName(writer, name);
-            writer.Flush();
-
-            var cost = buffer.WrittenCount + (kept == 0 ? 0 : 1);
+            var cost = JsonSerializer.SerializeToUtf8Bytes(item, row).Length + (kept == 0 ? 0 : 1);
 
             if (used + cost > budget)
             {
@@ -262,40 +202,8 @@ public static class ApproverProtocol
         return kept;
     }
 
-    private static byte[] WriteNames(NamesReply reply, int count, bool complete) =>
-        Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", NamesKind);
-            writer.WriteBoolean("unlocked", reply.VaultUnlocked);
-            writer.WriteString("reason", reply.Reason);
-            writer.WriteBoolean("complete", complete);
-            WriteOptional(writer, "session", reply.Session);
-
-            if (reply.Refusal is { } refusal)
-            {
-                writer.WriteNumber("method", (int)refusal);
-            }
-
-            writer.WriteStartArray("names");
-
-            for (var i = 0; i < count; i++)
-            {
-                WriteName(writer, reply.Names[i]);
-            }
-
-            writer.WriteEndArray();
-        });
-
-    private static void WriteName(Utf8JsonWriter writer, ListedEntry entry)
-    {
-        writer.WriteStartObject();
-        writer.WriteString("group", entry.Name.GroupPath);
-        writer.WriteString("title", entry.Name.Title);
-        WriteStrings(writer, "fields", entry.Fields);
-        WriteStrings(writer, "tags", entry.Tags);
-        writer.WriteEndObject();
-    }
+    private static byte[] WriteNames(NamesReply reply, IEnumerable<NameRow> names, bool complete) =>
+        JsonSerializer.SerializeToUtf8Bytes(new NamesReplyFrame(reply, names, complete), Wire.NamesReplyFrame);
 
     /// <summary>Encodes a reply to a credential request, bounded to what one frame can carry.</summary>
     /// <param name="reply">The decision, and the value on the one path that has one.</param>
@@ -404,18 +312,7 @@ public static class ApproverProtocol
             };
 
     private static byte[] WriteCredential(CredentialReply reply) =>
-        Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", CredentialKind);
-            writer.WriteString("decision", reply.Decision == AuditDecision.Granted ? "granted" : "denied");
-            writer.WriteNumber("method", (int)reply.Method);
-            writer.WriteString("reason", reply.Reason);
-            writer.WriteNumber("ttl_seconds", reply.TtlSeconds);
-            WriteOptional(writer, "entry", reply.Entry);
-            WriteOptional(writer, "session", reply.Session);
-            WriteOptional(writer, "value", reply.Value);
-        });
+        JsonSerializer.SerializeToUtf8Bytes(new CredentialReplyFrame(reply), Wire.CredentialReplyFrame);
 
     /// <summary>The most keys or file lines one env request names.</summary>
     public const int MaximumEnvListLength = 1024;
@@ -431,27 +328,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", EnvProfileKind);
-            writer.WriteString("vault", request.Vault);
-            writer.WriteString("session", request.Session);
-            writer.WriteString("project", request.Project);
-            WriteStrings(writer, "command", request.Command);
-            writer.WriteString("directory", request.Directory);
-            writer.WriteString("profile", request.Profile);
-
-            if (request.Keys is { } keys)
-            {
-                WriteStrings(writer, "keys", keys);
-            }
-
-            if (request.FileLines is { } lines)
-            {
-                WriteStrings(writer, "file_lines", lines);
-            }
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new EnvRequestFrame(request), Wire.EnvRequestFrame);
     }
 
     /// <summary>Encodes the answer to an env request, bounded to one frame.</summary>
@@ -482,40 +359,7 @@ public static class ApproverProtocol
     }
 
     private static byte[] WriteEnv(EnvReply reply) =>
-        Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", EnvKind);
-            writer.WriteString("project", reply.Set.Project);
-            writer.WriteString("profile", reply.Set.Profile);
-            writer.WriteNumber("outcome", (int)reply.Set.Outcome);
-            writer.WriteString("reason", reply.Reason);
-
-            writer.WriteStartArray("problems");
-            foreach (var problem in reply.Set.Problems)
-            {
-                writer.WriteStartObject();
-                writer.WriteString("key", problem.Key);
-                writer.WriteString("reason", problem.Reason);
-                writer.WriteEndObject();
-            }
-
-            writer.WriteEndArray();
-
-            if (reply.Set.Outcome == EnvOutcome.Resolved)
-            {
-                writer.WriteStartArray("variables");
-                foreach (var variable in reply.Set.Variables)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("key", variable.Key);
-                    writer.WriteString("value", variable.Value);
-                    writer.WriteEndObject();
-                }
-
-                writer.WriteEndArray();
-            }
-        });
+        JsonSerializer.SerializeToUtf8Bytes(new EnvReplyFrame(reply), Wire.EnvReplyFrame);
 
     /// <summary>Which kind of message a frame is, without committing to parsing it.</summary>
     /// <param name="frame">The frame's bytes.</param>
@@ -973,7 +817,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return WriteAttached(GrantsKind, request.Vault, request.Session, _ => { });
+        return WriteAttached(GrantsKind, request.Vault, request.Session);
     }
 
     /// <summary>Encodes the grants in force, bounded to what one frame can carry.</summary>
@@ -988,66 +832,17 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        var budget = MessageFramer.MaximumPayloadBytes - WriteGrants(reply, 0, false).Length;
-        var buffer = new ArrayBufferWriter<byte>(256);
-        using var measure = new Utf8JsonWriter(buffer);
-        var used = 0;
-        var kept = 0;
-
-        foreach (var grant in reply.Grants.Take(MaximumGrantRows))
-        {
-            buffer.Clear();
-            measure.Reset(buffer);
-            WriteGrant(measure, grant);
-            measure.Flush();
-
-            var cost = buffer.WrittenCount + (kept == 0 ? 0 : 1);
-
-            if (used + cost > budget)
-            {
-                break;
-            }
-
-            used += cost;
-            kept++;
-        }
-
-        var frame = WriteGrants(reply, kept, reply.Complete && kept == reply.Grants.Count);
+        var rows = reply.Grants.Take(MaximumGrantRows).Select(grant => new GrantRow(grant)).ToList();
+        var kept = Fit(WriteGrants(reply, [], false).Length, rows, Wire.GrantRow);
+        var frame = WriteGrants(reply, rows.Take(kept), reply.Complete && kept == reply.Grants.Count);
 
         return frame.Length <= MessageFramer.MaximumPayloadBytes
             ? frame
-            : WriteGrants(new GrantsReply(reply.Answered, [], false, Undersized), 0, false);
+            : WriteGrants(reply with { Reason = Undersized }, [], false);
     }
 
-    private static byte[] WriteGrants(GrantsReply reply, int count, bool complete) =>
-        Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", GrantsKind);
-            writer.WriteBoolean("answered", reply.Answered);
-            writer.WriteBoolean("complete", complete);
-            writer.WriteString("reason", reply.Reason);
-            writer.WriteStartArray("grants");
-
-            for (var i = 0; i < count; i++)
-            {
-                WriteGrant(writer, reply.Grants[i]);
-            }
-
-            writer.WriteEndArray();
-        });
-
-    private static void WriteGrant(Utf8JsonWriter writer, GrantSummary grant)
-    {
-        writer.WriteStartObject();
-        writer.WriteString("id", grant.Id);
-        writer.WriteString("kind", grant.Kind);
-        writer.WriteString("client", grant.Client);
-        writer.WriteString("scope", grant.Scope);
-        writer.WriteString("field", grant.Field);
-        writer.WriteNumber("seconds_left", grant.SecondsLeft);
-        writer.WriteEndObject();
-    }
+    private static byte[] WriteGrants(GrantsReply reply, IEnumerable<GrantRow> grants, bool complete) =>
+        JsonSerializer.SerializeToUtf8Bytes(new GrantsReplyFrame(reply, grants, complete), Wire.GrantsReplyFrame);
 
     /// <summary>Encodes a request to end grants.</summary>
     /// <param name="request">Which grants, and the attachment it is made under.</param>
@@ -1057,21 +852,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return WriteAttached(RevokeGrantsKind, request.Vault, request.Session, writer =>
-        {
-            WriteStrings(writer, "ids", request.Ids);
-
-            if (request.Client is null)
-            {
-                writer.WriteNull("client");
-            }
-            else
-            {
-                writer.WriteString("client", request.Client);
-            }
-
-            writer.WriteBoolean("all", request.All);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new RevokeGrantsRequestFrame(request), Wire.RevokeGrantsRequestFrame);
     }
 
     /// <summary>Encodes how many grants were ended.</summary>
@@ -1082,13 +863,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", RevokeGrantsKind);
-            writer.WriteNumber("revoked", reply.Revoked);
-            writer.WriteString("reason", reply.Reason);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new RevokeGrantsReplyFrame(reply), Wire.RevokeGrantsReplyFrame);
     }
 
     /// <summary>Encodes a request to lock now.</summary>
@@ -1099,7 +874,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return WriteAttached(LockKind, request.Vault, request.Session, _ => { });
+        return WriteAttached(LockKind, request.Vault, request.Session);
     }
 
     /// <summary>Encodes whether the owner is locking.</summary>
@@ -1110,13 +885,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", LockKind);
-            writer.WriteBoolean("locking", reply.Locking);
-            writer.WriteString("reason", reply.Reason);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new LockReplyFrame(reply), Wire.LockReplyFrame);
     }
 
     /// <summary>Decodes a request for the grants in force.</summary>
@@ -1278,15 +1047,8 @@ public static class ApproverProtocol
         }
     }
 
-    private static byte[] WriteAttached(string kind, string vault, string session, Action<Utf8JsonWriter> body) =>
-        Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", kind);
-            writer.WriteString("vault", vault);
-            writer.WriteString("session", session);
-            body(writer);
-        });
+    private static byte[] WriteAttached(string kind, string vault, string session) =>
+        JsonSerializer.SerializeToUtf8Bytes(new AttachedFrame(kind, vault, session), Wire.AttachedFrame);
 
     /// <summary>Reads a request's kind, vault and session, and hands back a copy of its root for the rest.</summary>
     private static bool TryAttached(
@@ -1345,18 +1107,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", TokenEnvKind);
-            writer.WriteString("vault", request.Vault);
-            writer.WriteString("session", request.Session);
-            writer.WriteString("token", request.Token);
-            writer.WriteString("project", request.Project);
-            writer.WriteString("profile", request.Profile);
-            WriteStrings(writer, "command", request.Command);
-            writer.WriteString("directory", request.Directory);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new TokenEnvRequestFrame(request), Wire.TokenEnvRequestFrame);
     }
 
     /// <summary>Decodes a request for a set authorized by a scoped token.</summary>
@@ -1404,43 +1155,7 @@ public static class ApproverProtocol
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", RunKind);
-            writer.WriteString("vault", request.Vault);
-            writer.WriteString("session", request.Session);
-            writer.WriteString("program", request.Program);
-            WriteStrings(writer, "command", request.Command);
-            writer.WriteString("directory", request.Directory);
-            WriteOptional(writer, "project", request.Project);
-            writer.WriteString("profile", request.Profile);
-
-            if (request.Keys is { } keys)
-            {
-                WriteStrings(writer, "keys", keys);
-            }
-
-            if (request.References is { } references)
-            {
-                writer.WriteStartArray("references");
-                foreach (var reference in references)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("name", reference.Name);
-                    writer.WriteString("ref", reference.Reference);
-                    writer.WriteEndObject();
-                }
-
-                writer.WriteEndArray();
-            }
-
-            writer.WriteString("reason", request.Reason);
-            WriteStrings(writer, "exposure", request.Exposure);
-            WriteOptional(writer, "client_name", request.ClientName);
-            WriteOptional(writer, "client_version", request.ClientVersion);
-            WriteOptional(writer, "client_label", request.ClientLabel);
-        });
+        return JsonSerializer.SerializeToUtf8Bytes(new RunRequestFrame(request), Wire.RunRequestFrame);
     }
 
     /// <summary>Decodes an agent's run request, bounded before anything is resolved or shown.</summary>
@@ -1569,44 +1284,7 @@ public static class ApproverProtocol
     }
 
     private static byte[] WriteRun(RunReply reply) =>
-        Write(writer =>
-        {
-            writer.WriteNumber("v", Version);
-            writer.WriteString("kind", RunKind);
-            writer.WriteString("project", reply.Set.Project);
-            writer.WriteString("profile", reply.Set.Profile);
-            writer.WriteNumber("outcome", (int)reply.Set.Outcome);
-            writer.WriteString("reason", reply.Reason);
-            writer.WriteNumber("method", (int)reply.Method);
-            writer.WriteNumber("granted_seconds", reply.GrantedSeconds);
-            WriteStrings(writer, "entries", reply.Entries);
-            WriteOptional(writer, "session", reply.Session);
-
-            writer.WriteStartArray("problems");
-            foreach (var problem in reply.Set.Problems)
-            {
-                writer.WriteStartObject();
-                writer.WriteString("key", problem.Key);
-                writer.WriteString("reason", problem.Reason);
-                writer.WriteEndObject();
-            }
-
-            writer.WriteEndArray();
-
-            if (reply.Set.Outcome == EnvOutcome.Resolved)
-            {
-                writer.WriteStartArray("variables");
-                foreach (var variable in reply.Set.Variables)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("key", variable.Key);
-                    writer.WriteString("value", variable.Value);
-                    writer.WriteEndObject();
-                }
-
-                writer.WriteEndArray();
-            }
-        });
+        JsonSerializer.SerializeToUtf8Bytes(new RunReplyFrame(reply), Wire.RunReplyFrame);
 
     /// <summary>Decodes the answer to a run request.</summary>
     /// <param name="frame">The frame's bytes.</param>
@@ -1709,39 +1387,7 @@ public static class ApproverProtocol
         return true;
     }
 
-    private static byte[] Write(Action<Utf8JsonWriter> body)
-    {
-        using var buffer = new MemoryStream(512);
-
-        using (var writer = new Utf8JsonWriter(buffer))
-        {
-            writer.WriteStartObject();
-            body(writer);
-            writer.WriteEndObject();
-        }
-
-        return buffer.ToArray();
-    }
-
-    private static void WriteStrings(Utf8JsonWriter writer, string name, IReadOnlyList<string> values)
-    {
-        writer.WriteStartArray(name);
-
-        for (var i = 0; i < values.Count; i++)
-        {
-            writer.WriteStringValue(values[i]);
-        }
-
-        writer.WriteEndArray();
-    }
-
-    private static void WriteOptional(Utf8JsonWriter writer, string name, string? value)
-    {
-        if (value is not null)
-        {
-            writer.WriteString(name, value);
-        }
-    }
+    private static ApproverJsonContext Wire => ApproverJsonContext.Default;
 
     // A property named twice would leave the reader to pick one, and the sender may have meant the other (D-0325).
     private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };

@@ -1,11 +1,11 @@
 using System.Globalization;
-using System.Net;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Sharing;
 
 namespace Keypaste.Cli.Commands;
@@ -57,13 +57,7 @@ internal static class ShareCommand
 
     internal static int Execute(string[] args, CliContext context)
     {
-        using var handler = new SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            AutomaticDecompression = DecompressionMethods.None,
-            ConnectTimeout = TimeSpan.FromSeconds(10),
-        };
+        using var handler = ShareClient.CreateTransport();
 
         return Execute(args, context, handler);
     }
@@ -157,13 +151,13 @@ internal static class ShareCommand
         var views = 1;
         if (line.Value("views") is { } viewsText
             && (!int.TryParse(viewsText, NumberStyles.None, CultureInfo.InvariantCulture, out views)
-                || views is < 1 or > ShareService.MaximumViews))
+                || !ShareService.IsValidViews(views)))
         {
             return Refuse(context, $"--views takes a whole number from 1 to {ShareService.MaximumViews}", CliApp.ExitUsageError);
         }
 
         var recipient = line.Value("to");
-        if (recipient is { Length: > ShareService.MaximumRecipientLength })
+        if (!ShareService.IsValidRecipient(recipient))
         {
             return Refuse(context, $"--to takes a label of at most {ShareService.MaximumRecipientLength} characters", CliApp.ExitUsageError);
         }
@@ -445,7 +439,7 @@ internal static class ShareCommand
         }
 
         var titled = vault.ReadEntries()
-            .Where(entry => !ReservedGroups.IsReserved(entry.GroupPath) && string.Equals(entry.Title, operand, StringComparison.Ordinal))
+            .Where(entry => string.Equals(entry.Title, operand, StringComparison.Ordinal))
             .ToList();
 
         switch (titled.Count)
@@ -479,7 +473,7 @@ internal static class ShareCommand
             return null;
         }
 
-        if (first.Length < ShareService.MinimumPassphraseLength || !ShareCrypto.AcceptsPassphrase(first.Value))
+        if (!ShareService.IsValidPassphrase(first.Value))
         {
             first.Dispose();
             context.Stderr.WriteLine($"keypaste share: {ShareService.PassphraseLengthRule}, of Latin letters, digits, spaces and punctuation");
@@ -609,7 +603,7 @@ internal static class ShareCommand
             _ => TimeSpan.Zero,
         };
 
-        return ttl >= ShareService.MinimumTtl && ttl <= ShareService.MaximumTtl;
+        return ShareService.IsValidTtl(ttl);
     }
 
     private static string ShortId(string id) => id[..Math.Min(8, id.Length)];

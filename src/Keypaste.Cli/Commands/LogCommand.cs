@@ -2,6 +2,7 @@ using System.Text.Json;
 using Keypaste.Cli.Output;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

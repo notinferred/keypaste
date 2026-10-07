@@ -226,6 +226,102 @@ public sealed class TrashTests : IDisposable
     }
 
     /// <summary>
+    /// A selection announces the lines and buttons that read it, or a binding keeps a stale prompt
+    /// or a greyed-out Restore.
+    /// </summary>
+    [Fact]
+    public void Selecting_a_row_announces_the_lines_and_buttons_that_read_it()
+    {
+        using var context = new Context(_vaultPath);
+
+        Delete(context, "servers/production");
+
+        var trash = context.NewTrash();
+        var raised = Record(trash);
+        var asked = new List<string>();
+        trash.RestoreCommand.CanExecuteChanged += (_, _) => asked.Add("restore");
+        trash.PurgeCommand.CanExecuteChanged += (_, _) => asked.Add("purge");
+
+        trash.Selected = Assert.Single(trash.Rows);
+
+        Assert.Contains(nameof(TrashViewModel.AwaitsSelection), raised);
+        Assert.Contains(nameof(TrashViewModel.PurgePrompt), raised);
+        Assert.Equal(["purge", "restore"], asked.Order(StringComparer.Ordinal));
+        Assert.True(trash.RestoreCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Arming_the_permanent_deletion_announces_which_buttons_can_be_pressed()
+    {
+        using var context = new Context(_vaultPath);
+
+        Delete(context, "servers/production");
+
+        var trash = context.NewTrash();
+        trash.Selected = Assert.Single(trash.Rows);
+        var asked = new List<string>();
+        trash.RestoreCommand.CanExecuteChanged += (_, _) => asked.Add("restore");
+        trash.PurgeCommand.CanExecuteChanged += (_, _) => asked.Add("purge");
+        trash.ConfirmPurgeCommand.CanExecuteChanged += (_, _) => asked.Add("confirm");
+        trash.CancelPurgeCommand.CanExecuteChanged += (_, _) => asked.Add("cancel");
+
+        trash.PurgeCommand.Execute(null);
+
+        Assert.Equal(["cancel", "confirm", "purge", "restore"], asked.Order(StringComparer.Ordinal));
+        Assert.False(trash.RestoreCommand.CanExecute(null));
+        Assert.True(trash.ConfirmPurgeCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Reading_the_bin_again_restates_its_notes()
+    {
+        using var context = new Context(_vaultPath);
+
+        var trash = context.Trash;
+        var raised = Record(trash);
+
+        trash.Load();
+
+        Assert.Contains(nameof(TrashViewModel.Note), raised);
+        Assert.Contains(nameof(TrashViewModel.EmptyNote), raised);
+    }
+
+    [Fact]
+    public void An_outcome_announces_that_there_is_one()
+    {
+        using var context = new Context(_vaultPath);
+
+        Delete(context, "servers/production");
+
+        var trash = context.NewTrash();
+        trash.Selected = Assert.Single(trash.Rows);
+        var raised = Record(trash);
+
+        trash.RestoreCommand.Execute(null);
+
+        Assert.Contains(nameof(TrashViewModel.HasNotice), raised);
+        Assert.True(trash.HasNotice);
+    }
+
+    [Fact]
+    public void A_refusal_announces_that_there_is_one()
+    {
+        using var context = new Context(_vaultPath);
+
+        Delete(context, "servers/production");
+
+        var trash = context.NewTrash();
+        trash.Selected = Assert.Single(trash.Rows);
+        context.Session.Lock(VaultLockReason.Manual);
+        var raised = Record(trash);
+
+        trash.RestoreCommand.Execute(null);
+
+        Assert.Contains(nameof(TrashViewModel.HasError), raised);
+        Assert.True(trash.HasError);
+    }
+
+    /// <summary>
     /// The refusal D-0249 requires, worded for somebody who cannot rename in the app yet, and
     /// writing nothing.
     /// </summary>
@@ -441,6 +537,13 @@ public sealed class TrashTests : IDisposable
         var open = context.Env.OpenProject!;
         open.Variables.Single(row => row.Key == key).RemoveCommand.Execute(null);
         open.ConfirmRemoveCommand.Execute(null);
+    }
+
+    private static List<string> Record(TrashViewModel trash)
+    {
+        var raised = new List<string>();
+        trash.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        return raised;
     }
 
     private static string Digest(string path) =>

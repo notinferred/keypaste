@@ -1,6 +1,5 @@
-using System.Globalization;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Policy;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Recent;
 
 namespace Keypaste.Core.Settings;
@@ -85,11 +84,12 @@ public sealed record AppSettings
     internal const string StayInTrayKey = "stay_in_tray";
     internal const string VaultKey = "vault";
 
+    private const string _vaultComment = "the vault agents and the CLI use without --vault";
+
     private static readonly string[] _header =
     [
-        "# keypaste keeps the desktop app's preferences here, and the vault agents and the CLI use.",
-        "# Delete this file to go back to the defaults.",
-        "",
+        "keypaste keeps the desktop app's preferences here, and the vault agents and the CLI use.",
+        "Delete this file to go back to the defaults.",
     ];
 
     private readonly int _idleTimeoutSeconds;
@@ -212,44 +212,38 @@ public sealed record AppSettings
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var lines = new List<string>(_header)
+        var writer = new TomlWriter(TomlLimits.Paths);
+
+        foreach (var line in _header)
         {
-            $"[[{SectionName}]]",
-            string.Create(
-                CultureInfo.InvariantCulture,
-                $"{IdleTimeoutKey} = {settings.IdleTimeoutSeconds}"),
-            $"{ThemeKey} = \"{Written(settings.Theme)}\"",
-            $"{LockWhenMinimizedKey} = {(settings.LockWhenMinimized ? "1" : "0")}  # 1 or 0; this file has no booleans",
-        };
+            writer.Comment(line);
+        }
+
+        writer
+            .BlankLine()
+            .Table(SectionName)
+            .Number(IdleTimeoutKey, settings.IdleTimeoutSeconds)
+            .Text(ThemeKey, Written(settings.Theme))
+            .Number(LockWhenMinimizedKey, settings.LockWhenMinimized ? 1 : 0, "1 or 0; this file has no booleans");
 
         if (settings.StayInTray is { } tray)
         {
-            lines.Add($"{StayInTrayKey} = {(tray ? "1" : "0")}");
+            writer.Number(StayInTrayKey, tray ? 1 : 0);
         }
 
-        if (settings.Vault is { } vault)
+        if (settings.Vault is { } vault && CanRecord(vault))
         {
-            lines.Add($"{VaultKey} = \"{RecentVaults.Portable(vault)}\"  # the vault agents and the CLI use without --vault");
+            writer.Text(VaultKey, RecentVaults.Portable(vault), _vaultComment);
         }
-
-        lines.Add(string.Empty);
 
         try
         {
-            var directory = Path.GetDirectoryName(path);
-
-            if (!string.IsNullOrEmpty(directory))
+            if (Path.GetDirectoryName(Path.GetFullPath(path)) is { Length: > 0 } directory)
             {
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllLines(path, lines);
-
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-
+            AtomicFile.Write(path, Encoding.UTF8.GetBytes(writer.ToString()));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -257,6 +251,11 @@ public sealed record AppSettings
             return false;
         }
     }
+
+    /// <summary>Whether <paramref name="vaultPath"/> can be written as <see cref="Vault"/> and read back as itself.</summary>
+    /// <remarks>A path holding a quote, a control character or, on Unix, a backslash cannot; nor can one longer than the file's strings.</remarks>
+    internal static bool CanRecord(string vaultPath) =>
+        new TomlWriter(TomlLimits.Paths).CanWrite(VaultKey, RecentVaults.Portable(vaultPath), _vaultComment);
 
     private static AppSettings Read(TomlTable table) => new()
     {

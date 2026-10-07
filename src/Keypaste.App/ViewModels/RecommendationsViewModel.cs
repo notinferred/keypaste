@@ -44,6 +44,12 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         MoveSelectedCommand = new RelayCommand(() => Move([.. _rows.Where(row => row.IsSelected && !row.IsDismissed)]));
         SelectAllCommand = new RelayCommand(SelectAll);
 
+        DependsOn(nameof(NeedsReview), nameof(Rows), nameof(LostTags));
+        DependsOn(nameof(IsEmpty), nameof(Rows), nameof(LostTags));
+        DependsOn(nameof(HasNoteKeys), nameof(Rows));
+        DependsOn(nameof(HasLostTags), nameof(LostTags));
+        DependsOn(nameof(HasMessage), nameof(Message));
+
         Check();
     }
 
@@ -51,30 +57,14 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<RecommendationRow> Rows
     {
         get => _rows;
-        private set
-        {
-            if (Set(ref _rows, value))
-            {
-                Raise(nameof(NeedsReview));
-                Raise(nameof(IsEmpty));
-                Raise(nameof(HasNoteKeys));
-            }
-        }
+        private set => Set(ref _rows, value);
     }
 
     /// <summary>Every project tag an entry lost in another app: those needing review first, then those dismissed.</summary>
     internal IReadOnlyList<LostTagRow> LostTags
     {
         get => _lostTags;
-        private set
-        {
-            if (Set(ref _lostTags, value))
-            {
-                Raise(nameof(NeedsReview));
-                Raise(nameof(IsEmpty));
-                Raise(nameof(HasLostTags));
-            }
-        }
+        private set => Set(ref _lostTags, value);
     }
 
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
@@ -90,13 +80,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     internal string Message
     {
         get => _message;
-        private set
-        {
-            if (Set(ref _message, value))
-            {
-                Raise(nameof(HasMessage));
-            }
-        }
+        private set => Set(ref _message, value);
     }
 
     internal bool HasMessage => _message.Length > 0;
@@ -156,35 +140,17 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     {
         row.Confirmation = [];
 
-        if (_session.Unlocked is not { } vault)
+        var write = _session.Write(vault => vault.AddTag(row.Finding.Entry, row.Finding.Tag), added => added);
+
+        if (write.Problem("restore the tag again") is { } problem)
         {
-            Message = "The vault is locked.";
+            Message = problem;
             return;
         }
 
-        try
-        {
-            if (!vault.AddTag(row.Finding.Entry, row.Finding.Tag))
-            {
-                Message = $"{row.Entry} already has {row.Tag}.";
-                Check();
-                return;
-            }
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Message = "Something else changed this vault since you opened it. Reload to see it, then restore the tag again.";
-            return;
-        }
-        catch (VaultException e)
-        {
-            Message = e.Message;
-            return;
-        }
-
-        Message = $"Put {row.Tag} back on {row.Entry}. The entry as it was stays in its history.";
+        Message = write.Outcome == WriteOutcome.NothingToSave
+            ? $"{row.Entry} already has {row.Tag}."
+            : $"Put {row.Tag} back on {row.Entry}. The entry as it was stays in its history.";
         Check();
     }
 
@@ -197,40 +163,25 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
+        var write = _session.Write(vault => vault.MoveNoteKeys(_check, [.. rows.Select(row => row.Finding)]), result => result.Moved);
+
+        if (write.Problem("move the keys again") is { } problem)
         {
-            Message = "The vault is locked.";
+            Message = problem;
             return;
         }
 
-        NoteKeyMove move;
+        var move = write.Value!;
 
-        try
+        if (!move.Moved)
         {
-            move = vault.MoveNoteKeys(_check, [.. rows.Select(row => row.Finding)]);
+            Message = Refused(move.Refusals);
 
-            if (!move.Moved)
+            if (move.Refusals.Any(refusal => refusal.Reason == NoteKeyRefusalReason.NotesChanged))
             {
-                Message = Refused(move.Refusals);
-
-                if (move.Refusals.Any(refusal => refusal.Reason == NoteKeyRefusalReason.NotesChanged))
-                {
-                    Check();
-                }
-
-                return;
+                Check();
             }
 
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Message = "Something else changed this vault since you opened it. Reload to see it, then move the keys again.";
-            return;
-        }
-        catch (VaultException e)
-        {
-            Message = e.Message;
             return;
         }
 

@@ -3,14 +3,20 @@ using Keypaste.App.Navigation;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>A sidebar row: a place, the count beside it and, for Agents, a status dot.</summary>
-internal sealed class NavItem(Destination destination) : ObservableObject
+internal sealed class NavItem : ObservableObject
 {
     private string _count = string.Empty;
     private bool _dotLive;
     private string? _detail;
     private bool _expanded = true;
 
-    internal Destination Destination { get; } = destination;
+    internal NavItem(Destination destination)
+    {
+        Destination = destination;
+        DependsOn(nameof(Chevron), nameof(IsExpanded));
+    }
+
+    internal Destination Destination { get; }
 
     internal string Title => Destination.Title;
 
@@ -40,13 +46,7 @@ internal sealed class NavItem(Destination destination) : ObservableObject
     internal bool IsExpanded
     {
         get => _expanded;
-        set
-        {
-            if (Set(ref _expanded, value))
-            {
-                Raise(nameof(Chevron));
-            }
-        }
+        set => Set(ref _expanded, value);
     }
 
     /// <summary>The fold's chevron: down while open, right while closed.</summary>

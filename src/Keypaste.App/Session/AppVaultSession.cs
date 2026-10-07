@@ -746,6 +746,62 @@ internal sealed class AppVaultSession : IDisposable
         return new AccessChangeResult(AccessChangeOutcome.Changed, result);
     }
 
+    /// <summary>Runs one edit against the open vault and saves it, unless the edit changed nothing.</summary>
+    /// <typeparam name="T">What the edit returns.</typeparam>
+    /// <param name="edit">The edit, given the open vault; what it returns comes back as <see cref="WriteResult{T}.Value"/>.</param>
+    /// <param name="changed">Whether what <paramref name="edit"/> returned is a change to save; false for a refusal or a no-op.</param>
+    /// <returns>What happened. Only an exception that is not a <see cref="VaultException"/> leaves this, and nothing is saved then.</returns>
+    /// <remarks>
+    /// <para>
+    /// A save that fails leaves the edit in the open vault, as the change the titlebar reports unsaved and
+    /// a reload discards (D-0412). A caller whose edit must not reach a later save undoes it when
+    /// <see cref="WriteResult{T}.Unwritten"/> is set.
+    /// </para>
+    /// <para>
+    /// Outside <c>_gate</c>, because a save can wait for a hardware key's touch, which <see cref="Lock(VaultLockReason)"/>
+    /// cancels.
+    /// </para>
+    /// </remarks>
+    internal WriteResult<T> Write<T>(Func<Vault, T> edit, Func<T, bool> changed)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+        ArgumentNullException.ThrowIfNull(changed);
+
+        if (Unlocked is not { } vault)
+        {
+            return new WriteResult<T>(WriteOutcome.Locked);
+        }
+
+        T? value = default;
+        var edited = false;
+
+        try
+        {
+            value = edit(vault);
+
+            if (!changed(value))
+            {
+                return new WriteResult<T>(WriteOutcome.NothingToSave, value);
+            }
+
+            edited = true;
+            vault.Save();
+            return new WriteResult<T>(WriteOutcome.Saved, value);
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            return new WriteResult<T>(WriteOutcome.ChangedOnDisk, value, edited);
+        }
+        catch (VaultException e)
+        {
+            return new WriteResult<T>(WriteOutcome.Failed, value, edited, e.Message);
+        }
+        catch (ObjectDisposedException) when (!ReferenceEquals(Unlocked, vault))
+        {
+            return new WriteResult<T>(WriteOutcome.Locked, value);
+        }
+    }
+
     /// <summary>Puts what the vault's file holds now in place of the open copy, keeping the session.</summary>
     /// <returns>What happened.</returns>
     /// <remarks>

@@ -1,7 +1,7 @@
-using System.Text;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -153,56 +153,46 @@ internal static class EnvExportCommand
 
         return VaultSession.Open(vaultPath, line, context, vault =>
         {
-            var listing = EnvResolution.List(vault, project, profile);
+            var export = EnvReferenceExport.Run(vault, project, profile, targetPath, force);
 
-            if ((Missing(listing, project, profile, context) ?? Repeated(listing, context)) is { } refused)
+            switch (export.Outcome)
             {
-                return refused;
+                case EnvReferenceExportOutcome.NoProject or EnvReferenceExportOutcome.NoProfile:
+                    return Missing(export.Outcome == EnvReferenceExportOutcome.NoProject ? EnvOutcome.NoProject : EnvOutcome.NoProfile, project, profile, context)
+                        ?? CliApp.ExitNotFound;
+
+                case EnvReferenceExportOutcome.Refused:
+                    context.Stderr.WriteLine($"keypaste env export: {export.Problem}");
+                    context.Stderr.WriteLine("Nothing was written.");
+                    return CliApp.ExitInternalError;
+
+                case EnvReferenceExportOutcome.OverVault:
+                    return VaultOverwriteGuard.Refuse("keypaste env export", vaultPath, targetPath!, export.Overwrite, "a .env", context);
+
+                case EnvReferenceExportOutcome.Unwritable:
+                    context.Stderr.WriteLine($"keypaste env export: could not write '{targetPath}': {export.Problem}");
+                    return CliApp.ExitInternalError;
             }
-
-            var variables = listing.Variables;
-
-            if (!EnvNameRules.TryCheck(variables, out var names))
-            {
-                context.Stderr.WriteLine($"keypaste env export: '{project}/{profile}' {names}");
-                context.Stderr.WriteLine("Nothing was written.");
-                return CliApp.ExitInternalError;
-            }
-
-            var text = EnvReferenceFile.Format(
-                project,
-                profile,
-                [.. variables.Select(variable => variable.Key)],
-                targetPath is null ? EnvReferenceFile.FileName : Path.GetFileName(targetPath));
 
             if (targetPath is null)
             {
-                context.Stdout.Write(text);
-            }
-            else if (!TryRefuseTheVault(vaultPath, targetPath, context, out var guardExit))
-            {
-                return guardExit;
-            }
-            else if (!TryWrite(targetPath, Encoding.UTF8.GetBytes(text), force, out var writeError))
-            {
-                context.Stderr.WriteLine($"keypaste env export: could not write '{targetPath}': {writeError}");
-                return CliApp.ExitInternalError;
+                context.Stdout.Write(export.Text);
             }
 
             var style = context.ConsoleStyle;
             var dot = style.Glyph(context.Stderr, Mark.Dot);
             context.Stderr.WriteLine(
                 $"  {style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done))} wrote " +
-                $"{Count(variables.Count, "reference")} {dot} 0 values {dot} safe to commit");
+                $"{Count(export.Count, "reference")} {dot} 0 values {dot} safe to commit");
 
             return CliApp.ExitSuccess;
         });
     }
 
     /// <summary>Says a project or its profile is not there, or null when both are.</summary>
-    private static int? Missing(EnvListing listing, string project, string profile, CliContext context)
+    private static int? Missing(EnvOutcome outcome, string project, string profile, CliContext context)
     {
-        switch (listing.Outcome)
+        switch (outcome)
         {
             case EnvOutcome.NoProject:
                 context.Stderr.WriteLine($"keypaste env export: no env set for '{project}'");
@@ -220,13 +210,12 @@ internal static class EnvExportCommand
     /// <summary>Refuses a key two entries hold, naming them, or null when every key has one.</summary>
     private static int? Repeated(EnvListing listing, CliContext context)
     {
-        if (listing.Sources.GroupBy(source => source.Key, StringComparer.Ordinal).FirstOrDefault(key => key.Count() > 1) is not { } repeated)
+        if (EnvReferenceExport.RepeatedKey(listing) is not { } repeated)
         {
             return null;
         }
 
-        var entries = string.Join(", ", repeated.Select(source => ApprovalPrompt.Shown(source.Entry)));
-        context.Stderr.WriteLine($"keypaste env export: {EntryNameSanitizer.Sanitize(repeated.Key).Text} is on more than one entry ({entries}); nothing was written.");
+        context.Stderr.WriteLine($"keypaste env export: {repeated}; nothing was written.");
         return CliApp.ExitInternalError;
     }
 
@@ -282,7 +271,7 @@ internal static class EnvExportCommand
         var listing = EnvResolution.List(vault, project, profile);
         var setName = EnvProfileNames.SetName(project, profile);
 
-        if ((Missing(listing, project, profile, context) ?? Repeated(listing, context) ?? NamedLikeStandard(listing, context)) is { } refused)
+        if ((Missing(listing.Outcome, project, profile, context) ?? Repeated(listing, context) ?? NamedLikeStandard(listing, context)) is { } refused)
         {
             return refused;
         }
@@ -365,7 +354,7 @@ internal static class EnvExportCommand
             return guardExit;
         }
 
-        if (!TryWrite(targetPath, file.Utf8.Span, force, out var writeError))
+        if (!DotEnvFile.TryWrite(targetPath, file.Utf8.Span, force, out var writeError))
         {
             context.Stderr.WriteLine($"keypaste env export: could not write '{targetPath}': {writeError}");
             return CliApp.ExitInternalError;
@@ -382,47 +371,6 @@ internal static class EnvExportCommand
         }
 
         return CliApp.ExitSuccess;
-    }
-
-    /// <summary>Writes the file, owner-only, refusing to follow anything already there.</summary>
-    /// <remarks>
-    /// <see cref="FileMode.CreateNew"/> rather than <see cref="FileMode.Create"/> even under
-    /// <c>--force</c>, with an explicit delete first: truncating in place would keep the old file's
-    /// permissions, so the mode below would apply on a fresh export and quietly not apply on a
-    /// repeat. <see cref="FileStreamOptions.UnixCreateMode"/> throws on Windows, which has no
-    /// equivalent — SECURITY.md states that gap rather than implying a mode that was never set.
-    /// </remarks>
-    private static bool TryWrite(string path, ReadOnlySpan<byte> bytes, bool force, out string error)
-    {
-        try
-        {
-            if (force && File.Exists(path))
-            {
-                File.Delete(path);
-            }
-
-            var options = new FileStreamOptions
-            {
-                Mode = FileMode.CreateNew,
-                Access = FileAccess.Write,
-            };
-
-            if (!OperatingSystem.IsWindows())
-            {
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            }
-
-            using var stream = new FileStream(path, options);
-            stream.Write(bytes);
-
-            error = string.Empty;
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            error = ex.Message;
-            return false;
-        }
     }
 
     /// <summary>What the writer had to do that a reader might disagree with. Keys, never values.</summary>

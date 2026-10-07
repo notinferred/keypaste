@@ -61,20 +61,19 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
 
         ToggleCommand = new RelayCommand(Toggle);
         RestoreCommand = new RelayCommand(Restore, () => _selected is not null);
+
+        DependsOn(nameof(ToggleLabel), nameof(IsOpen));
+        DependsOn(nameof(ShowsEmptyNote), nameof(IsOpen), nameof(Rows));
+        DependsOn(nameof(HasSelection), nameof(Selected));
+        DependsOn(nameof(RevealedWhen), nameof(Revealed));
+        DependsOn(RestoreCommand, nameof(Selected));
     }
 
     /// <summary>Whether the history section is showing.</summary>
     internal bool IsOpen
     {
         get => _isOpen;
-        private set
-        {
-            if (Set(ref _isOpen, value))
-            {
-                Raise(nameof(ToggleLabel));
-                Raise(nameof(ShowsEmptyNote));
-            }
-        }
+        private set => Set(ref _isOpen, value);
     }
 
     /// <summary>What the toggle says.</summary>
@@ -84,29 +83,14 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<EntryRevisionRow> Rows
     {
         get => _rows;
-        private set
-        {
-            if (Set(ref _rows, value))
-            {
-                Raise(nameof(ShowsEmptyNote));
-            }
-        }
+        private set => Set(ref _rows, value);
     }
 
     /// <summary>The revision being compared with the current values, or null.</summary>
     internal EntryRevisionRow? Selected
     {
         get => _selected;
-        set
-        {
-            if (!Set(ref _selected, value))
-            {
-                return;
-            }
-
-            Raise(nameof(HasSelection));
-            RestoreCommand.RaiseCanExecuteChanged();
-        }
+        set => Set(ref _selected, value);
     }
 
     /// <summary>Whether a revision is being compared.</summary>
@@ -127,7 +111,13 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         $"No earlier values yet. When you change {_owner.DisplayTitle}, the value it replaces is kept here.";
 
     /// <summary>Which revision is revealed, named by its time. Never by its value.</summary>
-    internal string RevealedWhen => _revealed?.When ?? string.Empty;
+    internal string RevealedWhen => Revealed?.When ?? string.Empty;
+
+    private EntryRevisionRow? Revealed
+    {
+        get => _revealed;
+        set => Set(ref _revealed, value);
+    }
 
     /// <summary>Opens and closes the section.</summary>
     internal RelayCommand ToggleCommand { get; }
@@ -177,12 +167,11 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _revealed = null;
+        Revealed = null;
         _countAtRead = revisions.Count;
         _read = true;
         Selected = null;
         Rows = [.. revisions.Select(revision => new EntryRevisionRow(this, revision))];
-        Raise(nameof(RevealedWhen));
     }
 
     /// <summary>Hands a row its password, and takes it away from whichever row had it.</summary>
@@ -190,22 +179,16 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     {
         ArgumentNullException.ThrowIfNull(row);
 
-        if (!ReferenceEquals(_revealed, row))
-        {
-            _revealed = row;
-            Raise(nameof(RevealedWhen));
-        }
-
+        Revealed = row;
         return Read(row);
     }
 
     /// <summary>Notes that a row's hold ended.</summary>
     internal void Conceal(EntryRevisionRow row)
     {
-        if (ReferenceEquals(_revealed, row))
+        if (ReferenceEquals(Revealed, row))
         {
-            _revealed = null;
-            Raise(nameof(RevealedWhen));
+            Revealed = null;
         }
     }
 
@@ -263,67 +246,60 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
+        // The revision's own title: restoring one from before a rename renames the entry back.
+        var restored = new EntryName(_owner.GroupPath, row.Title);
+        var write = _session.Write(vault => TryRestore(vault, row), outcome => outcome == RevisionRestore.Restored);
+
+        if (write.Problem("restore this again") is { } problem)
         {
-            _owner.Report("The vault is locked.");
+            _owner.Report(problem);
             return;
         }
 
-        // The revision's own title: restoring one from before a rename renames the entry back.
-        var restored = new EntryName(_owner.GroupPath, row.Title);
-
-        try
-        {
-            if (vault.ReadHistory(_owner.Name) is not { } fresh)
-            {
-                var gone = Gone();
-                Forget();
-                _owner.Report(gone);
-                return;
-            }
-
-            if (!Agrees(fresh, row))
-            {
-                _owner.Report(_stale);
-                Load();
-                return;
-            }
-
-            if (!vault.RestoreRevision(_owner.Name, row.Index))
-            {
-                var gone = Gone();
-                Forget();
-                _owner.Report(gone);
-                return;
-            }
-
-            vault.Save();
-        }
-        catch (ArgumentOutOfRangeException)
+        if (write.Value == RevisionRestore.Stale)
         {
             _owner.Report(_stale);
             Load();
             return;
         }
-        catch (VaultChangedOnDiskException)
+
+        if (write.Value == RevisionRestore.Gone)
         {
-            _owner.Report("Something else changed this vault since you opened it. Reload to see it, then restore this again.");
-            return;
-        }
-        catch (VaultException e)
-        {
-            _owner.Report(e.Message);
+            var gone = Gone();
+            Forget();
+            _owner.Report(gone);
             return;
         }
 
-        _revealed = null;
+        Revealed = null;
         Selected = null;
-        Raise(nameof(RevealedWhen));
         _owner.Report(null);
 
         // Last, because the screen answers a restored title by rebuilding this pane, which disposes
         // the object this call is running on.
         _restored(restored);
+    }
+
+    private RevisionRestore TryRestore(Vault vault, EntryRevisionRow row)
+    {
+        try
+        {
+            if (vault.ReadHistory(_owner.Name) is not { } fresh)
+            {
+                return RevisionRestore.Gone;
+            }
+
+            if (!Agrees(fresh, row))
+            {
+                return RevisionRestore.Stale;
+            }
+
+            return vault.RestoreRevision(_owner.Name, row.Index) ? RevisionRestore.Restored : RevisionRestore.Gone;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return RevisionRestore.Stale;
+        }
     }
 
     /// <summary>Reads one revision's password out of the open vault, for a hold.</summary>
@@ -360,11 +336,17 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
 
     private void Forget()
     {
-        _revealed = null;
+        Revealed = null;
         _read = false;
         _countAtRead = 0;
         Selected = null;
         Rows = [];
-        Raise(nameof(RevealedWhen));
+    }
+
+    private enum RevisionRestore
+    {
+        Gone,
+        Stale,
+        Restored,
     }
 }

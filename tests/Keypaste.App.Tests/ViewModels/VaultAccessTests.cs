@@ -355,6 +355,54 @@ public sealed class VaultAccessTests : IDisposable
         Assert.True(session.IsUnlocked);
     }
 
+    // ------------------------------------------------------------------ the form
+
+    /// <summary>Each step of the form announces what reads it, or a binding keeps a stale summary or button.</summary>
+    [Fact]
+    public void Each_step_announces_the_lines_and_buttons_that_read_it()
+    {
+        using var session = Unlocked(_master);
+        using var settings = Settings(session);
+        var access = settings.Access;
+        var raised = new List<string>();
+        access.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        var asked = new List<string>();
+        access.ReviewCommand.CanExecuteChanged += (_, _) => asked.Add("review");
+        access.ConfirmCommand.CanExecuteChanged += (_, _) => asked.Add("confirm");
+
+        Enter(access, _master, _later);
+        access.RemoveKeyfile = true;
+
+        string[] entered =
+        [
+            nameof(VaultAccessViewModel.CurrentMaskedLength), nameof(VaultAccessViewModel.NewMaskedLength),
+            nameof(VaultAccessViewModel.ConfirmMaskedLength), nameof(VaultAccessViewModel.SetPassword),
+            nameof(VaultAccessViewModel.KeepKeyfile), nameof(VaultAccessViewModel.RemoveKeyfile), nameof(VaultAccessViewModel.Summary),
+        ];
+        Assert.Empty(entered.Except(raised));
+        Assert.Contains("review", asked);
+
+        raised.Clear();
+        asked.Clear();
+        access.ReviewCommand.Execute(null);
+
+        string[] reviewed = [nameof(VaultAccessViewModel.IsConfirming), nameof(VaultAccessViewModel.IsEditing)];
+        Assert.Empty(reviewed.Except(raised));
+        Assert.Equal(["confirm", "review"], asked.Distinct().Order(StringComparer.Ordinal));
+
+        raised.Clear();
+        access.CancelCommand.Execute(null);
+
+        string[] cancelled =
+        [
+            nameof(VaultAccessViewModel.IsConfirming), nameof(VaultAccessViewModel.IsEditing), nameof(VaultAccessViewModel.SetPassword),
+            nameof(VaultAccessViewModel.KeepKeyfile), nameof(VaultAccessViewModel.RemoveKeyfile),
+            nameof(VaultAccessViewModel.CurrentMaskedLength), nameof(VaultAccessViewModel.NewMaskedLength),
+            nameof(VaultAccessViewModel.Factors), nameof(VaultAccessViewModel.Summary),
+        ];
+        Assert.Empty(cancelled.Except(raised));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private AppVaultSession Unlocked(string password, string? keyfile = null)

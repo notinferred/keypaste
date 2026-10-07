@@ -120,6 +120,37 @@ public sealed class VaultCreateEntryTests : IDisposable
         Assert.Null(vault.Find(_openAi));
     }
 
+    /// <summary>The CLI's create applies the name rules the app's does, and still makes the groups a typed path names (F.55).</summary>
+    [Theory]
+    [InlineData("Work", "Stripe", "is already in that group")]
+    [InlineData("Work", " OpenAI", "cannot begin or end with whitespace")]
+    [InlineData("Work", "a\\b", "cannot contain")]
+    [InlineData(".keypaste/tokens", "OpenAI", "keeps that group for itself")]
+    [InlineData(".Keypaste", "OpenAI", "keeps that group for itself")]
+    public void A_typed_path_create_is_refused_as_the_app_refuses_it(string group, string title, string says)
+    {
+        var path = NewVaultPath();
+        using var vault = Seeded(path);
+        var edits = 0;
+        vault.Edited += (_, _) => edits++;
+
+        var refused = Assert.Throws<VaultException>(() => vault.CreateEntryAtPath(new VaultEntry { Title = title, GroupPath = group, Password = "x" }));
+
+        Assert.Contains(says, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(0, edits);
+        Assert.Equal(["Work/Stripe"], vault.ReadEntries(includeReserved: true).Select(entry => entry.Path));
+    }
+
+    [Fact]
+    public void A_typed_path_create_makes_its_groups()
+    {
+        using var vault = Seeded(NewVaultPath());
+
+        vault.CreateEntryAtPath(new VaultEntry { Title = "OpenAI", GroupPath = "Work/AI", Password = "sk-1" });
+
+        Assert.Equal("sk-1", vault.Find(new EntryName("Work/AI", "OpenAI"))?.Password);
+    }
+
     private static Vault Seeded(string path)
     {
         var vault = Vault.Create(path, _master);

@@ -1,3 +1,5 @@
+using Keypaste.Core.Infrastructure;
+
 namespace Keypaste.Core.Login;
 
 /// <summary>The per-user entry that starts the desktop app, in the background, when the person logs in.</summary>
@@ -84,16 +86,12 @@ public static class LoginItems
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var temporary = path + ".tmp";
-            File.WriteAllText(temporary, text);
 
-            if (!OperatingSystem.IsWindows())
-            {
-                // launchd ignores an agent that others can write.
-                File.SetUnixFileMode(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
-            }
-
-            File.Move(temporary, path, overwrite: true);
+            // launchd ignores an agent that others can write.
+            AtomicFile.Write(
+                path,
+                Encoding.UTF8.GetBytes(text),
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

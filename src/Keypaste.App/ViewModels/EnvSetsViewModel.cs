@@ -61,6 +61,18 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
 
+        DependsOn(nameof(HasProjects), nameof(Projects));
+        DependsOn(nameof(HasMalformedTags), nameof(MalformedTags));
+        DependsOn(nameof(ProjectChoices), nameof(OpenProject), nameof(Projects));
+        DependsOn(nameof(SelectedProject), nameof(OpenProject));
+        DependsOn(nameof(HasOpenProject), nameof(OpenProject));
+        DependsOn(nameof(IsEmpty), nameof(HasProjects), nameof(HasOpenProject));
+        DependsOn(nameof(HasError), nameof(Error));
+        DependsOn(nameof(HasNotice), nameof(Notice));
+        DependsOn(BeginAddCommand, nameof(IsAdding));
+        DependsOn(CancelAddCommand, nameof(IsAdding));
+        DependsOn(ConfirmAddCommand, nameof(IsAdding));
+
         Reload();
     }
 
@@ -68,15 +80,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<string> Projects
     {
         get => _projectNames;
-        private set
-        {
-            if (Set(ref _projectNames, value))
-            {
-                Raise(nameof(HasProjects));
-                Raise(nameof(IsEmpty));
-                Raise(nameof(ProjectChoices));
-            }
-        }
+        private set => Set(ref _projectNames, value);
     }
 
     internal bool HasProjects => _projectNames.Count > 0;
@@ -85,13 +89,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<EnvTagProblemRow> MalformedTags
     {
         get => _malformed;
-        private set
-        {
-            if (Set(ref _malformed, value))
-            {
-                Raise(nameof(HasMalformedTags));
-            }
-        }
+        private set => Set(ref _malformed, value);
     }
 
     internal bool HasMalformedTags => _malformed.Count > 0;
@@ -128,10 +126,6 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
                 // Disposed on the way out: it holds a reveal slot and a table read from an open
                 // vault, and leaving it alive would keep both after the card was closed.
                 previous?.Dispose();
-                Raise(nameof(HasOpenProject));
-                Raise(nameof(IsEmpty));
-                Raise(nameof(ProjectChoices));
-                Raise(nameof(SelectedProject));
             }
         }
     }
@@ -145,13 +139,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     internal string? Error
     {
         get => _error;
-        private set
-        {
-            if (Set(ref _error, value))
-            {
-                Raise(nameof(HasError));
-            }
-        }
+        private set => Set(ref _error, value);
     }
 
     internal bool HasError => _error is not null;
@@ -164,13 +152,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     internal string? Notice
     {
         get => _notice;
-        private set
-        {
-            if (Set(ref _notice, value))
-            {
-                Raise(nameof(HasNotice));
-            }
-        }
+        private set => Set(ref _notice, value);
     }
 
     internal bool HasNotice => _notice is not null;
@@ -178,15 +160,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     internal bool IsAdding
     {
         get => _isAdding;
-        private set
-        {
-            if (Set(ref _isAdding, value))
-            {
-                BeginAddCommand.RaiseCanExecuteChanged();
-                CancelAddCommand.RaiseCanExecuteChanged();
-                ConfirmAddCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _isAdding, value);
     }
 
     /// <summary>The name of the project being created.</summary>

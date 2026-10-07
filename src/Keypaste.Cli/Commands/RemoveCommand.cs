@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -55,7 +56,7 @@ internal static class RemoveCommand
             if (vault.Find(entryPath) is null)
             {
                 var isGroup = false;
-                foreach (var group in vault.ReadGroupPaths())
+                foreach (var group in vault.ReadGroupPaths(includeReserved: true))
                 {
                     if (string.Equals(group, entryPath, StringComparison.Ordinal))
                     {

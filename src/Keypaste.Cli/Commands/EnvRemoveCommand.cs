@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

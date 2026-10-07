@@ -82,6 +82,35 @@ public sealed class GeneratorViewModelTests
         Assert.Contains(nameof(GeneratorViewModel.Strength), raised);
     }
 
+    /// <summary>Each choice raises every line that reads it, and nothing else.</summary>
+    [Fact]
+    public void Each_choice_raises_exactly_the_lines_that_read_it()
+    {
+        var generator = new GeneratorViewModel();
+        var raised = new List<string>();
+        generator.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+
+        generator.UseWords = true;
+        Assert.Equal(
+            [
+                nameof(GeneratorViewModel.UseWords),
+                nameof(GeneratorViewModel.UseCharacters),
+                nameof(GeneratorViewModel.Strength),
+                nameof(GeneratorViewModel.Error),
+            ],
+            raised);
+
+        raised.Clear();
+        generator.WordCount = 8;
+        Assert.Equal(
+            [nameof(GeneratorViewModel.WordCount), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error)],
+            raised);
+
+        raised.Clear();
+        generator.Separator = "ab";
+        Assert.Equal([nameof(GeneratorViewModel.Separator), nameof(GeneratorViewModel.Error)], raised);
+    }
+
     [Fact]
     public void The_provenance_line_names_the_list_and_its_size_and_its_bits_per_word()
     {

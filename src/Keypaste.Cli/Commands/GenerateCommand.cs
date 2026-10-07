@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.Core;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

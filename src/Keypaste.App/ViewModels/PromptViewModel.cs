@@ -31,6 +31,10 @@ internal abstract class PromptViewModel : ObservableObject
         ApproveCommand = new RelayCommand(() => Decide(ApprovalAnswer.Approved), () => _armed && OffersTimed && !IsAnswered);
         AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => _armed && !IsAnswered);
         DenyCommand = new RelayCommand(() => Decide(ApprovalAnswer.Denied), () => !IsAnswered);
+
+        DependsOn(ApproveCommand, nameof(IsArmed), nameof(IsAnswered));
+        DependsOn(AllowOnceCommand, nameof(IsArmed), nameof(IsAnswered));
+        DependsOn(DenyCommand, nameof(IsAnswered));
     }
 
     /// <summary>Allows this request and keeps the timed grant the prompt offers.</summary>
@@ -62,13 +66,14 @@ internal abstract class PromptViewModel : ObservableObject
     /// <summary>How long the timed grant lasts, or zero when the prompt offers only "allow once".</summary>
     protected abstract int TimedSeconds { get; }
 
-    /// <summary>Lets the allow buttons be pressed. Called on the UI thread once the prompt has been up long enough.</summary>
-    internal void Arm()
+    private bool IsArmed
     {
-        _armed = true;
-        ApproveCommand.RaiseCanExecuteChanged();
-        AllowOnceCommand.RaiseCanExecuteChanged();
+        get => _armed;
+        set => Set(ref _armed, value);
     }
+
+    /// <summary>Lets the allow buttons be pressed. Called on the UI thread once the prompt has been up long enough.</summary>
+    internal void Arm() => IsArmed = true;
 
     /// <summary>Shows how long is left to answer. Called on the UI thread.</summary>
     internal void Tick(TimeSpan remaining)
@@ -90,9 +95,7 @@ internal abstract class PromptViewModel : ObservableObject
     {
         if (_answer.TrySetResult(answer))
         {
-            ApproveCommand.RaiseCanExecuteChanged();
-            AllowOnceCommand.RaiseCanExecuteChanged();
-            DenyCommand.RaiseCanExecuteChanged();
+            Raise(nameof(IsAnswered));
         }
     }
 }

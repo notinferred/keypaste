@@ -129,6 +129,45 @@ public sealed class LockScreenTests : IDisposable
         Assert.True(model.HasNote);
     }
 
+    /// <summary>Choosing a vault and opening the create form announce what reads them, or a binding keeps the last screen.</summary>
+    [Fact]
+    public async Task Choosing_a_vault_and_creating_one_announce_the_lines_and_buttons_that_read_them()
+    {
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
+        var picker = new FakeVaultFilePicker { NewPath = Path.Combine(_vault.Home, "new.kdbx") };
+        using var model = new UnlockViewModel(session, _vault.Home, picker, () => { });
+        var raised = new List<string>();
+        model.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        var asked = new List<string>();
+        model.UnlockCommand.CanExecuteChanged += (_, _) => asked.Add("unlock");
+        model.BrowseCommand.CanExecuteChanged += (_, _) => asked.Add("browse");
+        model.CreateCommand.CanExecuteChanged += (_, _) => asked.Add("create");
+
+        Assert.True(model.Offer(_vault.Path_));
+
+        string[] chosen =
+        [
+            nameof(UnlockViewModel.SelectedName), nameof(UnlockViewModel.HasSelection), nameof(UnlockViewModel.Heading),
+            nameof(UnlockViewModel.Subtitle), nameof(UnlockViewModel.CanTypePassword), nameof(UnlockViewModel.OffersOpenFirst),
+            nameof(UnlockViewModel.WelcomeSubtitle), nameof(UnlockViewModel.HasLooseError),
+        ];
+        Assert.Empty(chosen.Except(raised));
+        Assert.Contains("unlock", asked);
+
+        raised.Clear();
+        asked.Clear();
+        await model.StartCreateAsync();
+
+        string[] creating =
+        [
+            nameof(UnlockViewModel.IsCreating), nameof(UnlockViewModel.IsOpening), nameof(UnlockViewModel.OffersRestore),
+            nameof(UnlockViewModel.NewVaultName), nameof(UnlockViewModel.CreateHeading),
+        ];
+        Assert.Empty(creating.Except(raised));
+        Assert.Equal(["browse", "create"], asked.Distinct().Order(StringComparer.Ordinal));
+        Assert.False(model.BrowseCommand.CanExecute(null));
+    }
+
     [Fact]
     public void A_file_that_is_not_a_vault_is_not_offered_with_a_keyfile()
     {

@@ -1,3 +1,4 @@
+using Keypaste.Core.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Core.Tests;

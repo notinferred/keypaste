@@ -112,6 +112,14 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(online: true));
         RetryCommand = new AsyncRelayCommand(RetryAsync);
 
+        DependsOn(nameof(IsEmpty), nameof(Rows));
+        DependsOn(nameof(HasUnchecked), nameof(Rows));
+        DependsOn(nameof(HasError), nameof(Error));
+        DependsOn(nameof(IsUnavailable), nameof(Unavailable));
+        DependsOn(nameof(CanRetry), nameof(Unavailable));
+        DependsOn(CreateCommand, nameof(SelectedWhat), nameof(Unavailable));
+        DependsOn(RevokeCommand, nameof(Selected));
+
         _ = LoadAsync(online: false);
     }
 
@@ -130,14 +138,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<SharingRow> Rows
     {
         get => _rows;
-        private set
-        {
-            if (Set(ref _rows, value))
-            {
-                Raise(nameof(IsEmpty));
-                Raise(nameof(HasUnchecked));
-            }
-        }
+        private set => Set(ref _rows, value);
     }
 
     /// <summary>Whether the vault remembers no link.</summary>
@@ -157,26 +158,14 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     internal SharingRow? Selected
     {
         get => _selected;
-        set
-        {
-            if (Set(ref _selected, value))
-            {
-                RevokeCommand.RaiseCanExecuteChanged();
-            }
-        }
+        set => Set(ref _selected, value);
     }
 
     /// <summary>The path of the entry to share, one of <see cref="Candidates"/>.</summary>
     internal string? SelectedWhat
     {
         get => _selectedWhat;
-        set
-        {
-            if (Set(ref _selectedWhat, value))
-            {
-                CreateCommand.RaiseCanExecuteChanged();
-            }
-        }
+        set => Set(ref _selectedWhat, value);
     }
 
     /// <summary>One of <see cref="FieldOptions"/>.</summary>
@@ -221,13 +210,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     internal string? Error
     {
         get => _error;
-        private set
-        {
-            if (Set(ref _error, value))
-            {
-                Raise(nameof(HasError));
-            }
-        }
+        private set => Set(ref _error, value);
     }
 
     internal bool HasError => _error is not null;
@@ -236,15 +219,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     internal string? Unavailable
     {
         get => _unavailable;
-        private set
-        {
-            if (Set(ref _unavailable, value))
-            {
-                Raise(nameof(IsUnavailable));
-                Raise(nameof(CanRetry));
-                CreateCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _unavailable, value);
     }
 
     internal bool IsUnavailable => _unavailable is not null;
@@ -396,7 +371,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
 
         Dictionary<string, EntryName> entries = new(StringComparer.Ordinal);
         HashSet<string> ambiguous = new(StringComparer.Ordinal);
-        foreach (var entry in vault.ReadEntries().Where(entry => !ReservedGroups.IsReserved(entry.GroupPath)))
+        foreach (var entry in vault.ReadEntries())
         {
             if (!entries.TryAdd(entry.Path, EntryName.Of(entry)))
             {

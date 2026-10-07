@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Platform;
-using Keypaste.App.ViewModels;
 
 namespace Keypaste.App;
 

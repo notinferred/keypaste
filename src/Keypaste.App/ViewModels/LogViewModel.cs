@@ -80,6 +80,21 @@ internal sealed class LogViewModel : ObservableObject
         VerifyCommand = new RelayCommand(ToggleVerdict, () => OffersChainCheck && _verdict is not null);
         CopyHashCommand = new RelayCommand(() => _ = CopyHashAsync(), () => OffersChainCheck && _clipboard is not null && _verdict is { HasHash: true });
 
+        DependsOn(nameof(OffersVerify), nameof(HasTable));
+        DependsOn(nameof(ShowAll), nameof(Filter));
+        DependsOn(nameof(ShowAgents), nameof(Filter));
+        DependsOn(nameof(ShowYou), nameof(Filter));
+        DependsOn(nameof(ShowDenied), nameof(Filter));
+        DependsOn(nameof(HasRows), nameof(Rows));
+        DependsOn(nameof(FilterEmpty), nameof(HasTable), nameof(Rows));
+        DependsOn(nameof(HasUnreadableNote), nameof(HasTable));
+        DependsOn(nameof(HasNotes), nameof(HasUnverifiedNote), nameof(HasUnreadNote), nameof(HasUnreadableNote));
+        DependsOn(nameof(VerifyLabel), nameof(VerdictShown));
+        DependsOn(nameof(HasMessage), nameof(Message));
+        DependsOn(nameof(HasNotice), nameof(HasMessage), nameof(IsEmpty));
+        DependsOn(VerifyCommand, nameof(Verdict));
+        DependsOn(CopyHashCommand, nameof(Verdict));
+
         Refresh();
     }
 
@@ -124,16 +139,10 @@ internal sealed class LogViewModel : ObservableObject
         get => _filter;
         set
         {
-            if (value is null || !Set(ref _filter, value))
+            if (value is not null && Set(ref _filter, value))
             {
-                return;
+                Apply();
             }
-
-            Apply();
-            Raise(nameof(ShowAll));
-            Raise(nameof(ShowAgents));
-            Raise(nameof(ShowYou));
-            Raise(nameof(ShowDenied));
         }
     }
 
@@ -249,19 +258,12 @@ internal sealed class LogViewModel : ObservableObject
         _all = [.. _history.Entries.Reverse().Select(entry => LogRow.From(entry, !_history.Unverified.Contains(entry.Line), _clock))];
 
         Raise(nameof(HasTable));
-        Raise(nameof(OffersVerify));
         Raise(nameof(Verdict));
         Raise(nameof(VerdictShown));
-        Raise(nameof(VerifyLabel));
         Raise(nameof(Message));
-        Raise(nameof(HasMessage));
         Raise(nameof(IsEmpty));
-        Raise(nameof(HasNotice));
         Raise(nameof(IsBroken));
         Raise(nameof(UnreadableNote));
-        Raise(nameof(HasUnreadableNote));
-        VerifyCommand.RaiseCanExecuteChanged();
-        CopyHashCommand.RaiseCanExecuteChanged();
 
         Apply();
     }
@@ -301,12 +303,9 @@ internal sealed class LogViewModel : ObservableObject
         _summary = HasTable ? Tally(_rows.Count, _history.Total, _filter.Words) : string.Empty;
 
         Raise(nameof(Rows));
-        Raise(nameof(HasRows));
-        Raise(nameof(FilterEmpty));
         Raise(nameof(Summary));
         Raise(nameof(HasUnverifiedNote));
         Raise(nameof(HasUnreadNote));
-        Raise(nameof(HasNotes));
     }
 
     /// <summary>Marks the first row of each day with its divider; a table of today alone needs none.</summary>
@@ -349,6 +348,5 @@ internal sealed class LogViewModel : ObservableObject
     {
         _verdictShown = !_verdictShown;
         Raise(nameof(VerdictShown));
-        Raise(nameof(VerifyLabel));
     }
 }

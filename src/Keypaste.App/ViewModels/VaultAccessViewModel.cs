@@ -60,6 +60,32 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         ConfirmCommand = new AsyncRelayCommand(ChangeAsync, () => _confirming && !_busy);
         CancelCommand = new RelayCommand(() => Forget(string.Empty), () => _confirming && !_busy);
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => IsEditing && _picker is not null);
+
+        DependsOn(nameof(Factors), nameof(Now));
+        DependsOn(nameof(HasKeyfile), nameof(Now));
+        DependsOn(nameof(AttachLabel), nameof(HasKeyfile));
+        DependsOn(nameof(IsEditing), nameof(IsConfirming), nameof(Busy));
+        DependsOn(nameof(KeepKeyfile), nameof(Keyfile));
+        DependsOn(nameof(AttachKeyfile), nameof(Keyfile));
+        DependsOn(nameof(RemoveKeyfile), nameof(Keyfile));
+        DependsOn(nameof(HasHardwareKey), nameof(Now));
+        DependsOn(nameof(AttachHardwareKeyLabel), nameof(HasHardwareKey));
+        DependsOn(nameof(KeepHardwareKey), nameof(HardwareKey));
+        DependsOn(nameof(AttachHardwareKey), nameof(HardwareKey));
+        DependsOn(nameof(RemoveHardwareKey), nameof(HardwareKey));
+        DependsOn(nameof(NewSlotOne), nameof(NewSlot));
+        DependsOn(nameof(NewSlotTwo), nameof(NewSlot));
+        DependsOn(nameof(HardwareKeyWarning), nameof(HardwareKey));
+        DependsOn(nameof(HasHardwareKeyWarning), nameof(HardwareKeyWarning));
+        DependsOn(nameof(NewKeyfileName), nameof(NewKeyfilePath));
+        DependsOn(nameof(Summary), nameof(Now), nameof(Keyfile), nameof(NewKeyfilePath), nameof(HardwareKey), nameof(NewSlot), nameof(SetPassword));
+        DependsOn(nameof(KeyfileWarning), nameof(Keyfile), nameof(NewKeyfilePath), nameof(NewKeyfileName));
+        DependsOn(nameof(HasKeyfileWarning), nameof(KeyfileWarning));
+        DependsOn(nameof(HasMessage), nameof(Message));
+        DependsOn(ReviewCommand, nameof(IsEditing), nameof(SetPassword), nameof(Keyfile), nameof(HardwareKey), nameof(NewKeyfilePath), nameof(CurrentMaskedLength), nameof(NewMaskedLength), nameof(Now));
+        DependsOn(ConfirmCommand, nameof(IsConfirming), nameof(Busy));
+        DependsOn(CancelCommand, nameof(IsConfirming), nameof(Busy));
+        DependsOn(ChooseKeyfileCommand, nameof(IsEditing));
     }
 
     /// <summary>Shows the confirmation for the change the form describes.</summary>
@@ -75,10 +101,10 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     internal AsyncRelayCommand ChooseKeyfileCommand { get; }
 
     /// <summary>What unlocks the vault now, read from the vault each time.</summary>
-    internal string Factors => Now() is { } now ? $"This vault {Opens(now)}" : string.Empty;
+    internal string Factors => Now is { } now ? $"This vault {Opens(now)}" : string.Empty;
 
     /// <summary>Whether the open vault has a keyfile, so that removing one is offered.</summary>
-    internal bool HasKeyfile => Now()?.Keyfile is not null;
+    internal bool HasKeyfile => Now?.Keyfile is not null;
 
     internal string AttachLabel => HasKeyfile ? "Use a different keyfile" : "Add a keyfile";
 
@@ -91,18 +117,16 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     /// <summary>Whether the form, rather than the confirmation, is showing.</summary>
     internal bool IsEditing => !_confirming && !_busy;
 
-    internal bool IsConfirming => _confirming;
+    internal bool IsConfirming
+    {
+        get => _confirming;
+        private set => Set(ref _confirming, value);
+    }
 
     internal bool Busy
     {
         get => _busy;
-        private set
-        {
-            if (Set(ref _busy, value))
-            {
-                RaiseState();
-            }
-        }
+        private set => Set(ref _busy, value);
     }
 
     /// <summary>Whether the change sets a new master password.</summary>
@@ -111,33 +135,28 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         get => _setPassword;
         set
         {
-            if (IsEditing && Set(ref _setPassword, value))
+            if (IsEditing && Set(ref _setPassword, value) && !value)
             {
-                if (!value)
-                {
-                    ResetNew();
-                }
-
-                RaiseState();
+                ResetNew();
             }
         }
     }
 
     internal bool KeepKeyfile
     {
-        get => _keyfile == KeyfileChoice.Keep;
+        get => Keyfile == KeyfileChoice.Keep;
         set => Choose(value, KeyfileChoice.Keep);
     }
 
     internal bool AttachKeyfile
     {
-        get => _keyfile == KeyfileChoice.Attach;
+        get => Keyfile == KeyfileChoice.Attach;
         set => Choose(value, KeyfileChoice.Attach);
     }
 
     internal bool RemoveKeyfile
     {
-        get => _keyfile == KeyfileChoice.Remove;
+        get => Keyfile == KeyfileChoice.Remove;
         set => Choose(value, KeyfileChoice.Remove);
     }
 
@@ -145,39 +164,39 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     internal bool OffersHardwareKey => _session.HardwareKeys is not null;
 
     /// <summary>Whether the open vault needs a YubiKey, so that removing one is offered.</summary>
-    internal bool HasHardwareKey => Now()?.Slot is not null;
+    internal bool HasHardwareKey => Now?.Slot is not null;
 
     internal string AttachHardwareKeyLabel => HasHardwareKey ? "Use a different YubiKey slot" : "Add a YubiKey";
 
     internal bool KeepHardwareKey
     {
-        get => _hardwareKey == KeyfileChoice.Keep;
+        get => HardwareKey == KeyfileChoice.Keep;
         set => ChooseHardwareKey(value, KeyfileChoice.Keep);
     }
 
     internal bool AttachHardwareKey
     {
-        get => _hardwareKey == KeyfileChoice.Attach;
+        get => HardwareKey == KeyfileChoice.Attach;
         set => ChooseHardwareKey(value, KeyfileChoice.Attach);
     }
 
     internal bool RemoveHardwareKey
     {
-        get => _hardwareKey == KeyfileChoice.Remove;
+        get => HardwareKey == KeyfileChoice.Remove;
         set => ChooseHardwareKey(value, KeyfileChoice.Remove);
     }
 
     /// <summary>Whether the YubiKey to add answers from slot 1.</summary>
     internal bool NewSlotOne
     {
-        get => _newSlot == 1;
+        get => NewSlot == 1;
         set => ChooseSlot(value, 1);
     }
 
     /// <summary>Whether the YubiKey to add answers from slot 2.</summary>
     internal bool NewSlotTwo
     {
-        get => _newSlot == 2;
+        get => NewSlot == 2;
         set => ChooseSlot(value, 2);
     }
 
@@ -185,7 +204,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     /// What adding a YubiKey costs, said before the change: a lost key locks the vault, only a spare
     /// programmed with the same secret opens it too, and every save asks the key.
     /// </summary>
-    internal string HardwareKeyWarning => _hardwareKey switch
+    internal string HardwareKeyWarning => HardwareKey switch
     {
         KeyfileChoice.Attach =>
             "If this YubiKey is lost or broken, the vault cannot be opened: not by keypaste, not by KeePassXC, and not from any " +
@@ -199,7 +218,11 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     internal bool HasHardwareKeyWarning => HardwareKeyWarning.Length > 0;
 
     /// <summary>The keyfile to attach, once one has been chosen.</summary>
-    internal string? NewKeyfilePath => _newKeyfilePath;
+    internal string? NewKeyfilePath
+    {
+        get => _newKeyfilePath;
+        private set => Set(ref _newKeyfilePath, value);
+    }
 
     internal string NewKeyfileName => _newKeyfilePath is null ? string.Empty : Path.GetFileName(_newKeyfilePath);
 
@@ -208,21 +231,21 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (Now() is not { } now)
+            if (Now is not { } now)
             {
                 return string.Empty;
             }
 
-            var keyfileAfter = _keyfile switch
+            var keyfileAfter = Keyfile switch
             {
                 KeyfileChoice.Attach => _newKeyfilePath,
                 KeyfileChoice.Remove => null,
                 _ => now.Keyfile,
             };
 
-            int? slotAfter = _hardwareKey switch
+            int? slotAfter = HardwareKey switch
             {
-                KeyfileChoice.Attach => _newSlot,
+                KeyfileChoice.Attach => NewSlot,
                 KeyfileChoice.Remove => null,
                 _ => now.Slot,
             };
@@ -239,7 +262,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         : string.Empty;
 
     /// <summary>Shown when a keyfile is being attached.</summary>
-    internal string KeyfileWarning => _keyfile == KeyfileChoice.Attach && _newKeyfilePath is not null
+    internal string KeyfileWarning => Keyfile == KeyfileChoice.Attach && _newKeyfilePath is not null
         ? $"Keep a copy of {NewKeyfileName} somewhere other than beside the vault. Losing it locks the vault, and nothing recovers it."
         : string.Empty;
 
@@ -248,23 +271,51 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     internal string Message
     {
         get => _message;
-        private set
-        {
-            if (Set(ref _message, value))
-            {
-                Raise(nameof(HasMessage));
-            }
-        }
+        private set => Set(ref _message, value);
     }
 
     internal bool HasMessage => _message.Length > 0;
 
+    private KeyfileChoice Keyfile
+    {
+        get => _keyfile;
+        set => Set(ref _keyfile, value);
+    }
+
+    private KeyfileChoice HardwareKey
+    {
+        get => _hardwareKey;
+        set => Set(ref _hardwareKey, value);
+    }
+
+    private int NewSlot
+    {
+        get => _newSlot;
+        set => Set(ref _newSlot, value);
+    }
+
+    /// <summary>The open vault's factors, or null once it has locked.</summary>
+    private (bool Password, string? Keyfile, int? Slot)? Now
+    {
+        get
+        {
+            try
+            {
+                return _session.Unlocked is { } vault ? (vault.HasPassword, vault.KeyfilePath, vault.HardwareKey?.Slot) : null;
+            }
+            catch (ObjectDisposedException)
+            {
+                return null;
+            }
+        }
+    }
+
     private bool CanReview =>
         IsEditing
-        && (_setPassword || _keyfile != KeyfileChoice.Keep || _hardwareKey != KeyfileChoice.Keep)
-        && (_keyfile != KeyfileChoice.Attach || _newKeyfilePath is not null)
+        && (_setPassword || Keyfile != KeyfileChoice.Keep || HardwareKey != KeyfileChoice.Keep)
+        && (Keyfile != KeyfileChoice.Attach || _newKeyfilePath is not null)
         && (!_setPassword || _new.Length > 0)
-        && (_current.Length > 0 || Now() is { Password: false });
+        && (_current.Length > 0 || Now is { Password: false });
 
     internal void TypeCurrent(char c) => Edit(() => _current.Append(c));
 
@@ -382,19 +433,6 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         };
     }
 
-    /// <summary>The open vault's factors, or null once it has locked.</summary>
-    private (bool Password, string? Keyfile, int? Slot)? Now()
-    {
-        try
-        {
-            return _session.Unlocked is { } vault ? (vault.HasPassword, vault.KeyfilePath, vault.HardwareKey?.Slot) : null;
-        }
-        catch (ObjectDisposedException)
-        {
-            return null;
-        }
-    }
-
     private string Explain(AccessChangeResult result) => result.Outcome switch
     {
         AccessChangeOutcome.Changed =>
@@ -459,43 +497,33 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _newKeyfilePath = full;
-        _keyfile = KeyfileChoice.Attach;
+        NewKeyfilePath = full;
+        Keyfile = KeyfileChoice.Attach;
         Message = string.Empty;
-        RaiseState();
     }
 
     private void Choose(bool selected, KeyfileChoice choice)
     {
-        if (!selected || !IsEditing || _keyfile == choice)
+        if (selected && IsEditing)
         {
-            return;
+            Keyfile = choice;
         }
-
-        _keyfile = choice;
-        RaiseState();
     }
 
     private void ChooseHardwareKey(bool selected, KeyfileChoice choice)
     {
-        if (!selected || !IsEditing || _hardwareKey == choice)
+        if (selected && IsEditing)
         {
-            return;
+            HardwareKey = choice;
         }
-
-        _hardwareKey = choice;
-        RaiseState();
     }
 
     private void ChooseSlot(bool selected, int slot)
     {
-        if (!selected || !IsEditing || _newSlot == slot)
+        if (selected && IsEditing)
         {
-            return;
+            NewSlot = slot;
         }
-
-        _newSlot = slot;
-        RaiseState();
     }
 
     private void Review()
@@ -505,9 +533,8 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _confirming = true;
+        IsConfirming = true;
         Message = string.Empty;
-        RaiseState();
     }
 
     private void Edit(Action edit)
@@ -518,7 +545,9 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         }
 
         edit();
-        RaiseState();
+        Raise(nameof(CurrentMaskedLength));
+        Raise(nameof(NewMaskedLength));
+        Raise(nameof(ConfirmMaskedLength));
 
         if (HasMessage)
         {
@@ -536,15 +565,16 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 
         _current.Dispose();
         _current = new SecretBuffer();
+        Raise(nameof(CurrentMaskedLength));
         ResetNew();
-        _confirming = false;
-        _setPassword = false;
-        _keyfile = KeyfileChoice.Keep;
-        _hardwareKey = KeyfileChoice.Keep;
-        _newSlot = 2;
-        _newKeyfilePath = null;
+        IsConfirming = false;
+        Set(ref _setPassword, false, nameof(SetPassword));
+        Keyfile = KeyfileChoice.Keep;
+        HardwareKey = KeyfileChoice.Keep;
+        NewSlot = 2;
+        NewKeyfilePath = null;
         Message = message;
-        RaiseState();
+        Raise(nameof(Now));
     }
 
     private void ResetNew()
@@ -553,40 +583,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         _confirm.Dispose();
         _new = new SecretBuffer();
         _confirm = new SecretBuffer();
-    }
-
-    private void RaiseState()
-    {
-        Raise(nameof(CurrentMaskedLength));
         Raise(nameof(NewMaskedLength));
         Raise(nameof(ConfirmMaskedLength));
-        Raise(nameof(IsEditing));
-        Raise(nameof(IsConfirming));
-        Raise(nameof(SetPassword));
-        Raise(nameof(KeepKeyfile));
-        Raise(nameof(AttachKeyfile));
-        Raise(nameof(RemoveKeyfile));
-        Raise(nameof(NewKeyfilePath));
-        Raise(nameof(NewKeyfileName));
-        Raise(nameof(Factors));
-        Raise(nameof(HasKeyfile));
-        Raise(nameof(AttachLabel));
-        Raise(nameof(Summary));
-        Raise(nameof(BackupCost));
-        Raise(nameof(KeyfileWarning));
-        Raise(nameof(HasKeyfileWarning));
-        Raise(nameof(HasHardwareKey));
-        Raise(nameof(AttachHardwareKeyLabel));
-        Raise(nameof(KeepHardwareKey));
-        Raise(nameof(AttachHardwareKey));
-        Raise(nameof(RemoveHardwareKey));
-        Raise(nameof(NewSlotOne));
-        Raise(nameof(NewSlotTwo));
-        Raise(nameof(HardwareKeyWarning));
-        Raise(nameof(HasHardwareKeyWarning));
-        ReviewCommand.RaiseCanExecuteChanged();
-        ConfirmCommand.RaiseCanExecuteChanged();
-        CancelCommand.RaiseCanExecuteChanged();
-        ChooseKeyfileCommand.RaiseCanExecuteChanged();
     }
 }

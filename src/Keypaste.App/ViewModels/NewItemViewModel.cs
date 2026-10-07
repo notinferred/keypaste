@@ -76,6 +76,15 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         Password = new SecretField(clipboard);
         KeyValue = new SecretField(clipboard);
         AddTagCommand = new RelayCommand(AddTag, () => _draftTag.Trim().Length > 0);
+
+        DependsOn(nameof(SelectedTemplate), nameof(Template));
+        DependsOn(nameof(ShowsUsername), nameof(Template));
+        DependsOn(nameof(ShowsPassword), nameof(ShowsUsername));
+        DependsOn(nameof(ShowsUrl), nameof(Template));
+        DependsOn(nameof(ShowsHost), nameof(Template));
+        DependsOn(nameof(ShowsKey), nameof(Template));
+        DependsOn(nameof(HasError), nameof(Error));
+        DependsOn(AddTagCommand, nameof(DraftTag));
     }
 
     /// <summary>The five things a new item can be.</summary>
@@ -96,12 +105,6 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         {
             if (Set(ref _template, value))
             {
-                Raise(nameof(SelectedTemplate));
-                Raise(nameof(ShowsUsername));
-                Raise(nameof(ShowsPassword));
-                Raise(nameof(ShowsUrl));
-                Raise(nameof(ShowsHost));
-                Raise(nameof(ShowsKey));
                 Error = null;
             }
         }
@@ -212,13 +215,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     internal string DraftTag
     {
         get => _draftTag;
-        set
-        {
-            if (Set(ref _draftTag, value))
-            {
-                AddTagCommand.RaiseCanExecuteChanged();
-            }
-        }
+        set => Set(ref _draftTag, value);
     }
 
     internal RelayCommand AddTagCommand { get; }
@@ -227,13 +224,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     internal string? Error
     {
         get => _error;
-        set
-        {
-            if (Set(ref _error, value))
-            {
-                Raise(nameof(HasError));
-            }
-        }
+        set => Set(ref _error, value);
     }
 
     internal bool HasError => _error is not null;
@@ -242,12 +233,6 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     /// <returns>The item's name, or null when it was refused and <see cref="Error"/> says why; nothing is written then.</returns>
     internal EntryName? Create()
     {
-        if (_session.Unlocked is not { } vault)
-        {
-            Error = "The vault is locked.";
-            return null;
-        }
-
         var title = _title.Trim();
 
         if (title.Length == 0)
@@ -299,30 +284,28 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
             return null;
         }
 
-        try
+        var write = _session.Write(
+            vault =>
+            {
+                vault.CreateEntry(
+                    new VaultEntry
+                    {
+                        Title = title,
+                        GroupPath = _folder.Path,
+                        Username = ShowsUsername ? _username.Trim() : string.Empty,
+                        Password = password,
+                        Url = ShowsUrl ? _url.Trim() : string.Empty,
+                        Notes = _notes,
+                    },
+                    fields,
+                    [.. _tags.Select(chip => chip.Tag)]);
+                return true;
+            },
+            created => created);
+
+        if (write.Problem("add this again") is { } problem)
         {
-            vault.CreateEntry(
-                new VaultEntry
-                {
-                    Title = title,
-                    GroupPath = _folder.Path,
-                    Username = ShowsUsername ? _username.Trim() : string.Empty,
-                    Password = password,
-                    Url = ShowsUrl ? _url.Trim() : string.Empty,
-                    Notes = _notes,
-                },
-                fields,
-                [.. _tags.Select(chip => chip.Tag)]);
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Error = "Something else changed this vault since you opened it. Reload to see it, then add this again.";
-            return null;
-        }
-        catch (VaultException e)
-        {
-            Error = e.Message;
+            Error = problem;
             return null;
         }
 

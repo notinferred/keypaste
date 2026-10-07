@@ -194,6 +194,36 @@ public sealed class SetVerbTests : IDisposable
         Assert.Empty(_harness.Prompt.PromptsSeen);
     }
 
+    /// <summary>The titles the app's new item refuses are refused here too, by the same Core check (F.55).</summary>
+    [Theory]
+    [InlineData("Banking/Chase ")]
+    [InlineData("Banking/ Chase")]
+    [InlineData("Banking/back\\slash")]
+    public void Add_ATitleCoreRefuses_IsRefused_AndWritesNothing(string target)
+    {
+        var before = File.ReadAllBytes(_harness.VaultPath);
+        _harness.Prompt.Enqueue(_master, _value);
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", target, "--vault", _harness.VaultPath));
+
+        Assert.Contains("keypaste add: The entry title cannot", _harness.Err, StringComparison.Ordinal);
+        Assert.Empty(_harness.Prompt.PromptsSeen);
+        Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
+    }
+
+    [Fact]
+    public void Set_ANewEntryWithATitleCoreRefuses_IsRefused_BeforeTheValue()
+    {
+        var before = File.ReadAllBytes(_harness.VaultPath);
+        _harness.Prompt.Enqueue(_master, _value, _value);
+
+        _harness.AssertExit(CliApp.ExitUsageError, Set("Banking/Chase "));
+
+        Assert.Contains("keypaste set: The entry title cannot begin or end with whitespace.", _harness.Err, StringComparison.Ordinal);
+        Assert.Equal(["Master password: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
+    }
+
     [Theory]
     [InlineData("env/acme-api/dev")]
     [InlineData("env/acme-api/staging/sub")]

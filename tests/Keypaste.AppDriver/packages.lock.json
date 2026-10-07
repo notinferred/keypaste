@@ -373,6 +373,7 @@
           "Avalonia.Fonts.Inter": "[12.1.0, )",
           "Avalonia.Themes.Fluent": "[12.1.0, )",
           "Keypaste.Core": "[0.4.0, )",
+          "Keypaste.Mvvm": "[0.4.0, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
       },
@@ -381,6 +382,9 @@
         "dependencies": {
           "KeePassLib": "[1.0.0, )"
         }
+      },
+      "keypaste.mvvm": {
+        "type": "Project"
       },
       "Avalonia": {
         "type": "CentralTransitive",

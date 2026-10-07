@@ -512,6 +512,56 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.Empty(restore.Message);
     }
 
+    /// <summary>Opening the panel and checking a copy announce what reads them, or a binding keeps the form.</summary>
+    [Fact]
+    public async Task Opening_the_panel_and_checking_a_copy_announce_the_lines_and_buttons_that_read_them()
+    {
+        ChangeThroughTheApp("v1");
+
+        using var session = new AppVaultSession(_clock);
+        using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
+        var raised = new List<string>();
+        unlock.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        var asked = new List<string>();
+        unlock.BrowseCommand.CanExecuteChanged += (_, _) => asked.Add("browse");
+        unlock.CloseRestoreCommand.CanExecuteChanged += (_, _) => asked.Add("close");
+
+        unlock.StartRestoreCommand.Execute(null);
+
+        string[] opened =
+        [
+            nameof(UnlockViewModel.Restore), nameof(UnlockViewModel.IsRestoring), nameof(UnlockViewModel.IsOpening),
+            nameof(UnlockViewModel.OffersRestore),
+        ];
+        Assert.Empty(opened.Except(raised));
+        Assert.Equal(["browse", "close"], asked.Distinct().Order(StringComparer.Ordinal));
+
+        var restore = unlock.Restore!;
+        raised.Clear();
+        asked.Clear();
+        restore.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
+        restore.CheckCommand.CanExecuteChanged += (_, _) => asked.Add("check");
+        restore.ConfirmCommand.CanExecuteChanged += (_, _) => asked.Add("confirm");
+
+        Enter(restore, _master);
+
+        Assert.Contains(nameof(RestoreBackupViewModel.MaskedLength), raised);
+        Assert.Contains("check", asked);
+
+        raised.Clear();
+        asked.Clear();
+        await restore.CheckAsync();
+
+        string[] checkedCopy =
+        [
+            nameof(RestoreBackupViewModel.IsChoosing), nameof(RestoreBackupViewModel.IsConfirming), nameof(RestoreBackupViewModel.Taken),
+            nameof(RestoreBackupViewModel.Holds), nameof(RestoreBackupViewModel.Replaces),
+        ];
+        Assert.Empty(checkedCopy.Except(raised));
+        Assert.Contains("confirm", asked);
+        Assert.True(restore.ConfirmCommand.CanExecute(null));
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     /// <summary>Changes the password on the Entries screen and locks, which is a real save and so a real backup.</summary>

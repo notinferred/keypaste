@@ -2,6 +2,7 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
@@ -285,28 +286,25 @@ internal static class RunCommand
         document = null!;
         exit = CliApp.ExitSuccess;
 
-        byte[] bytes;
-
-        try
+        if (!DotEnvFile.TryRead(path, out var bytes, out var failure, out var readError))
         {
-            if (new FileInfo(path).Length > DotEnv.MaximumBytes)
+            switch (failure)
             {
-                exit = Fail(context, $"{shown} is larger than a .env file can be");
-                return false;
+                case DotEnvFileFailure.Missing:
+                    context.Stderr.WriteLine($"keypaste run: no file at '{path}'");
+                    exit = CliApp.ExitNotFound;
+                    break;
+
+                case DotEnvFileFailure.TooLarge:
+                    exit = Fail(context, $"{shown} is larger than a .env file can be");
+                    break;
+
+                default:
+                    context.Stderr.WriteLine($"keypaste run: could not read '{path}': {readError}");
+                    exit = CliApp.ExitInternalError;
+                    break;
             }
 
-            bytes = File.ReadAllBytes(path);
-        }
-        catch (FileNotFoundException)
-        {
-            context.Stderr.WriteLine($"keypaste run: no file at '{path}'");
-            exit = CliApp.ExitNotFound;
-            return false;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            context.Stderr.WriteLine($"keypaste run: could not read '{path}': {ex.Message}");
-            exit = CliApp.ExitInternalError;
             return false;
         }
 

@@ -4,6 +4,7 @@ using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 
 namespace Keypaste.Cli.Commands;

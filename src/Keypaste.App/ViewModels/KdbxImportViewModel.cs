@@ -88,6 +88,32 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _source is null && _keyfilePath is not null);
         ChooseAnotherCommand = new AsyncRelayCommand(() => _chooseAnother!(), () => _chooseAnother is not null && !_disposed);
 
+        DependsOn(nameof(CardDetail), nameof(Source), nameof(EntryCount), nameof(KeyFactors));
+        DependsOn(nameof(HasTrailingMessage), nameof(HasMessage), nameof(NeedsUnlock));
+        DependsOn(nameof(NeedsUnlock), nameof(Disposed), nameof(Source), nameof(KeepEditingInPlace));
+        DependsOn(nameof(ShowsConfirm), nameof(NeedsUnlock));
+        DependsOn(nameof(ShowsRows), nameof(Source), nameof(KeepEditingInPlace));
+        DependsOn(nameof(UnlockText), nameof(Busy));
+        DependsOn(nameof(SkippedText), nameof(Source));
+        DependsOn(nameof(HasSkipped), nameof(SkippedText));
+        DependsOn(nameof(InPlaceNote), nameof(Source));
+        DependsOn(nameof(HasMessage), nameof(Message));
+        DependsOn(nameof(KeyfileName), nameof(KeyfilePath));
+        DependsOn(nameof(HasKeyfile), nameof(KeyfilePath));
+        DependsOn(nameof(KeyFactors), nameof(Source));
+        DependsOn(nameof(EntryCount), nameof(Source));
+        DependsOn(nameof(IsDecrypted), nameof(Source));
+        DependsOn(nameof(IsLocked), nameof(Source));
+        DependsOn(nameof(CardText), nameof(Source), nameof(EntryCount), nameof(KeyFactors));
+        DependsOn(nameof(PasswordLength), nameof(Disposed));
+        DependsOn(nameof(ConfirmText), nameof(KeepEditingInPlace));
+        DependsOn(nameof(CanConfirm), nameof(Disposed), nameof(KeepEditingInPlace), nameof(Source));
+        DependsOn(UnlockCommand, nameof(Busy), nameof(Source));
+        DependsOn(ConfirmCommand, nameof(CanConfirm));
+        DependsOn(ChooseKeyfileCommand, nameof(Busy), nameof(Source));
+        DependsOn(ClearKeyfileCommand, nameof(Busy), nameof(Source), nameof(KeyfilePath));
+        DependsOn(ChooseAnotherCommand, nameof(Disposed));
+
         _session.Locked += OnLocked;
     }
 
@@ -179,7 +205,11 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal bool IsLocked => _probe is not null && _source is null;
 
     /// <summary>The unlocked file, while there is one. A test seam for when its key goes.</summary>
-    internal ImportSource? Source => _source;
+    internal ImportSource? Source
+    {
+        get => _source;
+        private set => Set(ref _source, value);
+    }
 
     /// <summary>The file card's one line.</summary>
     internal string CardText => _source is null
@@ -193,15 +223,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal string? KeyfilePath
     {
         get => _keyfilePath;
-        set
-        {
-            if (Set(ref _keyfilePath, string.IsNullOrEmpty(value) ? null : value))
-            {
-                Raise(nameof(KeyfileName));
-                Raise(nameof(HasKeyfile));
-                ClearKeyfileCommand.RaiseCanExecuteChanged();
-            }
-        }
+        set => Set(ref _keyfilePath, string.IsNullOrEmpty(value) ? null : value);
     }
 
     internal AsyncRelayCommand UnlockCommand { get; }
@@ -226,42 +248,26 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal bool KeepEditingInPlace
     {
         get => _keepInPlace;
-        set
-        {
-            if (Set(ref _keepInPlace, value))
-            {
-                Refresh();
-            }
-        }
+        set => Set(ref _keepInPlace, value);
     }
 
     /// <summary>What is wrong with the file or the import as a whole, or empty.</summary>
     internal string Message
     {
         get => _message;
-        private set
-        {
-            if (Set(ref _message, value))
-            {
-                Raise(nameof(HasMessage));
-                Raise(nameof(HasTrailingMessage));
-            }
-        }
+        private set => Set(ref _message, value);
     }
 
     internal bool Busy
     {
         get => _busy;
-        private set
-        {
-            if (Set(ref _busy, value))
-            {
-                Raise(nameof(UnlockText));
-                UnlockCommand.RaiseCanExecuteChanged();
-                ChooseKeyfileCommand.RaiseCanExecuteChanged();
-                ClearKeyfileCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _busy, value);
+    }
+
+    private bool Disposed
+    {
+        get => _disposed;
+        set => Set(ref _disposed, value);
     }
 
     /// <summary><c>Import 142 entries</c>, or <c>Open acme.kdbx</c> when keeping the file in place.</summary>
@@ -336,7 +342,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
                 return;
             }
 
-            _source = opened;
+            Source = opened;
             Lay(null);
         }
         catch (InvalidMasterPasswordException)
@@ -364,13 +370,13 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
             return;
         }
 
-        _disposed = true;
+        Disposed = true;
         _session.Locked -= OnLocked;
         _source?.Dispose();
-        _source = null;
+        Source = null;
         _password.Dispose();
         Rows.Clear();
-        Refresh();
+        Raise(nameof(ConfirmText));
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -409,43 +415,36 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
             return;
         }
 
-        if (_source is not { } source || _session.Unlocked is not { } vault)
+        if (_source is not { } source)
         {
             return;
         }
 
         var plan = Plan();
-        ImportResult? applied = null;
+        var write = _session.Write(vault => source.ApplyTo(vault, plan), _ => true);
 
-        try
+        switch (write)
         {
-            applied = source.ApplyTo(vault, plan);
-            vault.Save();
-            _announce($"Imported {Entries(applied.Entries)} from {FileName}");
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            const string changed = "Something else changed this vault since you opened it. Reload to see it, then import again.";
-
-            if (applied is null)
-            {
-                Message = changed;
+            case { Outcome: WriteOutcome.Locked }:
                 return;
-            }
-
-            _announce(changed);
-        }
-        catch (VaultException ex) when (applied is null)
-        {
-            Message = DisplayTextSanitizer.Sanitize(ex.Message).Text;
-            Check();
-            return;
-        }
-        catch (VaultException ex)
-        {
-            // The copies are already in the open vault, so the dialog closes rather than offer a
-            // second Confirm that would copy them again.
-            _announce($"Copied {Entries(applied!.Entries)} from {FileName}, but they are not saved: {DisplayTextSanitizer.Sanitize(ex.Message).Text}");
+            case { Outcome: WriteOutcome.ChangedOnDisk, Unwritten: false }:
+                Message = write.Problem("import again")!;
+                return;
+            case { Outcome: WriteOutcome.Failed, Unwritten: false }:
+                Message = DisplayTextSanitizer.Sanitize(write.Reason!).Text;
+                Check();
+                return;
+            case { Outcome: WriteOutcome.ChangedOnDisk }:
+                _announce(write.Problem("import again")!);
+                break;
+            case { Outcome: WriteOutcome.Failed }:
+                // The copies are already in the open vault, so the dialog closes rather than offer a
+                // second Confirm that would copy them again.
+                _announce($"Copied {Entries(write.Value!.Entries)} from {FileName}, but they are not saved: {DisplayTextSanitizer.Sanitize(write.Reason!).Text}");
+                break;
+            default:
+                _announce($"Imported {Entries(write.Value!.Entries)} from {FileName}");
+                break;
         }
 
         Dispose();
@@ -494,31 +493,8 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
                 .Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text));
         }
 
-        Refresh();
-    }
-
-    private void Refresh()
-    {
-        Raise(nameof(NeedsUnlock));
-        Raise(nameof(ShowsConfirm));
-        Raise(nameof(HasTrailingMessage));
-        Raise(nameof(InPlaceNote));
-        Raise(nameof(ShowsRows));
-        Raise(nameof(CardDetail));
-        Raise(nameof(SkippedText));
-        Raise(nameof(HasSkipped));
-        Raise(nameof(IsDecrypted));
-        Raise(nameof(IsLocked));
-        Raise(nameof(EntryCount));
-        Raise(nameof(KeyFactors));
-        Raise(nameof(CardText));
         Raise(nameof(ConfirmText));
         Raise(nameof(CanConfirm));
-        UnlockCommand.RaiseCanExecuteChanged();
-        ConfirmCommand.RaiseCanExecuteChanged();
-        ChooseKeyfileCommand.RaiseCanExecuteChanged();
-        ClearKeyfileCommand.RaiseCanExecuteChanged();
-        ChooseAnotherCommand.RaiseCanExecuteChanged();
     }
 
     /// <summary>The probe's refusal about this file, without the directory it names.</summary>
@@ -549,6 +525,10 @@ internal sealed class ImportRowViewModel : ObservableObject
     {
         _row = row;
         _changed = changed;
+
+        DependsOn(nameof(Destination), nameof(Row));
+        DependsOn(nameof(Include), nameof(Row));
+        DependsOn(nameof(HasProblem), nameof(Problem));
     }
 
     /// <summary>The row as the plan will copy it.</summary>
@@ -584,24 +564,15 @@ internal sealed class ImportRowViewModel : ObservableObject
 
     internal void Show(string problem, bool blocks)
     {
-        if (Set(ref _problem, problem, nameof(Problem)))
-        {
-            Raise(nameof(HasProblem));
-        }
-
+        Set(ref _problem, problem, nameof(Problem));
         Set(ref _blocks, blocks, nameof(Blocks));
     }
 
     private void Change(ImportRow row)
     {
-        if (row == _row)
+        if (Set(ref _row, row, nameof(Row)))
         {
-            return;
+            _changed();
         }
-
-        _row = row;
-        Raise(nameof(Destination));
-        Raise(nameof(Include));
-        _changed();
     }
 }

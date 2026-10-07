@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Policy;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.Recent;
 
@@ -70,9 +70,8 @@ public static class RecentVaults
 
     private static readonly string[] _header =
     [
-        "# keypaste remembers which vault files you have opened on this machine.",
-        "# It holds no entry names and no secrets. Delete this file to forget them.",
-        "",
+        "keypaste remembers which vault files you have opened on this machine.",
+        "It holds no entry names and no secrets. Delete this file to forget them.",
     ];
 
     /// <summary>Reads the list.</summary>
@@ -187,52 +186,51 @@ public static class RecentVaults
     /// Owner-only on Unix. On Windows the file inherits the profile's ACL, which is the same
     /// protection <c>audit.jsonl</c> already relies on and is stated rather than implied.
     /// A failure to write is swallowed: losing a shortcut is not worth interrupting anybody.
+    /// A vault whose path the file cannot hold is left out and a keyfile it cannot hold costs only
+    /// the keyfile, so one such path never makes the file unreadable and empties the list.
     /// </remarks>
     public static bool Save(string path, IReadOnlyList<RecentVault> vaults)
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(vaults);
 
-        var lines = new List<string>(_header);
+        var writer = new TomlWriter(TomlLimits.Paths);
 
-        foreach (var vault in Trim(vaults))
+        foreach (var line in _header)
         {
-            lines.Add($"[[{SectionName}]]");
-            lines.Add($"{PathKey} = \"{Portable(vault.Path)}\"");
-            lines.Add(
-                string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"{OpenedAtKey} = \"{vault.OpenedAt.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}\""));
+            writer.Comment(line);
+        }
 
-            if (vault.KeyfilePath is { } keyfile)
+        writer.BlankLine();
+
+        foreach (var vault in vaults.Where(candidate => writer.CanWrite(PathKey, Portable(candidate.Path))).Take(Capacity))
+        {
+            writer
+                .Table(SectionName)
+                .Text(PathKey, Portable(vault.Path))
+                .Text(OpenedAtKey, vault.OpenedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
+
+            if (vault.KeyfilePath is { } keyfile && writer.CanWrite(KeyfileKey, Portable(keyfile)))
             {
-                lines.Add($"{KeyfileKey} = \"{Portable(keyfile)}\"");
+                writer.Text(KeyfileKey, Portable(keyfile));
             }
 
             if (vault.HardwareKeySlot is { } slot)
             {
-                lines.Add(string.Create(CultureInfo.InvariantCulture, $"{HardwareKeySlotKey} = {slot}"));
+                writer.Number(HardwareKeySlotKey, slot);
             }
 
-            lines.Add(string.Empty);
+            writer.BlankLine();
         }
 
         try
         {
-            var directory = System.IO.Path.GetDirectoryName(path);
-
-            if (!string.IsNullOrEmpty(directory))
+            if (System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) is { Length: > 0 } directory)
             {
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllLines(path, lines);
-
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-
+            AtomicFile.Write(path, Encoding.UTF8.GetBytes(writer.ToString()));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -242,15 +240,21 @@ public static class RecentVaults
     }
 
     /// <summary>
-    /// A path written the way this file writes it: absolute, and with no backslash in it.
+    /// A path written the way this file writes it: absolute, with Windows' separators as forward slashes.
     /// </summary>
     /// <param name="path">Any path.</param>
-    /// <returns>The path with forward slashes.</returns>
+    /// <returns>The full path, with forward slashes on Windows.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
+    /// <remarks>
+    /// On Unix a backslash is part of a file name, and a slash in its place would name another file, so it is kept
+    /// and the path is one the file cannot hold.
+    /// </remarks>
     public static string Portable(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
-        return System.IO.Path.GetFullPath(path).Replace('\\', '/');
+
+        var full = System.IO.Path.GetFullPath(path);
+        return OperatingSystem.IsWindows() ? full.Replace('\\', '/') : full;
     }
 
     private static bool TryRead(TomlTable table, [NotNullWhen(true)] out RecentVault? vault)
@@ -309,7 +313,7 @@ public static class RecentVaults
         }
     }
 
-    private static List<RecentVault> Trim(IReadOnlyList<RecentVault> vaults) =>
+    private static List<RecentVault> Trim(List<RecentVault> vaults) =>
         vaults.Count <= Capacity ? [.. vaults] : [.. vaults.Take(Capacity)];
 
     /// <summary>

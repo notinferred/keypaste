@@ -35,7 +35,7 @@ public sealed class ShareStoreTests : IDisposable
         Assert.True(ShareLink.TryParse(link, out var id, out var key));
 
         using var reopened = _fixture.Open();
-        var record = Assert.Single(reopened.ReadEntries(), e => e.GroupPath == ReservedGroups.Shares);
+        var record = Assert.Single(reopened.ReadEntries(includeReserved: true), e => e.GroupPath == ReservedGroups.Shares);
         Assert.Equal(id, record.Title);
         Assert.Equal("sam@acme.dev", record.Username);
         Assert.Equal("https://keypaste.com", record.Url);
@@ -47,7 +47,7 @@ public sealed class ShareStoreTests : IDisposable
         Assert.Equal(id, info.Id);
         Assert.Equal("1 view · 24h · passphrase", info.Rule);
 
-        var shareRecords = string.Join("\n", reopened.ReadEntries()
+        var shareRecords = string.Join("\n", reopened.ReadEntries(includeReserved: true)
             .Where(e => ReservedGroups.IsReserved(e.GroupPath))
             .Select(e => string.Join("|", e.Title, e.Username, e.Password, e.Url, e.Notes)));
         Assert.DoesNotContain(key, shareRecords, StringComparison.Ordinal);

@@ -63,18 +63,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _web = web;
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
-        PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName is nameof(IsAdding) or nameof(IsOrganizing) or nameof(IsCreatingGroup) or nameof(IsRenamingGroup) or nameof(Detail))
-            {
-                Raise(nameof(AddIsPrimary));
-            }
-
-            if (e.PropertyName is nameof(IsAdding) or nameof(Detail))
-            {
-                Raise(nameof(ShowsList));
-            }
-        };
         ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
@@ -85,7 +73,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         CancelDeleteCommand = new RelayCommand(
             () => IsConfirmingDelete = false,
             () => IsConfirmingDelete);
-        UndoDeleteCommand = new RelayCommand(UndoDelete, () => _undo is not null);
+        UndoDeleteCommand = new RelayCommand(UndoDelete, () => CanUndoDelete);
 
         OrganizeCommand = new RelayCommand(BeginOrganize, () => Selected is not null && !IsOrganizing);
         ConfirmOrganizeCommand = new RelayCommand(ConfirmOrganize, () => IsOrganizing);
@@ -98,6 +86,42 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             () => !IsRenamingGroup && SelectedGroup is { IsEverything: false });
         ConfirmRenameGroupCommand = new RelayCommand(ConfirmRenameGroup, () => IsRenamingGroup);
         CancelGroupCommand = new RelayCommand(CloseGroupForms, () => IsCreatingGroup || IsRenamingGroup);
+
+        DependsOn(nameof(CanRenameGroup), nameof(SelectedGroup));
+        DependsOn(nameof(ListTitle), nameof(SelectedGroup), nameof(VaultName));
+        DependsOn(nameof(SearchScope), nameof(SelectedGroup), nameof(ListTitle));
+        DependsOn(nameof(ShowsListEmpty), nameof(Rows));
+        DependsOn(nameof(ListEmptyNote), nameof(Search), nameof(SelectedGroup), nameof(ListTitle));
+        DependsOn(nameof(ListEmptyOffersNew), nameof(Search));
+        DependsOn(nameof(ListEmptyOffersImport), nameof(TotalCount), nameof(ListEmptyOffersNew), nameof(SelectedGroup));
+        DependsOn(nameof(IsAdding), nameof(NewItem));
+        DependsOn(nameof(Selected), nameof(Rows), nameof(IsAdding));
+        DependsOn(nameof(DeletePrompt), nameof(Selected));
+        DependsOn(nameof(AddIsPrimary), nameof(IsAdding), nameof(IsOrganizing), nameof(IsCreatingGroup), nameof(IsRenamingGroup), nameof(Detail));
+        DependsOn(nameof(ShowsList), nameof(IsAdding), nameof(Detail));
+        DependsOn(nameof(ShowsPlaceholder), nameof(Detail), nameof(IsAdding));
+        DependsOn(nameof(HasError), nameof(Error));
+        DependsOn(nameof(HasNotice), nameof(Notice));
+        DependsOn(nameof(OrganizePrompt), nameof(Selected));
+        DependsOn(nameof(CreateGroupPrompt), nameof(SelectedGroup));
+        DependsOn(nameof(RenameGroupPrompt), nameof(SelectedGroup));
+        DependsOn(nameof(ShowsProjectRenameNote), nameof(IsRenamingGroup), nameof(SelectedGroup));
+        DependsOn(nameof(ProjectRenameNote), nameof(ShowsProjectRenameNote), nameof(SelectedGroup));
+        DependsOn(BeginAddCommand, nameof(IsAdding));
+        DependsOn(CancelAddCommand, nameof(IsAdding));
+        DependsOn(ConfirmAddCommand, nameof(IsAdding));
+        DependsOn(DeleteCommand, nameof(Selected), nameof(IsConfirmingDelete));
+        DependsOn(ConfirmDeleteCommand, nameof(IsConfirmingDelete));
+        DependsOn(CancelDeleteCommand, nameof(IsConfirmingDelete));
+        DependsOn(UndoDeleteCommand, nameof(CanUndoDelete));
+        DependsOn(OrganizeCommand, nameof(Selected), nameof(IsOrganizing));
+        DependsOn(ConfirmOrganizeCommand, nameof(IsOrganizing));
+        DependsOn(CancelOrganizeCommand, nameof(IsOrganizing));
+        DependsOn(BeginCreateGroupCommand, nameof(IsCreatingGroup));
+        DependsOn(ConfirmCreateGroupCommand, nameof(IsCreatingGroup));
+        DependsOn(BeginRenameGroupCommand, nameof(IsRenamingGroup), nameof(SelectedGroup));
+        DependsOn(ConfirmRenameGroupCommand, nameof(IsRenamingGroup));
+        DependsOn(CancelGroupCommand, nameof(IsCreatingGroup), nameof(IsRenamingGroup));
 
         Reload();
 
@@ -125,11 +149,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             {
                 Filter();
                 CloseGroupForms();
-                BeginRenameGroupCommand.RaiseCanExecuteChanged();
-                Raise(nameof(CanRenameGroup));
-                Raise(nameof(CreateGroupPrompt));
-                Raise(nameof(RenameGroupPrompt));
-                RaiseHeader();
             }
         }
     }
@@ -154,16 +173,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<EntryRow> Rows
     {
         get => _rows;
-        private set
-        {
-            if (Set(ref _rows, value))
-            {
-                Raise(nameof(ShowsListEmpty));
-                Raise(nameof(ListEmptyNote));
-                Raise(nameof(ListEmptyOffersNew));
-                Raise(nameof(ListEmptyOffersImport));
-            }
-        }
+        private set => Set(ref _rows, value);
     }
 
     /// <summary>Whether the list has nothing to show, so it says why instead of standing blank.</summary>
@@ -184,7 +194,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// Whether the empty list also offers Import .kdbx: the vault holds no item at all, as a new one
     /// does, so the first thing a KeePass user may want is to bring their database in.
     /// </summary>
-    internal bool ListEmptyOffersImport => _all.Count == 0 && ListEmptyOffersNew && SelectedGroup is null or { IsEverything: true };
+    internal bool ListEmptyOffersImport => TotalCount == 0 && ListEmptyOffersNew && SelectedGroup is null or { IsEverything: true };
 
     /// <summary>The search box.</summary>
     /// <remarks>
@@ -268,15 +278,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal bool IsConfirmingDelete
     {
         get => _isConfirmingDelete;
-        private set
-        {
-            if (Set(ref _isConfirmingDelete, value))
-            {
-                DeleteCommand.RaiseCanExecuteChanged();
-                ConfirmDeleteCommand.RaiseCanExecuteChanged();
-                CancelDeleteCommand.RaiseCanExecuteChanged();
-            }
-        }
+        private set => Set(ref _isConfirmingDelete, value);
     }
 
     /// <summary>What the confirmation asks, naming what goes and whether it can come back.</summary>
@@ -335,8 +337,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
             if (Set(ref _detail, value))
             {
-                Raise(nameof(ShowsPlaceholder));
-
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
                 // a notes field read from an open vault, and the lock has to mean something.
                 previous?.Dispose();
@@ -351,13 +351,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal string? Error
     {
         get => _error;
-        private set
-        {
-            if (Set(ref _error, value))
-            {
-                Raise(nameof(HasError));
-            }
-        }
+        private set => Set(ref _error, value);
     }
 
     internal bool HasError => _error is not null;
@@ -371,13 +365,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal string? Notice
     {
         get => _notice;
-        private set
-        {
-            if (Set(ref _notice, value))
-            {
-                Raise(nameof(HasNotice));
-            }
-        }
+        private set => Set(ref _notice, value);
     }
 
     internal bool HasNotice => _notice is not null;
@@ -402,14 +390,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             if (Set(ref _newItem, value))
             {
                 old?.Dispose();
-                Raise(nameof(IsAdding));
-                Raise(nameof(ShowsPlaceholder));
-                Raise(nameof(Selected));
-                DeleteCommand.RaiseCanExecuteChanged();
-                OrganizeCommand.RaiseCanExecuteChanged();
-                BeginAddCommand.RaiseCanExecuteChanged();
-                CancelAddCommand.RaiseCanExecuteChanged();
-                ConfirmAddCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -431,50 +411,21 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal bool IsOrganizing
     {
         get => _isOrganizing;
-        private set
-        {
-            if (Set(ref _isOrganizing, value))
-            {
-                OrganizeCommand.RaiseCanExecuteChanged();
-                ConfirmOrganizeCommand.RaiseCanExecuteChanged();
-                CancelOrganizeCommand.RaiseCanExecuteChanged();
-                Raise(nameof(OrganizePrompt));
-            }
-        }
+        private set => Set(ref _isOrganizing, value);
     }
 
     /// <summary>Whether the new-group form is showing.</summary>
     internal bool IsCreatingGroup
     {
         get => _isCreatingGroup;
-        private set
-        {
-            if (Set(ref _isCreatingGroup, value))
-            {
-                BeginCreateGroupCommand.RaiseCanExecuteChanged();
-                ConfirmCreateGroupCommand.RaiseCanExecuteChanged();
-                CancelGroupCommand.RaiseCanExecuteChanged();
-                Raise(nameof(CreateGroupPrompt));
-            }
-        }
+        private set => Set(ref _isCreatingGroup, value);
     }
 
     /// <summary>Whether the rename-group form is showing.</summary>
     internal bool IsRenamingGroup
     {
         get => _isRenamingGroup;
-        private set
-        {
-            if (Set(ref _isRenamingGroup, value))
-            {
-                BeginRenameGroupCommand.RaiseCanExecuteChanged();
-                ConfirmRenameGroupCommand.RaiseCanExecuteChanged();
-                CancelGroupCommand.RaiseCanExecuteChanged();
-                Raise(nameof(RenameGroupPrompt));
-                Raise(nameof(ShowsProjectRenameNote));
-                Raise(nameof(ProjectRenameNote));
-            }
-        }
+        private set => Set(ref _isRenamingGroup, value);
     }
 
     /// <summary>The title being typed for the selected entry.</summary>
@@ -635,7 +586,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         var wantedGroup = _selectedGroup?.Path;
 
         _all = [.. vault.ReadEntries()
-            .Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))
             .Select(entry => new EntryRow(entry.Title, entry.GroupPath) { Kind = EntryKinds.Of(entry) })];
         Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         MoveTargets = Groups;
@@ -649,7 +599,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             ?? Groups.FirstOrDefault(node => node.IsEverything);
 
         Raise(nameof(SelectedGroup));
-        RaiseHeader();
 
         // The vault changed underneath, so an answer about the old one is not an answer about this.
         _matchedQuery = null;
@@ -661,12 +610,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     private void OnActivity(object? sender, EventArgs e) => ApplyActivity();
-
-    private void RaiseHeader()
-    {
-        Raise(nameof(ListTitle));
-        Raise(nameof(SearchScope));
-    }
 
     /// <summary>Gives every row and the open pane the latest picture of what agents did, never a value.</summary>
     private void ApplyActivity()
@@ -700,18 +643,15 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _matchedQuery = string.Empty;
         _matches = [];
         _pinned = null;
-        _draftTitle = string.Empty;
-        _draftGroupName = string.Empty;
-        _moveTarget = null;
+        DraftTitle = string.Empty;
+        DraftGroupName = string.Empty;
+        MoveTarget = null;
         MoveTargets = [];
         IsOrganizing = false;
         IsCreatingGroup = false;
         IsRenamingGroup = false;
 
         Raise(nameof(Search));
-        Raise(nameof(DraftTitle));
-        Raise(nameof(DraftGroupName));
-        Raise(nameof(MoveTarget));
     }
 
     /// <summary>Nothing derived from the vault outlives this.</summary>
@@ -833,7 +773,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         // either one being in the result is what puts the pair on screen.
         Dictionary<EntryName, MatchedFields> found = [];
 
-        foreach (var match in vault.Search(query).Where(match => !ReservedGroups.IsReserved(match.Name.GroupPath)))
+        foreach (var match in vault.Search(query))
         {
             found[match.Name] = match.Fields;
         }
@@ -875,8 +815,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         IsOrganizing = false;
 
         Raise(nameof(Selected));
-        DeleteCommand.RaiseCanExecuteChanged();
-        OrganizeCommand.RaiseCanExecuteChanged();
     }
 
     private void BeginAdd()
@@ -920,46 +858,32 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
-        {
-            Error = "The vault is locked.";
-            return;
-        }
+        // Reversible where the vault has a recycle bin: the entry keeps its identity, fields
+        // and history, and Trash puts it back. The confirmation is the view's job, and it is
+        // the one place KpDanger appears. The row is addressed by its name rather than its
+        // path: two entries can share a path.
+        var write = _session.Write(
+            vault => (Outcome: vault.RemoveEntry(row.Name, out var id), Recycled: id),
+            removal => removal.Outcome != DeletionOutcome.NothingMatched);
 
-        DeletionOutcome outcome;
-        RecycledEntryId recycled;
-        var name = EntryNameSanitizer.SanitizePath(row.Path).Text;
-
-        try
+        if (write.Problem("delete this again") is { } problem)
         {
-            // Reversible where the vault has a recycle bin: the entry keeps its identity, fields
-            // and history, and Trash puts it back. The confirmation is the view's job, and it is
-            // the one place KpDanger appears. The row is addressed by its name rather than its
-            // path: two entries can share a path.
-            outcome = vault.RemoveEntry(row.Name, out recycled);
-
-            if (outcome == DeletionOutcome.NothingMatched)
-            {
-                Error = "That entry is not in this vault any more.";
-                IsConfirmingDelete = false;
-                Reload();
-                return;
-            }
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Error = "Something else changed this vault since you opened it. Reload to see it, then delete this again.";
-            return;
-        }
-        catch (VaultException e)
-        {
-            Error = e.Message;
+            Error = problem;
             return;
         }
 
         IsConfirmingDelete = false;
+
+        if (write.Outcome == WriteOutcome.NothingToSave)
+        {
+            Error = "That entry is not in this vault any more.";
+            Reload();
+            return;
+        }
+
+        var (outcome, recycled) = write.Value;
+        var name = EntryNameSanitizer.SanitizePath(row.Path).Text;
+
         Select(null);
         Reload();
 
@@ -979,37 +903,19 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
-        {
-            Error = "The vault is locked.";
-            return;
-        }
+        var write = _session.Write(
+            vault => vault.RestoreRecycled(id),
+            outcome => outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot);
 
-        RestoreOutcome outcome;
-
-        try
+        if (write.Problem("restore this from Trash") is { } problem)
         {
-            outcome = vault.RestoreRecycled(id);
-
-            if (outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot)
-            {
-                vault.Save();
-            }
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Error = "Something else changed this vault since you opened it. Reload to see it, then restore this from Trash.";
-            return;
-        }
-        catch (VaultException e)
-        {
-            Error = e.Message;
+            Error = problem;
             return;
         }
 
         Offer(null, null);
 
-        if (outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot)
+        if (write.Outcome == WriteOutcome.Saved)
         {
             Reload();
             Error = null;
@@ -1069,12 +975,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_session.Unlocked is not { } vault)
-        {
-            Error = "The vault is locked.";
-            return;
-        }
-
         var title = DraftTitle.Trim();
 
         if (title.Length == 0)
@@ -1092,38 +992,26 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         var target = new EntryName(MoveTarget?.Path ?? string.Empty, sanitized.Text);
 
-        OrganizeOutcome outcome;
-        EntryName? result;
+        var write = _session.Write(
+            vault => (Outcome: vault.Relocate(row.Name, target, out var relocated), Moved: relocated),
+            relocation => relocation.Outcome is OrganizeOutcome.Renamed or OrganizeOutcome.Moved or OrganizeOutcome.RenamedAndMoved);
 
-        try
+        if (write.Problem("make your change again") is { } problem)
         {
-            outcome = vault.Relocate(row.Name, target, out result);
-
-            if (outcome is not (OrganizeOutcome.Renamed
-                or OrganizeOutcome.Moved
-                or OrganizeOutcome.RenamedAndMoved))
-            {
-                Error = Refusal(outcome, target);
-                return;
-            }
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Error = "Something else changed this vault since you opened it. Reload to see it, then make your change again.";
-            return;
-        }
-        catch (VaultException e)
-        {
-            Error = e.Message;
+            Error = problem;
             return;
         }
 
-        var moved = result!;
+        if (write.Outcome == WriteOutcome.NothingToSave)
+        {
+            Error = Refusal(write.Value.Outcome, target);
+            return;
+        }
+
+        var moved = write.Value.Moved!;
 
         CloseOrganize();
-        Offer(null, Did(outcome, moved));
+        Offer(null, Did(write.Value.Outcome, moved));
 
         // Held in the result even when its new name no longer answers the query that found it, so
         // the entry does not vanish from under somebody at the moment they renamed it.
@@ -1221,12 +1109,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Func<string, string> said,
         bool follow)
     {
-        if (_session.Unlocked is not { } vault)
-        {
-            Error = "The vault is locked.";
-            return;
-        }
-
         var name = DraftGroupName.Trim();
 
         if (name.Length == 0)
@@ -1242,31 +1124,21 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             return;
         }
 
-        string path;
+        var write = _session.Write(vault => operation(vault, sanitized.Text), result => result.Outcome == success);
 
-        try
+        if (write.Problem("make your change again") is { } problem)
         {
-            var (outcome, produced) = operation(vault, sanitized.Text);
-
-            if (outcome != success)
-            {
-                Error = Refusal(outcome);
-                return;
-            }
-
-            path = produced;
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Error = "Something else changed this vault since you opened it. Reload to see it, then make your change again.";
+            Error = problem;
             return;
         }
-        catch (VaultException e)
+
+        if (write.Outcome == WriteOutcome.NothingToSave)
         {
-            Error = e.Message;
+            Error = Refusal(write.Value.Outcome);
             return;
         }
+
+        var path = write.Value.Path;
 
         CloseGroupForms();
         Reload();
@@ -1383,6 +1255,5 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _undo = undo;
         Notice = notice;
         Raise(nameof(CanUndoDelete));
-        UndoDeleteCommand.RaiseCanExecuteChanged();
     }
 }

@@ -255,6 +255,35 @@ public sealed class EnvPullTests
         Assert.Empty(harness.Prompt.PromptsSeen);
     }
 
+    /// <summary>
+    /// The size is refused before the file is read: a file past what one read can hold fails a
+    /// whole-file read with an I/O error, so only a reader that asks first says it is too large (F.55).
+    /// </summary>
+    [Fact]
+    public void Pull_OfAnOversizedFile_IsRefusedBeforeItIsRead()
+    {
+        using var harness = Seeded();
+        var path = Path.Combine(harness.Directory, "huge.env");
+
+        using (var file = File.Create(path))
+        {
+            file.SetLength((long)int.MaxValue + 1);
+        }
+
+        try
+        {
+            var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
+
+            Assert.Equal(CliApp.ExitUsageError, exit);
+            Assert.Contains("is larger than 1024 KiB, which is not a .env file", harness.Err, StringComparison.Ordinal);
+            Assert.Empty(harness.Prompt.PromptsSeen);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void Pull_WithNoPathOperand_LooksForDotEnv()
     {

@@ -297,8 +297,8 @@ public static class VaultBackups
         try
         {
             using var vault = Vault.Open(listed.Path, password, keyfilePath, hardwareKey);
-            entries = vault.ReadEntries().Count;
-            groups = vault.ReadGroupPaths().Count;
+            entries = vault.ReadEntries(includeReserved: true).Count;
+            groups = vault.ReadGroupPaths(includeReserved: true).Count;
             projects = ProjectCatalog.Read(vault).Projects.Count;
         }
         catch (VaultException ex) when (ex is not UnreadableKeyfileException and not HardwareKeys.HardwareKeyException)

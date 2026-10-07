@@ -6,6 +6,7 @@ using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Tokens;
 
 namespace Keypaste.Cli.Commands;
@@ -454,24 +455,11 @@ internal static class TokenCommand
             return CliApp.ExitInternalError;
         }
 
-        var temporary = Path.Combine(
-            Path.GetDirectoryName(destination)!,
-            $".{Path.GetFileName(destination)}.{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.tmp");
-
         using (audit)
         {
             try
             {
-                var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
-                if (!OperatingSystem.IsWindows())
-                {
-                    options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-                }
-
-                using (var stream = new FileStream(temporary, options))
-                {
-                    stream.Write(bundle);
-                }
+                using var staged = AtomicFile.Stage(destination, bundle);
 
                 var record = new AuditRecord
                 {
@@ -490,16 +478,14 @@ internal static class TokenCommand
 
                 if (!audit.TryAppend(record, out var appendError))
                 {
-                    File.Delete(temporary);
                     context.Stderr.WriteLine($"keypaste token bundle: {appendError}; nothing was written");
                     return CliApp.ExitInternalError;
                 }
 
-                File.Move(temporary, destination, overwrite: true);
+                staged.Commit();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                File.Delete(temporary);
                 context.Stderr.WriteLine($"keypaste token bundle: the bundle could not be written: {ex.Message}");
                 return CliApp.ExitInternalError;
             }

@@ -1,5 +1,6 @@
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -79,9 +80,8 @@ internal static class SetCommand
             return CliApp.ExitUsageError;
         }
 
-        var target = line.Operands[0];
-        var slash = target.LastIndexOf('/');
-        var name = new EntryName(WrittenGroup.Normalize(slash < 0 ? string.Empty : target[..slash]), target[(slash + 1)..]);
+        var typed = EntryName.Parse(line.Operands[0]);
+        var name = new EntryName(WrittenGroup.Normalize(typed.GroupPath), typed.Title);
         var entryPath = name.GroupPath.Length == 0 ? name.Title : name.GroupPath + "/" + name.Title;
 
         if (name.Title.Length == 0)
@@ -111,6 +111,12 @@ internal static class SetCommand
 
             var existing = vault.Find(name);
 
+            if (existing is null && !Vault.IsCreatable(name, out var refusal))
+            {
+                context.Stderr.WriteLine($"keypaste set: {refusal}");
+                return CliApp.ExitUsageError;
+            }
+
             using var secret = recipe is { } wanted ? GenerateOption.Generate(wanted) : ReadValue(context);
 
             if (secret is null)
@@ -122,7 +128,7 @@ internal static class SetCommand
 
             if (existing is null)
             {
-                vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = value });
+                vault.CreateEntryAtPath(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = value });
             }
             else
             {

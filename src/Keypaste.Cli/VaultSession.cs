@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ownership;
 
 namespace Keypaste.Cli;
