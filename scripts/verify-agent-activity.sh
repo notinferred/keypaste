@@ -61,8 +61,10 @@ start_bridge() {
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 }
 
+# Asks for $ENTRY's field $2, the password unless named.
 ask() {
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci agent activity probe\",\"ttl_seconds\":60}}}" >&8
+  local field="${2:-password}"
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"$field\",\"reason\":\"ci agent activity probe\",\"ttl_seconds\":60}}}" >&8
 }
 
 reply() {
@@ -180,8 +182,9 @@ shows "^history .*DEPLOY_KEY.*denied.*prompt" "the refusal from the audit file"
 shows "^history-heading 4 records of [0-9]+ in .*, this session$" "every record of this session"
 
 # ------------------------------------------------ a lock empties both lists; the next session has none
+# Another field, because the refusal above cools the password down for every bridge (D-0425).
 start_bridge second
-ask 3
+ask 3 username
 wait_for '^prompt client' "$HOLD_OUT" 4
 activity
 shows '^waiting n=1 ' "the request waiting before the lock"

@@ -10,8 +10,8 @@ namespace Keypaste.Core.Ownership;
 /// <param name="Grants">The timed grants a person gave repeated runs, or null to ask about every run.</param>
 /// <param name="Narrate">Optional: a line for the operator's terminal when a timed grant releases a set unasked.</param>
 /// <param name="Audit">
-/// Where the owner records what a scoped token was given, asked for only when a token is presented so
-/// an owner that never sees one creates no log; null, or a null answer, refuses every token.
+/// Where the owner records what a scoped token or a <c>run --session</c> was given, asked for only when
+/// one arrives so an owner that never sees one creates no log; null, or a null answer, refuses them.
 /// </param>
 public sealed record SessionEnvironments(
     ApprovalGate Gate,

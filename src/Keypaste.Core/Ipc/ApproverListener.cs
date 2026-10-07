@@ -24,15 +24,25 @@ namespace Keypaste.Core.Ipc;
 /// that vanishes — costs that connection and nothing else. The approver holds the unlocked vault,
 /// so it is the last process in keypaste that may be brought down by something a peer sent.
 /// </para>
+/// <para>
+/// <b>At most <see cref="MaxConnections"/> are served at once</b>, and one more is closed as soon as
+/// it connects, so a process opening connections it never uses cannot exhaust the approver. Nothing
+/// closes an idle connection: a bridge waits between an agent's requests, and its grants end with it.
+/// </para>
 /// </remarks>
 public sealed class ApproverListener : IDisposable
 {
+    /// <summary>How many connections are served at once.</summary>
+    public const int MaxConnections = 64;
+
     private static readonly TimeSpan _deliveryBound = TimeSpan.FromSeconds(1);
 
     private readonly string _pipeName;
     private readonly IApproverHandler _handler;
+    private readonly int _maxConnections;
     private NamedPipeServerStream? _pending;
     private int _connections;
+    private int _serving;
     private bool _disposed;
 
     /// <summary>Builds a listener, binding the pipe immediately.</summary>
@@ -47,12 +57,20 @@ public sealed class ApproverListener : IDisposable
     /// race against a pipe that does not exist yet.
     /// </remarks>
     public ApproverListener(string pipeName, IApproverHandler handler)
+        : this(pipeName, handler, MaxConnections)
+    {
+    }
+
+    /// <summary>Builds a listener that serves at most <paramref name="maxConnections"/> at once; a test seam.</summary>
+    internal ApproverListener(string pipeName, IApproverHandler handler, int maxConnections)
     {
         ArgumentNullException.ThrowIfNull(pipeName);
         ArgumentNullException.ThrowIfNull(handler);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxConnections, 1);
 
         _pipeName = pipeName;
         _handler = handler;
+        _maxConnections = maxConnections;
         _pending = Create();
     }
 
@@ -97,6 +115,15 @@ public sealed class ApproverListener : IDisposable
                 // which a second bridge finds nothing listening.
                 _pending = Create();
 
+                // Counted rather than read off the tasks, so a connection is free again by the time its
+                // handler hears it ended, not at some later turn of this loop.
+                if (Volatile.Read(ref _serving) >= _maxConnections)
+                {
+                    await pipe.DisposeAsync().ConfigureAwait(false);
+                    continue;
+                }
+
+                Interlocked.Increment(ref _serving);
                 var id = string.Create(CultureInfo.InvariantCulture, $"conn-{Interlocked.Increment(ref _connections)}");
 
                 live.RemoveAll(task => task.IsCompleted);
@@ -167,6 +194,7 @@ public sealed class ApproverListener : IDisposable
 
             // Closing the pipe ends a read still pending; its outcome is nobody's to act on.
             _ = next?.ContinueWith(static read => read.Exception, TaskScheduler.Default);
+            Interlocked.Decrement(ref _serving);
             _handler.Disconnected(connectionId);
         }
     }

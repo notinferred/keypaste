@@ -11,8 +11,8 @@ Usage: bash scripts/dev.sh [--wait]
 Pushes the current branch and follows GitHub's verdict on it. Needs only git and gh; nothing builds
 on this machine.
 
-With no option it opens a draft pull request for the branch if there is none, and follows the ci and
-app runs each push to it starts: every job on all three runners. Each job is printed as it finishes.
+With no option it dispatches ci.yml and app.yml on the branch and follows their runs: every job on all
+three runners. No pull request is opened. Each job is printed as it finishes.
 The first failure ends the wait with that job's log; the runs carry on until the next push cancels them.
 
 --class   a fully qualified test class, run through dev.yml in its own project
@@ -79,16 +79,16 @@ if [ -n "$class" ] || [ "$relock" = true ]; then
   [ "$head" = "$sha" ] || die "run $id tests $head, not HEAD $sha"
   runs=("$id")
 else
-  pr="$(gh pr view "$branch" --json url,state --jq 'select(.state == "OPEN") | .url' 2>/dev/null || true)"
-  if [ -n "$pr" ]; then echo "$pr"; else gh pr create --draft --base main --head "$branch" --fill-first; fi
   # By workflow file, since a run whose file does not parse is named after its path.
   for workflow in ci.yml app.yml; do
+    before="$(gh run list --workflow "$workflow" --branch "$branch" --event workflow_dispatch --limit 1 --json databaseId --jq '.[].databaseId' || true)"
+    gh workflow run "$workflow" --ref "$branch" > /dev/null
     found='' tries=0
     while [ -z "$found" ] && [ "$tries" -lt 40 ]; do
       sleep 3
       tries=$((tries + 1))
-      found="$(gh run list --workflow "$workflow" --branch "$branch" --commit "$sha" --event pull_request --limit 1 \
-        --json databaseId --jq '.[].databaseId' || true)"
+      found="$(gh run list --workflow "$workflow" --branch "$branch" --commit "$sha" --event workflow_dispatch --limit 1 \
+        --json databaseId --jq ".[] | select(.databaseId != ${before:-0}) | .databaseId" || true)"
     done
     [ -n "$found" ] || die "no $workflow run started for $sha within 2 minutes"
     runs+=("$found")
@@ -117,15 +117,15 @@ while [ "$finished" = false ]; do
   sleep 10
   finished=true
   for id in "${runs[@]}"; do
-    report="$(gh run view "$id" --json status,conclusion,workflowName,jobs --jq '"\(.status) \(.conclusion) \(.jobs | length)", (.workflowName as $w | .jobs[]
+    report="$(gh run view "$id" --json status,conclusion,workflowName,jobs --jq '"\(.status) \(.conclusion)", (.workflowName as $w | .jobs[]
       | select(.status == "completed" and .conclusion != "skipped")
       | "\(.databaseId) \(.conclusion) \(try ((.completedAt | fromdateiso8601) - (.startedAt | fromdateiso8601)) catch 0) \($w) \(.name)")')" \
       || { finished=false; continue; }
-    read -r status conclusion jobs <<< "$(sed -n 1p <<< "$report")"
+    read -r status conclusion <<< "$(sed -n 1p <<< "$report")"
     [ "$status" = completed ] || finished=false
-    # A run GitHub refused before any job started, such as one whose workflow file is broken.
-    if [ "$status" = completed ] && [ "$jobs" = 0 ] && [ "$conclusion" != success ]; then
-      case "$seen" in *" run$id "*) ;; *) seen="${seen}run$id "; failed+=("run:$id run $id ended $conclusion with no job") ;; esac
+    # A run GitHub failed with no failed job: a broken workflow file, or a job it never created.
+    if [ "$status" = completed ] && [ "$conclusion" != success ] && [ -z "$(sed 1d <<< "$report" | awk '$2 != "success"')" ]; then
+      case "$seen" in *" run$id "*) ;; *) seen="${seen}run$id "; failed+=("run:$id run $id ended $conclusion with no failed job") ;; esac
     fi
     while read -r job conclusion seconds workflow name; do
       [ -n "$job" ] || continue

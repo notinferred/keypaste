@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Xunit;
@@ -20,6 +22,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-authority-env-").FullName;
     private readonly ApproverFixture _fixture = new();
     private readonly Vault _vault;
+    private readonly AuditLog _audit;
     private SessionLifetime? _lifetime = new("session-one");
 
     public SessionAuthorityEnvTests()
@@ -33,11 +36,15 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         }
 
         _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        Assert.True(AuditLog.TryOpen(AuditPath, _fixture.Clock, out var audit, out var error), error);
+        _audit = audit;
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private string VaultPath => Path.Combine(_directory, "vault.kdbx");
+
+    private string AuditPath => Path.Combine(_directory, "audit.jsonl");
 
     private string WorkDirectory => Path.Combine(_directory, "work");
 
@@ -45,12 +52,33 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     {
         _lifetime?.Dispose();
         _vault.Dispose();
+        _audit.Dispose();
         _fixture.Dispose();
         Directory.Delete(_directory, recursive: true);
     }
 
     private EnvRequest Request(string session, string project = "dev", IReadOnlyList<string>? command = null) =>
         new(project, command ?? ["deploy", "--to", "staging area"], WorkDirectory) { Vault = VaultPath, Session = session };
+
+    /// <summary>The log as the owner still holds it open for writing, which File.ReadAllText cannot share on Windows.</summary>
+    private string AuditText()
+    {
+        using var stream = new FileStream(AuditPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+
+        return reader.ReadToEnd();
+    }
+
+    private List<JsonElement> AuditLines()
+    {
+        return [.. AuditText().Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(Parse)];
+
+        static JsonElement Parse(string line)
+        {
+            using var document = JsonDocument.Parse(line);
+            return document.RootElement.Clone();
+        }
+    }
 
     [Fact]
     public async Task Approve_releases_the_whole_set_after_showing_names_command_and_directory()
@@ -73,6 +101,92 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.False(prompt.CommandWasAltered);
         Assert.DoesNotContain(_token1, prompt.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(_token2, prompt.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The owner records a run's release itself, as it records a token's: a run has no bridge to write
+    /// its line (T-30). The line names the set and the entries it came from, never a value.
+    /// </summary>
+    [Fact]
+    public async Task A_run_release_and_a_refusal_are_each_audited_by_the_owner()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using (var client = await AttachedAsync(owner))
+        {
+            Assert.Equal(EnvOutcome.Resolved, (await client.ReleaseEnvAsync(Request("session-one"), Token))?.Set.Outcome);
+        }
+
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using (var client = await AttachedAsync(owner))
+        {
+            Assert.Equal(EnvOutcome.Declined, (await client.ReleaseEnvAsync(Request("session-one", command: ["deploy", "--other"]), Token))?.Set.Outcome);
+        }
+
+        var lines = AuditLines();
+        Assert.Equal(["granted", "denied"], lines.Select(line => line.GetProperty("decision").GetString()));
+        Assert.All(lines, line =>
+        {
+            Assert.Equal("run", line.GetProperty("tool").GetString());
+            Assert.Equal("keypaste run --session", line.GetProperty("client").GetProperty("name").GetString());
+            Assert.Equal("prompt", line.GetProperty("method").GetString());
+            Assert.Equal("session-one", line.GetProperty("session").GetString());
+        });
+        Assert.Equal(["env/dev/.env"], lines[0].GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()).Distinct());
+
+        var text = AuditText();
+        Assert.DoesNotContain(_token1, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(_token2, text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A set naming more entries than one audit line can record is refused before anybody is asked, so
+    /// a person never approves a release that is then refused for want of its line.
+    /// </summary>
+    [Fact]
+    public async Task A_run_whose_entries_would_not_fit_its_audit_line_is_refused_unasked()
+    {
+        foreach (var i in Enumerable.Range(0, 30))
+        {
+            var wide = new EntryName("env/wide", $"KEY_{i}_" + new string('W', 70));
+            _vault.AddEntry(new VaultEntry { GroupPath = wide.GroupPath, Title = wide.Title });
+            Assert.True(_vault.SetFields(wide, [new FieldWrite(wide.Title, $"w{i}")]));
+            Assert.True(_vault.AddTag(wide, "env:wide"));
+        }
+
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseEnvAsync(Request("session-one", project: "wide"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Invalid, reply.Set.Outcome);
+        Assert.Equal("the run names more entries than one audit line can record", reply.Reason);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Equal("invalid-request", Assert.Single(AuditLines()).GetProperty("method").GetString());
+    }
+
+    /// <summary>No record, no release: a set whose audit line cannot be written is refused whole.</summary>
+    [Fact]
+    public async Task A_run_whose_audit_line_cannot_be_written_releases_nothing()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        EnvReply? reply;
+        using (new FileStream(AuditPath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            reply = await client.ReleaseEnvAsync(Request("session-one"), Token);
+        }
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Unreadable, reply.Set.Outcome);
+        Assert.Equal("the audit log could not be written", reply.Reason);
+        Assert.Empty(reply.Set.Variables);
+        Assert.DoesNotContain(_token1, reply.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -569,7 +683,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
             VaultIdentity.Of(_directory, VaultPath),
             () => _lifetime,
             _fixture.Handler,
-            new SessionEnvironments(_fixture.Gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, _fixture.Clock));
+            new SessionEnvironments(_fixture.Gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, _fixture.Clock, Audit: () => _audit));
         Assert.True((await authority.AttachAsync(new AttachRequest(VaultPath), "in-process", Token)).Attached);
 
         var badProfile = await authority.ReleaseEnvAsync(Request("session-one") with { Profile = "Prod" }, "in-process", Token);
@@ -636,7 +750,8 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                 lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
                 _fixture.Clock,
                 grants,
-                narrate));
+                narrate,
+                () => _audit));
 
     /// <summary>One run: a new connection that attaches and asks once, as every <c>keypaste run --session</c> is.</summary>
     private async Task<EnvReply> RunAsync(SessionAuthority authority, EnvRequest request)
@@ -705,7 +820,8 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                     ? new SessionEnvironments(
                         test._fixture.Gate,
                         lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,
-                        test._fixture.Clock)
+                        test._fixture.Clock,
+                        Audit: () => test._audit)
                     : null);
 
             return new Owner(name, new ApproverListener(name, authority));

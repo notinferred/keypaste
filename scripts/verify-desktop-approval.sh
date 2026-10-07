@@ -7,7 +7,8 @@
 # the lifetime. Approve returns the field, audited as a prompted grant naming the app's session and the
 # label. Deny, closing the prompt, the client cancelling, the bridge going away, a lock and the gate's
 # timeout each return a denial with the matching method and take the prompt down. Each case uses a new
-# bridge, so no grant or cooldown carries from one to the next.
+# bridge, so no grant carries from one to the next, and Deny and closing each ask for a field of their
+# own, because a refusal cools that field down for every bridge (D-0425).
 #
 # NEGATIVE CONTROL: this fails if a request is released without a press of Approve, if Approve does not
 # release it, if an audit line names the wrong method, session or label, or if a prompt stays up after
@@ -195,13 +196,13 @@ for value in "$API_PASSWORD" "$API_KEY" "$RECOVERY"; do
 done
 
 # ---------------------------------------------------------------- Deny and closing refuse
-raise_prompt deny
+raise_prompt deny username
 echo deny >&7
 answered 30
 withdrawn
 denied_as prompt "$FIRST" "Deny"
 
-raise_prompt close
+raise_prompt close url
 echo close >&7
 answered 30
 withdrawn

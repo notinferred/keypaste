@@ -507,12 +507,13 @@ public sealed class ApproverHandler
             : null;
 
     /// <summary>
-    /// What counts as "the same request" for the cooldown: the same connection asking for the same
-    /// field of the same entry. Spelled out rather than using the key's generated ToString, which
-    /// is a debugger convenience and not a thing to key behaviour on.
+    /// What counts as "the same request" for the cooldown: the same field of the same entry, whichever
+    /// connection asks, so a client that reconnects or starts another bridge is refused without a
+    /// second prompt (T-11). Spelled out rather than using the key's generated ToString, which is a
+    /// debugger convenience and not a thing to key behaviour on.
     /// </summary>
     private static string CooldownKey(GrantKey key) =>
-        $"{key.ConnectionId}|{key.Handle}|{key.Field}";
+        $"{key.Handle}|{key.Field}";
 
     private static CredentialReply Refused(AuditMethod method, string reason, string? entry = null) => new()
     {

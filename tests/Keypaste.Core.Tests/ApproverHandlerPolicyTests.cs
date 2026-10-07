@@ -226,34 +226,17 @@ public sealed class ApproverHandlerPolicyTests
 
     /// <summary>
     /// A refusal a person just gave outranks a rule that would otherwise have released the same
-    /// thing silently.
+    /// thing silently, including a refusal given to a client the rule does not cover: the cooldown
+    /// holds the field for every connection (D-0425), and it is checked before the policy (D-0029).
     /// </summary>
-    /// <remarks>
-    /// <b>No shipped path can reach this state today, and the check is kept anyway.</b> A rule that
-    /// matches never prompts, so it never arms a cooldown for its own request; a rule that has spent
-    /// its allowance denies rather than escalating; and the rule set is read once and never widens
-    /// mid-session. So the probe in front of the policy evaluation is defence in depth, for the
-    /// paths Stage 2.4 and 4.3 add — a per-client pause, a revoke switch — each of which produces a
-    /// human "no" about a request some rule also covers.
-    /// <para>
-    /// Which is why this test arms the state directly, through the gate, rather than pretending to
-    /// reach it: a test that drove it through <c>RequestAsync</c> would be asserting something the
-    /// handler cannot currently do, and would pass whether or not the probe existed.
-    /// </para>
-    /// </remarks>
     [Fact]
     public async Task ARefusalAPersonJustGave_OutranksAMatchingRule()
     {
         using var fixture = new ApproverFixture(Policy());
         fixture.Channel.Answer = ApprovalAnswer.Denied;
 
-        // The key the handler computes for this request: connection, entry handle, field.
-        var handle = EntryHandle.For(new EntryName("env/dev", "STRIPE_KEY"));
-        var key = $"conn-1|{handle}|password";
-        var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "why", 300);
-
-        Assert.Equal(ApprovalAnswer.Denied, await fixture.Gate.AskAsync(key, prompt, Token));
-        Assert.True(fixture.Gate.IsInCooldown(key));
+        var refused = await fixture.Handler.RequestAsync(Request(label: "other-bot"), "conn-2", Token);
+        Assert.Equal(AuditMethod.Prompt, refused.Method);
 
         // The rule covers this request exactly, and it must still be refused.
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -262,6 +245,7 @@ public sealed class ApproverHandlerPolicyTests
         Assert.Equal(AuditMethod.Cooldown, reply.Method);
         Assert.Null(reply.Value);
         Assert.Equal(0, fixture.Source.Reads);
+        Assert.Equal(1, fixture.Channel.Asked);
     }
 
     [Fact]

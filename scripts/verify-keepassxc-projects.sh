@@ -247,9 +247,10 @@ step "a real keypaste agent and keypaste mcp: the hour is refused for a protecte
 pipe="keypaste-projects-$$-$(date +%s)"
 audit="$dir/audit.jsonl"
 agent_err="$dir/agent.err"
-# One answer per request, in order: the hour for the dev entry, the hour then once for the prod
-# entry, the hour for the entry KeePassXC tagged through the merge, and the hour for env/billing/prod/DB.
-printf '%s\nh\nh\no\nh\nh\n' "$pw" | "$kp" agent --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
+# One answer per request, in order: the hour for the dev entry, once then the hour for the prod entry
+# (once first, because refusing the hour cools that field down for every bridge, D-0425), the hour for
+# the entry KeePassXC tagged through the merge, and the hour for env/billing/prod/DB.
+printf '%s\nh\no\nh\nh\nh\n' "$pw" | "$kp" agent --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
   >/dev/null 2>"$agent_err" &
 agent_pid=$!
 for _ in $(seq 1 100); do
@@ -273,17 +274,17 @@ ask() {
 granted() { jq -e --argjson id "$1" 'select(.id == $id) | .result.isError == false' >/dev/null; }
 
 ask 2 services/Stripe | granted 2 || die "the dev entry answered with the hour was not released (the hour is not honoured, so the control fails)"
-ask 3 services/Database | granted 3 && die "the prod-tagged entry was released for the hour"
-ask 4 services/Database | granted 4 || die "the prod-tagged entry answered once was not released"
+ask 3 services/Database | granted 3 || die "the prod-tagged entry answered once was not released"
+ask 4 services/Database | granted 4 && die "the prod-tagged entry was released for the hour"
 ask 5 services/Other | granted 5 && die "the entry KeePassXC tagged env:billing:Prod was released for the hour"
 ask 6 env/billing/prod/DB | granted 6 || die "the untagged env/billing/prod/DB answered with the hour was not released: a path protected it"
 
 [ "$(tr -d '\r' <"$agent_err" | grep -c 'it is asked about every time')" = 3 ] \
   || die "keypaste agent did not say three times that the entry is asked about every time: $(cat "$agent_err")"
 jq -e -s 'map(select(.method == "prompt")) | length == 5
-          and .[0].decision == "granted" and .[1].decision == "denied"
-          and .[2].decision == "granted" and .[3].decision == "denied" and .[4].decision == "granted"' <"$audit" >/dev/null \
-  || die "the audit log does not show granted, denied, granted, denied, granted: $(cat "$audit")"
+          and .[0].decision == "granted" and .[1].decision == "granted"
+          and .[2].decision == "denied" and .[3].decision == "denied" and .[4].decision == "granted"' <"$audit" >/dev/null \
+  || die "the audit log does not show granted, granted, denied, denied, granted: $(cat "$audit")"
 
 step "C.1b: KeePassXC makes a vault whose billing project is tagged entries' fields, beside the untagged entries"
 child=${BASH:-/bin/bash}

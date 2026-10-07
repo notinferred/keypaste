@@ -65,10 +65,11 @@ public sealed class ApproverHandlerTests
         Assert.Equal(0, fixture.Source.Reads);
         Assert.Null(reply.Value);
 
-        // ...and the same source does read when the answer changes, so this is not passing because
-        // reading is broken.
+        // ...and the same source does read when the answer changes once the refusal's cooldown is
+        // over, so this is not passing because reading is broken.
+        fixture.Clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultCooldownSeconds + 1));
         fixture.Channel.Answer = ApprovalAnswer.Approved;
-        await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
         Assert.Equal(1, fixture.Source.Reads);
     }
@@ -709,6 +710,27 @@ public sealed class ApproverHandlerTests
 
         Assert.Equal(AuditMethod.Cooldown, again.Method);
         Assert.Equal(1, fixture.Channel.Asked);
+    }
+
+    /// <summary>
+    /// A refusal holds back the same field of the same entry whichever connection asks next, so an
+    /// agent that reconnects or starts another bridge is refused without a second prompt (T-11).
+    /// </summary>
+    [Fact]
+    public async Task ADenial_CoolsTheSameFieldDownForAnotherConnection()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Denied;
+
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        var reconnected = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
+
+        Assert.Equal(AuditMethod.Cooldown, reconnected.Method);
+        Assert.Equal(AuditDecision.Granted, otherField.Decision);
+        Assert.Equal(2, fixture.Channel.Asked);
     }
 
     private static ApproverHandler LiveOnly(ApproverFixture fixture) =>

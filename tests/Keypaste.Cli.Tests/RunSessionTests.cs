@@ -396,6 +396,7 @@ public sealed class RunSessionTests : IDisposable
         private readonly Vault _vault;
         private readonly GrantCache _grants = new(TimeProvider.System);
         private readonly ApprovalGate _gate;
+        private readonly AuditLog? _audit;
         private readonly ApproverListener _listener;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _running;
@@ -405,6 +406,9 @@ public sealed class RunSessionTests : IDisposable
             _vault = Vault.Open(test._harness.VaultPath, _master);
             Channel = new ScriptedChannel(answer);
             _gate = new ApprovalGate(Channel, TimeProvider.System, ApprovalLimits.Default);
+            _audit = AuditLog.TryOpen(KeypasteHome.AuditPath(test._harness.Directory), TimeProvider.System, out var audit, out var error)
+                ? audit
+                : throw new InvalidOperationException(error);
 
             var handler = new ApproverHandler(
                 new VaultCredentialSource(() => _vault),
@@ -417,7 +421,7 @@ public sealed class RunSessionTests : IDisposable
                 VaultIdentity.Of(test._harness.Directory, test._harness.VaultPath),
                 () => Lifetime,
                 handler,
-                new SessionEnvironments(_gate, asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null, TimeProvider.System));
+                new SessionEnvironments(_gate, asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null, TimeProvider.System, Audit: () => _audit));
 
             _listener = new ApproverListener(test._pipe, authority);
             _running = _listener.RunAsync(_stop.Token);
@@ -446,6 +450,7 @@ public sealed class RunSessionTests : IDisposable
             Lifetime.Dispose();
             _gate.Dispose();
             _grants.Dispose();
+            _audit?.Dispose();
             _vault.Dispose();
             _stop.Dispose();
         }

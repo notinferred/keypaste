@@ -499,6 +499,58 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(1, _fixture.Channel.Asked);
     }
 
+    /// <summary>
+    /// A refusal also holds back the same secrets from another connection, so an agent that starts a
+    /// new bridge is refused without a second prompt; other secrets from that new connection are still
+    /// asked about (T-11).
+    /// </summary>
+    [Fact]
+    public async Task ADenial_CoolsTheSameSecretsDownForANewConnection()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+
+        await using (var client = await AttachedAsync(owner))
+        {
+            Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run(), Token))!.Method);
+        }
+
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var renewed = await AttachedAsync(owner);
+        var again = await renewed.ReleaseRunAsync(Run(command: ["npm", "run", "migrate", "--verbose"]), Token);
+        var other = await renewed.ReleaseRunAsync(Run() with { Profile = "prod" }, Token);
+
+        Assert.Equal(AuditMethod.Cooldown, again!.Method);
+        Assert.NotEqual(AuditMethod.Cooldown, other!.Method);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    /// <summary>
+    /// The cooldown names the entries and fields a run reaches, not how it spells them, so renaming a
+    /// variable or reordering references from a new bridge is still the same question (T-11).
+    /// </summary>
+    [Fact]
+    public async Task ADenial_CoolsTheSameSecretsHoweverANewConnectionNamesThem()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+
+        await using (var client = await AttachedAsync(owner))
+        {
+            var refused = await client.ReleaseRunAsync(
+                References(("DB", "kp://acme-api/prod/DATABASE_URL"), ("GH", "kp:///personal/github#username")), Token);
+            Assert.Equal(AuditMethod.Prompt, refused!.Method);
+        }
+
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var renewed = await AttachedAsync(owner);
+        var respelled = await renewed.ReleaseRunAsync(
+            References(("GITHUB_USER", "kp:///personal/github#username"), ("DATABASE", "kp://acme-api/prod/DATABASE_URL")), Token);
+
+        Assert.Equal(AuditMethod.Cooldown, respelled!.Method);
+        Assert.Equal(1, _fixture.Channel.Asked);
+    }
+
     [Fact]
     public async Task LockWhileAsked_ReleasesNothing()
     {
