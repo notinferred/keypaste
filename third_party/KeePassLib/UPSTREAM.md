@@ -60,6 +60,14 @@ KeePass has no hardware-key factor; KeePassXC's YubiKey challenge-response chang
 | `Keys/CompositeKey.cs` | `CreateRawCompositeKey32`, `GenerateKey32` and `GenerateKey32Ex` gain overloads that challenge; `ChallengeResponse` and `KdfSeed` are added |
 | `Serialization/KdbxFile.cs` | `ComputeKeys` challenges the KDF seed from KDBX 4, and the master seed into the cipher key before it |
 
+### `KEYPASTE_ATOMIC_REPLACE`
+
+Where Transactional NTFS is not used, which is always off Windows, `FileTransactionEx` commits a save by deleting the vault and then renaming the temporary file to its name, because `File.Move` could not overwrite on the frameworks upstream targets. A process that dies between the two leaves no file at the vault's path. This guard replaces both calls with `File.Move(temp, vault, overwrite: true)`, a single `rename` on POSIX and a replacing move on NTFS, so the path holds the old vault or the new one at every moment. Remote paths and the Transactional NTFS move are unchanged.
+
+| File | Change |
+|---|---|
+| `Serialization/FileTransactionEx.cs` | `CommitWriteTransaction` moves a local temporary file over the vault in one call instead of deleting and renaming |
+
 ### Files excluded from compilation
 
 | Path | Reason |

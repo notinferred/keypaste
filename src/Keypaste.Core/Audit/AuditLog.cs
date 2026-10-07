@@ -244,6 +244,12 @@ public sealed class AuditLog : IDisposable
 
             try
             {
+                if (FileLocking.IsDisabled)
+                {
+                    error = $"the audit log at '{Path}' cannot be locked: {FileLocking.Refusal}";
+                    return false;
+                }
+
                 writeLock = AcquireWriteLock();
                 if (writeLock is null)
                 {

@@ -99,8 +99,14 @@ for id in "${runs[@]}"; do gh run view "$id" --json url --jq .url; done
 # The end of a finished job's log, read while the run goes on, which gh run view refuses. Its colours and
 # other control characters are dropped, and with them the timestamps and the runner's cleanup.
 job_log() {
-  local esc=$'\033'
-  gh api --allow-escape-sequences "repos/{owner}/{repo}/actions/jobs/$1/logs" \
+  local esc=$'\033' log='' tries=0
+  # A job's log is published a few seconds after the job completes.
+  while [ -z "$log" ] && [ "$tries" -lt 6 ]; do
+    [ "$tries" -eq 0 ] || sleep 5
+    tries=$((tries + 1))
+    log="$(gh api --allow-escape-sequences "repos/{owner}/{repo}/actions/jobs/$1/logs" 2>/dev/null || true)"
+  done
+  printf '%s\n' "$log" \
     | sed "s/${esc}\[[0-9;]*[A-Za-z]//g" | LC_ALL=C tr -d '\000-\010\013-\037\177' \
     | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' | sed '/^Post job cleanup\./,$d' | tail -n 150 || true
 }

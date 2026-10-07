@@ -203,6 +203,38 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         Assert.Null(Record.Exception(vault.Save));
     }
 
+    /// <summary>
+    /// A write landing straight after this vault's save is another program's, not this vault's own.
+    /// </summary>
+    /// <remarks>
+    /// Stamped by reading the file back after the save, the vault took that write for its own state,
+    /// and its next save reverted it. The stamp is the digest of the bytes the save wrote.
+    /// </remarks>
+    [Fact]
+    public void A_write_landing_straight_after_a_save_is_not_taken_for_its_own()
+    {
+        var path = NewVault();
+
+        using var first = Vault.Open(path, MasterPassword);
+        using var second = Vault.Open(path, MasterPassword);
+
+        first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
+        first.SaveWaiting(null, afterReplacing: () =>
+        {
+            second.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
+            second.SaveOverwriting();
+        });
+
+        Assert.True(first.HasFileChangedSinceOpen());
+
+        first.AddEntry(new VaultEntry { Title = "a-later-edit", Password = "third" });
+        Assert.Throws<VaultChangedOnDiskException>(first.Save);
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        Assert.NotNull(reopened.Find("from-the-terminal"));
+        Assert.Null(reopened.Find("a-later-edit"));
+    }
+
     private string NewVault([System.Runtime.CompilerServices.CallerMemberName] string name = "")
     {
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;

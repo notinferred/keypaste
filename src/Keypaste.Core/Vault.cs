@@ -24,11 +24,6 @@ public sealed class Vault : IDisposable
     private bool _rekeyed;
     private VaultBackup? _lastKept;
 
-    private Vault(KeePassInterop interop, string path, bool stamp)
-        : this(interop, path, stamp ? SourceSnapshot.Digest(path) : null)
-    {
-    }
-
     private Vault(KeePassInterop interop, string path, byte[]? stamp)
     {
         _interop = interop;
@@ -203,7 +198,7 @@ public sealed class Vault : IDisposable
         return new Vault(
             WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8)),
             path,
-            stamp: false);
+            stamp: null);
     }
 
     /// <summary>Creates a new vault protected by a password and a keyfile.</summary>
@@ -228,7 +223,7 @@ public sealed class Vault : IDisposable
         return new Vault(
             WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8, keyfilePath, hardwareKey)),
             path,
-            stamp: false);
+            stamp: null);
     }
 
     /// <summary>Opens an existing vault.</summary>
@@ -273,10 +268,11 @@ public sealed class Vault : IDisposable
             throw new UnreadableKeyfileException(keyfilePath);
         }
 
-        return new Vault(
-            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath, hardwareKey)),
-            path,
-            stamp: true);
+        // Digested before the key derivation, as Reload does, so a save landing while the key is derived
+        // leaves this vault changed on disk rather than stamped with what it never read.
+        var stamp = SourceSnapshot.Digest(path);
+        var interop = WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath, hardwareKey));
+        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path));
     }
 
     /// <summary>Adds an entry, creating any groups <see cref="VaultEntry.GroupPath"/> names that do
@@ -1733,15 +1729,20 @@ public sealed class Vault : IDisposable
     /// Called inside each attempt, after the gate is taken and before any work, so a test can hold
     /// the gate the way a slow attempt does.
     /// </param>
+    /// <param name="afterReplacing">
+    /// Called once the file is replaced and before this vault takes its new stamp, so a test can land
+    /// another program's write in that gap.
+    /// </param>
     internal void SaveWaiting(
         Action<int>? waitBetweenAttempts,
         int attempts = KeePassInterop.SaveAttempts,
-        Action<int>? duringAttempt = null)
+        Action<int>? duringAttempt = null,
+        Action? afterReplacing = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ThrowIfRekeyed();
 
-        Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts, duringAttempt, backUp: !_backedUp);
+        Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts, duringAttempt, backUp: !_backedUp, afterReplacing: afterReplacing);
     }
 
     private void Commit(
@@ -1751,7 +1752,8 @@ public sealed class Vault : IDisposable
         Action<int>? duringAttempt = null,
         bool backUp = false,
         bool applyFloor = true,
-        KeePassInterop.KeyChange? keyChange = null)
+        KeePassInterop.KeyChange? keyChange = null,
+        Action? afterReplacing = null)
     {
         var clock = new SaveClock();
         var succeeded = false;
@@ -1772,7 +1774,8 @@ public sealed class Vault : IDisposable
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
                 backUp ? path => PreserveBefore(path, applyFloor) : null,
                 keyChange);
-            var stamp = clock.Stamp(() => SourceSnapshot.Digest(Path));
+            afterReplacing?.Invoke();
+            var stamp = clock.Stamp(() => _interop.WrittenDigest ?? SourceSnapshot.Digest(Path));
 
             lock (_state)
             {
