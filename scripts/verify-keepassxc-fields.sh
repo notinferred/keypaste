@@ -323,22 +323,23 @@ audit="$dir/audit.jsonl"
 start_agent 'o\nd\n' --approval-timeout 30
 
 ask_field() {
-  local id=$1 field=$2 wait=$3 out="$dir/field-$1.out"
+  local id=$1 field=$2 out="$dir/field-$1.out"
+  : >"$out"
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"fields-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"api/OpenAI\",\"field\":\"$field\",\"reason\":\"fields gate\",\"ttl_seconds\":60}}}"
-    sleep "$wait"
+    await_replies "${WAIT_SECONDS:-30}" "$out" "$id" || true
   } | "$kp" mcp --vault "$(native "$openai")" --expose 'api/**' --audit-log "$(native "$audit")" --approver "$pipe" \
         --client-label fields-probe >"$out" 2>"$dir/field-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/field-$id.err")"
   tr -d '\r' <"$out"
 }
 
-ask_field 2 OPENAI_API_KEY 8 | jq -e --arg v "$api_key" 'select(.id == 2) | .result.isError == false and .result.structuredContent.value == $v' >/dev/null \
+ask_field 2 OPENAI_API_KEY | jq -e --arg v "$api_key" 'select(.id == 2) | .result.isError == false and .result.structuredContent.value == $v' >/dev/null \
   || die "Allow once did not return exactly the OPENAI_API_KEY KeePassXC wrote: $(cat "$dir/field-2.out")"
 id=3
 for field in 'Recovery codes' otp KP2A_URL_1 URL; do
-  ask_field "$id" "$field" 3 | jq -e --arg t "$denial" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' >/dev/null \
+  ask_field "$id" "$field" | jq -e --arg t "$denial" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' >/dev/null \
     || die "a request for '$field' was not refused with the fixed denial: $(cat "$dir/field-$id.out")"
   id=$((id + 1))
 done
@@ -350,12 +351,13 @@ jq -e -s 'length == 5 and .[0].args.field == "OPENAI_API_KEY" and .[0].decision 
 step "the run tool naming kp:///api/OpenAI#OPENAI_API_KEY is asked about as the entry and its field"
 mkdir -p "$dir/project"
 run_dir=$(native "$(cd "$dir/project" && pwd -P)")
+: >"$dir/run-tool.out"
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"fields-probe","version":"1.0.0"}}}'
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   jq -cn --arg dir "$run_dir" \
     '{jsonrpc:"2.0",id:7,method:"tools/call",params:{name:"run",arguments:{command:["sh","-c","printf %s \"$OPENAI_API_KEY\""],directory:$dir,env:{OPENAI_API_KEY:"kp:///api/OpenAI#OPENAI_API_KEY"},reason:"fields gate run"}}}'
-  sleep 8
+  await_replies "${WAIT_SECONDS:-30}" "$dir/run-tool.out" 7 || true
 } | "$kp" mcp --vault "$(native "$openai")" --expose 'api/**' --allow-run --audit-log "$(native "$audit")" --approver "$pipe" \
       --client-label fields-probe >"$dir/run-tool.out" 2>"$dir/run-tool.err" || die "keypaste mcp exited non-zero: $(cat "$dir/run-tool.err")"
 jq -e 'select(.id == 7) | .result.isError == true' <"$dir/run-tool.out" >/dev/null || die "the denied run was not refused: $(cat "$dir/run-tool.out")"

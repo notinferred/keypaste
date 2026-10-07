@@ -50,7 +50,7 @@ AGENT_PID=""
 AGENT_ERR=""
 AGENT_PIDS=""
 
-# Every agent this script started, not just the current one, and SIGKILL after SIGTERM.
+# Every agent this script started, not just the current one: SIGTERM, then SIGKILL for any still running a second later.
 #
 # This is not tidiness. `keypaste agent` blocks on a pipe until it is stopped, and an agent that
 # outlives the script keeps the CI step's handles open — so the step sits there until the job times
@@ -58,9 +58,14 @@ AGENT_PIDS=""
 # looks like a hang in the product rather than a leak in the harness, which is why the cleanup is
 # thorough rather than minimal, and why the step carries its own timeout in ci.yml.
 stop_agents() {
-  local pid
+  local pid alive
   for pid in $AGENT_PIDS; do kill "$pid" 2>/dev/null || true; done
-  sleep 1
+  for _ in $(seq 1 10); do
+    alive=''
+    for pid in $AGENT_PIDS; do if kill -0 "$pid" 2>/dev/null; then alive=1; fi; done
+    [ -n "$alive" ] || break
+    sleep 0.1
+  done
   for pid in $AGENT_PIDS; do kill -9 "$pid" 2>/dev/null || true; done
   wait 2>/dev/null || true
 
@@ -159,7 +164,7 @@ ask() {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"$field\",\"reason\":\"ci policy probe\",\"ttl_seconds\":$ttl}}}"
-    sleep 6
+    await_replies 6 "$out" "$id" || true
   } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" ${expose[@]+"${expose[@]}"} "$@" \
         >"$out" 2>"$WORK/mcp-stderr.txt" || die "keypaste mcp exited non-zero"
 }

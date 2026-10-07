@@ -43,10 +43,11 @@ readonly ERR="$WORK/stderr.txt"
   printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"request_credential","arguments":{"entry":"env/dev/STRIPE_KEY","field":"password","reason":"ci probe","ttl_seconds":60}}}'
 
-  # Hold the pipe open. Closing stdin is how an MCP client says goodbye, and the server takes it
-  # at its word: without this it shuts down before it has answered anything, and the gate sees an
-  # empty stdout that looks like a protocol failure rather than a race in the harness.
-  sleep 5
+  # Hold the pipe open until every call is answered. Closing stdin is how an MCP client says
+  # goodbye, and the server takes it at its word: closed sooner, it shuts down before it has answered
+  # anything, and the gate sees an empty stdout that looks like a protocol failure rather than a race
+  # in the harness.
+  await_replies 5 "$OUT" 2 3 4 || true
 } | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe \
       >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero"
 
@@ -122,7 +123,7 @@ NOINIT_AUDIT="$WORK/noinit.jsonl"
 NOINIT_OUT="$WORK/noinit-stdout.txt"
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
-  sleep 3
+  await_replies 3 "$NOINIT_OUT" 7 || true
 } | "$BIN_PATH" mcp --vault "$WORK/noinit.kdbx" --audit-log "$NOINIT_AUDIT" --client-label ci-probe \
       >"$NOINIT_OUT" 2>/dev/null || true
 
@@ -145,7 +146,7 @@ RUN_OUT="$WORK/run-stdout.txt"
   done
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
-  sleep 3
+  await_replies 3 "$RUN_OUT" 2 || true
 } | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --audit-log "$WORK/run-audit.jsonl" --client-label ci-probe --allow-run \
       >"$RUN_OUT" 2>/dev/null || die "keypaste mcp --allow-run exited non-zero"
 

@@ -262,11 +262,12 @@ grep -q 'listening on' "$agent_err" || die "keypaste agent never started listeni
 
 ask() {
   local id=$1 entry=$2 out="$dir/ask-$1.out"
+  : >"$out"
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"projects-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$entry\",\"field\":\"password\",\"reason\":\"projects gate\",\"ttl_seconds\":60}}}"
-    sleep 8
+    await_replies "${WAIT_SECONDS:-30}" "$out" "$id" || true
   } | "$kp" mcp --vault "$(native "$grouped")" --expose 'services/**' --expose 'env/**' --audit-log "$(native "$audit")" --approver "$pipe" \
         --client-label projects-probe >"$out" 2>"$dir/ask-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/ask-$id.err")"
   tr -d '\r' <"$out"

@@ -16,6 +16,7 @@ set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='AUDIT'
+require jq
 
 CLI_PATH="$(keypaste_bin)"
 
@@ -53,6 +54,7 @@ restore() {
 
 # Drives the real server over real pipes, asking for each entry named in "$@".
 run_server() {
+  : >"$WORK/mcp-out.txt"
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
@@ -66,7 +68,7 @@ run_server() {
       id=$((id + 1))
     done
 
-    sleep 5
+    await_replies 5 "$WORK/mcp-out.txt" $(seq 2 $((id - 1))) || true
   } | "$CLI_PATH" mcp --vault "$WORK/vault.kdbx" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe \
         >"$WORK/mcp-out.txt" 2>"$WORK/mcp-err.txt"
 }

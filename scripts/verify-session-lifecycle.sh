@@ -91,15 +91,16 @@ expect_serving() {
 ask() {
   OUT="$1"
   ERR="$2"
+  : >"$OUT"
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
-    sleep 2
+    await_replies "${WAIT_SECONDS:-30}" "$OUT" 2 || true
     if [ "${3:-}" != "--list-only" ]; then
       printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}"
+      await_replies "${WAIT_SECONDS:-30}" "$OUT" 3 || true
     fi
-    sleep 3
   } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" 7>&- 9>&- \
     || die "keypaste mcp exited non-zero"
 }

@@ -67,6 +67,21 @@ wait_for() {
   die "timed out waiting for '$pattern' in $file"
 }
 
+# Waits up to $1 seconds until the JSON-RPC stream in $2 holds a response to every id after them, so a
+# client can close its stdin; 1 if one never came, which the gate's own assertion then names.
+await_replies() {
+  local seconds="$1" file="$2" ids
+  shift 2
+  ids="[$(IFS=,; printf '%s' "$*")]"
+  for _ in $(seq 1 $((seconds * 5))); do
+    [ -s "$file" ] && jq -nRe --argjson ids "$ids" \
+      '$ids - [inputs | fromjson? | objects | select(has("result") or has("error")) | .id] == []' \
+      <"$file" >/dev/null 2>&1 && return 0
+    sleep 0.2
+  done
+  return 1
+}
+
 # The held app's current session and process, from the latest line tests/Keypaste.AppDriver printed to HOLD_OUT.
 session_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/^holding session ([0-9a-f]+).*/\1/'; }
 process_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+).*/\1/'; }
