@@ -1,6 +1,6 @@
 # F.52 — Run every check in parallel jobs and stop skipping
 
-Completed 2026-10-07 at `b074854` on `task/f52`, scripts, workflows and documents only. Pull request #10's ci 37607983508 and app 37607983374 ran every job green there, and the integrated commit differs from that tree only in this record. Dev runs 37609347187 and 37609499808 exercised `dev.sh --class`.
+Completed 2026-10-07 at `b074854` on `task/f52`, scripts, workflows and documents only. Its pull request's ci 37607983508 and app 37607983374 ran every job green there, and the integrated commit differs from that tree only in this record. Dev runs 37609347187 and 37609499808 exercised `dev.sh --class`.
 
 It had no STEPS row. On 2026-10-06 the founder asked for CI and testing to be audited after waiting up to half an hour per fix ("I can't be waiting 30 mins each time testing"), and on 2026-10-07 chose to delete the skipping machinery rather than extend it (D-0423).
 
