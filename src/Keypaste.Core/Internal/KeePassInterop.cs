@@ -313,22 +313,27 @@ internal sealed class KeePassInterop : IDisposable
         return fresh;
     }
 
-    /// <summary>Serialises, proves the bytes open with the new key, and only then replaces the vault.</summary>
+    /// <summary>Serialises the vault and replaces the file with those bytes.</summary>
     /// <remarks>
-    /// What <c>PwDatabase.Save</c> does, with the check between the write and the commit that
-    /// method gives no hook for. Its file lock is off in keypaste and its hash fields have no reader
-    /// here; a re-keyed vault is closed rather than saved again (D-0293).
+    /// Never through <c>PwDatabase.Save</c>: KeePassLib writes a vault's last blocks while it closes its
+    /// streams and discards what that write throws, so a disk that filled during the save was committed
+    /// over the vault as a truncated file (D-0428). Its file lock is off in keypaste and its hash fields
+    /// have no reader here.
     /// </remarks>
+    private void Write()
+    {
+        Replace(Serialize);
+        _database.Modified = false;
+    }
+
+    /// <summary>Serialises, proves the bytes open with the new key, and only then replaces the vault.</summary>
+    /// <remarks>A re-keyed vault is closed rather than saved again (D-0293).</remarks>
     private void WriteVerified(KeyChange change)
     {
-        MemoryStream buffer = new();
-        byte[] bytes = [];
+        var bytes = Serialize();
+
         try
         {
-            // KdbxFile.Save closes the stream it is given; the buffer survives the close.
-            new KdbxFile(_database).Save(buffer, null, KeePassLib.Serialization.KdbxFormat.Default, null);
-            bytes = buffer.ToArray();
-
             PwDatabase check = new();
             try
             {
@@ -344,25 +349,66 @@ internal sealed class KeePassInterop : IDisposable
                 check.Close();
             }
 
+            Replace(() => bytes);
+            change.Committed = true;
+            _database.Modified = false;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    /// <summary>The vault as KDBX bytes, written to memory, where closing KeePassLib's streams cannot fail.</summary>
+    private byte[] Serialize()
+    {
+        MemoryStream buffer = new();
+
+        try
+        {
+            // KdbxFile.Save closes the stream it is given; the buffer survives the close.
+            new KdbxFile(_database).Save(buffer, null, KeePassLib.Serialization.KdbxFormat.Default, null);
+            return buffer.ToArray();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(buffer.GetBuffer());
+            buffer.Dispose();
+        }
+    }
+
+    /// <summary>Replaces the vault with what <paramref name="serialize"/> returns, flushed to disk before the rename that commits it.</summary>
+    /// <remarks>
+    /// The file is opened before <paramref name="serialize"/> runs, as <c>PwDatabase.Save</c> opened it, so an
+    /// attempt that cannot open its file fails before a key is derived and a doomed save's retries stay cheap.
+    /// </remarks>
+    private void Replace(Func<byte[]> serialize)
+    {
+        byte[] bytes = [];
+
+        try
+        {
             using (FileTransactionEx transaction = new(_database.IOConnectionInfo, _database.UseFileTransactions))
             {
                 using (Stream target = transaction.OpenWrite())
                 {
+                    bytes = serialize();
                     target.Write(bytes);
+
+                    if (target is FileStream file)
+                    {
+                        file.Flush(flushToDisk: true);
+                    }
                 }
 
                 transaction.CommitWrite();
             }
 
             _written = SHA256.HashData(bytes);
-            change.Committed = true;
-            _database.Modified = false;
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(buffer.GetBuffer());
             CryptographicOperations.ZeroMemory(bytes);
-            buffer.Dispose();
         }
     }
 
@@ -1767,8 +1813,7 @@ internal sealed class KeePassInterop : IDisposable
                 duringAttempt?.Invoke(attempt);
                 if (keyChange is null)
                 {
-                    _database.Save(null);
-                    _written = _database.HashOfFileOnDisk is { } hash ? [.. hash] : null;
+                    Write();
                 }
                 else
                 {

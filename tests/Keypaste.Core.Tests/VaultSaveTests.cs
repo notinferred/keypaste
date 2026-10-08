@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using Keypaste.Core.Internal;
 using Xunit;
 
@@ -233,6 +234,65 @@ public sealed class VaultSaveTests : IDisposable
     }
 
     /// <summary>A save that works still works, and the file is readable afterwards.</summary>
+    /// <summary>
+    /// A write that fails partway through a save is reported, and the vault stays as it was.
+    /// </summary>
+    /// <remarks>
+    /// A pipe at the temporary file's name stands in for a disk that fills during the save: each
+    /// attempt's reader takes the first kilobyte and goes away, so the rest of the write fails.
+    /// KeePassLib writes a vault under a megabyte while closing its streams and discards what that
+    /// throws, so a save through it reported success and moved the pipe over the vault (D-0428).
+    /// </remarks>
+    [Fact]
+    public void A_write_that_fails_partway_is_reported_and_leaves_the_vault_as_it_was()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Windows has no named pipe at a file path.");
+        }
+
+        var (vault, home) = NewVaultInItsOwnDirectory("partway");
+        using var _ = vault;
+        var path = Path.Combine(home, "vault.kdbx");
+        var before = File.ReadAllBytes(path);
+
+        // Random, so the file outgrows what a pipe holds and stays under KeePassLib's one-megabyte block.
+        vault.AddEntry(new VaultEntry { Title = "Large", Password = "p", Notes = Convert.ToBase64String(RandomNumberGenerator.GetBytes(300_000)) });
+
+        var temporary = path + ".tmp";
+        using (var mkfifo = Process.Start("mkfifo", [temporary]))
+        {
+            mkfifo.WaitForExit();
+            Assert.Equal(0, mkfifo.ExitCode);
+        }
+
+        List<Thread> readers = [ReadTheFirstKilobyte(temporary)];
+        var failure = Record.Exception(() => vault.SaveWaiting(attempt => readers.Add(ReadTheFirstKilobyte(temporary))));
+
+        Assert.All(readers, reader => Assert.True(reader.Join(TimeSpan.FromSeconds(40)), "a reader was left waiting for a write"));
+        Assert.Equal(before.Length, new FileInfo(path).Length);
+        Assert.Equal(before, File.ReadAllBytes(path));
+        Assert.IsType<VaultException>(failure);
+    }
+
+    private static Thread ReadTheFirstKilobyte(string pipe)
+    {
+        var reader = new Thread(() =>
+        {
+            using var head = Process.Start(new ProcessStartInfo("head") { ArgumentList = { "-c", "1024", pipe }, RedirectStandardOutput = true })
+                ?? throw new InvalidOperationException("head did not start");
+
+            if (!head.WaitForExit(TimeSpan.FromSeconds(30)))
+            {
+                head.Kill();
+            }
+        })
+        { IsBackground = true };
+
+        reader.Start();
+        return reader;
+    }
+
     [Fact]
     public void AnOrdinarySaveIsUnaffected()
     {

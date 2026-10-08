@@ -552,6 +552,70 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(1, _fixture.Channel.Asked);
     }
 
+    /// <summary>
+    /// A refusal holds back each field the run asked for, so a set from a new connection that adds a
+    /// variable to it is refused unasked, and a set sharing none of its fields is still asked about (T-11).
+    /// </summary>
+    [Fact]
+    public async Task ADenial_CoolsEverySetSharingAFieldFromANewConnection()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+
+        await using (var client = await AttachedAsync(owner))
+        {
+            Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(Run() with { Keys = ["DATABASE_URL"] }, Token))!.Method);
+        }
+
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var renewed = await AttachedAsync(owner);
+        var wider = await renewed.ReleaseRunAsync(Run(), Token);
+        var other = await renewed.ReleaseRunAsync(Run() with { Keys = ["STRIPE_SECRET_KEY"] }, Token);
+
+        Assert.Equal(AuditMethod.Cooldown, wider!.Method);
+        Assert.Equal(AuditMethod.Prompt, other!.Method);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    /// <summary>
+    /// A run and a credential request reaching the same field are the same question: refusing either
+    /// holds the other back from any connection (T-11).
+    /// </summary>
+    [Fact]
+    public async Task A_refused_field_holds_back_a_run_and_a_refused_run_holds_back_a_credential_request()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this, vaultSource: true);
+
+        await using (var client = await AttachedAsync(owner))
+        {
+            Assert.Equal(AuditMethod.Prompt, (await client.RequestAsync(Credential("env/acme-api/.env", "DATABASE_URL"), Token))!.Method);
+            Assert.Equal(AuditMethod.Prompt, (await client.ReleaseRunAsync(References(("GH", "kp:///personal/github#username")), Token))!.Method);
+        }
+
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var renewed = await AttachedAsync(owner);
+        var run = await renewed.ReleaseRunAsync(Run() with { Keys = ["DATABASE_URL"] }, Token);
+        var credential = await renewed.RequestAsync(Credential("personal/github", "username"), Token);
+
+        Assert.Equal(AuditMethod.Cooldown, run!.Method);
+        Assert.Equal(AuditMethod.Cooldown, credential!.Method);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    private CredentialRequest Credential(string entry, string field) => new()
+    {
+        Entry = entry,
+        Field = field,
+        Reason = "deploy",
+        TtlSeconds = 60,
+        Exposure = ["env/acme-api/**", "personal/**"],
+        ClientName = "claude-code-cli",
+        ClientLabel = _label,
+        Vault = VaultPath,
+        Session = "session-one",
+    };
+
     [Fact]
     public async Task LockWhileAsked_ReleasesNothing()
     {

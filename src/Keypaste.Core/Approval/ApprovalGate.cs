@@ -70,6 +70,12 @@ public sealed class ApprovalGate : IDisposable
     /// <summary>The window, TTL ceiling and cooldown in force.</summary>
     public ApprovalLimits Limits { get; }
 
+    /// <summary>The cooldown key for one field of one entry, the same whether a credential request or a run asked for it.</summary>
+    /// <param name="handle">The entry's <see cref="EntryHandle"/>.</param>
+    /// <param name="field">The field.</param>
+    /// <returns>The key.</returns>
+    internal static string FieldKey(string handle, string field) => $"{handle}|{field}";
+
     /// <summary>The request a person is being asked about now, or null when nobody is being asked.</summary>
     public WaitingRequest? Waiting =>
         _asking is { Prompt: { } prompt } asking ? new WaitingRequest(prompt, asking.Window.Remaining(_clock)) : null;

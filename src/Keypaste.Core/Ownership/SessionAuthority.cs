@@ -566,14 +566,15 @@ public sealed class SessionAuthority : IApproverHandler
                 grantSeconds,
                 onceOnly);
 
-            // A denial cools down every run of this connection, and every run asking for these secrets
-            // whichever connection asks and however it names them: another argument, another project
-            // from the same agent, or the same entries' fields from a new bridge is not a new question (T-11).
-            var secrets = entries.Select(entry => EntryHandle.For(entry.Name) + "|" + entry.Field)
-                .Distinct(StringComparer.Ordinal)
-                .Order(StringComparer.Ordinal);
-            answer = await environments.Gate.AskAsync(["run\0" + connectionId, string.Join('\0', ["run", .. secrets])], prompt, withdrawn)
-                .ConfigureAwait(false);
+            // A denial cools down every run of this connection and each field it asked for, whichever
+            // connection asks next and whether a run or a credential request reaches it: another argument,
+            // another project from the same agent, or a set sharing one of these fields is not a new question (T-11).
+            string[] cooldownKeys =
+            [
+                "run\0" + connectionId,
+                .. entries.Select(entry => ApprovalGate.FieldKey(EntryHandle.For(entry.Name), entry.Field)).Distinct(StringComparer.Ordinal),
+            ];
+            answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();

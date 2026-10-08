@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A save that fails partway, as on a full disk, is now reported and leaves the vault as it was; before, keypaste could report it saved and replace the vault with a truncated file. A save is now on disk before it replaces the vault. After you refuse a run, an agent asking again with one variable more or fewer, or asking for one of its fields alone, is refused for the minute too, as is a run reaching a field you just refused ([F.60](docs/steps/F.60.md)).
+
 A crash while the app saves project mappings or dismissed recommendations no longer leaves a torn file, a vault `keypaste import` adds while the unlock screen is open is no longer dropped from Recent, and a policy rule's hourly limit is no longer reset by moving the clock forward ([F.59](docs/steps/F.59.md)).
 
 `keypaste add` and `set` now refuse the entry titles the app refuses, `env pull` refuses a file over its size limit before reading it, and `keypaste agent` withdraws its grants when the vault is edited, as the app does. A remembered vault path `recent.toml` or `app.toml` cannot hold is now left out instead of making the whole file unreadable, and the app refuses to export a profile with no variables, as the CLI does ([F.55](docs/steps/F.55.md)).
