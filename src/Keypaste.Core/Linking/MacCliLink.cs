@@ -54,6 +54,9 @@ public sealed class MacCliLink : ICliLink
 
     private static readonly TimeSpan _answerWindow = TimeSpan.FromMinutes(5);
 
+    // Nothing is written to osascript's input, not even a preamble, which fails the start once osascript has closed it.
+    private static readonly Encoding _noPreamble = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
     private readonly string _target;
     private readonly IProcessRunner _runner;
     private readonly bool _administrator;
@@ -197,7 +200,7 @@ public sealed class MacCliLink : ICliLink
 
     private CliLinkResult Ask(bool replace)
     {
-        var result = _runner.Run(_osascript, Arguments(_target, LinkPath, replace, _administrator), stdin: null, Encoding.UTF8, _answerWindow);
+        var result = _runner.Run(_osascript, Arguments(_target, LinkPath, replace, _administrator), stdin: null, _noPreamble, _answerWindow);
 
         if (result.Succeeded)
         {
