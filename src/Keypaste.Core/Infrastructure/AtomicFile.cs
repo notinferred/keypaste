@@ -82,13 +82,13 @@ public sealed class AtomicFile : IDisposable
     /// <exception cref="InvalidOperationException">It was already committed or disposed.</exception>
     /// <exception cref="IOException">The move failed; the target is unchanged.</exception>
     /// <exception cref="UnauthorizedAccessException">The same, for want of permission.</exception>
-    public void Commit()
-    {
-        var staged = _staged ?? throw new InvalidOperationException("the file was already committed or discarded");
+    public void Commit() => Move(overwrite: true);
 
-        File.Move(staged, _target, overwrite: true);
-        _staged = null;
-    }
+    /// <summary>Moves the staged file to the target, which must not exist yet.</summary>
+    /// <exception cref="InvalidOperationException">It was already committed or disposed.</exception>
+    /// <exception cref="IOException">Something is already at the target, or the move failed; the target is unchanged.</exception>
+    /// <exception cref="UnauthorizedAccessException">The same, for want of permission.</exception>
+    public void CommitNew() => Move(overwrite: false);
 
     /// <summary>Deletes the staged file unless it was committed.</summary>
     public void Dispose()
@@ -98,6 +98,14 @@ public sealed class AtomicFile : IDisposable
             _staged = null;
             Discard(staged);
         }
+    }
+
+    private void Move(bool overwrite)
+    {
+        var staged = _staged ?? throw new InvalidOperationException("the file was already committed or discarded");
+
+        File.Move(staged, _target, overwrite);
+        _staged = null;
     }
 
     private static void Discard(string staged)
