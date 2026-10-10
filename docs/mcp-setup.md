@@ -128,14 +128,14 @@ Use `--scope local` instead if you would rather keep it to your own machine.
 
 ## What the agent may see
 
-Exposure defaults to the `env/` subtree used by `keypaste run`. Other entries cannot be named or read through the bridge.
+Exposure defaults to `tag:env:*`: the variable-named fields of entries tagged into a project, the same variables `keypaste run` uses. Other entries cannot be named or read through the bridge.
 
-To expose another group, add explicit patterns:
+To expose another group as well, name the default with it, because any `--expose` replaces the default:
 
 ```json
 "args": [
   "--vault", "/absolute/path/to/vault.kdbx",
-  "--expose", "env/**",
+  "--expose", "tag:env:*",
   "--expose", "servers/staging/*"
 ]
 ```

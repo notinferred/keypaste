@@ -17,7 +17,7 @@ The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md)
 - the app gets simpler;
 - connecting an agent takes one step.
 
-[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state that follows the first desktop release: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11). v1.11 (D-0416) drops compatibility with keypaste's own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read.
+[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state that follows the first desktop release: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11). v1.11 (D-0416) drops compatibility with keypaste's own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read. v1.12 (D-0430) lets a rule the person set release a value, offers run on every bridge keypaste connects but off until the person turns it on for that agent, lets an agent ask only about its own settings, with a change that gives it more taking effect once the person confirms it, makes the Agent Credential Access Format keypaste's storage format for agent access, and adds to T7 an agent that organizes the vault without seeing its values.
 
 ## Track order
 
@@ -101,6 +101,7 @@ This follows the first desktop release and serves one person on one machine.
 | Outcome | Tasks |
 |---|---|
 | An agent calls an API with a credential it never holds: the unlocked app attaches it for the hosts its entry names, under a grant the person approved, and writes the audit record | X.1 |
+| An agent organizes the vault without seeing its values: it sees names and structure, plus note text where the person allows it, and proposes changes such as classifying notes, moving keys into fields or tagging entries for projects, each approved in the app | X.17 |
 
 ## T8–T11: cloud vault and teams
 
@@ -126,7 +127,6 @@ None of these has a milestone:
 - phone and web vault clients, though a keypaste phone app for cloud vaults is a BACKLOG option;
 - SSH;
 - complete KeePassXC parity;
-- an AI that organizes the vault;
 - any server that could read a personal vault;
 - PKI, KMS, privileged-access management and dynamic secrets.
 

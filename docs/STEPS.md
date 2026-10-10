@@ -1,6 +1,6 @@
 # Build plan
 
-This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.11 (D-0416). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
+This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.12 (D-0430). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -209,12 +209,16 @@ Each row keeps its historical meaning and is expanded when selected.
 
 ## T7 — Agents without values
 
-PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, and v1.10 (D-0408) adds the cloud vault to T8 and adds T11. Each row carries its purpose until it is selected and detailed.
+PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, v1.10 (D-0408) adds the cloud vault to T8 and adds T11, and v1.12 (D-0430) adds X.17 to T7. Each row carries its purpose until it is selected and detailed.
 
 - [ ] **X.1 — Attach approved credentials on the wire.** Needs: none.
   - The process holding the vault proxies an agent's HTTPS requests to the hosts an entry names and attaches the entry's credential under a grant the person approved; the agent holds only a placeholder (PRODUCT §2, §3.2).
   - The agent asks by host; the owner matches it to an entry's service, the person picks a personal or team entry, and the agent learns only that service, its scope and its grant (D-0405).
   - The owner writes the audit record of every request it serves.
+- [ ] **X.17 — Let an agent organize the vault without seeing values.** Needs: none.
+  - By default the agent sees names and structure only, never a value, and note text counts as a value; the person may allow it to read a vault's note text, told that the text then reaches the agent's provider (PRODUCT §2).
+  - It proposes changes such as classifying notes, moving keys into fields or tagging entries for projects; each change is applied only once the person approves it in the app, and one that moves an item into or out of an agent's reach, such as tagging it into a project an agent can see, is flagged as such before the person approves it.
+  - Every name the agent reads reaches its provider, and a planted entry name can steer it, for example into proposing a move under a standing rule (T-13).
 
 ## T8 — Cloud vault and team projects
 
