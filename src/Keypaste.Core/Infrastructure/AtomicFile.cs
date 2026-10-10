@@ -88,7 +88,7 @@ public sealed class AtomicFile : IDisposable
     /// <exception cref="InvalidOperationException">It was already committed or disposed.</exception>
     /// <exception cref="IOException">Something is already at the target, or the move failed; the target is unchanged.</exception>
     /// <exception cref="UnauthorizedAccessException">The same, for want of permission.</exception>
-    public void CommitNew() => Move(overwrite: false);
+    public void CommitWithoutReplacing() => Move(overwrite: false);
 
     /// <summary>Deletes the staged file unless it was committed.</summary>
     public void Dispose()

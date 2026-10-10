@@ -136,7 +136,7 @@ public static class McpConfigFile
             try
             {
                 using var staged = AtomicFile.Stage(backup, original);
-                staged.CommitNew();
+                staged.CommitWithoutReplacing();
                 made = backup;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
