@@ -184,6 +184,10 @@ Fixed a race in the KeePassLib KDF registry that could throw or corrupt the engi
 
 In the desktop source, which this release does not publish, restoring the window no longer postpones the idle lock when the pointer has not moved, and input arriving after the idle deadline locks the vault instead of extending it. On Windows a restore delivers a pointer move at the resting cursor, which previously counted as somebody being there.
 
+## 0.5.0-rc.1
+
+Unadvertised candidate built from the source listed under Unreleased. It exists to install the internal, unsigned Windows MSI and Linux AppImage on fresh runners and check that a new terminal runs the `keypaste` they carry. The desktop packages stay workflow artifacts and are not published.
+
 ## 0.3.1-rc.2
 
 Unadvertised candidate whose CLI/MCP behavior matches `0.3.0`. It exists to install the internal, unsigned Windows MSI and Linux AppImage on fresh runners and exercise the installed app, and it is the first tag through the Windows signing steps, which sign nothing while signing is not enabled. The desktop packages stay workflow artifacts and are not published.

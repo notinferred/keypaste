@@ -52,6 +52,7 @@ on:
       - 'scripts/build-linux-appimage.sh'
       - 'scripts/build-macos-app.sh'
       - 'scripts/build-macos-dmg.sh'
+      - 'scripts/verify-macos-cli-link.sh'
       - 'scripts/verify-linux-appimage.sh'
       - 'scripts/verify-publisher-metadata.sh'
       - 'scripts/publish-desktop-bridge.sh'
@@ -553,6 +554,15 @@ jobs:
           printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
           (cd artifacts/dist && shasum -a 256 -c "$name.sha256")
           echo "zip=$bundle" >> "$GITHUB_OUTPUT"
+
+      # macOS has no install leg yet (4.7e), so the terminal's keypaste is checked on the built bundle (G.5).
+      - name: Check a new terminal runs the bundle's keypaste through its link
+        if: matrix.bundle
+        shell: bash
+        env:
+          BUNDLE: ${{ steps.bundle.outputs.zip }}
+          REPORTED: ${{ steps.v.outputs.reported }}
+        run: scripts/verify-macos-cli-link.sh "$BUNDLE" "$REPORTED"
 
       - name: Build and check the internal DMG the definition declares
         if: matrix.dmg
