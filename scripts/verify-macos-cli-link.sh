@@ -4,8 +4,8 @@
 #
 # A runner has nobody to type an administrator's password, so the link is made with sudo exactly as the
 # dialog's fixed program makes it; MacCliLinkTests cover that program and how the paths reach it. The shell is
-# a login zsh started from an empty environment with login(1)'s PATH, as Terminal starts one, so it finds
-# keypaste only through /etc/paths and the account's profile. The link is removed on exit.
+# a login zsh started from an empty environment with a PATH that lacks /usr/local/bin, so it finds keypaste
+# only as a new Terminal window does, through /etc/paths and the account's profile. The link is removed on exit.
 #
 # Usage: verify-macos-cli-link.sh <app-zip> <binary-version>
 set -euo pipefail

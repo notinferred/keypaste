@@ -40,7 +40,7 @@
       <RegistryValue Root="HKCU" Key="Software\keypaste\Installer" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
-    <!-- A key path no version changes, so a major upgrade's removal of the old product leaves the entry both share (D-G5-1). -->
+    <!-- Its key path is the same in every version, so a major upgrade's removal of the old product leaves the PATH entry the new one shares (D-G5-1). -->
     <Component Id="UserPath" Directory="INSTALLFOLDER">
       <Environment Id="UserPathEntry" Name="PATH" Value="[INSTALLFOLDER]" Action="set" Part="last" Permanent="no" System="no" />
       <RegistryValue Root="HKCU" Key="Software\keypaste\Installer" Name="UserPath" Type="integer" Value="1" KeyPath="yes" />
