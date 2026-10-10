@@ -117,6 +117,17 @@ public sealed class MacCliLinkTests : IDisposable
     }
 
     [Fact]
+    public void The_dialog_writes_nothing_to_osascripts_input()
+    {
+        var runner = new Runner(Succeeds);
+        For(_awkward, runner).Link();
+
+        // The input's preamble is written as the child starts, and that write fails the start once the child has closed its input.
+        Assert.Null(runner.Stdin);
+        Assert.Empty(runner.StdinEncoding!.GetPreamble());
+    }
+
+    [Fact]
     public void A_dialog_that_linked_or_replaced_says_so()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), _posix);
@@ -264,11 +275,7 @@ public sealed class MacCliLinkTests : IDisposable
         return (status.State, status.LinkedTo);
     }
 
-    private static Runner Real(Action? before = null) => new((fileName, arguments) =>
-    {
-        before?.Invoke();
-        return new SystemProcessRunner().Run(fileName, arguments, stdin: null, Encoding.UTF8, TimeSpan.FromMinutes(1));
-    });
+    private static After Real(Action? before = null) => new(before ?? (() => { }));
 
     private MacCliLink For(string target, Runner runner) => new(target, LinkPath, runner, administrator: true);
 
@@ -310,22 +317,33 @@ public sealed class MacCliLinkTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_root, "pwned-too")));
     }
 
-    private sealed class Runner(Func<string, IReadOnlyList<string>, ProcessResult> run) : IProcessRunner
+    private sealed class Runner(Func<ProcessResult> answer) : IProcessRunner
     {
-        internal Runner(Func<ProcessResult> answer)
-            : this((_, _) => answer())
-        {
-        }
-
         internal int Calls { get; private set; }
 
         internal string? FileName { get; private set; }
+
+        internal string? Stdin { get; private set; }
+
+        internal Encoding? StdinEncoding { get; private set; }
 
         public ProcessResult Run(string fileName, IReadOnlyList<string> arguments, string? stdin, Encoding stdinEncoding, TimeSpan timeout)
         {
             Calls++;
             FileName = fileName;
-            return run(fileName, arguments);
+            Stdin = stdin;
+            StdinEncoding = stdinEncoding;
+            return answer();
+        }
+    }
+
+    // The system's runner, given exactly what the link passes, once something else has happened first.
+    private sealed class After(Action before) : IProcessRunner
+    {
+        public ProcessResult Run(string fileName, IReadOnlyList<string> arguments, string? stdin, Encoding stdinEncoding, TimeSpan timeout)
+        {
+            before();
+            return new SystemProcessRunner().Run(fileName, arguments, stdin, stdinEncoding, timeout);
         }
     }
 }
