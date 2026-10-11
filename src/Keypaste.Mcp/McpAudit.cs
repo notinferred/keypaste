@@ -6,6 +6,11 @@ using ModelContextProtocol.Server;
 
 namespace Keypaste.Mcp;
 
+/// <summary>Who is calling, from one read of the handshake.</summary>
+/// <param name="Initialized">Whether the <c>initialize</c> handshake has completed; a call is never answered otherwise.</param>
+/// <param name="Client">What can honestly be said about the caller, for the owner and the audit line.</param>
+internal readonly record struct Caller(bool Initialized, AuditClient Client);
+
 /// <summary>
 /// Turns a protocol request into an audit line.
 /// </summary>
@@ -27,30 +32,6 @@ internal static class McpAudit
 {
     /// <summary>The longest client-supplied name or version kept.</summary>
     internal const int MaximumClientTextLength = 64;
-
-    /// <summary>Works out who is calling.</summary>
-    /// <param name="request">The tool call in flight.</param>
-    /// <param name="options">The server's configuration, for the operator-supplied label.</param>
-    /// <returns>What can honestly be said about the caller.</returns>
-    /// <remarks>
-    /// Both client-supplied strings go through <see cref="EntryNameSanitizer"/> before they are
-    /// recorded. They are attacker-chosen text that Stage 2.2 renders in an approval dialog and
-    /// <c>keypaste log</c> renders in a table — the two places an injection payload would most like to land.
-    /// Absent values are recorded as absent rather than as the word "unknown": that a client said
-    /// nothing is a different fact from a client calling itself nothing.
-    /// </remarks>
-    internal static AuditClient ClientOf(RequestContext<CallToolRequestParams> request, ServerOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(options);
-
-        var declared = request.Server?.ClientInfo;
-
-        return new AuditClient(
-            Clean(declared?.Name),
-            Clean(declared?.Version),
-            Clean(options.ClientLabel));
-    }
 
     /// <summary>What this bridge tells the owner about its client when it attaches: display and counting only (THREATS.md T-3).</summary>
     /// <param name="declared">What the client said in its handshake, or null before it has.</param>
@@ -86,7 +67,7 @@ internal static class McpAudit
     /// <param name="cancellationToken">The caller giving up.</param>
     /// <returns>The last answer, which is <c>false</c> if the budget ran out.</returns>
     /// <remarks>
-    /// Split out from <see cref="HandshakeCompleteAsync"/> because the thing worth testing is the
+    /// Split out from <see cref="CallerAsync"/> because the thing worth testing is the
     /// waiting, and the thing that cannot be tested in process is the SDK's dispatch order: a real
     /// <c>McpClient</c> performs the handshake and waits for its response, so no in-process test
     /// can produce the ordering this exists for. A predicate that flips can.
@@ -130,16 +111,18 @@ internal static class McpAudit
         return complete();
     }
 
-    /// <summary>Whether the <c>initialize</c> handshake has completed for this connection.</summary>
+    /// <summary>Works out who is calling, once the handshake that names them has completed or the wait for it has run out.</summary>
     /// <param name="request">The tool call in flight.</param>
+    /// <param name="options">The server's configuration, for the operator-supplied label.</param>
     /// <param name="cancellationToken">The caller giving up.</param>
-    /// <returns><c>true</c> once the client's identity is known.</returns>
+    /// <returns>Whether the handshake completed, and what can honestly be said about the caller.</returns>
     /// <remarks>
     /// <para>
-    /// Read off the same place <see cref="ClientOf"/> reads, deliberately: the question "do we know
-    /// who this is" and the answer "here is who this is" must not be able to disagree. The protocol
-    /// makes <c>clientInfo</c> required in <c>initialize</c>, so a null here means either the
-    /// handshake has not happened or the client broke the rule, and both are cases to refuse.
+    /// Both client-supplied strings go through <see cref="EntryNameSanitizer"/> before they are
+    /// recorded. They are attacker-chosen text that Stage 2.2 renders in an approval dialog and
+    /// <c>keypaste log</c> renders in a table — the two places an injection payload would most like to land.
+    /// Absent values are recorded as absent rather than as the word "unknown": that a client said
+    /// nothing is a different fact from a client calling itself nothing.
     /// </para>
     /// <para>
     /// <b>It waits, and the reason is F.5.</b> A client that writes <c>initialize</c>,
@@ -151,22 +134,38 @@ internal static class McpAudit
     /// <c>verify-mcp-stdio.sh</c> wait for the initialize response rather than to fix this.
     /// </para>
     /// <para>
+    /// <b>The identity is read once, after the wait, and both answers come from that read</b>: the
+    /// question "do we know who this is" and the answer "here is who this is" must not be able to
+    /// disagree. Read before the wait, a client that named itself while its call waited was put to
+    /// the owner and logged as an unnamed client (F.61). The protocol makes <c>clientInfo</c>
+    /// required in <c>initialize</c>, so a null here means either the handshake has not happened or
+    /// the client broke the rule, and both are cases to refuse.
+    /// </para>
+    /// <para>
     /// The guarantee is unchanged: a request is never answered for a client that cannot be named.
     /// Waiting only stops a client that <em>did</em> name itself from being told it did not. This
     /// is not authentication — a client can still call itself anything (THREATS.md T-3).
     /// </para>
     /// </remarks>
-    internal static ValueTask<bool> HandshakeCompleteAsync(
+    internal static async ValueTask<Caller> CallerAsync(
         RequestContext<CallToolRequestParams> request,
+        ServerOptions options,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(options);
 
-        return AwaitCompletionAsync(
+        await AwaitCompletionAsync(
             () => request.Server?.ClientInfo is not null,
             HandshakeGrace,
             TimeProvider.System,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+
+        var declared = request.Server?.ClientInfo;
+
+        return new Caller(
+            declared is not null,
+            new AuditClient(Clean(declared?.Name), Clean(declared?.Version), Clean(options.ClientLabel)));
     }
 
     /// <summary>Builds the line for a call that was refused.</summary>

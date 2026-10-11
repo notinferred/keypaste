@@ -42,6 +42,7 @@ internal sealed class McpHarness : IAsyncDisposable
     private TeeStream? _transcript;
 
     private AuditLog? _audit;
+    private McpServerPrimitiveCollection<McpServerTool>? _tools;
     private McpServer? _server;
     private McpClient? _client;
     private StreamServerTransport? _transport;
@@ -168,6 +169,7 @@ internal sealed class McpHarness : IAsyncDisposable
             serverOptions.ServerInstructions += ToolText.RunInstructions;
         }
 
+        _tools = serverOptions.ToolCollection;
         _transcript = new TeeStream(channels.ServerWrites);
         _owned.Add(_transcript);
 
@@ -180,6 +182,12 @@ internal sealed class McpHarness : IAsyncDisposable
 
         return channels;
     }
+
+    /// <summary>A tool the server is serving, for a test that calls it as the server's dispatch would.</summary>
+    internal McpServerTool Tool(string name) =>
+        _tools is not null && _tools.TryGetPrimitive(name, out var tool)
+            ? tool
+            : throw new InvalidOperationException($"the harness is not serving {name}");
 
     /// <summary>
     /// The audit trail so far, opened the way a reader has to while the server still holds it.

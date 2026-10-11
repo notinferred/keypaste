@@ -67,11 +67,11 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var client = McpAudit.ClientOf(request, options);
         var call = Read(request.Params?.Arguments);
         var line = new Line(call);
+        var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
 
-        if (!await McpAudit.HandshakeCompleteAsync(request, cancellationToken).ConfigureAwait(false))
+        if (!initialized)
         {
             return Finish(client, line, Verdict.Denied(AuditMethod.NotInitialized, "the client called a tool before the initialize handshake completed", ToolText.NotInitialized), null);
         }

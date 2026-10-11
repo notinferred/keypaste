@@ -65,7 +65,6 @@ internal sealed class RequestCredentialTool(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var client = McpAudit.ClientOf(request, options);
         var arguments = request.Params?.Arguments;
 
         var entry = ReadString(arguments, "entry");
@@ -75,12 +74,14 @@ internal sealed class RequestCredentialTool(
 
         var args = AuditArgs.ForCredentialRequest(entry, Recognised(field), ttl, reason);
 
-        Verdict verdict;
-
         // Checked before anything is decided, but after the arguments have been read, so the line
         // still records what was asked for. A refusal that does not say what was wanted is a worse
         // audit record than the request deserves (law 3.3).
-        if (!await McpAudit.HandshakeCompleteAsync(request, cancellationToken).ConfigureAwait(false))
+        var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
+
+        Verdict verdict;
+
+        if (!initialized)
         {
             verdict = new Verdict(
                 AuditDecision.Denied,

@@ -53,12 +53,12 @@ internal sealed class ListEntryNamesTool(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var client = McpAudit.ClientOf(request, options);
-
         // Before the vault is touched. Listing names is the cheaper call, but entry names are an
         // asset in their own right (law 3.5) and handing them to a caller whose identity the log
         // cannot record is the same mistake as releasing a value to one.
-        if (!await McpAudit.HandshakeCompleteAsync(request, cancellationToken).ConfigureAwait(false))
+        var (initialized, client) = await McpAudit.CallerAsync(request, options, cancellationToken).ConfigureAwait(false);
+
+        if (!initialized)
         {
             return Record(
                 McpAudit.Denial(

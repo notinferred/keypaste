@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+An agent request that arrives while its client is still introducing itself is now prompted for and logged under the name the client gave, not as "an unnamed client" ([F.61](docs/steps/F.61.md)).
+
 A save that fails partway, as on a full disk, is now reported and leaves the vault as it was; before, keypaste could report it saved and replace the vault with a truncated file. A save is now on disk before it replaces the vault. After you refuse a run, an agent asking again with one variable more or fewer, or asking for one of its fields alone, is refused for the minute too, as is a run reaching a field you just refused ([F.60](docs/steps/F.60.md)).
 
 A crash while the app saves project mappings or dismissed recommendations no longer leaves a torn file, a vault `keypaste import` adds while the unlock screen is open is no longer dropped from Recent, and a policy rule's hourly limit is no longer reset by moving the clock forward ([F.59](docs/steps/F.59.md)).
