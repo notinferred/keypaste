@@ -3,6 +3,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
 using Keypaste.Core.Sharing;
 
@@ -722,7 +723,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind)) { Login = LoginItem },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind)) { Login = LoginItem, CliLink = CliLink },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
@@ -775,6 +776,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The entry that opens the app at login, which Settings turns on and off; none where the platform has no per-user one.</summary>
     internal ILoginItem? LoginItem { get; init; }
+
+    /// <summary>The <c>keypaste</c> a terminal runs, which Settings links to this app's own; none where the platform needs no link.</summary>
+    internal ICliLink? CliLink { get; init; }
 
     private HttpMessageHandler? _ownShareTransport;
 

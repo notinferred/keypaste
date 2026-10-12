@@ -1,6 +1,7 @@
 using Avalonia;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
 using Keypaste.Core.Ownership;
 
@@ -48,6 +49,7 @@ internal static class Program
         return Run(
             args,
             home,
+            CliLinks.ForThisProcess(),
             claim => Configured(() => new App { Claim = claim }).StartWithClassicDesktopLifetime(args),
             Console.Error,
             ReopenWait);
@@ -58,14 +60,17 @@ internal static class Program
     /// </summary>
     /// <param name="args">The process's arguments, where <c>--background</c> marks a start at login.</param>
     /// <param name="home">keypaste's home.</param>
+    /// <param name="cliLink">The link a terminal finds <c>keypaste</c> through, which every start keeps current, one the running app takes included; null where there is none.</param>
     /// <param name="start">Runs the app under its claim and returns its exit code.</param>
     /// <param name="stderr">Where a start the running app never answered says so.</param>
     /// <param name="wait">How long to wait for the running app to answer.</param>
     /// <returns>The app's exit code, 0 when the running app showed its window, or 1 when it never answered.</returns>
-    internal static int Run(string[] args, string home, Func<AppClaim, int> start, TextWriter stderr, TimeSpan wait)
+    internal static int Run(string[] args, string home, ICliLink? cliLink, Func<AppClaim, int> start, TextWriter stderr, TimeSpan wait)
     {
         ArgumentNullException.ThrowIfNull(start);
         ArgumentNullException.ThrowIfNull(stderr);
+
+        cliLink?.KeepCurrent();
 
         AppClaim? claim = null;
 

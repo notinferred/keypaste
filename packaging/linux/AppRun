@@ -1,7 +1,8 @@
 #!/bin/sh
 here="$(dirname "$(readlink -f "$0")")"
-# A client connected from the app starts `<this AppImage> mcp`, because the mount path changes each launch.
-if [ "${1:-}" = mcp ]; then
-  exec "$here/usr/bin/keypaste" "$@"
-fi
+# A connected client starts `<this AppImage> mcp` and the terminal's keypaste `<this AppImage> cli …`, because the mount path changes each launch.
+case "${1:-}" in
+  mcp) exec "$here/usr/bin/keypaste" "$@" ;;
+  cli) shift; exec "$here/usr/bin/keypaste" "$@" ;;
+esac
 exec "$here/usr/bin/keypaste-app" "$@"

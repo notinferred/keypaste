@@ -3,6 +3,7 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Settings;
@@ -24,6 +25,9 @@ internal sealed record IdleChoice(int Seconds, string Label);
 /// </remarks>
 internal sealed class SettingsViewModel : ObservableObject, IDisposable
 {
+    private const string _translocatedNote =
+        "macOS is running this copy from a temporary location. Move keypaste to Applications and open it again to link it.";
+
     private readonly AppVaultSession _session;
     private readonly string? _home;
     private readonly DesktopPreferences _preferences;
@@ -38,6 +42,9 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     private bool? _openAtLogin;
     private string _message = string.Empty;
     private bool _exporting;
+    private CliLinkStatus? _cliStatus;
+    private bool _cliLinking;
+    private bool _confirmingCliReplace;
 
     internal SettingsViewModel(
         AppVaultSession session,
@@ -78,10 +85,28 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         OpenScopedTokensCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Tokens), () => open is not null);
         OpenDiagnosticsCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Diagnostics), () => open is not null);
         ShareLinksNote = ShareLinksNoteOf(session);
+        LinkCliCommand = new AsyncRelayCommand(LinkCliAsync, () => OffersCliLink && !IsCliLinking);
+        BeginReplaceCliCommand = new RelayCommand(
+            () => IsConfirmingCliReplace = true,
+            () => OffersCliReplace && !IsConfirmingCliReplace && !IsCliLinking);
+        ConfirmReplaceCliCommand = new AsyncRelayCommand(ReplaceCliAsync, () => IsConfirmingCliReplace && !IsCliLinking);
+        CancelReplaceCliCommand = new RelayCommand(
+            () => IsConfirmingCliReplace = false,
+            () => IsConfirmingCliReplace && !IsCliLinking);
 
         DependsOn(nameof(HasMessage), nameof(Message));
         DependsOn(nameof(ChosenVaultText), nameof(IsThisVaultChosen));
         DependsOn(UseThisVaultCommand, nameof(IsThisVaultChosen));
+        DependsOn(nameof(CliLinkText), nameof(CliStatus));
+        DependsOn(nameof(CliLinkNote), nameof(CliStatus));
+        DependsOn(nameof(HasCliLinkNote), nameof(CliLinkNote));
+        DependsOn(nameof(CliReplacePrompt), nameof(CliStatus));
+        DependsOn(nameof(OffersCliLink), nameof(CliStatus));
+        DependsOn(nameof(OffersCliReplace), nameof(CliStatus));
+        DependsOn(LinkCliCommand, nameof(OffersCliLink), nameof(IsCliLinking));
+        DependsOn(BeginReplaceCliCommand, nameof(OffersCliReplace), nameof(IsConfirmingCliReplace), nameof(IsCliLinking));
+        DependsOn(ConfirmReplaceCliCommand, nameof(IsConfirmingCliReplace), nameof(IsCliLinking));
+        DependsOn(CancelReplaceCliCommand, nameof(IsConfirmingCliReplace), nameof(IsCliLinking));
     }
 
     /// <summary>Settings › Advanced: the whole activity log, with its hash check.</summary>
@@ -293,6 +318,102 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         "A client connected with --vault keeps that vault.";
 #pragma warning restore CA1822
 
+    /// <summary>Links the <c>keypaste</c> a terminal runs to this app's own, or null where Settings offers no link (Windows, and an app with no <c>keypaste</c> beside it).</summary>
+    internal ICliLink? CliLink { get; init; }
+
+    internal bool CliLinkSupported => CliLink is not null;
+
+    /// <summary>What a terminal's <c>keypaste</c> is now.</summary>
+    internal string CliLinkText => CliStatus switch
+    {
+        null => string.Empty,
+        { State: CliLinkState.ThisCopy, EarlierCopy: null } status => $"A terminal runs this app's keypaste from {status.LinkPath}.",
+        { State: CliLinkState.ThisCopy } status => $"{status.LinkPath} runs this app's keypaste.",
+        { State: CliLinkState.OtherCopy } status => $"{status.LinkPath} runs keypaste from {status.LinkedTo}.",
+        { State: CliLinkState.Foreign, LinkedTo: { } target } status => $"{status.LinkPath} is another program, not this app's keypaste. It links to {target}.",
+        { State: CliLinkState.Foreign } status => $"{status.LinkPath} is another program, not this app's keypaste.",
+        { } status => $"Link this app's keypaste at {status.LinkPath} so a terminal can run it.{AdministratorNote(status)}",
+    };
+
+    /// <summary>What stands in the way of a terminal finding this app's <c>keypaste</c>, or nothing.</summary>
+    internal string CliLinkNote
+    {
+        get
+        {
+            if (CliStatus is not { } status)
+            {
+                return string.Empty;
+            }
+
+            List<string> notes = [];
+
+            if (status.Translocated)
+            {
+                notes.Add(_translocatedNote);
+            }
+
+            if (status is { State: CliLinkState.Foreign, BackupExists: true })
+            {
+                notes.Add(BackupTaken(status.LinkPath, status.BackupPath));
+            }
+
+            if (status.EarlierCopy is { } earlier)
+            {
+                notes.Add(
+                    $"A terminal may run {earlier} instead, if its folder comes before {Path.GetDirectoryName(status.LinkPath)} on PATH. " +
+                    "Move or delete it so a terminal runs this app's keypaste.");
+            }
+
+            if (!status.DirectoryOnPath)
+            {
+                notes.Add(
+                    $"{Path.GetDirectoryName(status.LinkPath)} is not on this session's PATH yet. Most Linux desktops add it " +
+                    "at your next login; otherwise add it to PATH in your shell profile.");
+            }
+
+            return string.Join(' ', notes);
+        }
+    }
+
+    internal bool HasCliLinkNote => CliLinkNote.Length > 0;
+
+    /// <summary>Whether Link is offered: nothing is at the path, or another copy's link is.</summary>
+    internal bool OffersCliLink => CliStatus is { State: CliLinkState.Absent or CliLinkState.OtherCopy, Translocated: false };
+
+    /// <summary>Whether Replace is offered: something keypaste did not write is at the path, and nothing is at its backup's.</summary>
+    internal bool OffersCliReplace => CliStatus is { State: CliLinkState.Foreign, BackupExists: false, Translocated: false };
+
+    /// <summary>Whether a link or a replacement is under way, which on macOS lasts until the person answers the system's dialog.</summary>
+    internal bool IsCliLinking
+    {
+        get => _cliLinking;
+        private set => Set(ref _cliLinking, value);
+    }
+
+    /// <summary>Whether the confirmation that names what Replace moves is showing.</summary>
+    internal bool IsConfirmingCliReplace
+    {
+        get => _confirmingCliReplace;
+        private set => Set(ref _confirmingCliReplace, value);
+    }
+
+    /// <summary>What Replace moves and where it keeps it.</summary>
+    internal string CliReplacePrompt => CliStatus is { } status
+        ? $"Replace {status.LinkPath} with this app's keypaste? The file there now is kept as {status.BackupPath}.{AdministratorNote(status)}"
+        : string.Empty;
+
+    internal AsyncRelayCommand LinkCliCommand { get; }
+
+    /// <summary>Shows the confirmation; nothing moves until <see cref="ConfirmReplaceCliCommand"/>.</summary>
+    internal RelayCommand BeginReplaceCliCommand { get; }
+
+    internal AsyncRelayCommand ConfirmReplaceCliCommand { get; }
+
+    internal RelayCommand CancelReplaceCliCommand { get; }
+
+    // Read when the row is first shown and again after each link or replacement.
+    private CliLinkStatus? CliStatus => _cliStatus ??= CliLink?.Read();
+
     /// <summary>Writes an exact encrypted copy of the open vault where the person says.</summary>
     internal AsyncRelayCommand ExportCommand { get; }
 
@@ -414,6 +535,58 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
         Raise(nameof(IsThisVaultChosen));
     }
+
+    private static string AdministratorNote(CliLinkStatus status) =>
+        OperatingSystem.IsMacOS() && !status.Translocated ? " macOS asks for an administrator's password." : string.Empty;
+
+    private static string BackupTaken(string linkPath, string backupPath) =>
+        $"{backupPath} already exists, so keypaste replaces nothing. Move or delete it to replace {linkPath}.";
+
+    private async Task LinkCliAsync()
+    {
+        if (CliLink is { } link)
+        {
+            Message = CliLinkMessage(link, await ChangeCliLinkAsync(link.Link).ConfigureAwait(true));
+        }
+    }
+
+    private async Task ReplaceCliAsync()
+    {
+        if (CliLink is { } link)
+        {
+            var result = await ChangeCliLinkAsync(link.Replace).ConfigureAwait(true);
+            IsConfirmingCliReplace = false;
+            Message = CliLinkMessage(link, result);
+        }
+    }
+
+    private async Task<CliLinkResult> ChangeCliLinkAsync(Func<CliLinkResult> change)
+    {
+        IsCliLinking = true;
+
+        try
+        {
+            return await Task.Run(change).ConfigureAwait(true);
+        }
+        finally
+        {
+            _cliStatus = CliLink?.Read();
+            IsCliLinking = false;
+            Raise(nameof(CliStatus));
+        }
+    }
+
+    private static string CliLinkMessage(ICliLink link, CliLinkResult result) => result switch
+    {
+        { Outcome: CliLinkOutcome.Linked } => $"{link.LinkPath} now runs this app's keypaste.",
+        { Outcome: CliLinkOutcome.Replaced } => $"{link.LinkPath} now runs this app's keypaste; the old file is {link.BackupPath}.",
+        { Outcome: CliLinkOutcome.Cancelled } => "Nothing was linked.",
+        { Refusal: CliLinkRefusal.BackupExists } => BackupTaken(link.LinkPath, link.BackupPath),
+        { Refusal: CliLinkRefusal.NotKeypaste } => $"{link.LinkPath} changed before keypaste linked it, so it was left as it is.",
+        { Refusal: CliLinkRefusal.Translocated } => _translocatedNote,
+        { Refusal: CliLinkRefusal.UnsafeProgram } => $"keypaste could not link {link.LinkPath}: this app's path holds a line break.",
+        _ => $"keypaste could not link {link.LinkPath}: {result.Reason}",
+    };
 
     private void ForgetAll()
     {

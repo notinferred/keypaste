@@ -1,20 +1,31 @@
 name: install-desktop
+run-name: ${{ inputs.rehearsal && format('install-desktop rehearsal of app run {0} (not release evidence)', inputs.app_run_id) || format('install-desktop {0}', inputs.tag) }}
 
 # 4.7b: installs a tag's attested desktop candidates on fresh runners and exercises the installed app from
-# outside its process (D-0199). The candidates are app.yml's workflow artifacts from that tag's run, and the
+# outside its process (D-0199), then checks that a new terminal runs the keypaste the MSI put on the user PATH
+# or Settings linked (G.5). The candidates are app.yml's workflow artifacts from that tag's run, and the
 # CLI/MCP is the same tag's published release; both are verified before anything is installed.
+#
+# A rehearsal installs instead the -dryrun packages of a successful app.yml run at this run's own commit, with
+# the CLI/MCP from that run's archive beside them. Nothing in it is attested, so it is never release evidence;
+# a candidate is tagged only after its rehearsal passes (D-0433).
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'The candidate tag, such as v0.3.1-rc.2. Its CLI/MCP must be in release-targets.json published[].'
-        required: true
+        description: 'The candidate tag, such as v0.5.0-rc.1. Its CLI/MCP must be in release-targets.json published[]. Empty for a rehearsal.'
+        required: false
         type: string
       app_run_id:
-        description: "The app.yml run for that tag, whose app-win-x64 and app-linux-x64 artifacts are the candidates."
+        description: "The app.yml run whose app-win-x64 and app-linux-x64 artifacts are the candidates: the tag's, or for a rehearsal a successful run at this branch's commit."
         required: true
         type: string
+      rehearsal:
+        description: "Install the packages a branch's app run built; never release evidence."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,18 +56,39 @@ jobs:
 
       - name: Read the candidate version
         id: v
+        if: ${{ !inputs.rehearsal }}
         shell: bash
         env:
           TAG: ${{ inputs.tag }}
           RUN_ID: ${{ inputs.app_run_id }}
         run: |
           set -euo pipefail
+          [ -n "$TAG" ] || { echo "::error::an install that is not a rehearsal names the candidate's tag"; exit 1; }
           case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "::error::$TAG is not a version tag"; exit 1 ;; esac
           case "$RUN_ID" in ''|*[!0-9]*) echo "::error::$RUN_ID is not a run ID"; exit 1 ;; esac
           version="${TAG#v}"
           listed="$(jq -r --arg v "$version" '[.published[] | select(.version == $v and .provenance == true)] | length' release-targets.json | tr -d '\r')"
           [ "$listed" = 1 ] || { echo "::error::$version is not a published, attested CLI/MCP release in release-targets.json"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # The harness and the packages then come from one commit.
+      - name: Check the rehearsal's app run built this commit
+        if: inputs.rehearsal
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          RUN_ID: ${{ inputs.app_run_id }}
+        run: |
+          set -euo pipefail
+          [ -z "$TAG" ] || { echo "::error::a rehearsal installs a branch build and takes no tag, not $TAG"; exit 1; }
+          case "$RUN_ID" in ''|*[!0-9]*) echo "::error::$RUN_ID is not a run ID"; exit 1 ;; esac
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '[.path, (.conclusion // "none"), .head_sha] | @tsv' | tr -d '\r')"
+          IFS=$'\t' read -r path conclusion sha <<< "$run"
+          [ "$path" = .github/workflows/app.yml ] || { echo "::error::run $RUN_ID is $path, not app.yml"; exit 1; }
+          [ "$conclusion" = success ] || { echo "::error::app run $RUN_ID concluded $conclusion, not success"; exit 1; }
+          [ "$sha" = "$GITHUB_SHA" ] || { echo "::error::app run $RUN_ID built $sha, and this rehearsal runs at $GITHUB_SHA"; exit 1; }
+          echo "app run $RUN_ID built $sha and succeeded"
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -65,7 +97,25 @@ jobs:
           run-id: ${{ inputs.app_run_id }}
           github-token: ${{ github.token }}
 
+      # A tag's build never carries -dryrun, the suffix app.yml gives a branch build's packages.
+      - name: Read the rehearsal's package version
+        id: rv
+        if: inputs.rehearsal
+        shell: bash
+        env:
+          RID: ${{ matrix.rid }}
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          mapfile -t found < <(find "$RUNNER_TEMP/candidate" -maxdepth 1 -type f -name "keypaste-app-*-dryrun-$RID-internal-unsigned.$PACKAGE")
+          [ "${#found[@]}" = 1 ] || { echo "::error::app-$RID holds ${#found[@]} -dryrun $PACKAGE packages, not one"; exit 1; }
+          version="$(basename "${found[0]}")"
+          version="${version#keypaste-app-}"
+          version="${version%-"$RID"-internal-unsigned."$PACKAGE"}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Download and verify the tag's CLI/MCP release anonymously
+        if: ${{ !inputs.rehearsal }}
         shell: bash
         env:
           VERSION: ${{ steps.v.outputs.version }}
@@ -76,6 +126,26 @@ jobs:
           scripts/verify-provenance.sh "$VERSION" "$RUNNER_TEMP/release"
           mkdir -p "$RUNNER_TEMP/cli"
           archive="$RUNNER_TEMP/release/keypaste-$VERSION-$RID.$EXT"
+          if [ "$EXT" = zip ]; then
+            powershell -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$archive")' -DestinationPath '$(cygpath -w "$RUNNER_TEMP/cli")'"
+          else
+            tar -xzf "$archive" -C "$RUNNER_TEMP/cli"
+          fi
+
+      # publish-desktop-bridge.sh built it in the same job, from the project release.yml publishes.
+      - name: Unpack the CLI/MCP from the rehearsal's archive
+        if: inputs.rehearsal
+        shell: bash
+        env:
+          VERSION: ${{ steps.rv.outputs.version }}
+          RID: ${{ matrix.rid }}
+          EXT: ${{ matrix.cli }}
+        run: |
+          set -euo pipefail
+          name="keypaste-app-$VERSION-$RID.$EXT"
+          (cd "$RUNNER_TEMP/candidate" && sha256sum -c "$name.sha256")
+          mkdir -p "$RUNNER_TEMP/cli"
+          archive="$RUNNER_TEMP/candidate/$name"
           if [ "$EXT" = zip ]; then
             powershell -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$archive")' -DestinationPath '$(cygpath -w "$RUNNER_TEMP/cli")'"
           else
@@ -114,7 +184,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.v.outputs.version }}
+          VERSION: ${{ steps.v.outputs.version || steps.rv.outputs.version }}
+          REHEARSAL: ${{ inputs.rehearsal && inputs.app_run_id || '' }}
           RID: ${{ matrix.rid }}
           PACKAGE: ${{ matrix.package }}
         run: |
@@ -129,7 +200,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: install-desktop-${{ matrix.rid }}
+          name: ${{ inputs.rehearsal && 'install-desktop-rehearsal' || 'install-desktop' }}-${{ matrix.rid }}
           path: install-desktop/
           if-no-files-found: error
           retention-days: 30

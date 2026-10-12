@@ -62,7 +62,7 @@ public sealed class SecondStartTests
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
 
             using var stderr = new StringWriter();
-            Assert.Equal(0, Program.Run(["--background"], home.Path, NoSecondApp, stderr, _wait));
+            Assert.Equal(0, Program.Run(["--background"], home.Path, null, NoSecondApp, stderr, _wait));
 
             await Task.Delay(_settle, Token);
             WindowInput.Drain();
@@ -104,7 +104,7 @@ public sealed class SecondStartTests
         using var claim = Claim(home);
         using var stderr = new StringWriter();
 
-        Assert.Equal(1, Program.Run([], home.Path, NoSecondApp, stderr, TimeSpan.FromMilliseconds(300)));
+        Assert.Equal(1, Program.Run([], home.Path, null, NoSecondApp, stderr, TimeSpan.FromMilliseconds(300)));
         Assert.Contains("already running", stderr.ToString(), StringComparison.Ordinal);
     }
 
@@ -117,7 +117,7 @@ public sealed class SecondStartTests
         var started = Stopwatch.GetTimestamp();
 
         var starting = Task.Run(
-            () => Program.Run([], home.Path, given => { taken = given; return 7; }, TextWriter.Null, _wait),
+            () => Program.Run([], home.Path, null, given => { taken = given; return 7; }, TextWriter.Null, _wait),
             Token);
         await Task.Delay(_settle, Token);
         claim.Dispose();
@@ -149,7 +149,7 @@ public sealed class SecondStartTests
 
             using var stderr = new StringWriter();
             var started = Stopwatch.GetTimestamp();
-            Assert.Equal(1, Program.Run([], home.Path, NoSecondApp, stderr, _wait));
+            Assert.Equal(1, Program.Run([], home.Path, null, NoSecondApp, stderr, _wait));
             Assert.True(Stopwatch.GetElapsedTime(started) < _wait / 2, "a refused start waited out its time");
             Assert.Contains("already running", stderr.ToString(), StringComparison.Ordinal);
         }
@@ -162,7 +162,7 @@ public sealed class SecondStartTests
     // Off the UI thread, which the running app needs to show its window before it answers.
     private static async Task<int> SecondStartAsync(string[] args, TempHome home, TextWriter stderr, TimeSpan wait)
     {
-        var starting = Task.Run(() => Program.Run(args, home.Path, NoSecondApp, stderr, wait), Token);
+        var starting = Task.Run(() => Program.Run(args, home.Path, null, NoSecondApp, stderr, wait), Token);
         await Until(() => starting.IsCompleted);
         return await starting;
     }

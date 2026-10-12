@@ -6,6 +6,8 @@
 #   - a ProductName, summary Subject or Keywords that drop the full version or the internal and
 #     unsigned labels, a ProductVersion other than the numeric prefix, or a publisher other than keypaste;
 #   - a per-machine package, or a signature on a package the definition declares unsigned;
+#   - any Environment row but one appending the install folder to the per-user PATH, removed on
+#     uninstall, from the UserPath component rather than the payload's (G.5);
 #   - an administrative extraction whose files differ from the staged payload, whose binary reports
 #     another version than the payload's or fails --selftest, or whose binaries do not publish as keypaste;
 #   - an extraction with no keypaste.exe beside the app answering mcp --help, which is what a client
@@ -69,6 +71,17 @@ readings="$(powershell -NoProfile -NonInteractive -Command "
   'Subject=' + \$s.GetType().InvokeMember('Property', 'GetProperty', \$null, \$s, 3)
   'Keywords=' + \$s.GetType().InvokeMember('Property', 'GetProperty', \$null, \$s, 5)
   'Signature=' + (Get-AuthenticodeSignature -LiteralPath '$msi_win').Status
+  function Rows(\$sql, \$columns) {
+    \$v = \$db.GetType().InvokeMember('OpenView', 'InvokeMethod', \$null, \$db, @(\$sql))
+    [void]\$v.GetType().InvokeMember('Execute', 'InvokeMethod', \$null, \$v, \$null)
+    while (\$r = \$v.GetType().InvokeMember('Fetch', 'InvokeMethod', \$null, \$v, \$null)) {
+      (1..\$columns | ForEach-Object { \$r.GetType().InvokeMember('StringData', 'GetProperty', \$null, \$r, \$_) }) -join ' '
+    }
+  }
+  \$environment = @()
+  if (Rows \"SELECT Name FROM _Tables WHERE Name='Environment'\" 1) { \$environment = @(Rows 'SELECT Name, Value, Component_ FROM Environment' 3) }
+  'EnvironmentRows=' + \$environment.Count
+  \$environment | ForEach-Object { 'Environment=' + \$_ }
 " | tr -d "$CR")"
 
 reading() {
@@ -91,6 +104,8 @@ expect MSIINSTALLPERUSER "$(reading MSIINSTALLPERUSER)" "<absent>"
 if [ "$signed" = "false" ]; then
   expect Signature "$(reading Signature)" "NotSigned"
 fi
+expect "Environment rows" "$(reading EnvironmentRows)" "1"
+expect "Environment (name, value, component)" "$(reading Environment)" "=-PATH [~];[INSTALLFOLDER] UserPath"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless;
 using Avalonia.Threading;
+using Keypaste.Core.Linking;
 using Keypaste.Core.Ownership;
 
 namespace Keypaste.AppDriver;
@@ -25,6 +26,7 @@ internal static class AppLaunch
         App.Program.Run(
             args,
             home,
+            CliLinks.ForThisProcess(),
             claim =>
             {
                 var code = Headless(claim).StartWithClassicDesktopLifetime(args);

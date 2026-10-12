@@ -1,20 +1,33 @@
 name: upgrade-desktop
+run-name: ${{ inputs.rehearsal && 'upgrade-desktop rehearsal (not release evidence)' || format('upgrade-desktop with CLI/MCP {0}', inputs.cli_version) }}
 
 # 4.7d: builds three unpublished desktop candidates from one commit at distinct numeric versions, then on a
 # fresh runner installs the lowest, fills a real vault and ~/.keypaste through the published CLI/MCP, upgrades,
 # interrupts an upgrade, refuses a downgrade and uninstalls, checking the user's data after every transition.
+# After each one a new terminal must run the keypaste the installed app carries (G.5): on Windows through the
+# user PATH entry the MSI keeps once and removes on uninstall, on Linux through the link the lower app's
+# Settings made, which a start of the higher image re-points, one handed to the running lower app included.
 #
 # Distinct numeric versions because an MSI ProductVersion is numeric and two candidates of one version cannot
 # be ordered (D-0139, D-0147). Nothing here is attested, published or signed: these candidates exist only to
 # be installed over one another. Public downloads and their upgrade evidence are 4.7c.
+#
+# A rehearsal makes the data with a CLI/MCP the build job publishes from this run's own commit instead of a
+# published release. It is never release evidence; a candidate is tagged only after its rehearsal passes
+# (D-0433).
 
 on:
   workflow_dispatch:
     inputs:
       cli_version:
-        description: 'The published CLI/MCP release that makes the fixture, such as 0.3.0.'
-        required: true
+        description: 'The published CLI/MCP release that makes the fixture, such as 0.5.0-rc.1. Empty for a rehearsal.'
+        required: false
         type: string
+      rehearsal:
+        description: 'Make the fixture with a CLI/MCP built from this commit; never release evidence.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -69,6 +82,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # The project release.yml publishes for the CLI/MCP archives.
+      - name: Build the rehearsal's fixture CLI/MCP
+        if: inputs.rehearsal
+        shell: bash
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/fixture-cli
+          bash scripts/publish-desktop-bridge.sh "$RID" artifacts/fixture-cli
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: inputs.rehearsal
+        with:
+          name: fixture-cli-${{ matrix.rid }}
+          path: artifacts/fixture-cli/
+          if-no-files-found: error
+          retention-days: 7
+
   exercise:
     name: upgrade-desktop (${{ matrix.rid }})
     needs: build
@@ -96,11 +128,13 @@ jobs:
 
       - name: Read the CLI/MCP version
         id: v
+        if: ${{ !inputs.rehearsal }}
         shell: bash
         env:
           CLI_VERSION: ${{ inputs.cli_version }}
         run: |
           set -euo pipefail
+          [ -n "$CLI_VERSION" ] || { echo "::error::an upgrade check that is not a rehearsal names the published CLI/MCP release that makes its fixture"; exit 1; }
           case "$CLI_VERSION" in [0-9]*.[0-9]*.[0-9]*) ;; *) echo "::error::$CLI_VERSION is not a version"; exit 1 ;; esac
           listed="$(jq -r --arg v "$CLI_VERSION" '[.published[] | select(.version == $v and .provenance == true)] | length' release-targets.json | tr -d '\r')"
           [ "$listed" = 1 ] || { echo "::error::$CLI_VERSION is not a published, attested CLI/MCP release in release-targets.json"; exit 1; }
@@ -112,6 +146,7 @@ jobs:
           path: ${{ runner.temp }}/candidates
 
       - name: Download and verify the CLI/MCP release anonymously
+        if: ${{ !inputs.rehearsal }}
         shell: bash
         env:
           VERSION: ${{ steps.v.outputs.version }}
@@ -127,6 +162,37 @@ jobs:
           else
             tar -xzf "$archive" -C "$RUNNER_TEMP/cli"
           fi
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: inputs.rehearsal
+        with:
+          name: fixture-cli-${{ matrix.rid }}
+          path: ${{ runner.temp }}/cli
+
+      - name: Read the rehearsal's CLI/MCP version
+        id: rv
+        if: inputs.rehearsal
+        shell: bash
+        env:
+          CLI_VERSION: ${{ inputs.cli_version }}
+        run: |
+          set -euo pipefail
+          [ -z "$CLI_VERSION" ] || { echo "::error::a rehearsal builds its CLI/MCP from this commit and takes no cli_version, not $CLI_VERSION"; exit 1; }
+          mapfile -t found < <(find "$RUNNER_TEMP/cli" -maxdepth 1 -type f \( -name keypaste -o -name keypaste.exe \))
+          [ "${#found[@]}" = 1 ] || { echo "::error::fixture-cli holds ${#found[@]} keypaste programs, not one"; exit 1; }
+          chmod +x "${found[0]}"
+          version="$("${found[0]}" --version | tr -d '[:space:]')"
+          case "$version" in [0-9]*.[0-9]*.[0-9]*) ;; *) echo "::error::the fixture's CLI/MCP reports '$version', not a version"; exit 1 ;; esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # The harness drives the app; it is not something the app needs.
+      - name: Install the Linux harness (Xvfb, openbox, AT-SPI client, xdotool)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/apt-install.sh --no-install-recommends xvfb openbox xdotool dbus-daemon dbus-x11 \
+            at-spi2-core python3-gi gir1.2-atspi-2.0 libglib2.0-bin
 
       # docs/desktop.md's Linux prerequisites; the AppImage needs FUSE to run at all (D-0205).
       - name: Install the Linux app prerequisites
@@ -150,20 +216,37 @@ jobs:
           set -euo pipefail
           echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh "$RUNNER_TEMP")" >> "$GITHUB_ENV"
 
+      - name: Start Xvfb and openbox
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 2
+          DISPLAY=:99 openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
+          sleep 2
+
       - name: Install, upgrade, interrupt, refuse and uninstall
         shell: bash
         env:
-          VERSION: ${{ steps.v.outputs.version }}
+          VERSION: ${{ steps.v.outputs.version || steps.rv.outputs.version }}
+          REHEARSAL: ${{ inputs.rehearsal && '1' || '' }}
           RID: ${{ matrix.rid }}
         run: |
           set -euo pipefail
-          bash scripts/exercise-desktop-upgrade.sh "$RID" "$RUNNER_TEMP/candidates" "$VERSION" \
-            "$RUNNER_TEMP/cli" upgrade-desktop
+          if [ "$RUNNER_OS" = Linux ]; then
+            dbus-run-session -- bash scripts/exercise-desktop-upgrade.sh "$RID" "$RUNNER_TEMP/candidates" "$VERSION" \
+              "$RUNNER_TEMP/cli" upgrade-desktop
+          else
+            bash scripts/exercise-desktop-upgrade.sh "$RID" "$RUNNER_TEMP/candidates" "$VERSION" \
+              "$RUNNER_TEMP/cli" upgrade-desktop
+          fi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: upgrade-desktop-${{ matrix.rid }}
+          name: ${{ inputs.rehearsal && 'upgrade-desktop-rehearsal' || 'upgrade-desktop' }}-${{ matrix.rid }}
           path: upgrade-desktop/
           # A run that fails in setup has no records to upload, and losing the run over that would
           # take the failing log with it (run 35260785520).

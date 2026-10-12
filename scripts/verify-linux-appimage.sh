@@ -9,7 +9,8 @@
 #   - a payload whose files differ from the staged payload, whose binary reports another version
 #     or fails --selftest, or whose binaries do not publish as keypaste;
 #   - an image whose AppRun does not start the bridge it carries for `mcp`, which is what a client
-#     connected from the app is told to run (2.6a).
+#     connected from the app is told to run (2.6a), or the CLI it carries for `cli`, which is what
+#     the terminal's keypaste linked from Settings runs (G.5).
 #
 # The image itself is never executed. The squashfs starts where the runtime's ELF ends, at its section
 # header table's end, and `unsquashfs -o` reads it from there. Installing it is 4.7b.
@@ -131,6 +132,9 @@ reported="$("$host" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the unpacked binary reports $reported, expected $binary_version"
 [ -x "$root/usr/bin/keypaste" ] || die "the image carries no keypaste binary for a connected client to start"
 case "$("$root/AppRun" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the image's AppRun does not start the bridge for mcp" ;; esac
+cli="$("$root/AppRun" cli --version | tr -d '[:space:]')"
+[ "$cli" = "$binary_version" ] || die "the image's AppRun cli --version reports $cli, expected $binary_version"
+case "$("$root/AppRun" cli mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the image's AppRun does not pass cli's arguments to the CLI it carries" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$root/usr/bin"
 
 echo "$(basename "$image"): keypaste $version, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files unpack byte-identical at offset $offset and pass --selftest."

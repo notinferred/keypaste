@@ -6,28 +6,42 @@
 # keystrokes: UI Automation on Windows (drive-desktop-windows.ps1), AT-SPI and xdotool on Linux
 # (drive-desktop-linux.py). The vault is made by the CLI (D-0146). The approval is a person's answer at the
 # terminal agent, which holds the vault, so the app's unlock is refused and its unlock screen names that agent.
+# A new terminal must then run the keypaste the install carries (G.5): on Windows the MSI puts its folder on
+# the user PATH, and on Linux the person links it from Settings, which the first session does.
 #
-# Checks, in order: candidate, install, first-window, unlock, entry-list, edit, env-run, approval. A check
-# passes only on its evidence, is unreached when its action could not be done or an earlier check failed,
+# Checks, in order: candidate, install, first-window, unlock, entry-list, edit, env-run, approval, terminal. A
+# check passes only on its evidence, is unreached when its action could not be done or an earlier check failed,
 # and is a contradiction when the action completed and the evidence disagrees. Anything but pass fails.
+#
+# A rehearsal installs a branch build instead (D-0433): app.yml names its packages <version>-dryrun and attests
+# none, so the candidate is checked only against the .sha256 beside it and its check is rehearsal, never pass.
+# That check alone may then be rehearsal; the run is never release evidence.
 #
 # Usage:
 #   exercise-desktop-install.sh <rid> <candidate-file> <version> <cli-dir> <output-dir>
 #   exercise-desktop-install.sh --classify <output-dir>
 #   exercise-desktop-install.sh --selftest
+# Environment: REHEARSAL  the app.yml run whose -dryrun package <candidate-file> is, for a rehearsal
 set -euo pipefail
 
 readonly SELF="${BASH_SOURCE[0]}"
 ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
 readonly ROOT
-readonly CHECKS=(candidate install first-window unlock entry-list edit env-run approval)
+readonly CHECKS=(candidate install first-window unlock entry-list edit env-run approval terminal)
 readonly MASTER='InstallCheckMaster4b7'
 readonly ENTRY_GROUP='web'
 readonly ENTRY_TITLE='install-check'
 readonly PROJECT='install'
 readonly VARIABLE='APP_ADDED'
 readonly AGENT_STATUS='Keypaste agent (process '
+readonly LINK_BUTTON='Link the keypaste command'
+readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
 readonly CR=$'\r'
+
+# shellcheck source=scripts/lib/desktop-drive.sh
+. "$ROOT/scripts/lib/desktop-drive.sh"
+# shellcheck source=scripts/lib/terminal.sh
+. "$ROOT/scripts/lib/terminal.sh"
 
 usage() {
   echo 'usage: bash scripts/exercise-desktop-install.sh <rid> <candidate-file> <version> <cli-dir> <output-dir> | --classify <output-dir> | --selftest'
@@ -64,10 +78,14 @@ classify() {
   emit() {
     verdict "$1" "$result" "$why"
     results[$1]="$result"
-    [ "$result" = pass ] || [ -n "$blocked" ] || blocked="$1"
+    [ "$result" = pass ] || [ "$result" = rehearsal ] || [ -n "$blocked" ] || blocked="$1"
   }
 
-  if judge verify-candidate; then result=pass; why="$detail"
+  if [ "$(fact_of "$dir" rehearsal)" = true ]; then
+    if judge verify-candidate; then result=rehearsal; why="a branch build intact against its .sha256; not attested, so this run is not release evidence: $detail"
+    elif [ -n "$record" ]; then result=contradiction; why="the candidate is not the branch build app.yml hashed: $detail"
+    fi
+  elif judge verify-candidate; then result=pass; why="$detail"
   elif [ -n "$record" ]; then result=contradiction; why="the candidate is not the attested build: $detail"
   fi
   emit candidate
@@ -127,6 +145,44 @@ classify() {
     fi
   fi
   emit approval
+
+  # What a new shell ran, against what the install or the link should make it run.
+  terminal_verdict() {
+    local platform expected version entries
+    platform="$(fact_of "$dir" platform)"; expected="$(fact_of "$dir" terminal_expected)"
+    version="$(fact_of "$dir" binary_version)"; entries="$(fact_of "$dir" path_entries)"
+    result=contradiction
+    why="$(terminal_mismatch "$platform" "$(fact_of "$dir" terminal)" "$expected" "$version")"
+    if [ -n "$why" ]; then return
+    elif [ "$platform" = windows ] && [ "$entries" != 1 ]; then why="the user PATH names the install folder ${entries:-no} times, not once"
+    elif [ "$platform" = windows ]; then
+      result=pass; why="a new terminal runs keypaste $version from $expected, its bridge answers, and the install folder is on the user PATH once"
+    else
+      result=pass; why="a new terminal runs keypaste $version from $expected and its bridge answers; the login shell read $(fact_of "$dir" shell_profile)"
+    fi
+  }
+
+  # The MSI puts keypaste on PATH as it installs; on Linux, Settings links it once the app is unlocked.
+  case "$(fact_of "$dir" platform)" in
+    windows)
+      blocked=''
+      [ "${results[install]}" = pass ] || blocked=install
+      if judge terminal-shell; then terminal_verdict; fi
+      ;;
+    linux)
+      blocked="$after_unlock"
+      if judge settings && judge link-cli && judge linked && judge terminal-shell; then terminal_verdict; fi
+      ;;
+    *) result=harness-failure; why='the run recorded no platform' ;;
+  esac
+  emit terminal
+}
+
+# Each check that fails the run, as an annotation. Only a rehearsal's candidate may be rehearsal rather than pass.
+refusals() {
+  jq -r --arg rehearsal "$(fact_of "$1" rehearsal)" \
+    'select(.result != "pass" and ($rehearsal != "true" or .check != "candidate" or .result != "rehearsal"))
+      | "::error::\(.check): \(.result): \(.why)"' "$1/verdicts.jsonl"
 }
 
 # --- recording ------------------------------------------------------------------------------------
@@ -155,18 +211,20 @@ platform() {
 
 native() { if [ "$(platform)" = windows ]; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 
-drive() {
-  if [ "$(platform)" = windows ]; then
-    local action="$1"
-    shift
-    powershell -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$ROOT/scripts/drive-desktop-windows.ps1")" \
-      -Action "$action" -AppPid "$APP_PID" -First "${1:-}" -Second "${2:-}"
-  else
-    python3 "$ROOT/scripts/drive-desktop-linux.py" "$@"
-  fi
-}
-
 sha256_of() { sha256sum < "$1" | awk '{print $1}'; }
+
+# A rehearsal's candidate: app.yml's package for this RID under the branch build's -dryrun version, intact
+# against the .sha256 that job wrote beside it. Nothing attests a branch build (D-0433).
+verify_branch_build() {
+  local extension=msi name recorded
+  [ "$(platform)" = windows ] || extension=AppImage
+  name="keypaste-app-$VERSION-$RID-internal-unsigned.$extension"
+  [ "$(basename "$CANDIDATE")" = "$name" ] || { echo "$(basename "$CANDIDATE") is not the branch build's package name $name"; return 1; }
+  [ -f "$CANDIDATE.sha256" ] || { echo "no $name.sha256 beside the candidate"; return 1; }
+  recorded="$(awk 'NR == 1 {print $1}' "$CANDIDATE.sha256" | tr -d "$CR")"
+  [ "$(sha256_of "$CANDIDATE")" = "$recorded" ] || { echo "$name does not match its .sha256"; return 1; }
+  echo "ok: $name from app run $REHEARSAL matches its .sha256; a branch build, not attested"
+}
 
 # --- the vault, the CLI and the agent ------------------------------------------------------------
 
@@ -177,7 +235,7 @@ fixture() {
   KP="$(find "$CLI_DIR" -maxdepth 3 -type f \( -name keypaste -o -name keypaste.exe \) | head -n 1)"
   [ -n "$KP" ] || { echo "no keypaste under $CLI_DIR"; return 1; }
   chmod +x "$KP" 2>/dev/null || true
-  "$KP" --version | tr -d '\r' | grep -qF "$VERSION" || { echo "the CLI is not $VERSION: $("$KP" --version)"; return 1; }
+  "$KP" --version | tr -d '\r' | grep -qF "$BINARY_VERSION" || { echo "the CLI is not $BINARY_VERSION: $("$KP" --version)"; return 1; }
 
   HOME_DIR="$OUT/home"
   vault_dir="$OUT/vault"
@@ -265,17 +323,23 @@ unlock() {
   act "$1" drive type "$MASTER" && act "$1-enter" drive key Return && act "$1" drive find 'Lock now'
 }
 
-# --- the run ---------------------------------------------------------------------------------------
-
-# Avalonia publishes its AT-SPI tree only once the session's accessibility bus says a reader is present.
-enable_accessibility() {
-  local property
-  for property in IsEnabled ScreenReaderEnabled; do
-    gdbus call --session --dest org.a11y.Bus --object-path /org/a11y/bus \
-      --method org.freedesktop.DBus.Properties.Set org.a11y.Status "$property" '<true>' || return 1
-  done
-  gdbus call --session --dest org.a11y.Bus --object-path /org/a11y/bus --method org.a11y.Bus.GetAddress
+# What a new terminal runs as keypaste, read as it would read its PATH, and what it should run.
+terminal_shell() {
+  local said folder
+  if [ "$(platform)" = windows ]; then
+    folder="$(cygpath -w "$(dirname "$APP")")"
+    fact terminal_expected "$folder\\keypaste.exe"
+    fact path_entries "$(user_path_entries "$folder")"
+  else
+    fact terminal_expected "$HOME/.local/bin/keypaste"
+    fact shell_profile "$(stock_login_profile)"
+  fi
+  said="$(terminal_keypaste "$(platform)")" || { echo "no new shell answered: $said"; return 1; }
+  fact terminal "$said"
+  printf '%s\n' "$said"
 }
+
+# --- the run ---------------------------------------------------------------------------------------
 
 first_session() {
   local before
@@ -284,6 +348,10 @@ first_session() {
   act window drive window 120 || return 0
   act screenshot drive screenshot "$(native "$OUT/first-window.png")" || return 0
   unlock unlocked || return 0
+
+  if [ "$(platform)" = linux ]; then
+    { act settings drive key ctrl+4 && act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX"; } || true
+  fi
 
   act entry-shortcut drive key ctrl+1 || return 0
   act entry-listed drive find "$ENTRY_TITLE" || return 0
@@ -372,21 +440,36 @@ environment() {
     --arg candidateSha256 "$(sha256_of "$CANDIDATE")" \
     --arg display "${DISPLAY:-}" \
     --arg fusermount "$(command -v fusermount3 || command -v fusermount || true)" \
-    '{rid: $rid, version: $version, os: $os, runnerImage: $image, sha: $sha, run: $run, candidate: $candidate, candidateSha256: $candidateSha256, display: $display, fusermount: $fusermount}'
+    --arg appRun "${REHEARSAL:-}" \
+    '{rid: $rid, version: $version, os: $os, runnerImage: $image, sha: $sha, run: $run, candidate: $candidate, candidateSha256: $candidateSha256, display: $display, fusermount: $fusermount, rehearsal: ($appRun != ""), appRun: (if $appRun == "" then null else $appRun end)}'
 }
 
 run_all() {
+  local refused
   mkdir -p "$OUT"
   : > "$OUT/facts.jsonl"
   : > "$OUT/driver.jsonl"
   [ -f "$CANDIDATE" ] || die "no candidate at $CANDIDATE"
   if [ "$(platform)" = linux ] && [ -z "${DISPLAY:-}" ]; then die 'DISPLAY is unset; start Xvfb and a window manager first'; fi
+  local verify=(bash "$ROOT/scripts/verify-desktop-candidate.sh" "$CANDIDATE" "$VERSION" "$RID")
+  BINARY_VERSION="$VERSION"
+  if [ -n "${REHEARSAL:-}" ]; then
+    case "$REHEARSAL" in *[!0-9]*) die "REHEARSAL names an app.yml run, and '$REHEARSAL' is not a run ID" ;; esac
+    case "$VERSION" in *-dryrun) ;; *) die "a rehearsal installs a branch build, whose version ends -dryrun, not $VERSION" ;; esac
+    BINARY_VERSION="${VERSION%-dryrun}"
+    verify=(verify_branch_build)
+    fact rehearsal true
+    fact app_run "$REHEARSAL"
+  fi
+  fact platform "$(platform)"
+  fact binary_version "$BINARY_VERSION"
 
   # The candidate is verified here, before anything else, so no refused package is ever installed.
-  if act verify-candidate bash "$ROOT/scripts/verify-desktop-candidate.sh" "$CANDIDATE" "$VERSION" "$RID" \
-    && act fixture fixture && act install install_candidate; then
+  if act verify-candidate "${verify[@]}" && act fixture fixture && act install install_candidate; then
+    if [ "$(platform)" = windows ]; then act terminal-shell terminal_shell || true; fi
     first_session || true
     stop_app
+    if [ "$(platform)" = linux ]; then act terminal-shell terminal_shell || true; fi
     if [ "$(step "$OUT" add-variable | cut -f1)" = ok ]; then env_run; fi
     approval || true
   fi
@@ -399,8 +482,9 @@ run_all() {
     '{environment: $environment, checks: $checks, facts: ($facts | map({(.fact): .value}) | add)}' > "$OUT/observation.json"
 
   echo "observation: $(jq -r '[.checks[] | "\(.check)=\(.result)"] | join(" ")' "$OUT/observation.json")"
-  if jq -e '[.checks[] | select(.result != "pass")] | length > 0' "$OUT/observation.json" >/dev/null; then
-    jq -r '.checks[] | select(.result != "pass") | "::error::\(.check): \(.result): \(.why)"' "$OUT/observation.json" >&2
+  refused="$(refusals "$OUT")"
+  if [ -n "$refused" ]; then
+    printf '%s\n' "$refused" >&2
     return 1
   fi
 }
@@ -427,8 +511,11 @@ selftest() {
       '{"action":"save-entry","status":"ok","detail":"invoked Save"}' \
       '{"action":"add-variable","status":"ok","detail":"invoked Add"}' \
       '{"action":"agent-activity","status":"ok","detail":"Keypaste agent (process 4242) holds this vault, and agents reach it there."}' \
-      '{"action":"request","status":"ok","detail":"{}"}' > "$dir/driver.jsonl"
+      '{"action":"request","status":"ok","detail":"{}"}' \
+      '{"action":"terminal-shell","status":"ok","detail":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe"}' > "$dir/driver.jsonl"
     printf '%s\n' \
+      '{"fact":"platform","value":"windows"}' \
+      '{"fact":"binary_version","value":"0.5.0-rc.1"}' \
       '{"fact":"installed_app","value":"C:/Users/runner/AppData/Local/Programs/keypaste/keypaste-app.exe"}' \
       '{"fact":"install_prompts","value":"none"}' \
       '{"fact":"nonce","value":"edited-in-app-1"}' \
@@ -441,11 +528,28 @@ selftest() {
       '{"fact":"username_readback","value":"edited-in-app-1"}' \
       '{"fact":"audit_decision","value":"granted"}' \
       '{"fact":"audit_method","value":"prompt"}' \
+      '{"fact":"terminal_expected","value":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe"}' \
+      '{"fact":"path_entries","value":"1"}' \
+      '{"fact":"terminal","value":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tusage: keypaste mcp [--vault <path>]"}' \
       '{"fact":"finished","value":"true"}' > "$dir/facts.jsonl"
+  }
+  # The passing run on Linux, where the first session links keypaste from Settings.
+  passing_linux() {
+    passing "$1"
+    printf '%s\n' \
+      '{"action":"settings","status":"ok","detail":"sent ctrl+4"}' \
+      '{"action":"link-cli","status":"ok","detail":"invoked Link the keypaste command"}' \
+      '{"action":"linked","status":"ok","detail":"A terminal runs this app\u0027s keypaste from /home/runner/.local/bin/keypaste."}' >> "$work/$1/driver.jsonl"
+    set_fact "$1" platform linux
+    set_fact "$1" installed_app /home/runner/work/keypaste/install-desktop/app/keypaste-app-0.5.0-rc.1-linux-x64-internal-unsigned.AppImage
+    set_fact "$1" terminal_expected /home/runner/.local/bin/keypaste
+    set_fact "$1" terminal $'/home/runner/.local/bin/keypaste\t0.5.0-rc.1\tusage: keypaste mcp [--vault <path>]'
+    set_fact "$1" shell_profile /home/runner/.profile
   }
   refuse_action() { jq -c --arg a "$2" --arg d "$3" 'if .action == $a then .status = "refused" | .detail = $d else . end' "$work/$1/driver.jsonl" > "$work/t" && mv "$work/t" "$work/$1/driver.jsonl"; }
   drop_action() { jq -c --arg a "$2" 'select(.action != $a)' "$work/$1/driver.jsonl" > "$work/t" && mv "$work/t" "$work/$1/driver.jsonl"; }
-  set_fact() { printf '{"fact":"%s","value":"%s"}\n' "$2" "$3" >> "$work/$1/facts.jsonl"; }
+  set_fact() { jq -cn --arg f "$2" --arg v "$3" '{fact: $f, value: $v}' >> "$work/$1/facts.jsonl"; }
+  drop_fact() { jq -c --arg f "$2" 'select(.fact != $f)' "$work/$1/facts.jsonl" > "$work/t" && mv "$work/t" "$work/$1/facts.jsonl"; }
 
   expect() { # expect <fixture> <check> <result>
     local actual
@@ -456,6 +560,17 @@ selftest() {
       failures=$((failures + 1))
     fi
   }
+
+  expect_run() { # expect_run <fixture> <accepted|refused>: whether the run's exit status accepts its verdicts
+    local actual=accepted
+    cases=$((cases + 1))
+    [ -z "$(refusals "$work/$1")" ] || actual=refused
+    if [ "$actual" != "$2" ]; then
+      echo "::error::selftest $1: the run is $actual, expected $2" >&2
+      failures=$((failures + 1))
+    fi
+  }
+  verdicts() { bash "$SELF" --classify "$work/$1" > "$work/$1/verdicts.jsonl"; }
 
   passing all-pass
   passing candidate-refused
@@ -488,6 +603,36 @@ selftest() {
   refuse_action no-agent-screen agent-activity "nothing starting 'Keypaste agent (process ' appeared"
   passing unfinished
   jq -c 'select(.fact != "finished")' "$work/unfinished/facts.jsonl" > "$work/t" && mv "$work/t" "$work/unfinished/facts.jsonl"
+  passing terminal-other-version
+  set_fact terminal-other-version terminal $'C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.4.0\tusage: keypaste mcp'
+  passing terminal-elsewhere
+  set_fact terminal-elsewhere terminal $'C:\\tools\\keypaste.exe\t0.5.0-rc.1\tusage: keypaste mcp'
+  passing terminal-other-case
+  set_fact terminal-other-case terminal $'c:\\users\\runner\\appdata\\local\\programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tusage: keypaste mcp'
+  passing terminal-two-entries
+  set_fact terminal-two-entries path_entries 2
+  passing terminal-no-bridge
+  set_fact terminal-no-bridge terminal $'C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tunknown command: mcp'
+  passing terminal-absent
+  set_fact terminal-absent terminal absent
+  passing_linux linux-pass
+  passing_linux linux-not-linked
+  refuse_action linux-not-linked link-cli "no button 'Link the keypaste command'"
+  passing_linux linux-not-unlocked
+  refuse_action linux-not-unlocked unlocked "nothing named 'Lock now' appeared"
+  passing_linux linux-absent
+  set_fact linux-absent terminal absent
+  passing_linux linux-fails
+  set_fact linux-fails terminal $'fails\t/home/runner/.local/bin/keypaste exited 127: not found'
+  passing rehearsal
+  set_fact rehearsal rehearsal true
+  set_fact rehearsal app_run 4242
+  passing rehearsal-not-intact
+  set_fact rehearsal-not-intact rehearsal true
+  refuse_action rehearsal-not-intact verify-candidate 'does not match its .sha256'
+  drop_action rehearsal-not-intact install
+  passing rehearsal-unmarked
+  set_fact rehearsal-unmarked rehearsal true
 
   local check
   for check in "${CHECKS[@]}"; do expect all-pass "$check" pass; done
@@ -516,6 +661,38 @@ selftest() {
   expect no-agent-screen approval unreached
   expect unfinished candidate harness-failure
   expect unfinished approval harness-failure
+  expect unfinished terminal harness-failure
+  expect candidate-refused terminal unreached
+  expect not-unlocked terminal pass
+  expect terminal-other-version terminal contradiction
+  expect terminal-elsewhere terminal contradiction
+  expect terminal-other-case terminal pass
+  expect terminal-two-entries terminal contradiction
+  expect terminal-no-bridge terminal contradiction
+  expect terminal-absent terminal contradiction
+  for check in "${CHECKS[@]}"; do expect linux-pass "$check" pass; done
+  expect linux-not-linked terminal unreached
+  expect linux-not-linked entry-list pass
+  expect linux-not-unlocked terminal unreached
+  expect linux-absent terminal contradiction
+  expect linux-fails terminal contradiction
+  expect rehearsal candidate rehearsal
+  for check in "${CHECKS[@]:1}"; do expect rehearsal "$check" pass; done
+  expect rehearsal-not-intact candidate contradiction
+  expect rehearsal-not-intact install unreached
+
+  verdicts all-pass
+  expect_run all-pass accepted
+  verdicts rehearsal
+  expect_run rehearsal accepted
+  verdicts rehearsal-not-intact
+  expect_run rehearsal-not-intact refused
+  verdicts terminal-two-entries
+  expect_run terminal-two-entries refused
+  # A rehearsal verdict the run did not mark as one is refused.
+  verdicts rehearsal-unmarked
+  drop_fact rehearsal-unmarked rehearsal
+  expect_run rehearsal-unmarked refused
 
   if [ "$failures" -gt 0 ]; then
     die "exercise-desktop-install selftest: $failures of $cases cases failed"

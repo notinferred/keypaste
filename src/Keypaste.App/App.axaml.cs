@@ -14,6 +14,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
@@ -149,6 +150,9 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>The entry that opens the app at login; the platform's own unless a test gives another.</summary>
     internal Func<ILoginItem?> LoginItemFor { get; init; } = LoginItems.ForThisProcess;
+
+    /// <summary>The link a terminal finds this app's <c>keypaste</c> through; the platform's own unless a test gives another.</summary>
+    internal Func<ICliLink?> CliLinkFor { get; init; } = CliLinks.ForThisProcess;
 
     /// <summary>Shows the window from the menu bar or tray.</summary>
     internal void OpenWindow()
@@ -486,6 +490,7 @@ internal sealed partial class App : Application, IDisposable
         {
             ShareTransport = ShareTransport,
             LoginItem = LoginItemFor(),
+            CliLink = CliLinkFor(),
         };
 
         _window.FindControl<ContentControl>("Root")!.Content =
