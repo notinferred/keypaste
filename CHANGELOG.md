@@ -8,6 +8,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 `keypaste lock` no longer reports that the app or `keypaste agent` holding the vault did not lock when it had: the holder now answers once it has locked, and that answer is the confirmation ([F.62](docs/steps/F.62.md)).
 
+A new terminal now runs the `keypaste` a desktop install carries. The Windows MSI adds its folder to your user PATH and removes it on uninstall. On Linux and macOS, Settings › keypaste in a terminal links it at `~/.local/bin/keypaste` or `/usr/local/bin/keypaste`, where macOS asks for an administrator's password, and on Linux each start of a newer app moves the link to it. A file keypaste did not write there is replaced only after you confirm, and kept beside it as `keypaste.keypaste-backup`. Started with `cli`, the Linux AppImage runs the CLI it carries ([G.5](docs/steps/G.5.md)).
+
 An agent request that arrives while its client is still introducing itself is now prompted for and logged under the name the client gave, not as "an unnamed client" ([F.61](docs/steps/F.61.md)).
 
 A save that fails partway, as on a full disk, is now reported and leaves the vault as it was; before, keypaste could report it saved and replace the vault with a truncated file. A save is now on disk before it replaces the vault. After you refuse a run, an agent asking again with one variable more or fewer, or asking for one of its fields alone, is refused for the minute too, as is a run reaching a field you just refused ([F.60](docs/steps/F.60.md)).

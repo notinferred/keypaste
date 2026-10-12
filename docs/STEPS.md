@@ -80,11 +80,6 @@ The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. E
 
 Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
-- [ ] **G.5 — Carry the CLI on PATH in every desktop install.** Needs: none.
-  - The MSI adds its folder to the per-user PATH and removes it on uninstall.
-  - The AppImage dispatches `cli` as it does `mcp`.
-  - Settings links the CLI into the terminal on Linux and macOS.
-  - `install-desktop.yml` and `upgrade-desktop.yml` check `keypaste --version` in a new shell.
 - [ ] **3.5a — Enable the macOS signing identity (H-0015).** Human. Needs: none.
   - External Apple Developer enrollment as keypaste.
   - Repository-scoped Developer ID Application and notarization credentials.
