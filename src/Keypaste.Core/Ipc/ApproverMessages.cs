@@ -375,10 +375,10 @@ public sealed record LockRequest
     public string Session { get; init; } = string.Empty;
 }
 
-/// <summary>Whether the owner is locking.</summary>
-/// <param name="Locking">Whether the lock was started; it completes after this reply leaves.</param>
+/// <summary>Whether the owner has locked.</summary>
+/// <param name="Locked">Whether the session the request was made under has ended.</param>
 /// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
-public sealed record LockReply(bool Locking, string Reason);
+public sealed record LockReply(bool Locked, string Reason);
 
 /// <summary>
 /// Asks the owner to release a set to a runner holding a scoped token, which the owner verifies

@@ -207,7 +207,7 @@ internal sealed class LockReplyFrame(LockReply reply)
 {
     public int V { get; } = ApproverProtocol.Version;
     public string Kind { get; } = ApproverProtocol.LockKind;
-    public bool Locking => reply.Locking;
+    public bool Locked => reply.Locked;
     public string Reason => reply.Reason;
 }
 

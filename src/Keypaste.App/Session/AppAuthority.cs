@@ -41,7 +41,7 @@ internal sealed class AppAuthority : IDisposable
     /// <summary>What <c>keypaste lock</c> does to the app: locks the session as requested, on the thread <paramref name="post"/> runs it on.</summary>
     /// <param name="session">The session to lock.</param>
     /// <param name="post">Runs an action on the UI thread; launch posts through the dispatcher.</param>
-    /// <returns>The action the authority runs after its reply has left.</returns>
+    /// <returns>The action the authority runs, answering once it has ended the session.</returns>
     internal static Action RequestLock(AppVaultSession session, Action<Action> post)
     {
         ArgumentNullException.ThrowIfNull(session);

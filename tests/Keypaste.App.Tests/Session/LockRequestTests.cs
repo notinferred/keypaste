@@ -64,7 +64,7 @@ public sealed class LockRequestTests
 
         var reply = await client.LockAsync(new LockRequest { Vault = fixture.Path_, Session = serving.Session }, Token);
 
-        Assert.False(reply!.Locking);
+        Assert.False(reply!.Locked);
         Assert.True(authority.Session.IsUnlocked);
     }
 }

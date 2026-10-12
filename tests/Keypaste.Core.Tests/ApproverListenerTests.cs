@@ -459,7 +459,7 @@ public sealed class ApproverListenerTests
         Assert.Equal(0, revoked.Revoked);
         Assert.Contains("does not revoke grants", revoked.Reason, StringComparison.Ordinal);
         Assert.NotNull(locked);
-        Assert.False(locked.Locking);
+        Assert.False(locked.Locked);
         Assert.Contains("does not lock", locked.Reason, StringComparison.Ordinal);
     }
 

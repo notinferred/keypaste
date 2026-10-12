@@ -70,7 +70,7 @@ public interface IApproverHandler
     /// <param name="request">The attachment it is made under.</param>
     /// <param name="connectionId">Who is asking.</param>
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
-    /// <returns>Whether the lock started. A handler that cannot lock refuses.</returns>
+    /// <returns>Whether the session the request was made under has ended. A handler that cannot lock refuses.</returns>
     ValueTask<LockReply> LockAsync(LockRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new LockReply(false, "this keypaste process does not lock on request"));
 

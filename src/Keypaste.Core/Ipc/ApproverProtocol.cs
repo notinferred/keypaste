@@ -877,7 +877,7 @@ public static class ApproverProtocol
         return WriteAttached(LockKind, request.Vault, request.Session);
     }
 
-    /// <summary>Encodes whether the owner is locking.</summary>
+    /// <summary>Encodes whether the owner has locked.</summary>
     /// <param name="reply">The answer.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
@@ -1018,7 +1018,7 @@ public static class ApproverProtocol
         return request is not null;
     }
 
-    /// <summary>Decodes whether the owner is locking.</summary>
+    /// <summary>Decodes whether the owner has locked.</summary>
     /// <param name="frame">The frame's bytes.</param>
     /// <param name="reply">The decoded reply.</param>
     /// <returns><see langword="true"/> when the frame was a well-formed lock reply.</returns>
@@ -1036,13 +1036,13 @@ public static class ApproverProtocol
             var root = document.RootElement;
 
             if (!IsKind(root, LockKind)
-                || !TryBoolean(root, "locking", out var locking)
+                || !TryBoolean(root, "locked", out var locked)
                 || !TryString(root, "reason", out var reason))
             {
                 return false;
             }
 
-            reply = new LockReply(locking, reason);
+            reply = new LockReply(locked, reason);
             return true;
         }
     }

@@ -61,7 +61,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="lifetime">The current unlocked lifetime, or null while the vault is locked.</param>
     /// <param name="inner">What decides a request once it belongs to the current session.</param>
     /// <param name="environments">What env sets are released with, or null to refuse every one.</param>
-    /// <param name="lockNow">What <c>keypaste lock</c> runs, after its reply has left; null refuses it.</param>
+    /// <param name="lockNow">What <c>keypaste lock</c> runs, which must end the session for the reply to say locked; null refuses it.</param>
     /// <param name="clock">What attachments and releases are timed on; null is the system clock.</param>
     public SessionAuthority(
         VaultIdentity vault,
@@ -1000,23 +1000,31 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
-    /// <remarks>The lock runs after this returns, so the reply leaves before the lifetime ends and the listener stops.</remarks>
-    public ValueTask<LockReply> LockAsync(LockRequest request, string connectionId, CancellationToken cancellationToken)
+    /// <remarks>
+    /// The lock runs on its own, since an owner's lock waits for its connections to end (D-0392), and the
+    /// reply waits for it to end the session it was asked under. The reply is then the confirmation, and
+    /// nothing more is asked on a connection the lock is closing (F.62).
+    /// </remarks>
+    public async ValueTask<LockReply> LockAsync(LockRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
-            return ValueTask.FromResult(new LockReply(false, refusal.Reason));
+            return new LockReply(false, refusal.Reason);
         }
 
         if (_lockNow is not { } lockNow)
         {
-            return ValueTask.FromResult(new LockReply(false, "the keypaste process holding this vault cannot be locked from outside"));
+            return new LockReply(false, "the keypaste process holding this vault cannot be locked from outside");
         }
 
         _ = Task.Run(lockNow, CancellationToken.None);
-        return ValueTask.FromResult(new LockReply(true, string.Empty));
+        await EndedAsync(lifetime, cancellationToken).ConfigureAwait(false);
+
+        return lifetime.IsLive
+            ? new LockReply(false, "the request ended before the lock ended the session")
+            : new LockReply(true, string.Empty);
     }
 
     /// <inheritdoc/>
@@ -1030,6 +1038,22 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     private SessionLifetime? Live() => _lifetime() is { IsLive: true } lifetime ? lifetime : null;
+
+    /// <summary>Completes once the lifetime has ended, or once nobody is waiting for the answer.</summary>
+    private static async Task EndedAsync(SessionLifetime lifetime, CancellationToken cancellationToken)
+    {
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = lifetime.Ended.Register(() => ended.TrySetResult());
+
+        try
+        {
+            await ended.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // The peer has gone or the listener is stopping; the caller reads the lifetime either way.
+        }
+    }
 
     /// <summary>A runner's file line as a prompt shows it: one line, nothing that draws anything else.</summary>
     private static string ShownLine(string line) =>

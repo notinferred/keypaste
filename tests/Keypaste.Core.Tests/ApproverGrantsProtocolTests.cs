@@ -81,7 +81,7 @@ public sealed class ApproverGrantsProtocolTests
         var reply = ApproverProtocol.Encode(new LockReply(true, string.Empty));
 
         Assert.Equal("""{"v":2,"kind":"lock","vault":"/v.kdbx","session":"s1"}""", Text(request));
-        Assert.Equal("""{"v":2,"kind":"lock","locking":true,"reason":""}""", Text(reply));
+        Assert.Equal("""{"v":2,"kind":"lock","locked":true,"reason":""}""", Text(reply));
         Assert.Equal(ApproverMessageKind.Lock, ApproverProtocol.KindOf(request));
         Assert.True(ApproverProtocol.TryDecode(request, out LockRequest? decodedRequest));
         Assert.Equal("s1", decodedRequest.Session);
@@ -133,7 +133,7 @@ public sealed class ApproverGrantsProtocolTests
     [InlineData("""{"v":2,"kind":"grants","answered":true,"reason":"","grants":[{"id":"x","kind":"credential","client":"c","scope":"e","field":"password"}]}""")]
     [InlineData("""{"v":2,"kind":"grants","answered":"yes","reason":"","grants":[]}""")]
     [InlineData("""{"v":2,"kind":"revoke-grants","revoked":-1,"reason":""}""")]
-    [InlineData("""{"v":2,"kind":"lock","locking":"true","reason":""}""")]
+    [InlineData("""{"v":2,"kind":"lock","locked":"true","reason":""}""")]
     public void AMalformedReply_IsRefused(string json)
     {
         var frame = Frame(json);

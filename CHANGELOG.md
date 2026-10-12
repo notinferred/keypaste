@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`keypaste lock` no longer reports that the app or `keypaste agent` holding the vault did not lock when it had: the holder now answers once it has locked, and that answer is the confirmation ([F.62](docs/steps/F.62.md)).
+
 An agent request that arrives while its client is still introducing itself is now prompted for and logged under the name the client gave, not as "an unnamed client" ([F.61](docs/steps/F.61.md)).
 
 A save that fails partway, as on a full disk, is now reported and leaves the vault as it was; before, keypaste could report it saved and replace the vault with a truncated file. A save is now on disk before it replaces the vault. After you refuse a run, an agent asking again with one variable more or fewer, or asking for one of its fields alone, is refused for the minute too, as is a run reaching a field you just refused ([F.60](docs/steps/F.60.md)).

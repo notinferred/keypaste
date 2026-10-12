@@ -8,8 +8,8 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The owner answers <c>grants</c>, <c>revoke-grants</c> and <c>lock</c> over its real endpoint only
-/// for a connection attached to the live session, lists names and never a value, and runs its lock
-/// action after the reply has left (D-0351).
+/// for a connection attached to the live session, lists names and never a value, and answers a lock
+/// once its lock action has ended the session (D-0351).
 /// </summary>
 public sealed class SessionAuthorityGrantsTests : IDisposable
 {
@@ -125,33 +125,33 @@ public sealed class SessionAuthorityGrantsTests : IDisposable
     }
 
     /// <summary>
-    /// The lock action waits for the reply to have arrived; run inline, it would hold the reply back
-    /// and this would time out.
+    /// The reply waits for the lock action to end the session it was asked under, so it is the
+    /// confirmation and nothing more need be asked on a connection the lock is closing (F.62).
     /// </summary>
     [Fact]
-    public async Task Lock_RepliesThenEndsTheLifetime()
+    public async Task Lock_RepliesOnceTheLifetimeHasEnded()
     {
-        var replied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var locked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var lifetime = _lifetime!;
 
         await using var owner = Owner.Start(this, () =>
         {
-            replied.Task.Wait(_bound);
+            started.SetResult();
+            release.Task.Wait(_bound);
             lifetime.End();
-            locked.SetResult();
         });
         await using var client = await owner.AttachAsync();
         await GrantAsync(client, "claude-code", "env/dev/STRIPE_KEY");
 
-        var reply = await client.LockAsync(Lock(), Token).AsTask().WaitAsync(_bound, Token);
+        var replying = client.LockAsync(Lock(), Token).AsTask();
+        await started.Task.WaitAsync(_bound, Token);
+        var first = await Task.WhenAny(replying, Task.Delay(TimeSpan.FromMilliseconds(500), Token));
+        release.SetResult();
+        var reply = await replying.WaitAsync(_bound, Token);
 
+        Assert.NotSame(replying, first);
         Assert.Equal(new LockReply(true, string.Empty), reply);
-        Assert.True(lifetime.IsLive);
-
-        replied.SetResult();
-        await locked.Task.WaitAsync(_bound, Token);
-
         Assert.False(lifetime.IsLive);
         Assert.Same(ApproverActivity.None, owner.Authority.Activity);
     }

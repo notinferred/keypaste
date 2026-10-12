@@ -7,14 +7,13 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary><c>keypaste lock</c>: asks the process holding the vault unlocked to lock now (D-0351).</summary>
 /// <remarks>
-/// It confirms only what it sees: after the owner agrees, the verb attaches again until the owner
-/// refuses or is gone, so "locked" is never printed about a vault that is still being served.
+/// The owner answers once its lock has ended the session the verb attached to, so "locked" is never
+/// printed about a vault that is still being served, and the verb asks nothing more on a connection the
+/// lock is closing (F.62).
 /// </remarks>
 internal static class LockCommand
 {
     private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan _settle = TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan _step = TimeSpan.FromMilliseconds(100);
 
     private static readonly OptionSpec[] _options =
     [
@@ -81,7 +80,7 @@ internal static class LockCommand
 
         var reply = await client.LockAsync(new LockRequest { Vault = vault, Session = session }, bound.Token);
 
-        if (reply is not { Locking: true })
+        if (reply is not { Locked: true })
         {
             context.Stderr.WriteLine(reply is null
                 ? "keypaste lock: the keypaste process holding the vault did not answer; it may be older than this keypaste"
@@ -89,41 +88,10 @@ internal static class LockCommand
             return CliApp.ExitInternalError;
         }
 
-        if (!await LockedAsync(client, vault))
-        {
-            context.Stderr.WriteLine($"keypaste lock: the keypaste process holding {vault} did not lock");
-            return CliApp.ExitInternalError;
-        }
-
         var style = context.ConsoleStyle;
         var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
         context.Stderr.WriteLine($"  {done} locked {vault} {style.Glyph(context.Stderr, Mark.Dot)} agents paused");
         return CliApp.ExitSuccess;
-    }
-
-    /// <summary>Attaches again until the owner refuses or has gone, or the time to settle runs out.</summary>
-    private static async Task<bool> LockedAsync(ApproverClient client, string vault)
-    {
-        using var settle = new CancellationTokenSource(_settle);
-
-        try
-        {
-            while (true)
-            {
-                var again = await client.AttachAsync(new AttachRequest(vault), settle.Token);
-
-                if (again is not { Attached: true })
-                {
-                    return !settle.IsCancellationRequested;
-                }
-
-                await Task.Delay(_step, settle.Token);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
     }
 
     /// <summary>Another process's words, made safe for this terminal.</summary>
