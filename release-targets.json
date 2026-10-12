@@ -436,6 +436,21 @@
       ],
       "advertised": false,
       "provenance": true
+    },
+    {
+      "version": "0.5.0-rc.1",
+      "tag": "v0.5.0-rc.1",
+      "component": "cli",
+      "date": "2026-10-12",
+      "origin": "https://dl.keypaste.com/v0.5.0-rc.1/",
+      "rids": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "advertised": false,
+      "provenance": true
     }
   ]
 }
