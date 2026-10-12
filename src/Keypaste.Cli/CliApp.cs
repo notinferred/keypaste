@@ -38,6 +38,12 @@ internal static class CliApp
     internal const int ExitTamperDetected = 5;
 
     /// <summary>
+    /// <c>setup</c> found AI clients and every one refused, or could not be started or reached.
+    /// </summary>
+    /// <remarks>Its own code so a script can tell it from finding none, which is <see cref="ExitNotFound"/>.</remarks>
+    internal const int ExitClientsRefused = 6;
+
+    /// <summary>
     /// The command <c>run</c> was given exists but could not be executed. The shell convention,
     /// used because scripts already branch on it.
     /// </summary>

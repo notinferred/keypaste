@@ -1,17 +1,71 @@
+using System.Diagnostics.CodeAnalysis;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Infrastructure;
+using Keypaste.Core.Ipc;
+using Keypaste.Core.Linking;
+using Keypaste.Core.Ownership;
+using Keypaste.Core.Settings;
+
 namespace Keypaste.Core.Clients;
 
-/// <summary>Finds the <c>keypaste</c> binary the desktop tells a client to start as <c>keypaste mcp</c>.</summary>
+/// <summary>The AppImage keypaste runs from on Linux, and the link a client is registered through instead of it.</summary>
+/// <param name="Image">The AppImage file.</param>
+/// <param name="Link">G.5's <c>~/.local/bin/keypaste</c>, which starts <paramref name="Image"/> with <c>cli</c>.</param>
+public sealed record McpAppImage(string Image, ICliLink Link)
+{
+    /// <summary>The AppImage this process runs from, or null when it does not run from one.</summary>
+    /// <remarks>
+    /// <see cref="CliLinks.TargetFor"/> decides, so <c>APPIMAGE</c> and <c>APPDIR</c> must agree with where keypaste
+    /// runs before either is believed.
+    /// </remarks>
+    public static McpAppImage? ForThisProcess()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return null;
+        }
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        return home is { Length: > 0 }
+            && SemanticVersion.TryParse(CoreInfo.Version, out var version)
+            && CliLinks.TargetFor(home, AppContext.BaseDirectory, Environment.GetEnvironmentVariable("APPIMAGE"), Environment.GetEnvironmentVariable("APPDIR"))
+                is { ThroughAppImage: true } target
+            ? new McpAppImage(target.Program, new LinuxCliLink(home, target, version, Environment.GetEnvironmentVariable("PATH")))
+            : null;
+    }
+}
+
+/// <summary>What a client is told to start, and what must happen before it can.</summary>
+/// <param name="Server">The bridge's path and the argument that selects it.</param>
+/// <param name="Link">The link to make first, inside an AppImage when the link is absent, stale or another program; otherwise null.</param>
+/// <param name="Note">What the person should know about the link left as it is, or null.</param>
+public sealed record McpBridgeTarget(McpServerCommand Server, McpBridgeLink? Link, string? Note);
+
+/// <summary>Finds the <c>keypaste</c> a client is told to start as <c>keypaste mcp</c>, at a path that outlives this run.</summary>
 /// <remarks>
-/// Beside the app first: the packages carry the two together, and a mismatched pair is a class of bug nobody
-/// would enjoy diagnosing. PATH is the fallback. <c>keypaste setup</c> needs none of this: it registers itself.
+/// <para>
+/// Windows and macOS install keypaste at a fixed path. Inside a Linux AppImage, whose mount moves on every launch and
+/// whose file an upgrade replaces, a client is registered through G.5's <c>~/.local/bin/keypaste</c>, which a newer image
+/// re-points when it starts (D-0334).
+/// </para>
+/// <para>
+/// The bridge reads its vault, its audit log and its approver from <c>KEYPASTE_HOME</c> and <c>KEYPASTE_APPROVER</c>,
+/// which a client need not pass on and Gemini CLI strips. <see cref="TryPin"/> writes them as flags when they differ
+/// from what a bridge started without them would find (D-0389).
+/// </para>
 /// </remarks>
 public static class McpServerLocator
 {
     /// <summary>The CLI binary's file name, without the platform's extension.</summary>
     public const string FileName = "keypaste";
 
-    /// <summary>What selects the bridge: <c>keypaste mcp</c>, which the desktop AppImage's <c>AppRun</c> passes through.</summary>
+    /// <summary>What selects the bridge: <c>keypaste mcp</c>.</summary>
     public const string BridgeArgument = "mcp";
+
+    private const string _volumes = "/Volumes/";
+
+    private const string _moveFirst = "move keypaste to Applications, then connect";
 
     /// <summary>The CLI binary's file name on this platform.</summary>
     public static string ExecutableName => OperatingSystem.IsWindows() ? FileName + ".exe" : FileName;
@@ -41,46 +95,196 @@ public static class McpServerLocator
         return null;
     }
 
-    /// <summary>
-    /// Finds the bridge for the desktop, which may be running from inside an AppImage.
-    /// </summary>
-    /// <remarks>
-    /// An AppImage is mounted at a new temporary path on every launch, so the bridge beside the app
-    /// is gone as soon as the app exits. When the app is running from inside its image, the image
-    /// file itself is what a client is told to start, with <see cref="BridgeArgument"/> selecting
-    /// the bridge; that path lasts as long as the person leaves the file where it is. The image's
-    /// runtime sets <c>APPIMAGE</c> and <c>APPDIR</c>, and both must agree with where the app is
-    /// actually running before either is believed.
-    /// </remarks>
-    /// <param name="appDirectory">The desktop's own directory.</param>
-    /// <param name="appImage">The <c>APPIMAGE</c> environment variable.</param>
-    /// <param name="appDir">The <c>APPDIR</c> environment variable.</param>
-    /// <param name="pathVariable">The PATH environment variable.</param>
-    public static McpServerCommand? FindForDesktop(string appDirectory, string? appImage, string? appDir, string? pathVariable)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(appDirectory);
-
-        if (appImage is { Length: > 0 }
-            && appDir is { Length: > 0 }
-            && File.Exists(appImage)
-            && IsWithin(appDirectory, appDir)
-            && File.Exists(Path.Combine(appDirectory, ExecutableName)))
-        {
-            return new McpServerCommand(Path.GetFullPath(appImage), [BridgeArgument]);
-        }
-
-        return Find(appDirectory, pathVariable);
-    }
-
     /// <summary>Where <see cref="Find"/> looked, for a message that says so.</summary>
     public static string Places(string? besideDirectory) =>
         besideDirectory is { Length: > 0 } ? $"in {besideDirectory} and on PATH" : "on PATH";
 
-    private static bool IsWithin(string directory, string root)
-    {
-        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
-        var prefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
+    /// <summary>The bridge <c>keypaste setup</c> registers: the <c>keypaste</c> running it, or the AppImage's link.</summary>
+    /// <param name="processPath">The running program.</param>
+    /// <param name="appImage">The AppImage keypaste runs from, or null.</param>
+    /// <param name="target">The bridge, when there is one.</param>
+    /// <param name="error">Why not.</param>
+    /// <returns>Whether there is a bridge to register.</returns>
+    /// <remarks>The client starts this binary, so setup and the bridge it registers are always one version.</remarks>
+    public static bool TryForSetup(
+        string? processPath,
+        McpAppImage? appImage,
+        [NotNullWhen(true)] out McpBridgeTarget? target,
+        out string error) =>
+        TryForSetup(processPath, appImage, McpClientMachine.CurrentPlatform, out target, out error);
 
-        return full.StartsWith(prefix, StringComparison.Ordinal);
+    /// <summary>The bridge the desktop registers: the <c>keypaste</c> beside it, else on PATH, or the AppImage's link.</summary>
+    /// <param name="appDirectory">The desktop's own directory.</param>
+    /// <param name="appImage">The AppImage the desktop runs from, or null.</param>
+    /// <param name="pathVariable">The PATH environment variable.</param>
+    /// <param name="target">The bridge, when there is one.</param>
+    /// <param name="error">Why not.</param>
+    /// <returns>Whether there is a bridge to register.</returns>
+    /// <remarks>
+    /// Beside the app first: the packages carry the two together, and a mismatched pair is a class of bug nobody would
+    /// enjoy diagnosing.
+    /// </remarks>
+    public static bool TryForDesktop(
+        string appDirectory,
+        McpAppImage? appImage,
+        string? pathVariable,
+        [NotNullWhen(true)] out McpBridgeTarget? target,
+        out string error) =>
+        TryForDesktop(appDirectory, appImage, pathVariable, McpClientMachine.CurrentPlatform, out target, out error);
+
+    /// <summary>What a registration pins with the bridge's own flags.</summary>
+    /// <param name="machine">The machine, whose home names the default <c>.keypaste</c>.</param>
+    /// <param name="home"><c>KEYPASTE_HOME</c>, or the app's home; null or empty when unset.</param>
+    /// <param name="approverOverride"><c>KEYPASTE_APPROVER</c>; null or empty when unset.</param>
+    /// <param name="namedVault">The vault named for this run (<c>--vault</c>, or the vault the app has unlocked), or null.</param>
+    /// <param name="chosenVault">The vault chosen with <c>keypaste use</c>, or null.</param>
+    /// <param name="pins">The flags, when they can be decided.</param>
+    /// <returns>False only for a home other than the default with no vault named or chosen, which no flag can stand in for.</returns>
+    /// <remarks>
+    /// <para>
+    /// Under the default home a bridge started without either variable finds the same vault, log and owner, so only a
+    /// named vault other than the chosen one is pinned, and a client keeps following <c>keypaste use</c>. A set
+    /// <c>KEYPASTE_APPROVER</c> adds <c>--approver</c>.
+    /// </para>
+    /// <para>
+    /// Under any other home all three are pinned: the vault named, else the chosen one; that home's log; and the
+    /// approver, else the pipe that home's owner of that vault listens on. The machine's home is read from the machine
+    /// rather than the real profile, so a test never compares against a developer's own.
+    /// </para>
+    /// </remarks>
+    public static bool TryPin(
+        McpClientMachine machine,
+        string? home,
+        string? approverOverride,
+        string? namedVault,
+        string? chosenVault,
+        [NotNullWhen(true)] out McpServerPins? pins)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+
+        var approver = approverOverride is { Length: > 0 } ? approverOverride : null;
+
+        if (home is not { Length: > 0 } || IsDefaultHome(machine, home))
+        {
+            var vault = namedVault is not null && !ChosenVault.Same(chosenVault, namedVault) ? namedVault : null;
+            pins = new McpServerPins(vault, AuditLogPath: null, approver);
+            return true;
+        }
+
+        if ((namedVault ?? chosenVault) is not { } pinned)
+        {
+            pins = null;
+            return false;
+        }
+
+        pins = new McpServerPins(
+            pinned,
+            KeypasteHome.AuditPath(home),
+            approver ?? ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(KeypasteHome.Resolve(home), pinned)));
+        return true;
     }
+
+    internal static bool TryForSetup(
+        string? processPath,
+        McpAppImage? appImage,
+        McpClientPlatform platform,
+        [NotNullWhen(true)] out McpBridgeTarget? target,
+        out string error)
+    {
+        if (appImage is not null)
+        {
+            return TryThrough(appImage, out target, out error);
+        }
+
+        if (processPath is null || !string.Equals(Path.GetFileName(processPath), ExecutableName, StringComparison.OrdinalIgnoreCase))
+        {
+            target = null;
+            error = $"setup registers the {FileName} that runs it, and this is {processPath ?? "an unknown program"}; "
+                + $"run {FileName} itself rather than through dotnet";
+            return false;
+        }
+
+        return TryStable(processPath, platform, out target, out error);
+    }
+
+    internal static bool TryForDesktop(
+        string appDirectory,
+        McpAppImage? appImage,
+        string? pathVariable,
+        McpClientPlatform platform,
+        [NotNullWhen(true)] out McpBridgeTarget? target,
+        out string error)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(appDirectory);
+
+        if (appImage is not null)
+        {
+            return TryThrough(appImage, out target, out error);
+        }
+
+        if (Find(appDirectory, pathVariable) is not { } found)
+        {
+            target = null;
+            error = $"{FileName} was not found {Places(appDirectory)}, so there is nothing a client could start";
+            return false;
+        }
+
+        return TryStable(found.Path, platform, out target, out error);
+    }
+
+    // A macOS path reached through a link, G.5's /usr/local/bin/keypaste among them, is registered as the bundle it names.
+    // A disk image or a translocated copy is gone once it is ejected or quits.
+    private static bool TryStable(string path, McpClientPlatform platform, [NotNullWhen(true)] out McpBridgeTarget? target, out string error)
+    {
+        var stable = platform == McpClientPlatform.MacOS ? PathIdentity.Canonical(path) : Path.GetFullPath(path);
+
+        if (platform == McpClientPlatform.MacOS && (stable.StartsWith(_volumes, StringComparison.Ordinal) || MacCliLink.IsTranslocated(stable)))
+        {
+            target = null;
+            error = _moveFirst;
+            return false;
+        }
+
+        target = new McpBridgeTarget(new McpServerCommand(stable, [BridgeArgument]), Link: null, Note: null);
+        error = string.Empty;
+        return true;
+    }
+
+    // Registered as the link in every state, so a client never names the image file an upgrade replaces.
+    private static bool TryThrough(McpAppImage appImage, [NotNullWhen(true)] out McpBridgeTarget? target, out string error)
+    {
+        var link = appImage.Link;
+        var status = link.Read();
+        var server = new McpServerCommand(link.LinkPath, [BridgeArgument]);
+        error = string.Empty;
+
+        // A replacement keeps what is there as the backup, and the backup a person already has is theirs for good.
+        if (status is { State: CliLinkState.Foreign, BackupExists: true })
+        {
+            target = null;
+            error = $"{link.LinkPath} is {Foreign(status)}, and {link.BackupPath} already exists, which keypaste never overwrites. "
+                + $"Move or delete it to replace {link.LinkPath}. Nothing was changed.";
+            return false;
+        }
+
+        target = status switch
+        {
+            { State: CliLinkState.Absent } => new(server, new McpBridgeLink(link, appImage.Image, McpLinkChange.Create, Was: null), Note: null),
+            { State: CliLinkState.OtherCopy, Stale: true, LinkedTo: var named } =>
+                new(server, new McpBridgeLink(link, appImage.Image, McpLinkChange.Repoint, named is not null && File.Exists(named) ? named : $"the missing {named}"), Note: null),
+            { State: CliLinkState.OtherCopy } => new(server, Link: null, $"{link.LinkPath} runs keypaste from {status.LinkedTo}"),
+            { State: CliLinkState.Foreign } => new(server, new McpBridgeLink(link, appImage.Image, McpLinkChange.Replace, Foreign(status)), Note: null),
+            _ => new(server, Link: null, Note: null),
+        };
+        return true;
+    }
+
+    private static string Foreign(CliLinkStatus status) => status.LinkedTo is { } linkedTo ? $"a link to {linkedTo}" : "another program";
+
+    private static bool IsDefaultHome(McpClientMachine machine, string home) =>
+        machine.Home is { } profile
+        && string.Equals(
+            PathIdentity.Canonical(KeypasteHome.Resolve(home)),
+            PathIdentity.Canonical(Path.Combine(profile, KeypasteHome.DirectoryName)),
+            PathIdentity.Comparison);
 }

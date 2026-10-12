@@ -46,12 +46,6 @@ keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an 
 
 Every release still needs a person's answer or a rule they wrote, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **G.2 — Connect every AI tool on this machine.** Needs: G.1.
-  - `keypaste setup` and the app connect Claude Code, Codex, VS Code and Gemini CLI through their own commands.
-  - Cursor, Claude Desktop and Windsurf are connected by a verified edit of their configuration file, with a backup.
-  - One confirmation, or `--yes`, covers the whole run.
-  - The registered bridge path survives upgrades.
-  - `setup` exits 0 when any tool is connected.
 - [ ] **N.3 — Show apps, requests, allowances and history on Agents.** Needs: N.1a, G.2.
   - Each detected tool gets one Connect.
   - The screen shows the waiting request, allowances with their time left and an End button, and the history.

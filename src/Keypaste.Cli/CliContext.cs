@@ -2,6 +2,7 @@ using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Processes;
 
@@ -60,6 +61,9 @@ internal sealed class CliContext
     /// <summary>The running <c>keypaste</c>, which <c>setup</c> registers as the bridge.</summary>
     internal string? ProcessPath { get; init; } = System.Environment.ProcessPath;
 
+    /// <summary>The AppImage this <c>keypaste</c> runs from, whose link <c>setup</c> registers instead; null outside one.</summary>
+    internal Func<McpAppImage?> AppImage { get; init; } = () => null;
+
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the
@@ -82,6 +86,7 @@ internal sealed class CliContext
             ProcessLauncher = new SystemProcessLauncher(),
             ProcessRunner = processRunner,
             ConsoleStyle = new SystemConsoleStyle(environment, stdout, stderr),
+            AppImage = McpAppImage.ForThisProcess,
         };
     }
 }

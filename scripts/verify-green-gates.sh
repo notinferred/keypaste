@@ -11,9 +11,12 @@
 #   - a commit with every required gate green is accepted, and it is the ONLY shape that is;
 #   - a missing app run, a red app run and a commit with neither run each refuse;
 #   - a green run triggered by a pull request or a push to main does not count (D-0403);
+#   - a ci run counts only when its real-tools jobs ran and all passed, whether a dispatch or the schedule
+#     ran them; one whose tools jobs were skipped does not (D-0438);
 #   - the required set is read from release-targets.json, so a component with its own gate is
 #     required without an edit here, and the release workflow never requires itself;
-#   - an empty or malformed reply refuses rather than counting as zero and passing something.
+#   - an empty or malformed reply, about the runs or about a run's jobs, refuses rather than counting as
+#     zero and passing something.
 #
 # A RED RUN AND AN ABSENT ONE ARE ONE ANSWER. The query asks only for successful runs, so a failed
 # run is not in the reply at all. Both cases are still driven, because they arrive by different
@@ -25,7 +28,9 @@
 #
 # NEGATIVE CONTROL: the last phase runs a copy of the script with `app` removed from the required
 # set - the shape the guard had before R.0a - and requires it to ACCEPT the commit whose app run is
-# missing. If the weakened one refuses too, this gate proves nothing about the fix (D-0043).
+# missing. If the weakened one refuses too, this gate proves nothing about the fix (D-0043). A second
+# copy without the tools requirement - the shape before D-0438 - must accept the ci run whose tools
+# jobs were skipped.
 set -euo pipefail
 
 # The expected number is counted here rather than written down: a floor somebody raises by hand
@@ -61,6 +66,18 @@ cat > "$SHIM/gh" <<'FAKE'
 set -euo pipefail
 [ "${1:-}" = "api" ] || { echo "fake gh: only 'api' is implemented" >&2; exit 64; }
 url="${2:-}"
+case "$url" in
+  */jobs*)
+    case "$KEYPASTE_FIXTURE_SCENARIO" in
+      jobs-empty) printf '' ; exit 0 ;;
+      jobs-garbage) printf 'not json at all\n' ; exit 0 ;;
+    esac
+    id="${url%/jobs*}"
+    id="${id##*/}"
+    printf '%s' "$KEYPASTE_FIXTURE_JOBS" | jq -c --arg id "$id" '(.[$id] // []) as $jobs | {total_count: ($jobs | length), jobs: $jobs}'
+    exit 0
+    ;;
+esac
 case "$KEYPASTE_FIXTURE_SCENARIO" in
   api-fails)  exit 1 ;;
   api-empty)  printf '' ; exit 0 ;;
@@ -92,6 +109,7 @@ run_case() {
     export GITHUB_REPOSITORY="$REPO"
     export KEYPASTE_FIXTURE_SCENARIO="$scenario"
     export KEYPASTE_FIXTURE_RUNS="$runs"
+    export KEYPASTE_FIXTURE_JOBS="$JOBS"
     bash "$subject" "${args[@]}"
   ) >"$OUT" 2>&1 || rc=$?
   [ "$rc" -eq 0 ] && accepted=$((accepted + 1))
@@ -114,6 +132,13 @@ readonly CI_ONLY_ON_A_MAIN_PUSH='[{"name":"ci","conclusion":"success","id":11,"h
 readonly APP_TWICE="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"},{"name":"app","conclusion":"success","id":23,"head_branch":"v9.9.9","event":"push"}]'
 readonly APP_ON_MAIN="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"main","event":"push"}]'
 readonly APP_ON_A_PR_NAMED_LIKE_THE_TAG="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"pull_request"}]'
+# The weekly run, and the jobs of each ci run: its tools jobs green on every runner, or skipped as a plain
+# dispatch skips them, listed once with the matrix unexpanded.
+readonly SCHEDULED_GREEN='[{"name":"ci","conclusion":"success","id":12,"head_branch":"main","event":"schedule"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"}]'
+readonly TOOLS_RAN='[{"name":"test (ubuntu-24.04)","conclusion":"success"},{"name":"tools (ubuntu-24.04)","conclusion":"success"},{"name":"tools (windows-2025)","conclusion":"success"},{"name":"tools (macos-15)","conclusion":"success"}]'
+readonly TOOLS_GREEN="{\"11\":$TOOLS_RAN,\"12\":$TOOLS_RAN}"
+readonly TOOLS_SKIPPED='{"11":[{"name":"test (ubuntu-24.04)","conclusion":"success"},{"name":"tools (${{ matrix.os }})","conclusion":"skipped"}]}'
+JOBS="$TOOLS_GREEN"
 
 echo "== the shapes a tag can arrive in"
 run_case "both-green"  ok "$BOTH_GREEN"  "$SUBJECT" 0 "every required gate is green"
@@ -127,6 +152,14 @@ echo "== a reply that cannot be counted refuses rather than counting as zero"
 run_case "api-fails"   api-fails   "$BOTH_GREEN" "$SUBJECT" 1 "could not ask"
 run_case "api-empty"   api-empty   "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
 run_case "api-garbage" api-garbage "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
+
+echo "== ci counts only with its real-tools jobs green (D-0438)"
+run_case "ci-scheduled-with-tools" ok "$SCHEDULED_GREEN" "$SUBJECT" 0 "every required gate is green"
+JOBS="$TOOLS_SKIPPED"
+run_case "ci-tools-skipped" ok "$BOTH_GREEN" "$SUBJECT" 1 "dispatch ci.yml at this commit with -f tools=true"
+JOBS="$TOOLS_GREEN"
+run_case "jobs-empty"   jobs-empty   "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
+run_case "jobs-garbage" jobs-garbage "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
 
 echo "== which run of a component's own workflow built this commit"
 run_case "run-id-resolved"    ok "$BOTH_GREEN"  "$SUBJECT" 0 "run_id=22" --run-id app "$SHA" refs/tags/v9.9.9
@@ -145,21 +178,32 @@ grep -q 'jq -r --arg self' "$WEAK" \
   && die "the weakened copy still derives the required set; the control would be vacuous"
 run_case "weakened-accepts-app-absent" ok "$APP_ABSENT" "$WEAK" 0 "every required gate is green"
 echo "  the weakened copy accepts a commit with no app run, so requiring app is what refuses it"
+WITHOUT_TOOLS="$WORK/without-tools.sh"
+# Deleting the one line that reads ci's jobs gives back the guard before D-0438; asserted as above.
+sed '/green_tools_runs "/d' "$SUBJECT" > "$WITHOUT_TOOLS"
+grep -qF 'green_tools_runs "' "$WITHOUT_TOOLS" \
+  && die "the copy without the tools requirement still reads ci's jobs; the control would be vacuous"
+JOBS="$TOOLS_SKIPPED"
+run_case "without-tools-accepts-skipped" ok "$BOTH_GREEN" "$WITHOUT_TOOLS" 0 "every required gate is green"
+echo "  the copy without the tools requirement accepts a ci run that skipped them, so reading the jobs is what refuses it"
 
 DECLARED="$(declared_cases)"
 [ -n "$DECLARED" ] || die "no case lines found in $SELF; the count this gate checks itself against is derived from them"
 [ "$cases_run" -eq "$DECLARED" ] || die "$cases_run cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
-[ "$accepted" -eq 3 ] \
-  || die "$accepted cases were accepted, expected exactly 3 (both-green, the resolved run id, and the weakened control)"
+[ "$accepted" -eq 5 ] \
+  || die "$accepted cases were accepted, expected exactly 5 (both-green, the scheduled run with its tools, the resolved run id, and the two weakened controls)"
 
 cat <<EOF
 ok: $cases_run cases. One shape was accepted by the real script - every required gate green in a
-    full run - and a missing app run, a red one, a commit with neither, a ci run only a pull request
-    or a push to main triggered, a failed call, an empty reply and an unparseable one all refused. Off the same reply it resolves
+    full run, ci's dispatched or scheduled with its tools jobs green - and a missing app run, a red one, a
+    commit with neither, a ci run only a pull request or a push to main triggered, a ci run whose tools
+    jobs were skipped, a failed call, and an empty or unparseable reply about the runs or a run's jobs
+    all refused. Off the same reply it resolves
     which app run built the commit, and refuses when there is none, when the only green run belongs
     to the branch rather than the tag or to a pull request whose branch carries the tag's name, and
     when two green runs would have to be chosen between. The pre-R.0a shape, same fixture and same
-    fake, accepts the commit whose desktop gate never ran.
+    fake, accepts the commit whose desktop gate never ran, and the shape before D-0438 accepts the ci
+    run whose tools jobs were skipped.
 not proved here: that the guard step is reached on a tag, which only a tag shows; and that GitHub
     returns runs in the shape this fake does, which R.0c's first real tag observes.
 EOF

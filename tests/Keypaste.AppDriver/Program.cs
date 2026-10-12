@@ -1251,7 +1251,7 @@ internal sealed class Driver(string home)
         internal async Task PreviewConnectAsync(string client, string[] rest)
         {
             var model = Model;
-            model.SelectedClient = McpClientCatalog.Find(client) ?? throw new DriverException($"no client called {client}");
+            model.SelectedClient = Offered(model, client);
 
             foreach (var option in rest)
             {
@@ -1275,7 +1275,7 @@ internal sealed class Driver(string home)
         internal async Task PreviewRemoveAsync(string client)
         {
             var model = Model;
-            model.SelectedClient = McpClientCatalog.Find(client) ?? throw new DriverException($"no client called {client}");
+            model.SelectedClient = Offered(model, client);
 
             await PressAsync(model.PreviewRemoveCommand, "Preview remove").ConfigureAwait(true);
             Shown(model);
@@ -1360,6 +1360,10 @@ internal sealed class Driver(string home)
                     break;
             }
         }
+
+        private static McpClient Offered(ConnectClientViewModel model, string id) =>
+            model.Clients.FirstOrDefault(client => string.Equals(client.Id, id, StringComparison.Ordinal))
+                ?? throw new DriverException($"the picker offers no client called {id}");
 
         private static void Shown(ConnectClientViewModel model)
         {

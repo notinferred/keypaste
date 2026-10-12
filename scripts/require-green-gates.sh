@@ -27,6 +27,12 @@
 # ONLY A DISPATCH, THE WEEKLY SCHEDULE OR A TAG'S OWN PUSH COUNTS (D-0403). Those are the runs this
 # accepts, and cutting a release starts with dispatching ci.yml at the commit.
 #
+# A CI RUN COUNTS ONLY WITH ITS REAL-TOOLS JOBS GREEN (D-0438). ci.yml's tools jobs run on the schedule and
+# on a dispatch whose tools input is true, so a plain dispatch is green without them. Each counted ci run's
+# jobs are read, and one counts only when it lists a `tools (...)` job and every such job succeeded. A matrix
+# job its condition skipped is listed once, with its name unexpanded and its conclusion skipped, so it never
+# counts. The release's dispatch is `gh workflow run ci.yml -f tools=true` at the commit.
+#
 # Usage:
 #   require-green-gates.sh <sha>
 #   require-green-gates.sh --run-id <workflow> <sha> <ref>   # prints run_id=<n> for that workflow
@@ -101,21 +107,46 @@ if [ "$MODE" = run-id ]; then
   exit 0
 fi
 
+# The runs of workflow $1 that count, passed through jq filter $2. Only a dispatch, the schedule, or a
+# tag's own push counts (D-0403).
+counted() {
+  printf '%s' "$runs" | jq --arg wf "$1" "[.workflow_runs[]? | select(.name == \$wf and (.event == \"workflow_dispatch\" or .event == \"schedule\" or (.event == \"push\" and .head_branch != \"main\")))] | $2" 2>/dev/null | tr -d "$CR" || true
+}
+
+# How many of the ci runs whose IDs are $1 ran tools jobs and passed every one of them (D-0438).
+green_tools_runs() {
+  local id jobs count green=0
+  for id in $1; do
+    case "$id" in *[!0-9]*) die "the API named a ci run that is not a run ID; refusing without a verified answer" ;; esac
+    jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=100" 2>/dev/null)" \
+      || die "could not ask $GITHUB_REPOSITORY which jobs ci run $id ran"
+    count="$(printf '%s' "$jobs" | jq '[.jobs[] | select(.name | startswith("tools (")) | .conclusion] | if length > 0 and all(. == "success") then length else 0 end' 2>/dev/null | tr -d "$CR" || true)"
+    case "$count" in
+      '' | *[!0-9]*) die "could not count the tools jobs of ci run $id; refusing without a verified answer" ;;
+    esac
+    [ "$count" -eq 0 ] || green=$((green + 1))
+  done
+  echo "$green"
+}
+
 missing=0
 for wf in $required; do
   # D-0106: the count is required to be digits. An empty or malformed reply must refuse rather than
   # arrive as "" and compare its way past -ge 1, which is how jq 1.6 let an empty answer reach an
   # upload. A refusal rests on what came back, never on how a tool chose to exit.
-  # Only a dispatch, the schedule, or a tag's own push counts (D-0403).
-  n="$(printf '%s' "$runs" | jq --arg wf "$wf" '[.workflow_runs[]? | select(.name == $wf and (.event == "workflow_dispatch" or .event == "schedule" or (.event == "push" and .head_branch != "main")))] | length' 2>/dev/null || true)"
+  n="$(counted "$wf" length)"
   case "$n" in
     '' | *[!0-9]*) die "could not count $wf runs for $SHA; refusing without a verified answer" ;;
   esac
+  # One line, so the second negative control in verify-green-gates.sh can delete it and get the shape before D-0438.
+  if [ "$wf" = ci ]; then n="$(green_tools_runs "$(counted ci '.[].id')")" || exit 1; fi
+  dispatch="dispatch $wf at this commit"
+  [ "$wf" != ci ] || dispatch='dispatch ci.yml at this commit with -f tools=true'
   if [ "$n" -ge 1 ]; then
     echo "  ok  $wf: $n full successful run(s) for $SHA"
   else
     echo "::error::no full successful $wf run for $SHA - a tag must not ship a commit its gates have not passed" >&2
-    echo "::error::a red run, a skipped one and a push that ran only some lanes look the same here; dispatch $wf at this commit and re-tag once it is green" >&2
+    echo "::error::a red run, a skipped one and a push that ran only some lanes look the same here; $dispatch and re-tag once it is green" >&2
     missing=1
   fi
 done

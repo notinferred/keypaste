@@ -12,7 +12,7 @@ Enter the master password and review requests in that terminal. Without the appr
 
 The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
 
-These instructions describe the CLI and MCP bridge in source, for the next release; the published `v0.3.0` ships the bridge as its own `keypaste-mcp` binary, asks `Approve? [y/N]` and keeps an approval for up to 300 seconds. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` or `KEYPASTE_VAULT` names, or with neither the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no vault named or chosen is refused. `keypaste setup` writes `--vault` only when you name a vault other than the chosen one, and a running bridge keeps the chosen vault it started with until its client restarts it. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
+These instructions describe the CLI and MCP bridge in source, for the next release; the published `v0.3.0` ships the bridge as its own `keypaste-mcp` binary, asks `Approve? [y/N]` and keeps an approval for up to 300 seconds. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` or `KEYPASTE_VAULT` names, or with neither the vault you chose, which the app records at its first create or unlock and Settings or `keypaste use <path>` changes: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no vault named or chosen is refused. `keypaste setup` writes `--vault` only when you name a vault other than the chosen one; under a `KEYPASTE_HOME` other than `~/.keypaste` it also writes the chosen vault, `--audit-log` and `--approver`, and a set `KEYPASTE_APPROVER` writes `--approver`, because a tool may start the bridge without those variables and Gemini CLI strips them. A running bridge keeps the chosen vault it started with until its client restarts it. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
 
 ## Before you start
 
@@ -26,40 +26,51 @@ It lands at `artifacts/bin/Keypaste.Cli/release/keypaste` (`keypaste.exe` on Win
 
 ## The short way
 
-`setup` is available in CLI/MCP `v0.2.0` and later, including the published `v0.3.0`. `v0.1.0` requires manual configuration. Building the source does not replace an older binary already on `PATH`.
+`setup` is available in CLI/MCP `v0.2.0` and later, including the published `v0.3.0`, which configures Claude Code and Codex and prints a block to paste for Cursor and Claude Desktop. `v0.1.0` requires manual configuration. Building the source does not replace an older binary already on `PATH`.
 
 ```sh
 keypaste setup --vault ~/vaults/personal.kdbx
 ```
 
-The command detects installed clients and configures Claude Code and Codex through their own commands. It prints configuration for Cursor and Claude Desktop to paste manually; those file formats have not been verified against real installs.
+In source, the command finds the AI tools installed here and connects Claude Code, Codex, Gemini CLI and Devin through each tool's own `mcp add` at user scope. VS Code, Cursor and, on macOS and Windows, Claude Desktop have no such command, so `setup` changes only keypaste's entry in the file each one reads: VS Code's user `mcp.json`, `~/.cursor/mcp.json` and `claude_desktop_config.json`. Before its first change to a file it keeps the original as `<file>.keypaste-backup` beside it and never replaces that copy, and it leaves alone a file that does not parse, holds a key twice or changes while it works. It prints every step and asks once for all of them; `--yes` answers for you, and without a terminal nothing changes unless you pass `--yes`.
 
 ```
 keypaste mcp   /home/you/.local/bin/keypaste
 vault          /home/you/vaults/personal.kdbx
 exposure       tag:env:* (the default: the variables of tagged entries, and nothing else)
 
+  claude-code      claude mcp remove --scope user keypaste
+  claude-code      claude mcp add --scope user --transport stdio keypaste -- /home/you/.local/bin/keypaste mcp --vault /home/you/vaults/personal.kdbx --client-label claude-code
+  codex            not installed on this machine
+  gemini-cli       gemini mcp remove --scope user keypaste
+  gemini-cli       gemini mcp add --scope user keypaste /home/you/.local/bin/keypaste -- mcp --vault /home/you/vaults/personal.kdbx --client-label gemini-cli
+  devin            not installed on this machine
+  vscode           not installed on this machine
+  cursor           edit /home/you/.cursor/mcp.json: set mcpServers.keypaste {"command":"/home/you/.local/bin/keypaste","args":["mcp","--vault","/home/you/vaults/personal.kdbx","--client-label","cursor"]}; keeps the original as /home/you/.cursor/mcp.json.keypaste-backup
+Connect keypaste to these 3 tools? [y/N] y
   claude-code      configured
-  codex            configured
-  cursor           has no command of its own; add this by hand:
+  gemini-cli       configured; Gemini CLI starts keypaste only in folders you have trusted
+  cursor           configured; the original is kept as /home/you/.cursor/mcp.json.keypaste-backup; restart Cursor to load it
   ...
 ```
 
-`--dry-run` prints commands without changing configuration. `--remove` removes keypaste while preserving other servers. Repeating setup is idempotent and can update a moved vault path.
+A tool's command is found only in the absolute entries of `PATH`, never in the folder you run `setup` from; the macOS app, which Finder starts without your shell's `PATH`, also looks in each tool's documented install folders. On Windows a tool installed with pnpm or yarn is refused, naming its launcher; install it with npm or the vendor's installer. Gemini CLI starts keypaste only in folders you have trusted, and it strips variables whose names contain `KEY`, so a bridge it starts never sees `KEYPASTE_HOME` or `KEYPASTE_APPROVER`.
+
+`--dry-run` prints every step and the program each one starts, and changes nothing. `--remove` first reads each tool's configuration: a tool holding no keypaste entry is reported `not connected` and left alone, and from the others keypaste is removed while their other servers stay. A removal that fails shows the tool's own words. `setup` exits 0 when any tool was connected, removed or found not connected, 3 when it found none and 6 when every tool it found refused. Repeating setup is idempotent and can update a moved vault path.
 
 `setup` configures paths and exposure. Credential release still requires a running approver and authorization.
 
 ## From the desktop app
 
-In source, the Agents screen has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `tag:env:*`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste` path and `mcp`, `--client-label` and each `--expose`, and `--vault` only when the unlocked vault is not the chosen one. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
+In source, the Agents screen has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `tag:env:*`, then press Preview connect. The app shows exactly what it will do: for Claude Code, Codex, Gemini CLI and Devin, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste` path and `mcp`, `--client-label` and each `--expose`, and `--vault` only when the unlocked vault is not the chosen one, or as above under another `KEYPASTE_HOME`; for VS Code, Cursor and Claude Desktop, the edit of keypaste's entry in the client's file and where its first original is kept. Nothing is written until you press Run it, and Cancel or changing a field drops the preview.
 
-The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start the image file itself with `mcp`: moving or deleting the `.AppImage` breaks the registration until you connect again.
+The app registers the `keypaste` beside it, or the first one on `PATH`, started as `keypaste mcp`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start `~/.local/bin/keypaste` with `mcp`: the script that starts the image with `cli`, which Settings also makes for your terminal and which a newer AppImage re-points when it starts. Connect and `setup` create it first when it is absent; when that path holds a file keypaste did not write, the preview names it and Run it replaces it, keeping it as `~/.local/bin/keypaste.keypaste-backup`. Deleting the `.AppImage` breaks the registration until another one starts.
 
-Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once, Allow for 1 hour or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove and Run it take keypaste out of the client and leave its other servers alone.
+Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once, Allow for 1 hour or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove reads the client's configuration first and says when keypaste is not connected there; otherwise Run it takes keypaste out of the client and leaves its other servers alone.
 
 No master password, keyfile or session identifier is written into a client's configuration.
 
-The following sections show manual configuration, including clients `setup` does not recognize.
+The following sections show manual configuration, for a client `setup` does not know or a scope other than your own.
 
 ## Claude Desktop
 
@@ -70,6 +81,8 @@ Open Claude menu → Settings → Developer → Edit Config, or edit the file di
 | macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
 | Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Linux | `~/.config/Claude/claude_desktop_config.json` |
+
+The packaged Claude Desktop on Windows (Microsoft Store or MSIX) reads its own copy at `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json` once it has one; the other Windows install reads the `%APPDATA%` path above.
 
 ```json
 {

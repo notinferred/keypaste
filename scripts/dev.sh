@@ -4,7 +4,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/dev.sh [--wait]
+Usage: bash scripts/dev.sh [--tools] [--wait]
        bash scripts/dev.sh --class FQN [--os O] [--wait]
        bash scripts/dev.sh --relock
 
@@ -15,6 +15,8 @@ With no option it dispatches ci.yml and app.yml on the branch and follows their 
 three runners. No pull request is opened. Each job is printed as it finishes.
 The first failure ends the wait with that job's log; the runs carry on until the next push cancels them.
 
+--tools   also run ci.yml's tools jobs, which install the real AI tools on every runner and connect keypaste
+          to them; not with --class or --relock
 --class   a fully qualified test class, run through dev.yml in its own project
 --os      the runner for --class: linux (default), windows, macos or all
 --wait    wait for every job and print each failed one's log, rather than stopping at the first
@@ -26,11 +28,12 @@ USAGE
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 die() { echo "dev: $1" >&2; exit 1; }
 
-class='' os='' relock=false wait_all=false
+class='' os='' relock=false wait_all=false tools=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
     --relock) relock=true ;;
+    --tools) tools=true ;;
     --wait) wait_all=true ;;
     --class|--os)
       [ "$#" -ge 2 ] || bad_usage "$1 needs a value"
@@ -46,6 +49,7 @@ while [ "$#" -gt 0 ]; do
 done
 [ -z "$os" ] || [ -n "$class" ] || bad_usage '--os chooses the runner for --class'
 [ -z "$class" ] || [ "$relock" = false ] || bad_usage '--class and --relock are separate runs'
+[ "$tools" = false ] || { [ -z "$class" ] && [ "$relock" = false ]; } || bad_usage '--tools runs ci.yml in full; it cannot accompany --class or --relock'
 case "${os:-linux}" in
   linux) runner=ubuntu-24.04 ;;
   windows) runner=windows-2025 ;;
@@ -82,7 +86,11 @@ else
   # By workflow file, since a run whose file does not parse is named after its path.
   for workflow in ci.yml app.yml; do
     before="$(gh run list --workflow "$workflow" --branch "$branch" --event workflow_dispatch --limit 1 --json databaseId --jq '.[].databaseId' || true)"
-    gh workflow run "$workflow" --ref "$branch" > /dev/null
+    if [ "$workflow" = ci.yml ] && [ "$tools" = true ]; then
+      gh workflow run "$workflow" --ref "$branch" -f tools=true > /dev/null
+    else
+      gh workflow run "$workflow" --ref "$branch" > /dev/null
+    fi
     found='' tries=0
     while [ -z "$found" ] && [ "$tries" -lt 40 ]; do
       sleep 3

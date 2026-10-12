@@ -45,6 +45,11 @@ on:
       - 'site/.node-version'
   pull_request:
   workflow_dispatch:
+    inputs:
+      tools:
+        description: Also install the real AI tools and connect keypaste to them; a release's dispatch sets it
+        type: boolean
+        default: false
   # Weekly, so a runner image or upstream change shows without a commit.
   schedule:
     - cron: '17 4 * * 1'
@@ -64,7 +69,8 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  # Every run runs every job; a dispatch, the schedule or a tag's own run counts toward a release (D-0403, D-0423).
+  # Every run runs every job but tools, which runs on the schedule and on a dispatch that asks for it; a dispatch, the
+  # schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0423, D-0438).
   checks:
     name: scripts + workflows
     runs-on: ubuntu-24.04
@@ -352,11 +358,48 @@ jobs:
           scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
           scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
 
+  # The AI tools keypaste connects, at the versions install-real-tools.sh pins, connected by keypaste setup, read back
+  # with each tool's own command where it has one (VS Code's, Claude Desktop's and Windows Cursor's at the file level)
+  # and removed again.
+  tools:
+    name: tools (${{ matrix.os }})
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.tools)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
+
+      - name: Install the real AI tools at their pinned versions
+        shell: bash
+        timeout-minutes: 15
+        run: bash scripts/install-real-tools.sh "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+
+      - name: Connect keypaste to every tool, read it back with the tool and remove it
+        shell: bash
+        run: bash scripts/verify.sh tools
+
   # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
   ok:
     name: ci ok
     if: always()
-    needs: [checks, format, test, integration, compat, aot]
+    needs: [checks, format, test, integration, compat, aot, tools]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

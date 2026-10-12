@@ -48,6 +48,30 @@ public sealed class AtomicFileTests : IDisposable
     }
 
     [Fact]
+    public void Committing_without_replacing_never_replaces_what_is_there()
+    {
+        File.WriteAllText(Target, "old");
+
+        using (var staged = AtomicFile.Stage(Target, "new"u8))
+        {
+            Assert.ThrowsAny<IOException>(staged.CommitWithoutReplacing);
+        }
+
+        Assert.Equal("old", File.ReadAllText(Target));
+        Assert.Equal([Target], Directory.GetFiles(_directory));
+
+        File.Delete(Target);
+
+        using (var staged = AtomicFile.Stage(Target, "new"u8))
+        {
+            staged.CommitWithoutReplacing();
+        }
+
+        Assert.Equal("new", File.ReadAllText(Target));
+        Assert.Equal([Target], Directory.GetFiles(_directory));
+    }
+
+    [Fact]
     public void A_move_that_fails_leaves_no_staged_copy()
     {
         Directory.CreateDirectory(Target);

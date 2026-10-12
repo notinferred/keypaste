@@ -52,7 +52,7 @@ public static class CliLinks
     /// <returns>The program, or null when there is none or it is at the link's own path.</returns>
     /// <remarks>
     /// An AppImage is mounted at a new path on every launch, so the link names the image, and both variables must agree with
-    /// where the app runs before either is believed, as <see cref="McpServerLocator.FindForDesktop"/> requires.
+    /// where the app runs before either is believed.
     /// </remarks>
     public static CliTarget? TargetFor(string home, string appDirectory, string? appImage, string? appDir)
     {

@@ -188,6 +188,7 @@ public sealed class LinuxCliLinkTests : IDisposable
         var mine = For(Program("mine/keypaste.AppImage"), throughAppImage: true);
         For(other, throughAppImage: true, Version(written)).Link();
 
+        Assert.Equal(rewritten, mine.Read().Stale);
         Assert.Equal(rewritten, mine.KeepCurrent());
         Assert.Equal(rewritten ? CliLinkState.ThisCopy : CliLinkState.OtherCopy, mine.Read().State);
         Assert.Contains($"# keypaste {(rewritten ? "0.5.0" : written)} wrote this", File.ReadAllText(LinkPath), StringComparison.Ordinal);
@@ -201,6 +202,7 @@ public sealed class LinuxCliLinkTests : IDisposable
         var mine = For(Program("mine/keypaste.AppImage"), throughAppImage: true);
         For(Path.Combine(_home, "gone", "keypaste.AppImage"), throughAppImage: true, Version("9.0.0")).Link();
 
+        Assert.True(mine.Read().Stale);
         Assert.True(mine.KeepCurrent());
         Assert.Equal(CliLinkState.ThisCopy, mine.Read().State);
     }
@@ -217,8 +219,10 @@ public sealed class LinuxCliLinkTests : IDisposable
         var mine = For(image, throughAppImage: true);
 
         Assert.Equal(CliLinkState.ThisCopy, mine.Read().State);
+        Assert.True(mine.Read().Stale);
         Assert.True(mine.KeepCurrent());
         Assert.Contains("# keypaste 0.5.0 wrote this", File.ReadAllText(LinkPath), StringComparison.Ordinal);
+        Assert.False(mine.Read().Stale);
         Assert.False(mine.KeepCurrent());
     }
 

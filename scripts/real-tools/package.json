@@ -1,0 +1,10 @@
+{
+  "name": "keypaste-real-tools",
+  "private": true,
+  "description": "The AI tools keypaste's real-tools job installs, at exact versions; scripts/install-real-tools.sh owns every other pin.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@google/gemini-cli": "0.63.0",
+    "@openai/codex": "0.162.1"
+  }
+}

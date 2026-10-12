@@ -51,7 +51,10 @@ public sealed class LinuxCliLink : ICliLink
     {
         var found = Inspect();
 
-        return new CliLinkStatus(found.State, LinkPath, found.LinkedTo, BackupPath, CliLinks.Occupied(BackupPath), DirectoryOnPath(), Translocated: false);
+        return new CliLinkStatus(found.State, LinkPath, found.LinkedTo, BackupPath, CliLinks.Occupied(BackupPath), DirectoryOnPath(), Translocated: false)
+        {
+            Stale = IsStale(found),
+        };
     }
 
     /// <inheritdoc/>
@@ -104,18 +107,7 @@ public sealed class LinuxCliLink : ICliLink
 
     /// <inheritdoc/>
     /// <remarks>Rewrites only a script keypaste wrote: one naming a program that is gone or an older version, or naming this program at another version.</remarks>
-    public bool KeepCurrent()
-    {
-        var found = Inspect();
-        var stale = found switch
-        {
-            { State: CliLinkState.ThisCopy } => found.Version != _version,
-            { State: CliLinkState.OtherCopy, Named: { } named } => named.Program == _target.Program || !File.Exists(named.Program) || found.Version < _version,
-            _ => false,
-        };
-
-        return stale && Write(CliLinkOutcome.Linked).Outcome == CliLinkOutcome.Linked;
-    }
+    public bool KeepCurrent() => IsStale(Inspect()) && Write(CliLinkOutcome.Linked).Outcome == CliLinkOutcome.Linked;
 
     /// <summary>Where the link is for one home.</summary>
     /// <param name="home">The person's home directory.</param>
@@ -123,6 +115,13 @@ public sealed class LinuxCliLink : ICliLink
     internal static string LinkPathFor(string home) => Path.Combine(home, ".local", "bin", McpServerLocator.FileName);
 
     private static CliLinkResult Refused(CliLinkRefusal refusal) => new(CliLinkOutcome.Refused, refusal);
+
+    private bool IsStale(Found found) => found switch
+    {
+        { State: CliLinkState.ThisCopy } => found.Version != _version,
+        { State: CliLinkState.OtherCopy, Named: { } named } => named.Program == _target.Program || !File.Exists(named.Program) || found.Version < _version,
+        _ => false,
+    };
 
     private Found Inspect()
     {

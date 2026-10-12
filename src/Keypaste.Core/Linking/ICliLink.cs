@@ -68,7 +68,11 @@ public sealed record CliLinkStatus(
     bool BackupExists,
     bool DirectoryOnPath,
     bool Translocated,
-    string? EarlierCopy = null);
+    string? EarlierCopy = null)
+{
+    /// <summary>Gets whether this copy's start re-points the link: one keypaste wrote that names a copy that is gone or older, or this copy at another version.</summary>
+    public bool Stale { get; init; }
+}
 
 /// <summary>What a link or a replacement did.</summary>
 /// <param name="Outcome">The outcome.</param>
@@ -98,7 +102,7 @@ public interface ICliLink
     /// <remarks>Called only after the person confirmed the replacement.</remarks>
     CliLinkResult Replace();
 
-    /// <summary>Re-points a link keypaste wrote when it names a missing or older copy.</summary>
+    /// <summary>Re-points a link keypaste wrote when <see cref="CliLinkStatus.Stale"/>.</summary>
     /// <returns>Whether the link was rewritten.</returns>
     bool KeepCurrent();
 }

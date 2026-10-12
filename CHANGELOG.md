@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`keypaste setup` and the app's Connect now also connect Gemini CLI and Devin through their own commands, and connect VS Code, Cursor and, on macOS and Windows, Claude Desktop by changing only keypaste's entry in the tool's configuration file, where Cursor and Claude Desktop used to get a block to paste. Before its first change to such a file keypaste keeps the original beside it as `<file>.keypaste-backup`, and it leaves alone a file it cannot read safely. One question, or `--yes`, covers a whole `setup` run, and without a terminal nothing changes unless you pass `--yes`. Removing first reads each tool's configuration and reports a tool without keypaste as not connected, and `setup` exits 3 when it finds no tool and 6 when every tool it found refused. A tool's command is found only on `PATH`, never in the folder you run `setup` from, and on Windows a tool installed with pnpm or yarn is refused. Under a `KEYPASTE_HOME` other than `~/.keypaste`, each registration also names the vault, audit log and approver. From an AppImage, tools start keypaste through `~/.local/bin/keypaste`, which setup creates when it is missing and a newer image re-points when it starts ([G.2](docs/steps/G.2.md)).
+
 `keypaste lock` no longer reports that the app or `keypaste agent` holding the vault did not lock when it had: the holder now answers once it has locked, and that answer is the confirmation ([F.62](docs/steps/F.62.md)).
 
 An agent request that arrives while its client is still introducing itself is now prompted for and logged under the name the client gave, not as "an unnamed client" ([F.61](docs/steps/F.61.md)).

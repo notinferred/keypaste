@@ -28,18 +28,30 @@ public sealed class AgentActivityViewTests
             Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(fixture.Path_, master.Value));
         }
 
+        var bin = Directory.CreateDirectory(Path.Combine(fixture.Home, "bin")).FullName;
+        var claude = Path.Combine(bin, OperatingSystem.IsWindows() ? "claude.exe" : "claude");
+        File.WriteAllText(claude, "#!/bin/sh\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(claude, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        }
+
+        var server = new McpServerCommand(Path.Combine(fixture.Home, "keypaste"), [McpServerLocator.BridgeArgument]);
         var connector = new ClientConnector(
             new InstalledRunner(),
-            () => new McpServerCommand(Path.Combine(fixture.Home, "keypaste"), [McpServerLocator.BridgeArgument]),
-            "nowhere",
+            McpClientMachine.From(name => name is "PATH" ? bin : name is "HOME" or "USERPROFILE" ? fixture.Home : null, McpClientMachine.CurrentPlatform),
+            ApproverOverride: null,
+            () => new McpBridgeTargetResult(new McpBridgeTarget(server, Link: null, Note: null), Error: null),
             _ => null);
         using var model = new AgentActivityViewModel(authority, fixture.Home, new ManualClock(AppClock.Start), connector: connector);
         model.ToggleConnectCommand.Execute(null);
         var window = new Window { Content = new AgentActivityView { DataContext = model } };
         window.Show();
 
-        var clients = Assert.Single(window.GetVisualDescendants().OfType<ComboBox>(), box => box.ItemCount == McpClientCatalog.All.Count);
-        Assert.Same(McpClientCatalog.All[0], clients.SelectedItem);
+        var offered = McpClientCatalog.For(McpClientMachine.CurrentPlatform);
+        var clients = Assert.Single(window.GetVisualDescendants().OfType<ComboBox>(), box => box.ItemCount == offered.Count);
+        Assert.Equal(offered, clients.Items.Cast<McpClient>());
+        Assert.Same(offered[0], clients.SelectedItem);
 
         await model.Connect!.PreviewConnectCommand.ExecuteAsync();
         window.UpdateLayout();

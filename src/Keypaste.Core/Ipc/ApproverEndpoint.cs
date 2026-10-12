@@ -68,23 +68,39 @@ public static class ApproverEndpoint
         return vault is null ? null : Prefix + vault.Key;
     }
 
-    private static string Checked(string name, string argument)
+    /// <summary>Whether <paramref name="name"/> is a pipe name <see cref="Resolve"/> accepts.</summary>
+    /// <param name="name">The name.</param>
+    /// <param name="error">Why not, when it is not.</param>
+    /// <returns>Whether it is 1 to <see cref="MaximumLength"/> characters with no path separator or control character.</returns>
+    public static bool IsValidName(string name, out string error)
     {
+        ArgumentNullException.ThrowIfNull(name);
+
+        if (name.Length == 0)
+        {
+            error = "an approver name cannot be empty";
+            return false;
+        }
+
         if (name.Length > MaximumLength)
         {
-            throw new ArgumentException(
-                $"an approver name cannot be longer than {MaximumLength} characters", argument);
+            error = $"an approver name cannot be longer than {MaximumLength} characters";
+            return false;
         }
 
         foreach (var c in name)
         {
             if (c is '/' or '\\' or ':' || char.IsControl(c))
             {
-                throw new ArgumentException(
-                    "an approver name cannot contain a path separator or a control character", argument);
+                error = "an approver name cannot contain a path separator or a control character";
+                return false;
             }
         }
 
-        return name;
+        error = string.Empty;
+        return true;
     }
+
+    private static string Checked(string name, string argument) =>
+        IsValidName(name, out var error) ? name : throw new ArgumentException(error, argument);
 }

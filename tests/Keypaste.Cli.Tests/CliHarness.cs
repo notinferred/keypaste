@@ -24,6 +24,11 @@ internal sealed class CliHarness : IDisposable
 
         // A verb that claims the vault writes under keypaste's home, which must never be the real one.
         Environment[KeypasteHome.EnvironmentVariable] = Path.Combine(Directory, ".keypaste");
+
+        // The profile setup reads AI tools' files under, so it is this directory, whose .keypaste is the default home.
+        Environment["HOME"] = Directory;
+        Environment["USERPROFILE"] = Directory;
+        Environment["APPDATA"] = Directory;
     }
 
     internal string Directory { get; }
@@ -60,6 +65,9 @@ internal sealed class CliHarness : IDisposable
     /// <summary>The running keypaste that <c>setup</c> registers; by default one in <see cref="Directory"/>.</summary>
     internal string? ProcessPath { get; set; }
 
+    /// <summary>The AppImage <c>setup</c> runs from; by default none.</summary>
+    internal McpAppImage? AppImage { get; set; }
+
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
@@ -77,6 +85,7 @@ internal sealed class CliHarness : IDisposable
         Clock = Clock,
         WorkingDirectory = WorkingDirectory,
         ProcessPath = ProcessPath ?? Path.Combine(Directory, McpServerLocator.ExecutableName),
+        AppImage = () => AppImage,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>
@@ -373,10 +382,10 @@ internal sealed class FakeProcessLauncher : IProcessLauncher
 /// </remarks>
 internal sealed class FakeProcessRunner : IProcessRunner
 {
-    /// <summary>Executables this machine is pretending to have.</summary>
+    /// <summary>The programs this machine is pretending to have, by the path setup found them at.</summary>
     internal HashSet<string> Installed { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>Executables that exist but fail every call, with this on stderr.</summary>
+    /// <summary>Programs that exist but fail every call, with this on stderr.</summary>
     internal Dictionary<string, string> Refuses { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Every invocation, in order, as <c>executable arg arg</c>.</summary>

@@ -11,8 +11,9 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// <b>Nothing is written before the person has seen it.</b> Preview composes the plan in core
 /// (<see cref="McpClientSetup"/>) and shows its display; Connect runs that same plan object, so the
-/// commands confirmed and the commands run cannot differ. A client with no command of its own is
-/// shown the block to paste, and nothing is claimed for it.
+/// steps confirmed and the steps run cannot differ. A client with no command of its own has only
+/// keypaste's entry in its file changed, with the first original kept beside it. Inside an AppImage the
+/// link a client starts is made or replaced first, as a step of the same plan.
 /// </para>
 /// <para>
 /// <b>The check goes through the bridge a client would start.</b> It launches that registration's
@@ -26,8 +27,8 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     private readonly ClientConnector _connector;
     private readonly CancellationTokenSource _closing = new();
 
-    private McpClient _client = McpClientCatalog.All[0];
-    private string _label = McpClientCatalog.All[0].Id;
+    private McpClient _client;
+    private string _label;
     private string _exposure = string.Empty;
     private McpSetupPlan? _pending;
     private McpServerRegistration? _pendingRegistration;
@@ -48,10 +49,13 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
         _session = session;
         _connector = connector;
+        Clients = McpClientCatalog.For(connector.Machine.Platform);
+        _client = Clients[0];
+        _label = _client.Id;
 
         PreviewConnectCommand = new AsyncRelayCommand(PreviewConnectAsync, () => !IsChecking);
         PreviewRemoveCommand = new AsyncRelayCommand(PreviewRemoveAsync, () => !IsChecking);
-        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => _pending is { RunsCommands: true });
+        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => _pending is not null);
         CancelCommand = new RelayCommand(Cancel, () => _pending is not null);
         CheckCommand = new AsyncRelayCommand(CheckAsync, () => _registered is not null && !IsChecking);
         AskCommand = new AsyncRelayCommand(AskAsync, () => _check is not null && _checkEntry is not null && _checkEntries.Count > 0);
@@ -69,10 +73,8 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         DependsOn(AskCommand, nameof(IsChecking), nameof(SelectedCheckEntry), nameof(CheckEntries));
     }
 
-    /// <summary>Every client keypaste knows how to connect; an instance property because a binding needs one.</summary>
-#pragma warning disable CA1822
-    internal IReadOnlyList<McpClient> Clients => McpClientCatalog.All;
-#pragma warning restore CA1822
+    /// <summary>Every client keypaste knows how to connect on this machine.</summary>
+    internal IReadOnlyList<McpClient> Clients { get; }
 
     internal McpClient SelectedClient
     {
@@ -120,7 +122,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Exactly what Connect or Remove will run, or the block to paste, as core composed it.</summary>
+    /// <summary>Exactly what Connect or Remove will run, as core composed it.</summary>
     internal string Preview => _preview;
 
     internal bool HasPreview => _preview.Length > 0;
@@ -159,14 +161,14 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     internal bool IsChecking => _check is not null;
 
-    /// <summary>The registration Connect ran, or whose block was shown, which the check starts.</summary>
+    /// <summary>The registration Connect ran, which the check starts.</summary>
     internal McpServerRegistration? Registered
     {
         get => _registered;
         private set => Set(ref _registered, value);
     }
 
-    /// <summary>Whether Check waits for a Connect or a shown block to start from.</summary>
+    /// <summary>Whether Check waits for a Connect to start from.</summary>
     internal bool NeedsRegistration => _registered is null;
 
     internal AsyncRelayCommand PreviewConnectCommand { get; }
@@ -193,71 +195,84 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     {
         Forget();
 
-        if (_session.VaultPath is not { } vault)
+        // A client may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both (D-0389).
+        if (_session.VaultPath is not { } vault
+            || !McpServerLocator.TryPin(_connector.Machine, _session.Home, _connector.ApproverOverride, vault, ChosenVault.Read(_session.Home), out var pins))
         {
             Message = "Unlock a vault before connecting a client to it.";
             return;
         }
 
-        if (_connector.FindServer() is not { } server)
+        var found = _connector.FindServer();
+
+        if (found.Target is not { } target)
         {
-            Message = $"{McpServerLocator.FileName} was not found {_connector.Places}, so there is nothing a client could start.";
+            Message = Sentence(found.Error ?? $"{McpServerLocator.FileName} was not found");
             return;
         }
 
         var globs = _exposure.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        // The chosen vault is left out, so the client follows the choice; any other is pinned with --vault (D-0389).
-        var pinned = ChosenVault.Same(ChosenVault.Read(_session.Home), vault) ? null : vault;
-        if (!McpServerRegistration.TryCreate(server, pinned, _label, globs, out var registration, out var error))
+        if (!McpServerRegistration.TryCreate(target.Server, pins, _label, globs, out var registration, out var error))
         {
-            Message = char.ToUpperInvariant(error[0]) + error[1..] + ".";
+            Message = Sentence(error);
             return;
         }
 
-        var plan = McpClientSetup.Connect(_client, registration);
+        var client = _client;
+        var machine = _connector.Machine;
+        var detection = await Task.Run(() => McpClientSetup.Detect(client, machine, _connector.Runner)).ConfigureAwait(true);
 
-        if (!plan.RunsCommands)
+        if (!detection.Found)
         {
-            // Nothing will be written, so this block is already what the client would start.
-            Registered = registration;
-            Show(plan, $"{_client.DisplayName} has no command of its own. Add this to its configuration file yourself; "
-                + "keypaste wrote nothing. docs/mcp-setup.md says which file.");
+            Message = NotInstalled(client);
             return;
         }
 
-        if (!await Task.Run(() => McpClientSetup.IsInstalled(_client, _connector.Runner)).ConfigureAwait(true))
+        if (!McpClientSetup.TryConnect(client, detection, registration, target.Link, out var plan, out var refusal))
         {
-            Message = $"{_client.DisplayName} is not installed here: `{_client.Executable}` could not be started.";
+            Message = Sentence(refusal);
             return;
         }
 
         Pending = plan;
         _pendingRegistration = registration;
-        Show(plan, $"Connect runs these commands. The first removes any earlier keypaste entry from {_client.DisplayName}; "
-            + "the second adds this vault. No password, keyfile or session goes into its configuration.");
+        Show(plan, ConnectNote(client, target, plan));
     }
 
     private async Task PreviewRemoveAsync()
     {
         Forget();
 
-        var plan = McpClientSetup.Remove(_client);
+        var client = _client;
+        var machine = _connector.Machine;
+        var detection = await Task.Run(() => McpClientSetup.Detect(client, machine, _connector.Runner)).ConfigureAwait(true);
 
-        if (!plan.RunsCommands)
+        if (!detection.Found)
         {
-            Message = $"{_client.DisplayName} has no command of its own. Delete the \"keypaste\" entry from its configuration file yourself; keypaste changed nothing.";
+            Message = NotInstalled(client);
             return;
         }
 
-        if (!await Task.Run(() => McpClientSetup.IsInstalled(_client, _connector.Runner)).ConfigureAwait(true))
+        if (detection.Problem is { } problem)
         {
-            Message = $"{_client.DisplayName} is not installed here: `{_client.Executable}` could not be started.";
+            Message = Sentence(problem);
+            return;
+        }
+
+        var reading = await Task.Run(() => McpClientConfig.Read(client, machine)).ConfigureAwait(true);
+        var plan = McpClientSetup.Remove(client, detection, reading);
+
+        if (plan.IsNotConnected)
+        {
+            Message = NotConnected(client);
             return;
         }
 
         Pending = plan;
-        Show(plan, $"Remove runs this command, which takes keypaste out of {_client.DisplayName} and leaves its other servers alone.");
+        Show(plan, plan.Steps[0] is McpConfigEdit edit
+            ? EditNote("Remove", edit)
+            : $"Remove runs this command, which takes keypaste out of {client.DisplayName} and leaves its other servers alone.");
     }
 
     private async Task ConfirmAsync()
@@ -273,12 +288,18 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         Forget();
 
         var removing = plan.Action == McpSetupAction.Remove;
+        var client = plan.Client;
+        var name = client.DisplayName;
         Message = result.Status switch
         {
-            McpSetupStatus.Done when removing => $"Removed. {plan.Client.DisplayName} can no longer start keypaste mcp for this vault.",
-            McpSetupStatus.Done => $"Connected. {plan.Client.DisplayName} starts keypaste mcp for this vault; Check asks through it once.",
-            McpSetupStatus.NotInstalled => $"{plan.Client.DisplayName} could not be started, so nothing was changed.",
-            _ => $"{plan.Client.DisplayName} refused" + (result.ClientSaid is { } said ? $": {said}" : "."),
+            McpSetupStatus.Done when removing => $"Removed. {name} can no longer start keypaste mcp for this vault." + Afterwards(client, result, removing),
+            McpSetupStatus.Done => $"Connected. {name} starts keypaste mcp for this vault; Check asks through it once." + Afterwards(client, result, removing),
+            McpSetupStatus.NotConnected => NotConnected(client),
+            McpSetupStatus.NotInstalled => $"{name} could not be started, so nothing was changed.",
+            McpSetupStatus.LinkFailed when plan.Steps.OfType<McpBridgeLink>().FirstOrDefault() is { } link =>
+                $"keypaste could not {link.Verb} {link.Link.LinkPath}: {result.Said}. Nothing else was changed.",
+            McpSetupStatus.Refused when client.Wiring == McpWiring.ConfigFile && result.Said is { } reason => Sentence(reason),
+            _ => $"{name} refused" + (result.Said is { } said ? $": {said}" : "."),
         };
 
         Registered = result.Status == McpSetupStatus.Done && !removing ? registration : null;
@@ -398,6 +419,80 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         {
             await check.DisposeAsync().ConfigureAwait(true);
         }
+    }
+
+    private static string NotInstalled(McpClient client) => client.Executable is { } command
+        ? $"{client.DisplayName} is not installed here: `{command}` could not be started."
+        : $"{client.DisplayName} is not installed here.";
+
+    private static string NotConnected(McpClient client) => $"{client.DisplayName} is not connected; there is nothing to remove.";
+
+    private static string ConnectNote(McpClient client, McpBridgeTarget target, McpSetupPlan plan)
+    {
+        List<string> notes =
+        [
+            plan.Steps.OfType<McpConfigEdit>().FirstOrDefault() is { } edit
+                ? EditNote("Connect", edit) + " No password, keyfile or session goes into it."
+                : $"Connect runs these commands. The first removes any earlier keypaste entry from {client.DisplayName}; "
+                    + "the second adds this vault. No password, keyfile or session goes into its configuration.",
+        ];
+
+        if (target.Link is { } link)
+        {
+            notes.Add(link.Change switch
+            {
+                McpLinkChange.Create => $"It first creates {link.Link.LinkPath}, which starts this AppImage.",
+                McpLinkChange.Repoint => $"It first re-points {link.Link.LinkPath} from {link.Was} to this AppImage.",
+                _ => $"It first replaces {link.Link.LinkPath}, which is {link.Was}, keeping it as {link.Link.BackupPath}.",
+            });
+        }
+
+        if (client.StartsOnlyInTrustedFolders)
+        {
+            notes.Add(Trusted(client));
+        }
+
+        if (target.Note is { } note)
+        {
+            notes.Add(note + ".");
+        }
+
+        return string.Join(' ', notes);
+    }
+
+    private static string EditNote(string verb, McpConfigEdit edit) => File.Exists(edit.Path)
+        ? $"{verb} changes only keypaste's entry in {edit.Path}, and keeps the first original as {edit.Backup ?? McpConfigFile.BackupPath(edit.Path)}."
+        : $"{verb} creates {edit.Path} holding only keypaste's entry.";
+
+    private static string Afterwards(McpClient client, McpSetupResult result, bool removing)
+    {
+        var notes = string.Empty;
+
+        if (result.Backup is { } backup)
+        {
+            notes += $" The original is kept as {backup}.";
+        }
+
+        if (!removing && client.StartsOnlyInTrustedFolders)
+        {
+            notes += " " + Trusted(client);
+        }
+
+        if (client.ReadsAtLaunch)
+        {
+            notes += $" Restart {client.DisplayName} to load it.";
+        }
+
+        return notes;
+    }
+
+    private static string Trusted(McpClient client) => $"{client.DisplayName} starts keypaste only in folders you have trusted.";
+
+    // keypaste is written in lower case even where it begins a sentence.
+    private static string Sentence(string text)
+    {
+        var opened = text.StartsWith(McpServerLocator.FileName, StringComparison.Ordinal) ? text : char.ToUpperInvariant(text[0]) + text[1..];
+        return opened.EndsWith('.') ? opened : opened + ".";
     }
 
     private void Show(McpSetupPlan plan, string note)

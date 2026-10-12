@@ -8,7 +8,7 @@ Usage: bash scripts/verify.sh [--from <profile>] [--list]
        bash scripts/verify.sh <profile> [--list] [--prepare-only|--test-only]
        bash scripts/verify.sh backend|desktop [--prepare-only|--test-only] --project <dir>... [--filter-class <class>]
 
-With no profile, runs every profile but compat: workflows and scripts beside the dotnet
+With no profile, runs every profile but compat and tools: workflows and scripts beside the dotnet
 profiles, which run in sequence. A failed run names every failed profile, prints their held
 output and the command that resumes; --from <profile> resumes at that profile, in the order
 workflows, scripts, format, backend, integration, desktop, desktop-gates. Each profile's
@@ -28,6 +28,10 @@ compat         Prepare the backend and the app driver, and verify creation, writ
                the site's Worker on loopback, and
                the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
                Never run without being named.
+tools          Prepare the backend, and connect keypaste to the real AI tools installed on this machine, read each
+               registration back with the tool's own command where it has one, else at the file level, and remove
+               it again. It writes those tools' own configuration, so it runs only on a GitHub runner, after
+               scripts/install-real-tools.sh. Never run without being named.
 
 --list prints the selection and commands without executing them. Backend, desktop, desktop-gates
 and integration accept --prepare-only and --test-only for CI or a build already prepared by this
@@ -77,7 +81,7 @@ while [ "$#" -gt 0 ]; do
       [ "$phase" = all ] || bad_usage 'choose only one phase'
       phase="${1#--}"
       ;;
-    format|backend|desktop|desktop-gates|scripts|workflows|integration|compat)
+    format|backend|desktop|desktop-gates|scripts|workflows|integration|compat|tools)
       [ -z "$profile" ] || bad_usage 'choose one profile'
       profile="$1"
       ;;
@@ -286,7 +290,8 @@ profile_workflows() {
     scripts/verify.sh scripts/verify-clipboard-markers.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh \
-    scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/lib/*.sh
+    scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh \
+    scripts/lib/*.sh
 }
 
 integration_script() { run "$timeout_command" --verbose --kill-after=10s 8m bash "$1"; }
@@ -376,6 +381,11 @@ profile_compat() {
   run bash scripts/verify-keepassxc-first-run.sh artifacts/compat/local-first-run
 }
 
+profile_tools() {
+  prepare_backend
+  integration_script scripts/verify-real-tools.sh
+}
+
 planned=()
 is_planned() {
   case " ${planned[*]:-} " in *" $1 "*) return 0 ;; *) return 1 ;; esac
@@ -393,6 +403,7 @@ plan_profiles() {
     fi
   done
   printf 'verify: skip %-13s needs an installed KeePassXC; run it by name\n' compat
+  printf 'verify: skip %-13s needs the real AI tools installed; run it by name\n' tools
 }
 
 require_tools() {
@@ -413,6 +424,13 @@ require_for() {
     workflows) require_tools docker ;;
     scripts) if scripts_in_container; then require_tools docker; else require_tools git jq; fi ;;
     integration|desktop-gates) require_tools dotnet git jq; require_gnu_timeout ;;
+    tools)
+      require_tools dotnet git jq
+      require_gnu_timeout
+      for tool in claude codex gemini devin; do
+        command -v "$tool" >/dev/null || { echo "missing $tool; put the real AI tools on PATH with scripts/install-real-tools.sh" >&2; exit 1; }
+      done
+      ;;
     compat)
       require_tools dotnet git
       command -v "${KPXC_CLI:-keepassxc-cli}" >/dev/null || { echo 'set KPXC_CLI to an installed keepassxc-cli' >&2; exit 1; }
