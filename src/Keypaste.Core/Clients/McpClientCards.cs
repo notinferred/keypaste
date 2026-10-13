@@ -43,7 +43,7 @@ public static class McpClientCards
     /// <summary>How a client that reaches keypaste through a bridge is described.</summary>
     public const string StdioKind = "MCP stdio";
 
-    private static readonly HashSet<string> _bridgeTools = new(["list_entry_names", "request_credential", "run"], StringComparer.Ordinal);
+    private static readonly HashSet<string> _bridgeTools = new([AuditTools.List, AuditTools.Credential, AuditTools.Run], StringComparer.Ordinal);
 
     /// <summary>Builds the cards.</summary>
     /// <param name="connected">The clients attached to the live session.</param>
@@ -92,10 +92,12 @@ public static class McpClientCards
 
         foreach (var entry in audit)
         {
-            // A token run names itself like a client but has no bridge; matched on the method because
-            // a bridge may assert any client name.
+            // A token run and a run --session name themselves like a client but have no bridge. The token
+            // run is matched on its method, which a bridge's line never has; an unlabelled bridge asserting
+            // the runner's name only hides its own card.
             if (!_bridgeTools.Contains(entry.Tool)
                 || string.Equals(entry.Method, "token", StringComparison.Ordinal)
+                || (entry.Label.Length == 0 && string.Equals(entry.Name, RequestRecords.SessionRunner, StringComparison.Ordinal))
                 || !string.Equals(entry.Vault, vaultKey, StringComparison.Ordinal)
                 || entry.At is not { } at
                 || now - at > SeenWindow

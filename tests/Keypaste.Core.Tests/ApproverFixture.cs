@@ -34,9 +34,9 @@ internal sealed class ApproverFixture : IDisposable
 
     /// <summary>Every line the handler printed to the operator's terminal, in order.</summary>
     /// <remarks>
-    /// The approver writes no audit line for a credential (D-0020), so this is the only record it produces itself.
-    /// A line claiming a release that never left the process is therefore the only place that
-    /// claim would ever be made, which is why it is worth asserting on.
+    /// The handler writes no audit line; the authority around it records the reply. So this is the
+    /// only record the handler produces itself, and a line claiming a release that never left the
+    /// process is a claim nothing else would contradict, which is why it is worth asserting on.
     /// </remarks>
     internal List<string> Narration { get; } = [];
 

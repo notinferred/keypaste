@@ -3,16 +3,18 @@
 # keypaste mcp, and tests/Keypaste.AppDriver unlocking through the app's unlock screen and serving the
 # vault as the app does.
 #
-# A real keypaste mcp request reaches the app's session, is put to the person in the app's prompt, whose
-# refusal is audited naming that session. With the app locked the request is refused and audited. `keypaste agent` and a
-# second app on the same vault are each refused with a message naming the app, before any password is
-# asked for. Unlocking again starts a new session. A killed app leaves nothing holding the vault. The
-# stale-session and unattached cases run over a real pipe in SessionAuthorityTests, because the shipped
-# bridge always attaches.
+# A real keypaste mcp request reaches the app's session, is put to the person in the app's prompt, and
+# the app records the listing and the refusal in its own home's log, naming that session, while the
+# bridge, logging elsewhere, records nothing. With the app locked the requests are refused and the bridge
+# records them, the app nothing. `keypaste agent` and a second app on the same vault are each refused with
+# a message naming the app, before any password is asked for. Unlocking again starts a new session. A
+# killed app leaves nothing holding the vault. The stale-session and unattached cases run over a real
+# pipe in SessionAuthorityTests, because the shipped bridge always attaches.
 #
-# NEGATIVE CONTROL: this fails if the listing does not come back from the app's vault, if its audit line
-# names no session or the wrong one, if a request is answered while the app is locked, or if either
-# second owner opens the vault. These checks must never be skipped or soft-passed.
+# NEGATIVE CONTROL: this fails if the listing does not come back from the app's vault, if the app's lines
+# name no session or the wrong one, if the bridge also records a request the app answered, if a request
+# is answered while the app is locked, or if either second owner opens the vault. These checks must never
+# be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-session-master-pw'
@@ -31,7 +33,10 @@ mkdir -p "$WORK/home"
 KEYPASTE_HOME="$(native "$WORK/home")"
 export KEYPASTE_HOME
 VAULT="$(native "$WORK/vault.kdbx")"
+# The bridge logs apart from the app, so each log shows which process recorded what.
 AUDIT="$(native "$WORK/audit.jsonl")"
+readonly BRIDGE_LOG="$WORK/audit.jsonl"
+readonly APP_LOG="$WORK/home/audit.jsonl"
 readonly HOLD_OUT="$WORK/hold.txt"
 readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
@@ -65,8 +70,10 @@ ask() {
     || die "keypaste mcp exited non-zero"
 }
 
-# The last two audit lines: the listing, then the request.
-last_lines() { tail -n 2 "$AUDIT"; }
+# The lines each log gained since the phase began.
+app_lines() { lines_after "$APP_LOG" "$app_before"; }
+bridge_lines() { lines_after "$BRIDGE_LOG" "$bridge_before"; }
+before_phase() { app_before=$(lines_in "$APP_LOG"); bridge_before=$(lines_in "$BRIDGE_LOG"); }
 
 # ---------------------------------------------------------------- a vault with something in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
@@ -84,6 +91,7 @@ FIRST="$(session_of)"
 
 OUT="$WORK/served-stdout.txt"
 ERR="$WORK/served-stderr.txt"
+before_phase
 ask "$OUT" "$ERR" 1
 
 jq -e 'select(.id == 2) | .result.isError == false' <"$OUT" >/dev/null || die "the listing from the app's session was refused"
@@ -92,10 +100,11 @@ jq -e 'select(.id == 3) | .result.isError == true' <"$OUT" >/dev/null \
   || die "a credential was released although the person denied it"
 grep -q "$SECRET" "$OUT" && die "a credential reached the client from the app's session"
 
-last_lines | head -1 | jq -e --arg s "$FIRST" '.tool == "list_entry_names" and .decision == "granted" and .session == $s' >/dev/null \
-  || die "the listing's audit line does not name the app's session $FIRST"
-last_lines | tail -1 | jq -e --arg s "$FIRST" '.tool == "request_credential" and .decision == "denied" and .method == "prompt" and .session == $s' >/dev/null \
-  || die "the request's audit line does not name the app's session $FIRST"
+app_lines | jq -e -s --arg s "$FIRST" 'length == 2
+    and .[0].tool == "list_entry_names" and .[0].decision == "granted" and .[0].session == $s
+    and .[1].tool == "request_credential" and .[1].decision == "denied" and .[1].method == "prompt" and .[1].session == $s' >/dev/null \
+  || die "the app did not record the listing and the request once each, naming its session $FIRST: $(app_lines)"
+[ -z "$(bridge_lines)" ] || die "the bridge recorded requests the app answered: $(bridge_lines)"
 
 # ------------------------------------------------------------------- a second owner is refused
 set +e
@@ -123,12 +132,14 @@ wait_for '^locked' "$HOLD_OUT"
 
 OUT="$WORK/locked-stdout.txt"
 ERR="$WORK/locked-stderr.txt"
+before_phase
 ask "$OUT" "$ERR"
 
 jq -e 'select(.id == 2) | .result.isError == true' <"$OUT" >/dev/null || die "a listing was answered while the app was locked"
 jq -e 'select(.id == 3) | .result.isError == true' <"$OUT" >/dev/null || die "a request was answered while the app was locked"
-last_lines | jq -e -s 'all(.decision == "denied" and (has("session") | not))' >/dev/null \
-  || die "the refusals while locked were not audited as denials reaching no session"
+bridge_lines | jq -e -s 'length == 2 and all(.decision == "denied" and (has("session") | not))' >/dev/null \
+  || die "the bridge did not record the two refusals while locked as denials reaching no session: $(bridge_lines)"
+[ -z "$(app_lines)" ] || die "the locked app recorded requests: $(app_lines)"
 
 # ---------------------------------------------------------- unlocking again is a new session
 echo unlock >&7
@@ -138,9 +149,10 @@ SECOND="$(session_of)"
 
 OUT="$WORK/again-stdout.txt"
 ERR="$WORK/again-stderr.txt"
+before_phase
 ask "$OUT" "$ERR" 2
-last_lines | head -1 | jq -e --arg s "$SECOND" '.decision == "granted" and .session == $s' >/dev/null \
-  || die "the listing after unlocking again does not name the new session $SECOND"
+app_lines | head -1 | jq -e --arg s "$SECOND" '.tool == "list_entry_names" and .decision == "granted" and .session == $s' >/dev/null \
+  || die "the app's line for the listing after unlocking again does not name the new session $SECOND"
 
 # ------------------------------------------------------------- a killed app holds nothing
 kill_process "$HOLD_PID"

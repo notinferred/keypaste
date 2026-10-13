@@ -45,7 +45,9 @@ internal sealed record ServerOptions
           --client-label <name> what to call this client in the audit log and in clients.toml
           --allow-run           offer the run tool: start a command you approve with secrets
                                 in its environment. A command can still reveal them.
-          --audit-log <path>    where to append the audit trail, or set KEYPASTE_HOME
+          --audit-log <path>    where this bridge records a call it refuses itself or that
+                                nothing holding the vault answered, or set KEYPASTE_HOME; the
+                                app or keypaste agent records the calls it answers in its own log
           --approver <name>     which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER
           -h, --help            print this help
 

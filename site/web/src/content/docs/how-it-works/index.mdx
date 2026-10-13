@@ -20,7 +20,7 @@ flowchart LR
   bridge e2@--> owner
   owner <--> vault
   owner e3@--> child
-  bridge --> log
+  owner --> log
   vault <-->|your own file sync| other["KeePassXC and KeePass phone apps"]
   e1@{ animate: true }
   e2@{ animate: true }
@@ -28,8 +28,8 @@ flowchart LR
 ```
 
 - **The vault** is a KDBX 4 file you own. KeePassXC and the KeePass apps on your phone open the same file, and your own file sync carries it between devices.
-- **The owner** is the process holding the vault unlocked. It is the only one that reads a secret, and only one process can own a vault at a time.
-- **The bridge**, `keypaste-mcp`, is what your AI tool starts. It forwards requests to the owner over a pipe only your user account can open, writes the audit record, and never holds the vault or asks for your master password.
+- **The owner** is the process holding the vault unlocked. It is the only one that reads a secret, it records every request it answers in your audit log before it replies, and only one process can own a vault at a time.
+- **The bridge**, `keypaste-mcp`, is what your AI tool starts. It forwards requests to the owner over a pipe only your user account can open, records only a request it refused itself or that nothing answered, and never holds the vault or asks for your master password.
 - **Programs you run** get a project's variables in their environment, never in a file.
 
 ## How a request is decided

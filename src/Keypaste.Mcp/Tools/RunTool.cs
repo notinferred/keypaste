@@ -16,11 +16,12 @@ namespace Keypaste.Mcp.Tools;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The order is the security property, and every exit goes through the one audit append.</b>
-/// The request is checked, the directory and the program are resolved to what will really start,
-/// references outside the exposure are refused, and only then is the vault's owner asked, which asks
-/// the person. The approved line is appended before the child starts; a failed append starts nothing
-/// and drops the values.
+/// <b>The order is the security property, and every call is recorded once.</b> The request is checked,
+/// the directory and the program are resolved to what will really start, references outside the
+/// exposure are refused, and only then is the vault's owner asked, which asks the person. The owner
+/// records its answer before it replies, so the approved line is written before the child starts; a
+/// reply it did not record starts nothing and drops the values. This file records only a call the
+/// owner did not answer.
 /// </para>
 /// <para>
 /// <b>The child runs here, not in the owner</b>: this is already the agent's process, with the
@@ -113,9 +114,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             return Finish(client, line, Invalid(malformed, "is not the type the tool's schema gives"), null);
         }
 
-        var arguments = new RunArguments(call.Command, call.Directory, call.Project, call.Profile, call.Keys, call.References, call.Reason, call.TimeoutSeconds);
-
-        if (RunRequestRules.Check(arguments) is { } problem)
+        if (RunRequestRules.Check(call.Arguments) is { } problem)
         {
             return Finish(client, line, Invalid(problem.Argument, problem.Rule), null);
         }
@@ -177,6 +176,19 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             },
             cancellationToken).ConfigureAwait(false);
 
+        line.Entries = reply?.Entries;
+        line.Session = reply?.Session;
+
+        // A value keypaste cannot record is one it does not hand over (T-6).
+        if (reply is { Recorded: false })
+        {
+            return Finish(client, line, Verdict.Denied(AuditMethod.Failed, McpAudit.Unrecorded, ToolText.AuditUnavailable), null);
+        }
+
+        // A reply from here is one the owner recorded, a withdrawn request's included, so nothing that
+        // follows adds a line: a release dropped after it stays recorded.
+        line.Recorded = reply is not null;
+
         if (cancellationToken.IsCancellationRequested)
         {
             return Finish(client, line, Verdict.Denied(AuditMethod.Cancelled, "the client withdrew the request"), null);
@@ -198,9 +210,6 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             }, null);
         }
 
-        line.Entries = reply.Entries;
-        line.Session = reply.Session;
-
         if (reply.Set.Outcome != EnvOutcome.Resolved)
         {
             return Finish(client, line, Verdict.Denied(reply.Method, reply.Reason), null);
@@ -208,18 +217,11 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
 
         var names = reply.Set.Variables.Select(variable => variable.Key).ToList();
 
-        if (!Expected(call, names))
+        // The owner checked this before it recorded the release; checked again here, before anything
+        // starts, so a reply naming other variables never runs.
+        if (!RunRequestRules.Answers(call.Arguments, names))
         {
-            return Finish(client, line, Verdict.Denied(AuditMethod.Failed, "the owner's reply named variables the request did not", ToolText.RunMismatched), null);
-        }
-
-        var granted = Verdict.Granted(reply.Method, reply.Reason, reply.GrantedSeconds);
-
-        // Before the child starts, and the only way it starts: a release keypaste cannot record is
-        // one it does not make (T-6).
-        if (!audit.TryAppend(line.Record(client, granted, options), out _))
-        {
-            return ToolResults.Refuse(ToolText.AuditUnavailable);
+            return ToolResults.Refuse(ToolText.RunMismatched);
         }
 
         var environment = EnvironmentMerge.Build(
@@ -236,7 +238,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
 
         if (result.Outcome != ChildOutcome.Exited)
         {
-            // The approved line stands: the values reached this process, and nothing ran with them.
+            // The owner's approved line stands: the values reached this process, and nothing ran with them.
             return ToolResults.Refuse(ToolText.RunNotStarted(program, result.Error));
         }
 
@@ -252,18 +254,10 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             scrubber.Scrub(result.Stderr));
     }
 
-    /// <summary>Whether the owner's names are the ones asked for: exactly, or for a whole set, ones the name rule allows.</summary>
-    private static bool Expected(Call call, List<string> names) =>
-        call.References is { } references
-            ? names.SequenceEqual(references.Select(reference => reference.Name), StringComparer.Ordinal)
-            : call.Keys is { } keys
-                ? names.SequenceEqual(keys, StringComparer.Ordinal)
-                : RunRequestRules.NameProblem(names) is null;
-
-    /// <summary>Appends the line for an answer that starts nothing, then answers.</summary>
+    /// <summary>Appends the line for an answer that starts nothing, unless the owner recorded the call, then answers.</summary>
     private CallToolResult Finish(AuditClient client, Line line, Verdict verdict, CallToolResult? answer)
     {
-        if (!audit.TryAppend(line.Record(client, verdict, options), out _))
+        if (!line.Recorded && !audit.TryAppend(line.Record(client, verdict, options), out _))
         {
             return ToolResults.Refuse(ToolText.AuditUnavailable);
         }
@@ -358,16 +352,14 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         int TimeoutSeconds)
     {
         public string? Malformed { get; init; }
+
+        public RunArguments Arguments => new(Command, Directory, Project, Profile, Keys, References, Reason, TimeoutSeconds);
     }
 
-    /// <summary>What was decided, for the log and for the agent.</summary>
-    private sealed record Verdict(AuditDecision Decision, AuditMethod Method, string Reason, string? Refusal, int GrantedSeconds)
+    /// <summary>Why a run was refused, for the log and for the agent.</summary>
+    private sealed record Verdict(AuditMethod Method, string Reason, string? Refusal)
     {
-        internal static Verdict Denied(AuditMethod method, string reason, string? refusal = null) =>
-            new(AuditDecision.Denied, method, reason, refusal, 0);
-
-        internal static Verdict Granted(AuditMethod method, string reason, int grantedSeconds) =>
-            new(AuditDecision.Granted, method, reason, null, grantedSeconds);
+        internal static Verdict Denied(AuditMethod method, string reason, string? refusal = null) => new(method, reason, refusal);
     }
 
     /// <summary>What the audit line says about the run, filled in as it is learned.</summary>
@@ -379,30 +371,22 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
 
         internal string? Session { get; set; }
 
-        internal AuditRecord Record(AuditClient client, Verdict verdict, ServerOptions options)
-        {
-            var group = call.Project is { } project && call.References is null
-                ? EnvProfileNames.SetName(project, call.Profile ?? EnvProfileNames.Default)
-                : null;
-            var shown = DisplayTextSanitizer.Sanitize(EnvReleasePrompt.CommandLine(call.Command), EnvReleasePrompt.MaximumCommandLength).Text;
+        /// <summary>Whether the owner recorded the call, so this bridge writes no line for it.</summary>
+        internal bool Recorded { get; set; }
 
-            return McpAudit.Line(
-                ToolText.RunToolName,
+        internal AuditRecord Record(AuditClient client, Verdict verdict, ServerOptions options) =>
+            RequestRecords.Run(
                 client,
-                verdict.Decision,
+                call.Arguments,
+                Program,
+                AuditDecision.Denied,
                 verdict.Method,
                 verdict.Reason,
-                options.Exposure,
-                AuditArgs.ForRun(group, call.Reason),
-                options.VaultKey) with
-            {
-                Session = Session,
-                GrantedSeconds = verdict.Decision == AuditDecision.Granted ? verdict.GrantedSeconds : null,
-                Entries = Entries,
-                Command = shown.Length > AuditRecord.CommandLength ? shown[..(AuditRecord.CommandLength - 1)] + "…" : shown,
-                CommandSha256 = call.Command.Count == 0 ? null : AuditRecord.HashOf([Program ?? call.Command[0], .. call.Command.Skip(1)]),
-            };
-        }
+                grantedSeconds: null,
+                Entries,
+                options.Exposure.Globs,
+                Session,
+                options.VaultKey);
     }
 
     /// <summary>Tells a client that asked for progress that the run is alive, so its request timeout resets.</summary>

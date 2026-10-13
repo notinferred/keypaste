@@ -113,9 +113,12 @@ public sealed class DesktopApprovalTests
             await PromptedApp.WithdrawnAsync(window);
         });
 
-    /// <summary>A bridge that gives up on its request and hangs up, as it does when its client cancels, takes the prompt down.</summary>
+    /// <summary>
+    /// A bridge that withdraws its request, as it does when its client cancels, takes the prompt down
+    /// and is answered as cancelled, then hangs up.
+    /// </summary>
     [Fact]
-    public Task A_bridge_that_hangs_up_takes_the_prompt_down() =>
+    public Task A_bridge_that_withdraws_its_request_takes_the_prompt_down() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
@@ -124,9 +127,12 @@ public sealed class DesktopApprovalTests
             var window = await app.PromptAsync();
 
             await givingUp.CancelAsync();
-            Assert.Null(await reply.WaitAsync(_wait, Token));
+            var answered = await reply.WaitAsync(_wait, Token);
             await app.HangUpAsync();
 
+            Assert.NotNull(answered);
+            Assert.Equal((AuditDecision.Denied, AuditMethod.Cancelled), (answered.Decision, answered.Method));
+            Assert.Null(answered.Value);
             await PromptedApp.WithdrawnAsync(window);
         });
 

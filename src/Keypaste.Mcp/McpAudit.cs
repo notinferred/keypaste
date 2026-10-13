@@ -1,4 +1,3 @@
-using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using ModelContextProtocol.Protocol;
@@ -12,7 +11,7 @@ namespace Keypaste.Mcp;
 internal readonly record struct Caller(bool Initialized, AuditClient Client);
 
 /// <summary>
-/// Turns a protocol request into an audit line.
+/// Reads who is calling from the protocol, for the owner and the audit line.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,8 +29,8 @@ internal readonly record struct Caller(bool Initialized, AuditClient Client);
 /// </remarks>
 internal static class McpAudit
 {
-    /// <summary>The longest client-supplied name or version kept.</summary>
-    internal const int MaximumClientTextLength = 64;
+    /// <summary>The reason this bridge records for a reply that says its owner did not record the request.</summary>
+    internal const string Unrecorded = "the vault's owner did not record this request";
 
     /// <summary>What this bridge tells the owner about its client when it attaches: display and counting only (THREATS.md T-3).</summary>
     /// <param name="declared">What the client said in its handshake, or null before it has.</param>
@@ -41,12 +40,11 @@ internal static class McpAudit
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var name = Clean(declared?.Name);
-        var version = Clean(declared?.Version);
+        var said = AuditClient.Of(declared?.Name, declared?.Version, null);
 
-        return name is null && version is null && options.ClientLabel is null
+        return said.Name is null && said.Version is null && options.ClientLabel is null
             ? null
-            : new AttachClient(name, version, options.ClientLabel);
+            : new AttachClient(said.Name, said.Version, options.ClientLabel);
     }
 
     /// <summary>How long a tool call waits for a handshake that is already in flight.</summary>
@@ -118,7 +116,7 @@ internal static class McpAudit
     /// <returns>Whether the handshake completed, and what can honestly be said about the caller.</returns>
     /// <remarks>
     /// <para>
-    /// Both client-supplied strings go through <see cref="EntryNameSanitizer"/> before they are
+    /// Both client-supplied strings are sanitized by <see cref="AuditClient.Of"/> before they are
     /// recorded. They are attacker-chosen text that Stage 2.2 renders in an approval dialog and
     /// <c>keypaste log</c> renders in a table — the two places an injection payload would most like to land.
     /// Absent values are recorded as absent rather than as the word "unknown": that a client said
@@ -165,68 +163,6 @@ internal static class McpAudit
 
         return new Caller(
             declared is not null,
-            new AuditClient(Clean(declared?.Name), Clean(declared?.Version), Clean(options.ClientLabel)));
+            AuditClient.Of(declared?.Name, declared?.Version, options.ClientLabel));
     }
-
-    /// <summary>Builds the line for a call that was refused.</summary>
-    /// <param name="tool">Which tool was called.</param>
-    /// <param name="client">Who called it.</param>
-    /// <param name="method">Why the answer was no.</param>
-    /// <param name="reason">keypaste's own explanation. Trusted text.</param>
-    /// <param name="exposure">What this server was configured to expose.</param>
-    /// <param name="args">What was asked for.</param>
-    /// <param name="vault">The configured vault's identity key, or null.</param>
-    /// <returns>The record to append.</returns>
-    internal static AuditRecord Denial(
-        string tool,
-        AuditClient client,
-        AuditMethod method,
-        string reason,
-        EntryExposure exposure,
-        AuditArgs? args = null,
-        string? vault = null) =>
-        Line(tool, client, AuditDecision.Denied, method, reason, exposure, args, vault);
-
-    /// <summary>Builds the line for a call, whatever the answer was.</summary>
-    /// <param name="tool">Which tool was called.</param>
-    /// <param name="client">Who called it.</param>
-    /// <param name="decision">Whether anything was released.</param>
-    /// <param name="method">How that was decided.</param>
-    /// <param name="reason">keypaste's own explanation. Trusted text.</param>
-    /// <param name="exposure">What this server was configured to expose.</param>
-    /// <param name="args">What was asked for.</param>
-    /// <param name="vault">The configured vault's identity key, or null.</param>
-    /// <returns>The record to append.</returns>
-    /// <remarks>
-    /// A grant and a denial go through the same builder and the same fields. Two shapes would be
-    /// two chances to leave something out of one of them, and the line that matters most to a
-    /// person reading the log later is the one that says yes.
-    /// </remarks>
-    internal static AuditRecord Line(
-        string tool,
-        AuditClient client,
-        AuditDecision decision,
-        AuditMethod method,
-        string reason,
-        EntryExposure exposure,
-        AuditArgs? args = null,
-        string? vault = null)
-    {
-        ArgumentNullException.ThrowIfNull(exposure);
-
-        return new AuditRecord
-        {
-            Tool = tool,
-            Client = client,
-            Args = args ?? AuditArgs.None,
-            Decision = decision,
-            Method = method,
-            Reason = reason,
-            Exposure = exposure.Globs,
-            Vault = vault,
-        };
-    }
-
-    private static string? Clean(string? value) =>
-        value is null ? null : EntryNameSanitizer.Sanitize(value, MaximumClientTextLength).Text;
 }

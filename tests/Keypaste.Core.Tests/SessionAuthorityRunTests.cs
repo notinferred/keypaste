@@ -30,6 +30,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     private readonly Vault _vault;
     private readonly EnvGrantCache _grants;
     private readonly List<string> _narration = [];
+    private readonly OwnerLog _log;
     private SessionLifetime? _lifetime = new("session-one");
 
     public SessionAuthorityRunTests()
@@ -50,10 +51,10 @@ public sealed class SessionAuthorityRunTests : IDisposable
                 ProjectVariables.Set(created, "outside-big", $"KEY_{i}", $"v{i}");
             }
 
-            // An entry each, so the run names thirty long paths.
+            // An entry each, so the run names thirty paths longer together than a whole audit line.
             foreach (var i in Enumerable.Range(0, 30))
             {
-                var wide = new EntryName("env/wide", $"KEY_{i}_" + new string('W', 70));
+                var wide = new EntryName("env/wide", $"KEY_{i}_" + new string('W', 120));
                 created.AddEntry(new VaultEntry { GroupPath = wide.GroupPath, Title = wide.Title });
                 Assert.True(created.SetFields(wide, [new FieldWrite(wide.Title, $"w{i}")]));
                 Assert.True(created.AddTag(wide, "env:wide"));
@@ -64,6 +65,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _grants = new EnvGrantCache(_fixture.Clock);
+        _log = new OwnerLog(_directory);
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -78,6 +80,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     {
         _lifetime?.Dispose();
         _grants.Dispose();
+        _log.Dispose();
         _vault.Dispose();
         _fixture.Dispose();
         Directory.Delete(_directory, recursive: true);
@@ -425,8 +428,12 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(0, _fixture.Channel.Asked);
     }
 
+    /// <summary>
+    /// A set whose entries one audit line cannot hold is refused before anybody is asked, and the
+    /// refusal leaves them out, so its own line is written.
+    /// </summary>
     [Fact]
-    public async Task EntriesTooLongForOneAuditLine_AreRefusedUnasked()
+    public async Task EntriesTooLongForOneAuditLine_AreRefusedUnasked_AndTheRefusalIsRecorded()
     {
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         await using var owner = Owner.Start(this);
@@ -437,6 +444,38 @@ public sealed class SessionAuthorityRunTests : IDisposable
         AssertNothingReleased(reply);
         Assert.Equal(AuditMethod.InvalidRequest, reply!.Method);
         Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Empty(reply.Entries);
+        Assert.True(reply.Recorded);
+
+        var line = Assert.Single(_log.Lines());
+        Assert.Equal(("run", "denied", "invalid-request"), (line.GetProperty("tool").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
+    }
+
+    /// <summary>
+    /// A release naming variables the request did not name is refused as failed before it is recorded,
+    /// so its line records no release and its reply carries no value; the resolver cannot produce one
+    /// today, which is why the check is driven directly.
+    /// </summary>
+    [Fact]
+    public void AReleaseNamingOtherVariables_IsRefusedAsFailedBeforeItIsRecorded()
+    {
+        var asked = new RunArguments(["npm", "run", "migrate"], _directory, "acme-api", "dev", ["DATABASE_URL"], null, "run the pending migration", RunRequestRules.DefaultTimeoutSeconds);
+        RunReply Released(string key, string value) =>
+            new(EnvResolved.Released("acme-api", [new EnvVariable(key, value)]), AuditMethod.Prompt, "a person approved this one run")
+            {
+                Entries = ["env/acme-api/.env"],
+                Session = "session-one",
+            };
+
+        var other = SessionAuthority.Deliverable(asked, Released("STRIPE_SECRET_KEY", _stripe));
+        var named = Released("DATABASE_URL", _database);
+
+        Assert.Equal(EnvOutcome.Unreadable, other.Set.Outcome);
+        Assert.Empty(other.Set.Variables);
+        Assert.Equal(AuditMethod.Failed, other.Method);
+        Assert.Equal("the resolved variables are not the ones the request named", other.Reason);
+        Assert.Equal("session-one", other.Session);
+        Assert.Same(named, SessionAuthority.Deliverable(asked, named));
     }
 
     [Fact]
@@ -833,6 +872,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
                 VaultIdentity.Of(test._directory, test.VaultPath),
                 () => test._lifetime,
                 handler,
+                audit: () => test._log.Log,
                 new SessionEnvironments(
                     used.Gate,
                     lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,

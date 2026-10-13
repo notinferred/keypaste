@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
-using System.Text.Json;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -42,6 +42,7 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
 
     private string _directory = string.Empty;
     private Vault? _vault;
+    private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
     private GrantCache? _grants;
     private ApprovalGate? _gate;
@@ -79,6 +80,7 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
 
         _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
+        _log = new OwnerLog(Path.Combine(_directory, "home"));
 
         _stop = new CancellationTokenSource();
         _listener = new ApproverListener(
@@ -90,7 +92,8 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
                     new VaultEntryNameLister(() => _vault),
                     _gate,
                     _grants,
-                    PolicyGate.None)));
+                    PolicyGate.None),
+                _log.Log));
 
         _serving = _listener.RunAsync(_stop.Token);
 
@@ -121,6 +124,7 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         _gate?.Dispose();
         _grants?.Dispose();
         _vault?.Dispose();
+        _log?.Dispose();
 
         Directory.Delete(_directory, recursive: true);
     }
@@ -137,12 +141,13 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
-    private static List<string> MethodsOf(McpHarness harness) =>
-        [.. harness.AuditLines().Select(line =>
-        {
-            using var parsed = JsonDocument.Parse(line);
-            return parsed.RootElement.GetProperty("method").GetString()!;
-        })];
+    /// <summary>The owner's methods, which record every request it answered; the bridge records none of them.</summary>
+    private List<string> MethodsOf(McpHarness harness)
+    {
+        Assert.Empty(harness.AuditLines());
+
+        return [.. _log!.Lines().Select(line => line.GetProperty("method").GetString()!)];
+    }
 
     private async Task<(McpHarness Harness, McpClient Client)> StartAsync()
     {
@@ -171,6 +176,7 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         Assert.DoesNotContain(_sentinel, text, StringComparison.Ordinal);
         Assert.DoesNotContain(_sentinel, harness.Transcript, StringComparison.Ordinal);
         Assert.DoesNotContain(_sentinel, string.Join("\n", harness.AuditLines()), StringComparison.Ordinal);
+        Assert.DoesNotContain(_sentinel, _log!.Text(), StringComparison.Ordinal);
     }
 
     /// <summary>

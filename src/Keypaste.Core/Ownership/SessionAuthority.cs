@@ -37,6 +37,15 @@ namespace Keypaste.Core.Ownership;
 /// names (D-0358). The owner runs nothing: the bridge starts the command.
 /// </para>
 /// <para>
+/// Every listing, credential, run and token request it reads is recorded in this owner's own log
+/// before it is answered, a request refused at admission, withdrawn or failed while deciding included,
+/// and a release whose line cannot be written is refused (THREATS.md T-6). While that log will not
+/// open, every request is refused before anybody is asked. Nothing the asker sends moves that log, so
+/// a bridge configured to log elsewhere, or a program speaking the pipe directly, is recorded all the
+/// same (T-14). Attaching, listing grants and locking release nothing and
+/// are not recorded.
+/// </para>
+/// <para>
 /// Reaching the endpoint at all is what the operating system authenticates (THREATS.md T-10). The
 /// session identifier is not a secret; it says which unlocked lifetime a request belongs to. What an
 /// attaching bridge says about its client is display only (T-3).
@@ -45,10 +54,12 @@ namespace Keypaste.Core.Ownership;
 public sealed class SessionAuthority : IApproverHandler
 {
     private const string _lockedReason = "the vault is locked";
+    private const string _unrecordedNarration = "the audit log could not be written, so nothing was sent";
 
     private readonly VaultIdentity _vault;
     private readonly Func<SessionLifetime?> _lifetime;
     private readonly ApproverHandler _inner;
+    private readonly RequestRecorder _recorder;
     private readonly SessionEnvironments? _environments;
     private readonly Action? _lockNow;
     private readonly TimeProvider _clock;
@@ -60,6 +71,11 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="vault">The vault this process holds.</param>
     /// <param name="lifetime">The current unlocked lifetime, or null while the vault is locked.</param>
     /// <param name="inner">What decides a request once it belongs to the current session.</param>
+    /// <param name="audit">
+    /// Opens the log this owner records each request it answers in, asked as each one is decided and
+    /// answered, so an owner that never sees one creates no log; a null answer refuses the request
+    /// before anybody is asked.
+    /// </param>
     /// <param name="environments">What env sets are released with, or null to refuse every one.</param>
     /// <param name="lockNow">What <c>keypaste lock</c> runs, which must end the session for the reply to say locked; null refuses it.</param>
     /// <param name="clock">What attachments and releases are timed on; null is the system clock.</param>
@@ -67,6 +83,7 @@ public sealed class SessionAuthority : IApproverHandler
         VaultIdentity vault,
         Func<SessionLifetime?> lifetime,
         ApproverHandler inner,
+        Func<AuditLog?> audit,
         SessionEnvironments? environments = null,
         Action? lockNow = null,
         TimeProvider? clock = null)
@@ -74,10 +91,12 @@ public sealed class SessionAuthority : IApproverHandler
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(lifetime);
         ArgumentNullException.ThrowIfNull(inner);
+        ArgumentNullException.ThrowIfNull(audit);
 
         _vault = vault;
         _lifetime = lifetime;
         _inner = inner;
+        _recorder = new RequestRecorder(audit);
         _environments = environments;
         _lockNow = lockNow;
         _clock = clock ?? TimeProvider.System;
@@ -224,25 +243,51 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// A listing carries nothing of its own (T-4), so it is recorded under the client its connection
+    /// attached as, and its line counts the names that cross the pipe.
+    /// </remarks>
     public async ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        var client = _attached.TryGetValue(connectionId, out var attachment) && attachment.Client is { } attached
+            ? AuditClient.Of(attached.Name, attached.Version, attached.Label)
+            : AuditClient.Unknown;
+
+        NamesReply Answer(NamesReply reply) => _recorder.Recorded(
+            reply,
+            reply.VaultUnlocked
+                ? RequestRecords.Listed(client, reply.Names.Count, request.Exposure, reply.Session, VaultNamed(request.Vault))
+                : RequestRecords.Listing(
+                    client,
+                    AuditDecision.Denied,
+                    reply.Refusal ?? AuditMethod.VaultLocked,
+                    reply.Reason,
+                    request.Exposure,
+                    reply.Session,
+                    VaultNamed(request.Vault)));
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
-            return new NamesReply(false, [], refusal.Reason, true);
+            return Answer(new NamesReply(false, [], refusal.Reason, true) { Refusal = refusal.Method });
         }
 
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
 
-        var reply = await _inner.ListAsync(request, connectionId, withdrawn.Token).ConfigureAwait(false);
+        var reply = await Decided(
+            token => _inner.ListAsync(request, connectionId, token),
+            lifetime,
+            (method, reason) => new NamesReply(false, [], reason, true) { Refusal = method },
+            withdrawn.Token).ConfigureAwait(false);
 
         if (!lifetime.TryCommit())
         {
-            return new NamesReply(false, [], _lockedReason, true);
+            reply = new NamesReply(false, [], _lockedReason, true) { Refusal = AuditMethod.VaultLocked };
         }
 
-        return reply with { Session = request.Session };
+        return Answer(ApproverProtocol.Fitted(reply with { Session = request.Session, Recorded = true }));
     }
 
     /// <inheritdoc/>
@@ -253,44 +298,60 @@ public sealed class SessionAuthority : IApproverHandler
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        CredentialReply Answer(CredentialReply reply) => _recorder.Recorded(
+            reply,
+            RequestRecords.Credential(
+                AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel),
+                request.Entry,
+                request.Field,
+                request.TtlSeconds,
+                request.Reason,
+                reply.Decision,
+                reply.Method,
+                reply.Reason,
+                reply.Entry,
+                reply.TtlSeconds,
+                request.Exposure,
+                reply.Session,
+                VaultNamed(request.Vault)));
+
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
-            return new CredentialReply
-            {
-                Decision = AuditDecision.Denied,
-                Method = refusal.Method,
-                Reason = refusal.Reason,
-            };
+            return Answer(CredentialRefused(refusal.Method, refusal.Reason));
         }
 
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
         Withdrawals.Add(lifetime.Ended);
 
-        var reply = await _inner.RequestAsync(request, connectionId, withdrawn.Token).ConfigureAwait(false);
+        var reply = await Decided(
+            token => _inner.RequestAsync(request, connectionId, token),
+            lifetime,
+            CredentialRefused,
+            withdrawn.Token).ConfigureAwait(false);
 
-        var committed = lifetime.TryCommit();
-
-        if (!committed && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
+        if (!lifetime.TryCommit() && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
         {
             // The released string is dropped here, never sent: the lock came before the release.
-            return new CredentialReply
-            {
-                Decision = AuditDecision.Denied,
-                Method = AuditMethod.VaultLocked,
-                Reason = reply.Decision == AuditDecision.Granted
-                    ? "the vault was locked before this was released"
-                    : "the vault was locked before anybody answered",
-                Entry = reply.Entry,
-                Session = request.Session,
-            };
+            var locked = reply.Decision == AuditDecision.Granted
+                ? "the vault was locked before this was released"
+                : "the vault was locked before anybody answered";
+            reply = CredentialRefused(AuditMethod.VaultLocked, locked) with { Entry = reply.Entry };
         }
 
-        if (reply.Decision == AuditDecision.Granted && reply.Entry is { } entry)
+        var delivered = Deliverable(reply with { Session = request.Session });
+        var answered = Answer(delivered);
+        var client = ClientName(request.ClientLabel, request.ClientName);
+
+        if (answered is { Decision: AuditDecision.Granted, Entry: { } entry })
         {
-            Record(lifetime, [entry], ClientName(request.ClientLabel, request.ClientName), AuditLog.Wire(reply.Method));
+            Record(lifetime, [entry], client, AuditLog.Wire(answered.Method));
+        }
+        else if (delivered.Decision == AuditDecision.Granted)
+        {
+            _environments?.Narrate?.Invoke($"refused {delivered.Entry} for {client}: {_unrecordedNarration}");
         }
 
-        return reply with { Session = request.Session };
+        return answered;
     }
 
     /// <inheritdoc/>
@@ -300,33 +361,55 @@ public sealed class SessionAuthority : IApproverHandler
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var admitted, out var refusal))
         {
-            return Refused(
-                request.Project,
-                request.Profile,
-                refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession,
-                refusal.Reason);
+            var unadmitted = Refused(request.Project, request.Profile, refusal);
+            return _recorder.Recorded(
+                unadmitted,
+                RequestRecords.EnvRun(request.Project, request.Profile, refusal.Method, unadmitted, session: null, VaultNamed(request.Vault)));
         }
 
+        var (method, decided) = await Decided(
+            token => DecideEnvAsync(request, admitted, token),
+            admitted,
+            (how, reason) => (how, Refused(request.Project, request.Profile, OutcomeOf(how), reason)),
+            cancellationToken).ConfigureAwait(false);
+
+        var reply = _recorder.Recorded(decided, RequestRecords.EnvRun(request.Project, request.Profile, method, decided, request.Session, _vault.Key));
+
+        if (_environments is { } environments)
+        {
+            Settled(environments, admitted, reply.Set, GrantSummary.EnvClient, "run --session");
+        }
+
+        return reply;
+    }
+
+    private async ValueTask<(AuditMethod Method, EnvReply Reply)> DecideEnvAsync(
+        EnvRequest request,
+        SessionLifetime admitted,
+        CancellationToken cancellationToken)
+    {
         if (_environments is not { } environments)
         {
-            return Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets");
+            return (
+                AuditMethod.NoSession,
+                Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets"));
         }
 
         if (EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory) is { } problem)
         {
-            return Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem);
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem));
         }
 
         if (!EnvProfileNames.IsValid(request.Profile, out var invalid))
         {
-            return Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid);
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid));
         }
 
         foreach (var key in request.Keys ?? [])
         {
             if (!EnvConvention.IsValidKey(key, out invalid))
             {
-                return Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid);
+                return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid));
             }
         }
 
@@ -403,25 +486,10 @@ public sealed class SessionAuthority : IApproverHandler
         {
             EnvOutcome.Resolved => fromGrant ? AuditMethod.GrantCache : AuditMethod.Prompt,
             EnvOutcome.Declined => answer.Releases() ? AuditMethod.Cancelled : answer.ToAuditMethod(),
-            EnvOutcome.NoProject or EnvOutcome.NoProfile or EnvOutcome.Unusable or EnvOutcome.Unauthorized => AuditMethod.OutOfScope,
-            EnvOutcome.Unsaved or EnvOutcome.ChangedOnDisk or EnvOutcome.ChangedWhileAsked => AuditMethod.VaultChanged,
-            EnvOutcome.Locked => AuditMethod.VaultLocked,
-            EnvOutcome.TooLarge => AuditMethod.Undeliverable,
-            EnvOutcome.Invalid => AuditMethod.InvalidRequest,
-            _ => AuditMethod.Failed,
+            _ => MethodOf(delivered.Set.Outcome),
         };
-        var reply = Audited(
-            environments.Audit,
-            request.Project,
-            request.Profile,
-            new AuditClient("keypaste run --session", CoreInfo.Version, null),
-            method,
-            request.Session,
-            delivered);
 
-        Settled(environments, admitted, reply.Set, GrantSummary.EnvClient, "run --session");
-
-        return reply;
+        return (method, delivered);
     }
 
     /// <inheritdoc/>
@@ -431,7 +499,8 @@ public sealed class SessionAuthority : IApproverHandler
     /// the client's policy, then resolved under the admitted lifetime; the person is asked about the
     /// names the set holds once exposure, the name rule and the audit line's room are checked, unless
     /// a timed grant this connection holds for the same command line covers the same names. The set is
-    /// read again after the answer, so an edit saved meanwhile is what leaves.
+    /// read again after the answer, so an edit saved meanwhile is what leaves. A release whose names are
+    /// not the ones the request named, or that one frame cannot carry, is refused before it is recorded.
     /// </para>
     /// <para>
     /// A missing project, a missing profile, an unusable set and one outside the exposure all come back
@@ -444,23 +513,7 @@ public sealed class SessionAuthority : IApproverHandler
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        var project = request.Project ?? EnvReferenceResolution.MixedProject;
-        var profile = request.Project is null ? EnvReferenceResolution.MixedProfile : request.Profile;
-
-        RunReply Refuse(EnvOutcome outcome, AuditMethod method, string reason, IReadOnlyList<string>? entries = null, string? session = null) =>
-            new(EnvResolved.Refused(project, outcome, profile: profile), method, reason) { Entries = entries ?? [], Session = session };
-
-        if (!TryAdmit(request.Vault, request.Session, connectionId, out var admitted, out var refusal))
-        {
-            return Refuse(refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession, refusal.Method, refusal.Reason);
-        }
-
-        if (_environments is not { } environments)
-        {
-            return Refuse(EnvOutcome.NoSession, AuditMethod.NoSession, "the keypaste process holding this vault does not run commands for agents");
-        }
-
-        var arguments = new RunArguments(
+        var asked = new RunArguments(
             request.Command,
             request.Directory,
             request.Project,
@@ -470,20 +523,85 @@ public sealed class SessionAuthority : IApproverHandler
             request.Reason,
             RunRequestRules.DefaultTimeoutSeconds);
 
+        RunReply Answer(RunReply reply) => _recorder.Recorded(
+            reply,
+            RequestRecords.Run(
+                AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel),
+                asked,
+                request.Program,
+                reply.Set.Outcome == EnvOutcome.Resolved ? AuditDecision.Granted : AuditDecision.Denied,
+                reply.Method,
+                reply.Reason,
+                reply.GrantedSeconds,
+                reply.Entries,
+                request.Exposure,
+                reply.Session,
+                VaultNamed(request.Vault)));
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var admitted, out var refusal))
+        {
+            return Answer(RunRefused(request, refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession, refusal.Method, refusal.Reason));
+        }
+
+        var client = ClientName(request.ClientLabel, request.ClientName);
+
+        var decided = await Decided(
+            token => DecideRunAsync(request, asked, connectionId, admitted, token),
+            admitted,
+            (method, reason) => RunRefused(request, OutcomeOf(method), method, reason),
+            cancellationToken).ConfigureAwait(false);
+
+        var delivered = Deliverable(asked, decided with { Session = request.Session });
+        var answered = Answer(delivered);
+
+        if (answered.Set.Outcome == EnvOutcome.Resolved)
+        {
+            Record(admitted, answered.Entries, client, "run");
+
+            // Every run is narrated with its command, a grant-served one too: the grant approved a
+            // command line, not what the files it runs do (T-35).
+            var command = EnvReleasePrompt.CommandLine(request.Command);
+            _environments?.Narrate?.Invoke(answered.Method == AuditMethod.GrantCache
+                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` from a timed grant ({answered.GrantedSeconds}s left)"
+                : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` {(answered.GrantedSeconds > 0 ? $"for {answered.GrantedSeconds}s" : "once")}");
+        }
+        else if (delivered.Set.Outcome == EnvOutcome.Resolved)
+        {
+            _environments?.Narrate?.Invoke($"refused a run for {client}: {_unrecordedNarration}");
+        }
+
+        return answered;
+    }
+
+    private async ValueTask<RunReply> DecideRunAsync(
+        RunRequest request,
+        RunArguments arguments,
+        string connectionId,
+        SessionLifetime admitted,
+        CancellationToken cancellationToken)
+    {
+        RunReply Refuse(EnvOutcome outcome, AuditMethod method, string reason, IReadOnlyList<string>? entries = null) =>
+            RunRefused(request, outcome, method, reason, entries);
+
+        if (_environments is not { } environments)
+        {
+            return Refuse(EnvOutcome.NoSession, AuditMethod.NoSession, "the keypaste process holding this vault does not run commands for agents");
+        }
+
         if ((RunRequestRules.Check(arguments) ?? RunRequestRules.CheckProgram(request.Program, request.Command)) is { } problem)
         {
-            return Refuse(EnvOutcome.Invalid, AuditMethod.InvalidRequest, $"the request's {problem.Argument} {problem.Rule}", session: request.Session);
+            return Refuse(EnvOutcome.Invalid, AuditMethod.InvalidRequest, $"the request's {problem.Argument} {problem.Rule}");
         }
 
         if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out var globError))
         {
-            return Refuse(EnvOutcome.Invalid, AuditMethod.Failed, $"the exposure this bridge was configured with is not usable: {globError}", session: request.Session);
+            return Refuse(EnvOutcome.Invalid, AuditMethod.Failed, $"the exposure this bridge was configured with is not usable: {globError}");
         }
 
         if (!_inner.TryPolicyFor(request.ClientLabel, out var policy, out var clientsProblem))
         {
             environments.Narrate?.Invoke($"refused a run: the clients file is not usable: {clientsProblem}");
-            return Refuse(EnvOutcome.Unreadable, AuditMethod.Failed, $"the clients file is not usable: {clientsProblem}", session: request.Session);
+            return Refuse(EnvOutcome.Unreadable, AuditMethod.Failed, $"the clients file is not usable: {clientsProblem}");
         }
 
         EnvReferenceDocument? document = null;
@@ -496,7 +614,7 @@ public sealed class SessionAuthority : IApproverHandler
             {
                 if (reference.Parsed is EntryReference { Entry: var named } && ReservedGroups.IsReserved(named.GroupPath))
                 {
-                    return Refuse(EnvOutcome.Unauthorized, AuditMethod.OutOfScope, "a reference names a group keypaste keeps for itself", session: request.Session);
+                    return Refuse(EnvOutcome.Unauthorized, AuditMethod.OutOfScope, "a reference names a group keypaste keeps for itself");
                 }
 
                 lines.Add(new ReferenceLine(reference.Name, reference.Parsed, null, index + 1));
@@ -506,7 +624,6 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         var command = EnvReleasePrompt.CommandLine(request.Command);
-        var client = ClientName(request.ClientLabel, request.ClientName);
         string[] mode = document is null
             ? ["set", request.Project!, request.Profile, .. (request.Keys ?? []).Order(StringComparer.Ordinal)]
             : ["refs", .. request.References!.Select(reference => reference.Name + "=" + reference.Reference)];
@@ -523,7 +640,11 @@ public sealed class SessionAuthority : IApproverHandler
         {
             var entries = EntriesOf(preview);
             var perKey = entries.Select(entry => ApprovalPrompt.Shown(entry.Name)).ToList();
-            shown = [.. perKey.Distinct(StringComparer.Ordinal)];
+            List<string> named = [.. perKey.Distinct(StringComparer.Ordinal)];
+            var recordable = AuditedLength(named) <= MaximumAuditedEntriesBytes;
+
+            // A reply carries only entries its line can hold, so a refusal of a larger set is still recorded.
+            shown = recordable ? named : [];
 
             // Exposure first, so a set outside it is refused as out of scope whatever its size (T-4).
             if (entries.Any(entry => !exposure.Permits(entry.Name, _inner.Tags(entry.Name), entry.Field)))
@@ -538,7 +659,7 @@ public sealed class SessionAuthority : IApproverHandler
                 return false;
             }
 
-            if (AuditedLength(shown) > MaximumAuditedEntriesBytes)
+            if (!recordable)
             {
                 (refused, refusedMethod) = ("the run names more entries than one audit line can record", AuditMethod.InvalidRequest);
                 return false;
@@ -609,9 +730,11 @@ public sealed class SessionAuthority : IApproverHandler
             ? await resolver.ResolveAsync(request.Project!, request.Profile, request.Keys, Confirm, cancellationToken).ConfigureAwait(false)
             : await resolver.ResolveReferencesAsync(document, Confirm, cancellationToken).ConfigureAwait(false);
 
+        Settled(environments, resolved);
+
         if (resolved.Outcome == EnvOutcome.Resolved)
         {
-            var released = new RunReply(resolved, method, method == AuditMethod.GrantCache
+            return new RunReply(resolved, method, method == AuditMethod.GrantCache
                 ? "served from a run a person had approved on this connection"
                 : granted > 0
                     ? $"a person approved this command line for {ApprovalLimits.Describe(granted)} on this connection"
@@ -619,50 +742,132 @@ public sealed class SessionAuthority : IApproverHandler
             {
                 GrantedSeconds = granted,
                 Entries = shown,
-                Session = request.Session,
             };
-
-            if (!ApproverProtocol.Fits(released))
-            {
-                var tooLarge = EnvResolved.Refused(resolved.Project, EnvOutcome.TooLarge, profile: resolved.Profile);
-                return new RunReply(tooLarge, AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(method))
-                {
-                    Entries = shown,
-                    Session = request.Session,
-                };
-            }
-
-            Settled(environments, admitted, resolved, client, "run", shown);
-
-            // Every run is narrated with its command, a grant-served one too: the grant approved a
-            // command line, not what the files it runs do (T-35).
-            environments.Narrate?.Invoke(method == AuditMethod.GrantCache
-                ? $"released {resolved.Variables.Count} variable(s) to {client} for `{command}` from a timed grant ({granted}s left)"
-                : $"released {resolved.Variables.Count} variable(s) to {client} for `{command}` {(granted > 0 ? $"for {granted}s" : "once")}");
-
-            return released;
         }
-
-        Settled(environments, admitted, resolved, client, "run", shown);
 
         if (refused is not null)
         {
-            return Refuse(EnvOutcome.Declined, refusedMethod, refused, shown, request.Session);
+            return Refuse(EnvOutcome.Declined, refusedMethod, refused, shown);
         }
 
-        var (outcomeMethod, reason) = resolved.Outcome switch
+        var reason = resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal;
+        var outcomeMethod = resolved.Outcome == EnvOutcome.Declined ? answer.ToAuditMethod() : MethodOf(resolved.Outcome);
+
+        return new RunReply(resolved, outcomeMethod, reason) { Entries = shown };
+    }
+
+    /// <summary>A run reply refused before anything was released.</summary>
+    private static RunReply RunRefused(RunRequest request, EnvOutcome outcome, AuditMethod method, string reason, IReadOnlyList<string>? entries = null) =>
+        new(
+            EnvResolved.Refused(
+                request.Project ?? EnvReferenceResolution.MixedProject,
+                outcome,
+                profile: request.Project is null ? EnvReferenceResolution.MixedProfile : request.Profile),
+            method,
+            reason)
         {
-            EnvOutcome.Declined => (answer.ToAuditMethod(), Declined(answer)),
-            EnvOutcome.NoProject or EnvOutcome.NoProfile or EnvOutcome.Unusable or EnvOutcome.Unauthorized => (AuditMethod.OutOfScope, resolved.Refusal),
-            EnvOutcome.Unsaved or EnvOutcome.ChangedOnDisk or EnvOutcome.ChangedWhileAsked => (AuditMethod.VaultChanged, resolved.Refusal),
-            EnvOutcome.Locked => (AuditMethod.VaultLocked, resolved.Refusal),
-            EnvOutcome.TooLarge => (AuditMethod.Undeliverable, resolved.Refusal),
-            EnvOutcome.Invalid => (AuditMethod.InvalidRequest, resolved.Refusal),
-            _ => (AuditMethod.Failed, resolved.Refusal),
+            Entries = entries ?? [],
         };
 
-        return new RunReply(resolved, outcomeMethod, reason) { Entries = shown, Session = request.Session };
+    /// <summary>
+    /// A run's release as it will leave, its session and <c>recorded</c> measured with it: one naming
+    /// variables the request did not name, or too large for one frame, is refused, the second naming
+    /// the authority it had (T-16).
+    /// </summary>
+    internal static RunReply Deliverable(RunArguments asked, RunReply reply)
+    {
+        if (reply.Set.Outcome != EnvOutcome.Resolved)
+        {
+            return reply;
+        }
+
+        var (outcome, method, reason) =
+            !RunRequestRules.Answers(asked, [.. reply.Set.Variables.Select(variable => variable.Key)])
+                ? (EnvOutcome.Unreadable, AuditMethod.Failed, "the resolved variables are not the ones the request named")
+                : !ApproverProtocol.Fits(reply with { Recorded = true })
+                    ? (EnvOutcome.TooLarge, AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(reply.Method))
+                    : (EnvOutcome.Resolved, reply.Method, reply.Reason);
+
+        return outcome == EnvOutcome.Resolved
+            ? reply
+            : new RunReply(EnvResolved.Refused(reply.Set.Project, outcome, profile: reply.Set.Profile), method, reason)
+            {
+                Entries = reply.Entries,
+                Session = reply.Session,
+            };
     }
+
+    /// <summary>A credential release as it will leave, its session and <c>recorded</c> measured with it; one too large for a frame is refused, naming the authority it had (T-16).</summary>
+    private static CredentialReply Deliverable(CredentialReply reply) =>
+        reply.Decision == AuditDecision.Granted && !ApproverProtocol.Fits(reply with { Recorded = true })
+            ? CredentialRefused(AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(reply.Method)) with
+            {
+                Entry = reply.Entry,
+                Session = reply.Session,
+            }
+            : reply;
+
+    private static CredentialReply CredentialRefused(AuditMethod method, string reason) => new()
+    {
+        Decision = AuditDecision.Denied,
+        Method = method,
+        Reason = reason,
+    };
+
+    /// <summary>
+    /// Decides a request once its line can be written, turning a withdrawal or a failure while deciding
+    /// into a refusal that is recorded and answered like any other (law 3.7).
+    /// </summary>
+    /// <remarks>
+    /// A log that will not open refuses the request at once, so a person is never asked about one this
+    /// owner cannot record (T-6). A request withdrawn by the lock that ended its lifetime is refused as
+    /// locked, otherwise as withdrawn.
+    /// </remarks>
+    private async ValueTask<T> Decided<T>(
+        Func<CancellationToken, ValueTask<T>> decide,
+        SessionLifetime lifetime,
+        Func<AuditMethod, string, T> refused,
+        CancellationToken cancellationToken)
+    {
+        if (!_recorder.Opens)
+        {
+            return refused(AuditMethod.Failed, RequestRecorder.Unopened);
+        }
+
+        try
+        {
+            return await decide(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return lifetime.IsLive
+                ? refused(AuditMethod.Cancelled, "the request was withdrawn before it was answered")
+                : refused(AuditMethod.VaultLocked, "the vault was locked before this was answered");
+        }
+        catch (Exception)
+        {
+            return refused(AuditMethod.Failed, "the request could not be completed");
+        }
+    }
+
+    /// <summary>The method a set refused for this outcome is recorded under, when nobody declined it.</summary>
+    private static AuditMethod MethodOf(EnvOutcome outcome) => outcome switch
+    {
+        EnvOutcome.NoProject or EnvOutcome.NoProfile or EnvOutcome.Unusable or EnvOutcome.Unauthorized => AuditMethod.OutOfScope,
+        EnvOutcome.Unsaved or EnvOutcome.ChangedOnDisk or EnvOutcome.ChangedWhileAsked => AuditMethod.VaultChanged,
+        EnvOutcome.Locked => AuditMethod.VaultLocked,
+        EnvOutcome.TooLarge => AuditMethod.Undeliverable,
+        EnvOutcome.Invalid => AuditMethod.InvalidRequest,
+        _ => AuditMethod.Failed,
+    };
+
+    /// <summary>The outcome a set refused under this method carries.</summary>
+    private static EnvOutcome OutcomeOf(AuditMethod method) => method switch
+    {
+        AuditMethod.VaultLocked => EnvOutcome.Locked,
+        AuditMethod.Cancelled => EnvOutcome.Declined,
+        _ => EnvOutcome.Unreadable,
+    };
 
     /// <summary>Each source entry of a released set, once, as every prompt and audit line writes it.</summary>
     private static List<string> EntriesOf(EnvResolved set) =>
@@ -697,23 +902,28 @@ public sealed class SessionAuthority : IApproverHandler
         return (int)buffer.Length;
     }
 
-    /// <summary>After a set was resolved: records a release in the ledger, and ends every env and run grant when the file changed under the owner.</summary>
+    /// <summary>After a set was released to a runner: records it in the ledger, and ends every env and run grant when the file changed under the owner.</summary>
     private void Settled(
         SessionEnvironments environments,
         SessionLifetime admitted,
         EnvResolved resolved,
         string client,
-        string how,
-        IReadOnlyList<string>? entries = null)
+        string how)
+    {
+        Settled(environments, resolved);
+
+        if (resolved.Outcome == EnvOutcome.Resolved)
+        {
+            Record(admitted, EntriesOf(resolved), client, how);
+        }
+    }
+
+    /// <summary>After a set was resolved: ends every env and run grant when the file changed under the owner.</summary>
+    private static void Settled(SessionEnvironments environments, EnvResolved resolved)
     {
         if (resolved.Outcome == EnvOutcome.ChangedOnDisk)
         {
             environments.Grants?.RevokeEntries(VaultEdit.Everything);
-        }
-
-        if (resolved.Outcome == EnvOutcome.Resolved)
-        {
-            Record(admitted, entries ?? EntriesOf(resolved), client, how);
         }
     }
 
@@ -746,9 +956,9 @@ public sealed class SessionAuthority : IApproverHandler
     /// no grant ever stored. Nobody is asked otherwise.
     /// </para>
     /// <para>
-    /// This owner, not the runner, writes the audit line for every outcome once the token is looked
-    /// at, before it replies: a runner is the untrusted side that could skip it. A release whose line
-    /// cannot be written is refused and nothing is sent (T-6).
+    /// This owner, not the runner, writes the audit line of every request it reads before it replies,
+    /// one refused at admission or as invalid included: a runner is the untrusted side that could skip
+    /// it. A release whose line cannot be written is refused and nothing is sent (T-6).
     /// </para>
     /// </remarks>
     public async ValueTask<EnvReply> ReleaseTokenEnvAsync(TokenEnvRequest request, string connectionId, CancellationToken cancellationToken)
@@ -757,27 +967,49 @@ public sealed class SessionAuthority : IApproverHandler
 
         if (!TryAdmit(request.Vault, request.Session, connectionId, out var admitted, out var refusal))
         {
-            return Refused(
-                request.Project,
-                request.Profile,
-                refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession,
-                refusal.Reason);
+            var unadmitted = Refused(request.Project, request.Profile, refusal);
+            return _recorder.Recorded(
+                unadmitted,
+                RequestRecords.TokenRun(request.Project, request.Profile, null, unadmitted, session: null, VaultNamed(request.Vault)));
         }
 
+        var (decided, verified) = await Decided(
+            token => DecideTokenAsync(request, admitted, token),
+            admitted,
+            (method, reason) => (Refused(request.Project, request.Profile, OutcomeOf(method), reason), (TokenInfo?)null),
+            cancellationToken).ConfigureAwait(false);
+
+        var answered = _recorder.Recorded(
+            decided,
+            RequestRecords.TokenRun(request.Project, request.Profile, verified, decided, request.Session, _vault.Key));
+
+        if (answered.Set.Outcome == EnvOutcome.Resolved && verified is not null)
+        {
+            Record(admitted, EntriesOf(answered.Set), $"token '{EntryNameSanitizer.Sanitize(verified.Name).Text}'", "token");
+        }
+
+        return answered;
+    }
+
+    private async ValueTask<(EnvReply Reply, TokenInfo? Verified)> DecideTokenAsync(
+        TokenEnvRequest request,
+        SessionLifetime admitted,
+        CancellationToken cancellationToken)
+    {
         if (_environments is not { } environments)
         {
-            return Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets");
+            return (Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets"), null);
         }
 
         if ((EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory)
             ?? (EnvProfileNames.IsValid(request.Profile, out var invalidProfile) ? null : invalidProfile)) is { } problem)
         {
-            return Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem);
+            return (Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem), null);
         }
 
         if (environments.VaultFor(admitted) is not { } vault)
         {
-            return Refused(request.Project, request.Profile, EnvOutcome.Locked, _lockedReason);
+            return (Refused(request.Project, request.Profile, EnvOutcome.Locked, _lockedReason), null);
         }
 
         TokenCheck check;
@@ -790,7 +1022,7 @@ public sealed class SessionAuthority : IApproverHandler
         catch (ObjectDisposedException)
         {
             // The lock disposed the vault between handing it over and reading it.
-            return Refused(request.Project, request.Profile, EnvOutcome.Locked, _lockedReason);
+            return (Refused(request.Project, request.Profile, EnvOutcome.Locked, _lockedReason), null);
         }
 
         var reply = check switch
@@ -803,22 +1035,7 @@ public sealed class SessionAuthority : IApproverHandler
             _ => Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, "the token is not valid for this vault"),
         };
 
-        var audited = Audited(
-            environments.Audit,
-            request.Project,
-            request.Profile,
-            new AuditClient("keypaste run --token", CoreInfo.Version, null),
-            AuditMethod.Token,
-            request.Session,
-            Deliverable(reply),
-            said => info is null ? said : TokenAuditReason.Format(info.Id, EntryNameSanitizer.Sanitize(info.Name).Text, said));
-
-        if (audited.Set.Outcome == EnvOutcome.Resolved && info is not null)
-        {
-            Record(admitted, EntriesOf(audited.Set), $"token '{EntryNameSanitizer.Sanitize(info.Name).Text}'", "token");
-        }
-
-        return audited;
+        return (Deliverable(reply), info);
     }
 
     private async ValueTask<EnvReply> ReleaseUnderTokenAsync(
@@ -891,57 +1108,6 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
-    }
-
-    /// <summary>A run's env reply, once its audit line is written; a release whose line cannot be written becomes a refusal.</summary>
-    /// <remarks>The owner writes these lines itself, because a run has no bridge to write them (T-30, T-32).</remarks>
-    private EnvReply Audited(
-        Func<AuditLog?>? audit,
-        string project,
-        string profile,
-        AuditClient client,
-        AuditMethod method,
-        string session,
-        EnvReply reply,
-        Func<string, string>? reason = null)
-    {
-        var released = reply.Set.Outcome == EnvOutcome.Resolved;
-        var said = released
-            ? $"{reply.Set.Variables.Count} variable(s)"
-            : reply.Reason.Length > 0 ? reply.Reason : reply.Set.Refusal;
-
-        var record = new AuditRecord
-        {
-            Tool = "run",
-            Client = client,
-            Args = new AuditArgs
-            {
-                Entry = EntryNameSanitizer.SanitizePath(
-                    $"{EnvConvention.RootGroup}/{project}/{profile}",
-                    maximumLength: AuditArgs.EntryLength).Text,
-            },
-            Decision = released ? AuditDecision.Granted : AuditDecision.Denied,
-            Method = method,
-            Reason = reason?.Invoke(said) ?? said,
-            Session = session,
-            Vault = _vault.Key,
-            Entries = released ? EntriesOf(reply.Set) : null,
-        };
-
-        bool written;
-
-        try
-        {
-            written = audit?.Invoke() is { } log && log.TryAppend(record, out _);
-        }
-        catch (ObjectDisposedException)
-        {
-            written = false;
-        }
-
-        return written || !released
-            ? reply
-            : Refused(project, profile, EnvOutcome.Unreadable, "the audit log could not be written");
     }
 
     /// <inheritdoc/>
@@ -1067,6 +1233,13 @@ public sealed class SessionAuthority : IApproverHandler
 
     private static EnvReply Refused(string project, string profile, EnvOutcome outcome, string reason) =>
         new(EnvResolved.Refused(project, outcome, profile: profile), reason);
+
+    /// <summary>A run refused at admission, saying whether the vault is locked or the request belongs to no session.</summary>
+    private static EnvReply Refused(string project, string profile, (AuditMethod Method, string Reason) refusal) =>
+        Refused(project, profile, refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession, refusal.Reason);
+
+    /// <summary>The vault a request refused at admission is recorded against: this one, only when the request named it.</summary>
+    private string? VaultNamed(string vault) => _vault.Names(vault) ? _vault.Key : null;
 
     private static EnvReply Refused(string project, string profile, EnvOutcome outcome)
     {

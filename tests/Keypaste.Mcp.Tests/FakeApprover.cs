@@ -84,10 +84,13 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// <summary>How many runs reached the approver.</summary>
     internal int Runs => Volatile.Read(ref _runs);
 
+    /// <summary>Whether each reply says this approver recorded the request, as an owner's does. True by default.</summary>
+    internal bool Records { get; set; } = true;
+
     /// <summary>Set to make the approver park on a request, so a timeout or a race is reachable.</summary>
     internal TaskCompletionSource Held { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    /// <summary>Whether requests should park on <see cref="Held"/> before being answered.</summary>
+    /// <summary>Whether requests should park on <see cref="Held"/> before being answered; one withdrawn meanwhile is answered as cancelled, as an owner answers it.</summary>
     internal bool Hold { get; set; }
 
 
@@ -231,7 +234,7 @@ internal sealed class FakeApprover : IAsyncDisposable
         }
 
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(approver.Names with { Session = approver.Session });
+            ValueTask.FromResult(approver.Names with { Session = approver.Session, Recorded = approver.Records });
 
         public async ValueTask<CredentialReply> RequestAsync(
             CredentialRequest request,
@@ -250,10 +253,21 @@ internal sealed class FakeApprover : IAsyncDisposable
 
             if (approver.Hold)
             {
-                await approver.Held.Task.ConfigureAwait(false);
+                try
+                {
+                    await approver.Held.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return Denial(AuditMethod.Cancelled, "the request was withdrawn before it was answered") with
+                    {
+                        Session = approver.Session,
+                        Recorded = approver.Records,
+                    };
+                }
             }
 
-            return approver.Answer with { Session = approver.Session };
+            return approver.Answer with { Session = approver.Session, Recorded = approver.Records };
         }
 
         public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
@@ -270,8 +284,8 @@ internal sealed class FakeApprover : IAsyncDisposable
                 throw new IOException("the fake approver dropped this run unanswered");
             }
 
-            return ValueTask.FromResult(approver.RunAnswer?.Invoke(request)
-                ?? RunReplyOf(EnvOutcome.NoSession, AuditMethod.NoSession, []));
+            var reply = approver.RunAnswer?.Invoke(request) ?? RunReplyOf(EnvOutcome.NoSession, AuditMethod.NoSession, []);
+            return ValueTask.FromResult(reply with { Recorded = approver.Records });
         }
 
         public void Disconnected(string connectionId)

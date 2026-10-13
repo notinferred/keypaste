@@ -12,8 +12,8 @@ In source, one vault has one owner: while the app has a vault unlocked, `keypast
   keypaste agent  ◄──── local pipe ────  keypaste mcp
    • unlocked vault                       • validates the request
    • asks you                             • refuses anything out of scope
-   • holds live grants                    • writes the audit line
-                                          • returns one field
+   • holds live grants                    • returns one field
+   • writes the audit line
 ```
 
 `keypaste mcp` is started by the MCP client and forwards requests without holding the vault. You start `keypaste agent`, which holds the vault and decides whether to prompt, reuse an approval or apply a policy rule.
@@ -113,7 +113,7 @@ In source, `keypaste run --session <project> -- <command>` asks the process hold
 
 ## Commands an agent asks to run
 
-In source, a bridge started with `--allow-run` lets an agent ask to run a command with secrets in its environment ([mcp-setup](mcp-setup.md#running-a-command-with-secrets---allow-run)). The prompt, in the app's window or the agent's terminal, shows `tool keypaste.run`, the client and its label, the exact program and command line, the resolved directory, the project and profile, each variable with the entry it comes from and `inject only`, and the agent's reason, and a loader such as `NODE_OPTIONS` is tagged as changing how programs start. Allow once, or `o`, starts that command once. The timed choice, or `h`, lets that client run the same command line in the same directory on the same connection again for up to 15 minutes without asking, and the prompt says it can change the files that command runs in that time; it is never offered for a protected entry or a client whose policy is Ask every time, and it ends when the bridge disconnects, on a lock, a revoke or an edit of an entry it names. `keypaste agent` prints a line for each run such a grant lets through. The bridge writes every run to the audit log before starting it. No standing rule releases a run. The output the agent gets back has each literal or escaped occurrence of a value replaced, but a command can reveal a value in another form, so approve only a command whose behaviour you know ([THREATS.md](../THREATS.md) T-35).
+In source, a bridge started with `--allow-run` lets an agent ask to run a command with secrets in its environment ([mcp-setup](mcp-setup.md#running-a-command-with-secrets---allow-run)). The prompt, in the app's window or the agent's terminal, shows `tool keypaste.run`, the client and its label, the exact program and command line, the resolved directory, the project and profile, each variable with the entry it comes from and `inject only`, and the agent's reason, and a loader such as `NODE_OPTIONS` is tagged as changing how programs start. Allow once, or `o`, starts that command once. The timed choice, or `h`, lets that client run the same command line in the same directory on the same connection again for up to 15 minutes without asking, and the prompt says it can change the files that command runs in that time; it is never offered for a protected entry or a client whose policy is Ask every time, and it ends when the bridge disconnects, on a lock, a revoke or an edit of an entry it names. `keypaste agent` prints a line for each run such a grant lets through. The app or `keypaste agent` writes every run to the audit log before it answers, and the bridge starts nothing the owner did not record. No standing rule releases a run. The output the agent gets back has each literal or escaped occurrence of a value replaced, but a command can reveal a value in another form, so approve only a command whose behaviour you know ([THREATS.md](../THREATS.md) T-35).
 
 ## When no agent is running
 
@@ -136,7 +136,7 @@ On `0.2.0`, this refusal can also occur under load while the approver is running
 
 ## What is written down
 
-`keypaste mcp` appends one line to `~/.keypaste/audit.jsonl` for every call, including granted, denied, malformed and abandoned requests. It records the entry, field, client, stated reason and decision.
+The app or `keypaste agent` appends one line to `~/.keypaste/audit.jsonl` for every call it answers, granted, denied or abandoned, and `keypaste mcp` one for every call it refuses itself, a malformed one included, or that nothing answered. Each line records the entry, field, client, stated reason and decision.
 
 It does not add the returned field value to the log. Names and reason excerpts are logged metadata, so do not put secret values in them. See [docs/mcp-setup.md](mcp-setup.md) for the format.
 

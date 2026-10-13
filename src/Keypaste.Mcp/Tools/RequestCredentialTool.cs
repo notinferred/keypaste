@@ -15,8 +15,7 @@ namespace Keypaste.Mcp.Tools;
 /// <para>
 /// docs/PRODUCT.md law 3.2: an agent gets one credential, one scope, one TTL, after one explicit human
 /// approval, and the default is deny. This file validates the request, checks it against what the
-/// server was configured to expose, forwards it to whoever can ask a person, records the answer,
-/// and only then answers the agent.
+/// server was configured to expose, forwards it to whoever can ask a person, and answers the agent.
 /// </para>
 /// <para>
 /// <b>There is still no vault code path in this file, and now no decision either.</b> Not "there is
@@ -25,10 +24,12 @@ namespace Keypaste.Mcp.Tools;
 /// result. Nothing here can release anything on its own.
 /// </para>
 /// <para>
-/// <b>Log first, answer second, always.</b> The record is written before the result is returned,
-/// including for a call that was refused before it was understood and for one the client abandoned
-/// — an unlogged denial is still an access that happened without a record (law 3.3, THREATS.md
-/// T-6). If the log refuses, so does the call.
+/// <b>Log first, answer second, always, and once.</b> The process holding the vault records every
+/// request it answers before replying, and says so in the reply. This file records the rest before
+/// the result is returned: a call refused before it was understood, one nothing answered, one the
+/// client abandoned before it was sent, and one whose reply says it was not recorded, which is
+/// refused whatever it carried. An unlogged denial is still an access that happened without a record
+/// (law 3.3, THREATS.md T-6). If the log refuses, so does the call.
 /// </para>
 /// </remarks>
 internal sealed class RequestCredentialTool(
@@ -72,8 +73,6 @@ internal sealed class RequestCredentialTool(
         var reason = ReadString(arguments, "reason");
         var ttl = ReadInteger(arguments, "ttl_seconds");
 
-        var args = AuditArgs.ForCredentialRequest(entry, Recognised(field), ttl, reason);
-
         // Checked before anything is decided, but after the arguments have been read, so the line
         // still records what was asked for. A refusal that does not say what was wanted is a worse
         // audit record than the request deserves (law 3.3).
@@ -112,33 +111,25 @@ internal sealed class RequestCredentialTool(
             }
         }
 
-        // The agent is told to prefer a handle, so `entry` above is an opaque k1_… and an audit line
-        // repeating it cannot answer the question the log exists for. The approver resolved it
-        // against the unlocked vault and sent the name back in CredentialReply.Entry.
-        if (verdict.ResolvedEntry is { Length: > 0 } resolved)
-        {
-            args = args with
-            {
-                Entry = EntryNameSanitizer.SanitizePath(
-                    resolved, maximumLength: AuditArgs.EntryLength).Text,
-                EntryKind = EntryAddressKind.Path,
-            };
-        }
-
-        var line = McpAudit.Line(
-            ToolText.CredentialToolName,
+        var record = RequestRecords.Credential(
             client,
+            entry,
+            field,
+            ttl,
+            reason,
             verdict.Decision,
             verdict.Method,
             verdict.Reason,
-            options.Exposure,
-            args);
-        var record = line with { Session = verdict.Session, GrantedSeconds = verdict.Released?.TtlSeconds, Vault = options.VaultKey };
+            verdict.ResolvedEntry,
+            verdict.Released?.TtlSeconds,
+            options.Exposure.Globs,
+            verdict.Session,
+            options.VaultKey);
 
         // No cancellation token reaches this, and there is none to forward: appending is synchronous
         // and takes none. That is what makes "every call is logged" true even for the calls nobody
         // is waiting for any more.
-        if (!audit.TryAppend(record, out _))
+        if (!verdict.Recorded && !audit.TryAppend(record, out _))
         {
             return ToolResults.Refuse(ToolText.AuditUnavailable);
         }
@@ -199,13 +190,29 @@ internal sealed class RequestCredentialTool(
             },
             cancellationToken).ConfigureAwait(false);
 
+        // A reply its owner did not record is refused whatever it carried: a value keypaste cannot
+        // record is one it does not hand over (T-6).
+        if (reply is { Recorded: false })
+        {
+            return new Verdict(
+                AuditDecision.Denied,
+                AuditMethod.Failed,
+                McpAudit.Unrecorded,
+                Refusal: ToolText.AuditUnavailable,
+                ResolvedEntry: reply.Entry,
+                Session: reply.Session);
+        }
+
         // Checked after the exchange as well as before, and this is the important one: a person can
         // say yes between the client giving up and the reply arriving, and without this the bridge
-        // records a grant and returns a credential for a request nobody was waiting for. It is also
-        // why "no answer" is read as cancelled rather than as an approver failure.
+        // returns a credential for a request nobody was waiting for. A reply here is one the owner
+        // recorded, the withdrawn request's included; with none, the bridge records the call.
         if (cancellationToken.IsCancellationRequested)
         {
-            return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
+            return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request")
+            {
+                Recorded = reply is not null,
+            };
         }
 
         // Returned from here rather than short-circuited out of InvokeAsync, so it goes through the
@@ -239,8 +246,10 @@ internal sealed class RequestCredentialTool(
 
         if (reply.Decision != AuditDecision.Granted || reply.Value is not { Length: > 0 })
         {
-            return new Verdict(
-                AuditDecision.Denied, reply.Method, reply.Reason, ResolvedEntry: reply.Entry, Session: reply.Session);
+            return new Verdict(AuditDecision.Denied, reply.Method, reply.Reason, ResolvedEntry: reply.Entry, Session: reply.Session)
+            {
+                Recorded = true,
+            };
         }
 
         return new Verdict(
@@ -249,7 +258,10 @@ internal sealed class RequestCredentialTool(
             reply.Reason,
             new Released(field, reply.Value, reply.TtlSeconds),
             ResolvedEntry: reply.Entry,
-            Session: reply.Session);
+            Session: reply.Session)
+        {
+            Recorded = true,
+        };
     }
 
     /// <summary>Whether a path-shaped argument names something this server may ask about; the owner decides by the entry's tags.</summary>
@@ -262,10 +274,6 @@ internal sealed class RequestCredentialTool(
             AuditMethod.InvalidRequest,
             "the request did not satisfy the tool's schema",
             Refusal: ToolText.Invalid(field, rule));
-
-    /// <summary>The field name if keypaste knows it, or null.</summary>
-    private static string? Recognised(string field) =>
-        CredentialFields.IsReleasable(field) ? field : null;
 
     private static string ReadString(IDictionary<string, JsonElement>? arguments, string name) =>
         arguments is not null
@@ -315,5 +323,9 @@ internal sealed class RequestCredentialTool(
         Released? Released = null,
         string? Refusal = null,
         string? ResolvedEntry = null,
-        string? Session = null);
+        string? Session = null)
+    {
+        /// <summary>Whether the owner recorded this call, so the bridge writes no line of its own.</summary>
+        public bool Recorded { get; init; }
+    }
 }

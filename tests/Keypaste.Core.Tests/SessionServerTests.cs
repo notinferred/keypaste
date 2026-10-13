@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
 using Xunit;
@@ -29,9 +31,34 @@ public sealed class SessionServerTests : IDisposable
         Assert.Empty(watching);
     }
 
+    /// <summary>The log an owner is built with is the one its authority records what it answers in.</summary>
+    [Fact]
+    public async Task The_owners_audit_log_is_where_its_authority_records_requests()
+    {
+        using var lifetime = new SessionLifetime();
+        var path = Path.Combine(_directory, "audit.jsonl");
+        Assert.True(AuditLog.TryOpen(path, TimeProvider.System, out var audit, out var error), error);
+
+        using (audit)
+        {
+            using var server = SessionServer.Listen(UniqueName(), Options(lifetime, []) with { Audit = () => audit });
+
+            var reply = await server.Authority.ReleaseEnvAsync(
+                new EnvRequest("dev", ["deploy"], _directory) { Vault = VaultPath, Session = lifetime.Id },
+                "never-attached",
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(EnvOutcome.NoSession, reply.Set.Outcome);
+        }
+
+        Assert.Contains("\"method\":\"no-session\"", Assert.Single(File.ReadAllLines(path)), StringComparison.Ordinal);
+    }
+
+    private string VaultPath => Path.Combine(_directory, "vault.kdbx");
+
     private SessionServerOptions Options(SessionLifetime lifetime, List<EventHandler<VaultEdit>> watching) => new()
     {
-        Vault = VaultIdentity.Of(_directory, Path.Combine(_directory, "vault.kdbx")),
+        Vault = VaultIdentity.Of(_directory, VaultPath),
         Lifetime = lifetime,
         CurrentLifetime = () => lifetime,
         UnlockedFor = _ => null,

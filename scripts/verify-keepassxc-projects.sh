@@ -245,7 +245,9 @@ grep -qx 'env:billing:Prod' <<<"$(tags "$grouped" services/Other)" || die "the m
 
 step "a real keypaste agent and keypaste mcp: the hour is refused for a protected tag and honoured otherwise, under a prod path too"
 pipe="keypaste-projects-$$-$(date +%s)"
-audit="$dir/audit.jsonl"
+# The home's log, which every owner and bridge here writes; each phase reads the lines it gained.
+audit="$KEYPASTE_HOME/audit.jsonl"
+logged=$(lines_in "$audit")
 agent_err="$dir/agent.err"
 # One answer per request, in order: the hour for the dev entry, once then the hour for the prod entry
 # (once first, because refusing the hour cools that field down for every bridge, D-0425), the hour for
@@ -282,10 +284,10 @@ ask 6 env/billing/prod/DB | granted 6 || die "the untagged env/billing/prod/DB a
 
 [ "$(tr -d '\r' <"$agent_err" | grep -c 'it is asked about every time')" = 3 ] \
   || die "keypaste agent did not say three times that the entry is asked about every time: $(cat "$agent_err")"
-jq -e -s 'map(select(.method == "prompt")) | length == 5
-          and .[0].decision == "granted" and .[1].decision == "granted"
-          and .[2].decision == "denied" and .[3].decision == "denied" and .[4].decision == "granted"' <"$audit" >/dev/null \
-  || die "the audit log does not show granted, granted, denied, denied, granted: $(cat "$audit")"
+lines_after "$audit" "$logged" | jq -e -s 'map(select(.method == "prompt")) | length == 5
+                                           and .[0].decision == "granted" and .[1].decision == "granted"
+                                           and .[2].decision == "denied" and .[3].decision == "denied" and .[4].decision == "granted"' >/dev/null \
+  || die "the audit log does not show granted, granted, denied, denied, granted: $(lines_after "$audit" "$logged")"
 
 step "C.1b: KeePassXC makes a vault whose billing project is tagged entries' fields, beside the untagged entries"
 child=${BASH:-/bin/bash}
@@ -403,7 +405,7 @@ exposed="$dir/exposed.kdbx"
 make_fields exposed '' 'db-c1b' ''
 expose_pipe="keypaste-exposed-$$-$(date +%s)"
 expose_err="$dir/exposed-agent.err"
-expose_audit="$dir/exposed-audit.jsonl"
+logged=$(lines_in "$audit")
 expose_out="$dir/exposed.out"
 trap 'cleanup; kill "${expose_pid:-}" 2>/dev/null || true' EXIT
 # The hour for STRIPE_SECRET_KEY, then once for the run; the password is refused before anyone is asked.
@@ -442,7 +444,7 @@ credential() {
   jq -cn --arg dir "$(native "$(cd "$dir" && pwd -P)")" \
     '{jsonrpc:"2.0",id:5,method:"tools/call",params:{name:"run",arguments:{command:["sh","-c","printf %s \"${STRIPE_SECRET_KEY:+stripe}${DATABASE_URL:+ db}${SHARED_KEY:+ shared}\""],directory:$dir,project:"billing",reason:"C.5b gate"}}}'
   replied 5 || true
-} | "$kp" mcp --vault "$(native "$exposed")" --audit-log "$(native "$expose_audit")" --approver "$expose_pipe" \
+} | "$kp" mcp --vault "$(native "$exposed")" --audit-log "$(native "$audit")" --approver "$expose_pipe" \
       --client-label exposed-probe --allow-run >"$expose_out" 2>"$dir/exposed-mcp.err" \
   || die "keypaste mcp exited non-zero: $(cat "$dir/exposed-mcp.err")"
 tr -d '\r' <"$expose_out" >"$expose_out.lf"
@@ -460,10 +462,10 @@ jq -se 'any(.[]; .id == 4 and .result.isError == true)' <"$expose_out.lf" >/dev/
 grep -qF 'stripe-login-c1b' "$expose_out.lf" && die "the tagged entry's password was released"
 jq -se 'any(.[]; .id == 5 and .result.isError == false and .result.structuredContent.stdout == "stripe db")' <"$expose_out.lf" >/dev/null \
   || die "billing's dev run did not get exactly its tagged fields: $(jq -sc 'map(select(.id == 5))' <"$expose_out.lf")"
-jq -e -s '[.[] | select(.tool == "request_credential")] | .[0].decision == "granted" and .[1].method == "out-of-scope"' <"$expose_audit" >/dev/null \
-  || die "the audit log does not show the variable granted and the password out of scope: $(cat "$expose_audit")"
-jq -e -s 'any(.[]; .tool == "run" and .decision == "granted" and (.entries | sort) == ["services/Database", "services/Stripe"])' <"$expose_audit" >/dev/null \
-  || die "the run's audit line does not name the two services entries: $(cat "$expose_audit")"
+lines_after "$audit" "$logged" | jq -e -s '[.[] | select(.tool == "request_credential")] | .[0].decision == "granted" and .[1].method == "out-of-scope"' >/dev/null \
+  || die "the audit log does not show the variable granted and the password out of scope: $(lines_after "$audit" "$logged")"
+lines_after "$audit" "$logged" | jq -e -s 'any(.[]; .tool == "run" and .decision == "granted" and (.entries | sort) == ["services/Database", "services/Stripe"])' >/dev/null \
+  || die "the run's audit line does not name the two services entries: $(lines_after "$audit" "$logged")"
 [ "$(tr -d '\r' <"$expose_err" | grep -c 'an agent is asking for a credential')" = 1 ] \
   || die "keypaste agent was not asked exactly once for a credential: $(cat "$expose_err")"
 [ "$(tr -d '\r' <"$expose_err" | grep -c 'an agent wants to run a command')" = 1 ] \
@@ -515,6 +517,7 @@ grep -qF 'services/Shared' <<<"$(tr -d '\r' <"$fields_err")" || die "the agent's
 grep -qF -- '-c1b' "$fields_err" && die "a value reached the agent's terminal"
 
 step "C.1b: the token's dev run is audited with its source entries, and its staging set, holding a prod-tagged member, is refused"
+logged=$(lines_in "$audit")
 out=$(KEYPASTE_TOKEN="$token" "$kp" run --token env --vault "$(native "$fields")" --approver "$fields_pipe" billing -- "$child" -c "$probe" 2>"$dir/token-dev.err" | tr -d '\r') \
   || die "run --token failed: $(cat "$dir/token-dev.err") / $(cat "$fields_err")"
 [ "$out" = "$dev_set" ] || die "the token child's environment was: ${out}"
@@ -526,12 +529,11 @@ set -e
 [ -z "$out" ] || die "a child started for the refused token run: ${out}"
 grep -qF 'holds an entry of a protected environment' "$dir/token-staging.err" \
   || die "the refused token run does not say why: $(cat "$dir/token-staging.err")"
-home_audit="$dir/home/audit.jsonl"
-jq -e -s 'map(select(.method == "token")) | length == 2
-          and .[0].decision == "granted" and .[0].entries == ["services/Database", "services/Stripe"]
-          and .[1].decision == "denied"' <"$home_audit" >/dev/null \
-  || die "the token runs' audit lines do not name the source entries: $(cat "$home_audit")"
-grep -qF -- '-c1b' "$home_audit" && die "a value reached the audit log"
+lines_after "$audit" "$logged" | jq -e -s 'map(select(.method == "token")) | length == 2
+                                           and .[0].decision == "granted" and .[0].entries == ["services/Database", "services/Stripe"]
+                                           and .[1].decision == "denied"' >/dev/null \
+  || die "the token runs' audit lines do not name the source entries: $(lines_after "$audit" "$logged")"
+grep -qF -- '-c1b' "$audit" && die "a value reached the audit log"
 
 step "C.1b: run --session through the app's prompt window on the untouched KeePassXC vault names the source entries, and the staging set is asked once only"
 hold_out="$dir/hold.out"

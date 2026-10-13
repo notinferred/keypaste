@@ -107,6 +107,30 @@ public sealed class RunSessionTests : IDisposable
         Assert.Null(owner.Channel.Last);
     }
 
+    /// <summary>The owner records a request it refuses as invalid, which the runner, the side that could skip it, never does (T-30).</summary>
+    [Fact]
+    public async Task A_command_the_prompt_cannot_show_whole_is_refused_and_recorded_by_the_owner()
+    {
+        await using var owner = Owner.Start(this, ApprovalAnswer.Approved);
+
+        _harness.AssertExit(
+            CliApp.ExitInternalError,
+            _harness.Run("run", "--session", "--vault", _harness.VaultPath, "dev", "--", "deploy", new string('a', EnvReleasePrompt.MaximumCommandLength)));
+
+        Assert.Contains(
+            $"the command is longer than the {EnvReleasePrompt.MaximumCommandLength} characters a prompt shows whole, so nothing was started",
+            _harness.Err,
+            StringComparison.Ordinal);
+        Assert.Empty(_harness.ProcessLauncher.Started);
+        Assert.Null(owner.Channel.Last);
+
+        var line = Assert.Single(owner.AuditLines());
+        Assert.Contains("keypaste run --session", line, StringComparison.Ordinal);
+        Assert.Contains("\"decision\":\"denied\"", line, StringComparison.Ordinal);
+        Assert.Contains("\"method\":\"invalid-request\"", line, StringComparison.Ordinal);
+        Assert.Contains($"\"session\":\"{owner.Lifetime.Id}\"", line, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task An_unknown_project_exits_3_and_an_unusable_set_names_its_entries_unasked()
     {
@@ -397,6 +421,7 @@ public sealed class RunSessionTests : IDisposable
         private readonly GrantCache _grants = new(TimeProvider.System);
         private readonly ApprovalGate _gate;
         private readonly AuditLog? _audit;
+        private readonly string _auditPath;
         private readonly ApproverListener _listener;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _running;
@@ -406,7 +431,8 @@ public sealed class RunSessionTests : IDisposable
             _vault = Vault.Open(test._harness.VaultPath, _master);
             Channel = new ScriptedChannel(answer);
             _gate = new ApprovalGate(Channel, TimeProvider.System, ApprovalLimits.Default);
-            _audit = AuditLog.TryOpen(KeypasteHome.AuditPath(test._harness.Directory), TimeProvider.System, out var audit, out var error)
+            _auditPath = KeypasteHome.AuditPath(test._harness.Directory);
+            _audit = AuditLog.TryOpen(_auditPath, TimeProvider.System, out var audit, out var error)
                 ? audit
                 : throw new InvalidOperationException(error);
 
@@ -421,7 +447,8 @@ public sealed class RunSessionTests : IDisposable
                 VaultIdentity.Of(test._harness.Directory, test._harness.VaultPath),
                 () => Lifetime,
                 handler,
-                new SessionEnvironments(_gate, asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null, TimeProvider.System, Audit: () => _audit));
+                () => _audit,
+                new SessionEnvironments(_gate, asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null, TimeProvider.System));
 
             _listener = new ApproverListener(test._pipe, authority);
             _running = _listener.RunAsync(_stop.Token);
@@ -432,6 +459,14 @@ public sealed class RunSessionTests : IDisposable
         internal SessionLifetime Lifetime { get; } = new();
 
         internal static Owner Start(RunSessionTests test, ApprovalAnswer answer) => new(test, answer);
+
+        /// <summary>The owner's log as it holds it open for writing, which File.ReadAllLines cannot share on Windows.</summary>
+        internal List<string> AuditLines()
+        {
+            using var stream = new FileStream(_auditPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            return [.. reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)];
+        }
 
         public async ValueTask DisposeAsync()
         {

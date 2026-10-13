@@ -11,8 +11,8 @@ public sealed record ReleaseSeen(string Entry, string Client, string How, DateTi
 /// The releases one unlocked lifetime committed, newest first, held in memory only (D-0361).
 /// </summary>
 /// <remarks>
-/// The one record of a <c>keypaste run --session</c> release, which no audit line names, and of every
-/// other release before its audit line is read back. It ends with the lifetime.
+/// What a screen lists of this lifetime's releases without reading the audit log back. It ends with
+/// the lifetime.
 /// </remarks>
 public sealed class ReleaseLedger
 {

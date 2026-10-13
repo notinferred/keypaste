@@ -473,6 +473,8 @@ public sealed class ApproverProtocolTests
     {
         Assert.Equal(ApproverMessageKind.Credential, ApproverProtocol.KindOf(ApproverProtocol.Encode(Request())));
         Assert.Equal(ApproverMessageKind.Names, ApproverProtocol.KindOf(ApproverProtocol.Encode(new NamesRequest([]))));
+        Assert.Equal(ApproverMessageKind.Withdraw, ApproverProtocol.KindOf(ApproverProtocol.EncodeWithdrawal()));
+        Assert.Equal("{\"v\":2,\"kind\":\"withdraw\"}", Encoding.UTF8.GetString(ApproverProtocol.EncodeWithdrawal()));
         Assert.Equal(ApproverMessageKind.Unknown, ApproverProtocol.KindOf(Encoding.UTF8.GetBytes("{}")));
         Assert.Equal(ApproverMessageKind.Unknown, ApproverProtocol.KindOf(Encoding.UTF8.GetBytes("nope")));
     }
@@ -774,5 +776,172 @@ public sealed class ApproverProtocolTests
     {
         Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachReply? reply));
         Assert.Null(reply);
+    }
+
+    private static RunReply Ran(string value = "sk_live_sentinel") =>
+        new(EnvResolved.Released("acme-api", [new EnvVariable("DATABASE_URL", value)], "staging"), AuditMethod.Prompt, "a person approved this one run")
+        {
+            Entries = ["env/acme-api/staging/DATABASE_URL"],
+        };
+
+    private const string _namesFrame = """{"v":2,"kind":"names","unlocked":true,"reason":"","complete":true,"names":[]""";
+    private const string _credentialFrame = """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","value":"sk_live_sentinel","ttl_seconds":60""";
+    private const string _runFrame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"granted_seconds":0,"entries":[],"problems":[]""";
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WhetherAReplyWasRecorded_SurvivesTheRoundTrip(bool recorded)
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new NamesReply(true, [Ordinary(1)], string.Empty, true) { Recorded = recorded }), out NamesReply? names));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Granted() with { Recorded = recorded }), out CredentialReply? credential));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Ran() with { Recorded = recorded }), out RunReply? run));
+
+        Assert.Equal(recorded, names.Recorded);
+        Assert.Equal(recorded, credential.Recorded);
+        Assert.Equal(recorded, run.Recorded);
+    }
+
+    /// <summary>
+    /// Only an explicit <c>true</c> says a reply was recorded: an absent or mistyped member reads as
+    /// not recorded, the fail-closed reading.
+    /// </summary>
+    [Theory]
+    [InlineData("", false)]
+    [InlineData(",\"recorded\":false", false)]
+    [InlineData(",\"recorded\":\"true\"", false)]
+    [InlineData(",\"recorded\":1", false)]
+    [InlineData(",\"recorded\":true", true)]
+    public void OnlyAnExplicitTrue_SaysAReplyWasRecorded(string member, bool recorded)
+    {
+        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_namesFrame + member + "}"), out NamesReply? names));
+        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_credentialFrame + member + "}"), out CredentialReply? credential));
+        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_runFrame + member + "}"), out RunReply? run));
+
+        Assert.Equal(recorded, names.Recorded);
+        Assert.Equal(recorded, credential.Recorded);
+        Assert.Equal(recorded, run.Recorded);
+    }
+
+    /// <summary>A reply saying twice whether it was recorded is not read at all (D-0325).</summary>
+    [Theory]
+    [InlineData("true", "true")]
+    [InlineData("false", "true")]
+    [InlineData("true", "false")]
+    public void AReplySayingTwiceWhetherItWasRecorded_IsRefused(string first, string second)
+    {
+        var members = $",\"recorded\":{first},\"recorded\":{second}}}";
+
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_namesFrame + members), out NamesReply? _));
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_credentialFrame + members), out CredentialReply? _));
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_runFrame + members), out RunReply? _));
+    }
+
+    /// <summary>
+    /// Every stand-in the encoder sends in place of a reply too large for one frame keeps the reply's
+    /// session and whether it was recorded, so it reads as the same answered request.
+    /// </summary>
+    [Fact]
+    public void TheEncodersStandIns_KeepTheSessionAndWhetherTheReplyWasRecorded()
+    {
+        const string session = "0123abcd";
+        var huge = new string('n', 100_000);
+
+        var credentials = new[]
+        {
+            (Granted(huge), AuditMethod.Undeliverable),
+            (Granted(huge) with { Entry = huge }, AuditMethod.Undeliverable),
+            (new CredentialReply { Decision = AuditDecision.Denied, Method = AuditMethod.Failed, Reason = huge }, AuditMethod.Failed),
+        };
+
+        foreach (var (reply, method) in credentials)
+        {
+            Assert.True(ApproverProtocol.TryDecode(
+                ApproverProtocol.Encode(reply with { Session = session, Recorded = true }), out CredentialReply? sent));
+            Assert.Equal(method, sent.Method);
+            Assert.Null(sent.Value);
+            Assert.Equal(session, sent.Session);
+            Assert.True(sent.Recorded);
+        }
+
+        foreach (var (reply, reason) in new[]
+                 {
+                     (Ran(huge), ApproverProtocol.UndeliverableReason(AuditMethod.Prompt)),
+                     (Ran(huge) with { Entries = [huge] }, ApproverProtocol.Oversized),
+                 })
+        {
+            Assert.True(ApproverProtocol.TryDecode(
+                ApproverProtocol.Encode(reply with { Session = session, Recorded = true }), out RunReply? sent));
+            Assert.Equal(EnvOutcome.TooLarge, sent.Set.Outcome);
+            Assert.Equal(reason, sent.Reason, StringComparer.Ordinal);
+            Assert.Equal(session, sent.Session);
+            Assert.True(sent.Recorded);
+        }
+
+        foreach (var (reply, reason) in new[]
+                 {
+                     (new NamesReply(true, [.. Enumerable.Range(0, 1000).Select(Ordinary)], string.Empty, true), string.Empty),
+                     (new NamesReply(true, [Ordinary(1)], huge, true), ApproverProtocol.Undersized),
+                 })
+        {
+            Assert.True(ApproverProtocol.TryDecode(
+                ApproverProtocol.Encode(reply with { Session = session, Recorded = true }), out NamesReply? sent));
+            Assert.False(sent.Complete);
+            Assert.Equal(reason, sent.Reason, StringComparer.Ordinal);
+            Assert.Equal(session, sent.Session);
+            Assert.True(sent.Recorded);
+        }
+    }
+
+    /// <summary>A fitted listing is exactly what the encoder sends, so a count taken from it is the count the peer reads.</summary>
+    [Fact]
+    public void AFittedListing_IsWhatTheEncoderSends()
+    {
+        foreach (var reply in new[]
+                 {
+                     new NamesReply(true, [Ordinary(1), Ordinary(2)], string.Empty, true),
+                     new NamesReply(true, [.. Enumerable.Range(0, 1000).Select(Ordinary)], string.Empty, true) { Session = "0123abcd", Recorded = true },
+                     new NamesReply(true, [Astral(100_000)], "the vault is open", true),
+                     new NamesReply(true, [Ordinary(1)], new string('e', 100_000), true) { Recorded = true },
+                 })
+        {
+            var fitted = ApproverProtocol.Fitted(reply);
+
+            Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out NamesReply? sent));
+            Assert.Equal(fitted.Names, sent.Names);
+            Assert.Equal(fitted.Complete, sent.Complete);
+            Assert.Equal(fitted.Reason, sent.Reason, StringComparer.Ordinal);
+            Assert.Equal(fitted.Session, sent.Session);
+            Assert.Equal(fitted.Recorded, sent.Recorded);
+            Assert.Equal(ApproverProtocol.Encode(fitted), ApproverProtocol.Encode(reply));
+        }
+    }
+
+    /// <summary>
+    /// The fit is measured on the reply as sent, its session and whether it was recorded included, so
+    /// neither can push a release past the bound after the check.
+    /// </summary>
+    [Fact]
+    public void TheFitIsMeasuredWithTheSessionAndWhetherTheReplyWasRecorded()
+    {
+        var credentialEnvelope = ApproverProtocol.Encode(Granted(string.Empty) with { Recorded = true }).Length;
+        var credential = Granted(new string('a', MessageFramer.MaximumPayloadBytes - credentialEnvelope)) with { Recorded = true };
+        var runEnvelope = ApproverProtocol.Encode(Ran(string.Empty) with { Recorded = true }).Length;
+        var run = Ran(new string('a', MessageFramer.MaximumPayloadBytes - runEnvelope)) with { Recorded = true };
+
+        Assert.True(ApproverProtocol.Fits(credential));
+        Assert.False(ApproverProtocol.Fits(credential with { Recorded = false }));
+        Assert.False(ApproverProtocol.Fits(credential with { Session = "0123abcd" }));
+
+        Assert.True(ApproverProtocol.Fits(run));
+        Assert.False(ApproverProtocol.Fits(run with { Recorded = false }));
+        Assert.False(ApproverProtocol.Fits(run with { Session = "0123abcd" }));
+
+        var listing = new NamesReply(true, [.. Enumerable.Range(0, 1000).Select(Ordinary)], string.Empty, true);
+
+        Assert.True(
+            ApproverProtocol.Fitted(listing with { Session = new string('s', 1000) }).Names.Count
+            < ApproverProtocol.Fitted(listing).Names.Count);
     }
 }

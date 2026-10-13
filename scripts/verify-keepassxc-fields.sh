@@ -318,7 +318,9 @@ start_agent() {
 # The prompts the current agent drew.
 asked() { tr -d '\r' <"$agent_err" | grep -c 'an agent is asking for a credential' || true; }
 
-audit="$dir/audit.jsonl"
+# The home's log, which every owner and bridge here writes; each phase reads the lines it gained.
+audit="$KEYPASTE_HOME/audit.jsonl"
+logged=$(lines_in "$audit")
 # Allow once for OPENAI_API_KEY, then Deny for the run tool. No other request may reach the agent.
 start_agent 'o\nd\n' --approval-timeout 30
 
@@ -344,9 +346,9 @@ for field in 'Recovery codes' otp KP2A_URL_1 URL; do
   id=$((id + 1))
 done
 [ "$(asked)" = 1 ] || die "keypaste agent was not asked exactly once: a field that never leaves reached a person"
-jq -e -s 'length == 5 and .[0].args.field == "OPENAI_API_KEY" and .[0].decision == "granted"
-          and (.[1:] | all(.args.field == "invalid" and .method == "invalid-request"))' <"$audit" >/dev/null \
-  || die "the audit log does not show the release and four invalid fields: $(cat "$audit")"
+lines_after "$audit" "$logged" | jq -e -s 'length == 5 and .[0].args.field == "OPENAI_API_KEY" and .[0].decision == "granted"
+                                           and (.[1:] | all(.args.field == "invalid" and .method == "invalid-request"))' >/dev/null \
+  || die "the audit log does not show the release and four invalid fields: $(lines_after "$audit" "$logged")"
 
 step "the run tool naming kp:///api/OpenAI#OPENAI_API_KEY is asked about as the entry and its field"
 mkdir -p "$dir/project"
@@ -363,8 +365,8 @@ run_dir=$(native "$(cd "$dir/project" && pwd -P)")
 jq -e 'select(.id == 7) | .result.isError == true' <"$dir/run-tool.out" >/dev/null || die "the denied run was not refused: $(cat "$dir/run-tool.out")"
 LC_ALL=C grep -Eq '^  injects +OPENAI_API_KEY +api/OpenAI .{1,3} OPENAI_API_KEY +inject only' "$agent_err" \
   || die "the run's prompt does not name api/OpenAI · OPENAI_API_KEY: $(cat "$agent_err")"
-jq -e -s 'length == 6 and .[5].tool == "run" and .[5].decision == "denied" and .[5].method == "prompt"' <"$audit" >/dev/null \
-  || die "the run was not audited as a prompted denial: $(cat "$audit")"
+lines_after "$audit" "$logged" | jq -e -s 'length == 6 and .[5].tool == "run" and .[5].decision == "denied" and .[5].method == "prompt"' >/dev/null \
+  || die "the run was not audited as a prompted denial: $(lines_after "$audit" "$logged")"
 for value in "${others[@]}"; do
   grep -q "$value" "$dir"/field-*.out "$dir/run-tool.out" "$audit" "$agent_err" && die "'$value' left the vault"
 done
@@ -374,14 +376,14 @@ step "a rule naming OPENAI_API_KEY releases it with nobody asked while the passw
 rule() { printf '[[allow]]\nclient          = "fields-probe"\nentries         = ["api/**"]\nfields          = ["%s"]\nmax_ttl_seconds = 300\n' "$2" >"$1"; }
 rule "$dir/field-rule.toml" OPENAI_API_KEY
 rule "$dir/recovery-rule.toml" 'Recovery codes'
-audit="$dir/policy-audit.jsonl"
+logged=$(lines_in "$audit")
 # Only the master password: a prompt the agent draws reads the end of its input, which denies.
 start_agent '' --policy "$(native "$dir/field-rule.toml")" --approval-timeout 10
 ask_field 10 OPENAI_API_KEY 4 | jq -e --arg v "$api_key" 'select(.id == 10) | .result.isError == false and .result.structuredContent.value == $v' >/dev/null \
   || die "a rule naming OPENAI_API_KEY did not release exactly the value KeePassXC wrote: $(cat "$dir/field-10.out")"
 [ "$(asked)" = 0 ] || die "a rule naming OPENAI_API_KEY put a prompt in front of the person"
 tail -n 1 "$audit" | jq -e '.decision == "granted" and .method == "policy" and .args.field == "OPENAI_API_KEY"' >/dev/null \
-  || die "the rule's release was not audited as a policy release of that field: $(cat "$audit")"
+  || die "the rule's release was not audited as a policy release of that field: $(lines_after "$audit" "$logged")"
 ask_field 11 password 6 | jq -e 'select(.id == 11) | .result.isError == true' >/dev/null \
   || die "the password, outside the rule's fields, was released: $(cat "$dir/field-11.out")"
 [ "$(asked)" = 1 ] || die "the password, outside the rule's fields, did not reach a person"
@@ -418,7 +420,6 @@ done
 
 step "a real keypaste mcp asks the app's own prompt window on an untouched copy: Allow once releases the field alone, and the hour serves no other"
 hold_out="$dir/hold.out"
-app_audit="$dir/app-audit.jsonl"
 DIE_FILES='hold_out bridge_out'
 exec 7> >(KEYPASTE_DRIVER_PASSWORD="$pw" exec "$drv" hold "$(native "$app_openai")" >"$hold_out" 2>&1)
 wait_for 'holding session' "$hold_out"
@@ -433,7 +434,7 @@ app_request() {
 app_prompt() {
   bridge_out="$dir/app-$1.out"
   exec 8>&-
-  exec 8> >(exec 7>&-; exec "$kp" mcp --vault "$(native "$app_openai")" --expose 'api/**' --audit-log "$(native "$app_audit")" \
+  exec 8> >(exec 7>&-; exec "$kp" mcp --vault "$(native "$app_openai")" --expose 'api/**' --audit-log "$(native "$audit")" \
     --client-label fields-probe >"$bridge_out" 2>"$dir/app-$1.err")
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"fields-probe","version":"1.0.0"}}}' >&8
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
@@ -459,8 +460,8 @@ app_reply 3
 withdrawn
 jq -e --arg v "$api_key" 'select(.id == 3) | .result.isError == false and .result.structuredContent.value == $v' <"$bridge_out" >/dev/null \
   || die "Allow once in the app did not return exactly the OPENAI_API_KEY KeePassXC wrote"
-tail -n 1 "$app_audit" | jq -e '.decision == "granted" and .method == "prompt" and .args.field == "OPENAI_API_KEY" and .granted_seconds == 0' >/dev/null \
-  || die "the app's release was not audited with its field as allowed once: $(tail -n 1 "$app_audit")"
+tail -n 1 "$audit" | jq -e '.decision == "granted" and .method == "prompt" and .args.field == "OPENAI_API_KEY" and .granted_seconds == 0' >/dev/null \
+  || die "the app's release was not audited with its field as allowed once: $(tail -n 1 "$audit")"
 
 app_prompt hour OPENAI_API_KEY
 echo approve >&7
@@ -483,16 +484,16 @@ for field in 'Recovery codes' otp KP2A_URL_1 URL; do
   app_reply "$id"
   jq -e --arg t "$denial" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' <"$bridge_out" >/dev/null \
     || die "the app's bridge did not refuse '$field' with the fixed denial"
-  tail -n 1 "$app_audit" | jq -e '.args.field == "invalid" and .method == "invalid-request" and .decision == "denied"' >/dev/null \
-    || die "'$field' was not audited as an invalid field: $(tail -n 1 "$app_audit")"
+  tail -n 1 "$audit" | jq -e '.args.field == "invalid" and .method == "invalid-request" and .decision == "denied"' >/dev/null \
+    || die "'$field' was not audited as an invalid field: $(tail -n 1 "$audit")"
   id=$((id + 1))
 done
 exec 8>&-
 [ "$(grep -c '^prompt client' "$hold_out")" -eq "$drawn" ] || die "a field that never leaves drew a prompt in the app"
 for value in "${others[@]}"; do
-  grep -q "$value" "$dir"/app-*.out "$app_audit" "$hold_out" && die "'$value' left the vault through the app"
+  grep -q "$value" "$dir"/app-*.out "$audit" "$hold_out" && die "'$value' left the vault through the app"
 done
-grep -q "$api_key" "$app_audit" "$hold_out" && die "the released value reached the audit log or the app's output"
+grep -q "$api_key" "$audit" "$hold_out" && die "the released value reached the audit log or the app's output"
 exec 7>&-
 wait_for '^shut down' "$hold_out"
 
@@ -581,7 +582,7 @@ refused_share 'kp:///api/OpenAI#Recovery%20codes'
 created=$(sed -e $'s/\033\\[[0-9;]*m//g' "$worker_log" | grep -c 'POST /api/share 201' || true)
 [ "$created" = 2 ] || die "the Worker made ${created} shares, not the two allowed: a refused field was uploaded or a share was not logged"
 for value in "$api_key" "${others[@]}"; do
-  grep -q "$value" "$worker_log" "$dir"/share-*.err "$KEYPASTE_HOME/audit.jsonl" && die "'$value' reached the Worker's log, the terminal or the audit log"
+  grep -q "$value" "$worker_log" "$dir"/share-*.err "$audit" && die "'$value' reached the Worker's log, the terminal or the audit log"
 done
 stop_worker
 DIE_FILES=

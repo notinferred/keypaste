@@ -145,7 +145,7 @@ public sealed class FourPlacesJourneyTests
             await Until(() => !shell.HasShare);
             Assert.Single(server.Shares);
 
-            // An agent's request, approved in the app's own prompt, recorded as the bridge records it.
+            // An agent's request, approved in the app's own prompt, which the app records before it answers.
             var session = app.Authority.Session.SessionId!;
             await using var client = await ConnectAsync(app.Authority, vault);
             var reply = client.RequestAsync(Request(vault, session), Token).AsTask();
@@ -155,8 +155,6 @@ public sealed class FourPlacesJourneyTests
             DesktopApprovalTests.Click(prompt, "Approve");
             var answered = await reply.WaitAsync(Wait, Token);
             Assert.Equal(AuditDecision.Granted, answered!.Decision);
-
-            Record(vault, session);
 
             // Agents: the waiting count and dot, revoking the grant, and History.
             Chord(main, PhysicalKey.Digit2);
@@ -209,31 +207,6 @@ public sealed class FourPlacesJourneyTests
         Vault = vault,
         Session = session,
     };
-
-    /// <summary>The bridge's own audit line for the answered request, which History reads.</summary>
-    private static void Record(string vault, string session)
-    {
-        var path = KeypasteHome.AuditPath(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
-        Assert.True(AuditLog.TryOpen(path, TimeProvider.System, out var log, out var error), error);
-
-        using (log)
-        {
-            Assert.True(
-                log!.TryAppend(
-                    new AuditRecord
-                    {
-                        Tool = "request_credential",
-                        Client = new AuditClient(_client, "1.0", _label),
-                        Decision = AuditDecision.Granted,
-                        Method = AuditMethod.Prompt,
-                        Reason = "the person approved it for an hour",
-                        Vault = vault,
-                        Session = session,
-                    },
-                    out var failure),
-                failure);
-        }
-    }
 
     /// <summary>What the automation tree names each row of a list, as a screen reader reads them.</summary>
     private static List<string> Names(ListBox list)

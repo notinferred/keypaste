@@ -51,6 +51,7 @@ public static class ApproverProtocol
     internal const string EnvProfileKind = "env-profile";
     internal const string TokenEnvKind = "token-env";
     internal const string RunKind = "run";
+    internal const string WithdrawKind = "withdraw";
 
     /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
     /// <remarks>
@@ -156,19 +157,29 @@ public static class ApproverProtocol
     /// <see cref="Approval.IEntryNameLister"/> leaves altering names to whoever renders them.
     /// </para>
     /// </remarks>
-    public static byte[] Encode(NamesReply reply)
+    public static byte[] Encode(NamesReply reply) => WriteNames(Fitted(reply));
+
+    /// <summary>A reply carrying entry names exactly as <see cref="Encode(NamesReply)"/> sends it.</summary>
+    /// <param name="reply">The names, or the reason there are none.</param>
+    /// <returns>The names that fit one frame, complete only when nothing was dropped, or the <see cref="Undersized"/> stand-in.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// The reply is measured as written, its session and <c>recorded</c> included, so whoever records
+    /// a listing asks with the reply it will send and counts the names that cross the pipe. Every
+    /// stand-in keeps those two members.
+    /// </remarks>
+    public static NamesReply Fitted(NamesReply reply)
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        var rows = reply.Names.Select(entry => new NameRow(entry)).ToList();
-        var kept = Fit(WriteNames(reply, [], false).Length, rows, Wire.NameRow);
-        var frame = WriteNames(reply, rows.Take(kept), reply.Complete && kept == rows.Count);
+        var kept = Fit(WriteNames(reply with { Names = [], Complete = false }).Length, NameRow.Of(reply.Names), Wire.NameRow);
+        var fitted = kept == reply.Names.Count ? reply : reply with { Names = [.. reply.Names.Take(kept)], Complete = false };
 
         // Belt and braces. Everything above says this cannot happen; this is what stops an error in
         // that reasoning costing a connection and its grants rather than a listing (law 3.7).
-        return frame.Length <= MessageFramer.MaximumPayloadBytes
-            ? frame
-            : WriteNames(reply with { Reason = Undersized }, [], false);
+        return WriteNames(fitted).Length <= MessageFramer.MaximumPayloadBytes
+            ? fitted
+            : reply with { Names = [], Reason = Undersized, Complete = false };
     }
 
     /// <summary>How many of a reply's rows fit one frame beside its envelope.</summary>
@@ -202,8 +213,8 @@ public static class ApproverProtocol
         return kept;
     }
 
-    private static byte[] WriteNames(NamesReply reply, IEnumerable<NameRow> names, bool complete) =>
-        JsonSerializer.SerializeToUtf8Bytes(new NamesReplyFrame(reply, names, complete), Wire.NamesReplyFrame);
+    private static byte[] WriteNames(NamesReply reply) =>
+        JsonSerializer.SerializeToUtf8Bytes(new NamesReplyFrame(reply), Wire.NamesReplyFrame);
 
     /// <summary>Encodes a reply to a credential request, bounded to what one frame can carry.</summary>
     /// <param name="reply">The decision, and the value on the one path that has one.</param>
@@ -252,7 +263,7 @@ public static class ApproverProtocol
     }
 
     /// <summary>Whether a reply would reach the peer as itself, rather than as a refusal.</summary>
-    /// <param name="reply">The reply the handler is about to return.</param>
+    /// <param name="reply">The reply as it will be sent, its session and <c>recorded</c> included, because the whole frame is measured.</param>
     /// <returns><see langword="true"/> when it fits one frame.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
     /// <remarks>
@@ -282,7 +293,7 @@ public static class ApproverProtocol
     }
 
     /// <summary>Whether <see cref="Encode(RunReply)"/> would send this reply as it is.</summary>
-    /// <param name="reply">The reply the owner is about to record and return.</param>
+    /// <param name="reply">The reply as it will be sent, its session and <c>recorded</c> included, because the whole frame is measured.</param>
     /// <returns><see langword="true"/> when it fits one frame.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
     internal static bool Fits(RunReply reply)
@@ -301,6 +312,7 @@ public static class ApproverProtocol
                 Reason = UndeliverableReason(reply.Method),
                 Entry = entry,
                 Session = reply.Session,
+                Recorded = reply.Recorded,
             }
             : new CredentialReply
             {
@@ -309,6 +321,7 @@ public static class ApproverProtocol
                 Reason = Oversized,
                 Entry = entry,
                 Session = reply.Session,
+                Recorded = reply.Recorded,
             };
 
     private static byte[] WriteCredential(CredentialReply reply) =>
@@ -390,6 +403,7 @@ public static class ApproverProtocol
                 EnvProfileKind => ApproverMessageKind.EnvProfile,
                 TokenEnvKind => ApproverMessageKind.TokenEnv,
                 RunKind => ApproverMessageKind.Run,
+                WithdrawKind => ApproverMessageKind.Withdraw,
                 _ => ApproverMessageKind.Unknown,
             };
         }
@@ -524,6 +538,7 @@ public static class ApproverProtocol
                 Refusal = TryInteger(root, "method", out var method)
                     ? Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed
                     : null,
+                Recorded = TrueOnly(root, "recorded"),
             };
 
             return true;
@@ -580,6 +595,7 @@ public static class ApproverProtocol
                 Entry = Optional(root, "entry"),
                 Value = granted ? value : null,
                 Session = Optional(root, "session"),
+                Recorded = TrueOnly(root, "recorded"),
             };
 
             return true;
@@ -876,6 +892,12 @@ public static class ApproverProtocol
 
         return WriteAttached(LockKind, request.Vault, request.Session);
     }
+
+    /// <summary>Encodes the withdrawal of the request a connection is waiting on.</summary>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <remarks>It names nothing: a connection carries one request at a time, so it can only mean that one.</remarks>
+    public static byte[] EncodeWithdrawal() =>
+        JsonSerializer.SerializeToUtf8Bytes(new WithdrawFrame(), Wire.WithdrawFrame);
 
     /// <summary>Encodes whether the owner has locked.</summary>
     /// <param name="reply">The answer.</param>
@@ -1276,11 +1298,16 @@ public static class ApproverProtocol
         {
             Entries = reply.Entries,
             Session = reply.Session,
+            Recorded = reply.Recorded,
         });
 
         return refusal.Length <= MessageFramer.MaximumPayloadBytes
             ? refusal
-            : WriteRun(new RunReply(EnvResolved.Refused(string.Empty, EnvOutcome.TooLarge), AuditMethod.Undeliverable, Oversized));
+            : WriteRun(new RunReply(EnvResolved.Refused(string.Empty, EnvOutcome.TooLarge), AuditMethod.Undeliverable, Oversized)
+            {
+                Session = reply.Session,
+                Recorded = reply.Recorded,
+            });
     }
 
     private static byte[] WriteRun(RunReply reply) =>
@@ -1350,6 +1377,7 @@ public static class ApproverProtocol
                 GrantedSeconds = granted,
                 Entries = entries,
                 Session = Optional(root, "session"),
+                Recorded = TrueOnly(root, "recorded"),
             };
 
             return true;

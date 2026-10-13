@@ -39,8 +39,12 @@ require jq
 CLI="$(keypaste_bin)"
 
 WORK="$(mktemp -d)"
+mkdir -p "$WORK/home"
+KEYPASTE_HOME="$(native "$WORK/home")"
+export KEYPASTE_HOME
 readonly VAULT="$WORK/vault.kdbx"
-readonly AUDIT="$WORK/audit.jsonl"
+# The log in the owner's home, where the bridges here write too.
+readonly AUDIT="$WORK/home/audit.jsonl"
 readonly POLICY="$WORK/policy.toml"
 readonly BROKEN="$WORK/broken.toml"
 readonly FIELDS="$WORK/fields.toml"

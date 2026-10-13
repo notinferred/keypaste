@@ -14,7 +14,13 @@ namespace Keypaste.Core.Ipc;
 /// come back as <see langword="null"/>, which the bridge turns into a denial with a reason an agent
 /// can act on. That is docs/PRODUCT.md law 3.7 expressed as a return type: there is no path through this
 /// class that produces a credential by accident, and no exception that could skip the audit line
-/// the bridge writes before answering.
+/// the bridge writes for a call nothing answered.
+/// </para>
+/// <para>
+/// A listing, credential or run request the caller gives up on once it was written is withdrawn, not
+/// abandoned: the owner still answers it, and that reply, which says whether the owner recorded the
+/// request, is returned, so the bridge records one the owner could not (THREATS.md T-6). The connection
+/// is spent after a withdrawal.
 /// </para>
 /// <para>
 /// Requests are serialised, one at a time per connection, because the protocol is a plain
@@ -38,7 +44,12 @@ public sealed class ApproverClient : IAsyncDisposable
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
     private static readonly TimeSpan _cancellationSlice = TimeSpan.FromMilliseconds(50);
 
+    /// <summary>How long a withdrawn request's reply is waited for.</summary>
+    /// <remarks>The owner withdraws it at once and records it, waiting at most a second for its log's lock.</remarks>
+    private static readonly TimeSpan _withdrawalWait = TimeSpan.FromSeconds(5);
+
     private bool _disposed;
+    private bool _withdrawn;
 
     private ApproverClient(NamedPipeClientStream pipe)
     {
@@ -127,8 +138,8 @@ public sealed class ApproverClient : IAsyncDisposable
         }
     }
 
-    /// <summary>Whether the pipe is still up. False does not mean the approver is gone for good.</summary>
-    public bool IsConnected => !_disposed && _pipe.IsConnected;
+    /// <summary>Whether the pipe is still up and carries no withdrawn request. False does not mean the approver is gone for good.</summary>
+    public bool IsConnected => !_disposed && !_withdrawn && _pipe.IsConnected;
 
     /// <summary>Attaches this connection to the session holding a vault.</summary>
     /// <param name="request">The vault to attach to.</param>
@@ -146,28 +157,28 @@ public sealed class ApproverClient : IAsyncDisposable
 
     /// <summary>Asks for the entry names an agent may be shown.</summary>
     /// <param name="request">The exposure to apply.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent; its reply is still returned.</param>
     /// <returns>The reply, or null when the approver could not be reached or understood.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
     public async ValueTask<NamesReply?> ListAsync(NamesRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out NamesReply? reply) ? reply : null;
     }
 
     /// <summary>Asks for one field of one entry.</summary>
     /// <param name="request">What the agent asked for.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent; its reply is still returned.</param>
     /// <returns>The reply, or null when the approver could not be reached or understood.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
     public async ValueTask<CredentialReply?> RequestAsync(CredentialRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out CredentialReply? reply) ? reply : null;
     }
@@ -244,21 +255,21 @@ public sealed class ApproverClient : IAsyncDisposable
 
     /// <summary>Asks for the secrets an agent's run would inject.</summary>
     /// <param name="request">The program, command, directory, variables and reason.</param>
-    /// <param name="cancellationToken">Cancels the exchange, which withdraws the question.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent; its reply is still returned.</param>
     /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
     public async ValueTask<RunReply?> ReleaseRunAsync(RunRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out RunReply? reply) ? reply : null;
     }
 
-    private async ValueTask<byte[]?> ExchangeAsync(byte[] request, CancellationToken cancellationToken)
+    private async ValueTask<byte[]?> ExchangeAsync(byte[] request, CancellationToken cancellationToken, bool withdrawable = false)
     {
-        if (_disposed)
+        if (_disposed || _withdrawn)
         {
             return null;
         }
@@ -285,8 +296,26 @@ public sealed class ApproverClient : IAsyncDisposable
 
         try
         {
+            // Here rather than left to the stream, so a request given up on before it is written is never sent.
+            cancellationToken.ThrowIfCancellationRequested();
             await _framer.WriteAsync(request, cancellationToken).ConfigureAwait(false);
-            return await _framer.ReadAsync(cancellationToken).ConfigureAwait(false);
+
+            if (!withdrawable)
+            {
+                return await _framer.ReadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            // Not read under the caller's token: a withdrawn request's reply is still read, below.
+            var reading = _framer.ReadAsync(CancellationToken.None).AsTask();
+
+            try
+            {
+                return await reading.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return await WithdrawnAsync(reading).ConfigureAwait(false);
+            }
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException or InvalidOperationException)
         {
@@ -298,6 +327,19 @@ public sealed class ApproverClient : IAsyncDisposable
             // the caller gave up, or one abandoned request wedges the connection permanently.
             _oneAtATime.Release();
         }
+    }
+
+    /// <summary>Withdraws the request the caller gave up on, and reads the owner's reply to it, or nothing once the wait is over.</summary>
+    private async Task<byte[]?> WithdrawnAsync(Task<byte[]?> reading)
+    {
+        // A read may still be pending on the stream, so nothing else is exchanged on it.
+        _withdrawn = true;
+        _ = reading.ContinueWith(static read => read.Exception, TaskScheduler.Default);
+
+        using var wait = new CancellationTokenSource(_withdrawalWait);
+        await _framer.WriteAsync(ApproverProtocol.EncodeWithdrawal(), wait.Token).ConfigureAwait(false);
+
+        return await reading.WaitAsync(wait.Token).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>

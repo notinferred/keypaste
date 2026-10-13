@@ -33,7 +33,7 @@ public sealed record SessionServerOptions
     /// <summary>Per-client policy, from <c>clients.toml</c>.</summary>
     public required ClientPolicySource Clients { get; init; }
 
-    /// <summary>Opens the audit log a token or an env release is recorded in, or returns null when it cannot.</summary>
+    /// <summary>Opens the audit log the owner records each request it answers in, or returns null when it cannot, which refuses the request before anybody is asked.</summary>
     public required Func<AuditLog?> Audit { get; init; }
 
     /// <summary>Subscribes to the owner's edits, which withdraw the grants naming what they touched before they are saved (D-0318).</summary>
@@ -121,7 +121,8 @@ public sealed class SessionServer : IDisposable
                 options.Vault,
                 options.CurrentLifetime,
                 handler,
-                new SessionEnvironments(gate, options.UnlockedFor, options.Clock, envGrants, options.Narrate, options.Audit),
+                options.Audit,
+                new SessionEnvironments(gate, options.UnlockedFor, options.Clock, envGrants, options.Narrate),
                 options.LockNow,
                 options.Clock);
 

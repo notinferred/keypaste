@@ -159,7 +159,7 @@ public sealed class ApproverListener : IDisposable
             while (await next.ConfigureAwait(false) is { } frame)
             {
                 // Read ahead while the request is decided. A peer sends nothing until it has its
-                // reply, so this read ending first means it hung up or spoke out of turn.
+                // reply, so this read ending first means it hung up, withdrew it or spoke out of turn.
                 next = framer.ReadAsync(cancellationToken).AsTask();
 
                 var reply = await AnswerWhileWaitedForAsync(frame, connectionId, next, cancellationToken).ConfigureAwait(false);
@@ -174,7 +174,7 @@ public sealed class ApproverListener : IDisposable
 
                 // A reply is delivered for as long as its peer takes to read it, and a stop gives it one
                 // second more: a request a lock or a shutdown withdrew still has its denial to deliver,
-                // which the bridge audits rather than a reply that never came (D-0313, D-0420).
+                // which the owner has recorded, rather than a reply that never came (D-0313, D-0420).
                 using var delivery = new CancellationTokenSource();
                 using var stopping = cancellationToken.Register(
                     static state => ((CancellationTokenSource)state!).CancelAfter(_deliveryBound), delivery);
@@ -203,18 +203,25 @@ public sealed class ApproverListener : IDisposable
     /// <summary>Answers one request, withdrawing it if its peer stops waiting first.</summary>
     /// <param name="frame">The request.</param>
     /// <param name="connectionId">The connection it came on.</param>
-    /// <param name="peer">The read of the peer's next frame, which ends early only if it hung up or spoke out of turn.</param>
+    /// <param name="peer">The read of the peer's next frame, which ends early only if it hung up, withdrew the request or spoke out of turn.</param>
     /// <param name="cancellationToken">Cancelled when the listener stops.</param>
     /// <returns>The reply, or null when the request was unreadable or nobody is waiting for it.</returns>
     /// <remarks>
+    /// <para>
     /// A prompt raised for a peer that has gone comes down rather than waiting out its window for an
     /// answer nobody will receive. A stopping listener is not a peer that went: its withdrawn requests
     /// still have their denials to deliver (D-0313).
+    /// </para>
+    /// <para>
+    /// A peer that withdraws its request is still waiting, for what became of it: the reply says whether
+    /// this owner recorded it, and a bridge records one that was not (THREATS.md T-6). The withdrawal,
+    /// read next as a request, then ends the connection.
+    /// </para>
     /// </remarks>
     private async Task<byte[]?> AnswerWhileWaitedForAsync(
         byte[] frame,
         string connectionId,
-        Task peer,
+        Task<byte[]?> peer,
         CancellationToken cancellationToken)
     {
         using var exchange = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -225,22 +232,27 @@ public sealed class ApproverListener : IDisposable
             && !cancellationToken.IsCancellationRequested)
         {
             await exchange.CancelAsync().ConfigureAwait(false);
-            await Settled(answering).ConfigureAwait(false);
-            return null;
+            var settled = await Settled(answering).ConfigureAwait(false);
+            var withdrew = peer.IsCompletedSuccessfully
+                && await peer.ConfigureAwait(false) is { } next
+                && ApproverProtocol.KindOf(next) == ApproverMessageKind.Withdraw;
+
+            return withdrew ? settled : null;
         }
 
         return await answering.ConfigureAwait(false);
     }
 
-    private static async Task Settled(Task answering)
+    private static async Task<byte[]?> Settled(Task<byte[]?> answering)
     {
         try
         {
-            await answering.ConfigureAwait(false);
+            return await answering.ConfigureAwait(false);
         }
         catch (Exception)
         {
-            // The answer has nobody to go to; what matters is that deciding it has finished.
+            // What matters is that deciding it has finished; a failure has no reply to give.
+            return null;
         }
     }
 

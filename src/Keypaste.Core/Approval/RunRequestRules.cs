@@ -171,6 +171,26 @@ public static class RunRequestRules
             : "must not name two variables that differ only in case";
     }
 
+    /// <summary>Whether a released set's variable names are the ones a run asked for.</summary>
+    /// <param name="run">The run as asked.</param>
+    /// <param name="names">The names the release would inject, in its order.</param>
+    /// <returns>
+    /// <see langword="true"/> when they are exactly its references' or its keys' names, in that order, or,
+    /// for a whole set, names the name rule allows.
+    /// </returns>
+    /// <remarks>Applied by the owner before it records a release, and by the bridge before it starts anything.</remarks>
+    public static bool Answers(RunArguments run, IReadOnlyList<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(names);
+
+        return run.References is { } references
+            ? names.SequenceEqual(references.Select(reference => reference.Name), StringComparer.Ordinal)
+            : run.Keys is { } keys
+                ? names.SequenceEqual(keys, StringComparer.Ordinal)
+                : NameProblem(names) is null;
+    }
+
     private static CredentialRequestProblem? CheckCommand(IReadOnlyList<string> command)
     {
         if (command.Count is 0 or > MaximumArguments || command[0].Length == 0)

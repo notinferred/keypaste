@@ -392,7 +392,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 <pre>keypaste setup --vault ~/vault.kdbx</pre>
       </div>
 
-      <p><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> MCP tool calls are logged locally, granted or refused. The bridge excludes the returned field value, but request names and reasons remain and may contain sensitive text:</p>
+      <p><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> MCP tool calls are logged locally, granted or refused. keypaste leaves the returned field value out of the log, but request names and reasons remain and may contain sensitive text:</p>
 
       <div class="terminal">
         <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste log</div>

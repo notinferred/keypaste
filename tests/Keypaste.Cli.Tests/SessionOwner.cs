@@ -53,6 +53,7 @@ internal sealed class SessionOwner : IAsyncDisposable
             VaultIdentity.Of(KeypasteHome.Resolve(harness.Environment[KeypasteHome.EnvironmentVariable]), harness.VaultPath),
             () => Lifetime,
             handler,
+            audit: () => null,
             lockNow: lockNow);
 
         _listener = new ApproverListener(Pipe, Authority);

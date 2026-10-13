@@ -64,9 +64,6 @@ Every release still needs a person's answer or a rule they wrote, and the bridge
 - [ ] **G.8 — Set in the app what each agent can see and run.** Needs: G.1, C.5b.
   - Each connected app's row says what the app can see and whether it may run commands.
   - The owner applies the intersection with the bridge's flags, so a flag an agent edits into its own configuration can only narrow access.
-- [ ] **G.9 — Have the owner write the audit line of every request.** Needs: none.
-  - The app and `keypaste agent` write the audit line for every listing, credential, run and token request they answer before they reply, and refuse one they cannot record, so a request made straight to the pipe is recorded too (D-0407, T-14).
-  - The bridge's line stays as a second witness.
 - [ ] **N.8 — Make `keypaste` alone show where things stand.** Needs: G.1.
   - On a terminal it shows the version, the chosen vault and who holds it, the connected tools and one next step.
   - It asks for no password.

@@ -35,7 +35,8 @@ export KEYPASTE_HOME
 VAULT="$(native "$WORK/vault.kdbx")"
 SOURCE="$(native "$WORK/source.kdbx")"
 DOTENV="$(native "$WORK/pull.env")"
-AUDIT="$(native "$WORK/audit.jsonl")"
+# The log in the owner's home, where the bridges here write too.
+AUDIT="$(native "$WORK/home/audit.jsonl")"
 readonly HOLD_OUT="$WORK/hold.txt"
 readonly AGENT_ERR="$WORK/agent-stderr.txt"
 readonly OUT="$WORK/mcp-stdout.txt"

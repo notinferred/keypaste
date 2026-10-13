@@ -5,6 +5,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
 using Xunit;
@@ -13,8 +14,8 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// The shipped bridge against a real vault's owner: a request is answered by the owner's gate under
-/// the session it attached to, and every way of not reaching that session is a denial the bridge
-/// audits (4.3a).
+/// the session it attached to and recorded by the owner, and every way of not reaching that session
+/// is a denial, recorded by the bridge when nothing answered and by the owner when it refused (4.3a).
 /// </summary>
 /// <remarks>
 /// Nothing is faked but the person, who says yes to anything they are asked, so a request that
@@ -40,7 +41,7 @@ public sealed class OwnerDenialTests : IDisposable
     };
 
     [Fact]
-    public async Task ARequest_IsAnsweredByTheOwnersGate_AndTheAuditLineNamesItsSession()
+    public async Task ARequest_IsAnsweredByTheOwnersGate_AndTheOwnersLineNamesItsSession()
     {
         await using var owner = Owner.Start(this);
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
@@ -52,10 +53,11 @@ public sealed class OwnerDenialTests : IDisposable
         Assert.Contains(Sentinel, TextOf(result), StringComparison.Ordinal);
         Assert.Equal(1, owner.Asked);
 
-        var line = Assert.Single(harness.AuditLines());
-        Assert.Equal("granted", Field(line, "decision"));
-        Assert.Equal("prompt", Field(line, "method"));
-        Assert.Equal(owner.Session, Field(line, "session"));
+        var line = Assert.Single(owner.Log.Lines());
+        Assert.Equal("granted", line.GetProperty("decision").GetString());
+        Assert.Equal("prompt", line.GetProperty("method").GetString());
+        Assert.Equal(owner.Session, line.GetProperty("session").GetString());
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
@@ -110,17 +112,29 @@ public sealed class OwnerDenialTests : IDisposable
         var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
 
         Assert.NotEqual(first, owner.Session);
-        AssertDenied(harness, result, owner, "no-session");
+        Assert.True(result.IsError);
+        Assert.DoesNotContain(Sentinel, harness.Transcript, StringComparison.Ordinal);
+        Assert.Equal(0, owner.Asked);
+
+        // The lost reply was never recorded; the retry the owner refused is, by the owner, and the
+        // bridge, answered, writes nothing.
+        var line = Assert.Single(owner.Log.Lines());
+        Assert.Equal("denied", line.GetProperty("decision").GetString());
+        Assert.Equal("no-session", line.GetProperty("method").GetString());
+        Assert.False(line.TryGetProperty("session", out _));
+        Assert.Empty(harness.AuditLines());
     }
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
+    /// <summary>A denial nothing answered: the bridge's one line, and none in the owner's log.</summary>
     private static void AssertDenied(McpHarness harness, CallToolResult result, Owner? owner, string method)
     {
         Assert.True(result.IsError);
         Assert.DoesNotContain(Sentinel, harness.Transcript, StringComparison.Ordinal);
         Assert.DoesNotContain(Sentinel, harness.AuditText, StringComparison.Ordinal);
         Assert.Equal(0, owner?.Asked ?? 0);
+        Assert.Empty(owner?.Log.Lines() ?? []);
 
         var line = Assert.Single(harness.AuditLines());
         Assert.Equal("denied", Field(line, "decision"));
@@ -150,6 +164,7 @@ public sealed class OwnerDenialTests : IDisposable
 
         private Owner(OwnerDenialTests test, string holds, bool relockOnFirstRequest)
         {
+            Log = new OwnerLog(Path.Combine(test._directory, "home"));
             _vault = Vault.Create(test.VaultPath, Master);
             _vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = Sentinel });
             _vault.Save();
@@ -164,7 +179,7 @@ public sealed class OwnerDenialTests : IDisposable
                 PolicyGate.None);
 
             IApproverHandler authority = new SessionAuthority(
-                VaultIdentity.Of(test._directory, holds), () => _lifetime, handler);
+                VaultIdentity.Of(test._directory, holds), () => _lifetime, handler, audit: () => Log.Log);
 
             if (relockOnFirstRequest)
             {
@@ -177,6 +192,9 @@ public sealed class OwnerDenialTests : IDisposable
         }
 
         internal string PipeName { get; }
+
+        /// <summary>The owner's own log, in its home.</summary>
+        internal OwnerLog Log { get; }
 
         internal string? Session => _lifetime?.Id;
 
@@ -216,6 +234,7 @@ public sealed class OwnerDenialTests : IDisposable
             _gate.Dispose();
             _grants.Dispose();
             _vault.Dispose();
+            Log.Dispose();
         }
 
         private void Relock()

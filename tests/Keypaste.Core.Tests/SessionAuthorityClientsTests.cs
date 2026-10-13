@@ -26,7 +26,7 @@ public sealed class SessionAuthorityClientsTests : IDisposable
     }
 
     private SessionAuthority Authority() =>
-        new(VaultIdentity.Of(_directory, VaultPath), () => _lifetime, _fixture.Handler, clock: _fixture.Clock);
+        new(VaultIdentity.Of(_directory, VaultPath), () => _lifetime, _fixture.Handler, audit: () => null, clock: _fixture.Clock);
 
     private Task<AttachReply> Attach(SessionAuthority authority, string connection, AttachClient? client) =>
         authority.AttachAsync(new AttachRequest(VaultPath) { Client = client }, connection, Token).AsTask();

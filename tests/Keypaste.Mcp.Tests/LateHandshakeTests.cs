@@ -12,7 +12,7 @@ using Xunit;
 namespace Keypaste.Mcp.Tests;
 
 /// <summary>
-/// A call that overtook the handshake naming its client is put to the owner and logged under the
+/// A call that overtook the handshake naming its client reaches the owner, which records it, under the
 /// name the handshake gave, once the call has waited for it (F.61).
 /// </summary>
 /// <remarks>
@@ -20,7 +20,9 @@ namespace Keypaste.Mcp.Tests;
 /// client that named itself while its call waited was put to the owner and logged as an unnamed
 /// client. A real client cannot produce that ordering in process (<see cref="HandshakeGraceTests"/>);
 /// a server whose client is unnamed the first time anybody asks and named every time after can, and
-/// each tool is called on it as the server's dispatch would call it.
+/// each tool is called on it as the server's dispatch would call it. A credential request and a run
+/// carry the name in the request; a listing carries nothing, so the owner records it under the client
+/// its connection attached as, which is read after the wait too.
 /// </remarks>
 public sealed class LateHandshakeTests
 {
@@ -35,7 +37,7 @@ public sealed class LateHandshakeTests
     };
 
     [Fact]
-    public async Task ACredentialRequest_ThatOvertookTheHandshake_IsPutToTheOwnerAndLoggedUnderTheNameItGave()
+    public async Task ACredentialRequest_ThatOvertookTheHandshake_IsPutToTheOwnerUnderTheNameItGave()
     {
         await using var harness = new McpHarness();
         harness.Approver.StartApproving();
@@ -45,23 +47,27 @@ public sealed class LateHandshakeTests
 
         var asked = Assert.Single(harness.Approver.Received);
         Assert.Equal((McpHarness.ClientName, McpHarness.ClientVersion), (asked.ClientName, asked.ClientVersion));
-        Assert.Equal(("prompt", McpHarness.ClientName, McpHarness.ClientVersion), Logged(harness));
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
-    public async Task AListing_ThatOvertookTheHandshake_IsLoggedUnderTheNameItGave()
+    public async Task AListing_ThatOvertookTheHandshake_AttachesToTheOwnerUnderTheNameItGave()
     {
-        await using var harness = new McpHarness();
-        harness.Source.With("env/dev", "STRIPE_KEY");
+        await using var approver = new FakeApprover();
+        approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
+        approver.Start();
+        await using var harness = new McpHarness(approver.PipeName);
         harness.Serve();
 
         await CallAsync(harness, ToolText.ListToolName, null);
 
-        Assert.Equal(("exposure", McpHarness.ClientName, McpHarness.ClientVersion), Logged(harness));
+        var attached = Assert.Single(approver.Attached).Client;
+        Assert.Equal((McpHarness.ClientName, McpHarness.ClientVersion, McpHarness.ClientLabel), (attached?.Name, attached?.Version, attached?.Label));
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
-    public async Task ARun_ThatOvertookTheHandshake_IsPutToTheOwnerAndLoggedUnderTheNameItGave()
+    public async Task ARun_ThatOvertookTheHandshake_IsPutToTheOwnerUnderTheNameItGave()
     {
         await using var harness = new McpHarness();
         var asked = new ConcurrentQueue<RunRequest>();
@@ -83,7 +89,7 @@ public sealed class LateHandshakeTests
 
         var run = Assert.Single(asked);
         Assert.Equal((McpHarness.ClientName, McpHarness.ClientVersion), (run.ClientName, run.ClientVersion));
-        Assert.Equal(("no-session", McpHarness.ClientName, McpHarness.ClientVersion), Logged(harness));
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
@@ -102,6 +108,7 @@ public sealed class LateHandshakeTests
     private static async Task CallAsync(McpHarness harness, string tool, Dictionary<string, object?>? arguments, bool introduces = true)
     {
         await using var server = new LateHandshakeServer(introduces);
+        harness.AttachAs(server);
 
         await harness.Tool(tool).InvokeAsync(
             new RequestContext<CallToolRequestParams>(
@@ -115,7 +122,7 @@ public sealed class LateHandshakeTests
             Token);
     }
 
-    /// <summary>The call's one audit line: how it was decided, and the name and version it gives the client.</summary>
+    /// <summary>The bridge's one audit line for a call it refused itself: how it was decided, and the name and version it gives the client.</summary>
     private static (string? Method, string? Name, string? Version) Logged(McpHarness harness)
     {
         using var parsed = JsonDocument.Parse(Assert.Single(harness.AuditLines()));

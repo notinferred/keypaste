@@ -24,8 +24,12 @@ require jq
 CLI="$(keypaste_bin)"
 
 WORK="$(mktemp -d)"
+mkdir -p "$WORK/home"
+KEYPASTE_HOME="$(native "$WORK/home")"
+export KEYPASTE_HOME
 readonly VAULT="$WORK/vault.kdbx"
-readonly AUDIT="$WORK/audit.jsonl"
+# The log in the owner's home, where the bridges here write too.
+readonly AUDIT="$WORK/home/audit.jsonl"
 readonly AGENT_ERR="$WORK/agent-stderr.txt"
 readonly OUT="$WORK/stdout.txt"
 readonly ERR="$WORK/stderr.txt"
@@ -38,7 +42,11 @@ readonly MARKER="$WORK/project/denied-run-ran"
 
 AGENT_PID=""
 cleanup() {
-  if [ -n "$AGENT_PID" ]; then kill "$AGENT_PID" 2>/dev/null || true; fi
+  # The agent's home is in $WORK, which Windows will not remove while the agent still holds it.
+  if [ -n "$AGENT_PID" ]; then
+    kill "$AGENT_PID" 2>/dev/null || true
+    wait "$AGENT_PID" 2>/dev/null || true
+  fi
   rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -125,7 +133,7 @@ grep -q "$CORE" "$ERR" && die "the bridge's stderr carries the injected value"
 [ -f "$AUDIT" ] || die "no audit log was written"
 grep -q "$CORE" "$AUDIT" && die "the audit log carries the injected value"
 
-# 5. One line per run, written by the bridge, naming the entry, the grant, the session and the vault.
+# 5. One line per run, naming the entry, the grant, the session and the vault.
 jq -e -s --arg s "$SESSION" '
   length == 3
   and all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16))

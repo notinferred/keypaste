@@ -9,8 +9,8 @@ using Xunit;
 namespace Keypaste.Mcp.Tests;
 
 /// <summary>
-/// The bridge names its vault and the session it reached on every operation, and records which
-/// session answered (D-0310).
+/// The bridge names its vault and the session it reached on every operation, and a line it records
+/// for a reply names the session that answered (D-0310).
 /// </summary>
 public sealed class SessionAttachmentTests
 {
@@ -49,17 +49,21 @@ public sealed class SessionAttachmentTests
         Assert.True(harness.Approver.Attaches >= 1);
     }
 
+    /// <summary>A reply its owner did not record is the bridge's to record, under the session that answered.</summary>
     [Fact]
-    public async Task TheAuditLineNamesTheSessionThatAnswered()
+    public async Task AReplyItsOwnerDidNotRecord_IsRecordedUnderTheSessionThatAnswered()
     {
         await using var harness = new McpHarness();
         harness.Approver.Session = "session-one";
+        harness.Approver.Records = false;
         harness.Approver.StartApproving();
         var client = await harness.StartAsync("--expose", "env/**");
 
         await client.CallToolAsync(ToolText.CredentialToolName, Credential(), cancellationToken: Token);
 
-        Assert.Equal("session-one", Field(Assert.Single(harness.AuditLines()), "session"));
+        var line = Assert.Single(harness.AuditLines());
+        Assert.Equal("failed", Field(line, "method"));
+        Assert.Equal("session-one", Field(line, "session"));
     }
 
     [Fact]
@@ -77,6 +81,28 @@ public sealed class SessionAttachmentTests
 
         Assert.Equal(VaultAvailability.Available, listing.Availability);
         Assert.Equal("session-one", listing.Session);
+        Assert.True(listing.Recorded);
+    }
+
+    [Fact]
+    public async Task AListingItsOwnerDidNotRecord_NamesNothing()
+    {
+        await using var approver = new FakeApprover();
+        approver.Session = "session-one";
+        approver.Records = false;
+        approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
+        approver.Start();
+
+        var (source, connection) = Source(approver);
+        await using var _ = connection;
+
+        var listing = await source.ListAsync(Token);
+
+        Assert.Equal(VaultAvailability.Unrecorded, listing.Availability);
+        Assert.Empty(listing.Names);
+        Assert.Equal(ToolText.AuditUnavailable, listing.Reason);
+        Assert.Equal("session-one", listing.Session);
+        Assert.False(listing.Recorded);
     }
 
     [Fact]
@@ -95,6 +121,7 @@ public sealed class SessionAttachmentTests
         Assert.Equal(VaultAvailability.NoSession, listing.Availability);
         Assert.Equal(ToolText.NoSession, listing.Reason);
         Assert.Empty(listing.Names);
+        Assert.False(listing.Recorded);
     }
 
     [Fact]

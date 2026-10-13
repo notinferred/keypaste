@@ -2,6 +2,7 @@ using System.Text.Json;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -49,28 +50,6 @@ public sealed class ServerToolsTests
 
     private static async Task<IList<McpClientTool>> ToolsAsync(McpClient client) =>
         await client.ListToolsAsync(cancellationToken: Token);
-
-    /// <summary>
-    /// Waits for the audit line to land. The tool writes it after the client has already given up,
-    /// so there is no result to await as a signal that the write has happened.
-    /// </summary>
-    private static async Task<string> AuditLineAsync(McpHarness harness)
-    {
-        for (var attempt = 0; attempt < 100; attempt++)
-        {
-            var lines = harness.AuditLines();
-
-            if (lines.Length > 0)
-            {
-                return lines[0];
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(50), Token);
-        }
-
-        Assert.Fail("no audit line was written for a cancelled call");
-        return string.Empty;
-    }
 
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
@@ -441,33 +420,6 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// A silent release is the one with no human witness, so the audit line is the only evidence it
-    /// happened at all — and it has to say <c>policy</c>, never <c>prompt</c>.
-    /// </summary>
-    [Fact]
-    public async Task APolicyRelease_IsAuditedAsPolicyAndNamesTheRule()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartPreapproving();
-        var client = await harness.StartAsync();
-
-        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
-
-        var line = Assert.Single(harness.AuditLines());
-        using var parsed = JsonDocument.Parse(line);
-
-        Assert.Equal("granted", parsed.RootElement.GetProperty("decision").GetString());
-        Assert.Equal("policy", parsed.RootElement.GetProperty("method").GetString());
-        Assert.Contains("allow#1", parsed.RootElement.GetProperty("reason").GetString()!, StringComparison.Ordinal);
-
-        // The agent's own stated reason is on the line too, and nobody read it. That is the whole
-        // of THREATS.md T-12 with the first approval removed as well as the second.
-        Assert.NotNull(parsed.RootElement.GetProperty("args").GetProperty("reason_sha256").GetString());
-
-        Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
-    }
-
-    /// <summary>
     /// The bridge sends the label the operator wrote, not the name the client asserted about itself.
     /// A rule keys on the first and never on the second (THREATS.md T-3).
     /// </summary>
@@ -506,70 +458,73 @@ public sealed class ServerToolsTests
         Assert.Contains("standing rule", text, StringComparison.Ordinal);
         Assert.Contains("hour", text, StringComparison.Ordinal);
 
-        Assert.Equal("policy-limit", MethodOf(Assert.Single(harness.AuditLines())));
-    }
-
-    /// <summary>
-    /// A release that cannot be recorded does not happen. THREATS.md T-6 admitted this was not
-    /// proved for a mid-run write failure; it closes here rather than in 2.4, and on the policy path
-    /// rather than the prompted one, because that is the path with no human witness — the log is not
-    /// the second record of a silent release, it is the only one.
-    /// </summary>
-    /// <remarks>
-    /// The failure is provoked by holding the log's sidecar lock, which is how <c>AuditLog</c>
-    /// serialises writers. The suffix is spelled out rather than referenced because
-    /// <c>Keypaste.Core</c> makes its internals visible to its own tests and not to these; a rename
-    /// would turn this test green for the wrong reason, so it also asserts the lock was contended.
-    /// </remarks>
-    [Fact]
-    public async Task APolicyRelease_IsRefusedWhenItsAuditLineCannotBeWritten()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartPreapproving();
-        var client = await harness.StartAsync();
-
-        var lockPath = harness.AuditPath + ".lock";
-
-        using (var held = new FileStream(lockPath, FileMode.Create, FileAccess.Write, FileShare.None))
-        {
-            var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
-            var text = TextOf(result);
-
-            Assert.True(result.IsError);
-            Assert.DoesNotContain(FakeApprover.Sentinel, text, StringComparison.Ordinal);
-
-            // The approver did release it — the credential existed and crossed the pipe — and the
-            // bridge threw it away rather than hand over something it could not record.
-            Assert.Single(harness.Approver.Received);
-            Assert.NotEmpty(held.Name);
-        }
-
+        // The owner recorded the refusal it answered; the bridge records nothing of its own.
         Assert.Empty(harness.AuditLines());
     }
 
     /// <summary>
-    /// A grant is one line in the log, saying so, and naming which entry and which method. This is
-    /// the line a person reads afterwards to answer "what did I agree to?".
+    /// A reply its owner did not record is refused whatever it carried, and the bridge records the
+    /// call itself: a value keypaste cannot record is one it does not hand over (THREATS.md T-6).
     /// </summary>
     [Fact]
-    public async Task AGrantIsAudited_AsAGrant()
+    public async Task AReleaseItsOwnerDidNotRecord_IsRefused_AndRecordedByTheBridge()
     {
         await using var harness = new McpHarness();
-        harness.Approver.StartApproving();
+        harness.Approver.Records = false;
+        harness.Approver.StartPreapproving();
         var client = await harness.StartAsync();
 
-        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        Assert.True(result.IsError);
+        Assert.Equal(ToolText.AuditUnavailable, TextOf(result));
+        Assert.DoesNotContain(FakeApprover.Sentinel, harness.Transcript, StringComparison.Ordinal);
+
+        // The approver did release it, and the bridge threw it away rather than hand over something
+        // nothing recorded.
+        Assert.Single(harness.Approver.Received);
 
         var line = Assert.Single(harness.AuditLines());
         using var parsed = JsonDocument.Parse(line);
-
-        Assert.Equal("granted", parsed.RootElement.GetProperty("decision").GetString());
-        Assert.Equal("prompt", parsed.RootElement.GetProperty("method").GetString());
-        Assert.Equal("env/dev/STRIPE_KEY", parsed.RootElement.GetProperty("args").GetProperty("entry").GetString());
-
-        // ...and the credential is not in it. The log records that access happened, never what was
-        // handed over.
+        Assert.Equal("denied", parsed.RootElement.GetProperty("decision").GetString());
+        Assert.Equal("failed", parsed.RootElement.GetProperty("method").GetString());
+        Assert.Equal("the vault's owner did not record this request", parsed.RootElement.GetProperty("reason").GetString());
         Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
+    }
+
+    /// <summary>A listing its owner did not record names nothing to the agent, whatever the reply carried.</summary>
+    [Fact]
+    public async Task AListingItsOwnerDidNotRecord_NamesNothing()
+    {
+        await using var approver = new FakeApprover();
+        approver.Records = false;
+        approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
+        approver.Start();
+        await using var harness = new McpHarness(approver.PipeName);
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.ListToolName);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ToolText.AuditUnavailable, TextOf(result));
+        Assert.DoesNotContain("STRIPE_KEY", harness.Transcript, StringComparison.Ordinal);
+        Assert.Equal("failed", MethodOf(Assert.Single(harness.AuditLines())));
+    }
+
+    /// <summary>A request the owner answered is recorded by the owner, before it replied, and leaves no line in the bridge's log.</summary>
+    [Fact]
+    public async Task AnAnsweredRequest_LeavesNoLineInTheBridgesLog()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        harness.Source.With("env/dev", "STRIPE_KEY");
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.ListToolName);
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        Assert.Contains(FakeApprover.Sentinel, TextOf(result), StringComparison.Ordinal);
+        Assert.Empty(harness.AuditLines());
     }
 
     /// <summary>
@@ -633,11 +588,8 @@ public sealed class ServerToolsTests
         await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "services/Stripe"));
         await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "services/Stripe", field: "STRIPE_SECRET_KEY"));
 
-        var lines = harness.AuditLines();
-        Assert.Equal(2, lines.Length);
-
-        using var first = JsonDocument.Parse(lines[0]);
-        Assert.Equal("out-of-scope", first.RootElement.GetProperty("method").GetString());
+        // One line, the bridge's own refusal; the owner recorded the request it answered.
+        Assert.Equal("out-of-scope", MethodOf(Assert.Single(harness.AuditLines())));
 
         var forwarded = Assert.Single(harness.Approver.Received);
         Assert.Equal("STRIPE_SECRET_KEY", forwarded.Field, StringComparer.Ordinal);
@@ -658,86 +610,13 @@ public sealed class ServerToolsTests
         await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "personal/bank"));
         await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
 
-        var lines = harness.AuditLines();
-        Assert.Equal(2, lines.Length);
+        // The bridge records its own refusal; the owner records the request it answered.
+        Assert.Equal("out-of-scope", MethodOf(Assert.Single(harness.AuditLines())));
 
-        using var first = JsonDocument.Parse(lines[0]);
-        using var second = JsonDocument.Parse(lines[1]);
-
-        Assert.Equal("out-of-scope", first.RootElement.GetProperty("method").GetString());
-        Assert.Equal("prompt", second.RootElement.GetProperty("method").GetString());
-
-        // One request crossed the wire, not two. Asserting only the audit methods would pass for a
+        // One request crossed the wire, not two. Asserting only the audit line would pass for a
         // bridge that forwarded both and discarded one answer.
         var forwarded = Assert.Single(harness.Approver.Received);
         Assert.Equal("env/dev/STRIPE_KEY", forwarded.Entry, StringComparer.Ordinal);
-    }
-
-    /// <summary>
-    /// A client that stops waiting still leaves exactly one line, and no credential in it.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// This is THREATS.md T-6 at its sharpest: a request that reached the approver is an access
-    /// whether or not anybody collected the answer. The natural way to write the bridge - forward
-    /// the cancellation token to everything, including the audit write - is exactly what would make
-    /// the record disappear at the moment it matters most, so the write deliberately takes no token.
-    /// </para>
-    /// <para>
-    /// <b>What this test does not prove, measured rather than assumed.</b> With
-    /// <c>ModelContextProtocol.Core</c> 1.4.1, a client abandoning one <c>tools/call</c> does not
-    /// reach the server at all: the token the tool is handed is never cancelled, and neither is the
-    /// approver's. So the line below says <c>granted</c>, not <c>cancelled</c> - the person really
-    /// was asked and really did say yes, and the answer went into a reply nobody read. The bridge's
-    /// cancellation branch is written and correct, and it is reachable when the server observes
-    /// cancellation, but this is not the path that produces it. Saying so is the point: a test
-    /// named for a branch it never reaches is worse than no test.
-    /// </para>
-    /// <para>
-    /// The consequence worth knowing is not a leak - nothing reaches a party that was not already
-    /// on that stream - but that an abandoned request still spends a person's approval, and the
-    /// agent's retry is then served from the grant cache without asking them again.
-    /// </para>
-    /// </remarks>
-    [Fact]
-    public async Task ACallTheClientAbandons_IsStillAudited_AndCarriesNoCredentialIntoTheLog()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.Hold = true;
-        harness.Approver.StartApproving();
-        var client = await harness.StartAsync();
-
-        using var giveUp = new CancellationTokenSource();
-
-        var call = client.CallToolAsync(
-            ToolText.CredentialToolName,
-            Credential(entry: "env/dev/STRIPE_KEY"),
-            cancellationToken: giveUp.Token).AsTask();
-
-        await harness.Approver.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
-
-        await giveUp.CancelAsync();
-
-        try
-        {
-            await call;
-        }
-        catch (OperationCanceledException)
-        {
-            // Giving up is the point of the test.
-        }
-
-        harness.Approver.Held.TrySetResult();
-
-        var line = await AuditLineAsync(harness);
-        using var parsed = JsonDocument.Parse(line);
-
-        // One line, whatever happened to the caller. That is the claim law 3.3 makes.
-        Assert.Single(harness.AuditLines());
-        Assert.Equal("env/dev/STRIPE_KEY", parsed.RootElement.GetProperty("args").GetProperty("entry").GetString());
-
-        // And never the credential itself, on any path.
-        Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -781,10 +660,17 @@ public sealed class ServerToolsTests
         Assert.Equal(ApprovalLimits.MaximumRequestableTtlSeconds, properties.GetProperty("ttl_seconds").GetProperty("maximum").GetInt32());
     }
 
+    /// <summary>
+    /// A call the bridge refuses itself, or that nothing answered, is one line in the bridge's log
+    /// naming the client as it said and the exposure (T-3); one the owner answered is the owner's
+    /// (<c>SessionAuthorityRecordsTests</c>).
+    /// </summary>
     [Fact]
-    public async Task EveryCall_WritesOneAuditLine_NamingTheClientAndTheExposure()
+    public async Task EveryCallNothingAnswered_WritesOneAuditLine_NamingTheClientAndTheExposure()
     {
         await using var harness = new McpHarness();
+        harness.Source.Availability = VaultAvailability.NoSession;
+        harness.Source.Recorded = false;
         var client = await harness.StartAsync();
 
         await CallAsync(client, ToolText.ListToolName);
@@ -820,6 +706,7 @@ public sealed class ServerToolsTests
     public async Task ARealRunLeavesALogThatVerifies()
     {
         await using var harness = new McpHarness();
+        harness.Source.Recorded = false;
         var client = await harness.StartAsync();
 
         await CallAsync(client, ToolText.ListToolName);
@@ -863,11 +750,11 @@ public sealed class ServerToolsTests
         Assert.DoesNotContain(Sentinel, listing, StringComparison.Ordinal);
         Assert.DoesNotContain(Sentinel, refusal, StringComparison.Ordinal);
 
-        // The agent named it itself in the second call, so the audit line records that argument -
-        // which is law 3.3 working, not a leak. What must not appear is the listing's copy.
-        using var parsed = JsonDocument.Parse(harness.AuditLines()[0]);
-        Assert.DoesNotContain(Sentinel, harness.AuditLines()[0], StringComparison.Ordinal);
-        Assert.Equal(ToolText.ListToolName, parsed.RootElement.GetProperty("tool").GetString());
+        // The agent named it itself in the second call, so the bridge's line for that refusal records
+        // the argument - which is law 3.3 working, not a leak. The listing was the owner's to record.
+        using var parsed = JsonDocument.Parse(Assert.Single(harness.AuditLines()));
+        Assert.Equal(ToolText.CredentialToolName, parsed.RootElement.GetProperty("tool").GetString());
+        Assert.Equal("out-of-scope", parsed.RootElement.GetProperty("method").GetString());
     }
 
     /// <summary>
@@ -887,31 +774,6 @@ public sealed class ServerToolsTests
 
         using var parsed = JsonDocument.Parse(lines[0]);
         Assert.Equal("invalid-request", parsed.RootElement.GetProperty("method").GetString());
-    }
-
-    /// <summary>
-    /// The audit line names the entry, not the opaque handle the agent sent.
-    /// </summary>
-    /// <remarks>
-    /// <c>request_credential</c>'s schema tells an agent to prefer a handle, so the handle is the
-    /// ordinary case rather than the exotic one. Recording it verbatim leaves a log that cannot
-    /// answer the only question it exists for. Found by running real Claude Code, which sent a
-    /// handle and produced a line reading <c>k1_6f91aa064e192942</c> where <c>docs/demo.md</c>
-    /// promises <c>env/demo/STRIPE_KEY</c>. The approver had resolved it and sent the name back in
-    /// <c>CredentialReply.Entry</c> the whole time; nothing read it.
-    /// </remarks>
-    [Fact]
-    public async Task TheAuditLineNamesTheEntryRatherThanTheHandleTheAgentSent()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartApproving();
-        var client = await harness.StartAsync();
-
-        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "k1_0123456789abcdef"));
-
-        var audit = harness.AuditText;
-        Assert.Contains("env/dev/STRIPE_KEY", audit, StringComparison.Ordinal);
-        Assert.DoesNotContain("k1_0123456789abcdef", audit, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -950,33 +812,5 @@ public sealed class ServerToolsTests
         Assert.Contains("for 3600 seconds", text, StringComparison.Ordinal);
         Assert.DoesNotContain("APPROVED ONCE", text, StringComparison.Ordinal);
         Assert.Equal(3600, result.StructuredContent!.Value.GetProperty("expires_in_seconds").GetInt32());
-    }
-
-    [Theory]
-    [InlineData(3600)]
-    [InlineData(0)]
-    public async Task TheAuditLine_CarriesGrantedSeconds(int seconds)
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartApproving(ttlSeconds: seconds);
-        var client = await harness.StartAsync();
-
-        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
-
-        using var parsed = JsonDocument.Parse(Assert.Single(harness.AuditLines()));
-        Assert.Equal(seconds, parsed.RootElement.GetProperty("granted_seconds").GetInt32());
-        Assert.Equal(900, parsed.RootElement.GetProperty("args").GetProperty("ttl_seconds").GetInt32());
-    }
-
-    [Fact]
-    public async Task ARefusedCall_HasNoGrantedSeconds()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartRefusing(AuditMethod.Prompt);
-        var client = await harness.StartAsync();
-
-        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
-
-        Assert.DoesNotContain("granted_seconds", Assert.Single(harness.AuditLines()), StringComparison.Ordinal);
     }
 }

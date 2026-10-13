@@ -20,9 +20,9 @@ namespace Keypaste.Mcp.Tests;
 /// </para>
 /// <para>
 /// The cancellation and disconnection halves of F.3b are in <c>ApproverConnectionTests</c>
-/// instead: the SDK does not carry a client's cancellation through to the server's token here, as
-/// <c>ServerToolsTests.ACallTheClientAbandons_IsStillAudited_AndCarriesNoCredentialIntoTheLog</c>
-/// records, so driving them from this end would test nothing.
+/// instead: the SDK client does not carry its own cancellation through to the server's token, so
+/// driving them from this end would test nothing. <c>OneLinePerRequestTests</c> sends the
+/// cancellation notification itself.
 /// </para>
 /// </remarks>
 public sealed class ConcurrentRequestsTests
@@ -152,6 +152,9 @@ public sealed class ConcurrentRequestsTests
 
         harness.Approver.Held.TrySetResult();
         await held;
+
+        // The refusal is the bridge's to record; the request the owner answered is the owner's.
+        Assert.Equal(["busy"], MethodsOf(harness));
 
         // Never alongside a release: a refusal that reads as a grant is the one shape the log must
         // not be able to take.

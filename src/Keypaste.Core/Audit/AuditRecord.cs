@@ -137,8 +137,22 @@ public enum AuditMethod
 /// <param name="Label">The name a human gave this server via <c>--client-label</c>.</param>
 public sealed record AuditClient(string? Name, string? Version, string? Label)
 {
+    /// <summary>The longest client-supplied name, version or label kept.</summary>
+    public const int MaximumTextLength = 64;
+
     /// <summary>A client that said nothing about itself.</summary>
     public static AuditClient Unknown { get; } = new(null, null, null);
+
+    /// <summary>Who asked, as a line records them: each part sanitized and capped, and one that was not said left absent.</summary>
+    /// <param name="name">The client's self-declared name, or null.</param>
+    /// <param name="version">The client's self-declared version, or null.</param>
+    /// <param name="label">The label its configuration gave it, or null.</param>
+    /// <returns>The client.</returns>
+    public static AuditClient Of(string? name, string? version, string? label) =>
+        new(Clean(name), Clean(version), Clean(label));
+
+    private static string? Clean(string? value) =>
+        value is null ? null : EntryNameSanitizer.Sanitize(value, MaximumTextLength).Text;
 }
 
 /// <summary>The arguments a tool was called with, reduced to what is safe to keep.</summary>

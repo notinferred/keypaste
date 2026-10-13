@@ -160,4 +160,25 @@ public sealed class RunRequestRulesTests
     [InlineData("DATABASE_URL", false)]
     public void LoaderAndProxyNames_AreFlagged(string name, bool flagged) =>
         Assert.Equal(flagged, RunRequestRules.ChangesHowProgramsStart(name));
+
+    /// <summary>
+    /// What the owner checks before it records a release and the bridge before it starts anything: the
+    /// names are the references' or the keys', in order, or for a whole set ones the name rule allows.
+    /// </summary>
+    [Fact]
+    public void AReleaseAnswersARun_OnlyWithTheNamesItAskedFor()
+    {
+        var byReference = References(("API_KEY", "kp:///api/OpenAI#password"), ("DB", "kp:///db/main#password"));
+
+        Assert.True(RunRequestRules.Answers(byReference, ["API_KEY", "DB"]));
+        Assert.False(RunRequestRules.Answers(byReference, ["DB", "API_KEY"]));
+        Assert.False(RunRequestRules.Answers(byReference, ["API_KEY", "DB", "PATH"]));
+
+        Assert.True(RunRequestRules.Answers(Set(keys: ["DATABASE_URL"]), ["DATABASE_URL"]));
+        Assert.False(RunRequestRules.Answers(Set(keys: ["DATABASE_URL"]), ["DATABASE_URL", "STRIPE_SECRET_KEY"]));
+
+        Assert.True(RunRequestRules.Answers(Set(), ["DATABASE_URL", "STRIPE_SECRET_KEY"]));
+        Assert.False(RunRequestRules.Answers(Set(), ["DATABASE_URL", "PATH"]));
+        Assert.False(RunRequestRules.Answers(Set(), []));
+    }
 }

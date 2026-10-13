@@ -37,7 +37,8 @@ KEYPASTE_HOME="$(native "$WORK/home")"
 export KEYPASTE_HOME
 OTHER_HOME="$(native "$WORK/other-home")"
 VAULT="$(native "$WORK/vault.kdbx")"
-AUDIT="$(native "$WORK/audit.jsonl")"
+# The log in the owner's home, where the bridges here write too.
+AUDIT="$(native "$WORK/home/audit.jsonl")"
 readonly HOLD_OUT="$WORK/hold.txt"
 readonly OUT="$WORK/mcp-stdout.txt"
 readonly ERR="$WORK/mcp-stderr.txt"

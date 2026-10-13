@@ -1,3 +1,4 @@
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Xunit;
 
@@ -45,10 +46,9 @@ public sealed class ApproverConnectionTests
     /// different grant and a different cooldown.
     /// </para>
     /// <para>
-    /// The connection is now finished explicitly instead: the reply to the abandoned exchange may
-    /// still be in flight and a frame stopped mid-write may be on the wire, and the protocol has
-    /// nothing to correlate a reply by, so reusing that stream is how one request's answer becomes
-    /// another's.
+    /// The connection is now finished explicitly instead: the request is withdrawn on it, the owner
+    /// answers that and ends it, and the protocol has nothing to correlate a reply by, so reusing that
+    /// stream is how one request's answer becomes another's.
     /// </para>
     /// </remarks>
     [Fact]
@@ -68,9 +68,13 @@ public sealed class ApproverConnectionTests
 
         await giveUp.CancelAsync();
 
-        var (reply, _) = await call.WaitAsync(_promptly, Token);
+        var (reply, outcome) = await call.WaitAsync(_promptly, Token);
 
-        Assert.Null(reply);
+        // Withdrawn, and answered: the reply says the owner recorded the withdrawal, so the bridge does not.
+        Assert.Equal(ApproverOutcome.Answered, outcome);
+        Assert.NotNull(reply);
+        Assert.Equal((AuditMethod.Cancelled, true), (reply.Method, reply.Recorded));
+        Assert.Null(reply.Value);
 
         approver.Held.TrySetResult();
 
@@ -79,6 +83,24 @@ public sealed class ApproverConnectionTests
         await Task.Delay(TimeSpan.FromMilliseconds(500), Token);
 
         Assert.Single(approver.Received);
+    }
+
+    /// <summary>A call given up on before it reached the owner has no reply, so the bridge records it, and nothing was sent.</summary>
+    [Fact]
+    public async Task ACallCancelledBeforeItIsSent_HasNoReply()
+    {
+        await using var approver = new FakeApprover();
+        approver.StartApproving();
+
+        await using var connection = new ApproverConnection(approver.PipeName, _vault);
+
+        using var gaveUp = new CancellationTokenSource();
+        await gaveUp.CancelAsync();
+
+        var (reply, _) = await connection.RequestAsync(Request(), gaveUp.Token);
+
+        Assert.Null(reply);
+        Assert.Empty(approver.Received);
     }
 
     /// <summary>

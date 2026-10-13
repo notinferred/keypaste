@@ -309,8 +309,12 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A request refused before it is considered is recorded by the owner too, under no session, and
+    /// against this vault only when it named this vault.
+    /// </summary>
     [Fact]
-    public async Task A_request_from_no_attachment_another_vault_or_an_ended_session_is_refused_unasked()
+    public async Task A_request_from_no_attachment_another_vault_or_an_ended_session_is_refused_unasked_and_recorded()
     {
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         await using var owner = Owner.Start(this);
@@ -334,6 +338,26 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         }
 
         Assert.Equal(0, _fixture.Channel.Asked);
+
+        var lines = AuditLines();
+        Assert.Equal(
+            [
+                "the request came from a connection attached to no session",
+                "the request named a different vault from its attachment",
+                "the request belongs to a session that has ended",
+            ],
+            lines.Select(line => line.GetProperty("reason").GetString()));
+        Assert.All(lines, line =>
+        {
+            Assert.Equal("run", line.GetProperty("tool").GetString());
+            Assert.Equal("keypaste run --session", line.GetProperty("client").GetProperty("name").GetString());
+            Assert.Equal("denied", line.GetProperty("decision").GetString());
+            Assert.Equal("no-session", line.GetProperty("method").GetString());
+            Assert.False(line.TryGetProperty("session", out _));
+        });
+
+        var key = VaultIdentity.Of(_directory, VaultPath).Key;
+        Assert.Equal(new[] { key, null, key }, lines.Select(line => line.TryGetProperty("vault", out var vault) ? vault.GetString() : null));
     }
 
     [Fact]
@@ -348,6 +372,11 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.NotNull(reply);
         Assert.Equal(EnvOutcome.Locked, reply.Set.Outcome);
         Assert.Equal(0, _fixture.Channel.Asked);
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("vault-locked", line.GetProperty("method").GetString());
+        Assert.Equal("the vault is locked", line.GetProperty("reason").GetString());
+        Assert.False(line.TryGetProperty("session", out _));
     }
 
     [Fact]
@@ -380,6 +409,13 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(EnvOutcome.Invalid, empty?.Set.Outcome);
         Assert.Equal(EnvOutcome.Invalid, tooLong?.Set.Outcome);
         Assert.Equal(0, _fixture.Channel.Asked);
+
+        var lines = AuditLines();
+        Assert.Equal(["invalid-request", "invalid-request"], lines.Select(line => line.GetProperty("method").GetString()));
+        Assert.Equal(
+            ["the request names no command", $"the command is longer than the {EnvReleasePrompt.MaximumCommandLength} characters a prompt shows whole"],
+            lines.Select(line => line.GetProperty("reason").GetString()));
+        Assert.All(lines, line => Assert.Equal("session-one", line.GetProperty("session").GetString()));
     }
 
     [Fact]
@@ -426,6 +462,10 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.NotNull(reply);
         Assert.Equal(EnvOutcome.NoSession, reply.Set.Outcome);
         Assert.Equal(0, _fixture.Channel.Asked);
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("no-session", line.GetProperty("method").GetString());
+        Assert.Equal("session-one", line.GetProperty("session").GetString());
     }
 
     [Fact]
@@ -683,7 +723,8 @@ public sealed class SessionAuthorityEnvTests : IDisposable
             VaultIdentity.Of(_directory, VaultPath),
             () => _lifetime,
             _fixture.Handler,
-            new SessionEnvironments(_fixture.Gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, _fixture.Clock, Audit: () => _audit));
+            () => _audit,
+            new SessionEnvironments(_fixture.Gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, _fixture.Clock));
         Assert.True((await authority.AttachAsync(new AttachRequest(VaultPath), "in-process", Token)).Attached);
 
         var badProfile = await authority.ReleaseEnvAsync(Request("session-one") with { Profile = "Prod" }, "in-process", Token);
@@ -693,6 +734,9 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal("Prod", badProfile.Set.Profile);
         Assert.Equal(EnvOutcome.Invalid, badKey.Set.Outcome);
         Assert.Equal(0, _fixture.Channel.Asked);
+
+        // Every request the owner read is recorded; the frame it hung up on was never read.
+        Assert.Equal(["out-of-scope", "invalid-request", "invalid-request"], AuditLines().Select(line => line.GetProperty("method").GetString()));
     }
 
     [Fact]
@@ -745,13 +789,13 @@ public sealed class SessionAuthorityEnvTests : IDisposable
             VaultIdentity.Of(_directory, VaultPath),
             () => _lifetime,
             _fixture.Handler,
+            () => _audit,
             new SessionEnvironments(
                 _fixture.Gate,
                 lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
                 _fixture.Clock,
                 grants,
-                narrate,
-                () => _audit));
+                narrate));
 
     /// <summary>One run: a new connection that attaches and asks once, as every <c>keypaste run --session</c> is.</summary>
     private async Task<EnvReply> RunAsync(SessionAuthority authority, EnvRequest request)
@@ -816,12 +860,12 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                 VaultIdentity.Of(test._directory, test.VaultPath),
                 () => test._lifetime,
                 handler ?? test._fixture.Handler,
+                () => test._audit,
                 environments
                     ? new SessionEnvironments(
                         test._fixture.Gate,
                         lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,
-                        test._fixture.Clock,
-                        Audit: () => test._audit)
+                        test._fixture.Clock)
                     : null);
 
             return new Owner(name, new ApproverListener(name, authority));

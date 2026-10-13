@@ -33,6 +33,8 @@ public enum ApproverMessageKind
     TokenEnv = 9,
     /// <summary>An agent's command to start with approved secrets in its environment.</summary>
     Run = 10,
+    /// <summary>Withdraws the request a connection is waiting on: the owner still sends its reply, then ends the connection.</summary>
+    Withdraw = 11,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -130,6 +132,10 @@ public sealed record NamesReply(
     /// vault being locked, as before this existed.
     /// </summary>
     public AuditMethod? Refusal { get; init; }
+
+    /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
+    /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
+    public bool Recorded { get; init; }
 }
 
 /// <summary>An agent's credential request, forwarded to whoever can ask a human about it.</summary>
@@ -210,7 +216,7 @@ public sealed record CredentialReply
     /// <summary>Whether anything was released.</summary>
     public required AuditDecision Decision { get; init; }
 
-    /// <summary>How the decision was reached, for the audit line the bridge writes.</summary>
+    /// <summary>How the decision was reached, as its audit line says.</summary>
     public required AuditMethod Method { get; init; }
 
     /// <summary>keypaste's own one-line explanation. Trusted text, unlike the agent's reason.</summary>
@@ -227,6 +233,10 @@ public sealed record CredentialReply
 
     /// <summary>The session that answered, or null when none did.</summary>
     public string? Session { get; init; }
+
+    /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
+    /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
+    public bool Recorded { get; init; }
 
     /// <summary>A description with the credential left out.</summary>
     /// <returns>The decision and method, and never the value.</returns>
@@ -483,7 +493,7 @@ public sealed record RunRequest
 
 /// <summary>The owner's answer to a <see cref="RunRequest"/>: the variables, or why none.</summary>
 /// <param name="Set">The variables, with values only when its outcome is <see cref="EnvOutcome.Resolved"/>.</param>
-/// <param name="Method">How it was decided, for the bridge's audit line.</param>
+/// <param name="Method">How it was decided, as its audit line says.</param>
 /// <param name="Reason">keypaste's own words.</param>
 public sealed record RunReply(EnvResolved Set, AuditMethod Method, string Reason)
 {
@@ -495,6 +505,10 @@ public sealed record RunReply(EnvResolved Set, AuditMethod Method, string Reason
 
     /// <summary>The session that answered, or null when none did.</summary>
     public string? Session { get; init; }
+
+    /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
+    /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
+    public bool Recorded { get; init; }
 
     /// <summary>A description with every value left out.</summary>
     /// <returns>The outcome and method, never a value.</returns>

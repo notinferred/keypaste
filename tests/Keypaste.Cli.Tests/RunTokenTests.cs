@@ -154,7 +154,7 @@ public sealed class RunTokenTests : IDisposable
         _harness.AssertExit(CliApp.ExitInternalError, Run("-p", "staging", "acme-api"));
 
         Assert.Empty(_harness.ProcessLauncher.Started);
-        Assert.Contains("the audit log could not be written, so nothing was started", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("the audit log could not be opened, so nothing was started", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(TokenVerbTests.Value, _harness.Out + _harness.Err, StringComparison.Ordinal);
     }
 
@@ -175,6 +175,31 @@ public sealed class RunTokenTests : IDisposable
         Assert.Contains("'acme-api' has no 'qa' profile", _harness.Err, StringComparison.Ordinal);
         Assert.Null(owner.Channel.Last);
         Assert.Equal(3, owner.AuditLines().Count);
+    }
+
+    [Fact]
+    public async Task Session_AnInvalidRequest_IsRefusedAndTheOwnerAudited()
+    {
+        var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*");
+        await using var owner = Owner.Start(this, audited: true);
+        RunAsARunner(token);
+
+        _harness.AssertExit(
+            CliApp.ExitInternalError,
+            _harness.Run(
+                "run", "--token", "env", "--vault", _harness.VaultPath, "-p", "staging", "acme-api",
+                "--", "deploy", new string('a', EnvReleasePrompt.MaximumCommandLength)));
+
+        Assert.Empty(_harness.ProcessLauncher.Started);
+        Assert.Contains("characters a prompt shows whole, so nothing was started", _harness.Err, StringComparison.Ordinal);
+
+        var line = Assert.Single(owner.AuditLines());
+        Assert.Contains("keypaste run --token", line, StringComparison.Ordinal);
+        Assert.Contains("\"method\":\"token\"", line, StringComparison.Ordinal);
+        Assert.Contains("\"decision\":\"denied\"", line, StringComparison.Ordinal);
+        Assert.Contains("characters a prompt shows whole", line, StringComparison.Ordinal);
+        Assert.DoesNotContain(token[13..], line, StringComparison.Ordinal);
+        Assert.False(File.Exists(KeypasteHome.AuditPath(RunnerHome)));
     }
 
     [Fact]
@@ -307,11 +332,11 @@ public sealed class RunTokenTests : IDisposable
                 VaultIdentity.Of(test._harness.Directory, test._harness.VaultPath),
                 () => Lifetime,
                 handler,
+                () => _audit,
                 new SessionEnvironments(
                     _gate,
                     asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null,
-                    test._harness.Clock,
-                    Audit: () => _audit));
+                    test._harness.Clock));
 
             _listener = new ApproverListener(test._pipe, authority);
             _running = _listener.RunAsync(_stop.Token);

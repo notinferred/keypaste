@@ -113,7 +113,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
 
     /// <summary>Asks the owner to release the secrets an agent's run would inject.</summary>
     /// <param name="request">The run. Its vault and session are filled in here.</param>
-    /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
     /// <returns>The owner's answer, and what became of the exchange.</returns>
     /// <remarks>
     /// Never sent twice. A run whose reply was lost may already have been approved, or released, and
@@ -128,7 +128,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
 
     /// <summary>Asks the owner to decide one credential request.</summary>
     /// <param name="request">What the agent asked for. Its vault and session are filled in here.</param>
-    /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
     /// <returns>The owner's answer, and what became of the exchange.</returns>
     internal ValueTask<Exchange<CredentialReply>> RequestAsync(
         CredentialRequest request,
@@ -139,7 +139,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
 
     /// <summary>Asks the owner which entry names may be shown.</summary>
     /// <param name="request">The exposure to apply. Its vault and session are filled in here.</param>
-    /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
     /// <returns>The reply, and what became of the exchange.</returns>
     internal ValueTask<Exchange<NamesReply>> ListAsync(
         NamesRequest request,

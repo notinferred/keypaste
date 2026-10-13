@@ -262,6 +262,44 @@ public sealed class SessionAuthorityTokenTests : IDisposable
 
         Assert.Equal(EnvOutcome.Locked, reply.Set.Outcome);
         Assert.Empty(reply.Set.Variables);
+
+        var line = Assert.Single(Lines());
+        Assert.Equal("token", line.GetProperty("method").GetString());
+        Assert.Equal("denied", line.GetProperty("decision").GetString());
+        Assert.Equal("the vault is locked", line.GetProperty("reason").GetString());
+        Assert.False(line.TryGetProperty("session", out _));
+    }
+
+    /// <summary>
+    /// A token request refused before its token is looked at is recorded by the owner as well: one from
+    /// no attachment or an ended session under no session, an invalid one under its own, and none
+    /// carrying anything of the token.
+    /// </summary>
+    [Fact]
+    public async Task ARequestRefusedBeforeItsTokenIsLookedAt_IsAuditedByTheOwner()
+    {
+        var token = Mint("ci", "read:acme-api/staging/*");
+        var authority = await AttachedAsync();
+
+        var unattached = await authority.ReleaseTokenEnvAsync(Request(token, "staging"), "never-attached", Cancel);
+        var ended = await authority.ReleaseTokenEnvAsync(Request(token, "staging") with { Session = "ended" }, _connection, Cancel);
+        var invalid = await authority.ReleaseTokenEnvAsync(Request(token, "staging", command: []), _connection, Cancel);
+
+        Assert.All(new[] { unattached, ended, invalid }, reply => Assert.Empty(reply.Set.Variables));
+
+        var lines = Lines();
+        Assert.Equal(
+            ["the request came from a connection attached to no session", "the request belongs to a session that has ended", "the request names no command"],
+            lines.Select(line => line.GetProperty("reason").GetString()));
+        Assert.Equal(new[] { null, null, "session-one" }, lines.Select(line => line.TryGetProperty("session", out var session) ? session.GetString() : null));
+        Assert.All(lines, line =>
+        {
+            Assert.Equal("keypaste run --token", line.GetProperty("client").GetProperty("name").GetString());
+            Assert.Equal("token", line.GetProperty("method").GetString());
+            Assert.Equal("denied", line.GetProperty("decision").GetString());
+            Assert.Equal(VaultIdentity.Of(_directory, VaultPath).Key, line.GetProperty("vault").GetString());
+            Assert.DoesNotContain(token[13..], line.GetRawText(), StringComparison.Ordinal);
+        });
     }
 
     [Fact]
@@ -370,10 +408,10 @@ public sealed class SessionAuthorityTokenTests : IDisposable
             locked = await authority.ReleaseTokenEnvAsync(Request(token, "staging"), _connection, Cancel);
         }
 
-        foreach (var reply in new[] { noLog, locked })
+        foreach (var (reply, reason) in new[] { (noLog, "the audit log could not be opened"), (locked, "the audit log could not be written") })
         {
             Assert.Equal(EnvOutcome.Unreadable, reply.Set.Outcome);
-            Assert.Equal("the audit log could not be written", reply.Reason);
+            Assert.Equal(reason, reply.Reason);
             Assert.Empty(reply.Set.Variables);
             Assert.DoesNotContain(_database, reply.ToString(), StringComparison.Ordinal);
         }
@@ -408,6 +446,8 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         var bad = await authority.ReleaseTokenEnvAsync(Request(token, "Bad Profile"), _connection, Cancel);
         Assert.Equal(EnvOutcome.Invalid, bad.Set.Outcome);
         Assert.Equal("Bad Profile", bad.Set.Profile);
+
+        Assert.Equal(6, Lines().Count);
     }
 
     [Fact]
@@ -468,11 +508,11 @@ public sealed class SessionAuthorityTokenTests : IDisposable
             VaultIdentity.Of(_directory, VaultPath),
             () => _lifetime,
             _fixture.Handler,
+            () => audit ? _audit : null,
             new SessionEnvironments(
                 _fixture.Gate,
                 lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
-                _fixture.Clock,
-                Audit: audit ? () => _audit : null));
+                _fixture.Clock));
 
     private async Task<SessionAuthority> AttachedAsync(bool audit = true)
     {

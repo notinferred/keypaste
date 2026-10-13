@@ -27,6 +27,11 @@ namespace Keypaste.App.Session;
 /// A failure to listen does not stop the unlock. The app is a password manager without MCP
 /// (docs/PRODUCT.md law 5.6); the failure is reported instead of the endpoint.
 /// </para>
+/// <para>
+/// Every request answered is recorded in the home's audit log before its reply leaves. A log that
+/// cannot be opened does not stop the unlock either: each request is refused before anybody is asked,
+/// and the next one tries the log again, so mending the file needs no new unlock.
+/// </para>
 /// </remarks>
 internal sealed class SessionHost : IDisposable
 {
@@ -273,11 +278,11 @@ internal sealed class SessionHost : IDisposable
     private sealed class Hosted : IDisposable
     {
         private readonly SessionServer _server;
-        private readonly Lazy<AuditLog?> _audit;
+        private readonly AuditOpener _audit;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
 
-        private Hosted(SessionServer server, Lazy<AuditLog?> audit)
+        private Hosted(SessionServer server, AuditOpener audit)
         {
             _server = server;
             _audit = audit;
@@ -310,9 +315,7 @@ internal sealed class SessionHost : IDisposable
             Action? requestLock,
             out string? failure)
         {
-            // Opened when a token or a run first arrives, so an unlock creates no log; one that cannot be opened refuses them.
-            var audit = new Lazy<AuditLog?>(() =>
-                AuditLog.TryOpen(KeypasteHome.AuditPath(session.Home), TimeProvider.System, out var opened, out _) ? opened : null);
+            AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home));
 
             try
             {
@@ -325,7 +328,7 @@ internal sealed class SessionHost : IDisposable
                     Channel = channel,
                     Policy = PolicyGate.None,
                     Clients = new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)),
-                    Audit = () => audit.Value,
+                    Audit = audit.Open,
                     WatchEdits = edited => session.Edited += edited,
                     UnwatchEdits = edited => session.Edited -= edited,
                     LockNow = requestLock,
@@ -333,12 +336,18 @@ internal sealed class SessionHost : IDisposable
                 });
 
                 failure = null;
-                return new Hosted(server, audit);
+                var hosted = new Hosted(server, audit);
+                audit = null;
+                return hosted;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 failure = $"keypaste could not listen for agents: {ex.Message}";
                 return null;
+            }
+            finally
+            {
+                audit?.Dispose();
             }
         }
 
@@ -357,11 +366,43 @@ internal sealed class SessionHost : IDisposable
             }
 
             _server.Dispose();
-            if (_audit.IsValueCreated)
-            {
-                _audit.Value?.Dispose();
-            }
+            _audit.Dispose();
             _stop.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The home's audit log, opened at the first request, so an unlock creates no log, and tried again
+    /// on the next request after an open that failed.
+    /// </summary>
+    private sealed class AuditOpener(string path) : IDisposable
+    {
+        private readonly Lock _gate = new();
+        private AuditLog? _log;
+        private bool _disposed;
+
+        /// <summary>The log, or null while it cannot be opened, which refuses every request.</summary>
+        internal AuditLog? Open()
+        {
+            lock (_gate)
+            {
+                if (_log is null && !_disposed && AuditLog.TryOpen(path, TimeProvider.System, out var opened, out _))
+                {
+                    _log = opened;
+                }
+
+                return _log;
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                _disposed = true;
+                _log?.Dispose();
+                _log = null;
+            }
         }
     }
 }

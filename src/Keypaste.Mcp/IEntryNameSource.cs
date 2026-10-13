@@ -36,6 +36,12 @@ internal enum VaultAvailability
     /// <see cref="ToolText.VaultChanged"/> is what the agent is told.
     /// </summary>
     Changed = 5,
+
+    /// <summary>
+    /// The owner answered without recording the listing, so nothing it named is shown.
+    /// <see cref="ToolText.AuditUnavailable"/> is what the agent is told.
+    /// </summary>
+    Unrecorded = 6,
 }
 
 /// <summary>What the vault had to say when asked for its entry names.</summary>
@@ -56,6 +62,9 @@ internal sealed record EntryNameListing(
 {
     /// <summary>The unlocked session that answered, or null when none did.</summary>
     public string? Session { get; init; }
+
+    /// <summary>Whether the owner recorded this listing, so the bridge writes no line.</summary>
+    public bool Recorded { get; init; }
 }
 
 /// <summary>
@@ -128,6 +137,12 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
                 : new EntryNameListing(VaultAvailability.NoSession, [], ToolText.NoSession, true);
         }
 
+        // A withdrawn listing's reply is still read, so one its owner recorded adds no line here.
+        if (cancellationToken.IsCancellationRequested && reply is not { Recorded: false })
+        {
+            return new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled, true) { Recorded = reply is not null };
+        }
+
         if (reply is null)
         {
             return new EntryNameListing(
@@ -139,11 +154,21 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
                 true);
         }
 
+        // Nothing an unrecorded reply named is shown: entry names are an asset too (law 3.5, T-6).
+        if (!reply.Recorded)
+        {
+            return new EntryNameListing(VaultAvailability.Unrecorded, [], ToolText.AuditUnavailable, true)
+            {
+                Session = reply.Session,
+            };
+        }
+
         if (reply.Refusal == Core.Audit.AuditMethod.VaultChanged)
         {
             return new EntryNameListing(VaultAvailability.Changed, [], ToolText.VaultChanged, true)
             {
                 Session = reply.Session,
+                Recorded = true,
             };
         }
 
@@ -151,7 +176,8 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
             ? new EntryNameListing(VaultAvailability.Available, reply.Names, string.Empty, reply.Complete)
             {
                 Session = reply.Session,
+                Recorded = true,
             }
-            : new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked, true);
+            : new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked, true) { Recorded = true };
     }
 }

@@ -20,7 +20,10 @@ public sealed class SessionAuthorityTests : IDisposable
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-authority-tests-").FullName;
     private readonly ApproverFixture _fixture = new();
+    private readonly OwnerLog _log;
     private SessionLifetime? _lifetime = new("session-one");
+
+    public SessionAuthorityTests() => _log = new OwnerLog(_directory);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -597,6 +600,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public void Dispose()
     {
         _lifetime?.Dispose();
+        _log.Dispose();
         _fixture.Dispose();
         Directory.Delete(_directory, recursive: true);
     }
@@ -693,7 +697,8 @@ public sealed class SessionAuthorityTests : IDisposable
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._directory, test.VaultPath),
                 () => test._lifetime,
-                handler ?? test._fixture.Handler);
+                handler ?? test._fixture.Handler,
+                audit: () => test._log.Log);
 
             return new Owner(name, new ApproverListener(name, authority), authority);
         }

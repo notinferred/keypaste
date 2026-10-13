@@ -42,6 +42,7 @@ internal sealed class McpHarness : IAsyncDisposable
     private TeeStream? _transcript;
 
     private AuditLog? _audit;
+    private ServerOptions? _options;
     private McpServerPrimitiveCollection<McpServerTool>? _tools;
     private McpServer? _server;
     private McpClient? _client;
@@ -51,6 +52,7 @@ internal sealed class McpHarness : IAsyncDisposable
     /// <summary>The vault the server will be pointed at. Never opened: nothing opens a vault here.</summary>
     internal string VaultPath => _vaultPath ?? Path.Combine(_directory, "vault.kdbx");
 
+    /// <summary>Where this bridge records the calls no owner recorded.</summary>
     internal string AuditPath => Path.Combine(_directory, "audit.jsonl");
 
     /// <summary>Every byte the server has sent the client, as text.</summary>
@@ -139,6 +141,8 @@ internal sealed class McpHarness : IAsyncDisposable
             throw new InvalidOperationException($"the harness could not start the server: {error}");
         }
 
+        _options = options;
+
         if (!AuditLog.TryOpen(options.AuditPath, TimeProvider.System, out _audit, out var auditError))
         {
             throw new InvalidOperationException($"the harness could not open the audit log: {auditError}");
@@ -182,6 +186,10 @@ internal sealed class McpHarness : IAsyncDisposable
 
         return channels;
     }
+
+    /// <summary>Has the bridge attach to its owner as the client <paramref name="server"/> names, for a test that calls a tool on a server of its own.</summary>
+    internal void AttachAs(McpServer server) =>
+        _approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, _options ?? throw new InvalidOperationException("the harness is not serving"));
 
     /// <summary>A tool the server is serving, for a test that calls it as the server's dispatch would.</summary>
     internal McpServerTool Tool(string name) =>
@@ -276,6 +284,9 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
     /// <summary>Whether the fake vault claims it gave every name it had.</summary>
     internal bool Complete { get; set; } = true;
 
+    /// <summary>Whether the owner says it recorded each listing, so the bridge writes no line. True by default, as an owner does.</summary>
+    internal bool Recorded { get; set; } = true;
+
     /// <summary>How many times the tool asked.</summary>
     internal int Calls { get; private set; }
 
@@ -320,8 +331,8 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
 
         return ValueTask.FromResult(
             Availability == VaultAvailability.Available
-                ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty, Complete)
-                : new EntryNameListing(Availability, [], ToolText.VaultLocked, true));
+                ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty, Complete) { Recorded = Recorded }
+                : new EntryNameListing(Availability, [], ToolText.VaultLocked, true) { Recorded = Recorded });
     }
 
     public void Dispose()

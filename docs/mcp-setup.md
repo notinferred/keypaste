@@ -2,7 +2,7 @@
 
 keypaste ships an MCP server, `keypaste mcp`, that lets an AI agent see the names of things in your vault and ask you for one credential at a time.
 
-The bridge holds no vault. It checks exposure and records access; the approver handles consent, grants and policy. Start the current terminal approver yourself:
+The bridge holds no vault and checks exposure; the approver handles consent, grants and policy, and records each request it answers. Start the current terminal approver yourself:
 
 ```sh
 keypaste agent --vault ~/vaults/personal.kdbx
@@ -171,7 +171,7 @@ Add `--allow-run` to the bridge's arguments and it offers a third tool, `run`. N
 
 `run` takes `command` (the program and its arguments, one per item, never through a shell), `directory` (an existing absolute path), either `project` with an optional `profile` and `keys` or `env` mapping variable names to `kp://` references, a `reason` and an optional `timeout_seconds` (default 120, at most 600). The person holding the vault is shown the exact program, command line, resolved directory, each variable with the entry it comes from and the agent's reason, and answers Deny, Allow once or allow for up to 15 minutes; the timed choice covers only that command line in that directory on that connection. `PATH`, `KEYPASTE_*` and literal values cannot be set, and a program is searched for only in absolute `PATH` entries.
 
-The bridge writes the audit line, then starts the command with the values in its environment and stdin closed, and returns its exit code and the last 16384 characters of each stream with every literal or escaped occurrence of a value replaced by `[keypaste:NAME]`. When the client asked for progress, the bridge reports every 10 seconds while a person decides and while the command runs; a client that times tool calls out sooner should raise its limit. If the client cancels, the command is stopped with what it started (on macOS, only what is still found under it).
+The app or `keypaste agent` records the run before it answers; the bridge then starts the command with the values in its environment and stdin closed, and returns its exit code and the last 16384 characters of each stream with every literal or escaped occurrence of a value replaced by `[keypaste:NAME]`. When the client asked for progress, the bridge reports every 10 seconds while a person decides and while the command runs; a client that times tool calls out sooner should raise its limit. If the client cancels, the command is stopped with what it started (on macOS, only what is still found under it).
 
 The scrubbing is a safety net, not a boundary: a command can still print a value in another form, write it to a file, send it over the network, and any process of the same user can read its environment while it runs. Approve only commands whose behaviour you know; [THREATS.md](../THREATS.md) T-35 lists the limits.
 
@@ -181,7 +181,7 @@ In source, `keypaste mcp serve` is `keypaste agent` and `keypaste mcp setup` is 
 
 ## The audit log
 
-Every call, allowed or refused, appends one JSON line to `~/.keypaste/audit.jsonl`. Set `KEYPASTE_HOME` to move the directory, or `--audit-log` to move just the file.
+Every call, allowed or refused, appends one JSON line to `~/.keypaste/audit.jsonl`. The app or `keypaste agent` writes the line of each call it answers, in its own home's log; the bridge writes one only for a call it refused itself or that nothing holding the vault answered. `KEYPASTE_HOME` moves the directory for the process it is set for, and the bridge's `--audit-log` moves only the bridge's own lines.
 
 ```sh
 jq -c . < ~/.keypaste/audit.jsonl
@@ -305,7 +305,7 @@ If calls report "no keypaste agent is running" (in source, "nothing holds this v
 
 A call says the vault is locked. The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
 
-Nothing in the audit log. Confirm that the client actually called a tool, then check whether `KEYPASTE_HOME` or `--audit-log` changed the destination. A startup or write failure is another possibility; inspect the client's MCP server log for keypaste's stderr.
+Nothing in the audit log. Confirm that the client actually called a tool, then check whether `KEYPASTE_HOME` changed the destination: the app or `keypaste agent` writes in its own home, and `--audit-log` moves only the bridge's lines. A startup or write failure is another possibility; inspect the client's MCP server log for keypaste's stderr.
 
 For protocol errors, inspect wrappers and shell profiles for text written to stdout. A stdio MCP server reserves stdout for protocol messages; CI checks that keypaste follows this rule.
 

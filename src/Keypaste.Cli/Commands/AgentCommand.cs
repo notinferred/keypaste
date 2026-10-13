@@ -33,11 +33,11 @@ namespace Keypaste.Cli.Commands;
 /// opened (D-0309).
 /// </para>
 /// <para>
-/// <b>It writes audit lines for runs and nothing else.</b> The bridge records what agents asked for
-/// (DECISIONS.md D-0020); a <c>keypaste run --token</c> or <c>run --session</c> is recorded here, by the
-/// owner that decided it, because the runner is the side that could skip it. A log that cannot be
-/// opened refuses every token and every run's release and nothing else. What this process prints is for the person
-/// watching it, not the record.
+/// <b>It writes the audit line of every request it answers</b>, in its own home's log, before it
+/// replies: an agent's listing, credential and run, and a <c>keypaste run --session</c> or
+/// <c>--token</c>, because the side that asked is the side that could skip it or point it elsewhere.
+/// A log that cannot be opened stops it before the password is asked for, since it could only refuse.
+/// What this process prints is for the person watching it, not the record.
 /// </para>
 /// <para>
 /// <b>The vault stays unlocked for as long as this runs.</b> There is no idle auto-lock — closing
@@ -124,22 +124,41 @@ internal static class AgentCommand
             line.Value(PolicyOption)
             ?? KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
 
-        if (!VaultClaim.TryAcquire(home, vaultPath, OwnerKind.TerminalAgent, out var claim, out var refusal))
+        if (!AuditLog.TryOpen(
+                KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)),
+                TimeProvider.System,
+                out var audit,
+                out var auditError))
         {
-            context.Stderr.WriteLine($"keypaste: {refusal}");
+            context.Stderr.WriteLine($"keypaste: {auditError}");
             return CliApp.ExitInternalError;
         }
 
-        using (claim)
+        using (audit)
         {
-            var clients = new ClientPolicySource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
-            return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, pipeName, limits, policy, clients, context));
+            if (audit.TightenedPermissions)
+            {
+                context.Stderr.WriteLine($"keypaste: tightened permissions on {audit.Path} to owner-only.");
+            }
+
+            if (!VaultClaim.TryAcquire(home, vaultPath, OwnerKind.TerminalAgent, out var claim, out var refusal))
+            {
+                context.Stderr.WriteLine($"keypaste: {refusal}");
+                return CliApp.ExitInternalError;
+            }
+
+            using (claim)
+            {
+                var clients = new ClientPolicySource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+                return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, audit, pipeName, limits, policy, clients, context));
+            }
         }
     }
 
     private static int Serve(
         Vault vault,
         VaultClaim claim,
+        AuditLog audit,
         string pipeName,
         ApprovalLimits limits,
         PolicyLoad policy,
@@ -150,7 +169,6 @@ internal static class AgentCommand
         void Narrate(string line) => console.WriteLine($"keypaste: {line}");
 
         using var lifetime = new SessionLifetime();
-        using var audit = OpenAudit(context);
         using var stop = new CancellationTokenSource();
 
         SessionServer server;
@@ -226,21 +244,6 @@ internal static class AgentCommand
         {
             // Already stopped.
         }
-    }
-
-    private static AuditLog? OpenAudit(CliContext context)
-    {
-        if (AuditLog.TryOpen(
-                KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)),
-                TimeProvider.System,
-                out var audit,
-                out var error))
-        {
-            return audit;
-        }
-
-        context.Stderr.WriteLine($"keypaste: tokens and runs are refused: {error}");
-        return null;
     }
 
     private static List<PosixSignalRegistration> LockOnSignals(SessionLifetime lifetime, CancellationTokenSource stop)

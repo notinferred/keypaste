@@ -31,14 +31,22 @@ require jq
 CLI="$(keypaste_bin)"
 
 WORK="$(mktemp -d)"
+mkdir -p "$WORK/home"
+KEYPASTE_HOME="$(native "$WORK/home")"
+export KEYPASTE_HOME
 readonly VAULT="$WORK/vault.kdbx"
-readonly AUDIT="$WORK/audit.jsonl"
+# The log in the owner's home, where the bridges here write too.
+readonly AUDIT="$WORK/home/audit.jsonl"
 readonly AGENT_ERR="$WORK/agent-stderr.txt"
 readonly PIPE="keypaste-e2e-$$-$(date +%s)"
 
 AGENT_PID=""
 cleanup() {
-  if [ -n "$AGENT_PID" ]; then kill "$AGENT_PID" 2>/dev/null || true; fi
+  # The agent's home is in $WORK, which Windows will not remove while the agent still holds it.
+  if [ -n "$AGENT_PID" ]; then
+    kill "$AGENT_PID" 2>/dev/null || true
+    wait "$AGENT_PID" 2>/dev/null || true
+  fi
   rm -rf "$WORK"
 }
 trap cleanup EXIT

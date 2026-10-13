@@ -29,6 +29,7 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(TokenEnvRequestFrame))]
 [JsonSerializable(typeof(RunRequestFrame))]
 [JsonSerializable(typeof(RunReplyFrame))]
+[JsonSerializable(typeof(WithdrawFrame))]
 internal sealed partial class ApproverJsonContext : JsonSerializerContext
 {
 }
@@ -42,16 +43,17 @@ internal sealed class NamesRequestFrame(NamesRequest request)
     public IReadOnlyList<string> Exposure => request.Exposure;
 }
 
-internal sealed class NamesReplyFrame(NamesReply reply, IEnumerable<NameRow> names, bool complete)
+internal sealed class NamesReplyFrame(NamesReply reply)
 {
     public int V { get; } = ApproverProtocol.Version;
     public string Kind { get; } = ApproverProtocol.NamesKind;
     public bool Unlocked => reply.VaultUnlocked;
     public string Reason => reply.Reason;
-    public bool Complete => complete;
+    public bool Complete => reply.Complete;
     public string? Session => reply.Session;
     public int? Method => (int?)reply.Refusal;
-    public IEnumerable<NameRow> Names => names;
+    public bool Recorded => reply.Recorded;
+    public IEnumerable<NameRow> Names => NameRow.Of(reply.Names);
 }
 
 internal sealed class NameRow(ListedEntry entry)
@@ -60,6 +62,8 @@ internal sealed class NameRow(ListedEntry entry)
     public string Title => entry.Name.Title;
     public IReadOnlyList<string> Fields => entry.Fields;
     public IReadOnlyList<string> Tags => entry.Tags;
+
+    public static IEnumerable<NameRow> Of(IEnumerable<ListedEntry> entries) => entries.Select(entry => new NameRow(entry));
 }
 
 internal sealed class AttachRequestFrame(AttachRequest request)
@@ -108,6 +112,7 @@ internal sealed class CredentialReplyFrame(CredentialReply reply)
     public int TtlSeconds => reply.TtlSeconds;
     public string? Entry => reply.Entry;
     public string? Session => reply.Session;
+    public bool Recorded => reply.Recorded;
     public string? Value => reply.Value;
 }
 
@@ -161,6 +166,12 @@ internal sealed class AttachedFrame(string kind, string vault, string session)
     public string Kind => kind;
     public string Vault => vault;
     public string Session => session;
+}
+
+internal sealed class WithdrawFrame
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.WithdrawKind;
 }
 
 internal sealed class GrantsReplyFrame(GrantsReply reply, IEnumerable<GrantRow> grants, bool complete)
@@ -262,6 +273,7 @@ internal sealed class RunReplyFrame(RunReply reply)
     public int GrantedSeconds => reply.GrantedSeconds;
     public IReadOnlyList<string> Entries => reply.Entries;
     public string? Session => reply.Session;
+    public bool Recorded => reply.Recorded;
     public IEnumerable<ProblemRow> Problems => ProblemRow.Of(reply.Set);
     public IEnumerable<VariableRow>? Variables => VariableRow.Of(reply.Set);
 }

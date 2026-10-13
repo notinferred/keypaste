@@ -125,6 +125,38 @@ public sealed class SessionOwnershipTests
     }
 
     /// <summary>
+    /// The app records every request it answers in its home's log. One it cannot open refuses what it
+    /// would have released, and the next request tries it again, so mending the file needs no new unlock.
+    /// </summary>
+    [Fact]
+    public async Task A_log_that_could_not_be_opened_is_tried_again_on_the_next_request()
+    {
+        using var fixture = new TempVault();
+        var log = KeypasteHome.AuditPath(fixture.Home);
+        Directory.CreateDirectory(log);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
+        Unlock(session, fixture.Path_, TempVault.Password);
+
+        await using var client = await ApproverClient.TryConnectAsync(host.Endpoint!, _connect, Token);
+        Assert.NotNull(client);
+        var attached = (await client.AttachAsync(new AttachRequest(fixture.Path_), Token))?.Session;
+        Assert.NotNull(attached);
+
+        var refused = await client.ListAsync(Listing(fixture.Path_, attached), Token);
+        Directory.Delete(log);
+        var listed = await client.ListAsync(Listing(fixture.Path_, attached), Token);
+
+        Assert.NotNull(refused);
+        Assert.False(refused.Recorded);
+        Assert.Empty(refused.Names);
+        Assert.NotNull(listed);
+        Assert.True(listed.Recorded);
+        Assert.Equal([new EntryName(string.Empty, "example")], listed.Names.Select(entry => entry.Name));
+        Assert.Contains("\"tool\":\"list_entry_names\"", Assert.Single(ReadShared(log)), StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Nothing unlocks across the endpoint: every byte of an attachment, a listing and a credential
     /// request, both ways, carries neither the master password nor the keyfile.
     /// </summary>
@@ -198,6 +230,14 @@ public sealed class SessionOwnershipTests
 
     private static NamesRequest Listing(string vault, string session) =>
         new(["**"]) { Vault = vault, Session = session };
+
+    /// <summary>A log's lines, read as a reader must while the app holds it open.</summary>
+    private static string[] ReadShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+    }
 
     private static UnlockOutcome Unlock(AppVaultSession session, string path, string password)
     {

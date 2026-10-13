@@ -6,12 +6,12 @@
 # `revoke` presses the screen's buttons.
 #
 # A real keypaste mcp request waiting at the unlocked app is listed. After Approve its grant is listed and
-# the history shows the prompted grant from the audit file the bridge wrote. Revoke and Revoke all make the
-# same request ask again. A lock empties both lists, and the next session starts with nothing listed. A
-# missing audit log reads as a session with no records yet, and an unreadable one is shown as unavailable.
+# the history shows the prompted grant from the audit file. Revoke and Revoke all make the same request
+# ask again. A lock empties both lists, and the next session starts with nothing listed. A missing audit
+# log reads as a session with no records yet, and an unreadable one is shown as unavailable.
 #
 # NEGATIVE CONTROL: this fails if a waiting request or a grant is not listed, if a revoked grant still
-# answers, if history is missing the bridge's record or is shown for a log that cannot be read, or if a
+# answers, if history is missing a request's record or is shown for a log that cannot be read, or if a
 # credential reaches the driver's output. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
@@ -32,7 +32,7 @@ mkdir -p "$WORK/home"
 KEYPASTE_HOME="$(native "$WORK/home")"
 export KEYPASTE_HOME
 VAULT="$(native "$WORK/vault.kdbx")"
-# Where the bridge writes by default and the app reads: the gate passes no --audit-log.
+# Where the app writes and reads, and the bridge writes by default: the gate passes no --audit-log.
 readonly AUDIT="$WORK/home/audit.jsonl"
 readonly HOLD_OUT="$WORK/hold.txt"
 
@@ -120,8 +120,8 @@ grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its 
 HOLD_PID="$(process_of)"
 FIRST="$(session_of)"
 
-# ------------------------------------------------ before any bridge has run there is no log to read
-[ -e "$AUDIT" ] && die "an audit log exists before any bridge ran"
+# ------------------------------------------------- before any agent has asked there is no log to read
+[ -e "$AUDIT" ] && die "an audit log exists before any agent asked"
 activity
 omits '^unavailable ' "the authority as unreadable while it serves"
 omits '^(waiting|grant) ' "a request or grant before any agent asked"

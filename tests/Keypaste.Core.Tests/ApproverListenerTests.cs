@@ -363,7 +363,7 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>
-    /// A bridge that hangs up while its request waits for a person withdraws that request, so the
+    /// A peer that hangs up while its request waits for a person withdraws that request, so the
     /// prompt comes down rather than waiting out its window for an answer nobody will receive.
     /// </summary>
     [Fact]
@@ -372,19 +372,61 @@ public sealed class ApproverListenerTests
         var handler = new RecordingHandler { HoldRequests = true };
         await using var host = Host.Start(handler);
 
-        var client = await ConnectAsync(host.PipeName);
-        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
-        var waiting = client.RequestAsync(Request(), givingUp.Token).AsTask();
+        await using var peer = new NamedPipeClientStream(
+            ".", host.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await peer.ConnectAsync(Token);
+        byte[] request = [.. ApproverProtocol.Encode(Request()), (byte)'\n'];
+        await peer.WriteAsync(request, Token);
+        await peer.FlushAsync(Token);
         await handler.Asking.Task.WaitAsync(_connectTimeout, Token);
 
-        // As the bridge does when its client cancels: the exchange gives up, then the connection goes.
-        await givingUp.CancelAsync();
-        Assert.Null(await waiting);
-        await client.DisposeAsync();
+        await peer.DisposeAsync();
 
         await handler.Withdrawn.Task.WaitAsync(_connectTimeout, Token);
         await handler.Gone.Task.WaitAsync(_connectTimeout, Token);
         Assert.Single(handler.Disconnections);
+    }
+
+    /// <summary>
+    /// A bridge whose client gives up withdraws the request it sent and still reads the owner's reply,
+    /// which says whether the owner recorded it; the connection then ends (THREATS.md T-6).
+    /// </summary>
+    [Fact]
+    public async Task AWithdrawnRequest_IsStillAnswered_ThenItsConnectionEnds()
+    {
+        var handler = new RecordingHandler { HoldRequests = true };
+        await using var host = Host.Start(handler);
+
+        await using var client = await ConnectAsync(host.PipeName);
+        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var waiting = client.RequestAsync(Request(), givingUp.Token).AsTask();
+        await handler.Asking.Task.WaitAsync(_connectTimeout, Token);
+
+        await givingUp.CancelAsync();
+        var reply = await waiting.WaitAsync(_connectTimeout, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Cancelled), (reply.Decision, reply.Method));
+        Assert.True(handler.Withdrawn.Task.IsCompleted);
+        await handler.Gone.Task.WaitAsync(_connectTimeout, Token);
+        Assert.False(client.IsConnected);
+        Assert.Null(await client.ListAsync(new NamesRequest([]), Token));
+    }
+
+    /// <summary>A request its caller gave up on before it was written never reaches the owner, so nothing there records it.</summary>
+    [Fact]
+    public async Task ARequestCancelledBeforeItIsWritten_IsNeverSent()
+    {
+        var handler = new RecordingHandler();
+        await using var host = Host.Start(handler);
+
+        await using var client = await ConnectAsync(host.PipeName);
+        using var gaveUp = new CancellationTokenSource();
+        await gaveUp.CancelAsync();
+
+        Assert.Null(await client.RequestAsync(Request(), gaveUp.Token));
+        Assert.NotNull(await client.ListAsync(new NamesRequest([]), Token));
+        Assert.Empty(handler.Credentials);
     }
 
     /// <summary>

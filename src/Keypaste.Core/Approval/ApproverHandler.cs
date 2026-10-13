@@ -144,7 +144,7 @@ public sealed class ApproverHandler
         if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out _))
         {
             return ValueTask.FromResult(
-                new NamesReply(false, [], "the exposure this bridge was configured with is not usable", true));
+                new NamesReply(false, [], "the exposure this bridge was configured with is not usable", true) { Refusal = AuditMethod.Failed });
         }
 
         if (!_lister.TryList(exposure, out var names, out var failure))
@@ -198,7 +198,7 @@ public sealed class ApproverHandler
         {
             // A name that resolves to nothing and one outside the exposure get the same answer:
             // telling them apart would let an agent enumerate entries in parts of the vault it was
-            // never allowed to see (THREATS.md T-4). The audit line below still records which.
+            // never allowed to see (THREATS.md T-4). The audit line's reason still records which.
             return failure switch
             {
                 CredentialFailure.VaultLocked => Refused(AuditMethod.VaultLocked, "no vault is unlocked"),
@@ -443,7 +443,8 @@ public sealed class ApproverHandler
     /// costs once escaped. Asking here as well as there is not a second answer to one question — it
     /// is the same function and the same budget — it is that <b>this method narrates</b>, and a line
     /// saying a credential was released before the reply has left the process is a claim nothing
-    /// else in keypaste would ever contradict. The approver writes no audit line for a credential (D-0020).
+    /// else in keypaste would ever contradict. The owner records the reply after this, and checks it
+    /// again as it will be sent.
     /// </para>
     /// <para>
     /// The refusal names which authority the release had, so a rule's release is never written up

@@ -61,12 +61,7 @@ internal sealed class ListEntryNamesTool(
         if (!initialized)
         {
             return Record(
-                McpAudit.Denial(
-                    ToolText.ListToolName,
-                    client,
-                    AuditMethod.NotInitialized,
-                    "the client called a tool before the initialize handshake completed",
-                    options.Exposure),
+                Denial(client, AuditMethod.NotInitialized, "the client called a tool before the initialize handshake completed"),
                 ToolResults.Refuse(ToolText.NotInitialized));
         }
 
@@ -91,16 +86,15 @@ internal sealed class ListEntryNamesTool(
             listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.VaultLocked, true);
         }
 
+        if (listing.Availability == VaultAvailability.Unrecorded)
+        {
+            return Record(Denial(client, AuditMethod.Failed, McpAudit.Unrecorded, listing.Session), ToolResults.Refuse(listing.Reason));
+        }
+
         if (listing.Availability != VaultAvailability.Available)
         {
-            return Record(
-                McpAudit.Denial(
-                    ToolText.ListToolName,
-                    client,
-                    Method(listing.Availability),
-                    listing.Reason,
-                    options.Exposure),
-                ToolResults.Refuse(listing.Reason));
+            var refusal = ToolResults.Refuse(listing.Reason);
+            return listing.Recorded ? refusal : Record(Denial(client, Method(listing.Availability), listing.Reason), refusal);
         }
 
         // The exposure is applied twice on purpose: two things enforcing one rule that cannot
@@ -118,19 +112,15 @@ internal sealed class ListEntryNamesTool(
         }
 
         var truncated = !listing.Complete;
-        var record = new AuditRecord
-        {
-            Tool = ToolText.ListToolName,
-            Client = client,
-            Decision = AuditDecision.Granted,
-            Method = AuditMethod.Exposure,
-            Reason = $"listed {exposed.Count} entry names",
-            Exposure = options.Exposure.Globs,
-            Session = listing.Session,
-        };
+        var rendered = Render(exposed, truncated, options.Exposure.Globs);
 
-        return Record(record, Render(exposed, truncated, options.Exposure.Globs));
+        return listing.Recorded
+            ? rendered
+            : Record(RequestRecords.Listed(client, exposed.Count, options.Exposure.Globs, listing.Session, options.VaultKey), rendered);
     }
+
+    private AuditRecord Denial(AuditClient client, AuditMethod method, string reason, string? session = null) =>
+        RequestRecords.Listing(client, AuditDecision.Denied, method, reason, options.Exposure.Globs, session, options.VaultKey);
 
     /// <summary>Which word the log gets for a listing that produced no names.</summary>
     /// <remarks>
@@ -150,16 +140,17 @@ internal sealed class ListEntryNamesTool(
     };
 
     /// <summary>
-    /// Writes the audit line first, and turns a failure to write into a refusal.
+    /// Writes the audit line of a listing no owner recorded first, and turns a failure to write into a refusal.
     /// </summary>
     /// <remarks>
     /// Log-then-answer, not answer-then-log. If the record cannot be written the call is refused,
     /// because otherwise breaking the logger becomes the way to obtain access that leaves no trace
     /// (docs/PRODUCT.md laws 3.3 and 3.7, THREATS.md T-6). A crash between the two over-reports an access
-    /// rather than under-reporting one, which is the safe direction.
+    /// rather than under-reporting one, which is the safe direction. A listing the owner recorded
+    /// before replying is answered with no line here.
     /// </remarks>
     private CallToolResult Record(AuditRecord record, CallToolResult answer) =>
-        audit.TryAppend(record with { Vault = options.VaultKey }, out _) ? answer : ToolResults.Refuse(ToolText.AuditUnavailable);
+        audit.TryAppend(record, out _) ? answer : ToolResults.Refuse(ToolText.AuditUnavailable);
 
     /// <summary>
     /// Builds the reply: a datamarked block for the model to read, and a structured payload that

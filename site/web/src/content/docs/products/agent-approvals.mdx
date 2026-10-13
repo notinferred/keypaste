@@ -21,8 +21,8 @@ sequenceDiagram
   B->>O: over a named pipe, to the unlocked session
   O->>Y: who asks, for what, and why
   Y-->>O: deny, allow once, or allow for an hour
+  O->>O: one audit line, allowed or refused
   O-->>B: one field, only if you allowed it
-  B->>B: one audit line, allowed or refused
   B-->>C: the value, or a refusal
 ```
 
@@ -31,13 +31,13 @@ flowchart LR
   agent["AI agent"] e1@--> bridge["keypaste-mcp"]
   bridge e2@--> owner["app or keypaste agent"]
   owner e3@--> you["You"]
-  bridge --> log[("audit.jsonl, hash-chained")]
+  owner --> log[("audit.jsonl, hash-chained")]
   e1@{ animate: true }
   e2@{ animate: true }
   e3@{ animate: true }
 ```
 
-The bridge your AI tool starts holds no vault and can never ask for your master password. The process holding the unlocked vault re-checks what the agent may see and reads the field only after your answer, or a rule you wrote. Locking the app, or stopping `keypaste agent`, refuses whatever is waiting and ends every allowance.
+The bridge your AI tool starts holds no vault and can never ask for your master password. The process holding the unlocked vault re-checks what the agent may see, reads the field only after your answer or a rule you wrote, and writes the audit line before it replies. Locking the app, or stopping `keypaste agent`, refuses whatever is waiting and ends every allowance.
 
 ## What it does
 

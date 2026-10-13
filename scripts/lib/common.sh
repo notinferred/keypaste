@@ -48,6 +48,11 @@ native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else pri
 # A file's bytes as one hex string, so a refusal can be shown to leave it unchanged.
 bytes() { od -An -v -tx1 "$1" | tr -d ' \n'; }
 
+# A log several phases write is read one phase at a time: lines_in counts the lines file $1 holds, 0 before
+# it exists, and lines_after prints the lines it gained after it held $2.
+lines_in() { if [ -f "$1" ]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
+lines_after() { tail -n +"$(($2 + 1))" "$1"; }
+
 # Git Bash's kill cannot end a native Windows process.
 kill_process() {
   if command -v taskkill >/dev/null 2>&1; then

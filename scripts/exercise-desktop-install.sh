@@ -385,7 +385,7 @@ env_run() {
 }
 
 approval() {
-  local pipe="keypaste-install-check-$$-$RANDOM" agent_pid response audit="$OUT/audit.jsonl"
+  local pipe="keypaste-install-check-$$-$RANDOM" agent_pid response audit="$HOME_DIR/audit.jsonl"
   printf '%s\nh\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
@@ -408,7 +408,7 @@ approval() {
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY_GROUP/$ENTRY_TITLE\",\"field\":\"username\",\"reason\":\"4.7b reads back the username the installed app saved\",\"ttl_seconds\":60}}}"
     sleep 10
-  } | "$KP" mcp --vault "$VAULT_NATIVE" --expose "$ENTRY_GROUP/**" --audit-log "$(native "$audit")" --approver "$pipe" \
+  } | "$KP" mcp --vault "$VAULT_NATIVE" --expose "$ENTRY_GROUP/**" --approver "$pipe" \
       --client-label install-check > "$response" 2> "$OUT/mcp-stderr.txt" || true
   act request jq -e 'select(.id == 2) | .result' "$response" || true
 

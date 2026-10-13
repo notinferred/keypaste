@@ -11,11 +11,11 @@ namespace Keypaste.Mcp.Tools;
 /// </remarks>
 internal static class ToolText
 {
-    internal const string ListToolName = "list_entry_names";
+    internal const string ListToolName = AuditTools.List;
 
-    internal const string CredentialToolName = "request_credential";
+    internal const string CredentialToolName = AuditTools.Credential;
 
-    internal const string RunToolName = "run";
+    internal const string RunToolName = AuditTools.Run;
 
     /// <summary>What the instructions add when this bridge offers <c>run</c>.</summary>
     internal const string RunInstructions = """
@@ -66,7 +66,7 @@ internal static class ToolText
     /// <summary>Why an approved run was not started: what the owner sent was not what was asked for.</summary>
     internal const string RunMismatched = """
         keypaste: DENIED. The vault's owner answered with variables this request did not ask for, so
-        nothing was started and nothing was kept. This call was recorded in the audit log as denied.
+        nothing was started and nothing was kept.
         """;
 
     /// <summary>Why an approved run did not start.</summary>

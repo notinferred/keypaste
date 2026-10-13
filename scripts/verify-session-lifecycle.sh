@@ -39,7 +39,8 @@ mkdir -p "$WORK/home"
 KEYPASTE_HOME="$(native "$WORK/home")"
 export KEYPASTE_HOME
 VAULT="$(native "$WORK/vault.kdbx")"
-AUDIT="$(native "$WORK/audit.jsonl")"
+# The log in the owner's home, where the bridges here write too.
+AUDIT="$(native "$WORK/home/audit.jsonl")"
 HOLD_OUT="$WORK/hold-1.txt"
 readonly AGENT_ERR="$WORK/agent-stderr.txt"
 

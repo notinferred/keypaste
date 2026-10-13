@@ -20,8 +20,8 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// The shipped <c>run</c> tool against a real vault's owner and a real child (D-0358): a person's
-/// answer decides whether anything starts, the audit line is written first, the child gets the values
-/// and nothing of the protocol, and what comes back holds no value in any form the scrubber knows.
+/// answer decides whether anything starts, the owner's audit line is written first, the child gets the
+/// values and nothing of the protocol, and what comes back holds no value in any form the scrubber knows.
 /// </summary>
 public sealed class RunToolTests : IDisposable
 {
@@ -91,6 +91,7 @@ public sealed class RunToolTests : IDisposable
         AssertNoValue(TextOf(result));
         AssertNoValue(harness.Transcript);
         AssertNoValue(harness.AuditText);
+        AssertNoValue(owner.Log.Text());
         Assert.Equal(0, Structured(result).GetProperty("exit_code").GetInt32());
         Assert.True(Structured(result).GetProperty("replacements").GetInt32() >= 10);
     }
@@ -128,24 +129,24 @@ public sealed class RunToolTests : IDisposable
         Assert.False(File.Exists(marker));
         Assert.Equal(1, owner.Asked);
 
-        var line = Assert.Single(harness.AuditLines());
-        Assert.Equal(("run", "denied", "prompt"), (Field(line, "tool"), Field(line, "decision"), Field(line, "method")));
+        var line = Assert.Single(owner.Log.Lines());
+        Assert.Equal(("run", "denied", "prompt"), (line.GetProperty("tool").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
-    public async Task TheAuditLine_IsWrittenBeforeTheChildStarts_AndNamesWhatRan()
+    public async Task TheOwnersLine_IsWrittenBeforeTheChildStarts_AndNamesWhatRan()
     {
         await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce);
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
         var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
 
-        var result = await client.CallToolAsync(ToolText.RunToolName, Run("--has-line", harness.AuditPath, "\"tool\":\"run\""), cancellationToken: Token);
+        var result = await client.CallToolAsync(ToolText.RunToolName, Run("--has-line", owner.Log.Path, "\"tool\":\"run\""), cancellationToken: Token);
 
         Assert.Contains("audit=found", Structured(result).GetProperty("stdout").GetString(), StringComparison.Ordinal);
+        Assert.Empty(harness.AuditLines());
 
-        var line = Assert.Single(harness.AuditLines());
-        using var parsed = JsonDocument.Parse(line);
-        var root = parsed.RootElement;
+        var root = Assert.Single(owner.Log.Lines());
         Assert.Equal("granted", root.GetProperty("decision").GetString());
         Assert.Equal(["env/acme-api/.env", "env/acme-api/TOKEN"], root.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
         Assert.StartsWith(Reporter.Path, root.GetProperty("command").GetString(), StringComparison.Ordinal);
@@ -154,15 +155,16 @@ public sealed class RunToolTests : IDisposable
         Assert.Equal(owner.Session, root.GetProperty("session").GetString());
     }
 
+    /// <summary>A run the owner cannot record is not released, so nothing starts, and the bridge records the refusal it was handed.</summary>
     [Fact]
-    public async Task AnUnwritableAuditLog_StartsNothing()
+    public async Task AnOwnerThatCannotRecord_StartsNothing()
     {
         await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce);
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
         var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
         var marker = Path.Combine(_directory, "ran");
 
-        using (new FileStream(harness.AuditPath + ".lock", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
+        using (new FileStream(owner.Log.Path + ".lock", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
         {
             var result = await client.CallToolAsync(ToolText.RunToolName, Run("--touch", marker), cancellationToken: Token);
 
@@ -171,6 +173,8 @@ public sealed class RunToolTests : IDisposable
         }
 
         Assert.False(File.Exists(marker));
+        Assert.Empty(owner.Log.Lines());
+        Assert.Equal("failed", Field(Assert.Single(harness.AuditLines()), "method"));
     }
 
     [Fact]
@@ -375,7 +379,9 @@ public sealed class RunToolTests : IDisposable
 
         Assert.True(result.IsError);
         Assert.False(File.Exists(marker));
-        Assert.Equal("no-session", Field(Assert.Single(harness.AuditLines()), "method"));
+
+        // The owner recorded its refusal; the bridge writes nothing after an answer.
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
@@ -392,6 +398,9 @@ public sealed class RunToolTests : IDisposable
         Assert.True(result.IsError);
         Assert.Equal(ToolText.RunMismatched, TextOf(result));
         Assert.False(File.Exists(marker));
+
+        // The owner recorded what it decided; a release the bridge drops after that adds no line.
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
@@ -407,6 +416,7 @@ public sealed class RunToolTests : IDisposable
         Assert.True(result.IsError);
         Assert.Equal(ToolText.RunUnanswered, TextOf(result));
         Assert.Equal(1, harness.Approver.Runs);
+        Assert.Equal("failed", Field(Assert.Single(harness.AuditLines()), "method"));
     }
 
     [Fact]
@@ -464,7 +474,8 @@ public sealed class RunToolTests : IDisposable
         Assert.True(result.IsError);
         Assert.Equal(ToolText.InjectOnly, TextOf(result));
         Assert.Equal(0, owner.Asked);
-        Assert.Equal("inject-only", Field(Assert.Single(harness.AuditLines()), "method"));
+        Assert.Equal("inject-only", Assert.Single(owner.Log.Lines()).GetProperty("method").GetString());
+        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]
@@ -485,7 +496,7 @@ public sealed class RunToolTests : IDisposable
     }
 
     [Fact]
-    public async Task KeyOf_MatchesWhatTheBridgeWrites()
+    public async Task KeyOf_MatchesWhatTheOwnerWrites()
     {
         await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce);
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
@@ -496,10 +507,9 @@ public sealed class RunToolTests : IDisposable
             new Dictionary<string, object?> { ["entry"] = "env/acme-api/TOKEN", ["field"] = "password", ["reason"] = "deploy", ["ttl_seconds"] = 60 },
             cancellationToken: Token);
 
-        using var parsed = JsonDocument.Parse(Assert.Single(harness.AuditLines()));
         Assert.Equal(
             EntryActivity.KeyOf(new EntryName("env/acme-api", "TOKEN")),
-            parsed.RootElement.GetProperty("args").GetProperty("entry").GetString());
+            Assert.Single(owner.Log.Lines()).GetProperty("args").GetProperty("entry").GetString());
     }
 
     /// <summary>A real owner of the test's vault, whose person answers every question the same way.</summary>
@@ -520,6 +530,7 @@ public sealed class RunToolTests : IDisposable
         private Owner(RunToolTests test, ApprovalAnswer answer, string? clients)
         {
             _answer = answer;
+            Log = new OwnerLog(Path.Combine(test._directory, "home"));
             _vault = Vault.Create(test.VaultPath, "correct horse battery staple");
             ProjectVariables.Set(_vault, "acme-api", "DATABASE_URL", _value);
             var token = new EntryName("env/acme-api", "TOKEN");
@@ -552,6 +563,7 @@ public sealed class RunToolTests : IDisposable
                 VaultIdentity.Of(KeypasteHome.Resolve(null), test.VaultPath),
                 () => _lifetime,
                 handler,
+                audit: () => Log.Log,
                 new SessionEnvironments(_gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, TimeProvider.System, _envGrants));
 
             PipeName = "keypaste-run-tool-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
@@ -560,6 +572,9 @@ public sealed class RunToolTests : IDisposable
         }
 
         internal string PipeName { get; }
+
+        /// <summary>The owner's own log, in its home.</summary>
+        internal OwnerLog Log { get; }
 
         internal string Session => _lifetime.Id;
 
@@ -601,6 +616,7 @@ public sealed class RunToolTests : IDisposable
             _grants.Dispose();
             _envGrants.Dispose();
             _vault.Dispose();
+            Log.Dispose();
         }
 
         /// <summary>Counts the runs that reach the owner, so a bridge's own refusal is seen to send nothing.</summary>

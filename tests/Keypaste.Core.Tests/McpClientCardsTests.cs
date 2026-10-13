@@ -43,6 +43,18 @@ public sealed class McpClientCardsTests
         Assert.Empty(McpClientCards.Build([], [token], _vault, ClientPolicies.Empty, _now));
     }
 
+    /// <summary>The owner records every <c>keypaste run --session</c> request under the runner's name, refused ones included: no card is a runner's.</summary>
+    [Fact]
+    public void ASessionRun_IsNoMcpClient_ButALabelledBridgeOfThatName_Is()
+    {
+        var runs = new[] { "prompt", "grant-cache", "invalid-request", "no-session" }
+            .Select(method => Line(string.Empty, RequestRecords.SessionRunner, 1, tool: "run") with { Method = method });
+        var labelled = Line("claude-code", RequestRecords.SessionRunner, 1, tool: "run") with { Method = "prompt" };
+
+        Assert.Empty(McpClientCards.Build([], [.. runs], _vault, ClientPolicies.Empty, _now));
+        Assert.Equal("claude-code", Assert.Single(McpClientCards.Build([], [labelled], _vault, ClientPolicies.Empty, _now)).Key);
+    }
+
     [Fact]
     public void SeenOnlyInTheLog_IsIdle_WithLastSeen()
     {

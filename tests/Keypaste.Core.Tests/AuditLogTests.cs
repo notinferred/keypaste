@@ -735,6 +735,57 @@ public sealed class AuditLogTests : IDisposable
     }
 
     [Fact]
+    public void TryReadFrom_ReadsOnlyNewCompleteLines()
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial(), out _));
+        }
+
+        Assert.True(AuditReader.TryReadFrom(LogPath, AuditPosition.Start, out var first, out var next, out _, out _));
+        Assert.Single(first);
+
+        File.AppendAllText(LogPath, "{\"partial\":");
+        Assert.True(AuditReader.TryReadFrom(LogPath, next, out var none, out var same, out _, out _));
+        Assert.Empty(none);
+        Assert.Equal(next, same);
+
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial(), out _));
+        }
+
+        Assert.True(AuditReader.TryReadFrom(LogPath, next, out var later, out var after, out var unreadable, out _));
+        Assert.Single(later);
+        Assert.Equal(1, unreadable);
+        Assert.Equal(3, after.Line);
+        Assert.Equal(new FileInfo(LogPath).Length, after.Offset);
+    }
+
+    [Fact]
+    public void TryReadFrom_RestartsWhenTheFileShrank()
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial(), out _));
+            Assert.True(log.TryAppend(Denial(), out _));
+        }
+
+        Assert.True(AuditReader.TryReadFrom(LogPath, AuditPosition.Start, out _, out var next, out _, out _));
+
+        File.Delete(LogPath);
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial(), out _));
+        }
+
+        Assert.True(AuditReader.TryReadFrom(LogPath, next, out var entries, out var restarted, out _, out _));
+        var entry = Assert.Single(entries);
+        Assert.Equal(1, entry.Line);
+        Assert.Equal(1, restarted.Line);
+    }
+
+    [Fact]
     public void TryOpen_RejectsNull()
     {
         Assert.Throws<ArgumentNullException>(() => AuditLog.TryOpen(null!, TimeProvider.System, out _, out _));

@@ -4,6 +4,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -99,6 +100,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
     private string _directory = string.Empty;
     private Vault? _vault;
+    private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
     private GrantCache? _grants;
     private ApprovalGate? _gate;
@@ -161,6 +163,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
         _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
+        _log = new OwnerLog(Path.Combine(_directory, "home"));
 
         var handler = new ApproverHandler(
             new VaultCredentialSource(() => _vault),
@@ -170,7 +173,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             PolicyGate.None);
 
         _stop = new CancellationTokenSource();
-        _listener = new ApproverListener(PipeName, TestSession.Over(_vault, handler));
+        _listener = new ApproverListener(PipeName, TestSession.Over(_vault, handler, _log.Log));
         _serving = _listener.RunAsync(_stop.Token);
 
         // A second approver over the same vault, with a rule in force. Two listeners rather than one
@@ -192,7 +195,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
                     new VaultEntryNameLister(() => _vault),
                     _ruleGate,
                     _ruleGrants,
-                    new PolicyGate(rules, TimeProvider.System))));
+                    new PolicyGate(rules, TimeProvider.System)),
+                _log.Log));
 
         _ruleServing = _ruleListener.RunAsync(_ruleStop.Token);
 
@@ -235,6 +239,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         _grants?.Dispose();
         _ruleGrants?.Dispose();
         _vault?.Dispose();
+        _log?.Dispose();
 
         Directory.Delete(_directory, recursive: true);
     }
@@ -269,10 +274,10 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
     /// <summary>
     /// Sweeps every channel that leaves the process for a sentinel, and says which one it found it
-    /// in. The audit log and the raw transcript are searched as text, because that is what is
+    /// in. Both audit logs and the raw transcript are searched as text, because that is what is
     /// actually on disk and on the wire.
     /// </summary>
-    private static void AssertNowhere(McpHarness harness, string sentinel, string result, string what)
+    private void AssertNowhere(McpHarness harness, string sentinel, string result, string what)
     {
         Assert.False(
             result.Contains(sentinel, StringComparison.Ordinal),
@@ -285,7 +290,11 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
         Assert.False(
             harness.AuditText.Contains(sentinel, StringComparison.Ordinal),
-            $"{what}: the audit log contains {sentinel}");
+            $"{what}: the bridge's audit log contains {sentinel}");
+
+        Assert.False(
+            _log!.Text().Contains(sentinel, StringComparison.Ordinal),
+            $"{what}: the owner's audit log contains {sentinel}");
     }
 
     /// <summary>
@@ -314,7 +323,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Assert.DoesNotContain(SentinelNotes, text, StringComparison.Ordinal);
 
             // And the log records the access without recording what was handed over.
-            var log = harness.AuditText;
+            var log = _log!.Text() + harness.AuditText;
 
             foreach (var sentinel in _everySentinel)
             {
@@ -504,10 +513,11 @@ public sealed class SecretHygieneTests : IAsyncLifetime
                 AssertNowhere(harness, other, text, "a policy grant");
             }
 
-            // The log records that it happened — which, with no human witness, is the only record
-            // that it happened at all — and records it as a policy release, never as an approval.
-            Assert.Contains("\"method\":\"policy\"", harness.AuditText, StringComparison.Ordinal);
-            Assert.DoesNotContain(SentinelPassword, harness.AuditText, StringComparison.Ordinal);
+            // The owner's log records that it happened — which, with no human witness, is the only
+            // record that it happened at all — and records it as a policy release, never as an approval.
+            Assert.Contains("\"method\":\"policy\"", _log!.Text(), StringComparison.Ordinal);
+            Assert.DoesNotContain(SentinelPassword, _log.Text(), StringComparison.Ordinal);
+            Assert.Empty(harness.AuditLines());
         }
     }
 
@@ -652,6 +662,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Keypaste.Core.Ownership.VaultIdentity.Of(Path.GetDirectoryName(_vault!.Path)!, _vault.Path),
             () => lifetime,
             new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), gate, grants, PolicyGate.None),
+            audit: () => _log!.Log,
             new Keypaste.Core.Ownership.SessionEnvironments(gate, _ => _vault, TimeProvider.System, envGrants));
         using var stop = new CancellationTokenSource();
         using var listener = new ApproverListener(pipe, authority);

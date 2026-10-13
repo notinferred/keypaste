@@ -6,13 +6,15 @@
 # A real keypaste mcp request raises the prompt, which shows the client's label, the entry, the field and
 # the lifetime. Approve returns the field, audited as a prompted grant naming the app's session and the
 # label. Deny, closing the prompt, the client cancelling, the bridge going away, a lock and the gate's
-# timeout each return a denial with the matching method and take the prompt down. Each case uses a new
-# bridge, so no grant carries from one to the next, and Deny and closing each ask for a field of their
-# own, because a refusal cools that field down for every bridge (D-0425).
+# timeout each return a denial with the matching method and take the prompt down. The client cancelling
+# and the bridge going away each leave exactly one line, cancelled, which the app records. Each case uses
+# a new bridge, so no grant carries from one to the next, and Deny and closing each ask for a field of
+# their own, because a refusal cools that field down for every bridge (D-0425).
 #
 # NEGATIVE CONTROL: this fails if a request is released without a press of Approve, if Approve does not
-# release it, if an audit line names the wrong method, session or label, or if a prompt stays up after
-# its request is answered or abandoned. These checks must never be skipped or soft-passed.
+# release it, if an audit line names the wrong method, session or label, if an abandoned request leaves
+# no line or two, or if a prompt stays up after its request is answered or abandoned. These checks must
+# never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-approval-master-pw'
@@ -39,7 +41,9 @@ mkdir -p "$WORK/home"
 KEYPASTE_HOME="$(native "$WORK/home")"
 export KEYPASTE_HOME
 VAULT="$(native "$WORK/vault.kdbx")"
-AUDIT="$(native "$WORK/audit.jsonl")"
+# The log in the owner's home, where the bridges here write too.
+AUDIT="$(native "$WORK/home/audit.jsonl")"
+readonly LOG="$WORK/home/audit.jsonl"
 readonly HOLD_OUT="$WORK/hold.txt"
 
 HOLD_PID=""
@@ -102,6 +106,19 @@ answered() {
 
 # The prompt that request raised has come down.
 withdrawn() { wait_for '^prompt withdrawn' "$HOLD_OUT" "$PROMPTS"; }
+
+# Waits up to 10 seconds for an abandoned request's line, then checks the log gained exactly that one: a
+# cancelled denial in session $2 under the label, recorded by the app. $1 is the line count before it.
+cancelled_once() {
+  local before="$1" session="$2" what="$3"
+  for _ in $(seq 1 50); do
+    [ "$(lines_in "$LOG")" -gt "$before" ] && break
+    sleep 0.2
+  done
+  lines_after "$LOG" "$before" | jq -e -s --arg s "$session" --arg l "$LABEL" 'length == 1 and .[0].tool == "request_credential"
+      and .[0].decision == "denied" and .[0].method == "cancelled" and .[0].session == $s and .[0].client.label == $l' >/dev/null \
+    || die "$what was not recorded once, as a cancelled denial in session $session: $(lines_after "$LOG" "$before")"
+}
 
 # The request was refused with no value, and its audit line is a denial with method $1 in session $2.
 denied_as() {
@@ -209,20 +226,16 @@ withdrawn
 denied_as prompt "$FIRST" "closing the prompt"
 
 # ------------------------------------------------ the client giving up takes the prompt down
+logged=$(lines_in "$LOG")
 raise_prompt cancelled
 printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":3,"reason":"ci probe gave up"}}' >&8
 withdrawn
 exec 8>&-
-for _ in $(seq 1 50); do
-  tail -n 1 "$AUDIT" | jq -e '.method == "cancelled"' >/dev/null 2>&1 && break
-  sleep 0.2
-done
-tail -n 1 "$AUDIT" | jq -e --arg l "$LABEL" \
-  '.tool == "request_credential" and .decision == "denied" and .method == "cancelled" and .client.label == $l' >/dev/null \
-  || die "the cancelled request was not audited as a cancelled denial"
+cancelled_once "$logged" "$FIRST" "the cancelled request"
 grep -q "$SECRET" "$OUT" && die "a cancelled request reached the client"
 
 # A bridge whose standard input closes waits for its call to finish, so going away is being killed.
+logged=$(lines_in "$LOG")
 raise_prompt gone
 if [ -r "/proc/$BRIDGE_PID/winpid" ]; then
   kill_process "$(cat "/proc/$BRIDGE_PID/winpid")"
@@ -231,6 +244,7 @@ else
 fi
 withdrawn
 exec 8>&-
+cancelled_once "$logged" "$FIRST" "the request whose bridge went away"
 grep -q "$SECRET" "$OUT" && die "a request whose bridge went away reached the client"
 
 # -------------------------------------------------------------------- a lock refuses and withdraws

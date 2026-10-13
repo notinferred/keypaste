@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
-using System.Text.Json;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -45,6 +45,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
 
     private string _directory = string.Empty;
     private Vault? _vault;
+    private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
     private GrantCache? _grants;
     private ApprovalGate? _gate;
@@ -80,6 +81,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
 
         _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
+        _log = new OwnerLog(Path.Combine(_directory, "home"));
 
         _stop = new CancellationTokenSource();
         _listener = new ApproverListener(
@@ -91,7 +93,8 @@ public sealed class LargeCredentialTests : IAsyncLifetime
                     new VaultEntryNameLister(() => _vault),
                     _gate,
                     _grants,
-                    PolicyGate.None)));
+                    PolicyGate.None),
+                _log.Log));
 
         _serving = _listener.RunAsync(_stop.Token);
 
@@ -122,6 +125,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         _gate?.Dispose();
         _grants?.Dispose();
         _vault?.Dispose();
+        _log?.Dispose();
 
         Directory.Delete(_directory, recursive: true);
     }
@@ -147,14 +151,13 @@ public sealed class LargeCredentialTests : IAsyncLifetime
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
-    private static List<(string Method, string Reason)> LinesOf(McpHarness harness) =>
-        [.. harness.AuditLines().Select(line =>
-        {
-            using var parsed = JsonDocument.Parse(line);
+    /// <summary>The owner's lines, which record every request it answered; the bridge records none of them.</summary>
+    private List<(string Method, string Reason)> LinesOf(McpHarness harness)
+    {
+        Assert.Empty(harness.AuditLines());
 
-            return (parsed.RootElement.GetProperty("method").GetString()!,
-                    parsed.RootElement.GetProperty("reason").GetString()!);
-        })];
+        return [.. _log!.Lines().Select(line => (line.GetProperty("method").GetString()!, line.GetProperty("reason").GetString()!))];
+    }
 
     private async Task<(McpHarness Harness, McpClient Client)> StartAsync()
     {
@@ -221,6 +224,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         Assert.DoesNotContain(_noteSentinel, TextOf(result), StringComparison.Ordinal);
         Assert.DoesNotContain(_noteSentinel, harness.Transcript, StringComparison.Ordinal);
         Assert.DoesNotContain(_noteSentinel, harness.AuditText, StringComparison.Ordinal);
+        Assert.DoesNotContain(_noteSentinel, _log!.Text(), StringComparison.Ordinal);
     }
 
     /// <summary>
