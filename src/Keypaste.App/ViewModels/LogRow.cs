@@ -127,7 +127,7 @@ internal sealed record LogRow
             return TokenAuditReason.TryName(entry.Reason, out var name) ? name : "token";
         }
 
-        return entry.Client.Length > 0 ? entry.Client : "unknown client";
+        return entry.Client.Length > 0 ? entry.Client : "unknown agent";
     }
 
     private static string ActionOf(AuditEntry entry)
@@ -221,7 +221,7 @@ internal sealed record LogRow
             "token" => ("Token", LogTone.Info),
             "share-created" => ("Link", LogTone.Muted),
             "share-revoked" => ("Revoked", LogTone.Muted),
-            _ => ("Granted", LogTone.Ok),
+            _ => ("Allowed", LogTone.Ok),
         };
     }
 
@@ -252,7 +252,7 @@ internal sealed record LogRow
 
         if (entry.Name.Length > 0 && entry.Label.Length > 0)
         {
-            lines.Add($"client {entry.Name}, label {entry.Label}");
+            lines.Add($"agent {entry.Name}, label {entry.Label}");
         }
 
         return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);

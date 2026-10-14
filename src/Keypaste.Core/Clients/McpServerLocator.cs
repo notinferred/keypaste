@@ -227,7 +227,7 @@ public static class McpServerLocator
         if (Find(appDirectory, pathVariable) is not { } found)
         {
             target = null;
-            error = $"{FileName} was not found {Places(appDirectory)}, so there is nothing a client could start";
+            error = $"{FileName} was not found {Places(appDirectory)}, so there is nothing an AI tool could start";
             return false;
         }
 

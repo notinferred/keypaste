@@ -50,7 +50,7 @@ internal static class RotateCommand
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste rotate: expected exactly one entry name");
+            context.Stderr.WriteLine("keypaste rotate: expected exactly one item name");
             return CliApp.ExitUsageError;
         }
 
@@ -77,7 +77,7 @@ internal static class RotateCommand
             switch (EntryRotation.Rotate(vault, name, wanted))
             {
                 case RotateOutcome.NotFound:
-                    context.Stderr.WriteLine($"keypaste rotate: no entry named {Shown(entryPath)}");
+                    context.Stderr.WriteLine($"keypaste rotate: no item named {Shown(entryPath)}");
                     return CliApp.ExitNotFound;
 
                 case RotateOutcome.Reserved:
@@ -100,10 +100,10 @@ internal static class RotateCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste rotate <entry> [--length N | --words N] [--separator C] [--no-symbols]");
+        writer.WriteLine("usage: keypaste rotate <item> [--length N | --words N] [--separator C] [--no-symbols]");
         writer.WriteLine("                       [--no-lookalikes] [--vault <path>] [--keyfile <path>]");
         writer.WriteLine();
-        writer.WriteLine("replaces the entry's password with a new generated one, 20 characters unless");
+        writer.WriteLine("replaces the item's password with a new generated one, 20 characters unless");
         writer.WriteLine("told otherwise; the old value stays in its history and the new one is never");
         writer.WriteLine("printed. A key a provider issued still has to be rotated at the provider and");
         writer.WriteLine("stored with keypaste set.");

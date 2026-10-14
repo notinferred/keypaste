@@ -207,8 +207,8 @@ public sealed class ImportSource : IDisposable
                 problems.Add(new ImportProblem(
                     row.Index,
                     duplicates == 1
-                        ? $"1 title in {where} names another entry too; both are kept"
-                        : $"{duplicates} titles in {where} name another entry too; all are kept",
+                        ? $"1 title in {where} names another item too; both are kept"
+                        : $"{duplicates} titles in {where} name another item too; all are kept",
                     Blocks: false));
             }
         }

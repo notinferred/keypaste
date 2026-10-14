@@ -53,7 +53,7 @@ The import above used `--keep` so you can inspect the result before deletion. On
 ```
 Deleting removes the file from the directory. It does not overwrite the blocks it
 used: on an SSD, on a copy-on-write filesystem, or on any volume with snapshots or
-backups, the old contents can outlive the file. If these values were exposed, rotate them.
+backups, the old contents can outlive the file. If these values may have leaked, rotate them.
 Delete '/repo/app/.env'? [y/N]
 ```
 

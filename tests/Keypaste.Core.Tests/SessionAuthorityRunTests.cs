@@ -214,7 +214,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal(AuditMethod.GrantCache, second.Method);
         Assert.Equal("postgres://rotated", second.Set.Variables[0].Value);
         Assert.Equal(1, _fixture.Channel.Asked);
-        Assert.Contains(_narration, line => line.Contains("from a timed grant", StringComparison.Ordinal) && line.Contains("npm run migrate", StringComparison.Ordinal));
+        Assert.Contains(_narration, line => line.Contains("under an allowance", StringComparison.Ordinal) && line.Contains("npm run migrate", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -441,7 +441,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     [Fact]
     public async Task EntriesOverAnAgentRunsBudget_AreRefusedUnasked_AndTheRefusalIsRecorded()
     {
-        const string Reason = "the run names more entries than an agent's run can carry back in one reply";
+        const string Reason = "the run names more items than an agent's run can carry back in one reply";
         Assert.Null(SessionAuthority.Unrecordable(EnvResolution.Resolve(_vault, "wide", EnvProfileNames.Default, keys: null, _fixture.Clock).Preview));
 
         _fixture.Channel.Answer = ApprovalAnswer.Approved;

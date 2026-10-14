@@ -1,14 +1,14 @@
 # Handoff: keypaste — desktop app, CLI, brand system
 
 ## Overview
-keypaste is an open-source, local password manager on a KDBX file, for people who keep their passwords in KeePass and write software ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes the current screens were built from; [ROADMAP](../../ROADMAP.md) has the simpler app that replaces parts of them. Core ideas:
-- **MCP server**: AI clients (claude-code, cursor, …) request secrets over MCP stdio. A human approves each request (deny / allow once / allow for 1h), or a time-boxed **grant** covers it.
+keypaste is an open-source, local password manager on a KeePass database, for people who keep their passwords in KeePass and write software ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes the current screens were built from; [ROADMAP](../../ROADMAP.md) has the simpler app that replaces parts of them. Core ideas:
+- **MCP server**: agents in AI tools (claude-code, cursor, …) request secrets over MCP. A human approves each request (deny / allow once / allow for 1h), or a time-boxed **allowance** covers it.
 - **Inject first**: agents list key *names*; a value reaches an agent only through a request the person approves, and `keypaste run -p dev -- cmd` injects values into a child process instead.
 - **Projects**: one key set per project, with a value per environment (dev / staging / prod). Prod always needs a live approval.
-- **.env import/export**: export writes `.env.keypaste` containing **references only** (`KEY=kp://project/profile/KEY`), which is safe to commit.
+- **.env import/export**: export writes `.env.keypaste` containing **references only** (`KEY=kp://project/environment/KEY`), which is safe to commit.
 - **Sharing**: end-to-end encrypted, expiring, view-limited links; the key lives in the URL fragment.
 - **Scoped tokens**: for CI and scripts, e.g. `read:acme/api/staging/*`, inject-only, with expiry.
-- **KDBX**: import a .kdbx and keep editing it in place, so it stays compatible with KeePassXC and other KDBX apps.
+- **KeePass database**: import a .kdbx and keep editing it in place, so it stays compatible with KeePassXC and other KeePass apps.
 
 Surfaces: **desktop app** (Electron/Tauri/native; your choice) and **CLI**.
 
@@ -58,20 +58,20 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - **Back**: a screen under a place (a project's screen, Agents › History, and Settings › Advanced's activity log, share links, scoped tokens and diagnostics) has a ghost "‹ <place>" button above its title.
 
 **1. Items**, as KeePassXC's main window (D-0376): the list header, then the table over the chosen item's preview, split 2:3 by a draggable 1px line (the table at least 100px tall, the preview 140px). A new item, an edit or a comparison of two revisions takes the whole area below the header.
-- List header: the group or project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), Rename group (a 14px folder-pen icon) while a group is chosen, and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New group, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
-- Table: column heads TITLE, KIND, GROUP, LAST USED (table-heading style), then rows 36h, radius 7, grid `28px | 1fr | 112px | 1fr | 112px`: kind icon, title (sans 13.5/500, a variable's key mono 13) with the matched field ("username", "URL") after it in a search, kind (12.5 muted), group or "project · profile" (mono 12 muted), and "last used" (mono 11) with a 6px dot. The dot is blue for in use, green for recently granted, `#55575C` for idle. No field value is ever a column.
+- List header: the group or project path (mono 13), environment badge "dev" (20h, `#24262A`, radius 4, mono 11), Rename group (a 14px folder-pen icon) while a group is chosen, and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New group, New project, Import .env, Import KeePass database. No filter field: the titlebar search is the only one.
+- Table: column heads TITLE, KIND, GROUP, LAST USED (table-heading style), then rows 36h, radius 7, grid `28px | 1fr | 112px | 1fr | 112px`: kind icon, title (sans 13.5/500, a variable's key mono 13) with the matched field ("username", "URL") after it in a search, kind (12.5 muted), group or "project · environment" (mono 12 muted), and "last used" (mono 11) with a 6px dot. The dot is blue for in use, green for recently granted, `#55575C` for idle. No field value is ever a column.
   - Hover bg `#1D1E22`. Selected: bg `rgba(242,181,68,.10)`, `box-shadow: inset 2px 0 0 #F2B544`, icon in the text colour.
 - New item (N.4): the templates Login, API key, Database, Server and Secure note as a row of selectable chips with their icons (globe, key-round, database, server, sticky-note), then Title and Folder side by side (Folder a dropdown of the vault's groups, "Top level" first, 14px indent a level), the template's own fields, Notes, Tags as chips with an add box, and Create, the form's one amber element, beside a ghost Cancel.
 - Preview (padding 28/32, gap 24, max-width 820); username, password or value, URL and notes are one row each, the label in a 96px column to the left of its value:
   - Title (sans 22/600; a variable's key in mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
   - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
   - **URL**: a web address is an underlined mono link with a 13px external-link icon, in primary text, never amber, with its own Copy; any other value is plain text with a caption saying keypaste opens only web addresses (N.5).
-  - Two cards: Agent access, shown only when agents can see the item, and Profiles (dev set / staging set / prod "approval required" in secondary text).
+  - Two cards: Agent access, shown only when agents can see the item, and Environments (dev set / staging set / prod "approval required" in secondary text).
   - Metadata rows (140px label column): Created, Rotated.
-  - The ⋯ menu ends, above Delete, with the reference (`kp://acme-api/dev/KEY`, mono 12, its helper as a tooltip), the KDBX entry identifier and Copy the reference (N.5).
+  - The ⋯ menu ends, above Delete, with the reference (`kp://acme-api/dev/KEY`, mono 12, its helper as a tooltip), the KeePass item ID and Copy the reference (N.5).
 
 **2. Agents** (D-0455, D-0456): one page read top to bottom, padding 28/32, max-width 1080, sections 28 apart. Nothing on it answers a request.
-- Header: h1 "Agents" over the subtitle "Connect your AI tools and choose what each may see. A request waits for your answer in its own window, unless you set that agent to Automatic, which never covers commands."; beneath, a 6px green dot and the caption "Answering agents from this app · process 4120 · session 1c08…", its process and session in mono, while the app answers agents, else a card with a 15px amber alert-triangle saying why agents cannot reach the vault. A ghost "History" button (30h, 13px history icon) sits at the right.
+- Header: h1 "Agents" over the subtitle "Connect your AI tools and choose what each may see. A request waits for your answer in its own window, unless you set that agent to Automatic, which never covers commands."; beneath, a 6px green dot and the caption "Answering agents from this app · process 4120 · unlock 1c08…", its process and unlock in mono, while the app answers agents, else a card with a 15px amber alert-triangle saying why agents cannot reach the vault. A ghost "History" button (30h, 13px history icon) sits at the right.
 - **Waiting for you**, only while a request waits: a 15px muted clock and the section heading, with "Answer in the prompt window" (caption) at the right. A table row (padding 16/14) holds the agent (13.5/600) over what it asked for (mono 12, secondary: item · field, a command, or whose settings change and where the request claims it came from), the countdown (mono 11), which is the frame's one amber, and "Show the prompt" (sm). The agent's reason is never shown here; Show the prompt brings the prompt window forward with focus on Deny and its allows disarmed for a second.
 - **Allowances**: a 15px muted hourglass and the heading, with "End all" (danger, sm) at the right while any is in force; otherwise the caption "No allowance is in force, so the next request asks you." Each row: the agent (13.5/600) over item · field (mono 12, secondary), a 150px column with the time left (mono, secondary) over a thin progress bar, and "End" (danger, sm).
 - **AI tools**: a 15px muted plug and the heading, the caption "Found on this computer, and any agent that asked in the last 30 days. Settings follow each one's name.", "Looking for AI tools on this computer…" while the background look runs, and, when none is found, a caption naming the tools keypaste looks for. A `clients.toml` keypaste cannot use shows a card with its problem in danger text and "Reset". One table, a row each (padding 16/14):
@@ -85,14 +85,14 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 
 **3. Activity log** (Settings › Advanced; Agents › History is the same table held to Agents, with no filter and no Verify chain)
 - Segmented filter: All / Agents / You / Denied.
-- Table columns `64 | 110 | 100 | 1.6fr | 1fr | 100`, min-width 680, scrolls horizontally: TIME (mono muted), ACTOR, ACTION, SECRETS (mono), WHERE (mono muted), RESULT (colored dot + label: Granted / Approved 1h = ok, Denied = danger, Token = info, Expired / Link = muted).
-- Subtitle: "Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only."
+- Table columns `64 | 110 | 100 | 1.6fr | 1fr | 100`, min-width 680, scrolls horizontally: TIME (mono muted), ACTOR, ACTION, SECRETS (mono), WHERE (mono muted), RESULT (colored dot + label: Allowed / Approved 1h = ok, Denied = danger, Token = info, Expired / Link = muted).
+- Subtitle: "Every agent request, allowance, token run and share. Kept on this machine, hash-chained, append-only."
 
 **4. Projects** (D-0417; the prototype still calls it Env profiles)
 - Title: the open project's name, sans 24/600, which is also its picker; "Projects" when none is open. Header actions: "Import .env", "Export .env.keypaste".
-- A card listing each tag that starts `env:` and puts its entry in no project, muted icon, no amber.
+- A card listing each tag that starts `env:` and puts its item in no project, muted icon, no amber.
 - Matrix with columns KEY | DEV | STAGING | PROD (shield icon on PROD), and "+ ENVIRONMENT". Cells: "••••••" (set), "differs" (secondary), "missing" (danger), and under a value its entry and the other environments that entry serves (mono 11, muted).
-- Entries: a table per environment, its name as the table heading with "Add entry", each row the entry's path, its keys, "also staging" (mono 11, muted) and a Remove action shown on hover. Add entry opens a form with a filter and a list of entries; choosing one, or Remove, shows what the tag change reaches, with "Add to staging" as the primary or "Remove from dev" in danger, and "Keep it".
+- Items: a table per environment, its name as the table heading with "Add item", each row the item's path, its keys, "also staging" (mono 11, muted) and a Remove action shown on hover. Add item opens a form with a filter and a list of items; choosing one, or Remove, shows what the tag change reaches, with "Add to staging" as the primary or "Remove from dev" in danger, and "Keep it".
 - Below it, two panels:
   - `.env.keypaste` preview (terminal style) with a dev/staging/prod segmented toggle that rewrites the references.
   - "Run with this environment" card showing the command `keypaste run -p <environment> -- npm start` plus explanatory copy.
@@ -109,15 +109,15 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 
 **Overlays**
 - **MCP approval dialog** (the key moment), 460 max, radius 14, `#1D1E22`, border `#3A3D43`:
-  - Bot tile, "claude-code wants 2 secrets" (16/600), "via MCP · ~/acme/api · profile dev", and a countdown "0:28" (mono 11 secondary) with a muted dot: the primary answer is the prompt's one amber element.
+  - Bot tile, "claude-code wants 2 secrets" (16/600), "via MCP · environment dev · ~/acme/api", and a countdown "0:28" (mono 11 secondary) with a muted dot: the primary answer is the prompt's one amber element.
   - Tool call box (mono 11.5): "tool: keypaste.run / npm run migrate".
   - Secrets list with "inject only" tags.
   - Explainer text, then the buttons Deny (ghost) · Allow once (secondary) · **Allow for 1 hour ⏎** (primary, right-aligned).
-- **KDBX import dialog**:
-  - File card: "acme.kdbx · KDBX 4.1 · Argon2id · 142 entries · key file + password · Decrypted".
+- **KeePass database import dialog**:
+  - File card: "acme.kdbx · KeePass database 4.1 · Argon2id · 142 items · key file + password · Decrypted".
   - Group → project mapping rows.
-  - Toggle: "Keep editing this file in place, so KeePassXC and other KDBX apps stay in sync".
-  - Buttons: Cancel / "Import 142 entries".
+  - Toggle: "Keep editing this file in place, so KeePassXC and other KeePass apps stay in sync".
+  - Buttons: Cancel / "Import 142 items".
 - **Lock screen**: full-window with a 16px hairline grid background.
   - 56px mark, "acme.kdbx is locked", "Enter its master password to open it." It says nothing of agents (N.2).
   - Focused password field with an amber caret, amber "Unlock" button, the key-file line, then "More options", which reveals "Unlock with a YubiKey too"; a vault that last opened with a YubiKey shows it directly. While the key waits for a touch, its waiting dot is the amber element and Unlock is secondary.

@@ -119,7 +119,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             .ToList();
         if (matches.Count != 1)
         {
-            return Refused(matches.Count == 0 ? $"no entry '{what}'" : $"more than one entry is called '{what}'");
+            return Refused(matches.Count == 0 ? $"no item '{what}'" : $"more than one item is called '{what}'");
         }
 
         var fields = Select(vault, matches[0], request.Field);

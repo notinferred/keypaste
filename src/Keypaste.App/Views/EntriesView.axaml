@@ -223,10 +223,10 @@
               <Button x:Name="ImportKdbx"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Import .kdbx">
+                      AutomationProperties.Name="Import KeePass database">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="file-input" Size="14" />
-                  <TextBlock Text="Import .kdbx" VerticalAlignment="Center" />
+                  <TextBlock Text="Import KeePass database" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -333,10 +333,10 @@
                       Classes="sm"
                       IsVisible="{Binding ListEmptyOffersImport}"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Import .kdbx">
+                      AutomationProperties.Name="Import KeePass database">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="file-input" Size="13" />
-                  <TextBlock Text="Import .kdbx" VerticalAlignment="Center" />
+                  <TextBlock Text="Import KeePass database" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -708,7 +708,7 @@
                                        Text="{Binding Reference}"
                                        TextTrimming="CharacterEllipsis"
                                        ToolTip.Tip="Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when the bridge allows it. keypaste puts the value into the command&apos;s environment, not into the file." />
-                            <TextBlock Classes="caption" Text="KDBX entry" Margin="0,4,0,0" />
+                            <TextBlock Classes="caption" Text="KeePass item ID" Margin="0,4,0,0" />
                             <TextBlock x:Name="KdbxEntryText"
                                        Classes="mono secondary"
                                        FontSize="12"
@@ -859,7 +859,7 @@
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
                                    Classes="caption"
-                                   Text="{Binding History.Selected.When, StringFormat='Then is the revision saved {0}. Now is the entry as it is.'}"
+                                   Text="{Binding History.Selected.When, StringFormat='Then is the revision saved {0}. Now is the item as it is.'}"
                                    TextWrapping="Wrap" />
 
                         <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Password" Margin="0,12,0,6" />
@@ -937,7 +937,7 @@
                                 Command="{Binding History.RestoreCommand}"
                                 HorizontalAlignment="Left" />
                         <TextBlock Classes="caption"
-                                   Text="Restoring makes these the entry's values. The ones it replaces are kept here." />
+                                   Text="Restoring makes these the item's values. The ones it replaces are kept here." />
                       </StackPanel>
 
                     </StackPanel>
@@ -1177,7 +1177,7 @@
                                          MaskedLength="{Binding ReplacementFieldValue.MaskedLength}"
                                          Placeholder="New field value" />
                         <TextBlock Classes="caption" IsVisible="{Binding ReplacementFieldValue.Note.Length}" Text="{Binding ReplacementFieldValue.Note}" />
-                        <TextBlock Classes="caption" Text="The old value stays in the entry's history." />
+                        <TextBlock Classes="caption" Text="The old value stays in the item's history." />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceFieldCommand}" />
                           <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceFieldCommand}" />
@@ -1323,7 +1323,7 @@
                                          Sink="{Binding NewPassword}"
                                          MaskedLength="{Binding NewPassword.MaskedLength}"
                                          Placeholder="New password" />
-                        <TextBlock Classes="caption" Text="Leave this empty to keep the current password. A replacement keeps the old one in this entry's history." TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="Leave this empty to keep the current password. A replacement keeps the old one in this item's history." TextWrapping="Wrap" />
                         <TextBlock Classes="caption"
                                    IsVisible="{Binding NewPassword.Note.Length}"
                                    Text="{Binding NewPassword.Note}" />

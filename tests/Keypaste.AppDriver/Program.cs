@@ -535,7 +535,7 @@ internal sealed class Driver(string home)
     internal Task<int> AddEnvEntryAsync(string vault, string project, string environment, string entry, bool decline) =>
         WithProjectAsync(vault, project, environment, (screen, open) =>
         {
-            Press(Listed(open, environment).AddEntry, "Add entry");
+            Press(Listed(open, environment).AddEntry, "Add item");
             open.EntryFilter = entry;
             open.ChosenEntry = open.EntryCandidates.SingleOrDefault(candidate => candidate.Display == entry)
                 ?? throw new DriverException($"'{entry}' is not offered to add to {project}/{environment}");

@@ -551,7 +551,7 @@ public sealed class Vault : IDisposable
 
         if (Fields(name) is { } current && current.Any(field => string.Equals(field.Name, write.Name, StringComparison.Ordinal)))
         {
-            throw new VaultException($"This entry already has {EntryNameSanitizer.Sanitize(write.Name).Text}. Replace its value instead.");
+            throw new VaultException($"This item already has {EntryNameSanitizer.Sanitize(write.Name).Text}. Replace its value instead.");
         }
 
         return SetFields(name, [write]);
@@ -1931,7 +1931,7 @@ public sealed class Vault : IDisposable
             if (found is not null)
             {
                 throw new VaultException(
-                    $"'{entryPath}' names more than one entry: a title containing a separator and " +
+                    $"'{entryPath}' names more than one item: a title containing a separator and " +
                     "a group of that name produce the same path. Rename one of them in KeePassXC.");
             }
 

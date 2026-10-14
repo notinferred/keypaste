@@ -114,7 +114,7 @@ grep -q '"password"' "$AUDIT" || die "the requested field name was not recorded"
 # 7. A tool call that arrives before the handshake is refused, and refused for that reason.
 #
 #    The client's name is read off `initialize`, so a call that overtakes it would otherwise be
-#    answered for "an unnamed client" - putting a request to a person, or releasing it under an
+#    answered for "an unnamed agent" - putting a request to a person, or releasing it under an
 #    agent's settings, with the caller missing from both the dialog and the log. That is a law 3.3 gap
 #    and a law 3.7 error path, so it denies (THREATS.md T-3).
 #

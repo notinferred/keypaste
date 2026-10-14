@@ -36,13 +36,13 @@
         </Border>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
           <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
-          <StackPanel Orientation="Horizontal">
-            <TextBlock Name="ProjectText" Classes="prompt-sub" Text="{Binding Project}"
-                       MaxWidth="160" TextTrimming="CharacterEllipsis" />
-            <TextBlock Classes="prompt-sub" Text=" · profile " />
-            <TextBlock Name="ProfileText" Classes="prompt-sub" Text="{Binding Profile}"
-                       MaxWidth="100" TextTrimming="CharacterEllipsis" />
-          </StackPanel>
+          <!-- Docked first, the environment keeps its width and the project is trimmed to what is left. -->
+          <DockPanel HorizontalAlignment="Left">
+            <TextBlock Name="ProfileText" DockPanel.Dock="Right" Classes="prompt-sub" Text="{Binding Profile}"
+                       MaxWidth="120" TextTrimming="CharacterEllipsis" />
+            <TextBlock DockPanel.Dock="Right" Classes="prompt-sub" Text=" · environment " />
+            <TextBlock Name="ProjectText" Classes="prompt-sub" Text="{Binding Project}" TextTrimming="CharacterEllipsis" />
+          </DockPanel>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Border Classes="dot waiting" />

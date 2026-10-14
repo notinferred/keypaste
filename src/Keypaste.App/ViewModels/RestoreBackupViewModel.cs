@@ -192,7 +192,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         : string.Empty;
 
     internal string Holds => Validated is { } summary
-        ? $"It holds {Count(summary.Entries, "entry", "entries")} in {Count(summary.Groups, "group", "groups")}, " +
+        ? $"It holds {Count(summary.Entries, "item", "items")} in {Count(summary.Groups, "group", "groups")}, " +
           $"and {Count(summary.EnvProjects, "env project", "env projects")}."
         : string.Empty;
 

@@ -100,7 +100,7 @@ internal sealed record EnvProfileCell(
                 null or "" => "unusable",
                 _ when first.StartsWith("expired", StringComparison.Ordinal) => "expired",
                 _ when first.StartsWith("holds the KeePass placeholder", StringComparison.Ordinal) => "placeholder",
-                _ when first.StartsWith("is on more than one entry", StringComparison.Ordinal) => "on two entries",
+                _ when first.StartsWith("is on more than one item", StringComparison.Ordinal) => "on two items",
                 _ => DisplayTextSanitizer.Sanitize(first).Text,
             };
         }

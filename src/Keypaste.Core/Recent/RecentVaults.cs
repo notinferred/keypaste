@@ -71,7 +71,7 @@ public static class RecentVaults
     private static readonly string[] _header =
     [
         "keypaste remembers which vault files you have opened on this machine.",
-        "It holds no entry names and no secrets. Delete this file to forget them.",
+        "It holds no item names and no secrets. Delete this file to forget them.",
     ];
 
     /// <summary>Reads the list.</summary>

@@ -102,6 +102,6 @@ internal static class LockCommand
         writer.WriteLine("usage: keypaste lock [--vault <path>] [--approver <name>]");
         writer.WriteLine();
         writer.WriteLine("asks the keypaste app or `keypaste agent` holding the vault unlocked to lock it now.");
-        writer.WriteLine("every grant ends and every agent is refused until somebody unlocks it again.");
+        writer.WriteLine("every allowance ends and every agent is refused until somebody unlocks it again.");
     }
 }

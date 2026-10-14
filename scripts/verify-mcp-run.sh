@@ -75,8 +75,8 @@ for _ in $(seq 1 100); do
   sleep 0.2
 done
 grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listening"
-SESSION="$(grep 'listening on' "$AGENT_ERR" | head -1 | sed -E 's/.* for session ([^,]+),.*/\1/')"
-[ -n "$SESSION" ] || die "keypaste agent named no session on its listening line"
+SESSION="$(grep 'listening on' "$AGENT_ERR" | head -1 | sed -E 's/.* for unlock ([^,]+),.*/\1/')"
+[ -n "$SESSION" ] || die "keypaste agent named no unlock on its listening line"
 
 call() {
   local id="$1" command="$2"
@@ -99,7 +99,7 @@ readonly DENIED
 OFF="$(jq -cn --arg marker "$(native "$OFF_MARKER")" '["sh","-c",("printf ran > \"" + $marker + "\"")]')"
 readonly OFF
 
-prompts_drawn() { grep -c 'tool       keypaste.run' "$AGENT_ERR" 2>/dev/null || true; }
+prompts_drawn() { grep -c 'tool         keypaste.run' "$AGENT_ERR" 2>/dev/null || true; }
 
 # ----------------------------------------------------------- commands are off until the person says
 # An agent with no settings runs nothing: its run is refused before anything resolves, and nobody is asked.
@@ -175,9 +175,9 @@ jq -e -s --arg s "$SESSION" '
   || die "the audit lines do not show a run refused while off, the change, a prompted grant, a grant-served run and a denial in session $SESSION"
 
 # 6. The person was shown the exact command and the claim, and the owner narrated the grant's use.
-grep -q 'tool       keypaste.run' "$AGENT_ERR" || die "the run dialog was not shown"
+grep -q 'tool         keypaste.run' "$AGENT_ERR" || die "the run dialog was not shown"
 grep -q 'ci run probe' "$AGENT_ERR" || die "the agent's stated reason was not shown to the person"
-grep -q 'from a timed grant' "$AGENT_ERR" || die "the grant-served run was not narrated"
+grep -q 'under an allowance' "$AGENT_ERR" || die "the run an allowance served was not narrated"
 
 echo "ok: a person approved a run and denied another across two real processes; the value reached the"
 echo "    command and never the result, the transcript or the log, and the grant served the same run once more"

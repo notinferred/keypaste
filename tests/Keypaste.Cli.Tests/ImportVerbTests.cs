@@ -41,8 +41,8 @@ public sealed class ImportVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal(["Password for acme.kdbx: ", "Master password: "], _cli.Prompt.PromptsSeen);
-        Assert.Contains("  acme.kdbx · KDBX 4.0 · Argon2d · AES-256", _cli.Err, StringComparison.Ordinal);
-        Assert.Contains("  ✓ 2 entries · 0 projects · copied into acme", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("  acme.kdbx · KeePass database 4.0 · Argon2d · AES-256", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("  ✓ 2 items · 0 projects · copied into acme", _cli.Err, StringComparison.Ordinal);
         Assert.Empty(_cli.Out);
 
         using var vault = Vault.Open(_cli.VaultPath, _master);
@@ -63,8 +63,8 @@ public sealed class ImportVerbTests : IDisposable
         var exit = _cli.Run("import", source, "--vault", _cli.VaultPath, "--dry-run");
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Contains("foreign.kdbx · KDBX 4.0 · Argon2id · ChaCha20", _cli.Err, StringComparison.Ordinal);
-        Assert.Contains("  3 entries in 4 groups", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("foreign.kdbx · KeePass database 4.0 · Argon2id · ChaCha20", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("  3 items in 4 groups", _cli.Out, StringComparison.Ordinal);
         Assert.Contains("→ foreign/Banking", _cli.Out, StringComparison.Ordinal);
         Assert.Matches(@"Recycle Bin +1  skipped", _cli.Out);
         Assert.Matches(@"\.keypaste +1  skipped", _cli.Out);
@@ -83,7 +83,7 @@ public sealed class ImportVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal(["Password for acme.kdbx: "], _cli.Prompt.PromptsSeen);
-        Assert.Contains("  ✓ 2 entries · 0 projects · editing in place", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("  ✓ 2 items · 0 projects · editing in place", _cli.Err, StringComparison.Ordinal);
         Assert.Contains($"pass --vault {source} or set KEYPASTE_VAULT", _cli.Err, StringComparison.Ordinal);
 
         var remembered = Assert.Single(RecentVaults.Load(KeypasteHome.RecentPath(Home)));

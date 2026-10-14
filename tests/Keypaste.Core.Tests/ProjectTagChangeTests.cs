@@ -91,7 +91,7 @@ public sealed class ProjectTagChangeTests : IDisposable
 
         Assert.Null(shouted.Environment);
         Assert.StartsWith("env:billing:Prod puts services/Stripe in no project: ", described[0], StringComparison.Ordinal);
-        Assert.Equal("While the entry carries it, every agent request for the entry is asked live.", described[1]);
+        Assert.Equal("While the item carries it, every agent request for the item is asked live.", described[1]);
         Assert.Equal("It changes no environment.", Preview(["Env:billing"], adding: true)!.Describe()[1]);
     }
 

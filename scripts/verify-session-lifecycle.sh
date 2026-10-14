@@ -252,7 +252,7 @@ exec 9>&-
 exec 9> >(exec 7>&- 8>&-; exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
 printf '%s\n' "$MASTER" >&9
 wait_for 'listening on' "$AGENT_ERR"
-AGENT_SESSION="$(grep 'listening on' "$AGENT_ERR" | sed -E 's/.* for session ([0-9a-f]+),.*/\1/')"
+AGENT_SESSION="$(grep 'listening on' "$AGENT_ERR" | sed -E 's/.* for unlock ([0-9a-f]+),.*/\1/')"
 
 HOLD_OUT="$WORK/hold-4.txt"
 set +e

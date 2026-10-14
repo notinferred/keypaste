@@ -150,7 +150,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
         Message = write.Outcome == WriteOutcome.NothingToSave
             ? $"{row.Entry} already has {row.Tag}."
-            : $"Put {row.Tag} back on {row.Entry}. The entry as it was stays in its history.";
+            : $"Put {row.Tag} back on {row.Entry}. The item as it was stays in its history.";
         Check();
     }
 
@@ -279,7 +279,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
         return entries.Count == 1
             ? $"Moved {what} from the notes of {Shown(entries[0])} into protected fields. The notes as they were stay in its history."
-            : $"Moved {what} from the notes of {entries.Count} entries into protected fields. The notes as they were stay in each entry's history.";
+            : $"Moved {what} from the notes of {entries.Count} items into protected fields. The notes as they were stay in each item's history.";
     }
 
     private static string Refused(IReadOnlyList<NoteKeyRefusal> refusals)

@@ -65,13 +65,13 @@ internal static class FieldCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste field ls <entry> [--json]");
+            context.Stdout.WriteLine("usage: keypaste field ls <item> [--json]");
             return CliApp.ExitSuccess;
         }
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste field ls: expected exactly one entry name");
+            context.Stderr.WriteLine("keypaste field ls: expected exactly one item name");
             return CliApp.ExitUsageError;
         }
 
@@ -88,7 +88,7 @@ internal static class FieldCommand
         {
             if (vault.Find(entryPath) is not { } entry)
             {
-                context.Stderr.WriteLine($"keypaste field ls: no entry '{entryPath}'");
+                context.Stderr.WriteLine($"keypaste field ls: no item '{entryPath}'");
                 return CliApp.ExitNotFound;
             }
 
@@ -141,13 +141,13 @@ internal static class FieldCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste field rm <entry> <name>");
+            context.Stdout.WriteLine("usage: keypaste field rm <item> <name>");
             return CliApp.ExitSuccess;
         }
 
         if (line.Operands.Count != 2)
         {
-            context.Stderr.WriteLine("keypaste field rm: expected an entry name and a field name");
+            context.Stderr.WriteLine("keypaste field rm: expected an item name and a field name");
             return CliApp.ExitUsageError;
         }
 
@@ -169,7 +169,7 @@ internal static class FieldCommand
         {
             if (vault.Find(entryPath) is not { } entry)
             {
-                context.Stderr.WriteLine($"keypaste field rm: no entry '{entryPath}'");
+                context.Stderr.WriteLine($"keypaste field rm: no item '{entryPath}'");
                 return CliApp.ExitNotFound;
             }
 
@@ -195,11 +195,11 @@ internal static class FieldCommand
         writer.WriteLine("usage: keypaste field <command>");
         writer.WriteLine();
         writer.WriteLine("commands:");
-        writer.WriteLine("  ls <entry>          list custom fields by name and protection, never by value");
-        writer.WriteLine("  rm <entry> <name>   remove a custom field; its value stays in history");
+        writer.WriteLine("  ls <item>           list custom fields by name and protection, never by value");
+        writer.WriteLine("  rm <item> <name>    remove a custom field; its value stays in history");
         writer.WriteLine();
-        writer.WriteLine("to read one: keypaste get <entry> --field <name>");
-        writer.WriteLine("to set one:  keypaste set <entry> --field <name> [--plain]");
+        writer.WriteLine("to read one: keypaste get <item> --field <name>");
+        writer.WriteLine("to set one:  keypaste set <item> --field <name> [--plain]");
     }
 
     private static string Shown(string path) => EntryNameSanitizer.SanitizePath(path).Text;

@@ -107,7 +107,7 @@ public sealed record EnvReferenceExport(EnvReferenceExportOutcome Outcome, int C
         }
 
         var entries = string.Join(", ", repeated.Select(source => ApprovalPrompt.Shown(source.Entry)));
-        return $"{EntryNameSanitizer.Sanitize(repeated.Key).Text} is on more than one entry ({entries})";
+        return $"{EntryNameSanitizer.Sanitize(repeated.Key).Text} is on more than one item ({entries})";
     }
 
     private static EnvReferenceExport Failed(EnvReferenceExportOutcome outcome, string problem) =>

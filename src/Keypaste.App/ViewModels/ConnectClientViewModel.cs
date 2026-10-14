@@ -421,9 +421,9 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         List<string> notes =
         [
             plan.Steps.OfType<McpConfigEdit>().FirstOrDefault() is { } edit
-                ? EditNote("Connect", edit) + " No password, keyfile or session goes into it."
-                : $"Connect runs these commands. The first removes any earlier keypaste entry from {client.DisplayName}; "
-                    + "the second adds this vault. No password, keyfile or session goes into its configuration.",
+                ? EditNote("Connect", edit) + " No password, keyfile or unlock ID goes into it."
+                : $"Connect runs these commands. The first removes keypaste from {client.DisplayName} if it was there before; "
+                    + "the second adds this vault. No password, keyfile or unlock ID goes into its configuration.",
         ];
 
         if (target.Link is { } link)
@@ -450,8 +450,8 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     }
 
     private static string EditNote(string verb, McpConfigEdit edit) => File.Exists(edit.Path)
-        ? $"{verb} changes only keypaste's entry in {edit.Path}, and keeps the first original as {edit.Backup ?? McpConfigFile.BackupPath(edit.Path)}."
-        : $"{verb} creates {edit.Path} holding only keypaste's entry.";
+        ? $"{verb} changes only keypaste's part of {edit.Path}, and keeps the first original as {edit.Backup ?? McpConfigFile.BackupPath(edit.Path)}."
+        : $"{verb} creates {edit.Path} holding only keypaste's part.";
 
     private static string Afterwards(McpClient client, McpSetupResult result, bool removing)
     {

@@ -145,7 +145,7 @@ public sealed class EnvVerbTests
 
         // The retention is stated where it happens, not only in SECURITY.md — a user rotating a
         // leaked credential needs to know the old one is still in the file (DECISIONS.md D-0014).
-        Assert.Contains("Updated TOKEN on env/billing/.env (previous value kept in entry history)", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Updated TOKEN on env/billing/.env (previous value kept in item history)", harness.Err, StringComparison.Ordinal);
 
         harness.Stderr.GetStringBuilder().Clear();
         harness.Prompt.Enqueue(Master, "second");
@@ -201,7 +201,7 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "set", "billing", "OTHER_KEY=v", "--entry", "services/Absent", "--vault", harness.VaultPath));
-        Assert.Contains("no entry 'services/Absent'", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("no item 'services/Absent'", harness.Err, StringComparison.Ordinal);
 
         using var opened = Vault.Open(harness.VaultPath, Master);
         Assert.Equal("whsec", opened.ReadField(stripe, "WEBHOOK"), StringComparer.Ordinal);
@@ -220,7 +220,7 @@ public sealed class EnvVerbTests
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "set", "billing", "STRIPE_KEY=new", "--vault", harness.VaultPath));
 
-        Assert.Contains("STRIPE_KEY is on more than one entry (services/Stripe, services/Twin)", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("STRIPE_KEY is on more than one item (services/Stripe, services/Twin)", harness.Err, StringComparison.Ordinal);
         Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
     }
 
@@ -240,7 +240,7 @@ public sealed class EnvVerbTests
         var exit = harness.Run("env", "rm", "billing", "A", "--yes", "--vault", harness.VaultPath);
 
         Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Contains("Removed A from env/billing/.env (its value stays in the entry's history)", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Removed A from env/billing/.env (its value stays in the item's history)", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
         Assert.Equal(["B"], vault.Fields(_home)!.Select(field => field.Name));
@@ -286,7 +286,7 @@ public sealed class EnvVerbTests
         var exit = harness.Run("env", "rm", "billing", "TOKEN", "--yes", "--vault", harness.VaultPath);
 
         Assert.NotEqual(CliApp.ExitSuccess, exit);
-        Assert.Contains("TOKEN is on more than one entry (services/Stripe, services/Twin)", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("TOKEN is on more than one item (services/Stripe, services/Twin)", harness.Err, StringComparison.Ordinal);
         Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
     }
 
@@ -463,10 +463,10 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "rm", "acme-api", "PULLED", "-p", "qa", "--yes", "--vault", harness.VaultPath));
-        Assert.Contains("'acme-api' has no 'qa' profile", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("'acme-api' has no 'qa' environment", harness.Err, StringComparison.Ordinal);
 
         Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "set", "acme-api", "X=y", "-p", "Staging", "--vault", harness.VaultPath));
-        Assert.Contains("is not a profile name", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("is not an environment name", harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]

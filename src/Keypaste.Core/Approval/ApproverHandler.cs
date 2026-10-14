@@ -166,7 +166,7 @@ public sealed class ApproverHandler
         if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out _))
         {
             return ValueTask.FromResult(
-                new NamesReply(false, [], "the exposure this bridge was configured with is not usable", true) { Refusal = AuditMethod.Failed });
+                new NamesReply(false, [], "this bridge's --expose is not usable", true) { Refusal = AuditMethod.Failed });
         }
 
         if (!TryAccess(request.ClientLabel, out var access, out var problem))
@@ -214,7 +214,7 @@ public sealed class ApproverHandler
 
         if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out var globError))
         {
-            return Refused(AuditMethod.Failed, $"the exposure this bridge was configured with is not usable: {globError}");
+            return Refused(AuditMethod.Failed, $"this bridge's --expose is not usable: {globError}");
         }
 
         if (!TryAccess(request.ClientLabel, out var access, out var unusable))
@@ -251,12 +251,12 @@ public sealed class ApproverHandler
 
         if (reach == ExposureReach.None)
         {
-            return Refused(AuditMethod.OutOfScope, "the entry is outside what this agent can see through this bridge");
+            return Refused(AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge");
         }
 
         if (!EntryExposure.Permits(reach, request.Field))
         {
-            return Refused(AuditMethod.OutOfScope, "this agent reaches the entry through a project tag, which exposes only its project variables");
+            return Refused(AuditMethod.OutOfScope, "this agent reaches the item through a project tag, which lets it see only the item's project variables");
         }
 
         var handle = EntryHandle.For(name);
@@ -285,7 +285,7 @@ public sealed class ApproverHandler
                     {
                         Decision = AuditDecision.Granted,
                         Method = AuditMethod.GrantCache,
-                        Reason = "served from a grant a person had already given, inside its lifetime",
+                        Reason = "served from an allowance a person had already given, inside its lifetime",
                         Entry = display,
                         TtlSeconds = (int)remaining.TotalSeconds,
                         Value = live.Value.ToString(),
@@ -465,7 +465,7 @@ public sealed class ApproverHandler
                 {
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Automatic,
-                    Reason = $"released without asking: {shown}'s mode for this entry is Automatic",
+                    Reason = $"released without asking: {shown}'s mode for this item is Automatic",
                     Entry = display,
                     TtlSeconds = ttl,
                     Value = released.Value.ToString(),
@@ -1058,10 +1058,10 @@ public sealed class ApproverHandler
     private static string Explain(CredentialFailure failure) => failure switch
     {
         CredentialFailure.VaultLocked => "no vault is unlocked",
-        CredentialFailure.NotFound => "no entry answers to that name",
-        CredentialFailure.Ambiguous => "more than one entry answers to that name",
+        CredentialFailure.NotFound => "no item answers to that name",
+        CredentialFailure.Ambiguous => "more than one item answers to that name",
         CredentialFailure.NoSuchField => "the field asked for is not one keypaste releases",
-        CredentialFailure.Empty => "the entry has nothing in that field",
+        CredentialFailure.Empty => "the item has nothing in that field",
         CredentialFailure.ChangedOnDisk =>
             "another program changed the vault file since keypaste read it; nothing is released until a person reloads the vault",
         CredentialFailure.Unsaved => "the vault has a change that is not saved yet",

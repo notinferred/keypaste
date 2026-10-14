@@ -77,7 +77,7 @@ public sealed class CliLinkSettingsTests
 
         Assert.False(onPath.HasCliLinkNote);
         Assert.True(offPath.HasCliLinkNote);
-        Assert.StartsWith($"{Path.GetDirectoryName(FakeCliLink.Location)} is not on this session's PATH yet.", offPath.CliLinkNote, StringComparison.Ordinal);
+        Assert.StartsWith($"{Path.GetDirectoryName(FakeCliLink.Location)} is not on PATH yet.", offPath.CliLinkNote, StringComparison.Ordinal);
     }
 
     [Fact]

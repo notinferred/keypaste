@@ -242,7 +242,7 @@
             <ctl:KpIcon Icon="alert-triangle" Size="14" Margin="0,1,10,0" VerticalAlignment="Top"
                         Foreground="{DynamicResource KpTextMuted}" />
             <StackPanel Grid.Column="1" Spacing="6">
-              <TextBlock Classes="body primary" Text="Some tags put their entry in no project" />
+              <TextBlock Classes="body primary" Text="Some tags put their item in no project" />
               <ItemsControl ItemsSource="{Binding MalformedTags}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:EnvTagProblemRow">
@@ -250,7 +250,7 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Classes="caption" Text="Correct the tag on the entry in Items, or remove it." />
+              <TextBlock Classes="caption" Text="Correct the tag on the item in Items, or remove it." />
             </StackPanel>
           </Grid>
         </Border>
@@ -259,7 +259,7 @@
           <StackPanel Spacing="10">
             <TextBlock Classes="section" Text="New project" />
             <TextBlock Classes="caption"
-                       Text="A project is the entries in your vault tagged with its name, such as env:billing-api. It appears in the vault once you add its first entry or key." />
+                       Text="A project is the items in your vault tagged with its name, such as env:billing-api. It appears in the vault once you add its first item or key." />
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" />
               <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
@@ -272,7 +272,7 @@
           <StackPanel Spacing="12">
             <TextBlock Classes="section" Text="No projects yet" />
             <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left"
-                       Text="A project is the entries in your vault tagged with its name, such as env:billing-api, with a value per environment. Tag an entry in Items, run keypaste env set billing-api STRIPE_KEY, or choose New project." />
+                       Text="A project is the items in your vault tagged with its name, such as env:billing-api, with a value per environment. Tag an item in Items, run keypaste env set billing-api STRIPE_KEY, or choose New project." />
             <Button Content="New project" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
                     HorizontalAlignment="Left" />
           </StackPanel>
@@ -434,7 +434,7 @@
                                                 ToolTip.Tip="Replace the value"
                                                 Command="{Binding ReplaceCommand}" />
                                         <Button Classes="ghost row-action" Content="Remove" ContentTemplate="{StaticResource RemoveGlyph}"
-                                                ToolTip.Tip="Remove this key from its entry"
+                                                ToolTip.Tip="Remove this key from its item"
                                                 Command="{Binding RemoveCommand}" />
                                       </StackPanel>
                                     </DataTemplate>
@@ -471,7 +471,7 @@
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="New environment" />
                     <TextBlock Classes="caption"
-                               Text="Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key or entry creates it, and prod and production environments always ask before release." />
+                               Text="Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key or item creates it, and prod and production environments always ask before release." />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" />
                       <Button Classes="primary" Content="Add key" Command="{Binding ConfirmAddProfileCommand}" />
@@ -492,7 +492,7 @@
                       <ComboBox ItemsSource="{Binding EntryChoices}"
                                 SelectedItem="{Binding NewEntry}"
                                 MinWidth="320"
-                                AutomationProperties.Name="Entry for the new key">
+                                AutomationProperties.Name="Item for the new key">
                         <ComboBox.ItemTemplate>
                           <DataTemplate x:DataType="vm:EnvEntryChoice">
                             <TextBlock Text="{Binding Display}" FontFamily="{DynamicResource KpMono}" />
@@ -576,7 +576,7 @@
                      entry puts its variables in. Add entry tags one and Remove takes the tag off, each after
                      saying what it reaches (D-0415); neither deletes an entry or a field. -->
                 <StackPanel Spacing="8">
-                  <TextBlock Classes="label" Text="Entries" />
+                  <TextBlock Classes="label" Text="Items" />
                   <Border Classes="table">
                     <ItemsControl ItemsSource="{Binding Environments}">
                       <ItemsControl.ItemTemplate>
@@ -590,11 +590,11 @@
                                               Foreground="{DynamicResource KpTextSecondary}" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Classes="ghost sm" Command="{Binding AddEntry}"
-                                        ToolTip.Tip="Tag an entry from your vault into this environment"
+                                        ToolTip.Tip="Tag an item from your vault into this environment"
                                         AutomationProperties.Name="{Binding AddName}">
                                   <StackPanel Orientation="Horizontal" Spacing="6">
                                     <ctl:KpIcon Icon="plus" Size="13" />
-                                    <TextBlock Text="Add entry" />
+                                    <TextBlock Text="Add item" />
                                   </StackPanel>
                                 </Button>
                               </Grid>
@@ -618,7 +618,7 @@
                                       <StackPanel Grid.Column="2" Classes="row-actions" Orientation="Horizontal"
                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,-4">
                                         <Button Classes="ghost row-action" Command="{Binding Remove}"
-                                                ToolTip.Tip="Take this entry out of the environment; the entry and its fields stay"
+                                                ToolTip.Tip="Take this item out of the environment; the item and its fields stay"
                                                 AutomationProperties.Name="{Binding RemoveName}">
                                           <ctl:KpIcon Icon="x" Size="13" />
                                         </Button>
@@ -637,11 +637,11 @@
                 <Border Classes="card filled" IsVisible="{Binding IsAddingEntry}" ctl:ShowInView.OnShow="True">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding AddEntryTitle}" />
-                    <TextBox Text="{Binding EntryFilter}" PlaceholderText="Find an entry by its path" Width="420"
-                             HorizontalAlignment="Left" AutomationProperties.Name="Find an entry" />
+                    <TextBox Text="{Binding EntryFilter}" PlaceholderText="Find an item by its path" Width="420"
+                             HorizontalAlignment="Left" AutomationProperties.Name="Find an item" />
                     <ListBox Name="EntryCandidates" ItemsSource="{Binding EntryCandidates}" SelectedItem="{Binding ChosenEntry}"
                              MaxHeight="240" Width="420" HorizontalAlignment="Left"
-                             AutomationProperties.Name="Entries you can add">
+                             AutomationProperties.Name="Items you can add">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:EnvEntryCandidate">
                           <TextBlock Classes="mono" Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
@@ -743,7 +743,7 @@
                       <TextBlock Classes="body muted" FontSize="12.5" LineHeight="18.75"
                                  Text="Values go only into the command's environment and are never written to disk. The command, anything it starts and other programs running as you can read them." />
                       <TextBlock Classes="body muted" FontSize="12.5" LineHeight="18.75"
-                                 Text="Through an agent or a token, a prod environment is asked about live every time and never kept in a grant." />
+                                 Text="Through an agent or a token, a prod environment is asked about live every time and never kept in an allowance." />
 
                       <Border Classes="divider" Margin="0,2" />
 

@@ -50,8 +50,8 @@ In source, Allow once releases one field and keeps nothing; Allow for 1 hour als
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  client   claude-code
-  entry    env/demo/.env
+  agent    claude-code
+  item     env/demo/.env
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -69,7 +69,7 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
 ```
 2 records in /home/you/.keypaste/audit.jsonl
 
-  time (UTC)           client       entry          decision  method
+  time (UTC)           agent        item           decision  method
   2026-07-27 09:57:42  claude-code  -              granted   exposure
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```

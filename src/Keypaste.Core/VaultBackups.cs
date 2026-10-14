@@ -407,7 +407,7 @@ public static class VaultBackups
 
         return KdbxHeader.IsVaultFile(listed.Path)
             ? listed
-            : throw new VaultRestoreException($"The backup '{listed.Path}' is not a KDBX file.");
+            : throw new VaultRestoreException($"The backup '{listed.Path}' is not a KeePass database.");
     }
 
     /// <summary>The backup's bytes, read once, which must be the bytes <see cref="Inspect"/> opened.</summary>

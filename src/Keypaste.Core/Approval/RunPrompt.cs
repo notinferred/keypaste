@@ -32,7 +32,7 @@ public sealed record RunPrompt
     /// <summary>The tool an agent called, as the prompt names it.</summary>
     public const string ToolName = "keypaste.run";
 
-    /// <summary>What the requesting client calls itself, sanitized, or <c>an unnamed client</c>.</summary>
+    /// <summary>What the requesting client calls itself, sanitized, or <c>an unnamed agent</c>.</summary>
     public required string Client { get; init; }
 
     /// <summary>The bridge's <c>--client-label</c>, sanitized, or null.</summary>

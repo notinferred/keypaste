@@ -26,7 +26,7 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         var who = prompt.Label ?? prompt.Client;
 
         Title = $"{who} wants {prompt.Variables.Count} secret{(prompt.Variables.Count == 1 ? string.Empty : "s")}";
-        Subtitle = $"via MCP · {prompt.Directory} · profile {prompt.Profile}";
+        Subtitle = $"via MCP · environment {prompt.Profile} · {prompt.Directory}";
         Client = prompt.Label is { } label ? $"{prompt.Client} · label {label}" : prompt.Client;
         Tool = $"tool: {RunPrompt.ToolName}";
         Program = $"runs {prompt.Program}";
@@ -45,8 +45,8 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         OnceOnlyText = prompt.OnceOnly switch
         {
             _ when prompt.GrantSeconds > 0 => string.Empty,
-            OnceOnly.AskEveryTime => "This agent is set to Ask every time: no timed grant is offered.",
-            _ => "This profile is protected: it is asked about every time.",
+            OnceOnly.AskEveryTime => "This agent is set to Ask every time: no timed allowance is offered.",
+            _ => "This environment is protected: it is asked about every time.",
         };
         TimedSeconds = prompt.GrantSeconds;
         TimedCaption = prompt.GrantSeconds > 0

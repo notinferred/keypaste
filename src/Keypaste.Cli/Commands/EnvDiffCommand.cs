@@ -4,11 +4,11 @@ using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Compares profiles by name: <c>keypaste env diff [project] [&lt;profileA&gt; &lt;profileB&gt;]</c>.</summary>
+/// <summary>Compares environments by name: <c>keypaste env diff [project] [&lt;environmentA&gt; &lt;environmentB&gt;]</c>.</summary>
 /// <remarks>
 /// Values are compared inside <see cref="EnvMatrix"/> and never printed: a key is missing from one
-/// profile, unusable in one, or holds the value another profile holds. Two profiles holding
-/// different values is what profiles are for, so it is not a difference.
+/// environment, unusable in one, or holds the value another environment holds. Two environments
+/// holding different values is what environments are for, so it is not a difference.
 /// </remarks>
 internal static class EnvDiffCommand
 {
@@ -29,9 +29,9 @@ internal static class EnvDiffCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env diff [project] [<profileA> <profileB>]");
+            context.Stdout.WriteLine("usage: keypaste env diff [project] [<environmentA> <environmentB>]");
             context.Stdout.WriteLine();
-            context.Stdout.WriteLine($"with no profiles, compares {EnvProfileNames.Default} with every other profile. names only, never values.");
+            context.Stdout.WriteLine($"with no environments, compares {EnvProfileNames.Default} with every other environment. names only, never values.");
             return CliApp.ExitSuccess;
         }
 
@@ -39,7 +39,7 @@ internal static class EnvDiffCommand
 
         if (operands.Count > 3)
         {
-            return Fail(context, "expected a project and two profiles at most");
+            return Fail(context, "expected a project and two environments at most");
         }
 
         var named = operands.Count is 1 or 3 ? operands[0] : null;
@@ -87,7 +87,7 @@ internal static class EnvDiffCommand
             {
                 if (new[] { asked.A, asked.B }.FirstOrDefault(profile => !names.Contains(profile, StringComparer.Ordinal)) is { } absent)
                 {
-                    context.Stderr.WriteLine($"keypaste env diff: '{project}' has no '{absent}' profile");
+                    context.Stderr.WriteLine($"keypaste env diff: '{project}' has no '{absent}' environment");
                     return CliApp.ExitNotFound;
                 }
 
@@ -100,7 +100,7 @@ internal static class EnvDiffCommand
 
             if (names.Count == 1)
             {
-                context.Stdout.WriteLine($"  {Done(context)} '{Shown(project)}' has only the {first} profile");
+                context.Stdout.WriteLine($"  {Done(context)} '{Shown(project)}' has only the {first} environment");
                 return CliApp.ExitSuccess;
             }
 

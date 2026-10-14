@@ -85,7 +85,7 @@ internal sealed class RequestCredentialTool(
             verdict = new Verdict(
                 AuditDecision.Denied,
                 AuditMethod.NotInitialized,
-                "the client called a tool before the initialize handshake completed",
+                "the agent called a tool before the initialize handshake completed",
                 Refusal: ToolText.NotInitialized);
         }
         else
@@ -99,7 +99,7 @@ internal sealed class RequestCredentialTool(
                 // The client stopped waiting. It will never read this result, and that is exactly why
                 // the line below still gets written: a request that reached a person, or nearly did,
                 // is an access whether or not anybody collected the answer.
-                verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
+                verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the agent withdrew the request");
             }
             catch (Exception)
             {
@@ -168,7 +168,7 @@ internal sealed class RequestCredentialTool(
             return new Verdict(
                 AuditDecision.Denied,
                 AuditMethod.OutOfScope,
-                "the entry is outside this server's configured exposure");
+                "the item is outside what this agent can see through this bridge");
         }
 
         var (reply, outcome, refusal) = await approver.RequestAsync(
@@ -209,7 +209,7 @@ internal sealed class RequestCredentialTool(
         // recorded, the withdrawn request's included; with none, the bridge records the call.
         if (cancellationToken.IsCancellationRequested)
         {
-            return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request")
+            return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the agent withdrew the request")
             {
                 Recorded = reply is not null,
             };

@@ -16,7 +16,7 @@ public static class AccessChangeRules
     public const string ModeRule = "must be ask, allow-for-a-while or automatic";
 
     /// <summary>The rule for <c>project</c>.</summary>
-    public const string ProjectRule = "must be <project> or <project>:<environment>, as an entry's project tag names it after env:";
+    public const string ProjectRule = "must be <project> or <project>:<environment>, as an item's project tag names it after env:";
 
     /// <summary>The rule for <c>values</c>.</summary>
     public const string ValuesRule = "must be yes or no";

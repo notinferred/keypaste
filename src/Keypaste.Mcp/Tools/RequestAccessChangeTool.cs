@@ -91,7 +91,7 @@ internal sealed class RequestAccessChangeTool(
             verdict = new Verdict(
                 AuditDecision.Denied,
                 AuditMethod.NotInitialized,
-                "the client called a tool before the initialize handshake completed",
+                "the agent called a tool before the initialize handshake completed",
                 ToolText.NotInitialized);
         }
         else
@@ -102,7 +102,7 @@ internal sealed class RequestAccessChangeTool(
             }
             catch (OperationCanceledException)
             {
-                verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request", ToolText.Cancelled);
+                verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the agent withdrew the request", ToolText.Cancelled);
             }
             catch (Exception)
             {
@@ -194,7 +194,7 @@ internal sealed class RequestAccessChangeTool(
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request" + named, ToolText.Cancelled);
+            return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the agent withdrew the request" + named, ToolText.Cancelled);
         }
 
         return outcome switch

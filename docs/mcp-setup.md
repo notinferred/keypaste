@@ -37,7 +37,7 @@ In source, the command finds the AI tools installed here and connects Claude Cod
 ```
 keypaste mcp   /home/you/.local/bin/keypaste
 vault          /home/you/vaults/personal.kdbx
-exposure       ** (each agent sees what its settings allow: every project's variables until you change them)
+can see        ** (each agent sees what its settings allow: every project's variables until you change them)
 run            offered; each agent runs nothing until you turn run on in its settings
 
   claude-code      claude mcp remove --scope user keypaste
@@ -254,7 +254,7 @@ keypaste log --client claude-code --since 2h
 ```
 3 records in /home/you/.keypaste/audit.jsonl
 
-  time (UTC)           client       entry               decision  method
+  time (UTC)           agent        item                decision  method
   2026-07-26 14:03:09  claude-code  -                   granted   exposure
   2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
   2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   grant-cache (!)
@@ -290,7 +290,7 @@ keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e8
 No release of keypaste wrote a `v:1` record, so in source one is reported as a line something else wrote (D-0416). `keypaste log` marks it and other unverifiable rows with `?`:
 
 ```
-  time (UTC)           client       entry                decision  method
+  time (UTC)           agent        item                 decision  method
 ? 2026-07-26 14:10:00  claude-code  env/prod/PAYROLL_DB  granted   prompt
 
 ?  the hash chain does not vouch for this row. Run 'keypaste log verify'.

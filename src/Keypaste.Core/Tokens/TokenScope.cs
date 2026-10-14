@@ -71,7 +71,7 @@ public sealed record TokenScope(string Project, string Profile, string? Key)
 
         if (!text.StartsWith(_verb, StringComparison.Ordinal))
         {
-            error = $"'{Shown(text)}' is not a scope: write read:<project>/<profile>/<key or *>";
+            error = $"'{Shown(text)}' is not a scope: write read:<project>/<environment>/<key or *>";
             return false;
         }
 
@@ -79,7 +79,7 @@ public sealed record TokenScope(string Project, string Profile, string? Key)
 
         if (parts.Length != 3)
         {
-            error = $"'{Shown(text)}' is not a scope: write read:<project>/<profile>/<key or *>";
+            error = $"'{Shown(text)}' is not a scope: write read:<project>/<environment>/<key or *>";
             return false;
         }
 
@@ -93,7 +93,7 @@ public sealed record TokenScope(string Project, string Profile, string? Key)
 
         if (!EnvProfileNames.IsValid(profile, out error))
         {
-            error = $"'{Shown(text)}' does not name a profile: {error}";
+            error = $"'{Shown(text)}' does not name an environment: {error}";
             return false;
         }
 

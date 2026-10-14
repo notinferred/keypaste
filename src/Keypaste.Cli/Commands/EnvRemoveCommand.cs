@@ -27,7 +27,7 @@ internal static class EnvRemoveCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env rm <project> <KEY> [-p <profile>] [--entry <entry>] [--yes]");
+            context.Stdout.WriteLine("usage: keypaste env rm <project> <KEY> [-p <environment>] [--entry <item>] [--yes]");
             return CliApp.ExitSuccess;
         }
 
@@ -75,7 +75,7 @@ internal static class EnvRemoveCommand
             {
                 context.Stderr.WriteLine(listing.Outcome == EnvOutcome.NoProject
                     ? $"keypaste env rm: no env set for '{project}'"
-                    : $"keypaste env rm: '{project}' has no '{profile}' profile");
+                    : $"keypaste env rm: '{project}' has no '{profile}' environment");
                 return CliApp.ExitNotFound;
             }
 
@@ -87,14 +87,14 @@ internal static class EnvRemoveCommand
             {
                 context.Stderr.WriteLine(string.Equals(profile, EnvProfileNames.Default, StringComparison.Ordinal)
                     ? $"keypaste env rm: '{project}' has no variable '{key}'"
-                    : $"keypaste env rm: '{project}' has no variable '{key}' in its '{profile}' profile");
+                    : $"keypaste env rm: '{project}' has no variable '{key}' in its '{profile}' environment");
                 return CliApp.ExitNotFound;
             }
 
             if (holding.Count > 1)
             {
                 var entries = string.Join(", ", holding.Select(source => ApprovalPrompt.Shown(source.Entry)).Order(StringComparer.Ordinal));
-                context.Stderr.WriteLine($"keypaste env rm: {key} is on more than one entry ({entries}); name the one to remove from with --entry");
+                context.Stderr.WriteLine($"keypaste env rm: {key} is on more than one item ({entries}); name the one to remove from with --entry");
                 return CliApp.ExitInternalError;
             }
 
@@ -103,7 +103,7 @@ internal static class EnvRemoveCommand
 
             if (!assumeYes)
             {
-                var answer = context.Prompt.ReadLine($"Remove {key} from {shown}? Its value stays in the entry's history. [y/N] ");
+                var answer = context.Prompt.ReadLine($"Remove {key} from {shown}? Its value stays in the item's history. [y/N] ");
                 if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
                 {
                     context.Stderr.WriteLine("Cancelled.");
@@ -128,7 +128,7 @@ internal static class EnvRemoveCommand
 
             vault.Save();
 
-            context.Stderr.WriteLine($"Removed {key} from {shown} (its value stays in the entry's history)");
+            context.Stderr.WriteLine($"Removed {key} from {shown} (its value stays in the item's history)");
             return CliApp.ExitSuccess;
         });
     }

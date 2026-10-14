@@ -45,15 +45,15 @@ internal static class SetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste set <entry> [--vault <path>] [--keyfile <path>]");
+            context.Stdout.WriteLine("usage: keypaste set <item> [--vault <path>] [--keyfile <path>]");
             context.Stdout.WriteLine($"       {GenerateOption.Usage}");
-            context.Stdout.WriteLine("       keypaste set <entry> --field <name> [--field <name> ...] [--plain]");
+            context.Stdout.WriteLine("       keypaste set <item> --field <name> [--field <name> ...] [--plain]");
             context.Stdout.WriteLine();
-            context.Stdout.WriteLine("creates the entry, or replaces the password of the one already there;");
+            context.Stdout.WriteLine("creates the item, or replaces the password of the one already there;");
             context.Stdout.WriteLine("the old password stays in its history. The value is asked for, read");
             context.Stdout.WriteLine("from stdin, or generated, and never printed.");
             context.Stdout.WriteLine();
-            context.Stdout.WriteLine("with --field it sets custom fields of an existing entry instead, asking");
+            context.Stdout.WriteLine("with --field it sets custom fields of an existing item instead, asking");
             context.Stdout.WriteLine("for each value in turn. A new field is protected unless --plain; an");
             context.Stdout.WriteLine("existing one keeps its protection.");
             return CliApp.ExitSuccess;
@@ -67,7 +67,7 @@ internal static class SetCommand
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste set: expected exactly one entry name");
+            context.Stderr.WriteLine("keypaste set: expected exactly one item name");
             return CliApp.ExitUsageError;
         }
 
@@ -86,7 +86,7 @@ internal static class SetCommand
 
         if (name.Title.Length == 0)
         {
-            context.Stderr.WriteLine("keypaste set: the entry name cannot be empty");
+            context.Stderr.WriteLine("keypaste set: the item name cannot be empty");
             return CliApp.ExitUsageError;
         }
 
@@ -186,7 +186,7 @@ internal static class SetCommand
     {
         if (vault.Fields(name) is not { } current)
         {
-            context.Stderr.WriteLine($"keypaste set: no entry '{Shown(entryPath)}'; --field writes to an entry that already exists");
+            context.Stderr.WriteLine($"keypaste set: no item '{Shown(entryPath)}'; --field writes to an item that already exists");
             return CliApp.ExitNotFound;
         }
 
@@ -218,7 +218,7 @@ internal static class SetCommand
         var style = context.ConsoleStyle;
         var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
         context.Stderr.WriteLine(
-            $"  {done} set {string.Join(", ", fields.Select(Shown))} on {Shown(entryPath)} {style.Glyph(context.Stderr, Mark.Dot)} the entry's earlier state stays in history");
+            $"  {done} set {string.Join(", ", fields.Select(Shown))} on {Shown(entryPath)} {style.Glyph(context.Stderr, Mark.Dot)} the item's earlier state stays in history");
 
         return CliApp.ExitSuccess;
     }

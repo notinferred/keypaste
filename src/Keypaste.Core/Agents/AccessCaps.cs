@@ -799,13 +799,13 @@ public sealed class AccessCaps
 
         if (table.Pairs.FirstOrDefault(pair => pair.Key is not (_labelKey or _projectKey or _modeKey or _valuesKey or _runKey or _seeKey or _perHourKey or _untilKey)) is { } unknown)
         {
-            problem = At(unknown.Line, $"'{Safe(unknown.Key)}' is not a setting; a client has label, project, mode, per_hour, until, values, run and see");
+            problem = At(unknown.Line, $"'{Safe(unknown.Key)}' is not a setting; an agent row has label, project, mode, per_hour, until, values, run and see");
             return false;
         }
 
         if (!table.TryGet(_labelKey, out var label) || label.Value.Kind != TomlValueKind.Text)
         {
-            problem = At(table.Line, $"a client needs {_labelKey} as a string");
+            problem = At(table.Line, $"an agent row needs {_labelKey} as a string");
             return false;
         }
 
@@ -875,7 +875,7 @@ public sealed class AccessCaps
 
         if (mode is null && values is null && run is null && see is null && limit is null)
         {
-            problem = At(table.Line, "a client row sets at least one of mode, per_hour, until, values, run and see");
+            problem = At(table.Line, "an agent row sets at least one of mode, per_hour, until, values, run and see");
             return false;
         }
 
@@ -958,7 +958,7 @@ public sealed class AccessCaps
 
         if (row.Mode is null && row.Values is null && row.Run is null && row.See is null && row.Limit is null)
         {
-            error = "a client row sets at least one of mode, per_hour, until, values, run and see";
+            error = "an agent row sets at least one of mode, per_hour, until, values, run and see";
             return false;
         }
 
@@ -1025,14 +1025,14 @@ public sealed class AccessCaps
     {
         if (rows.Count > MaximumRows)
         {
-            throw new ArgumentException($"a clients file holds at most {MaximumRows} rows", parameter);
+            throw new ArgumentException($"clients.toml holds at most {MaximumRows} rows", parameter);
         }
 
         var caps = new AccessCaps(rows);
 
         return Encoding.UTF8.GetByteCount(caps.Format()) <= MaximumBytes
             ? caps
-            : throw new ArgumentException($"a clients file holds at most {MaximumBytes / 1024} KiB", parameter);
+            : throw new ArgumentException($"clients.toml holds at most {MaximumBytes / 1024} KiB", parameter);
     }
 
     private static void SetAgent(List<CapsRow> own, string label, Func<CapsRow, CapsRow> change)

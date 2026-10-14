@@ -291,7 +291,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         AuthorityStatus.Serving serving =>
             string.Create(
                 CultureInfo.InvariantCulture,
-                $"This app (process {serving.Owner.ProcessId}) holds this vault for agents while it is unlocked (session {serving.Session}). ")
+                $"This app (process {serving.Owner.ProcessId}, unlock {serving.Session}) holds this vault for agents while it is unlocked. ")
             + "AI tools connected to this vault reach it here and can list the item names they are allowed to see. "
             + "Each credential request is asked about in a prompt window, and nothing is released unless you allow it, "
             + (automatic.Count == 0
@@ -336,7 +336,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     {
         var status = _authority?.Status ?? new AuthorityStatus.Locked();
         Serving = status is AuthorityStatus.Serving answering
-            ? string.Create(CultureInfo.InvariantCulture, $"process {answering.Owner.ProcessId} · session {answering.Session}")
+            ? string.Create(CultureInfo.InvariantCulture, $"process {answering.Owner.ProcessId} · unlock {answering.Session}")
             : string.Empty;
 
         string? session = null;

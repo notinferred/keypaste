@@ -510,7 +510,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     private static string Show(string? name) => name is null ? string.Empty : EntryNameSanitizer.SanitizePath(name).Text;
 
     private static string Entries(int count) =>
-        count == 1 ? "1 entry" : string.Create(CultureInfo.InvariantCulture, $"{count} entries");
+        count == 1 ? "1 item" : string.Create(CultureInfo.InvariantCulture, $"{count} items");
 }
 
 /// <summary>One group of the file being imported: where it lands, whether it is copied, and what is wrong.</summary>

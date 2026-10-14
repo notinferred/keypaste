@@ -114,11 +114,11 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal(before + 1, _session.Unlocked.ReadHistory(stripe)!.Count);
 
         project.BeginRemove(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
-        Assert.Equal("Remove STRIPE_KEY from services/Stripe? Its value stays in the entry's history.", project.RemovePrompt);
+        Assert.Equal("Remove STRIPE_KEY from services/Stripe? Its value stays in the item's history.", project.RemovePrompt);
         project.ConfirmRemoveCommand.Execute(null);
 
         Assert.Null(screen.Error);
-        Assert.Equal("Removed STRIPE_KEY from services/Stripe. Its value stays in the entry's history.", screen.Notice);
+        Assert.Equal("Removed STRIPE_KEY from services/Stripe. Its value stays in the item's history.", screen.Notice);
         Assert.Null(_session.Unlocked.ReadField(stripe, "STRIPE_KEY"));
         Assert.DoesNotContain(project.Variables, row => row.Key == "STRIPE_KEY");
         Assert.Empty(_session.Unlocked.ReadRecycled());
@@ -221,7 +221,7 @@ public sealed class EnvProfilesTests : IDisposable
         File.Delete(path);
 
         Assert.Equal(
-            "STRIPE_KEY is on more than one entry (services/Stripe, services/Twin). Nothing was written.",
+            "STRIPE_KEY is on more than one item (services/Stripe, services/Twin). Nothing was written.",
             project.ExportReferences(path));
         Assert.False(File.Exists(path));
     }
@@ -472,14 +472,14 @@ public sealed class EnvProfilesTests : IDisposable
 
         project.BeginReplace(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Assert.Equal(
-            "New value for STRIPE_KEY on services/Stripe, which acme-api/dev, acme-api/staging and billing/dev read. The old one stays in the entry's history.",
+            "New value for STRIPE_KEY on services/Stripe, which acme-api/dev, acme-api/staging and billing/dev read. The old one stays in the item's history.",
             project.ReplacePrompt);
         project.BeginRemove(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Assert.Equal(
-            "Remove STRIPE_KEY from services/Stripe, which acme-api/dev, acme-api/staging and billing/dev read? Its value stays in the entry's history.",
+            "Remove STRIPE_KEY from services/Stripe, which acme-api/dev, acme-api/staging and billing/dev read? Its value stays in the item's history.",
             project.RemovePrompt);
         project.BeginReplace(project.Variables.Single(row => row.Key == "MAIL_KEY"));
-        Assert.Equal("New value for MAIL_KEY on services/Mail. The old one stays in the entry's history.", project.ReplacePrompt);
+        Assert.Equal("New value for MAIL_KEY on services/Mail. The old one stays in the item's history.", project.ReplacePrompt);
     }
 
     [Fact]
@@ -496,7 +496,7 @@ public sealed class EnvProfilesTests : IDisposable
 
         project.Environments[0].AddEntry.Execute(null);
         Assert.True(project.IsAddingEntry);
-        Assert.Equal("Add an entry to dev", project.AddEntryTitle);
+        Assert.Equal("Add an item to dev", project.AddEntryTitle);
         var offered = project.EntryCandidates.Select(candidate => candidate.Entry).ToList();
         Assert.Contains(queue, offered);
         Assert.Contains(ProjectVariables.Home("acme-api", "prod"), offered);
@@ -548,7 +548,7 @@ public sealed class EnvProfilesTests : IDisposable
         project.ConfirmTagChangeCommand.Execute(null);
 
         Assert.Null(screen.Error);
-        Assert.Equal("Removed services/Mail from acme-api/dev. The entry and its fields are kept.", screen.Notice);
+        Assert.Equal("Removed services/Mail from acme-api/dev. The item and its fields are kept.", screen.Notice);
         Assert.DoesNotContain(mail, project.Environments[0].Members.Select(member => member.Entry));
         Assert.DoesNotContain("MAIL_KEY", project.Variables.Select(row => row.Key));
         using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
@@ -565,7 +565,7 @@ public sealed class EnvProfilesTests : IDisposable
 
         var problem = Assert.Single(screen.MalformedTags);
         Assert.StartsWith("services/Odd has the tag env:acme-api:Prod, which puts it in no project: ", problem.Sentence, StringComparison.Ordinal);
-        Assert.EndsWith(" Every agent request for the entry is still asked live.", problem.Sentence, StringComparison.Ordinal);
+        Assert.EndsWith(" Every agent request for the item is still asked live.", problem.Sentence, StringComparison.Ordinal);
         Assert.DoesNotContain("services/Odd", Open(screen).Environments.SelectMany(environment => environment.Members).Select(member => member.Display));
     }
 

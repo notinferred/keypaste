@@ -147,7 +147,7 @@
                 <TextBlock Grid.Column="0"
                            Classes="caption"
                            TextWrapping="Wrap"
-                           Text="Each value becomes a protected field named by its key, and its line leaves the notes, in one change to each entry. The notes as they were stay in the entry's history." />
+                           Text="Each value becomes a protected field named by its key, and its line leaves the notes, in one change to each item. The notes as they were stay in the item's history." />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
                   <Button Name="SelectAllRecommendations" Classes="sm ghost" Content="Select all" Command="{Binding SelectAllCommand}" />
                   <Button Name="MoveSelected" Classes="sm" Content="Move selected" Command="{Binding MoveSelectedCommand}" />
@@ -541,7 +541,7 @@
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <TextBlock Grid.Column="0" Classes="caption"
-                           Text="keypaste remembers the paths of vaults you have opened on this machine, where the keyfile each one opened with is, and which YubiKey slot. It holds no entry names, no secrets and no key material." />
+                           Text="keypaste remembers the paths of vaults you have opened on this machine, where the keyfile each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material." />
                 <Button Grid.Column="1" Classes="ghost" Content="Forget them all" Command="{Binding ForgetAllCommand}"
                         VerticalAlignment="Top" />
               </Grid>
@@ -563,7 +563,7 @@
                 <StackPanel Grid.Column="0" Spacing="4">
                   <TextBlock Classes="row-label" Text="Activity log" />
                   <TextBlock Classes="caption" TextWrapping="Wrap"
-                             Text="Every agent request, grant, token run and share on this machine, with a check that none was changed." />
+                             Text="Every agent request, allowance, token run and share on this machine, with a check that none was changed." />
                 </StackPanel>
                 <Button Grid.Column="1" Name="OpenActivityLog" Classes="sm" Content="Open" VerticalAlignment="Center"
                         AutomationProperties.Name="Open the activity log"

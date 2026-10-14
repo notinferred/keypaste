@@ -367,7 +367,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>What the replace form is headed with.</summary>
     /// <remarks>An entry several environments read is named with each of them, since every one gets the new value.</remarks>
     internal string ReplacePrompt => _replacing is { } row
-        ? $"New value for {row.DisplayKey} on {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}. The old one stays in the entry's history."
+        ? $"New value for {row.DisplayKey} on {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}. The old one stays in the item's history."
         : string.Empty;
 
     /// <summary>The value being entered for a new variable, when it is not being generated.</summary>
@@ -413,7 +413,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     /// <summary>What the confirmation asks.</summary>
     internal string RemovePrompt => _removing is { } row
-        ? $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}? Its value stays in the entry's history."
+        ? $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}? Its value stays in the item's history."
         : string.Empty;
 
     /// <summary>The other environments an entry serves, the open project's by name and another project's as <c>project/environment</c>.</summary>
@@ -495,7 +495,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     }
 
     internal string AddEntryTitle => AddingEntryTo is { } environment
-        ? $"Add an entry to {EntryNameSanitizer.Sanitize(environment).Text}"
+        ? $"Add an item to {EntryNameSanitizer.Sanitize(environment).Text}"
         : string.Empty;
 
     /// <summary>What the add form's list is narrowed to: part of an entry's path, in any case.</summary>
@@ -524,7 +524,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         {
             var count = Matching().Count();
 
-            return count == 0 ? "No other entry matches."
+            return count == 0 ? "No other item matches."
                 : count > _shownCandidates ? $"{count - _shownCandidates} more. Type part of a path to narrow the list."
                 : string.Empty;
         }
@@ -1046,7 +1046,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         Removing = null;
         _report(null);
-        _announce($"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the entry's history.");
+        _announce($"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the item's history.");
 
         Reload();
     }
@@ -1227,7 +1227,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _report(null);
         _announce(change.Adding
             ? $"Added {entry} to {environment}."
-            : $"Removed {entry} from {environment}. The entry and its fields are kept.");
+            : $"Removed {entry} from {environment}. The item and its fields are kept.");
         Reload();
         _projectsChanged();
     }

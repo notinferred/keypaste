@@ -80,7 +80,7 @@ internal static class UseText
         if (access.Grants.Count > 0)
         {
             var grant = access.Grants.MinBy(grant => grant.SecondsLeft)!;
-            return $"{grant.Client} · grant, {Left(grant.SecondsLeft)} left";
+            return $"{grant.Client} · allowance, {Left(grant.SecondsLeft)} left";
         }
 
         if (access.Clients.Count > 0)
@@ -108,7 +108,7 @@ internal static class UseText
         }
 
         var grants = access.Grants.Select(grant =>
-            $"{EntryNameSanitizer.Sanitize(grant.Client).Text} · {grant.Kind} grant, {Left(grant.SecondsLeft)} left");
+            $"{EntryNameSanitizer.Sanitize(grant.Client).Text} · {grant.Kind} allowance, {Left(grant.SecondsLeft)} left");
         var clients = access.Clients.Select(client =>
             string.Create(CultureInfo.InvariantCulture, $"{EntryNameSanitizer.Sanitize(client.Client).Text} · {Ago(client.LastAt, now)} · {client.Releases}×"));
 

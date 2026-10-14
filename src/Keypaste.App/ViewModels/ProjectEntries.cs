@@ -17,9 +17,9 @@ internal sealed record EnvEnvironmentEntries(string Name, bool IsProtected, IRea
 
     internal bool HasMembers => Members.Count > 0;
 
-    internal string AddName => $"Add an entry to {DisplayName}";
+    internal string AddName => $"Add an item to {DisplayName}";
 
-    internal string EmptyNote => $"No entry is tagged into {DisplayName} yet.";
+    internal string EmptyNote => $"No item is tagged into {DisplayName} yet.";
 }
 
 /// <summary>One entry of an environment. Holds the names of its variables, never a value.</summary>
@@ -58,6 +58,6 @@ internal sealed record EnvTagProblemRow(ProjectTagProblem Problem)
 {
     internal string Sentence => EntryNameSanitizer.SanitizeProse(
         $"{ApprovalPrompt.Shown(Problem.Entry)} has the tag {Problem.Tag}, which puts it in no project: {Problem.Problem}."
-            + (Problem.Protects ? " Every agent request for the entry is still asked live." : string.Empty),
+            + (Problem.Protects ? " Every agent request for the item is still asked live." : string.Empty),
         1024).Text;
 }

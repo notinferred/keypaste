@@ -43,7 +43,7 @@ internal static class EnvListCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env ls [project] [-p <profile>] [--profiles] [--json]");
+            context.Stdout.WriteLine("usage: keypaste env ls [project] [-p <environment>] [--profiles] [--json]");
             return CliApp.ExitSuccess;
         }
 
@@ -237,7 +237,7 @@ internal static class EnvListCommand
         foreach (var problem in problems)
         {
             var sentence = $"'{Path(problem.Entry)}' has the tag '{problem.Tag}', which puts it in no project: {problem.Problem}"
-                + (problem.Protects ? "; every release of the entry is still asked about live" : string.Empty);
+                + (problem.Protects ? "; every release of the item is still asked about live" : string.Empty);
             context.Stderr.WriteLine($"warning: {EntryNameSanitizer.SanitizeProse(sentence, _displayLength).Text}");
         }
     }

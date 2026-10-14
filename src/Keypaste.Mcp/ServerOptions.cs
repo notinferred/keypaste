@@ -30,18 +30,17 @@ internal sealed record ServerOptions
                keypaste mcp serve | setup | policy [options]
 
         An MCP server that lets an AI agent ask for one credential, with your approval and a full
-        audit trail. It speaks the protocol on stdin and stdout, so it is started by an MCP client
-        rather than by you. See docs/mcp-setup.md.
+        audit trail. An AI tool starts it; you do not run it yourself. See docs/mcp-setup.md.
 
           serve    approve agents' requests in this terminal (same as keypaste agent)
-          setup    point this machine's AI clients at your vault (same as keypaste setup)
-          policy   show or change each agent's settings: what it sees, values, run and mode
+          setup    connect this computer's AI tools to your vault (same as keypaste setup)
+          policy   show or change each agent's settings: what it can see, values, run and mode
 
-          --vault <path>        which vault to expose, or set KEYPASTE_VAULT. Without either,
+          --vault <path>        which vault to ask, or set KEYPASTE_VAULT. Without either,
                                 the vault chosen in the keypaste app or with `keypaste use`
-          --expose <glob>       what may be named, repeatable: a group/title glob reaches whole
-                                entries, tag:env:<project>[:<environment>] the variables of
-                                entries tagged into it. Defaults to tag:env:*
+          --expose <glob>       what this agent can see at most, repeatable: a group/title glob
+                                reaches whole items, tag:env:<project>[:<environment>] the
+                                variables of items tagged into it. Defaults to tag:env:*
           --client-label <name> the agent's name: its settings follow it, and the audit log uses it
           --allow-run           offer the run tool: start a command you approve with secrets
                                 in its environment, if the agent's settings let it run commands.

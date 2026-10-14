@@ -108,7 +108,7 @@ public sealed class EnvStore(Vault vault)
 
             if (holding.Count > 1)
             {
-                refusals.Add($"{key} is on more than one entry ({Where(holding)}); name the one to write");
+                refusals.Add($"{key} is on more than one item ({Where(holding)}); name the one to write");
                 continue;
             }
 
@@ -260,7 +260,7 @@ public sealed class EnvStore(Vault vault)
 
         if (holding.Count > 1)
         {
-            return new EnvRemoval(EnvRemoveOutcome.Ambiguous, null, $"{key} is on more than one entry ({Where(holding)}); name the one to remove from");
+            return new EnvRemoval(EnvRemoveOutcome.Ambiguous, null, $"{key} is on more than one item ({Where(holding)}); name the one to remove from");
         }
 
         var source = holding[0].Source;
@@ -285,7 +285,7 @@ public sealed class EnvStore(Vault vault)
 
         if (FieldNameRules.IsStandard(key))
         {
-            error = $"'{key}' is named like one of an entry's standard fields, which no project releases as a variable";
+            error = $"'{key}' is named like one of an item's standard fields, which no project releases as a variable";
             return false;
         }
 
@@ -310,13 +310,13 @@ public sealed class EnvStore(Vault vault)
 
         if (found.Count > 1)
         {
-            return $"{shown} names more than one entry; rename one";
+            return $"{shown} names more than one item; rename one";
         }
 
         if (found.Count == 0)
         {
             createsHome = !explicitly;
-            return explicitly ? $"there is no entry {shown}" : null;
+            return explicitly ? $"there is no item {shown}" : null;
         }
 
         if (found[0].IsTaggedInto(project, environment))

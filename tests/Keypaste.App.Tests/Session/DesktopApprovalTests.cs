@@ -618,7 +618,7 @@ public sealed class DesktopApprovalTests
 
             Assert.False(window.FindControl<Button>("Approve")!.IsVisible);
             Assert.True(window.FindControl<Button>("AllowOnce")!.IsVisible);
-            Assert.Equal("once only: protected profile", Text(window, "LifetimeText"));
+            Assert.Equal("once only: protected environment", Text(window, "LifetimeText"));
 
             await app.ArmAsync();
             Click(window, "AllowOnce");
@@ -831,6 +831,10 @@ public sealed class DesktopApprovalTests
         [.. window.GetVisualDescendants().OfType<Button>().Where(button => button is not RepeatButton && button.IsEffectivelyVisible)];
 
     internal static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)!.Text;
+
+    /// <summary>What the frame shows of a trimmed line: the characters kept and the ellipsis.</summary>
+    internal static string Drawn(Window window, string name) =>
+        string.Concat(window.FindControl<TextBlock>(name)!.TextLayout.TextLines.SelectMany(line => line.TextRuns).Select(run => run.Text.ToString()));
 
     /// <summary>A key press alone: the release would reach a window the press may already have closed.</summary>
     internal static void Key(Window window, PhysicalKey key)

@@ -33,7 +33,7 @@ internal static class AddCommand
         if (line.WantsHelp)
         {
             context.Stdout.WriteLine(
-                "usage: keypaste add <entry> [--group G] [--username U] [--url X] [--notes N]");
+                "usage: keypaste add <item> [--group G] [--username U] [--url X] [--notes N]");
             context.Stdout.WriteLine($"       {GenerateOption.Usage}");
             return CliApp.ExitSuccess;
         }
@@ -46,7 +46,7 @@ internal static class AddCommand
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste add: expected exactly one entry name");
+            context.Stderr.WriteLine("keypaste add: expected exactly one item name");
             return CliApp.ExitUsageError;
         }
 
@@ -57,7 +57,7 @@ internal static class AddCommand
         if (pathNamesGroup && groupFlag is not null)
         {
             context.Stderr.WriteLine(
-                "keypaste add: give the group in the entry path or with --group, not both");
+                "keypaste add: give the group in the item path or with --group, not both");
             return CliApp.ExitUsageError;
         }
 
@@ -67,7 +67,7 @@ internal static class AddCommand
 
         if (title.Length == 0)
         {
-            context.Stderr.WriteLine("keypaste add: the entry name cannot be empty");
+            context.Stderr.WriteLine("keypaste add: the item name cannot be empty");
             return CliApp.ExitUsageError;
         }
 
@@ -143,7 +143,7 @@ internal static class AddCommand
             if (sharesPath)
             {
                 context.Stderr.WriteLine(
-                    $"note: '{entryPath}' now names two entries. Address them by group and title; " +
+                    $"note: '{entryPath}' now names two items. Address them by group and title; " +
                     "keypaste get will refuse that path until one is renamed.");
             }
 

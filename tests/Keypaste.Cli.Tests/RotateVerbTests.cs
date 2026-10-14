@@ -75,7 +75,7 @@ public sealed class RotateVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitNotFound, Rotate("Banking/Nope"));
 
-        Assert.Contains("keypaste rotate: no entry named Banking/Nope", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("keypaste rotate: no item named Banking/Nope", _harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -230,7 +230,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         var refused = await authority.ReleaseTokenEnvAsync(Request(plain, "staging"), _connection, Cancel);
 
         Assert.Equal(EnvOutcome.Unauthorized, refused.Set.Outcome);
-        Assert.Equal("the token's scope does not cover acme-api/staging: it holds an entry of a protected environment", refused.Reason);
+        Assert.Equal("the token's scope does not cover acme-api/staging: it holds an item of a protected environment", refused.Reason);
         Assert.Empty(refused.Set.Variables);
         Assert.Equal(0, _fixture.Channel.Asked);
 
@@ -289,7 +289,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
 
         var lines = Lines();
         Assert.Equal(
-            ["the request came from a connection attached to no session", "the request belongs to a session that has ended", "the request names no command"],
+            ["the request came from a connection attached to no unlock of the vault", "the request belongs to an unlock of the vault that has ended", "the request names no command"],
             lines.Select(line => line.GetProperty("reason").GetString()));
         Assert.Equal(new[] { null, null, "session-one" }, lines.Select(line => line.TryGetProperty("session", out var session) ? session.GetString() : null));
         Assert.All(lines, line =>
@@ -399,7 +399,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     [Fact]
     public async Task ASetNamingMoreItemsThanOneLineCanRecord_IsRefusedUnasked_AndRecorded()
     {
-        const string Reason = "the run names more entries than one audit line can record";
+        const string Reason = "the run names more items than one audit line can record";
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         // Each item's name takes more bytes in the line than its title has characters.

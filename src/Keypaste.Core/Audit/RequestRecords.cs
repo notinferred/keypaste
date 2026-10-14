@@ -80,7 +80,7 @@ public static class RequestRecords
         IReadOnlyList<string> exposure,
         string? session,
         string? vault) =>
-        Listing(client, AuditDecision.Granted, AuditMethod.Exposure, $"listed {count} entry names", exposure, session, vault);
+        Listing(client, AuditDecision.Granted, AuditMethod.Exposure, $"listed {count} item names", exposure, session, vault);
 
     /// <summary>The line for a request for one field of one entry.</summary>
     /// <param name="client">Who asked.</param>

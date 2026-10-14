@@ -74,7 +74,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
 
         if (!initialized)
         {
-            return Finish(client, line, Verdict.Denied(AuditMethod.NotInitialized, "the client called a tool before the initialize handshake completed", ToolText.NotInitialized), null);
+            return Finish(client, line, Verdict.Denied(AuditMethod.NotInitialized, "the agent called a tool before the initialize handshake completed", ToolText.NotInitialized), null);
         }
 
         // Taken now or refused now: a second run is never queued behind one that may be waiting on a person.
@@ -89,7 +89,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         }
         catch (OperationCanceledException)
         {
-            return Finish(client, line, Verdict.Denied(AuditMethod.Cancelled, "the client withdrew the request"), null);
+            return Finish(client, line, Verdict.Denied(AuditMethod.Cancelled, "the agent withdrew the request"), null);
         }
         catch (Exception)
         {
@@ -152,7 +152,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
 
             if (!forwarded)
             {
-                return Finish(client, line, Verdict.Denied(AuditMethod.OutOfScope, "a reference is outside this server's configured exposure"), null);
+                return Finish(client, line, Verdict.Denied(AuditMethod.OutOfScope, "a reference is outside what this agent can see through this bridge"), null);
             }
         }
 
@@ -191,7 +191,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return Finish(client, line, Verdict.Denied(AuditMethod.Cancelled, "the client withdrew the request"), null);
+            return Finish(client, line, Verdict.Denied(AuditMethod.Cancelled, "the agent withdrew the request"), null);
         }
 
         if (outcome == ApproverOutcome.Busy)

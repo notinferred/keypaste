@@ -134,7 +134,7 @@ public static class EnvReferenceResolution
 
         if (withheld && problems.Count == 0)
         {
-            problems.Add(new EnvProblem(string.Empty, "a referenced profile cannot be used"));
+            problems.Add(new EnvProblem(string.Empty, "a referenced environment cannot be used"));
         }
 
         if (problems.Count == 0 && !EnvNameRules.TryCheck(variables, out var names))
@@ -194,7 +194,7 @@ public static class EnvReferenceResolution
             : EnvResolved.Released(released.Project, variables, released.Profile);
     }
 
-    private const string _missing = "is not in this profile's set";
+    private const string _missing = "is not in this environment's set";
 
     /// <summary>A value, a reason, or neither when the line is withheld because another line of its profile is refused.</summary>
     private static (string? Value, string? Why) Pick(EnvResolved set, EnvReference env)
@@ -237,7 +237,7 @@ public static class EnvReferenceResolution
 
         if (matches.Count != 1)
         {
-            return (null, matches.Count == 0 ? "names no entry" : "names more than one entry", null);
+            return (null, matches.Count == 0 ? "names no item" : "names more than one item", null);
         }
 
         var found = matches[0].Entry;

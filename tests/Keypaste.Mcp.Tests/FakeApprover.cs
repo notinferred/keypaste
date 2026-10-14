@@ -134,7 +134,7 @@ internal sealed class FakeApprover : IAsyncDisposable
         {
             Decision = AuditDecision.Granted,
             Method = AuditMethod.Automatic,
-            Reason = "released without asking: billing-bot's mode for this entry is Automatic (project billing:dev)",
+            Reason = "released without asking: billing-bot's mode for this item is Automatic (project billing:dev)",
             Entry = "env/dev/STRIPE_KEY",
             TtlSeconds = ttlSeconds,
             Value = Sentinel,

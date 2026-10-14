@@ -182,7 +182,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Assert.Equal("billing-bot", line.GetProperty("client").GetProperty("label").GetString());
         Assert.Equal("granted", line.GetProperty("decision").GetString());
         Assert.Equal("exposure", line.GetProperty("method").GetString());
-        Assert.Equal($"listed {reply!.Names.Count} entry names", line.GetProperty("reason").GetString());
+        Assert.Equal($"listed {reply!.Names.Count} item names", line.GetProperty("reason").GetString());
         Assert.Equal(["env/**"], line.GetProperty("exposure").EnumerateArray().Select(glob => glob.GetString()));
         Assert.Equal("session-one", line.GetProperty("session").GetString());
         Assert.Equal(VaultKey, line.GetProperty("vault").GetString());
@@ -252,7 +252,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Assert.Equal(0, automatic.Channel.Asked);
         Assert.Equal("granted", line.GetProperty("decision").GetString());
         Assert.Equal("automatic", line.GetProperty("method").GetString());
-        Assert.Contains("billing-bot's mode for this entry is Automatic", line.GetProperty("reason").GetString()!, StringComparison.Ordinal);
+        Assert.Contains("billing-bot's mode for this item is Automatic", line.GetProperty("reason").GetString()!, StringComparison.Ordinal);
         Assert.NotNull(line.GetProperty("args").GetProperty("reason_sha256").GetString());
         Assert.DoesNotContain(ApproverFixture.Sentinel, _log.Text(), StringComparison.Ordinal);
     }

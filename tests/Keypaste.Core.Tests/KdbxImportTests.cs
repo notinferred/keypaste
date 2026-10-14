@@ -238,7 +238,7 @@ public sealed class KdbxImportTests : IDisposable
 
         var problem = Assert.Single(opened.Check(target, plan));
         Assert.False(problem.Blocks);
-        Assert.Equal("1 title in x/Work and its subgroups names another entry too; both are kept", problem.Message);
+        Assert.Equal("1 title in x/Work and its subgroups names another item too; both are kept", problem.Message);
 
         var result = opened.ApplyTo(target, plan);
 
@@ -380,7 +380,7 @@ public sealed class KdbxImportTests : IDisposable
 
         var problem = Assert.Single(opened.Check(target, plan));
         Assert.False(problem.Blocks);
-        Assert.Equal("1 title in env and its subgroups names another entry too; both are kept", problem.Message);
+        Assert.Equal("1 title in env and its subgroups names another item too; both are kept", problem.Message);
 
         opened.ApplyTo(target, plan);
 

@@ -183,7 +183,7 @@ internal sealed class SystemClipboard : IClipboard
         {
             // Nothing is spawned. On a headless server "install xclip" is actively wrong
             // advice, so the caller is told there is no display at all.
-            error = "no graphical session (neither WAYLAND_DISPLAY nor DISPLAY is set)";
+            error = "no desktop display (neither WAYLAND_DISPLAY nor DISPLAY is set)";
             return ClipboardStatus.NoDisplay;
         }
 

@@ -35,8 +35,7 @@ public sealed class DesktopRunApprovalTests
             var window = Assert.IsType<RunApprovalWindow>(await app.PromptAsync());
 
             Assert.Equal($"{DesktopApprovalTests.Label} wants 1 secret", Text(window, "TitleText"));
-            Assert.StartsWith("via MCP · ", Text(window, "SubtitleText"), StringComparison.Ordinal);
-            Assert.EndsWith(" · profile dev", Text(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.StartsWith("via MCP · environment dev · ", Text(window, "SubtitleText"), StringComparison.Ordinal);
             Assert.Equal("tool: keypaste.run", Text(window, "ToolText"));
             Assert.Equal("deploy --to staging", Text(window, "CommandText"));
             Assert.StartsWith("runs ", Text(window, "ProgramText"), StringComparison.Ordinal);
@@ -128,6 +127,19 @@ public sealed class DesktopRunApprovalTests
 
             ordinary.Close();
             hostile.Close();
+        });
+
+    /// <summary>The header is the one place the environment is named, so a directory long enough to fill it, shown whole in the call box, is what gets trimmed.</summary>
+    [Fact]
+    public Task A_long_directory_leaves_the_environment_whole_in_the_header() =>
+        HeadlessSession.On(() =>
+        {
+            var (window, _) = Layout(Run("claude-code", "/home/alice/src/" + string.Join('/', Enumerable.Repeat("billing-api", 12)), "deploy") with { Profile = "prod" });
+
+            Assert.StartsWith("via MCP · environment prod · /home/", Drawn(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.EndsWith("…", Drawn(window, "SubtitleText"), StringComparison.Ordinal);
+
+            window.Close();
         });
 
     private static RunPrompt Run(string client, string directory, string command) => new()

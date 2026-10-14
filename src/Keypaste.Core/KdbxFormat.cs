@@ -71,7 +71,7 @@ public readonly record struct KdbxHeader
         {
             if (stream.ReadAtLeast(prefix, prefix.Length, throwOnEndOfStream: false) < prefix.Length)
             {
-                throw new VaultException($"'{path}' is too short to be a KDBX file.");
+                throw new VaultException($"'{path}' is too short to be a KeePass database.");
             }
         }
 
@@ -81,7 +81,7 @@ public readonly record struct KdbxHeader
         if (signature1 != KdbxFormat.FileSignature1 || signature2 != KdbxFormat.FileSignature2)
         {
             throw new VaultException(
-                $"'{path}' is not a KDBX file (signature {signature1:X8} {signature2:X8}).");
+                $"'{path}' is not a KeePass database (signature {signature1:X8} {signature2:X8}).");
         }
 
         return new KdbxHeader

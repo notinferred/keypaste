@@ -140,7 +140,7 @@ public static class KpReferences
 
         if (segments.Length != 3)
         {
-            error = $"a reference to an env value is {Scheme}<project>/<profile>/<KEY>";
+            error = $"a reference to an env value is {Scheme}<project>/<environment>/<KEY>";
             return false;
         }
 

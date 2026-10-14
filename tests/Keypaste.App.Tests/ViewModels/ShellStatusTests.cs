@@ -138,7 +138,7 @@ public sealed class ShellStatusTests
         }
 
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
-        Assert.Equal("Answering agents · no clients", shell.AgentsDetail);
+        Assert.Equal("Answering agents · none connected", shell.AgentsDetail);
 
         var endpoint = Assert.IsType<AuthorityStatus.Serving>(authority.Status).Endpoint;
         List<ApproverClient> clients = [];
@@ -153,7 +153,7 @@ public sealed class ShellStatusTests
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("Answering agents · 2 clients", shell.AgentsDetail);
+        Assert.Equal("Answering agents · 2 connected", shell.AgentsDetail);
 
         foreach (var client in clients)
         {
@@ -214,7 +214,7 @@ public sealed class ShellStatusTests
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("Answering agents · 1 waiting · 2 clients", shell.AgentsDetail);
+        Assert.Equal("Answering agents · 1 waiting · 2 connected", shell.AgentsDetail);
 
         await stop.CancelAsync();
         await waiting;
@@ -253,7 +253,7 @@ public sealed class ShellStatusTests
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("Answering agents · 1 waiting · no clients", shell.AgentsDetail);
+        Assert.Equal("Answering agents · 1 waiting · none connected", shell.AgentsDetail);
         Assert.Equal("1", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity).Count);
 
         await stop.CancelAsync();

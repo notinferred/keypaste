@@ -62,8 +62,8 @@ internal static class SetupCommand
 
         if (!TrySelectClients(line.Value("client"), platform, out var clients, out var unknown))
         {
-            context.Stderr.WriteLine($"keypaste: no client called '{unknown}'.");
-            context.Stderr.WriteLine("keypaste: known clients: " + KnownClientIds(platform));
+            context.Stderr.WriteLine($"keypaste: no AI tool called '{unknown}'.");
+            context.Stderr.WriteLine("keypaste: known AI tools: " + KnownClientIds(platform));
             return CliApp.ExitUsageError;
         }
 
@@ -359,7 +359,7 @@ internal static class SetupCommand
         context.Stdout.WriteLine($"keypaste mcp   {registration.Server.Path}");
         context.Stdout.WriteLine(registration.VaultPath is { } pinned
             ? $"vault          {pinned}"
-            : $"vault          {chosen ?? "none chosen yet"} (the chosen vault; the client's entry names none)");
+            : $"vault          {chosen ?? "none chosen yet"} (the chosen vault; the tool's configuration names none)");
 
         if (registration.AuditLogPath is { } auditLog)
         {
@@ -377,8 +377,8 @@ internal static class SetupCommand
         }
 
         context.Stdout.WriteLine(registration.Expose is [McpServerRegistration.WideExposure]
-            ? $"exposure       {McpServerRegistration.WideExposure} (each agent sees what its settings allow: every project's variables until you change them)"
-            : $"exposure       {string.Join(", ", registration.Expose)} (no agent these tools start sees beyond these, whatever its settings)");
+            ? $"can see        {McpServerRegistration.WideExposure} (each agent sees what its settings allow: every project's variables until you change them)"
+            : $"can see        {string.Join(", ", registration.Expose)} (no agent these tools start sees beyond these, whatever its settings)");
         context.Stdout.WriteLine("run            offered; each agent runs nothing until you turn run on in its settings");
 
         if (note is not null)
@@ -405,7 +405,7 @@ internal static class SetupCommand
     private static void WriteNextStep(CliContext context, McpServerRegistration registration)
     {
         context.Stdout.WriteLine();
-        context.Stdout.WriteLine("Nothing is granted yet. keypaste mcp holds no vault and decides nothing.");
+        context.Stdout.WriteLine("Nothing is allowed yet. keypaste mcp holds no vault and decides nothing.");
         context.Stdout.WriteLine("Unlock the vault in the keypaste app, or start the process that decides in a terminal:");
         context.Stdout.WriteLine();
         context.Stdout.WriteLine(registration.VaultPath is { } pinned ? $"  keypaste agent --vault {pinned}" : "  keypaste agent");
@@ -427,18 +427,18 @@ internal static class SetupCommand
         writer.WriteLine("usage: keypaste setup [--vault <path>] [--client <a,b>] [--label <name>]");
         writer.WriteLine("                      [--expose <glob,glob>] [--dry-run] [--remove] [--yes]");
         writer.WriteLine();
-        writer.WriteLine("Finds the AI clients on this machine and points them at your vault.");
+        writer.WriteLine("Finds the AI tools on this machine and points them at your vault.");
         writer.WriteLine();
-        writer.WriteLine("  --vault <path>      pin the clients to this vault instead of the chosen one");
+        writer.WriteLine("  --vault <path>      pin the AI tools to this vault instead of the chosen one");
         writer.WriteLine("  --client <a,b>      only these, from: " + KnownClientIds(McpClientMachine.CurrentPlatform));
-        writer.WriteLine("  --label <name>      what the audit log calls the client (default: its id)");
+        writer.WriteLine("  --label <name>      what the audit log calls the agent (default: its id)");
         writer.WriteLine("  --expose <globs>    narrow what agents may see through these tools; by default their settings decide");
         writer.WriteLine("  --dry-run           print every step and change nothing");
         writer.WriteLine("  --remove            take keypaste out again, leaving everything else alone");
         writer.WriteLine("  --yes               change without asking; required when stdin is not a terminal");
         writer.WriteLine();
-        writer.WriteLine("A client that ships its own command is configured with it. For one that does not,");
-        writer.WriteLine("keypaste changes only its own entry in the client's configuration file and keeps");
+        writer.WriteLine("An AI tool that ships its own command is configured with it. For one that does not,");
+        writer.WriteLine("keypaste changes only its own part of the tool's configuration file and keeps");
         writer.WriteLine("the first original beside it.");
     }
 

@@ -145,7 +145,7 @@ public sealed class EnvResolved
     {
         EnvOutcome.Resolved => string.Empty,
         EnvOutcome.NoProject => $"no env set for '{Project}'",
-        EnvOutcome.NoProfile => $"'{Project}' has no '{Profile}' profile",
+        EnvOutcome.NoProfile => $"'{Project}' has no '{Profile}' environment",
         EnvOutcome.Unusable => $"'{Project}/{Profile}' cannot be used: " +
             string.Join("; ", Problems.Select(problem => $"{problem.Key} {problem.Reason}")),
         EnvOutcome.Unsaved => "the vault holds a change that has not been saved",
@@ -154,7 +154,7 @@ public sealed class EnvResolved
         EnvOutcome.Locked => "the vault was locked before the set was released",
         EnvOutcome.Declined => "the set was not confirmed",
         EnvOutcome.ChangedWhileAsked => "the set's names changed while it was being confirmed",
-        EnvOutcome.NoSession => "the request belongs to no session holding the vault",
+        EnvOutcome.NoSession => "the request belongs to no unlock of the vault",
         EnvOutcome.TooLarge => "the set is too large to send in one reply",
         EnvOutcome.Unauthorized => "the token does not authorize this set",
         _ => "the request could not be asked about",
@@ -215,7 +215,7 @@ internal sealed record EnvMember(string Key, string Value, EnvEntry Entry, strin
 /// </remarks>
 public static class EnvResolution
 {
-    private const string _notInSet = "is not in this profile's set";
+    private const string _notInSet = "is not in this environment's set";
 
     /// <summary>Resolves a project's default profile from the vault as its file holds it (D-0317).</summary>
     /// <param name="vault">The open vault.</param>
@@ -404,7 +404,7 @@ public static class EnvResolution
 
         foreach (var same in members.GroupBy(member => member.Key, StringComparer.Ordinal).Where(group => group.Count() > 1))
         {
-            yield return new EnvProblem(same.Key, $"is on more than one entry ({Where([.. same])})");
+            yield return new EnvProblem(same.Key, $"is on more than one item ({Where([.. same])})");
         }
     }
 

@@ -314,8 +314,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
 #pragma warning disable CA1822
     internal string ChosenVaultRule =>
-        "An agent's app that is already running keeps the vault it started with until it restarts keypaste mcp. " +
-        "A client connected with --vault keeps that vault.";
+        "An AI tool that is already running keeps the vault it started with until it restarts keypaste mcp. " +
+        "An AI tool connected with --vault keeps that vault.";
 #pragma warning restore CA1822
 
     /// <summary>Links the <c>keypaste</c> a terminal runs to this app's own, or null where Settings offers no link (Windows, and an app with no <c>keypaste</c> beside it).</summary>
@@ -367,8 +367,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
             if (!status.DirectoryOnPath)
             {
                 notes.Add(
-                    $"{Path.GetDirectoryName(status.LinkPath)} is not on this session's PATH yet. Most Linux desktops add it " +
-                    "at your next login; otherwise add it to PATH in your shell profile.");
+                    $"{Path.GetDirectoryName(status.LinkPath)} is not on PATH yet. Most Linux desktops add it " +
+                    "at your next login; otherwise add it to PATH in your shell's startup file.");
             }
 
             return string.Join(' ', notes);

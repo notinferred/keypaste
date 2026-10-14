@@ -66,7 +66,7 @@ public static class FieldNameRules
 
         if (IsStandard(name))
         {
-            error = $"'{name}' is one of the entry's standard fields, not a custom field";
+            error = $"'{name}' is one of the item's standard fields, not a custom field";
             return false;
         }
 

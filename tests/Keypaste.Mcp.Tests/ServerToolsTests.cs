@@ -211,7 +211,7 @@ public sealed class ServerToolsTests
 
         var text = TextOf(result);
         Assert.Contains("STRIPE_KEY", text, StringComparison.Ordinal);
-        Assert.Contains("BEGIN UNTRUSTED ENTRY NAMES", text, StringComparison.Ordinal);
+        Assert.Contains("BEGIN UNTRUSTED ITEM NAMES", text, StringComparison.Ordinal);
 
         Assert.NotNull(result.StructuredContent);
         var entries = result.StructuredContent.Value.GetProperty("entries");

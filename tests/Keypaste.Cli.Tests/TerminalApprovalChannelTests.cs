@@ -14,7 +14,7 @@ namespace Keypaste.Cli.Tests;
 /// <remarks>
 /// This is the display half of THREATS.md T-2. The reason arrives already sanitized and capped, so
 /// what is under test here is that the channel does not undo that — and that the default is no:
-/// <c>o</c> allows once, <c>h</c> allows for the timed grant when one is offered, and everything
+/// <c>o</c> allows once, <c>h</c> allows for the timed allowance when one is offered, and everything
 /// else denies.
 /// </remarks>
 public sealed class TerminalApprovalChannelTests
@@ -163,7 +163,7 @@ public sealed class TerminalApprovalChannelTests
 
         Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
         Assert.Contains(
-            Environment.NewLine + "  this entry is in a protected profile: it is asked about every time." + Environment.NewLine,
+            Environment.NewLine + "  this item is in a protected environment: it is asked about every time." + Environment.NewLine,
             rig.Stderr.ToString(),
             StringComparison.Ordinal);
     }
@@ -187,8 +187,8 @@ public sealed class TerminalApprovalChannelTests
             TerminalApprovalChannel.Rule,
             "keypaste: an agent is asking for a credential.",
             string.Empty,
-            "  client   claude-code",
-            "  entry    env/demo/STRIPE_KEY",
+            "  agent    claude-code",
+            "  item     env/demo/STRIPE_KEY",
             "  field    password",
             string.Empty,
             "  the agent says it needs this because:",
@@ -237,7 +237,7 @@ public sealed class TerminalApprovalChannelTests
         await rig.Channel.AskAsync(Prompt(), Token);
 
         Assert.DoesNotContain("not what the vault holds", rig.Stderr.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("protected profile", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("protected environment", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -335,12 +335,12 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal(ApprovalAnswer.Denied, await nothing.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
 
         var shown = once.Stderr.ToString();
-        Assert.Contains("project    billing", shown, StringComparison.Ordinal);
-        Assert.Contains("profile    dev", shown, StringComparison.Ordinal);
-        Assert.Contains("variables  DATABASE_URL STRIPE_KEY", shown, StringComparison.Ordinal);
-        Assert.Contains("from       env/billing/DATABASE_URL, env/billing/STRIPE_KEY", shown, StringComparison.Ordinal);
-        Assert.Contains("command    npm run deploy", shown, StringComparison.Ordinal);
-        Assert.Contains("in         /home/me/billing", shown, StringComparison.Ordinal);
+        Assert.Contains("project      billing", shown, StringComparison.Ordinal);
+        Assert.Contains("environment  dev", shown, StringComparison.Ordinal);
+        Assert.Contains("variables    DATABASE_URL STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("from         env/billing/DATABASE_URL, env/billing/STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("command      npm run deploy", shown, StringComparison.Ordinal);
+        Assert.Contains("in           /home/me/billing", shown, StringComparison.Ordinal);
         Assert.DoesNotContain("scrubbed", shown, StringComparison.Ordinal);
         Assert.DoesNotContain("asked by", shown, StringComparison.Ordinal);
         Assert.Contains("keypaste: allowed for 15 minutes.", hour.Stderr.ToString(), StringComparison.Ordinal);
@@ -355,7 +355,7 @@ public sealed class TerminalApprovalChannelTests
 
         var shown = rig.Stderr.ToString();
         Assert.Contains(
-            "  project    billing" + Environment.NewLine + "  profile    staging" + Environment.NewLine + "  asked by   token ci-deploy" + Environment.NewLine,
+            "  project      billing" + Environment.NewLine + "  environment  staging" + Environment.NewLine + "  asked by     token ci-deploy" + Environment.NewLine,
             shown,
             StringComparison.Ordinal);
     }
@@ -368,7 +368,7 @@ public sealed class TerminalApprovalChannelTests
         await rig.Channel.AskAsync(EnvPrompt("deploy") with { FileLines = ["DB ← DATABASE_URL", "MODE=ci"] }, Token);
 
         Assert.Contains(
-            "  variables  DATABASE_URL STRIPE_KEY" + Environment.NewLine + "  injects    DB ← DATABASE_URL" + Environment.NewLine + "  injects    MODE=ci" + Environment.NewLine,
+            "  variables    DATABASE_URL STRIPE_KEY" + Environment.NewLine + "  injects      DB ← DATABASE_URL" + Environment.NewLine + "  injects      MODE=ci" + Environment.NewLine,
             rig.Stderr.ToString(),
             StringComparison.Ordinal);
     }
@@ -409,7 +409,7 @@ public sealed class TerminalApprovalChannelTests
         var answer = await rig.Channel.AskAsync(EnvPrompt("deploy") with { Profile = "prod", GrantSeconds = 0 }, Token);
 
         Assert.Equal(ApprovalAnswer.Denied, answer);
-        Assert.Contains("this profile is protected: it is asked about every time.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("this environment is protected: it is asked about every time.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>A line break in a command cannot draw a line of its own under the prompt's.</summary>
@@ -470,15 +470,15 @@ public sealed class TerminalApprovalChannelTests
             TerminalApprovalChannel.Rule,
             "keypaste: an agent wants to run a command with your secrets.",
             string.Empty,
-            "  client     claude-code (claude-code)",
-            "  tool       keypaste.run",
-            "  runs       /usr/bin/npm",
-            "  command    npm run migrate",
-            "  in         /home/me/acme/api",
-            "  project    acme-api",
-            "  profile    dev",
-            "  injects    DATABASE_URL        env/acme-api/DATABASE_URL        inject only",
-            "  injects    STRIPE_SECRET_KEY   env/acme-api/STRIPE_SECRET_KEY   inject only",
+            "  agent        claude-code (claude-code)",
+            "  tool         keypaste.run",
+            "  runs         /usr/bin/npm",
+            "  command      npm run migrate",
+            "  in           /home/me/acme/api",
+            "  project      acme-api",
+            "  environment  dev",
+            "  injects      DATABASE_URL        env/acme-api/DATABASE_URL        inject only",
+            "  injects      STRIPE_SECRET_KEY   env/acme-api/STRIPE_SECRET_KEY   inject only",
             string.Empty,
             "  the agent says it needs this because:",
             "    run the pending migration",
@@ -510,8 +510,8 @@ public sealed class TerminalApprovalChannelTests
     }
 
     [Theory]
-    [InlineData(OnceOnly.ProtectedProfile, "  this profile is protected: it is asked about every time.")]
-    [InlineData(OnceOnly.AskEveryTime, "  this agent is set to Ask every time: no timed grant is offered.")]
+    [InlineData(OnceOnly.ProtectedProfile, "  this environment is protected: it is asked about every time.")]
+    [InlineData(OnceOnly.AskEveryTime, "  this agent is set to Ask every time: no timed allowance is offered.")]
     public async Task ARunPromptOfferingNone_H_Denies_AndSaysWhy(OnceOnly onceOnly, string why)
     {
         var rig = Build("h");
@@ -533,8 +533,8 @@ public sealed class TerminalApprovalChannelTests
     }
 
     [Theory]
-    [InlineData(OnceOnly.ProtectedProfile, "  this entry is in a protected profile: it is asked about every time.")]
-    [InlineData(OnceOnly.AskEveryTime, "  this agent is set to Ask every time: no timed grant is offered.")]
+    [InlineData(OnceOnly.ProtectedProfile, "  this item is in a protected environment: it is asked about every time.")]
+    [InlineData(OnceOnly.AskEveryTime, "  this agent is set to Ask every time: no timed allowance is offered.")]
     public async Task TheCredentialDialog_SaysWhyItIsOnceOnly(OnceOnly onceOnly, string why)
     {
         var rig = Build("d");

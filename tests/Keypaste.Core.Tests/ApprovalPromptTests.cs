@@ -169,8 +169,8 @@ public sealed class ApprovalPromptTests
     [Fact]
     public void AClientThatGaveNoName_IsSaidToBeUnnamed_NotCalledUnknown()
     {
-        Assert.Equal("an unnamed client", For(client: null).Client, StringComparer.Ordinal);
-        Assert.Equal("an unnamed client", For(client: "").Client, StringComparer.Ordinal);
+        Assert.Equal("an unnamed agent", For(client: null).Client, StringComparer.Ordinal);
+        Assert.Equal("an unnamed agent", For(client: "").Client, StringComparer.Ordinal);
     }
 
     /// <summary>

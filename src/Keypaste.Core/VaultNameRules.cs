@@ -33,7 +33,7 @@ public static class VaultNameRules
     /// <returns><see langword="true"/> if the title is valid.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="title"/> is null.</exception>
     public static bool IsValidTitle(string title, out string error) =>
-        IsValidName(title, "entry title", out error);
+        IsValidName(title, "item title", out error);
 
     /// <summary>The shared rule, worded for whatever is being named.</summary>
     /// <param name="name">The name to check.</param>

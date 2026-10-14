@@ -40,7 +40,7 @@ public sealed class ImportDialogKeyboardTests
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         window.KeyReleaseQwerty(PhysicalKey.Enter, RawInputModifiers.None);
 
-        Assert.Equal(["Imported 3 entries from foreign.kdbx"], announced);
+        Assert.Equal(["Imported 3 items from foreign.kdbx"], announced);
     });
 
     [Fact]

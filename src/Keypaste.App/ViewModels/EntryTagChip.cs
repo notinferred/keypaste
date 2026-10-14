@@ -23,7 +23,7 @@ internal sealed class EntryTagChip
         IsProtected = read.Protects;
         Display = EntryNameSanitizer.Sanitize(IsProject ? $"{read.Project} · {read.Environment}" : tag).Text;
         Tip = IsMalformed
-            ? $"{EntryNameSanitizer.Sanitize(tag).Text} puts this entry in no project: {read.Problem}"
+            ? $"{EntryNameSanitizer.Sanitize(tag).Text} puts this item in no project: {read.Problem}"
             : IsProject ? EntryNameSanitizer.Sanitize(tag).Text : null;
 
         RemoveCommand = new RelayCommand(() => remove(this));

@@ -56,7 +56,7 @@ public interface IApproverHandler
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
     /// <returns>The grants, or why none were listed. A handler that does not hold grants refuses.</returns>
     ValueTask<GrantsReply> GrantsAsync(GrantsRequest request, string connectionId, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(new GrantsReply(false, [], true, "this keypaste process does not list grants"));
+        ValueTask.FromResult(new GrantsReply(false, [], true, "this keypaste process does not list allowances"));
 
     /// <summary>Ends grants of the current session.</summary>
     /// <param name="request">Which grants, and the attachment it is made under.</param>
@@ -64,7 +64,7 @@ public interface IApproverHandler
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
     /// <returns>How many ended. A handler that does not hold grants refuses.</returns>
     ValueTask<RevokeGrantsReply> RevokeGrantsAsync(RevokeGrantsRequest request, string connectionId, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(new RevokeGrantsReply(0, "this keypaste process does not revoke grants"));
+        ValueTask.FromResult(new RevokeGrantsReply(0, "this keypaste process does not end allowances"));
 
     /// <summary>Locks now.</summary>
     /// <param name="request">The attachment it is made under.</param>

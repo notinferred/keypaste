@@ -428,7 +428,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
 
         Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing), (full!.Decision, full.Method));
         Assert.Contains(
-            $"applied at once in the vault, since it gives the agent nothing more, but this computer's ceilings could not hold it: a clients file holds at most {AccessCaps.MaximumRows} rows",
+            $"applied at once in the vault, since it gives the agent nothing more, but this computer's ceilings could not hold it: clients.toml holds at most {AccessCaps.MaximumRows} rows",
             full.Reason,
             StringComparison.Ordinal);
         Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing), (unwritable!.Decision, unwritable.Method));

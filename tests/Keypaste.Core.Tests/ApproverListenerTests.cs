@@ -567,10 +567,10 @@ public sealed class ApproverListenerTests
         Assert.NotNull(grants);
         Assert.False(grants.Answered);
         Assert.Empty(grants.Grants);
-        Assert.Contains("does not list grants", grants.Reason, StringComparison.Ordinal);
+        Assert.Contains("does not list allowances", grants.Reason, StringComparison.Ordinal);
         Assert.NotNull(revoked);
         Assert.Equal(0, revoked.Revoked);
-        Assert.Contains("does not revoke grants", revoked.Reason, StringComparison.Ordinal);
+        Assert.Contains("does not end allowances", revoked.Reason, StringComparison.Ordinal);
         Assert.NotNull(locked);
         Assert.False(locked.Locked);
         Assert.Contains("does not lock", locked.Reason, StringComparison.Ordinal);

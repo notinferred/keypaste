@@ -44,14 +44,14 @@ public sealed class KdbxImportViewModelTests : IDisposable
     public async Task CardText_AfterUnlock()
     {
         using var import = NewImport();
-        Assert.Equal("foreign.kdbx · KDBX 4.0 · Argon2id · Locked", import.CardText);
+        Assert.Equal("foreign.kdbx · KeePass database 4.0 · Argon2id · Locked", import.CardText);
         Assert.Equal(_keyfile, import.KeyfilePath);
 
         await Unlock(import);
 
         Assert.True(import.IsDecrypted);
         Assert.Equal("key file + password", import.KeyFactors);
-        Assert.Equal("foreign.kdbx · KDBX 4.0 · Argon2id · 3 entries · key file + password · Decrypted", import.CardText);
+        Assert.Equal("foreign.kdbx · KeePass database 4.0 · Argon2id · 3 items · key file + password · Decrypted", import.CardText);
         Assert.Equal(0, import.PasswordLength);
     }
 
@@ -61,10 +61,10 @@ public sealed class KdbxImportViewModelTests : IDisposable
         using var import = NewImport();
         await Unlock(import);
 
-        Assert.Equal("Import 3 entries", import.ConfirmText);
+        Assert.Equal("Import 3 items", import.ConfirmText);
 
         import.Rows.Single(row => row.SourceGroup == "Banking").Include = false;
-        Assert.Equal("Import 1 entry", import.ConfirmText);
+        Assert.Equal("Import 1 item", import.ConfirmText);
 
         import.KeepEditingInPlace = true;
         Assert.Equal("Open foreign.kdbx", import.ConfirmText);
@@ -97,7 +97,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
         import.ConfirmCommand.Execute(null);
 
-        Assert.Equal(["Imported 3 entries from foreign.kdbx"], _announced);
+        Assert.Equal(["Imported 3 items from foreign.kdbx"], _announced);
         Assert.False(import.IsDecrypted);
         Assert.Empty(_opened);
 
@@ -215,7 +215,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
         Assert.True(import.IsUnreadable);
         Assert.Equal("notes.kdbx", import.FileName);
-        Assert.Equal("This file is not a KDBX vault.", import.Message);
+        Assert.Equal("This file is not a KeePass database.", import.Message);
         Assert.False(import.ShowsConfirm);
         Assert.False(import.NeedsUnlock);
         Assert.True(import.CanChooseAnother);

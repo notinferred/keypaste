@@ -519,8 +519,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
             var project = EntryNameSanitizer.Sanitize(group.Name).Text;
 
-            return $"New keys for {project} go to entries in {EnvConvention.RootGroup}/{project}, which keypaste "
-                + "creates again after this rename. Moved entries keep their tags, and with them their projects.";
+            return $"New keys for {project} go to items in {EnvConvention.RootGroup}/{project}, which keypaste "
+                + "creates again after this rename. Moved items keep their tags, and with them their projects.";
         }
     }
 
@@ -689,7 +689,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         if (found is not { } entry)
         {
-            Error = "That entry could not be read. The vault may have locked.";
+            Error = "That item could not be read. The vault may have locked.";
             return null;
         }
 
@@ -876,7 +876,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         if (write.Outcome == WriteOutcome.NothingToSave)
         {
-            Error = "That entry is not in this vault any more.";
+            Error = "That item is not in this vault any more.";
             Reload();
             return;
         }
@@ -924,7 +924,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         // Every refusal reads the same way from here: the entry is still in the bin, and Trash is
         // the screen that says which refusal it was and what to do about it.
-        Error = "That entry could not be put back. Open Trash to see why.";
+        Error = "That item could not be put back. Open Trash to see why.";
     }
 
     private void BeginOrganize()
@@ -979,7 +979,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         if (title.Length == 0)
         {
-            Error = "An entry needs a name.";
+            Error = "An item needs a name.";
             return;
         }
 
@@ -1186,7 +1186,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         switch (outcome)
         {
             case OrganizeOutcome.NothingMatched:
-                return "That entry is not in this vault any more.";
+                return "That item is not in this vault any more.";
 
             case OrganizeOutcome.DestinationMissing:
                 return "That group is not in this vault any more.";
@@ -1195,10 +1195,10 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 return "That is already its name and its group.";
 
             case OrganizeOutcome.DestinationOccupied:
-                return "That group already has an entry with this name.";
+                return "That group already has an item with this name.";
 
             case OrganizeOutcome.DestinationAmbiguous:
-                return "That would leave two entries answering to one path, and keypaste could not tell them apart afterwards.";
+                return "That would leave two items answering to one path, and keypaste could not tell them apart afterwards.";
 
             case OrganizeOutcome.NameRefused:
                 VaultNameRules.IsValidTitle(target.Title, out var why);
@@ -1225,7 +1225,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 return "Something in there already answers to that name. Nothing was changed.";
 
             case GroupOutcome.DestinationAmbiguous:
-                return "That rename would leave two entries answering to one path, and keypaste could not tell them apart afterwards.";
+                return "That rename would leave two items answering to one path, and keypaste could not tell them apart afterwards.";
 
             case GroupOutcome.NameRefused:
                 VaultNameRules.IsValidGroupName(DraftGroupName.Trim(), out var why);

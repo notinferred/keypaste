@@ -26,16 +26,16 @@ namespace Keypaste.App.ViewModels;
 internal sealed class TrashViewModel : ObservableObject, IDisposable
 {
     internal const string RecycledNote =
-        "Deleting an entry in keypaste moves it here, to the vault's own recycle bin. KeePassXC "
+        "Deleting an item in keypaste moves it here, to the vault's own recycle bin. KeePassXC "
         + "opens the same file and shows the same bin.";
 
     internal const string NoBinNote =
-        "This vault's recycle bin is switched off in KeePassXC, so deleting removes an entry and "
+        "This vault's recycle bin is switched off in KeePassXC, so deleting removes an item and "
         + "its history for good. Nothing can arrive here until that setting is turned back on.";
 
     /// <summary>What recycling anything costs the file's other readers (DECISIONS.md D-0247).</summary>
     internal const string ReaderFloorNote =
-        "A vault that has recycled anything is written as KDBX 4.1, which KeePassXC 2.7 and "
+        "A vault that has recycled anything is saved in the KeePass database format 4.1, which KeePassXC 2.7 and "
         + "KeePass 2.48 and later read. Older readers do not.";
 
     private readonly AppVaultSession _session;

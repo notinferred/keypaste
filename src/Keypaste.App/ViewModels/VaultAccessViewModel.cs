@@ -257,8 +257,8 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     /// <summary>What the change costs the copies already taken (V.1a2).</summary>
     internal string BackupCost => _session.VaultPath is { } path
         ? $"The vault as it is now is kept in {VaultBackups.DirectoryFor(path)} before it changes. That copy, and every " +
-          "copy already there, still opens with the current password, keyfile and YubiKey, not the new ones. If those were " +
-          "exposed, delete the copies."
+          "copy already there, still opens with the current password, keyfile and YubiKey, not the new ones. If those " +
+          "may have leaked, delete the copies."
         : string.Empty;
 
     /// <summary>Shown when a keyfile is being attached.</summary>

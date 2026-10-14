@@ -37,13 +37,13 @@ internal static class EnvTagCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine($"usage: keypaste env {verb} <project> <entry> [-p <environment>] [--yes]");
+            context.Stdout.WriteLine($"usage: keypaste env {verb} <project> <item> [-p <environment>] [--yes]");
             return CliApp.ExitSuccess;
         }
 
         if (line.Operands.Count != 2)
         {
-            return Fail(context, verb, "expected a project and an entry");
+            return Fail(context, verb, "expected a project and an item");
         }
 
         var (project, entryPath) = (line.Operands[0], line.Operands[1]);
@@ -72,7 +72,7 @@ internal static class EnvTagCommand
         {
             if (vault.Find(entryPath) is not { } entry)
             {
-                context.Stderr.WriteLine($"keypaste env {verb}: no entry '{entryPath}'");
+                context.Stderr.WriteLine($"keypaste env {verb}: no item '{entryPath}'");
                 return CliApp.ExitNotFound;
             }
 

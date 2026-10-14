@@ -174,8 +174,8 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.BeginRenameGroupCommand.Execute(null);
 
         Assert.True(entries.ShowsProjectRenameNote);
-        Assert.Contains("New keys for billing go to entries in env/billing", entries.ProjectRenameNote, StringComparison.Ordinal);
-        Assert.Contains("Moved entries keep their tags", entries.ProjectRenameNote, StringComparison.Ordinal);
+        Assert.Contains("New keys for billing go to items in env/billing", entries.ProjectRenameNote, StringComparison.Ordinal);
+        Assert.Contains("Moved items keep their tags", entries.ProjectRenameNote, StringComparison.Ordinal);
     }
 
     /// <summary>

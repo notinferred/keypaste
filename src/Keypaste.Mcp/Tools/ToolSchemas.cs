@@ -46,7 +46,7 @@ internal static class ToolSchemas
               "type": "string",
               "minLength": 1,
               "maxLength": 512,
-              "description": "The handle from list_entry_names (preferred), or the entry's full path."
+              "description": "The handle from list_entry_names (preferred), or the item's full path."
             },
             "field": {
               "type": "string",
@@ -54,7 +54,7 @@ internal static class ToolSchemas
                 { "enum": ["password", "username", "url", "notes"] },
                 { "pattern": "^[A-Z][A-Z0-9_]{0,127}$" }
               ],
-              "description": "Which single field to release: password, username, url or notes, or one custom field of the entry named like an environment variable, such as OPENAI_API_KEY. Never more than one."
+              "description": "Which single field to release: password, username, url or notes, or one custom field of the item named like an environment variable, such as OPENAI_API_KEY. Never more than one."
             },
             "reason": {
               "type": "string",
@@ -66,7 +66,7 @@ internal static class ToolSchemas
               "type": "integer",
               "minimum": 1,
               "maximum": 3600,
-              "description": "How long you would like it for. The person chooses once or a timed grant; a release under an Automatic mode honours this number."
+              "description": "How long you would like it for. The person chooses once or an allowance for a set time; a release under an Automatic mode honours this number."
             }
           },
           "required": ["entry", "field", "reason", "ttl_seconds"],
@@ -102,7 +102,7 @@ internal static class ToolSchemas
             "profile": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
-              "description": "The project's profile. Defaults to dev."
+              "description": "The project's environment. Defaults to dev."
             },
             "keys": {
               "type": "array",
@@ -151,7 +151,7 @@ internal static class ToolSchemas
             "project": {
               "type": "string",
               "minLength": 1,
-              "description": "<project> or <project>:<environment>, as an entry's project tag names it after env:. Holds only a mode and its limits."
+              "description": "<project> or <project>:<environment>, as an item's project tag names it after env:. Holds only a mode and its limits."
             },
             "until": {
               "type": "string",

@@ -137,9 +137,9 @@ public sealed class ProjectsJourneyTests
                 AmberElements.AssertOne(main, null, "a project's keys and entries");
 
                 // An entry added to staging: asked first, nothing written when declined.
-                Press(main, ByName<Button>(main, "Add an entry to staging"));
+                Press(main, ByName<Button>(main, "Add an item to staging"));
                 AmberElements.AssertOne(main, null, "the add-entry form");
-                Fill(main, "Find an entry", "Queue");
+                Fill(main, "Find an item", "Queue");
                 Press(main, Row(main, "EntryCandidates", candidate => candidate is EnvEntryCandidate { Display: "services/Queue" }));
                 Assert.Contains("env:billing:staging puts services/Queue in billing/staging.", AutomationNames(main));
                 Assert.Contains("Joining billing/staging: QUEUE_KEY.", AutomationNames(main));
@@ -165,7 +165,7 @@ public sealed class ProjectsJourneyTests
                 var project = screen.OpenProject!;
                 Press(main, RowAction(main, "STRIPE_KEY", "Replace"));
                 Assert.Contains(
-                    "New value for STRIPE_KEY on services/Stripe, which billing/dev and billing/staging read. The old one stays in the entry's history.",
+                    "New value for STRIPE_KEY on services/Stripe, which billing/dev and billing/staging read. The old one stays in the item's history.",
                     AutomationNames(main));
                 AssertOneRevealed(main, ByCommand(main, project.ConfirmReplaceCommand), "replacing the shared value");
                 Unchanged(vault, () => Press(main, ByCommand(main, project.CancelReplaceCommand)));

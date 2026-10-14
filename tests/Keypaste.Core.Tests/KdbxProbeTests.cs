@@ -22,7 +22,7 @@ public sealed class KdbxProbeTests : IDisposable
         }
 
         Assert.True(KdbxImport.TryProbe(path, out var probe, out var error), error);
-        Assert.Equal("KDBX 4.0", probe.Version);
+        Assert.Equal("KeePass database 4.0", probe.Version);
         Assert.Equal("Argon2d", probe.Kdf);
         Assert.Equal("AES-256", probe.Cipher);
         Assert.Equal("mine.kdbx", probe.FileName);
@@ -37,7 +37,7 @@ public sealed class KdbxProbeTests : IDisposable
         KdbxImportTests.WriteForeign(path, _password, "Argon2id", "ChaCha20");
 
         Assert.True(KdbxImport.TryProbe(path, out var probe, out var error), error);
-        Assert.StartsWith("KDBX 4.", probe.Version, StringComparison.Ordinal);
+        Assert.StartsWith("KeePass database 4.", probe.Version, StringComparison.Ordinal);
         Assert.Equal("Argon2id", probe.Kdf);
         Assert.Equal("ChaCha20", probe.Cipher);
     }
@@ -50,7 +50,7 @@ public sealed class KdbxProbeTests : IDisposable
         File.WriteAllBytes(path, Kdbx31Header());
 
         Assert.True(KdbxImport.TryProbe(path, out var probe, out var error), error);
-        Assert.Equal("KDBX 3.1", probe.Version);
+        Assert.Equal("KeePass database 3.1", probe.Version);
         Assert.Equal("AES-KDF", probe.Kdf);
         Assert.Equal("AES-256", probe.Cipher);
     }
@@ -63,7 +63,7 @@ public sealed class KdbxProbeTests : IDisposable
 
         Assert.False(KdbxImport.TryProbe(path, out var probe, out var error));
         Assert.Null(probe);
-        Assert.Contains("not a KDBX vault", error, StringComparison.Ordinal);
+        Assert.Contains("not a KeePass database", error, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -357,8 +357,8 @@ wait_for 'listening on' "$AGENT_ERR"
 
 start_run ci agent-yes
 wait_for "is asking for a project's variables" "$AGENT_ERR" 1
-grep -q 'variables  DB_URL DEPLOY_KEY' "$AGENT_ERR" || die "keypaste agent did not show the variable names"
-grep -q 'command    .* agent-yes' "$AGENT_ERR" || die "keypaste agent did not show the command"
+grep -q 'variables    DB_URL DEPLOY_KEY' "$AGENT_ERR" || die "keypaste agent did not show the variable names"
+grep -q 'command      .* agent-yes' "$AGENT_ERR" || die "keypaste agent did not show the command"
 printf 'o\n' >&9
 released "o at keypaste agent"
 

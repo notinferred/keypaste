@@ -312,7 +312,7 @@ public sealed class SetupVerbTests
 
         harness.AssertExit(CliApp.ExitUsageError, RunSetup(harness, "--client", "emacs"));
 
-        Assert.Contains("no client called 'emacs'", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("no AI tool called 'emacs'", harness.Err, StringComparison.Ordinal);
         Assert.Contains("claude-code, codex, gemini-cli, devin, vscode, cursor", harness.Err, StringComparison.Ordinal);
         Assert.Empty(harness.ProcessRunner.Calls);
     }
@@ -340,7 +340,7 @@ public sealed class SetupVerbTests
 
         Assert.EndsWith("--client-label claude-code --allow-run --expose **", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
         Assert.Contains(
-            "exposure       ** (each agent sees what its settings allow: every project's variables until you change them)\n"
+            "can see        ** (each agent sees what its settings allow: every project's variables until you change them)\n"
                 + "run            offered; each agent runs nothing until you turn run on in its settings\n",
             harness.Out.ReplaceLineEndings("\n"),
             StringComparison.Ordinal);
@@ -356,7 +356,7 @@ public sealed class SetupVerbTests
         var call = Assert.Single(Ran(harness), Adds);
         Assert.EndsWith("--client-label claude-code --allow-run --expose env/** --expose deploy/**", call, StringComparison.Ordinal);
         Assert.DoesNotContain("--expose **", call, StringComparison.Ordinal);
-        Assert.Contains("exposure       env/**, deploy/** (no agent these tools start sees beyond these, whatever its settings)", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("can see        env/**, deploy/** (no agent these tools start sees beyond these, whatever its settings)", harness.Out, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -450,7 +450,7 @@ public sealed class SetupVerbTests
         var call = Assert.Single(Ran(harness), Adds);
         Assert.DoesNotContain("--vault", call, StringComparison.Ordinal);
         Assert.DoesNotContain(harness.VaultPath, call, StringComparison.Ordinal);
-        Assert.Contains($"vault          {harness.VaultPath} (the chosen vault; the client's entry names none)", harness.Out, StringComparison.Ordinal);
+        Assert.Contains($"vault          {harness.VaultPath} (the chosen vault; the tool's configuration names none)", harness.Out, StringComparison.Ordinal);
         Assert.EndsWith("  keypaste agent", harness.Out.TrimEnd(), StringComparison.Ordinal);
     }
 

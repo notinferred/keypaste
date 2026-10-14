@@ -68,7 +68,7 @@ public sealed class McpServerLocatorTests : IDisposable
 
         Assert.False(McpServerLocator.TryForDesktop(beside, appImage: null, pathVariable: null, McpClientPlatform.Linux, out var target, out var error));
         Assert.Null(target);
-        Assert.Equal($"keypaste was not found in {beside} and on PATH, so there is nothing a client could start", error);
+        Assert.Equal($"keypaste was not found in {beside} and on PATH, so there is nothing an AI tool could start", error);
 
         File.WriteAllText(Path.Combine(beside, McpServerLocator.ExecutableName), "");
 

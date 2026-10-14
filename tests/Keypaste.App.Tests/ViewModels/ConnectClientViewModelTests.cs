@@ -304,7 +304,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal(Plan("cursor", Expected("cursor")), model.Preview);
         Assert.EndsWith($"; keeps the original as {backup}", model.Preview, StringComparison.Ordinal);
         Assert.Equal(
-            $"Connect changes only keypaste's entry in {file}, and keeps the first original as {backup}. No password, keyfile or session goes into it.",
+            $"Connect changes only keypaste's part of {file}, and keeps the first original as {backup}. No password, keyfile or unlock ID goes into it.",
             model.PreviewNote);
         Assert.Equal(seed, File.ReadAllText(file));
 
@@ -375,7 +375,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         await model.PreviewAsync();
 
         Assert.Equal($"edit {file}: remove mcpServers.keypaste; keeps the original as {backup}", model.Preview);
-        Assert.Equal($"Remove changes only keypaste's entry in {file}, and keeps the first original as {backup}.", model.PreviewNote);
+        Assert.Equal($"Remove changes only keypaste's part of {file}, and keeps the first original as {backup}.", model.PreviewNote);
 
         await model.ConfirmCommand.ExecuteAsync();
 
@@ -416,11 +416,11 @@ public sealed class ConnectClientViewModelTests : IDisposable
     [Fact]
     public async Task Without_a_bridge_to_start_there_is_nothing_to_connect()
     {
-        using var model = Model(findServer: () => new McpBridgeTargetResult(Target: null, "keypaste was not found in the test's directory and on PATH, so there is nothing a client could start"));
+        using var model = Model(findServer: () => new McpBridgeTargetResult(Target: null, "keypaste was not found in the test's directory and on PATH, so there is nothing an AI tool could start"));
 
         await model.PreviewAsync();
 
-        Assert.Equal("keypaste was not found in the test's directory and on PATH, so there is nothing a client could start.", model.Message);
+        Assert.Equal("keypaste was not found in the test's directory and on PATH, so there is nothing an AI tool could start.", model.Message);
         Assert.Empty(_runner.Calls);
     }
 

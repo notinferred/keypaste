@@ -473,7 +473,7 @@ public sealed class LogVerbTests : IDisposable
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log"));
 
         var lines = _cli.Out.Split(Environment.NewLine);
-        Assert.Contains("  time (UTC)           client       entry                decision  method", lines);
+        Assert.Contains("  time (UTC)           agent        item                 decision  method", lines);
         Assert.Contains("  2026-07-27 09:57:42  claude-code  env/demo/STRIPE_KEY  granted   prompt", lines);
         Assert.DoesNotContain("\u001b", _cli.Out, StringComparison.Ordinal);
     }

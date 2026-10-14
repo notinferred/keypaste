@@ -75,12 +75,12 @@ internal static class LogCommand
         writer.WriteLine("usage: keypaste log [--denied] [--client <text>] [--since <when>] [--json]");
         writer.WriteLine("       keypaste log verify [--expect <hash>]");
         writer.WriteLine();
-        writer.WriteLine("Shows every call an AI agent made through the bridge: when, which client,");
-        writer.WriteLine("which entry, whether it was allowed, and how that was decided.");
+        writer.WriteLine("Shows every call an AI agent made through the bridge: when, which agent,");
+        writer.WriteLine("which item, whether it was allowed, and how that was decided.");
         writer.WriteLine();
         writer.WriteLine("filters:");
         writer.WriteLine("  --denied            only the calls that were refused");
-        writer.WriteLine("  --client <text>     only clients whose label or name contains this");
+        writer.WriteLine("  --client <text>     only agents whose label or name contains this");
         writer.WriteLine($"  --since <when>      {AuditSince.Expected}");
         writer.WriteLine("  --json              the records as one JSON array, each saying whether the chain vouches for it");
         writer.WriteLine();
@@ -303,7 +303,7 @@ internal static class LogCommand
             // Sanitized on the way back out even though the user typed it: the heading sits directly
             // above a table whose whole purpose is to be trustworthy, and text echoed into it should
             // arrive on the same terms as the text read out of the file.
-            described.Add($"client containing '{EntryNameSanitizer.Sanitize(client, 40).Text}'");
+            described.Add($"agent containing '{EntryNameSanitizer.Sanitize(client, 40).Text}'");
         }
 
         if (line.Value(SinceOption) is { } text)

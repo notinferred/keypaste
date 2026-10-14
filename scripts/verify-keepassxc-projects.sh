@@ -410,7 +410,7 @@ refused() { # name, expected text, then fields_seed's arguments
   printf '    refused, nothing started: %s\n' "$name"
 }
 twin="<Entry><UUID>$(uuid ftwin)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Twin</Value></String><String><Key>DATABASE_URL</Key><Value ProtectInMemory=\"True\">twin-c1b</Value></String></Entry>"
-refused two-entries 'DATABASE_URL is on more than one entry (services/Database, services/Twin)' "$twin" 'db-c1b' ''
+refused two-entries 'DATABASE_URL is on more than one item (services/Database, services/Twin)' "$twin" 'db-c1b' ''
 refused expired 'DATABASE_URL expired 2020-01-02 03:04:05Z (services/Database)' '' 'db-c1b' \
   '<Times><Expires>True</Expires><ExpiryTime>2020-01-02T03:04:05Z</ExpiryTime></Times>'
 refused placeholder 'DATABASE_URL holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Database)' \
@@ -550,7 +550,7 @@ status=$?
 set -e
 [ "$status" -ne 0 ] || die "a token without allow-prod ran a set holding a prod-tagged member"
 [ -z "$out" ] || die "a child started for the refused token run: ${out}"
-grep -qF 'holds an entry of a protected environment' "$dir/token-staging.err" \
+grep -qF 'holds an item of a protected environment' "$dir/token-staging.err" \
   || die "the refused token run does not say why: $(cat "$dir/token-staging.err")"
 lines_after "$audit" "$logged" | jq -e -s 'map(select(.method == "token")) | length == 2
                                            and .[0].decision == "granted" and .[0].entries == ["services/Database", "services/Stripe"]
@@ -838,7 +838,7 @@ said=$(drive env-entry-rm "$(native "$c4")" billing dev services/Mail) || die "t
 step "C.4: replacing the shared value names dev and staging; declined it writes nothing, and KeePassXC reads the new value"
 was=$(bytes "$c4")
 said=$(drive env-set "$(native "$c4")" billing dev STRIPE_KEY --decline) || die "the declined replace failed: ${said}"
-grep -qxF "asked: New value for STRIPE_KEY on services/Stripe, which billing/dev and billing/staging read. The old one stays in the entry's history." <<<"$said" \
+grep -qxF "asked: New value for STRIPE_KEY on services/Stripe, which billing/dev and billing/staging read. The old one stays in the item's history." <<<"$said" \
   || die "the replace did not name both environments: ${said}"
 [ "$was" = "$(bytes "$c4")" ] || die "a declined replace changed the vault"
 value=stripe-c4-new

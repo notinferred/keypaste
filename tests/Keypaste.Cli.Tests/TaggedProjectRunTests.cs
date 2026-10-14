@@ -83,7 +83,7 @@ public sealed class TaggedProjectRunTests : IDisposable
 
     public static TheoryData<string, string[]> Refusals => new()
     {
-        { "two-entries", ["STRIPE_SECRET_KEY is on more than one entry (services/Database, services/Stripe)"] },
+        { "two-entries", ["STRIPE_SECRET_KEY is on more than one item (services/Database, services/Stripe)"] },
         { "expired", ["DATABASE_URL expired 2020-01-02 03:04:05Z (services/Database)"] },
         { "placeholder", ["DATABASE_URL holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Database)"] },
     };
@@ -150,7 +150,7 @@ public sealed class TaggedProjectRunTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitInternalError, Run("env", "export", "billing", "--stdout"));
 
-        Assert.Contains("STRIPE_SECRET_KEY is on more than one entry (services/Database, services/Stripe)", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("STRIPE_SECRET_KEY is on more than one item (services/Database, services/Stripe)", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Out);
     }
 

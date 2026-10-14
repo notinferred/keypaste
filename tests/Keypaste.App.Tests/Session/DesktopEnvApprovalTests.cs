@@ -226,6 +226,24 @@ public sealed class DesktopEnvApprovalTests
             hostile.Close();
         });
 
+    /// <summary>The environment keeps its width and the project is trimmed to what is left, so neither is drawn under the countdown.</summary>
+    [Fact]
+    public Task A_long_project_and_environment_end_before_the_countdown() =>
+        HeadlessSession.On(() =>
+        {
+            var preview = new EnvPreview("acme-payments-platform-api", ["DEPLOY_KEY"]) { Profile = "staging-eu-west-1" };
+            var (window, _) = Layout(preview, ["deploy"], "/work");
+            var environment = window.FindControl<TextBlock>("ProfileText")!;
+            var ends = environment.TranslatePoint(new Point(environment.Bounds.Width, 0), window)!.Value.X;
+            var countdown = window.FindControl<TextBlock>("CountdownText")!.GetVisualParent()!.TranslatePoint(default, window)!.Value.X;
+
+            Assert.Equal("staging-eu-west-1", Drawn(window, "ProfileText"));
+            Assert.EndsWith("…", Drawn(window, "ProjectText"), StringComparison.Ordinal);
+            Assert.True(ends < countdown, $"the environment ends at {ends}, past the countdown at {countdown}");
+
+            window.Close();
+        });
+
     private static (EnvApprovalWindow Window, string Layout) Layout(
         EnvPreview preview, IReadOnlyList<string> command, string directory, string? requester = null)
     {

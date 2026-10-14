@@ -250,7 +250,7 @@ internal static class EnvPullCommand
         if (updated.Count > 0)
         {
             context.Stderr.WriteLine(
-                $"{Count(updated.Count, "variable")} will be updated; the previous values stay in the entry history.");
+                $"{Count(updated.Count, "variable")} will be updated; the previous values stay in the item history.");
         }
 
         if (!assumeYes)
@@ -342,7 +342,7 @@ internal static class EnvPullCommand
             context.Stderr.WriteLine(
                 "used: on an SSD, on a copy-on-write filesystem, or on any volume with snapshots or");
             context.Stderr.WriteLine(
-                "backups, the old contents can outlive the file. If these values were exposed, rotate them.");
+                "backups, the old contents can outlive the file. If these values may have leaked, rotate them.");
 
             var answer = context.Prompt.ReadLine($"Delete '{sourcePath}'? [y/N] ");
             if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
@@ -395,7 +395,7 @@ internal static class EnvPullCommand
         {
             context.Stderr.WriteLine(
                 "note: deleting does not overwrite the disk blocks the file used. " +
-                "If these values were exposed, rotate them.");
+                "If these values may have leaked, rotate them.");
         }
 
         return CliApp.ExitSuccess;
@@ -454,11 +454,11 @@ internal static class EnvPullCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste env pull <project> [file] [-p <profile>] [--entry <entry>] [--yes] [--delete-source | --keep]");
+        writer.WriteLine("usage: keypaste env pull <project> [file] [-p <environment>] [--entry <item>] [--yes] [--delete-source | --keep]");
         writer.WriteLine();
         writer.WriteLine($"imports a .env file, defaulting to ./{DefaultFileName}, then offers to delete it.");
         writer.WriteLine("a key the project has is updated where it lives; a new one becomes a protected field of");
-        writer.WriteLine("--entry, or of the environment's home entry env/<project>/.env, created tagged.");
+        writer.WriteLine("--entry, or of the environment's home item env/<project>/.env, created tagged.");
         writer.WriteLine("if any line is malformed, every problem is reported and nothing is imported.");
         writer.WriteLine("values are stored exactly as written -- ${VAR} is not expanded.");
     }

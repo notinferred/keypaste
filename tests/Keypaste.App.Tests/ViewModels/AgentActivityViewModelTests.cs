@@ -41,7 +41,7 @@ public sealed class AgentActivityViewModelTests
         Assert.Empty(model.Grants);
         Assert.True(model.IsAvailable);
         var serving = Assert.IsType<AuthorityStatus.Serving>(app.Authority.Status);
-        Assert.Equal($"process {serving.Owner.ProcessId} · session {serving.Session}", model.Serving);
+        Assert.Equal($"process {serving.Owner.ProcessId} · unlock {serving.Session}", model.Serving);
 
         app.Clock.Advance(TimeSpan.FromSeconds(5));
 

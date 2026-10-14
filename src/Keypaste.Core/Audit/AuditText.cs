@@ -34,10 +34,10 @@ public static class AuditText
     internal const string TimeHeader = "time (UTC)";
 
     /// <inheritdoc cref="TimeHeader"/>
-    internal const string ClientHeader = "client";
+    internal const string ClientHeader = "agent";
 
     /// <inheritdoc cref="TimeHeader"/>
-    internal const string EntryHeader = "entry";
+    internal const string EntryHeader = "item";
 
     /// <inheritdoc cref="TimeHeader"/>
     internal const string DecisionHeader = "decision";

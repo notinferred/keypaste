@@ -115,7 +115,7 @@ grep -qF "keypaste's own group" <<<"$said" || die "the refusal did not name the 
 step "keypaste copies the source into the target under moved"
 said=$(printf '%s\n%s\n' "$pw" "$pw" | "$kp" import "$src" --vault "$target" --into moved 2>&1) \
   || die "keypaste import failed: ${said}"
-{ grep -qF '2 entries' <<<"$said" && grep -qF '0 projects' <<<"$said" && grep -qF 'copied into moved' <<<"$said"; } \
+{ grep -qF '2 items' <<<"$said" && grep -qF '0 projects' <<<"$said" && grep -qF 'copied into moved' <<<"$said"; } \
   || die "the import did not report the copy: ${said}"
 
 step "KeePassXC opens the target and finds the entry, its attribute, its attachment and its history"

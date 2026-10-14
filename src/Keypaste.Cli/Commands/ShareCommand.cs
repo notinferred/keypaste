@@ -80,16 +80,16 @@ internal static class ShareCommand
 
     private static int Usage(TextWriter writer, int exit)
     {
-        writer.WriteLine("usage: keypaste share <entry> [--field password|username|url|notes|login|<ENV_NAME>]");
+        writer.WriteLine("usage: keypaste share <item> [--field password|username|url|notes|login|<ENV_NAME>]");
         writer.WriteLine("                      [--ttl 1h|24h|7d] [--views 1|3|10] [--passphrase] [--to <label>]");
         writer.WriteLine("                      [--print] [--endpoint <url>]");
         writer.WriteLine("       keypaste share ls [--offline] [--json]");
         writer.WriteLine("       keypaste share revoke <id> | --expired");
         writer.WriteLine();
-        writer.WriteLine("Encrypts one entry's field on this machine and uploads only ciphertext. The link");
+        writer.WriteLine("Encrypts one item's field on this machine and uploads only ciphertext. The link");
         writer.WriteLine("holds the key, so it is copied to the clipboard; --print writes it to stdout instead.");
         writer.WriteLine("--ttl takes 5m to 7d (default 24h), --views 1 to 10 (default 1). --to is a label");
-        writer.WriteLine("for your own list and is never sent. <entry> may be a kp:// reference, which names");
+        writer.WriteLine("for your own list and is never sent. <item> may be a kp:// reference, which names");
         writer.WriteLine("its own field. --passphrase asks for one the recipient must also type; whoever holds");
         writer.WriteLine("the link can guess it offline, so it has at least 20 characters, and");
         writer.WriteLine("`keypaste generate --words 6` makes one.");
@@ -110,7 +110,7 @@ internal static class ShareCommand
 
         if (line.Operands.Count != 1)
         {
-            return Refuse(context, "expected exactly one entry", CliApp.ExitUsageError);
+            return Refuse(context, "expected exactly one item", CliApp.ExitUsageError);
         }
 
         var field = line.Value("field") ?? "password";
@@ -371,13 +371,13 @@ internal static class ShareCommand
         }
         catch (VaultException)
         {
-            exit = Refuse(context, $"{Clean(reference.ToString())} names more than one entry", CliApp.ExitUsageError);
+            exit = Refuse(context, $"{Clean(reference.ToString())} names more than one item", CliApp.ExitUsageError);
             return null;
         }
 
         if (found is null)
         {
-            exit = Refuse(context, $"no entry at {Clean(reference.ToString())}", CliApp.ExitNotFound);
+            exit = Refuse(context, $"no item at {Clean(reference.ToString())}", CliApp.ExitNotFound);
             return null;
         }
 
@@ -399,14 +399,14 @@ internal static class ShareCommand
                 return holding[0].Entry;
 
             case 0:
-                exit = Refuse(context, $"no entry holds {Clean(env.ToString())}", CliApp.ExitNotFound);
+                exit = Refuse(context, $"no item holds {Clean(env.ToString())}", CliApp.ExitNotFound);
                 return null;
 
             default:
                 var entries = string.Join(", ", holding.Select(source => ApprovalPrompt.Shown(source.Entry)).Order(StringComparer.Ordinal));
                 exit = Refuse(
                     context,
-                    $"{Clean(env.ToString())} is on more than one entry ({entries}); share it from one: keypaste share <entry> --field {Clean(env.Key)}",
+                    $"{Clean(env.ToString())} is on more than one item ({entries}); share it from one: keypaste share <item> --field {Clean(env.Key)}",
                     CliApp.ExitUsageError);
                 return null;
         }
@@ -448,11 +448,11 @@ internal static class ShareCommand
                 return EntryName.Of(titled[0]);
 
             case 0:
-                exit = Refuse(context, $"no entry '{Clean(operand)}'", CliApp.ExitNotFound);
+                exit = Refuse(context, $"no item '{Clean(operand)}'", CliApp.ExitNotFound);
                 return null;
 
             default:
-                context.Stderr.WriteLine($"keypaste share: more than one entry is called '{Clean(operand)}'; name one by its path:");
+                context.Stderr.WriteLine($"keypaste share: more than one item is called '{Clean(operand)}'; name one by its path:");
                 foreach (var entry in titled)
                 {
                     context.Stderr.WriteLine("  " + EntryNameSanitizer.SanitizePath(entry.Path).Text);

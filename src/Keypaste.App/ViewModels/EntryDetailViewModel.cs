@@ -255,7 +255,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     internal bool IsRemovingField => _removingField is not null;
 
-    internal string RemoveFieldPrompt => $"Remove {_removingField?.DisplayName} from this entry? Its value stays in the entry's history.";
+    internal string RemoveFieldPrompt => $"Remove {_removingField?.DisplayName} from this item? Its value stays in the item's history.";
 
     /// <summary>A tag being typed, added on Add tag.</summary>
     internal string DraftTag
@@ -342,7 +342,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     {
         if (!Ask(chip.Tag, adding: false))
         {
-            Write(vault => vault.RemoveTags(Name, [chip.Tag]), "That tag is no longer on this entry.");
+            Write(vault => vault.RemoveTags(Name, [chip.Tag]), "That tag is no longer on this item.");
         }
     }
 
@@ -779,7 +779,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         if (found is not { Length: > 0 } password)
         {
-            Report("That entry could not be read. The vault may have locked.");
+            Report("That item could not be read. The vault may have locked.");
             return;
         }
 
@@ -954,7 +954,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             return;
         }
 
-        if (Write(vault => vault.RemoveField(Name, row.Name), $"{row.DisplayName} is no longer on this entry."))
+        if (Write(vault => vault.RemoveField(Name, row.Name), $"{row.DisplayName} is no longer on this item."))
         {
             RemovingField = null;
         }
@@ -1008,14 +1008,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     {
         if (adding)
         {
-            if (Write(vault => vault.AddTag(Name, tag), "This entry already has that tag."))
+            if (Write(vault => vault.AddTag(Name, tag), "This item already has that tag."))
             {
                 DraftTag = string.Empty;
             }
         }
         else
         {
-            Write(vault => vault.RemoveTags(Name, [tag]), "That tag is no longer on this entry.");
+            Write(vault => vault.RemoveTags(Name, [tag]), "That tag is no longer on this item.");
         }
     }
 

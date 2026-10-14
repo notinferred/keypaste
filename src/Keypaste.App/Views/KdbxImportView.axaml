@@ -147,7 +147,7 @@
 
       <Grid ColumnDefinitions="Auto,*,Auto">
         <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
-        <TextBlock Grid.Column="1" Classes="dialog-title" Text="Import a KDBX vault" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Classes="dialog-title" Text="Import a KeePass database" VerticalAlignment="Center" />
         <Button Grid.Column="2"
                 Classes="icon ghost sm"
                 ToolTip.Tip="Cancel"
@@ -307,12 +307,12 @@
       </StackPanel>
 
       <StackPanel Spacing="6" IsVisible="{Binding IsReadable}">
-        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}" AutomationProperties.Name="Keep editing this file in place, so KeePassXC and other KDBX apps stay in sync">
+        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}" AutomationProperties.Name="Keep editing this file in place, so KeePassXC and other KeePass apps stay in sync">
           <TextBlock FontSize="13"
                      FontWeight="Normal"
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource KpTextPrimary}"
-                     Text="Keep editing this file in place, so KeePassXC and other KDBX apps stay in sync" />
+                     Text="Keep editing this file in place, so KeePassXC and other KeePass apps stay in sync" />
         </ToggleButton>
         <TextBlock Classes="caption"
                    Margin="42,0,0,0"

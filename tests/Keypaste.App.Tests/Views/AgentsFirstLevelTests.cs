@@ -177,7 +177,7 @@ public sealed class AgentsFirstLevelTests
     /// disclosure and pane closed: tools found in each state, an agent of no tool, one with no name and Every other
     /// agent; an allowance with history; a request waiting; a change waiting; an unusable clients.toml; not serving.
     /// </summary>
-    private static async Task EveryStateAsync(Action<Window> look)
+    internal static async Task EveryStateAsync(Action<Window> look)
     {
         await using var agents = await Agents.StartAsync();
         await using var zed = await agents.AttachAsync(new AttachClient("Zed", "1.0", null));
@@ -258,7 +258,7 @@ public sealed class AgentsFirstLevelTests
         window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == name && button.IsEffectivelyVisible);
 
     /// <summary>Agents in a window over a serving authority, its tools found on a computer of the test's own.</summary>
-    private sealed class Agents : IAsyncDisposable
+    internal sealed class Agents : IAsyncDisposable
     {
         private readonly List<ApproverClient> _clients = [];
 
@@ -371,7 +371,7 @@ public sealed class AgentsFirstLevelTests
     }
 
     /// <summary>The person at the prompt: allows every request until told to hold, then leaves each waiting until it is withdrawn.</summary>
-    private sealed class Person : IApprovalChannel
+    internal sealed class Person : IApprovalChannel
     {
         internal bool Hold { get; set; }
 

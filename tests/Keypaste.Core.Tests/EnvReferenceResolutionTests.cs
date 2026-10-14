@@ -47,7 +47,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
         Assert.Empty(resolved.Variables);
         var problem = Assert.Single(resolved.Problems);
         Assert.Equal("MISSING", problem.Key);
-        Assert.Equal("(kp://acme-api/staging/NOT_THERE) NOT_THERE is not in this profile's set", problem.Reason);
+        Assert.Equal("(kp://acme-api/staging/NOT_THERE) NOT_THERE is not in this environment's set", problem.Reason);
         AssertNoValue(resolved);
     }
 

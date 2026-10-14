@@ -179,9 +179,9 @@ public sealed class SessionAuthorityGrantsTests : IDisposable
         Assert.NotNull(grants);
         Assert.False(grants.Answered);
         Assert.Empty(grants.Grants);
-        Assert.Equal("the request belongs to a session that has ended", grants.Reason);
-        Assert.Equal(new RevokeGrantsReply(0, "the request belongs to a session that has ended"), revoked);
-        Assert.Equal(new LockReply(false, "the request belongs to a session that has ended"), locking);
+        Assert.Equal("the request belongs to an unlock of the vault that has ended", grants.Reason);
+        Assert.Equal(new RevokeGrantsReply(0, "the request belongs to an unlock of the vault that has ended"), revoked);
+        Assert.Equal(new LockReply(false, "the request belongs to an unlock of the vault that has ended"), locking);
         Assert.Equal(1, _fixture.Grants.Count);
         Assert.Equal(0, asked);
     }
@@ -194,7 +194,7 @@ public sealed class SessionAuthorityGrantsTests : IDisposable
 
         var locking = await client!.LockAsync(Lock(), Token);
 
-        Assert.Equal(new LockReply(false, "the request came from a connection attached to no session"), locking);
+        Assert.Equal(new LockReply(false, "the request came from a connection attached to no unlock of the vault"), locking);
         Assert.True(_lifetime!.IsLive);
     }
 

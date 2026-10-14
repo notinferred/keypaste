@@ -25,12 +25,12 @@ internal sealed class ApprovalViewModel : PromptViewModel
         TimedSeconds = prompt.TtlSeconds;
         Lifetime = prompt.TtlSeconds > 0
             ? $"once, or for {ApprovalLimits.Describe(prompt.TtlSeconds)}"
-            : prompt.OnceOnly == OnceOnly.AskEveryTime ? "once only: this agent is set to Ask every time" : "once only: protected profile";
+            : prompt.OnceOnly == OnceOnly.AskEveryTime ? "once only: this agent is set to Ask every time" : "once only: protected environment";
         Reason = prompt.Reason;
         Scrubbed = (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
         {
-            (true, true) => "The entry and the reason are not what the vault holds and the agent sent: both were scrubbed.",
-            (true, false) => "The entry is not what the vault holds: the stored name was scrubbed.",
+            (true, true) => "The item and the reason are not what the vault holds and the agent sent: both were scrubbed.",
+            (true, false) => "The item is not what the vault holds: the stored name was scrubbed.",
             (false, true) => "The reason is not what the agent sent: it was scrubbed.",
             _ => string.Empty,
         };

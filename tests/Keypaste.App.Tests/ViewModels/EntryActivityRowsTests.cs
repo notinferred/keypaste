@@ -34,7 +34,7 @@ public sealed class EntryActivityRowsTests
         Assert.Equal("in use", row.LastUsedText);
 
         screen.Entries.Selected = row;
-        Assert.Equal("claude-code · grant, 1h left", screen.Entries.Detail!.AgentAccessSummary);
+        Assert.Equal("claude-code · allowance, 1h left", screen.Entries.Detail!.AgentAccessSummary);
         Assert.Equal("in use", screen.Entries.Detail.LastUsedText);
         Assert.Single(screen.Entries.Detail.AgentAccess!.Grants);
     }

@@ -1053,9 +1053,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private static string ClientCount(int count) => count switch
     {
-        0 => "no clients",
-        1 => "1 client",
-        _ => string.Create(CultureInfo.InvariantCulture, $"{count} clients"),
+        0 => "none connected",
+        _ => string.Create(CultureInfo.InvariantCulture, $"{count} connected"),
     };
 
     private void OnStatusTick()

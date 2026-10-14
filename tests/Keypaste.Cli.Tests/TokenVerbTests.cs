@@ -330,7 +330,7 @@ public sealed class TokenVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitInternalError, Bundle(token));
 
         Assert.Contains(
-            "keypaste token bundle: acme-api/staging holds an entry of a protected environment; a bundle opens without asking anybody, so it cannot carry it",
+            "keypaste token bundle: acme-api/staging holds an item of a protected environment; a bundle opens without asking anybody, so it cannot carry it",
             _harness.Err,
             StringComparison.Ordinal);
         Assert.DoesNotContain("deploy-bundle-sentinel", _harness.Out + _harness.Err, StringComparison.Ordinal);
@@ -346,7 +346,7 @@ public sealed class TokenVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitInternalError, Bundle(token));
 
-        Assert.Contains("MISSING is not in this profile's set", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("MISSING is not in this environment's set", _harness.Err, StringComparison.Ordinal);
         Assert.False(File.Exists(BundlePath));
     }
 

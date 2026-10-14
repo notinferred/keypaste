@@ -213,7 +213,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
         Assert.NotNull(reply);
         Assert.Equal(EnvOutcome.Invalid, reply.Set.Outcome);
-        Assert.Equal("the run names more entries than one audit line can record", reply.Reason);
+        Assert.Equal("the run names more items than one audit line can record", reply.Reason);
         Assert.Equal(0, _fixture.Channel.Asked);
         Assert.Equal("invalid-request", Assert.Single(AuditLines()).GetProperty("method").GetString());
     }
@@ -420,9 +420,9 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         var lines = AuditLines();
         Assert.Equal(
             [
-                "the request came from a connection attached to no session",
+                "the request came from a connection attached to no unlock of the vault",
                 "the request named a different vault from its attachment",
-                "the request belongs to a session that has ended",
+                "the request belongs to an unlock of the vault that has ended",
             ],
             lines.Select(line => line.GetProperty("reason").GetString()));
         Assert.All(lines, line =>
@@ -584,7 +584,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
         var line = Assert.Single(narrated);
         Assert.Equal(
-            $"released dev/dev to `deploy --to \"staging area\"` from a timed grant ({EnvGrantCache.CeilingSeconds - 60}s left)",
+            $"released dev/dev to `deploy --to \"staging area\"` under an allowance ({EnvGrantCache.CeilingSeconds - 60}s left)",
             line);
         Assert.DoesNotContain(_token1, line, StringComparison.Ordinal);
     }

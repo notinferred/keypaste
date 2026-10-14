@@ -220,7 +220,7 @@ public sealed class VerbTests
 
         // Why it refused matters: "already exists" would be a false statement about an identity
         // no entry has, and it is the answer the old joined-path check gave.
-        Assert.Contains("names more than one entry", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("names more than one item", harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("already exists", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
@@ -244,7 +244,7 @@ public sealed class VerbTests
         var exit = harness.Run("add", "c", "--group", "a/b", "--vault", harness.VaultPath);
 
         harness.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Contains("names two entries", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("names two items", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
         Assert.Equal("fresh", vault.Find(new EntryName("a/b", "c"))?.Password);

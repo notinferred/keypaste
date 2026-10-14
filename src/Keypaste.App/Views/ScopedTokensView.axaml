@@ -54,7 +54,7 @@
               </Border>
             </Grid>
             <TextBlock Classes="caption"
-                       Text="read:project/profile/KEY, or * for the whole set; separate several with commas." />
+                       Text="read:project/environment/KEY, or * for the whole set; separate several with commas." />
             <TextBlock Classes="body danger" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
               <Button Classes="ghost" Content="Cancel" Command="{Binding CancelFormCommand}" />

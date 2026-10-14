@@ -32,8 +32,8 @@ The recorded example uses a fake credential. `scripts/verify-demo.sh` compares t
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  client   claude-code
-  entry    env/demo/.env
+  agent    claude-code
+  item     env/demo/.env
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -49,7 +49,7 @@ keypaste: an agent is asking for a credential.
 ```
 2 records in /home/you/.keypaste/audit.jsonl
 
-  time (UTC)           client       entry          decision  method
+  time (UTC)           agent        item           decision  method
   2026-07-27 09:57:42  claude-code  -              granted   exposure
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```

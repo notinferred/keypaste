@@ -82,7 +82,7 @@ keypaste agent --vault ~/keypaste-demo.kdbx
 ```
 Master password:
 keypaste: watching /home/you/keypaste-demo.kdbx
-keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for session 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, grants last at most 3600 seconds
+keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for unlock 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, an allowance lasts at most 1 hour
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
@@ -133,8 +133,8 @@ Claude calls `request_credential`, and your left terminal stops being idle:
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  client   claude-code
-  entry    env/demo/.env
+  agent    claude-code
+  item     env/demo/.env
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -147,7 +147,7 @@ keypaste: an agent is asking for a credential.
 [d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
 ```
 
-Your run may use different arguments. Claude writes the reason. `client` is the sanitized, unauthenticated MCP handshake name; it can differ from `--client-label`, the name the audit log records and the agent's settings follow. `entry` is the resolved vault entry, and `field` is the requested allowed field.
+Your run may use different arguments. Claude writes the reason. `agent` is the sanitized name the AI tool gave itself, which nothing checks; it can differ from `--client-label`, the name the audit log records and the agent's settings follow. `item` is the resolved vault item, and `field` is the requested allowed field.
 
 `o` releases it for this request only. `h` also lets the same client ask for the same field again for an hour without asking you. `a` releases it once and then asks you, in a confirmation of its own, whether to make `demo:dev` Automatic for claude-code, so that what it can see there is released without asking from then on and each release is still recorded; deny that confirmation and it stays one release. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
 
@@ -206,7 +206,7 @@ keypaste log --since 5m
 ```
 2 records of 2 in /home/you/.keypaste/audit.jsonl, since 2026-07-27 09:53:07Z
 
-  time (UTC)           client       entry          decision  method
+  time (UTC)           agent        item           decision  method
   2026-07-27 09:57:42  claude-code  -              granted   exposure
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
@@ -234,7 +234,7 @@ Repeat the credential request on the same MCP connection while its approval rema
 |---|---|
 | `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste agent` from starting on it; lock the vault in the app first. |
 | Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read STRIPE_KEY from env/demo/.env`. |
-| `DENIED. That entry is outside what this agent can see` (`v0.3.0`: `outside what this server was configured to expose`) | The request named something other than `STRIPE_KEY` on `env/demo/.env`, the key was stored some other way than `env set`, or an `--expose` was added to the bridge. Approval cannot widen it. |
+| `DENIED. That item is outside what this agent can see` (`v0.3.0`: `outside what this server was configured to expose`) | The request named something other than `STRIPE_KEY` on `env/demo/.env`, the key was stored some other way than `env set`, or an `--expose` was added to the bridge. Approval cannot widen it. |
 | The dialog never appears | Your MCP client is running somewhere you are not looking. The approval prompt is that terminal: `v0.3.0` has no native dialog. |
 | The server shows as failed to start | Check the absolute executable path and permissions, then whether `~/.keypaste` is writable for auditing. |
 

@@ -79,6 +79,6 @@ public static class EnvDiff
             }
         }
 
-        throw new ArgumentException($"'{matrix.Project}' has no '{profile}' profile", parameter);
+        throw new ArgumentException($"'{matrix.Project}' has no '{profile}' environment", parameter);
     }
 }

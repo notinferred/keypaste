@@ -26,7 +26,7 @@ public sealed class GrantsVerbTests : IDisposable
 
         var lines = _harness.Out.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(2, lines.Length);
-        Assert.Equal(["ID", "AGENT", "ENTRY", "FIELD", "LEFT"], lines[0].Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        Assert.Equal(["ID", "AGENT", "ITEM", "FIELD", "LEFT"], lines[0].Split(' ', StringSplitOptions.RemoveEmptyEntries));
         Assert.Equal([id, "claude-code", "env/acme-api/STRIPE_KEY", "password", "42m"], lines[1].Split(' ', StringSplitOptions.RemoveEmptyEntries));
         Assert.StartsWith("  ", lines[1], StringComparison.Ordinal);
         Assert.DoesNotContain(SessionOwner.Sentinel, _harness.Out + _harness.Err, StringComparison.Ordinal);
@@ -61,7 +61,7 @@ public sealed class GrantsVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("grants"));
 
-        Assert.Equal("  no active grants" + Environment.NewLine, _harness.Out);
+        Assert.Equal("  no allowances" + Environment.NewLine, _harness.Out);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class GrantsVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("grants"));
         Assert.Empty(_harness.Out);
-        Assert.Contains($"keypaste grants: nothing holds {_harness.VaultPath} unlocked, so nothing is granted", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains($"keypaste grants: nothing holds {_harness.VaultPath} unlocked, so nothing is allowed", _harness.Err, StringComparison.Ordinal);
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("grants", "--json"));
         Assert.Equal("[]" + Environment.NewLine, _harness.Out);
@@ -99,7 +99,7 @@ public sealed class GrantsVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("grants", "revoke", first.ToUpperInvariant()));
 
-        Assert.Contains("  ✓ revoked 1 grant" + Environment.NewLine, _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("  ✓ revoked 1 allowance" + Environment.NewLine, _harness.Err, StringComparison.Ordinal);
         Assert.Equal(second, Core.Approval.GrantId.Of(Assert.Single(owner.Authority.Activity.Grants).Key));
     }
 
@@ -113,7 +113,7 @@ public sealed class GrantsVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("grants", "revoke", "claude-code"));
 
-        Assert.Contains("  ✓ revoked 2 grants", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("  ✓ revoked 2 allowances", _harness.Err, StringComparison.Ordinal);
         Assert.Equal("cursor", Assert.Single(owner.Authority.Activity.Grants).Approved.Client);
     }
 
@@ -126,11 +126,11 @@ public sealed class GrantsVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("grants", "revoke", "--all"));
 
-        Assert.Contains("  ✓ revoked 2 grants", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("  ✓ revoked 2 allowances", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(owner.Authority.Activity.Grants);
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("grants"));
-        Assert.Contains("no active grants", _harness.Out, StringComparison.Ordinal);
+        Assert.Contains("no allowances", _harness.Out, StringComparison.Ordinal);
     }
 
     [Theory]

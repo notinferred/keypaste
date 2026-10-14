@@ -99,7 +99,7 @@ public sealed class ListingSizeTests
     /// </summary>
     /// <remarks>
     /// The header is asserted, not only the trailer. It is the line a model summarizes from, and
-    /// "1000 entries, exposed by env/**" reads as a complete count — the old trailer named a number
+    /// "1000 items, within --expose env/**" reads as a complete count — the old trailer named a number
     /// the bound no longer uses, and sat after a block of untrusted names long enough to be skimmed.
     /// </remarks>
     [Fact]

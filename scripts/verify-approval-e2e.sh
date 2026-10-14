@@ -118,8 +118,8 @@ for _ in $(seq 1 100); do
   sleep 0.2
 done
 grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listening"
-SESSION="$(grep 'listening on' "$AGENT_ERR" | head -1 | sed -E 's/.* for session ([^,]+),.*/\1/')"
-[ -n "$SESSION" ] || die "keypaste agent named no session on its listening line"
+SESSION="$(grep 'listening on' "$AGENT_ERR" | head -1 | sed -E 's/.* for unlock ([^,]+),.*/\1/')"
+[ -n "$SESSION" ] || die "keypaste agent named no unlock on its listening line"
 
 ask() {
   local id="$1" out="$2" err="$3"

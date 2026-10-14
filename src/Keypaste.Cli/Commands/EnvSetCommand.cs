@@ -43,7 +43,7 @@ internal static class EnvSetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value] [-p <profile>] [--entry <entry>]");
+            context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value] [-p <environment>] [--entry <item>]");
             context.Stdout.WriteLine($"       {GenerateOption.Usage}");
             return CliApp.ExitSuccess;
         }
@@ -153,7 +153,7 @@ internal static class EnvSetCommand
             {
                 { Change: EnvWriteChange.New } when plan.CreatesHome => $"Set {key} on {where}, created and tagged {ProjectTagFor(project, profile)}{generated}",
                 { Change: EnvWriteChange.New } => $"Set {key} on {where}{generated}",
-                _ => $"Updated {key} on {where} (previous value kept in entry history){generated}",
+                _ => $"Updated {key} on {where} (previous value kept in item history){generated}",
             });
 
             return CliApp.ExitSuccess;

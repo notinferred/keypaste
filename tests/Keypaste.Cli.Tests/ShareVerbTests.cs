@@ -179,14 +179,14 @@ public sealed class ShareVerbTests : IDisposable
         var exit = Share("Chase");
 
         Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("more than one entry is called 'Chase'", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("more than one item is called 'Chase'", _cli.Err, StringComparison.Ordinal);
         Assert.Contains("  Banking/Chase", _cli.Err, StringComparison.Ordinal);
         Assert.Contains("  Work/Chase", _cli.Err, StringComparison.Ordinal);
         Assert.Empty(_server.Requests);
 
         Clear();
         Assert.Equal(CliApp.ExitNotFound, Share("Nothing"));
-        Assert.Contains("no entry 'Nothing'", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("no item 'Nothing'", _cli.Err, StringComparison.Ordinal);
 
         Clear();
         _cli.AssertExit(CliApp.ExitSuccess, Share("Banking/Chase", "--print"));

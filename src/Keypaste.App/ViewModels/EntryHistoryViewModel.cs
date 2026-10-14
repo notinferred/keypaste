@@ -29,7 +29,7 @@ namespace Keypaste.App.ViewModels;
 internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
 {
     private const string _stale =
-        "This entry changed since its history was read. The list has been refreshed — choose again.";
+        "This item changed since its history was read. The list has been refreshed — choose again.";
 
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;

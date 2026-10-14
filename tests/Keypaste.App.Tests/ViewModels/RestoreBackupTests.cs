@@ -92,7 +92,7 @@ public sealed class RestoreBackupTests : IDisposable
 
         Assert.True(restore.IsConfirming);
         // The variable is a field of billing's home entry, and env and env/billing are groups: counts, and no names.
-        Assert.Equal("It holds 2 entries in 3 groups, and 1 env project.", restore.Holds);
+        Assert.Equal("It holds 2 items in 3 groups, and 1 env project.", restore.Holds);
         Assert.DoesNotContain("production", restore.Holds + restore.Taken + restore.Replaces, StringComparison.Ordinal);
         Assert.Contains("vault.kdbx", restore.Replaces, StringComparison.Ordinal);
         Assert.Equal(replaced, File.ReadAllBytes(_vaultPath));

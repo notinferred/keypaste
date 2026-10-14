@@ -87,7 +87,7 @@ public sealed class TrashTests : IDisposable
         Assert.True(context.Trash.IsEmpty);
         Assert.Empty(context.Trash.Rows);
         Assert.Equal(TrashViewModel.RecycledNote, context.Trash.Note);
-        Assert.Contains("KDBX 4.1", context.Trash.ReaderFloor, StringComparison.Ordinal);
+        Assert.Contains("format 4.1", context.Trash.ReaderFloor, StringComparison.Ordinal);
     }
 
     /// <summary>

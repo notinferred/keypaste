@@ -31,7 +31,7 @@ It asks for your master password, then waits:
 ```
 Master password:
 keypaste: watching /home/you/vaults/personal.kdbx
-keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for session 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, grants last at most 3600 seconds
+keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for unlock 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, an allowance lasts at most 1 hour
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
@@ -52,8 +52,8 @@ Both processes derive the same per-user pipe name, so [MCP configuration](mcp-se
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  client   claude-code
-  entry    env/billing/.env
+  agent    claude-code
+  item     env/billing/.env
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -68,9 +68,9 @@ keypaste: an agent is asking for a credential.
 
 `v0.3.0` asks `Approve? [y/N]`; `y` releases the value and keeps a grant up to `--max-ttl`, and anything else is a no.
 
-`client` is the connecting program's unauthenticated name. Any process that can start `keypaste mcp` can claim it; keypaste displays it but does not authorize from it. The agent's settings follow the bridge's `--client-label` instead, which is what `[a]` names.
+`agent` is the name the connecting program gave itself, which nothing checks. Any process that can start `keypaste mcp` can claim it; keypaste displays it but does not authorize from it. The agent's settings follow the bridge's `--client-label` instead, which is what `[a]` names.
 
-`entry` and `field` identify the requested value in your vault. A `/` inside an entry title is displayed as a space so a title such as `../../prod/ROOT_TOKEN` cannot impersonate a different group path.
+`item` and `field` identify the requested value in your vault. A `/` inside an item title is displayed as a space so a title such as `../../prod/ROOT_TOKEN` cannot impersonate a different group path.
 
 The reason is text written by the agent. keypaste removes control characters, line breaks, invisible characters and right-to-left controls, then truncates it to 400 characters. It cannot alter the dialog, default answer or deadline.
 

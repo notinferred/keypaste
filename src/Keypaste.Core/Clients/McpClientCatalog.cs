@@ -232,7 +232,7 @@ public sealed record McpServerRegistration(
 
         if (expose.Count > 0 && !EntryExposure.TryCreate(expose, out _, out var globError))
         {
-            error = $"exposure: {globError}";
+            error = $"what agents can see: {globError}";
             return false;
         }
 

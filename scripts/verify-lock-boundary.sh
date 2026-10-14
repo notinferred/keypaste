@@ -133,7 +133,7 @@ else
   exec 9>"$WORK/agent.in"
   printf '%s\n' "$MASTER" >&9
   wait_for 'listening on' "$AGENT_ERR"
-  AGENT_SESSION="$(grep 'listening on' "$AGENT_ERR" | sed -E 's/.* for session ([0-9a-f]+),.*/\1/')"
+  AGENT_SESSION="$(grep 'listening on' "$AGENT_ERR" | sed -E 's/.* for unlock ([0-9a-f]+),.*/\1/')"
 
   start_request "$WORK/agent-stdout.txt" "$WORK/agent-mcp-stderr.txt"
   wait_for 'an agent is asking for a credential' "$AGENT_ERR"
@@ -147,7 +147,7 @@ else
   finish_request
   [ "$agent_exit" -eq 0 ] || die "keypaste agent did not stop cleanly on SIGTERM (exit $agent_exit)"
   grep -q 'withdrawn before you answered' "$AGENT_ERR" || die "SIGTERM did not withdraw the agent's prompt"
-  grep -q 'every grant is gone' "$AGENT_ERR" || die "keypaste agent did not report that it locked"
+  grep -q 'every allowance has ended' "$AGENT_ERR" || die "keypaste agent did not report that it locked"
   denied_as_locked "$AGENT_SESSION" "stopping keypaste agent"
   echo "ok: SIGTERM withdrew the request waiting at keypaste agent's prompt and it was audited as vault-locked"
 fi

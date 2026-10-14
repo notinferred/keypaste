@@ -23,13 +23,13 @@ internal static class RemoveCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste rm <entry> [--yes]");
+            context.Stdout.WriteLine("usage: keypaste rm <item> [--yes]");
             return CliApp.ExitSuccess;
         }
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste rm: expected exactly one entry name");
+            context.Stderr.WriteLine("keypaste rm: expected exactly one item name");
             return CliApp.ExitUsageError;
         }
 
@@ -66,8 +66,8 @@ internal static class RemoveCommand
                 }
 
                 context.Stderr.WriteLine(isGroup
-                    ? $"keypaste rm: '{entryPath}' is a group; only entries can be removed"
-                    : $"keypaste rm: no entry '{entryPath}'");
+                    ? $"keypaste rm: '{entryPath}' is a group; only items can be removed"
+                    : $"keypaste rm: no item '{entryPath}'");
                 return CliApp.ExitNotFound;
             }
 

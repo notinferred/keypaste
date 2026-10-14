@@ -73,7 +73,7 @@ public sealed class EnvResolutionTests : IDisposable
         Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
         Assert.Empty(resolved.Variables);
         Assert.Equal(
-            [("TWICE", "is on more than one entry (services/One, services/Two)")],
+            [("TWICE", "is on more than one item (services/One, services/Two)")],
             resolved.Problems.Select(p => (p.Key, p.Reason)));
         AssertNoValue(resolved, "good-value", "bad-value", "twice-1", "twice-2", "untagged-value", "untitled-value");
     }
@@ -204,7 +204,7 @@ public sealed class EnvResolutionTests : IDisposable
 
         Assert.Equal(EnvOutcome.NoProfile, resolved.Outcome);
         Assert.Equal("qa", resolved.Profile);
-        Assert.Equal("'acme' has no 'qa' profile", resolved.Refusal);
+        Assert.Equal("'acme' has no 'qa' environment", resolved.Refusal);
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public sealed class EnvResolutionTests : IDisposable
 
         var missing = EnvResolution.Resolve(vault, "acme", "dev", ["A", "C"], _clock);
         Assert.Equal(EnvOutcome.Unusable, missing.Outcome);
-        Assert.Equal(new EnvProblem("C", "is not in this profile's set"), Assert.Single(missing.Problems));
+        Assert.Equal(new EnvProblem("C", "is not in this environment's set"), Assert.Single(missing.Problems));
         Assert.Empty(missing.Variables);
     }
 

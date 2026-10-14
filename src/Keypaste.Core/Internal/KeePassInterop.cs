@@ -140,10 +140,10 @@ internal sealed class KeePassInterop : IDisposable
             throw new InvalidMasterPasswordException(
                 (!hasKeyfile, !hasHardwareKey) switch
                 {
-                    (true, true) => "The master password is incorrect, or the vault is not a readable KDBX file.",
-                    (false, true) => "The master password or the keyfile is incorrect, or the vault is not a readable KDBX file.",
-                    (true, false) => "The master password or the hardware key is incorrect, or the vault is not a readable KDBX file.",
-                    (false, false) => "The master password, the keyfile or the hardware key is incorrect, or the vault is not a readable KDBX file.",
+                    (true, true) => "The master password is incorrect, or the vault is not a readable KeePass database.",
+                    (false, true) => "The master password or the keyfile is incorrect, or the vault is not a readable KeePass database.",
+                    (true, false) => "The master password or the hardware key is incorrect, or the vault is not a readable KeePass database.",
+                    (false, false) => "The master password, the keyfile or the hardware key is incorrect, or the vault is not a readable KeePass database.",
                 },
                 ex);
         }
@@ -161,7 +161,7 @@ internal sealed class KeePassInterop : IDisposable
             // as "this did not open" and nothing partial is handed back (docs/PRODUCT.md law 3.7).
             throw ex is IOException or UnauthorizedAccessException
                 ? new VaultException($"Could not read '{path}'.", ex)
-                : new VaultException($"'{path}' could not be opened as a KDBX vault.", ex);
+                : new VaultException($"'{path}' could not be opened as a KeePass database.", ex);
         }
 
         return database;
@@ -458,7 +458,7 @@ internal sealed class KeePassInterop : IDisposable
             case OrganizeOutcome.DestinationOccupied:
                 throw new VaultException($"'{entry.Title}' is already in that group. Choose another title.");
             case OrganizeOutcome.DestinationAmbiguous:
-                throw new VaultException($"'{ChildPath(entry.GroupPath, entry.Title)}' would name two entries. Choose another title.");
+                throw new VaultException($"'{ChildPath(entry.GroupPath, entry.Title)}' would name two items. Choose another title.");
         }
 
         // Nothing above this line writes. The entry is whole before it joins the group, so a
@@ -2651,7 +2651,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             string where = name.GroupPath.Length == 0 ? "the root group" : name.GroupPath;
             throw new VaultException(
-                $"'{name.Title}' in '{where}' names {matches.Count} entries. keypaste will not guess " +
+                $"'{name.Title}' in '{where}' names {matches.Count} items. keypaste will not guess " +
                 "which one you meant; rename one of them in KeePassXC.");
         }
 
@@ -2775,7 +2775,7 @@ internal sealed class KeePassInterop : IDisposable
             if (next is not null && ReferenceEquals(next, bin))
             {
                 throw new VaultException(
-                    $"'{groupPath}' is inside the recycle bin; keypaste does not write there. Restore the entry or choose another group.");
+                    $"'{groupPath}' is inside the recycle bin; keypaste does not write there. Restore the item or choose another group.");
             }
 
             if (next is null)
@@ -2859,7 +2859,7 @@ internal sealed class KeePassInterop : IDisposable
             || BinaryPrimitives.ReadUInt32LittleEndian(header) != KdbxFormat.FileSignature1
             || BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4)) != KdbxFormat.FileSignature2)
         {
-            error = $"'{path}' is not a KDBX vault.";
+            error = $"'{path}' is not a KeePass database.";
             return null;
         }
 
@@ -2867,7 +2867,7 @@ internal sealed class KeePassInterop : IDisposable
         var major = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(10));
         if (major is not (3 or 4))
         {
-            error = $"'{path}' is KDBX {major}.{minor}, which keypaste does not read.";
+            error = $"'{path}' is a KeePass database {major}.{minor}, which keypaste does not read.";
             return null;
         }
 
@@ -2903,7 +2903,7 @@ internal sealed class KeePassInterop : IDisposable
             {
                 case 0:
                     error = string.Empty;
-                    return new KdbxProbe(path, Path.GetFileName(path), $"KDBX {major}.{minor}", cipher, kdf, null);
+                    return new KdbxProbe(path, Path.GetFileName(path), $"KeePass database {major}.{minor}", cipher, kdf, null);
                 case 2 when size == PwUuid.UuidSize:
                     cipher = CipherName(new PwUuid(data.ToArray()));
                     break;

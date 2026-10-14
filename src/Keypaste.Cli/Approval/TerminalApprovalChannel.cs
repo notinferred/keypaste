@@ -30,7 +30,7 @@ namespace Keypaste.Cli.Approval;
 /// newlines, no bidirectional overrides — so it cannot draw a second dialog inside this one or move
 /// the question off the screen. It is printed last, under a line saying who wrote it, and it is
 /// never interpolated into anything that gets parsed. The default is no: <c>o</c> allows once,
-/// <c>h</c> allows for the timed grant when one is offered, <c>a</c> allows once and then asks to make
+/// <c>h</c> allows for the timed allowance when one is offered, <c>a</c> allows once and then asks to make
 /// the entry's project environment Automatic when that is offered, and every other answer, Enter and
 /// silence included, is a denial (D-0326).
 /// </para>
@@ -170,7 +170,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         && name[0] != '-'
         && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' or ':' or '/');
 
-    /// <summary>The timed grant an env prompt offers: none to a requester that is not the person's own run.</summary>
+    /// <summary>The timed allowance an env prompt offers: none to a requester that is not the person's own run.</summary>
     private static int OfferedSeconds(EnvReleasePrompt request) =>
         request.Requester is null ? request.GrantSeconds : 0;
 
@@ -286,25 +286,25 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             rule,
             "keypaste: `keypaste run --session` is asking for a project's variables.",
             string.Empty,
-            $"  project    {request.Project}",
-            $"  profile    {request.Profile}",
+            $"  project      {request.Project}",
+            $"  environment  {request.Profile}",
         ];
 
         if (request.Requester is { } requester)
         {
-            lines.Add($"  asked by   {requester}");
+            lines.Add($"  asked by     {requester}");
         }
 
-        lines.Add($"  variables  {(request.Keys.Count == 0 ? "(none)" : string.Join(' ', request.Keys))}");
-        lines.AddRange(request.FileLines.Select(line => $"  injects    {line}"));
+        lines.Add($"  variables    {(request.Keys.Count == 0 ? "(none)" : string.Join(' ', request.Keys))}");
+        lines.AddRange(request.FileLines.Select(line => $"  injects      {line}"));
 
         if (request.Entries.Count > 0)
         {
-            lines.Add($"  from       {string.Join(", ", request.Entries.Distinct(StringComparer.Ordinal))}");
+            lines.Add($"  from         {string.Join(", ", request.Entries.Distinct(StringComparer.Ordinal))}");
         }
 
-        lines.Add($"  command    {request.Command}");
-        lines.Add($"  in         {request.Directory}");
+        lines.Add($"  command      {request.Command}");
+        lines.Add($"  in           {request.Directory}");
 
         if (request.CommandWasAltered || request.DirectoryWasAltered)
         {
@@ -328,7 +328,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         }
         else if (request.Requester is null)
         {
-            lines.Add("  this profile is protected: it is asked about every time.");
+            lines.Add("  this environment is protected: it is asked about every time.");
         }
 
         return string.Join(Environment.NewLine, lines);
@@ -342,8 +342,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             rule,
             "keypaste: an agent is asking for a credential.",
             string.Empty,
-            $"  client   {request.Client}",
-            $"  entry    {request.Entry}",
+            $"  agent    {request.Client}",
+            $"  item     {request.Entry}",
             $"  field    {request.Field}",
             string.Empty,
             "  the agent says it needs this because:",
@@ -359,9 +359,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         {
             lines.Add(string.Empty);
             lines.Add(request.EntryWasAltered && request.ReasonWasAltered
-                ? "  The entry and the reason above are not what the vault holds: both were scrubbed."
+                ? "  The item and the reason above are not what the vault holds: both were scrubbed."
                 : request.EntryWasAltered
-                    ? "  The entry above is not what the vault holds: the stored name was scrubbed."
+                    ? "  The item above is not what the vault holds: the stored name was scrubbed."
                     : "  The reason above is not what the agent sent: it was scrubbed.");
         }
 
@@ -373,7 +373,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         {
             lines.Add(request.OnceOnly == OnceOnly.AskEveryTime
                 ? _askEveryTimeLine
-                : "  this entry is in a protected profile: it is asked about every time.");
+                : "  this item is in a protected environment: it is asked about every time.");
         }
 
         if (request.AlwaysFor is { } scope)
@@ -385,7 +385,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return string.Join(Environment.NewLine, lines);
     }
 
-    private const string _askEveryTimeLine = "  this agent is set to Ask every time: no timed grant is offered.";
+    private const string _askEveryTimeLine = "  this agent is set to Ask every time: no timed allowance is offered.";
 
     /// <summary>The confirmation of a change that gives an agent more: who, what it gains, where the request says it came from, and its reason last.</summary>
     internal static string Render(AccessChangePrompt request, string rule)
@@ -446,17 +446,17 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             rule,
             "keypaste: an agent wants to run a command with your secrets.",
             string.Empty,
-            $"  client     {client}",
-            $"  tool       {RunPrompt.ToolName}",
-            $"  runs       {request.Program}",
-            $"  command    {request.Command}",
-            $"  in         {request.Directory}",
-            $"  project    {request.Project}",
-            $"  profile    {request.Profile}",
+            $"  agent        {client}",
+            $"  tool         {RunPrompt.ToolName}",
+            $"  runs         {request.Program}",
+            $"  command      {request.Command}",
+            $"  in           {request.Directory}",
+            $"  project      {request.Project}",
+            $"  environment  {request.Profile}",
         ];
 
         lines.AddRange(request.Variables.Select(variable =>
-            $"  injects    {variable.Name.PadRight(nameWidth)}   {Source(variable).PadRight(entryWidth)}   inject only"
+            $"  injects      {variable.Name.PadRight(nameWidth)}   {Source(variable).PadRight(entryWidth)}   inject only"
             + (variable.ChangesHowProgramsStart ? "  (changes how programs start)" : string.Empty)));
 
         lines.Add(string.Empty);
@@ -488,7 +488,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
                 + Environment.NewLine
                 + "  It can change the files that command runs (scripts, package.json) in that time.",
             OnceOnly.AskEveryTime => _askEveryTimeLine,
-            _ => "  this profile is protected: it is asked about every time.",
+            _ => "  this environment is protected: it is asked about every time.",
         });
 
         return string.Join(Environment.NewLine, lines);

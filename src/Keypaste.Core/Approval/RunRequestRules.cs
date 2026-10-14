@@ -258,7 +258,7 @@ public static class RunRequestRules
 
                 if (reference.Parsed is null)
                 {
-                    return new("env", "values must be kp:// references to an env value or an entry");
+                    return new("env", "values must be kp:// references to an env value or an item");
                 }
             }
 
@@ -272,7 +272,7 @@ public static class RunRequestRules
 
         if (run.Profile is { } profile && !EnvProfileNames.IsValid(profile, out _))
         {
-            return new("profile", "must be a profile name: lowercase letters, digits and '-'");
+            return new("profile", "must be an environment name: lowercase letters, digits and '-'");
         }
 
         if (run.Keys is { } keys)

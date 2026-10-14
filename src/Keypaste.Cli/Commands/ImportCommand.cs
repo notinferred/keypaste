@@ -50,7 +50,7 @@ internal static class ImportCommand
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste import: expected exactly one .kdbx file");
+            context.Stderr.WriteLine("keypaste import: expected exactly one KeePass database file");
             return CliApp.ExitUsageError;
         }
 
@@ -123,7 +123,7 @@ internal static class ImportCommand
         var output = context.Stdout;
         var arrow = ConsoleMarks.Carried(output, "→", "->");
 
-        output.WriteLine($"  {Count(source.EntryCount, "entry", "entries")} in {Count(plan.Rows.Count + source.Skipped.Count, "group", "groups")}");
+        output.WriteLine($"  {Count(source.EntryCount, "item", "items")} in {Count(plan.Rows.Count + source.Skipped.Count, "group", "groups")}");
 
         var labels = plan.Rows.Select(row => Label(row.SourceGroup, row.IsRootEntries))
             .Concat(source.Skipped.Select(skip => Label(skip.SourceGroup, isRoot: false)))
@@ -169,12 +169,12 @@ internal static class ImportCommand
         var style = context.ConsoleStyle;
         var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
         context.Stderr.WriteLine(
-            $"  {done} {string.Join(Dot(context), Count(result.Entries, "entry", "entries"), Count(source.ProjectCount, "project", "projects"), $"copied into {EntryNameSanitizer.SanitizePath(plan.Into).Text}")}");
+            $"  {done} {string.Join(Dot(context), Count(result.Entries, "item", "items"), Count(source.ProjectCount, "project", "projects"), $"copied into {EntryNameSanitizer.SanitizePath(plan.Into).Text}")}");
 
         if (result.DuplicateTitles > 0)
         {
             context.Stderr.WriteLine(
-                $"  {Count(result.DuplicateTitles, "copied entry shares", "copied entries share")} a group and title with another entry; every one was kept");
+                $"  {Count(result.DuplicateTitles, "copied item shares", "copied items share")} a group and title with another item; every one was kept");
         }
 
         return CliApp.ExitSuccess;
@@ -187,7 +187,7 @@ internal static class ImportCommand
             var style = context.ConsoleStyle;
             var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
             context.Stderr.WriteLine(
-                $"  {done} {string.Join(Dot(context), Count(opened.EntryCount, "entry", "entries"), Count(opened.ProjectCount, "project", "projects"), "editing in place")}");
+                $"  {done} {string.Join(Dot(context), Count(opened.EntryCount, "item", "items"), Count(opened.ProjectCount, "project", "projects"), "editing in place")}");
             return CliApp.ExitSuccess;
         });
 
@@ -331,7 +331,7 @@ internal static class ImportCommand
         writer.WriteLine("usage: keypaste import <file.kdbx> [--into <group>] [--dry-run] [--in-place]");
         writer.WriteLine("                       [--source-keyfile <path|none>] [--vault <path>] [--keyfile <path>]");
         writer.WriteLine();
-        writer.WriteLine("  copies every entry of another KeePass file into your vault, with its fields, attachments");
+        writer.WriteLine("  copies every item of another KeePass file into your vault, with its fields, attachments");
         writer.WriteLine("  and history, under a group named after the file. The file itself is never changed. Its");
         writer.WriteLine("  recycle bin is left behind. With no vault configured, or --in-place, the file is kept");
         writer.WriteLine("  where it is and remembered as a vault to open.");

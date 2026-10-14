@@ -196,7 +196,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The line under the heading with no vault selected.</summary>
     internal string WelcomeSubtitle => OffersKeePassXc
         ? "Open a vault KeePassXC opened, another file, or a new vault."
-        : "Choose a .kdbx file, drag one here, or create a new vault.";
+        : "Choose a KeePass database, drag one here, or create a new vault.";
 
     /// <summary>The databases KeePassXC last opened, offered while no vault is selected (D-0377).</summary>
     internal IReadOnlyList<KeePassXcDatabaseItem> KeePassXc { get; private set; } = [];

@@ -85,7 +85,7 @@ internal static class EnvCommand
 
         if (vault.Find(path) is not { } found)
         {
-            error = $"no entry '{EntryNameSanitizer.SanitizePath(path).Text}'";
+            error = $"no item '{EntryNameSanitizer.SanitizePath(path).Text}'";
             return false;
         }
 
@@ -142,21 +142,21 @@ internal static class EnvCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste env <command> [-p <profile>]");
+        writer.WriteLine("usage: keypaste env <command> [-p <environment>]");
         writer.WriteLine();
         writer.WriteLine("commands:");
-        writer.WriteLine("  ls [project]             list projects and tagged entries, or variables");
+        writer.WriteLine("  ls [project]             list projects and tagged items, or variables");
         writer.WriteLine("  set <project> <KEY>      set a variable, prompting for the value");
         writer.WriteLine("  rm <project> <KEY>       remove a variable");
         writer.WriteLine("  pull <project> [file]    import a .env file, then offer to delete it");
         writer.WriteLine("  export [project] [file]  write kp:// references, safe to commit; --dotenv for plain text");
-        writer.WriteLine("  diff [project] [a b]     compare profiles by name, never by value");
-        writer.WriteLine("  tag <project> <entry>    put an entry in a project through its env: tag");
-        writer.WriteLine("  untag <project> <entry>  take it out again");
+        writer.WriteLine("  diff [project] [a b]     compare environments by name, never by value");
+        writer.WriteLine("  tag <project> <item>     put an item in a project through its env: tag");
+        writer.WriteLine("  untag <project> <item>   take it out again");
         writer.WriteLine();
-        writer.WriteLine("a variable is a field of an entry tagged env:<project> (the dev profile) or");
-        writer.WriteLine("env:<project>:<profile>, editable in KeePassXC. set and pull write a new one on");
-        writer.WriteLine("--entry, or on the profile's home entry env/<project>/.env, created tagged.");
-        writer.WriteLine("to read a value: keypaste get <entry> --field <KEY> --show");
+        writer.WriteLine("a variable is a field of an item tagged env:<project> (the dev environment) or");
+        writer.WriteLine("env:<project>:<environment>, editable in KeePassXC. set and pull write a new one on");
+        writer.WriteLine("--entry, or on the environment's home item env/<project>/.env, created tagged.");
+        writer.WriteLine("to read a value: keypaste get <item> --field <KEY> --show");
     }
 }

@@ -86,7 +86,7 @@ public sealed class EnvReferenceFileTests
         Assert.Empty(none);
 
         Assert.False(EnvReferenceFile.IsDiscoverableFor(Parse("A=kp://acme-api/dev/A\nB=kp:///work/aws\n"), "acme-api", out var entries));
-        Assert.Equal("vault entries", entries);
+        Assert.Equal("vault items", entries);
 
         Assert.False(EnvReferenceFile.IsDiscoverableFor(Parse("A=kp://acme-api/dev/A\nB=kp://billing/dev/B\n"), "acme-api", out var two));
         Assert.Equal("several projects (acme-api, billing)", two);

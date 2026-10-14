@@ -356,7 +356,7 @@ public static class McpConfigFile
     // A servers object the edit added to a file without one is taken out with keypaste's member before comparing.
     private static bool Keeps(ReadOnlySpan<byte> before, ReadOnlySpan<byte> after, string serversKey, JsonObject? entry, out string error)
     {
-        error = "could not be edited without changing more than keypaste's entry";
+        error = "could not be edited without changing more than keypaste's part";
 
         if ((IsBlank(before) ? new JsonObject() : Parsed(before) as JsonObject) is not { } old
             || Parsed(after) is not JsonObject now

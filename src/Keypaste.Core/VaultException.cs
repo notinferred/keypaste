@@ -83,7 +83,7 @@ public sealed class InvalidMasterPasswordException : VaultException
 {
     /// <summary>Creates an exception with a default message.</summary>
     public InvalidMasterPasswordException()
-        : base("The master password is incorrect, or the vault is not a readable KDBX file.")
+        : base("The master password is incorrect, or the vault is not a readable KeePass database.")
     {
     }
 

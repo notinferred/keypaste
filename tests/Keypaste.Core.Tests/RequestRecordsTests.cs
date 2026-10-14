@@ -119,7 +119,7 @@ public sealed class RequestRecordsTests : IDisposable
         var line = RequestRecords.Listed(_client, 3, _exposure, _session, _vault);
 
         Assert.Equal(AuditTools.List, line.Tool);
-        Assert.Equal((AuditDecision.Granted, AuditMethod.Exposure, "listed 3 entry names"), (line.Decision, line.Method, line.Reason));
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Exposure, "listed 3 item names"), (line.Decision, line.Method, line.Reason));
         Assert.Equal((_session, _vault), (line.Session, line.Vault));
         Assert.Equal(_exposure, line.Exposure);
         Assert.Same(AuditArgs.None, line.Args);
@@ -152,7 +152,7 @@ public sealed class RequestRecordsTests : IDisposable
             AuditDecision.Denied, AuditMethod.Prompt, "a person refused this request", "env/dev/STRIPE_KEY", null, _exposure, _session, _vault);
         var unresolved = RequestRecords.Credential(
             _client, "k1_0123456789abcdef", "password", 60, "why",
-            AuditDecision.Denied, AuditMethod.OutOfScope, "the entry is outside this server's configured exposure", null, null, _exposure, null, _vault);
+            AuditDecision.Denied, AuditMethod.OutOfScope, "the item is outside what this agent can see through this bridge", null, null, _exposure, null, _vault);
 
         Assert.Equal("env/dev/STRIPE_KEY", resolved.Args.Entry);
         Assert.Equal(EntryAddressKind.Path, resolved.Args.EntryKind);
@@ -198,7 +198,7 @@ public sealed class RequestRecordsTests : IDisposable
             null,
             AuditDecision.Denied,
             AuditMethod.OutOfScope,
-            "a reference is outside this server's configured exposure",
+            "a reference is outside what this agent can see through this bridge",
             0,
             null,
             _exposure,

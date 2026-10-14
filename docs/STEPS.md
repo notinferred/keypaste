@@ -12,9 +12,6 @@ These rows serve every track: a development machine builds nothing, and CI runs 
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **N.6 — Use plain words everywhere.** Needs: N.1a, N.3.
-  - The app, the CLI help and the bridge's refusal texts replace stdio, exposure, grant, session and KDBX-entry wording with plain terms.
-  - The approval prompts keep every element T-2's evidence relies on.
 - [ ] **N.13 — Search and show fields from the terminal.** Needs: V.7a.
   - `search` looks at names only (D-0278).
   - `show` masks values and prints none without `--reveal`.

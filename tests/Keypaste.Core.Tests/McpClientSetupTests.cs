@@ -391,7 +391,7 @@ public sealed class McpClientSetupTests : IDisposable
     {
         Assert.False(McpServerRegistration.TryCreate(
             new McpServerCommand("keypaste", [McpServerLocator.BridgeArgument]), Pins("vault.kdbx"), "claude-code", ["env/**", " "], out _, out var error));
-        Assert.StartsWith("exposure: ", error, StringComparison.Ordinal);
+        Assert.StartsWith("what agents can see: ", error, StringComparison.Ordinal);
     }
 
     [Theory]

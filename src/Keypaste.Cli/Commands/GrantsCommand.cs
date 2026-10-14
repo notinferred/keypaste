@@ -97,7 +97,7 @@ internal static class GrantsCommand
                 context.Stdout.WriteLine("[]");
             }
 
-            context.Stderr.WriteLine($"keypaste grants: nothing holds {vault} unlocked, so nothing is granted");
+            context.Stderr.WriteLine($"keypaste grants: nothing holds {vault} unlocked, so nothing is allowed");
             return CliApp.ExitSuccess;
         }
 
@@ -127,7 +127,7 @@ internal static class GrantsCommand
         if (!reply.Complete)
         {
             context.Stderr.WriteLine(
-                $"keypaste grants: more grants are in force than one reply holds; these are the first {reply.Grants.Count}");
+                $"keypaste grants: more allowances are in force than one reply holds; these are the first {reply.Grants.Count}");
         }
 
         return CliApp.ExitSuccess;
@@ -150,11 +150,11 @@ internal static class GrantsCommand
 
         if (grants.Count == 0)
         {
-            writer.WriteLine(style.Paint(writer, Tone.Muted, "  no active grants"));
+            writer.WriteLine(style.Paint(writer, Tone.Muted, "  no allowances"));
             return;
         }
 
-        string[] headings = ["ID", "AGENT", "ENTRY", "FIELD", "LEFT"];
+        string[] headings = ["ID", "AGENT", "ITEM", "FIELD", "LEFT"];
         var rows = grants.Select(grant => new[]
         {
             EntryNameSanitizer.Sanitize(grant.Id, GrantId.Length).Text,
@@ -200,7 +200,7 @@ internal static class GrantsCommand
         {
             return Usage(context, verb, all
                 ? "give --all or one id or agent, not both"
-                : "expected one grant id or agent name, or --all");
+                : "expected one allowance id or agent name, or --all");
         }
 
         if (!TryPipe(line, context, verb, out var vault, out var pipe))
@@ -232,7 +232,7 @@ internal static class GrantsCommand
         {
             context.Stderr.WriteLine(attachment.Refusal is { } refusal
                 ? $"keypaste grants revoke: {Shown(refusal)}"
-                : $"keypaste grants revoke: nothing holds {vault} unlocked, so nothing is granted");
+                : $"keypaste grants revoke: nothing holds {vault} unlocked, so nothing is allowed");
             return attachment.Refusal is null ? CliApp.ExitSuccess : CliApp.ExitInternalError;
         }
 
@@ -254,7 +254,7 @@ internal static class GrantsCommand
         {
             if (target is null)
             {
-                context.Stderr.WriteLine(context.ConsoleStyle.Paint(context.Stderr, Tone.Muted, "  no active grants"));
+                context.Stderr.WriteLine(context.ConsoleStyle.Paint(context.Stderr, Tone.Muted, "  no allowances"));
                 return CliApp.ExitSuccess;
             }
 
@@ -266,7 +266,7 @@ internal static class GrantsCommand
         var style = context.ConsoleStyle;
         var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
         context.Stderr.WriteLine(
-            string.Create(CultureInfo.InvariantCulture, $"  {done} revoked {reply.Revoked} grant{(reply.Revoked == 1 ? string.Empty : "s")}"));
+            string.Create(CultureInfo.InvariantCulture, $"  {done} revoked {reply.Revoked} allowance{(reply.Revoked == 1 ? string.Empty : "s")}"));
 
         return CliApp.ExitSuccess;
     }
@@ -317,7 +317,7 @@ internal static class GrantsCommand
         writer.WriteLine("       keypaste grants revoke (<id> | <agent> | --all) [--vault <path>] [--approver <name>]");
         writer.WriteLine();
         writer.WriteLine("lists the time-boxed access the keypaste app or `keypaste agent` holding the vault");
-        writer.WriteLine("has given, names only, and ends it: one grant by its id, every grant an agent");
+        writer.WriteLine("has given, names only, and ends it: one allowance by its id, every allowance an agent");
         writer.WriteLine("holds by its name, or all of them.");
     }
 }

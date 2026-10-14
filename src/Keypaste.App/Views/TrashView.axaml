@@ -37,7 +37,7 @@
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top"
                   IsVisible="{Binding !IsEmpty}">
-        <TextBlock Classes="caption" Text="Select an entry to restore or delete it" VerticalAlignment="Center"
+        <TextBlock Classes="caption" Text="Select an item to restore or delete it" VerticalAlignment="Center"
                    Margin="0,0,4,0" IsVisible="{Binding AwaitsSelection}" />
         <Button Name="RestoreButton" Command="{Binding RestoreCommand}" AutomationProperties.Name="Restore">
           <StackPanel Orientation="Horizontal" Spacing="6">

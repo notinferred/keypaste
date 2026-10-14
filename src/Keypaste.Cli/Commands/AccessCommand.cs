@@ -150,7 +150,7 @@ internal static class AccessCommand
         err.WriteLine($"keypaste: the vault as it was is kept at '{kept.Path}'.");
         err.WriteLine(
             $"keypaste: copies made before this change may open with earlier credentials ({copies} in " +
-            $"'{VaultBackups.DirectoryFor(vaultPath)}'). If an old password or keyfile was exposed, delete them.");
+            $"'{VaultBackups.DirectoryFor(vaultPath)}'). If an old password or keyfile may have leaked, delete them.");
         err.WriteLine(
             $"keypaste: routine saves keep only the last {VaultBackups.Retained} copies, so these leave over " +
             "time, including the one this change just took.");

@@ -163,7 +163,7 @@ public sealed class LogRowTests
 
         Assert.Equal("Listed names", row.Action);
         Assert.Equal("names only", row.Secrets);
-        Assert.Equal("Granted", row.Result);
+        Assert.Equal("Allowed", row.Result);
     }
 
     /// <summary>The clock keeps its seconds on every day, so two records a minute apart still read in order.</summary>

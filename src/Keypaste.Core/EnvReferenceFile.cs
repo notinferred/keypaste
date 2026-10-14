@@ -125,7 +125,7 @@ public static class EnvReferenceFile
             .Order(StringComparer.Ordinal)
             .ToList();
 
-        reason = document.Lines.Any(line => line.Reference is EntryReference) ? "vault entries"
+        reason = document.Lines.Any(line => line.Reference is EntryReference) ? "vault items"
             : projects.Count > 1 ? $"several projects ({string.Join(", ", projects)})"
             : projects.Count == 0 ? "no project"
             : !string.Equals(projects[0], inferredProject, StringComparison.Ordinal) ? $"project '{projects[0]}'"

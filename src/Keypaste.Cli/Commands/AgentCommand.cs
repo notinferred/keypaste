@@ -274,7 +274,7 @@ internal static class AgentCommand
             }
         }
 
-        console.WriteLine("keypaste: the agent has stopped. The vault is locked and every grant is gone.");
+        console.WriteLine("keypaste: the agent has stopped. The vault is locked and every allowance has ended.");
         return CliApp.ExitSuccess;
     }
 
@@ -361,7 +361,7 @@ internal static class AgentCommand
         console.WriteLine(
             string.Create(
                 CultureInfo.InvariantCulture,
-                $"keypaste: listening on {pipeName} for session {session}, {limits.Window.TotalSeconds:0} seconds to answer, grants last at most {limits.MaximumTtlSeconds} seconds"));
+                $"keypaste: listening on {pipeName} for unlock {session}, {limits.Window.TotalSeconds:0} seconds to answer, an allowance lasts at most {ApprovalLimits.Describe(limits.MaximumTtlSeconds)}"));
 
         console.WriteLine(
             automatic.Count > 0
@@ -444,7 +444,7 @@ internal static class AgentCommand
         writer.WriteLine($"  --keyfile <path>           the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
         writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
-        writer.WriteLine($"  --max-ttl <secs>           how long an [h] grant lasts, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
+        writer.WriteLine($"  --max-ttl <secs>           how long an [h] allowance lasts, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
         writer.WriteLine();
         writer.WriteLine("Each agent's settings, kept in the vault, decide what it can see and how it is");
         writer.WriteLine("asked; an agent you set to Automatic is answered without asking you, and every");

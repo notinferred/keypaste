@@ -124,7 +124,7 @@ internal sealed class LogViewModel : ObservableObject
 
     internal string Subtitle => IsAgentHistory
         ? "What agents and tokens asked for, and what came of it. Kept on this machine, hash-chained, append-only."
-        : "Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only.";
+        : "Every agent request, allowance, token run and share. Kept on this machine, hash-chained, append-only.";
 
     internal IReadOnlyList<LogFilterOption> Filters { get; } =
     [

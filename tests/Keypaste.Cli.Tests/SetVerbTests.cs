@@ -206,7 +206,7 @@ public sealed class SetVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", target, "--vault", _harness.VaultPath));
 
-        Assert.Contains("keypaste add: The entry title cannot", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("keypaste add: The item title cannot", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Prompt.PromptsSeen);
         Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }
@@ -219,7 +219,7 @@ public sealed class SetVerbTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitUsageError, Set("Banking/Chase "));
 
-        Assert.Contains("keypaste set: The entry title cannot begin or end with whitespace.", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("keypaste set: The item title cannot begin or end with whitespace.", _harness.Err, StringComparison.Ordinal);
         Assert.Equal(["Master password: "], _harness.Prompt.PromptsSeen);
         Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }

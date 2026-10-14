@@ -93,12 +93,12 @@ public sealed class ShellImportTests : IDisposable
         await Unlock(import);
 
         Assert.True(import.ShowsRows);
-        Assert.Equal("KDBX 4.0 · Argon2id · 3 entries · key file + password", import.CardDetail);
+        Assert.Equal("KeePass database 4.0 · Argon2id · 3 items · key file + password", import.CardDetail);
 
         import.ConfirmCommand.Execute(null);
 
         Assert.Null(shell.Import);
-        Assert.Equal("Imported 3 entries from foreign.kdbx", shell.Toast);
+        Assert.Equal("Imported 3 items from foreign.kdbx", shell.Toast);
         Assert.Equal(VaultSaveStatus.Saved, _session.Unlocked!.SaveState().Status);
         Assert.NotNull(_session.Unlocked!.Find(new EntryName("foreign/Banking", "Checking")));
     }

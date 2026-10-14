@@ -154,8 +154,8 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
                 $"{tags} puts {entry} in no project: {problem}.",
                 Read.Protects
                     ? Adding
-                        ? "While the entry carries it, every agent request for the entry is asked live."
-                        : "It stops making agent requests for the entry ask live, unless another tag or the entry's group still does."
+                        ? "While the item carries it, every agent request for the item is asked live."
+                        : "It stops making agent requests for the item ask live, unless another tag or the item's group still does."
                     : Adding ? "It changes no environment." : "Removing it changes no environment.",
             ];
         }

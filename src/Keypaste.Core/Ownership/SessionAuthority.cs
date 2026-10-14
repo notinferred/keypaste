@@ -753,7 +753,7 @@ public sealed class SessionAuthority : IApproverHandler
                 if (!preview.RequiresLiveApproval && environments.Grants?.TryUse(cooldownKey, preview.Keys, out var remaining) == true)
                 {
                     environments.Narrate?.Invoke(
-                        $"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` from a timed grant ({(int)remaining.TotalSeconds}s left)");
+                        $"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` under an allowance ({(int)remaining.TotalSeconds}s left)");
                     fromGrant = true;
                     return true;
                 }
@@ -872,7 +872,7 @@ public sealed class SessionAuthority : IApproverHandler
             // command line, not what the files it runs do (T-35).
             var command = EnvReleasePrompt.CommandLine(request.Command);
             _environments?.Narrate?.Invoke(answered.Method == AuditMethod.GrantCache
-                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` from a timed grant ({answered.GrantedSeconds}s left)"
+                ? $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` under an allowance ({answered.GrantedSeconds}s left)"
                 : $"released {answered.Set.Variables.Count} variable(s) to {client} for `{command}` {(answered.GrantedSeconds > 0 ? $"for {answered.GrantedSeconds}s" : "once")}");
         }
         else if (delivered.Set.Outcome == EnvOutcome.Resolved)
@@ -905,7 +905,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out var globError))
         {
-            return Refuse(EnvOutcome.Invalid, AuditMethod.Failed, $"the exposure this bridge was configured with is not usable: {globError}");
+            return Refuse(EnvOutcome.Invalid, AuditMethod.Failed, $"this bridge's --expose is not usable: {globError}");
         }
 
         if (!_inner.TryAccess(request.ClientLabel, out var access, out var settingsProblem))
@@ -966,7 +966,7 @@ public sealed class SessionAuthority : IApproverHandler
             // What the agent can see first, so a set outside it is refused as out of scope whatever its size (T-4).
             if (entries.Any(entry => !EntryExposure.Permits(access.Reach(exposure, entry.Name, _inner.Tags(entry.Name)), entry.Field)))
             {
-                (refused, refusedMethod) = ("a variable's entry or field is outside what this agent can see through this bridge", AuditMethod.OutOfScope);
+                (refused, refusedMethod) = ("a variable's item or field is outside what this agent can see through this bridge", AuditMethod.OutOfScope);
                 return false;
             }
 
@@ -978,7 +978,7 @@ public sealed class SessionAuthority : IApproverHandler
 
             if (!recordable)
             {
-                (refused, refusedMethod) = ("the run names more entries than an agent's run can carry back in one reply", AuditMethod.InvalidRequest);
+                (refused, refusedMethod) = ("the run names more items than an agent's run can carry back in one reply", AuditMethod.InvalidRequest);
                 return false;
             }
 
@@ -1217,7 +1217,7 @@ public sealed class SessionAuthority : IApproverHandler
         ArgumentNullException.ThrowIfNull(preview);
 
         return AuditedLength([.. EntriesOf(preview).Select(entry => ApprovalPrompt.Shown(entry.Name)).Distinct(StringComparer.Ordinal)]) > MaximumAuditedEntriesBytes
-            ? "the run names more entries than one audit line can record"
+            ? "the run names more items than one audit line can record"
             : null;
     }
 
@@ -1300,7 +1300,7 @@ public sealed class SessionAuthority : IApproverHandler
     private static string ClientName(string? label, string? name) =>
         label is { Length: > 0 } ? EntryNameSanitizer.Sanitize(label, ApprovalPrompt.MaximumClientLength).Text
         : name is { Length: > 0 } ? EntryNameSanitizer.Sanitize(name, ApprovalPrompt.MaximumClientLength).Text
-        : "an unnamed client";
+        : "an unnamed agent";
 
     /// <inheritdoc/>
     /// <remarks>
@@ -1468,7 +1468,7 @@ public sealed class SessionAuthority : IApproverHandler
                 request.Project,
                 request.Profile,
                 EnvOutcome.Unauthorized,
-                $"the token's scope does not cover {request.Project}/{request.Profile}: it holds an entry of a protected environment");
+                $"the token's scope does not cover {request.Project}/{request.Profile}: it holds an item of a protected environment");
         }
 
         if (unrecordable is not null)
@@ -1558,7 +1558,7 @@ public sealed class SessionAuthority : IApproverHandler
         await EndedAsync(lifetime, cancellationToken).ConfigureAwait(false);
 
         return lifetime.IsLive
-            ? new LockReply(false, "the request ended before the lock ended the session")
+            ? new LockReply(false, "the request ended before the vault was locked")
             : new LockReply(true, string.Empty);
     }
 
@@ -1644,7 +1644,7 @@ public sealed class SessionAuthority : IApproverHandler
         }
         else if (!_attached.TryGetValue(connectionId, out var attachment))
         {
-            refusal = (AuditMethod.NoSession, "the request came from a connection attached to no session");
+            refusal = (AuditMethod.NoSession, "the request came from a connection attached to no unlock of the vault");
         }
         else if (!string.Equals(attachment.Vault, vault, StringComparison.Ordinal))
         {
@@ -1653,7 +1653,7 @@ public sealed class SessionAuthority : IApproverHandler
         else if (!string.Equals(attachment.Session, session, StringComparison.Ordinal)
             || !string.Equals(session, lifetime.Id, StringComparison.Ordinal))
         {
-            refusal = (AuditMethod.NoSession, "the request belongs to a session that has ended");
+            refusal = (AuditMethod.NoSession, "the request belongs to an unlock of the vault that has ended");
         }
         else
         {

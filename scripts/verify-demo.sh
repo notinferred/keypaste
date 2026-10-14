@@ -165,7 +165,7 @@ ask() {
     # Wait for the initialize *response* before saying anything else, which is what a real client
     # does and what the protocol requires. Writing all three messages at once races: the client's
     # name arrives with initialize and the server reads it off the handshake, so a tools/call that
-    # overtakes it is answered for "an unnamed client" and the dialog no longer matches the page.
+    # overtakes it is answered for "an unnamed agent" and the dialog no longer matches the page.
     # That is not hypothetical - it was observed failing on macOS in release run 30319209914 while
     # the same commit passed on the other three platforms.
     for _ in $(seq 1 100); do

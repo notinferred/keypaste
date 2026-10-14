@@ -58,8 +58,8 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  client   claude-code
-  entry    env/demo/.env
+  agent    claude-code
+  item     env/demo/.env
   field    STRIPE_KEY
 
   the agent says it needs this because:
@@ -324,7 +324,7 @@ Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or r
 ```
 3 records in /home/you/.keypaste/audit.jsonl
 
-  time (UTC)           client       entry          decision  method
+  time (UTC)           agent        item           decision  method
   2026-07-26 14:03:09  claude-code  -              granted   exposure
   2026-07-26 14:03:11  claude-code  env/demo/.env  granted   prompt
   2026-07-26 14:07:44  claude-code  env/demo/.env  denied    prompt

@@ -58,7 +58,7 @@ internal static class UseCommand
         {
             case ChooseOutcome.Chosen:
                 context.Stderr.WriteLine($"keypaste: agents and the CLI now use {path} when no --vault is given.");
-                context.Stderr.WriteLine("keypaste: an MCP client's running bridge keeps the vault it started with until the client restarts it.");
+                context.Stderr.WriteLine("keypaste: an AI tool's running bridge keeps the vault it started with until the tool restarts it.");
                 return CliApp.ExitSuccess;
 
             case ChooseOutcome.Unreadable:

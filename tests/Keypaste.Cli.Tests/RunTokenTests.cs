@@ -238,7 +238,7 @@ public sealed class RunTokenTests : IDisposable
         Assert.Empty(_harness.ProcessLauncher.Started);
         Assert.Contains("the token's scope does not cover acme-api/dev, so nothing was started", _harness.Err, StringComparison.Ordinal);
         Assert.Contains("does not cover acme-api/prod", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("'acme-api' has no 'qa' profile", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("'acme-api' has no 'qa' environment", _harness.Err, StringComparison.Ordinal);
         Assert.Null(owner.Channel.Last);
         Assert.Equal(3, owner.AuditLines().Count);
     }

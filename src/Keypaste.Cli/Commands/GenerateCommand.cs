@@ -129,6 +129,6 @@ internal static class GenerateCommand
             WordList.Count,
             WordList.BitsPerWord));
         writer.WriteLine("       the passphrase goes to stdout and is not stored; to keep one, use");
-        writer.WriteLine("       `keypaste add <entry> --generate --words <n>` instead.");
+        writer.WriteLine("       `keypaste add <item> --generate --words <n>` instead.");
     }
 }

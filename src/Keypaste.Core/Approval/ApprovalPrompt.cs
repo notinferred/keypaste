@@ -133,7 +133,7 @@ public sealed record ApprovalPrompt
         {
             Client = client is { Length: > 0 }
                 ? EntryNameSanitizer.Sanitize(client, MaximumClientLength).Text
-                : "an unnamed client",
+                : "an unnamed agent",
             Label = clientLabel is { Length: > 0 }
                 ? EntryNameSanitizer.Sanitize(clientLabel, MaximumClientLength).Text
                 : null,

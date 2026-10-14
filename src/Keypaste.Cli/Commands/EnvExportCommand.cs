@@ -199,7 +199,7 @@ internal static class EnvExportCommand
                 return CliApp.ExitNotFound;
 
             case EnvOutcome.NoProfile:
-                context.Stderr.WriteLine($"keypaste env export: '{project}' has no '{profile}' profile");
+                context.Stderr.WriteLine($"keypaste env export: '{project}' has no '{profile}' environment");
                 return CliApp.ExitNotFound;
 
             default:
@@ -397,10 +397,10 @@ internal static class EnvExportCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste env export [project] [file] [-p <profile>] [--force]");
-        writer.WriteLine("       keypaste env export <project> [file] [-p <profile>] --dotenv [--stdout] [--yes] [--force]");
+        writer.WriteLine("usage: keypaste env export [project] [file] [-p <environment>] [--force]");
+        writer.WriteLine("       keypaste env export <project> [file] [-p <environment>] --dotenv [--stdout] [--yes] [--force]");
         writer.WriteLine();
-        writer.WriteLine($"writes a kp:// reference for every variable of a profile, to the file or stdout, as a");
+        writer.WriteLine($"writes a kp:// reference for every variable of an environment, to the file or stdout, as a");
         writer.WriteLine($"{EnvReferenceFile.FileName} that holds no value and is safe to commit. `keypaste run` resolves it.");
         writer.WriteLine("with no project, the one projects.json maps this directory to is used.");
         writer.WriteLine();

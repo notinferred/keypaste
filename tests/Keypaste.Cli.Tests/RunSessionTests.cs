@@ -217,7 +217,7 @@ public sealed class RunSessionTests : IDisposable
 
             Assert.Equal("staging-token", _harness.ProcessLauncher.Environment["TOKEN"]);
             Assert.Equal("staging", Assert.IsType<EnvReleasePrompt>(owner.Channel.Last).Profile);
-            Assert.Contains("profile 'staging'", _harness.Err, StringComparison.Ordinal);
+            Assert.Contains("environment 'staging'", _harness.Err, StringComparison.Ordinal);
         }
 
         await using var liar = Liar.Start(this, EnvResolved.Released("dev", [new EnvVariable("TOKEN", _value)]));
@@ -225,7 +225,7 @@ public sealed class RunSessionTests : IDisposable
         _harness.AssertExit(CliApp.ExitInternalError, RunProfile("staging", "dev"));
 
         Assert.Equal("staging", liar.Asked?.Profile);
-        Assert.Contains("released the 'dev' profile when 'staging' was asked for", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("released the 'dev' environment when 'staging' was asked for", _harness.Err, StringComparison.Ordinal);
         Assert.Single(_harness.ProcessLauncher.Started);
         Assert.DoesNotContain(_value, _harness.Out + _harness.Err, StringComparison.Ordinal);
     }
@@ -323,7 +323,7 @@ public sealed class RunSessionTests : IDisposable
 
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
-        Assert.Contains("entry references and several projects need the vault opened directly; run without --session", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("item references and several projects need the vault opened directly; run without --session", _harness.Err, StringComparison.Ordinal);
         Assert.Null(owner.Channel.Last);
         Assert.Empty(_harness.ProcessLauncher.Started);
         Assert.Empty(_harness.Prompt.PromptsSeen);

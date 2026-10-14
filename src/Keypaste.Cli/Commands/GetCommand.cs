@@ -40,7 +40,7 @@ internal static class GetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste get <entry> [--field <name>] [--reveal | --show] [--timeout <seconds>]");
+            context.Stdout.WriteLine("usage: keypaste get <item> [--field <name>] [--reveal | --show] [--timeout <seconds>]");
             return CliApp.ExitSuccess;
         }
 
@@ -52,7 +52,7 @@ internal static class GetCommand
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste get: expected exactly one entry name");
+            context.Stderr.WriteLine("keypaste get: expected exactly one item name");
             return CliApp.ExitUsageError;
         }
 
@@ -65,7 +65,7 @@ internal static class GetCommand
 
         if (field is not null && FieldNameRules.IsStandard(field))
         {
-            context.Stderr.WriteLine($"keypaste get: '{field}' is one of the entry's standard fields; without --field, get reads the password");
+            context.Stderr.WriteLine($"keypaste get: '{field}' is one of the item's standard fields; without --field, get reads the password");
             return CliApp.ExitUsageError;
         }
 
@@ -93,7 +93,7 @@ internal static class GetCommand
             var entry = vault.Find(entryPath);
             if (entry is null)
             {
-                context.Stderr.WriteLine($"keypaste get: no entry '{entryPath}'");
+                context.Stderr.WriteLine($"keypaste get: no item '{entryPath}'");
                 return CliApp.ExitNotFound;
             }
 

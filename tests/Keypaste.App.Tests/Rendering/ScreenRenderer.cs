@@ -876,7 +876,7 @@ public sealed class ScreenRenderer
                         Client = new AuditClient("claude-code", "1.0.43", null),
                         Decision = AuditDecision.Granted,
                         Method = AuditMethod.Exposure,
-                        Reason = "every name listed lies inside the exposure",
+                        Reason = "listed 3 item names",
                     },
                     out var failure), failure);
             }
@@ -1140,20 +1140,20 @@ public sealed class ScreenRenderer
         [
             Row(new BrandWordmark { Width = 104 }, new BrandMark { Width = 56 }, new BrandMark { Width = 22, Classes = { "mono" } }),
             Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("Allowances", "section")),
-            Row(Text("MCP clients and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
+            Row(Text("AI tools and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
             Row(Button("Connect", ""), Button("Allow for 1 hour", "primary"), Button("Deny", "ghost"), Button("End", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
             Row(new ComboBox { ItemsSource = new[] { "As the vault's settings say", "Ask every time", "No values, only commands" }, SelectedIndex = 1, Width = 240 }, new CheckBox { Content = "Require a passphrase", IsChecked = true }, new CheckBox { Content = "Unchecked" }, new ToggleSwitch { IsChecked = true, Content = "Keep editing in place" }, new ToggleSwitch { IsChecked = false }),
             Row(segments, Box("chip", Text("dev", "")), Box("chip outline", Text("inject-only", "")), Box("chip amber", Text("approval required", "")), Box("keycap", Text("Ctrl K", ""))),
-            Row(Box("dot ok"), Text("Granted", "ok medium"), Box("dot danger"), Text("Denied", "danger medium"), Box("dot info"), Text("Token", "info medium"), Box("dot idle"), Text("Idle", "muted"), Box("dot waiting"), Text("0:28", "mono sm amber"), new ProgressBar { Classes = { "thin" }, Value = 70, Width = 150 }),
+            Row(Box("dot ok"), Text("Allowed", "ok medium"), Box("dot danger"), Text("Denied", "danger medium"), Box("dot info"), Text("Token", "info medium"), Box("dot idle"), Text("Idle", "muted"), Box("dot waiting"), Text("0:28", "mono sm amber"), new ProgressBar { Classes = { "thin" }, Value = 70, Width = 150 }),
             Row(
                 new Border { Classes = { "card" }, Width = 260, Child = Text("card: hairline, no fill", "") },
                 new Border { Classes = { "card", "filled" }, Width = 260, Child = Text("card filled", "") },
                 new Border { Classes = { "terminal" }, Width = 300, Padding = new Thickness(12, 10), Child = Text("› keypaste run -p dev -- npm start", "") },
                 new Border { Classes = { "field" }, Width = 300, Child = Text("kp://acme-api/dev/STRIPE_SECRET_KEY", "mono secondary") }),
             Row(
-                new Border { Classes = { "dialog" }, Width = 360, Child = new StackPanel { Spacing = 8, Children = { Text("claude-code wants 2 secrets", "dialog-title"), Text("via MCP · ~/acme/api · profile dev", "subtitle") } } },
-                new Border { Classes = { "toast" }, Child = Row(new KpIcon { Icon = "circle-check", Size = 15, Foreground = (IBrush)Application.Current.FindResource(Application.Current.ActualThemeVariant, "KpOk")! }, Text("Granted claude-code for 1 hour", "")) }),
+                new Border { Classes = { "dialog" }, Width = 360, Child = new StackPanel { Spacing = 8, Children = { Text("claude-code wants 2 secrets", "dialog-title"), Text("via MCP · ~/acme/api · environment dev", "subtitle") } } },
+                new Border { Classes = { "toast" }, Child = Row(new KpIcon { Icon = "circle-check", Size = 15, Foreground = (IBrush)Application.Current.FindResource(Application.Current.ActualThemeVariant, "KpOk")! }, Text("Allowed claude-code for 1 hour", "")) }),
             icons,
         ]);
 
@@ -1283,7 +1283,7 @@ public sealed class ScreenRenderer
                     Client = claude,
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Exposure,
-                    Reason = "every name listed lies inside the exposure",
+                    Reason = "listed 3 item names",
                 });
                 Write(TimeSpan.FromSeconds(41), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.Prompt, "approved for 1 hour", 3600));
                 Write(TimeSpan.FromMinutes(17), new AuditRecord
@@ -1293,11 +1293,11 @@ public sealed class ScreenRenderer
                     Args = AuditArgs.ForRun(null, "Run the migration."),
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.GrantCache,
-                    Reason = "served from a grant given 17 minutes ago",
+                    Reason = "served from an allowance given 17 minutes ago",
                     Entries = ["env/acme-api/.env"],
                     Command = "npm run migrate",
                 });
-                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.GrantCache, "served from a grant given 19 minutes ago", asked: "Print the connection string so I can check it."));
+                Write(TimeSpan.FromMinutes(2), Credential(claude, "env/acme-api/.env", "DATABASE_URL", AuditDecision.Granted, AuditMethod.GrantCache, "served from an allowance given 19 minutes ago", asked: "Print the connection string so I can check it."));
                 Write(TimeSpan.FromMinutes(2), Credential(cursor, "Work/aws-console", "password", AuditDecision.Denied, AuditMethod.Prompt, "the person denied it"));
                 Write(TimeSpan.FromMinutes(18), new AuditRecord
                 {
@@ -1319,7 +1319,7 @@ public sealed class ScreenRenderer
                     Reason = "share 3a11: 1 view, expires 2026-07-29T08:30:53Z, to maya@acme.dev, passphrase",
                 });
                 Write(TimeSpan.FromMinutes(14), Credential(cursor, "env/acme-web/.env", "VERCEL_TOKEN", AuditDecision.Denied, AuditMethod.TimedOut, "nobody answered within 60 seconds"));
-                Write(TimeSpan.FromMinutes(20), Credential(claude, "Work/github", "username", AuditDecision.Granted, AuditMethod.Automatic, "released without asking: claude-code's mode for this entry is Automatic"));
+                Write(TimeSpan.FromMinutes(20), Credential(claude, "Work/github", "username", AuditDecision.Granted, AuditMethod.Automatic, "released without asking: claude-code's mode for this item is Automatic"));
                 Write(TimeSpan.FromMinutes(3), new AuditRecord
                 {
                     Tool = "run",

@@ -128,7 +128,7 @@ public sealed class AgentCommandTests : IDisposable
 
         Assert.Equal(AuditMethod.Prompt, reply.Method);
         Assert.Equal(AuditDecision.Denied, reply.Decision);
-        Assert.Contains("this entry is in a protected profile: it is asked about every time.", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("this item is in a protected environment: it is asked about every time.", stderr.ToString(), StringComparison.Ordinal);
         Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(prompt.PromptsSeen));
     }
 

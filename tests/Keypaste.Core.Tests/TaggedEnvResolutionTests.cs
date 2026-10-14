@@ -74,7 +74,7 @@ public sealed class TaggedEnvResolutionTests : IDisposable
             [
                 ("OLD_KEY", "expired 2026-09-23 12:00:00Z (services/Old)"),
                 ("REF_KEY", "holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Ref)"),
-                ("SHARED", "is on more than one entry (services/Stripe, services/Twin)"),
+                ("SHARED", "is on more than one item (services/Stripe, services/Twin)"),
             ],
             resolved.Problems.Select(problem => (problem.Key, problem.Reason)));
 

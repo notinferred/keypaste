@@ -156,7 +156,7 @@ internal static class TokenCommand
 
         if (!allowProd && scopes.FirstOrDefault(scope => scope.IsProtected) is { } protectedScope)
         {
-            return Fail(context, "create", $"{protectedScope} names a protected profile; --allow-prod lets the token ask you live for it, every time");
+            return Fail(context, "create", $"{protectedScope} names a protected environment; --allow-prod lets the token ask you live for it, every time");
         }
 
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
@@ -397,7 +397,7 @@ internal static class TokenCommand
                 if (resolved.RequiresLiveApproval)
                 {
                     context.Stderr.WriteLine(
-                        $"keypaste token bundle: {project}/{profile} holds an entry of a protected environment; a bundle opens without asking anybody, so it cannot carry it");
+                        $"keypaste token bundle: {project}/{profile} holds an item of a protected environment; a bundle opens without asking anybody, so it cannot carry it");
                     return CliApp.ExitInternalError;
                 }
 
@@ -580,12 +580,12 @@ internal static class TokenCommand
         writer.WriteLine("  bundle <name> -o <file> [--force] [--token <token|-|env>]");
         writer.WriteLine("                             seal the token's sets into a file for CI");
         writer.WriteLine();
-        writer.WriteLine("a scope is read:<project>/<profile>/<KEY or *>; separate several with commas.");
+        writer.WriteLine("a scope is read:<project>/<environment>/<KEY or *>; separate several with commas.");
         writer.WriteLine("a token only feeds `keypaste run --token` or `--bundle`: it injects a set into a");
         writer.WriteLine($"command and never prints a value. --ttl defaults to 30d. pass the token in {RunWithToken.EnvironmentVariable}.");
         writer.WriteLine();
         writer.WriteLine("create and revoke change the vault, so lock it in the app or `keypaste agent` first.");
-        writer.WriteLine("a protected profile (prod) needs --allow-prod, then asks you live every time,");
+        writer.WriteLine("a protected environment (prod) needs --allow-prod, then asks you live every time,");
         writer.WriteLine("and is never put in a bundle.");
     }
 }

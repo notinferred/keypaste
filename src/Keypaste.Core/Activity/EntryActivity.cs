@@ -99,7 +99,7 @@ public sealed class EntryActivity
 
             var client = TokenAuditReason.TryName(entry.Reason, out var token)
                 ? $"{token} · token"
-                : entry.Client.Length > 0 ? entry.Client : "an unnamed client";
+                : entry.Client.Length > 0 ? entry.Client : "an unnamed agent";
             var how = string.Equals(entry.Tool, "run", StringComparison.Ordinal) && entry.Method != "token" ? "run" : entry.Method;
 
             foreach (var named in entry.Entries.Count > 0 ? entry.Entries : entry.Entry.Length > 0 ? [entry.Entry] : [])

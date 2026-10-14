@@ -168,7 +168,7 @@ internal static class RunCommand
                     $"{OneLine(set.Label)} line {hidden.Line}: the value of {OneLine(hidden.Name)} is too long or holds characters that cannot be shown on one line");
             }
 
-            context.Stderr.WriteLine($"keypaste run: resolving {OneLine(set.Label)} {Arrow(context.Stderr)} project {OneLine(set.Project)} profile {OneLine(set.Profile)}");
+            context.Stderr.WriteLine($"keypaste run: resolving {OneLine(set.Label)} {Arrow(context.Stderr)} project {OneLine(set.Project)} environment {OneLine(set.Profile)}");
 
             foreach (var literal in file.Lines.Where(fileLine => fileLine.Reference is null))
             {
@@ -419,7 +419,7 @@ internal static class RunCommand
             && !string.Equals(reply.Set.Profile, request.Profile, StringComparison.Ordinal))
         {
             context.Stderr.WriteLine(
-                $"keypaste run: the keypaste process holding {vaultPath} released the '{Shown(reply.Set.Profile)}' profile " +
+                $"keypaste run: the keypaste process holding {vaultPath} released the '{Shown(reply.Set.Profile)}' environment " +
                 $"when '{request.Profile}' was asked for, so nothing was started");
             return (CliApp.ExitInternalError, null);
         }
@@ -454,13 +454,13 @@ internal static class RunCommand
 
         if (envs.Count != references.Count || envs.Select(env => env.Project).Distinct(StringComparer.Ordinal).Count() > 1)
         {
-            exit = Fail(context, "entry references and several projects need the vault opened directly; run without --session");
+            exit = Fail(context, "item references and several projects need the vault opened directly; run without --session");
             return false;
         }
 
         if (envs.Count == 0 || envs.Select(env => env.Profile).Distinct(StringComparer.Ordinal).Count() > 1)
         {
-            exit = Fail(context, $"{set.Label} names {(envs.Count == 0 ? "no reference" : "several profiles")}; run without --session, or pass -p to choose one profile");
+            exit = Fail(context, $"{set.Label} names {(envs.Count == 0 ? "no reference" : "several environments")}; run without --session, or pass -p to choose one environment");
             return false;
         }
 
@@ -526,7 +526,7 @@ internal static class RunCommand
         if (request.Launch is null)
         {
             context.Stderr.WriteLine(profiled
-                ? $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}' profile '{request.Profile}'; answer in its prompt"
+                ? $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}' environment '{request.Profile}'; answer in its prompt"
                 : $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}'; answer in its prompt");
             context.Stderr.Flush();
         }
@@ -674,7 +674,7 @@ internal static class RunCommand
             ? file.Lines
             : resolved.Variables.Select(variable => new ReferenceLine(variable.Key, new EnvReference(set.Project, set.Profile, variable.Key), null, 0));
 
-        writer.WriteLine($"  resolving {OneLine(set.Label)}  {style.Paint(writer, Tone.Muted, "profile")} {OneLine(resolved.Profile)}");
+        writer.WriteLine($"  resolving {OneLine(set.Label)}  {style.Paint(writer, Tone.Muted, "environment")} {OneLine(resolved.Profile)}");
 
         var references = 0;
 
@@ -738,15 +738,15 @@ internal static class RunCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste run [--vault <path>] [--keyfile <path>] [-p <profile>] [project] -- <command> [args...]");
-        writer.WriteLine("       keypaste run [--vault <path>] [--keyfile <path>] [-p <profile>] --env-file <file> -- <command> [args...]");
-        writer.WriteLine("       keypaste run --session [--vault <path>] [--approver <name>] [-p <profile>] [project] -- <command> [args...]");
-        writer.WriteLine("       keypaste run --token <token|-|env> [--vault <path>] [--approver <name>] [-p <profile>] <project> -- <command> [args...]");
-        writer.WriteLine("       keypaste run --bundle <file> [--token <token|-|env>] [-p <profile>] [project] -- <command> [args...]");
+        writer.WriteLine("usage: keypaste run [--vault <path>] [--keyfile <path>] [-p <environment>] [project] -- <command> [args...]");
+        writer.WriteLine("       keypaste run [--vault <path>] [--keyfile <path>] [-p <environment>] --env-file <file> -- <command> [args...]");
+        writer.WriteLine("       keypaste run --session [--vault <path>] [--approver <name>] [-p <environment>] [project] -- <command> [args...]");
+        writer.WriteLine("       keypaste run --token <token|-|env> [--vault <path>] [--approver <name>] [-p <environment>] <project> -- <command> [args...]");
+        writer.WriteLine("       keypaste run --bundle <file> [--token <token|-|env>] [-p <environment>] [project] -- <command> [args...]");
         writer.WriteLine();
         writer.WriteLine("runs a command with the project's variables in its environment. nothing is");
         writer.WriteLine("written to disk, and the vault is closed before the command starts.");
-        writer.WriteLine($"-p picks the profile, {EnvProfileNames.Default} by default. with no project, the one projects.json");
+        writer.WriteLine($"-p picks the environment, {EnvProfileNames.Default} by default. with no project, the one projects.json");
         writer.WriteLine($"maps this directory to is used, and its {EnvReferenceFile.FileName} only when that file names");
         writer.WriteLine("nothing but that project's variables; --env-file uses any reference file you name.");
         writer.WriteLine("--project <name> names the project as the operand does, and takes a name that");
@@ -758,7 +758,7 @@ internal static class RunCommand
         writer.WriteLine();
         writer.WriteLine($"with --token, a scoped token (default: {RunWithToken.EnvironmentVariable}) is checked by the process");
         writer.WriteLine("holding the vault, which releases what its scope covers without asking, except a");
-        writer.WriteLine("protected profile. --bundle opens a token bundle with no vault at all.");
+        writer.WriteLine("protected environment. --bundle opens a token bundle with no vault at all.");
         writer.WriteLine();
         writer.WriteLine("the -- is required: without it, 'keypaste run dev npm start' cannot be told");
         writer.WriteLine("apart from a project called 'npm'. everything after it belongs to the command.");
@@ -783,7 +783,7 @@ internal static class RunCommand
 
             if (envs.Count != references.Count)
             {
-                named.Add("vault entries");
+                named.Add("vault items");
             }
 
             return new RunSet(
