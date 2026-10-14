@@ -1,0 +1,213 @@
+---
+title: Agent Credential Access Format, version 1
+description: How a KeePass file keeps a vault's projects and what each AI agent may see, receive and run, so that any KeePass app can read, keep and apply them.
+---
+
+import { Code } from '@astrojs/starlight/components';
+import schema from '../../../../../public/acaf/v1/record.schema.json?raw';
+
+The Agent Credential Access Format (ACAF) says how a KDBX file keeps two things: a vault's projects, the environment variables a program runs with, and each AI agent's access to them, what it may see, whether it is given values, whether it may run commands and how its requests are answered. A KeePass app that follows it can open a vault keypaste wrote, keep every agent's settings intact, and apply them the way keypaste does; one that does not apply them can still keep them.
+
+Version 1 is final. Any change to what follows is a new version, starting with 1.1. "Must", "must not", "never" and "may" below are requirements on an implementation.
+
+## Status
+
+keypaste implements this version: its source reads and writes everything below, its tests check each rule, and a gate in its CI has KeePassXC 2.7 open, edit, save and merge a vault holding agents' settings on Linux, macOS and Windows. In the terms of [keypaste's release contract](https://github.com/notinferred/keypaste/blob/main/docs/RELEASE.md) this is Implemented. No published keypaste release includes it yet; the first planned to is 0.5.0.
+
+## Scope
+
+ACAF covers what a vault stores. It does not cover how an agent asks a running app for a credential, which stays each app's own protocol and which a later version may specify, or the history of what was released, which keypaste keeps in a log outside the vault.
+
+Terms used below:
+
+- **Vault**: a KDBX 4 file, read and written with the format's own library or an equivalent.
+- **An entry's own tags**: the tags on the entry itself, never those of its group.
+- **Agent**: a program that asks for credentials, such as an AI coding tool. Its **name** is the name the person gave its connection in configuration they wrote, such as keypaste's `--client-label claude-code`. A reader never takes the name from what the agent says about itself.
+- **Owner**: the app holding the vault unlocked that answers agents. **Reader**: an implementation that applies ACAF data. **Writer**: one that changes it.
+- **Person**: whoever unlocked the vault.
+
+## Projects
+
+An entry belongs to a project's environment through one of its own tags:
+
+| Tag | Puts the entry in |
+|---|---|
+| `env:billing` | project `billing`, environment `dev` |
+| `env:billing:staging` | project `billing`, environment `staging` |
+
+The prefix is `env:` in lower case, matched exactly. A project name is not empty, holds no `/`, `\`, `:` or control character, and neither begins nor ends with white space. An environment name is 1 to 32 characters of `a`–`z`, `0`–`9` and `-`, not starting with `-`. A tag that starts `env:` in any case and breaks these rules, such as `Env:billing` or `env:billing:Prod`, is malformed: it puts the entry in no project, and a reader may report it. An entry with several project tags is in each of those environments. A group's tags, its name and its path make no project, and entries in the recycle bin or in `.keypaste` belong to none.
+
+A project's **variables** are its entries' custom string fields whose names match `[A-Z][A-Z0-9_]{0,127}`, do not start `KPEX_`, `KPXC_` or `KP2A_`, and are not the name of a standard field (`Title`, `UserName`, `Password`, `URL`, `Notes`) in any case. An entry's other fields are not variables. A custom field that matches that pattern but is a standard field's name in another case, such as `PASSWORD`, is never released, and its environment's set is refused rather than released without it. A writer creates a variable as a protected string. Any entry with the tag serves equally; keypaste keeps a variable it creates on an entry of its own for the project's environment, titled `.env` for `dev` and `.env.` followed by the environment's name for any other.
+
+An environment's set must not be built by choosing between entries. keypaste refuses to release a set in which a variable is on more than one entry, an entry holding one has expired, a value holds a KeePass placeholder such as `{PASSWORD}`, or an entry has a custom field named like a standard one in another case, and names the entries concerned.
+
+**Protected environments** are `prod`, `production`, and any name starting `prod-` or `production-`, in any case. An entry is protected when any of its own tags names one, a malformed tag such as `env:billing:Prod` included. Whatever an agent's settings say, a reader never releases anything from a protected entry to an agent without a person answering that one request, and offers no way to allow it again unasked.
+
+## Agents' settings
+
+### Where they are kept
+
+Each agent's settings are one entry in the group `.keypaste/agents`: the group `agents` directly inside a group `.keypaste` directly under the root group. Readers read only entries directly in a group at exactly that path, with those names in that case, and outside the recycle bin; where more than one group has the path, every one of them is read.
+
+`.keypaste` is keypaste's reserved group, and everything in it is the app's own records. A reader never names an entry of a group `.keypaste` directly under the root, its name in any case, or of any group inside it, to an agent, and never lists, searches or exports one as a secret.
+
+Each entry is titled with the agent's name and holds its record, the JSON text below, in a custom string field named `acaf`. A reader reads the field whether or not it is marked protected. An entry in the group whose title is not a valid name is ignored.
+
+A **name** is `*` or 1 to 64 UTF-16 code units containing no control character, no Unicode format, private-use, line-separator or paragraph-separator character, no U+FFFD, none of `` ` `` `<` `>` `{` `}` `[` `]` `|` `\` `/` `"`, and no white space at either end. Names are compared exactly, so `claude-code` and `Claude-Code` are two agents. `*` stands for every agent without settings of its own.
+
+### UUIDs
+
+Every writer gives an agent's entry, and each of the two groups, a UUID derived from its name, so that two copies of a vault that each create one create the same object:
+
+- The ACAF v1 namespace is `919d7b74-6e77-5fb0-99eb-74758c119d7d`, the version 5 UUID of `https://keypaste.com/acaf/v1/` in RFC 9562's URL namespace.
+- An agent's entry has the RFC 9562 version 5 UUID of the UTF-8 bytes of its name, exactly as the entry is titled, in that namespace.
+- The group `.keypaste` has the version 5 UUID of `/.keypaste`, and `.keypaste/agents` that of `/.keypaste/agents`, in the same namespace. No name holds a `/`, so no entry can share a group's UUID.
+- The 16 bytes of the UUID, in RFC 9562's order, are the KeePass UUID, which KeePass's XML writes in base64.
+
+| Input | UUID | In KeePass's XML |
+|---|---|---|
+| `claude-code` | `a1e1d967-675e-5db1-987a-5faf0dbe0627` | `oeHZZ2deXbGYel+vDb4GJw==` |
+| `*` | `f6fc6f43-949a-5159-b8ad-cdff2e6c90f8` | |
+| `/.keypaste` | `0fe73e58-3954-5d56-bca4-c9696b45564a` | |
+| `/.keypaste/agents` | `ecef397c-6fd7-5243-8bd5-c0a96d98a672` | |
+
+A writer creating either group, or an agent's entry, uses its derived UUID unless another object in the vault already holds it, in which case it uses a random one. A group that already exists under its path is used as it is, and while a group holds an agent's derived UUID, the entry in `.keypaste/agents` titled with the agent's name is its entry.
+
+### The record
+
+A record is one JSON object (RFC 8259, with no comments or trailing commas). A member named twice makes the whole text unreadable.
+
+| Member | Value | When left out | Meaning |
+|---|---|---|---|
+| `acaf` | the number `1`, written as an integer | not understood | The version. |
+| `see` | an array of 0 to 16 selectors | `["tag:env:*"]` | What the agent can see. An empty array sees nothing. |
+| `values` | `true` or `false` | `true` | With `false`, the agent is never handed a value; values reach only commands it runs. |
+| `run` | `true` or `false` | `false` | Whether the agent may ask to run commands with secrets in their environment. |
+| `mode` | `"ask"`, `"allow-for-a-while"` or `"automatic"` | `"allow-for-a-while"` | How its requests for values are answered where no project row decides. |
+| `limit` | a limit object | no limit | A limit on `automatic` where no project row decides. |
+| `projects` | an array of 0 to 256 project rows | no rows | Modes and limits for one project or one environment. |
+
+A **limit** object has one or both of `perHour`, an integer from 1 to 1000 written with no fraction or exponent, and `until`, a time written exactly as `YYYY-MM-DDTHH:MM:SSZ` in UTC, and no other member; an empty object is not a limit as specified. `until` is an instant: keypaste takes it, and shows it, on the clock of the computer it runs on, a date alone meaning the close of that day there, and writes it in UTC.
+
+A **project row** has `project`, `mode` and optionally `limit`, and no other member. `project` is a project's name, which covers every environment of it, or a project's name, `:` and an environment's, which covers that one: `"project":"billing"` covers billing's `dev` and `staging` alike, and `"project":"billing:staging"` covers `staging` alone. It is never written as a tag, since the tag `env:billing` on an entry puts it in billing's `dev` alone. No two rows of a record have the same scope.
+
+A **selector** is 1 to 128 characters, not only white space, with no control character and no `\`:
+
+- `tag:env:` followed by a project pattern, optionally `:` and an environment pattern, each not empty, sees the variables of each entry tagged into a matching project and environment, and nothing else of that entry. A missing environment pattern matches every environment, so `tag:env:*` sees every project's variables. A selector that starts `tag:` in any case and is not of this form makes the whole list invalid.
+- Any other selector names a place and sees whole entries. The part after its last `/` matches the entry's title and the rest its group path, segment by segment; a last segment of exactly `**` belongs to the group path and leaves the title unconstrained, so `env/**` is everything under `env`. In a segment, project or environment pattern, `*` matches any run of characters; a segment of `**` matches any number of group segments, none included. The group path and the title are matched separately against the names as stored, case-sensitively, so a title holding a `/` can never match a group pattern.
+
+A record that keypaste writes for the defaults is:
+
+```json
+{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"allow-for-a-while"}
+```
+
+A record keypaste creates has its members in the order of the table, `limit` and `projects` only when they hold something. A change keypaste writes into a record keeps each member where it is and adds one the record lacks after the members of the table that come before it. A reader must not depend on the order.
+
+### Modes
+
+| Mode | A request for a value |
+|---|---|
+| `ask` | A person answers each request and can allow it once only. |
+| `allow-for-a-while` | A person answers, and may let the same request be served again for a while (keypaste offers up to an hour). |
+| `automatic` | Released without asking anyone, within what the agent can see. Each release must still be recorded where the person can read it. |
+
+Commands are never answered without a person, whatever the mode; keypaste offers no timed allowance for a command when the mode that applies is `ask`. A limit applies to `automatic` alone. After `until`, or once `perHour` releases have been made in the last hour, a request a mode would have released unasked is put to a person instead, as under `allow-for-a-while`; reaching a limit never refuses a request outright. keypaste counts an hour's releases in the owner that made them, keeps the count while the vault is locked, and starts again when that owner restarts.
+
+## Reading
+
+### What applies to an agent
+
+1. The records that bear on an agent are those titled with its name. An agent with none, an agent whose connection was given no name, and the name `*` itself are given the **defaults**, the record above, beneath every record titled `*`: those can only take away, and never make an agent `automatic` or let it run commands.
+2. Where several records bear on the agent, for example a second entry titled with its name, what applies is the least of them. The defaults join them when any record is not wholly understood, and when the open vault differs from its file.
+3. The least of several settings is, item by item, the least of what each sees; values only when every one gives values; commands only when every one allows them; and the strictest mode, `ask` being stricter than `allow-for-a-while`, which is stricter than `automatic`.
+4. A reader may hold an agent to less, with ceilings of its own or the constraints of the agent's connection. Nothing in a reader's own configuration gives an agent more than its records do.
+
+keypaste keeps its own ceilings for each name in `~/.keypaste/clients.toml` on each computer, so that a narrowing made there survives a restored backup or a merge, and applies the least of the vault's records, those ceilings and the arguments the agent's bridge was started with. A narrowing the person makes is written to the record and to those ceilings, each even when the other cannot take it, and keypaste says which did not.
+
+### Applying it to an item
+
+- The agent can name, list and ask for an item only within what it sees, and for an entry seen through a `tag:` selector alone, only its variables.
+- With `values` false, a request for a value is refused before the vault is searched for it.
+- With `run` false, a request to run a command is refused before anything is looked up.
+- For each of the item's project tags, the mode is that environment's row, else that project's row, else `mode`, decided in each record that applies and then taken as the least. An item in several environments takes the strictest of them, and an item in none takes `mode`.
+- Where the result is `automatic`, every limit that decided it counts the release, so an item whose release two rows decide counts against both. A limit whose `until` has passed, or whose `perHour` is spent, sends the request to a person.
+- A protected entry is asked about every time, whatever the mode.
+
+### Only what the file holds
+
+A reader applies a record as the vault's file holds it. While the owner's open copy holds a change not yet saved, or another program has changed the file since the owner read it, the records apply only beneath the defaults, so they can take away and never give more.
+
+### What a reader does not understand
+
+A record is wholly understood when its `acaf` is `1` and every member, and every value inside one, is as specified. Anything else can only take away: each part not understood is read at its narrowest, and the record then applies only beneath the defaults. keypaste reads them this way:
+
+| Not understood | Read as |
+|---|---|
+| Text that is not a JSON object, or names a member twice | The defaults |
+| No `acaf`, or a member this version does not have | Everything else as written |
+| An `acaf` member other than `1` | Everything else as written, and the record is never rewritten |
+| `see` | Sees nothing |
+| `values` or `run` | `false` |
+| `mode`, or any project row | `mode` is `ask`, and with a row not understood, no rows |
+| `limit` | `mode` is `ask`, with no limit, since the limit may have been all that bounded an `automatic` |
+
+## Writing
+
+- **Only the person widens.** A writer writes a record that gives an agent more than what applies to it now only after the person, in an app holding the vault unlocked, has confirmed exactly what it gains. A change that gives an agent nothing more in any way may be written at once. What a change gives is judged by what the agent could do before and after it. Where the record it leaves is wholly understood, that is everything the record then gives beyond what applies now, including what it said while a part of it was not understood. Where that record would still not be wholly understood, it still applies only beneath the defaults, so what it already said gives nothing: the change gives only what it adds beyond what the record says, reading each part at its word and a value the writer cannot read at its narrowest, and what the agent would get beneath the defaults once the person confirms it, such as values a reader's own ceiling held back. A change that only takes away, such as `values` turned off, is then written at once, and what the record already said stays in it, inactive. A selector list gives nothing more only when each new selector equals or lies under one in force; a mode or limit is compared in every project and environment either record names; removing a limit, raising `perHour`, a later `until` and moving an hourly limit to another row each give more. A change a writer cannot show to give nothing more counts as giving more.
+- **`*` only takes away.** A writer never writes a `*` record that gives more than the defaults in any way.
+- **Change only what changes.** A writer changing a version 1 record rewrites only what the change names: `see`, `values` or `run`; the `mode` and the parts of the `limit` that apply where no row decides; or one row, found by its `project`, and its `mode` and the parts of its `limit`. Every other member, row and value stays as the record holds it, including what the writer does not understand, so a change never removes what another writer or a person put there; until all of it is understood, the record still applies only beneath the defaults, and keypaste says so when it asks the person to confirm a change. A record with no `acaf` member gains `"acaf":1`. A row the change names that the record holds twice becomes one row. A change that adds or changes a row of a record whose `projects` is not an array, or holds more than 256 rows, is refused rather than replacing it, and so is one that adds a 257th. Text that is not a JSON object, or names a member twice, holds nothing a writer can keep, and a change replaces it, the old text staying in the entry's history. A writer never rewrites a record that has an `acaf` member other than `1`, and says so rather than writing.
+- **Reset is a record.** Putting an agent back to the defaults writes the defaults over every member this version has, keeping the members it does not know, rather than deleting the entry, so that a merge carries it by time like any other change.
+- **One entry, by UUID.** A writer finds the agent's entry by its derived UUID wherever it is. From the recycle bin or another group, it moves it back into `.keypaste/agents`, recording the move, so that a merge carries the move too. Found in the group under another title, it is that title's record, so the writer first copies it, under that title's derived UUID where no object holds it, before retitling it. Writing the entry, it removes any record that an object with its UUID was deleted.
+- **History.** Each change is an edit that keeps the entry's previous version in its history. keypaste writes the `acaf` field unprotected and leaves the entry's other fields empty.
+- **Another entry under the name.** An entry in the group titled with the agent's name under another UUID, made by hand or by a writer that ignores this section, still applies with the agent's own entry as the least of them. A writer makes a change to the agent's own entry's record, adds each top-level member it does not know that only the other entry holds, and gives both entries that record rather than deleting the other, so that a merge settles it by time like the entry it duplicates.
+
+## Merging
+
+Because every writer derives the same UUIDs, two copies of a vault that each create an agent's settings hold one entry for that agent in one group, and KeePass's and KeePassXC's merges treat it like any other entry: the copy changed later wins whole, and the older version is kept in the entry's history. Different agents are different entries and never collide. A merge settles by modification time, so a computer whose clock is wrong can win a merge it should lose, and merging with an older copy keeps whichever change is newer, not whichever narrowed. A computer's own narrowings, kept outside the vault as keypaste keeps them, are what a merge cannot undo.
+
+Records add nothing that needs more than KDBX 4.0: a vault at 4.0 stays at 4.0 when settings are written.
+
+## Security considerations
+
+- **The master password is the boundary.** ACAF does not authenticate who wrote a record. Anyone who can open the vault, in KeePassXC for example, can change an agent's settings without the confirmation an owner asks for, and KeePass apps show and let a person edit `.keypaste/agents`.
+- **A name is configuration.** A record follows the name the agent's connection was given. Another program running as the same user can start a connection with that name and receive what the record allows, so a reader must take the name only from configuration the person wrote, and `automatic` is best kept to what the person would let any such program have.
+- **A row covers what is in its project now.** An item tagged into a project later, by any app or a merge, is covered by that project's rows from then on. keypaste says so in its app and its `env tag` command when a tag change would give an `automatic` agent an item, and cannot say so for a change made elsewhere.
+- **Not understood never widens.** A record, member or version a reader does not understand applies only beneath the defaults, and a writer's change keeps every part of a record it does not understand, so a narrowing that another reader applies survives keypaste's changes.
+- **Settings travel with the file.** Restoring a backup or merging with an older copy can bring an older record back on a computer that never narrowed it itself.
+
+## Evidence
+
+In keypaste's repository, `AcafRecordTests` holds the record's reading and writing and a change rewriting only what it names, `AcafIdsTests` the UUIDs and the known answers above, `AgentAccessStoreTests` the group, the entry, history, reset, a change keeping what keypaste does not understand, a record read as the file holds it, other versions and other entries under one name, and merges through KeePass's own library both ways, `EffectiveAccessTests` what applies to an item, `AccessChangeTests` what counts as giving more, and `SessionAuthorityAccessTests` the owner applying it over a real pipe. `scripts/verify-keepassxc-projects.sh` has KeePassXC 2.7 import a vault, keypaste write agents' settings into it, KeePassXC edit, add to and save it, and two copies merged with `keepassxc-cli merge` in both directions, after each agent was changed in one copy, the same agent in both and the same agent created in both, keeping one entry per agent with the newer record whole and the older in its history, and a vault at KDBX 4.0.
+
+## Licence
+
+The text of this specification is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The schema and examples in the section below are dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). keypaste's code is licensed under the AGPL-3.0.
+
+## Schema and examples (CC0 1.0)
+
+The schema describes a record keypaste wholly understands. It cannot express every rule: the text above governs uniqueness of rows, the grammar of selectors, project tags and project names, and integers written with a fraction. keypaste.com serves it at its `$id`, [https://keypaste.com/acaf/v1/record.schema.json](https://keypaste.com/acaf/v1/record.schema.json), and this page shows that file.
+
+<Code code={schema} lang="json" title="record.schema.json" />
+
+An agent that sees every project's variables, runs commands when the person allows each one, is asked every time by default, and is `automatic` for billing's `dev` environment, at most 20 times an hour and only until the end of 2026:
+
+```json
+{"acaf":1,"see":["tag:env:*"],"values":true,"run":true,"mode":"ask","projects":[{"project":"billing:dev","mode":"automatic","limit":{"perHour":20,"until":"2026-12-31T23:59:59Z"}}]}
+```
+
+The `*` record that keeps every agent without settings of its own to one project, never handing it values:
+
+```json
+{"acaf":1,"see":["tag:env:billing"],"values":false,"run":false,"mode":"ask"}
+```
+
+The entry for `claude-code` in KeePass's XML, abbreviated, its UUID derived from its name:
+
+```xml
+<Entry>
+  <UUID>oeHZZ2deXbGYel+vDb4GJw==</UUID>
+  <String><Key>Title</Key><Value>claude-code</Value></String>
+  <String><Key>acaf</Key><Value>{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"allow-for-a-while"}</Value></String>
+</Entry>
+```

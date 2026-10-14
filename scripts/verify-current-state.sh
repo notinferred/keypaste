@@ -117,6 +117,9 @@ printf '%s\n%s\n' "$MASTER" "$V1" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/n
   || die "could not store the test credential"
 printf '%s\n' "$MASTER" | "$CLI" add KEEP --group personal --generate --vault "$VAULT" >/dev/null \
   || die "could not make a group outside the exposure"
+# The entry is not tagged into a project, so the agent sees it only once a person lets it see env/**,
+# confirmed at keypaste agent's terminal before the app holds the vault.
+agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-probe --see env/**' || die "could not save ci-probe's settings in the vault"
 
 # --------------------------------------------------------------- the app holds it; a bridge attaches
 exec 7>&-

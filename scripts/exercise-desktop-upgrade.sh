@@ -159,7 +159,7 @@ classify() {
     elif [ "$(fact_of "$dir" token_after_upgrade)" != "${VALUES[2]}" ]; then result=contradiction; why="the vault reads $(fact_of "$dir" token_after_upgrade) for $VARIABLE, not ${VALUES[2]}"
     elif [ "$(fact_of "$dir" log_verify_after_upgrade)" != pass ]; then result=contradiction; why="keypaste log verify says $(fact_of "$dir" log_verify_after_upgrade)"
     elif [ "$(fact_of "$dir" keepassxc_after_upgrade)" != "$HISTORY_TITLES" ]; then result=contradiction; why="KeePassXC reads $(fact_of "$dir" keepassxc_after_upgrade) revisions of $PROJECT's $HOME_ENTRY, not $HISTORY_TITLES"
-    else result=pass; why="the vault, its history, the settings, the policy and the audit came through the upgrade unchanged"
+    else result=pass; why="the vault, its history, the settings, the ceilings and the audit came through the upgrade unchanged"
     fi
   fi
   emit data-after-upgrade
@@ -203,8 +203,8 @@ classify() {
     elif [ "$platform" = windows ] && [ -z "$(fact_of "$dir" user_path_before)" ]; then result=unreached; why='the user Path was not recorded before the install'
     elif [ "$platform" = windows ] && [ "$(fact_of "$dir" user_path_after_uninstall)" != "$(fact_of "$dir" user_path_before)" ]; then
       result=contradiction; why="the uninstall left the user Path '$(fact_of "$dir" user_path_after_uninstall)', not '$(fact_of "$dir" user_path_before)' as before the install"
-    elif [ "$platform" = windows ]; then result=pass; why='the app, its user Path entry and its terminal keypaste are gone, and the vault, settings, policy and audit are untouched'
-    else result=pass; why="the app is gone and the vault, settings, policy and audit are untouched; the link Settings made is left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
+    elif [ "$platform" = windows ]; then result=pass; why='the app, its user Path entry and its terminal keypaste are gone, and the vault, settings, ceilings and audit are untouched'
+    else result=pass; why="the app is gone and the vault, settings, ceilings and audit are untouched; the link Settings made is left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
     fi
   fi
   emit uninstall
@@ -250,8 +250,8 @@ candidate() { # candidate <version>
 
 # --- the data whose survival is the point ---------------------------------------------------------
 
-# The five files a user would lose: the vault, the app's two settings files, the policy and the audit.
-data_files() { printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/policy.toml" "$HOME_DIR/audit.jsonl"; }
+# The five files a user would lose: the vault, the app's two settings files, this computer's ceilings and the audit.
+data_files() { printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/clients.toml" "$HOME_DIR/audit.jsonl"; }
 
 snapshot() { # snapshot <file>
   local path
@@ -305,11 +305,12 @@ fixture() {
       || { echo "keypaste env set $value failed"; return 1; }
   done
 
+  # A ceiling this computer keeps for the agent, made before any recent vault names one to hold it.
+  "$KP" mcp policy upgrade-check --run off >/dev/null 2>&1 || { echo 'keypaste mcp policy did not write a ceiling'; return 1; }
+  "$KP" mcp policy --json 2>/dev/null | jq -e '. == [{"kind":"ceiling","label":"upgrade-check","run":"off"}]' >/dev/null \
+    || { echo 'keypaste mcp policy --json does not read the ceiling back'; return 1; }
   printf '[[vault]]\npath = "%s"\nopened_at = "%s"\n' "$VAULT_NATIVE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME_DIR/recent.toml"
   printf '[[settings]]\nidle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
-  printf '[[allow]]\nclient = "upgrade-check"\nentries = ["env/%s/**"]\nfields = ["password"]\nmax_ttl_seconds = 60\n' \
-    "$PROJECT" > "$HOME_DIR/policy.toml"
-  "$KP" policy ls >/dev/null || { echo 'keypaste policy ls refused the policy file'; return 1; }
   echo "vault $VAULT_NATIVE with $ENTRY and env/$PROJECT, made by $("$KP" --version | tr -d "$CR")"
 }
 
@@ -338,9 +339,9 @@ audit_record() {
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"upgrade-check","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"username\",\"reason\":\"4.7d writes one audit record before the upgrade\",\"ttl_seconds\":60}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"env/$PROJECT/$HOME_ENTRY\",\"field\":\"$VARIABLE\",\"reason\":\"4.7d writes one audit record before the upgrade\",\"ttl_seconds\":60}}}"
     sleep 5
-  } | "$KP" mcp --vault "$VAULT_NATIVE" --expose "${ENTRY%%/*}/**" --approver "$pipe" --client-label upgrade-check \
+  } | "$KP" mcp --vault "$VAULT_NATIVE" --expose 'env/**' --approver "$pipe" --client-label upgrade-check \
       > "$OUT/mcp-response.jsonl" 2> "$OUT/mcp-stderr.txt" || true
   kill "$agent_pid" 2>/dev/null || true
   wait "$agent_pid" 2>/dev/null || true
@@ -359,7 +360,7 @@ read_after() { # read_after <when>
     fact "log_verify_after_$1" "exit $?"
   fi
   fact "keepassxc_after_$1" "$(keepassxc)"
-  "$KP" policy ls > "$OUT/policy-$1.txt" 2>&1 || true
+  "$KP" mcp policy --json > "$OUT/ceilings-$1.json" 2>&1 || true
 }
 
 # --- a new terminal -------------------------------------------------------------------------------
@@ -820,7 +821,7 @@ selftest() {
   passing install-unregistered
   set_fact install-unregistered products_after_install 0
   passing fixture-incomplete
-  set_fact fixture-incomplete baseline 'absent policy.toml'
+  set_fact fixture-incomplete baseline 'absent clients.toml'
   passing no-baseline
   refuse_action no-baseline baseline 'no audit record was written'
   passing upgrade-not-taken

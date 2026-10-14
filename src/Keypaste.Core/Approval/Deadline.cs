@@ -35,6 +35,13 @@ internal readonly record struct Deadline(DateTimeOffset Wall, long Stamp, TimeSp
     /// <summary>Whether a refusal this long still stands, on whichever clock ran least.</summary>
     internal bool StillInForce(TimeProvider clock) => ShorterElapsed(clock) < Duration;
 
+    /// <summary>How long a refusal this long still stands, on whichever clock ran least, never less than nothing.</summary>
+    internal TimeSpan Standing(TimeProvider clock)
+    {
+        var left = Duration - ShorterElapsed(clock);
+        return left < TimeSpan.Zero ? TimeSpan.Zero : left;
+    }
+
     private TimeSpan LongerElapsed(TimeProvider clock)
     {
         var (wall, monotonic) = Elapsed(clock);

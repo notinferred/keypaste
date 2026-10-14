@@ -245,6 +245,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         {
             "once" => "o",
             "hour" => "h",
+            "always" => "a",
             var other => other,
         };
 

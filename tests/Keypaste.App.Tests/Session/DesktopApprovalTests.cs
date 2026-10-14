@@ -12,6 +12,7 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -577,9 +578,151 @@ public sealed class DesktopApprovalTests
             await reply.WaitAsync(_wait, Token);
         });
 
-    private static (ApprovalWindow Window, string Layout) Layout(string reason)
+    /// <summary>Always for has a place of its own: whether a prompt offers it or not, the window and the other buttons stay where they are (D-0326, T-2).</summary>
+    [Fact]
+    public Task Always_for_has_a_place_of_its_own_and_moves_no_other_button() =>
+        HeadlessSession.On(() =>
+        {
+            Assert.True(ProjectScope.TryCreate("ci", "dev", out var scope, out var error), error);
+
+            var (without, _) = Layout("deploy billing to staging");
+            var (offered, _) = Layout("deploy billing to staging", scope);
+
+            Assert.False(without.FindControl<Button>("AlwaysFor")!.IsEffectivelyVisible);
+            Assert.True(offered.FindControl<Button>("AlwaysFor")!.IsEffectivelyVisible);
+            Assert.Equal("Always for ci:dev", offered.FindControl<TextBlock>("AlwaysText")!.Text);
+            var caption = offered.FindControl<TextBlock>("AlwaysCaptionText")!;
+            Assert.Equal("Allows once, then asks to make it Automatic", caption.Text);
+            Assert.True(caption.Bounds.Height <= offered.FindControl<Grid>("AlwaysSlot")!.Bounds.Height, "the caption is taller than its slot");
+            Assert.Equal(Places(without), Places(offered));
+
+            without.Close();
+            offered.Close();
+        });
+
+    /// <summary>
+    /// Always for arms with the allows, allows this one request and then asks to make its project
+    /// environment Automatic; once that is confirmed the next request is released without a prompt.
+    /// </summary>
+    [Fact]
+    public Task Always_for_allows_once_then_asks_and_a_confirmed_change_releases_the_next_without_asking() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+
+            Assert.Equal("Always for ci:dev", Text(window, "AlwaysText"));
+            Assert.False(window.FindControl<Button>("AlwaysFor")!.IsEffectivelyEnabled);
+            Click(window, "AlwaysFor");
+            await app.ArmAsync();
+            Click(window, "AlwaysFor");
+
+            var confirm = Assert.IsType<AccessChangeWindow>(await app.PromptAsync(count: 2));
+            Assert.Equal(Label, Text(confirm, "AgentText"));
+            Assert.Equal("asked from the approval prompt's Always for", Text(confirm, "OriginText"));
+            Assert.False(reply.IsCompleted, "the release came back before the change it asked for was answered");
+            await app.ArmAsync("Allow");
+            Click(confirm, "Allow");
+
+            var answered = await reply.WaitAsync(_wait, Token);
+            Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt, 0, Sentinel), (answered!.Decision, answered.Method, answered.TtlSeconds, answered.Value));
+            await PromptedApp.WithdrawnAsync(confirm);
+
+            var automatic = await app.Ask().WaitAsync(_wait, Token);
+            Assert.Equal((AuditMethod.Automatic, Sentinel), (automatic!.Method, automatic.Value));
+            Assert.Equal(2, app.Windows.Count);
+        });
+
+    [Fact]
+    public Task Refusing_the_change_Always_for_asks_for_keeps_it_to_one_release() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            await app.ArmAsync();
+            Click(window, "AlwaysFor");
+
+            var confirm = await app.PromptAsync(count: 2);
+            Click(confirm, "Deny");
+
+            var answered = await reply.WaitAsync(_wait, Token);
+            Assert.Equal((AuditDecision.Granted, 0, Sentinel), (answered!.Decision, answered.TtlSeconds, answered.Value));
+            await PromptedApp.WithdrawnAsync(confirm);
+
+            var again = app.Ask();
+            var third = await app.PromptAsync(count: 3);
+            Assert.IsType<ApprovalWindow>(third);
+            Click(third, "Deny");
+            Assert.Equal(AuditMethod.Prompt, (await again.WaitAsync(_wait, Token))!.Method);
+        });
+
+    /// <summary>
+    /// When the change Always for asks for does not take effect, here because this computer's
+    /// <c>clients.toml</c> stopped reading while the person decided, the release stands once and a notice
+    /// on screen says what was not made Automatic and why.
+    /// </summary>
+    [Fact]
+    public Task Always_for_whose_change_does_not_take_effect_says_so_where_the_person_answered() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            File.WriteAllText(KeypasteHome.ClientsPath(app.Home), "this is not a clients file\n");
+            await app.ArmAsync();
+            Click(window, "AlwaysFor");
+
+            var answered = await reply.WaitAsync(_wait, Token);
+            Assert.Equal((AuditDecision.Granted, 0, Sentinel), (answered!.Decision, answered.TtlSeconds, answered.Value));
+
+            var notice = Assert.IsType<NoticeWindow>(await app.PromptAsync(count: 2));
+            Assert.StartsWith(
+                $"ci:dev was not made Automatic for {Label}: agent settings are not usable: ",
+                Text(notice, "NoticeText"),
+                StringComparison.Ordinal);
+            Assert.EndsWith($"To try again, open {Label}'s settings on the Agents screen.", Text(notice, "NoticeText"), StringComparison.Ordinal);
+            Assert.DoesNotContain(app.Windows, shown => shown is AccessChangeWindow);
+
+            Click(notice, "Dismiss");
+            await PromptedApp.WithdrawnAsync(notice);
+        });
+
+    /// <summary>
+    /// The notice's second button opens the agent's settings in the main window and closes it, while Close
+    /// stays its default; a notice with nowhere to open them offers Close alone.
+    /// </summary>
+    [Fact]
+    public Task The_notice_opens_the_agents_settings_while_Close_stays_its_default() =>
+        HeadlessSession.On(async () =>
+        {
+            List<string> opened = [];
+            var said = new AlwaysForNotice(Label, "ci:dev", "nobody answered");
+            var notice = new NoticeWindow(said, opened.Add);
+            notice.Show();
+
+            Assert.True(notice.FindControl<Button>("Dismiss")!.IsDefault);
+            Assert.Equal($"Open {Label}'s settings", Avalonia.Automation.AutomationProperties.GetName(notice.FindControl<Button>("OpenSettings")!));
+            Assert.False(new NoticeWindow(said).FindControl<Button>("OpenSettings")!.IsVisible);
+
+            Click(notice, "OpenSettings");
+
+            Assert.Equal([Label], opened);
+            await PromptedApp.WithdrawnAsync(notice);
+        });
+
+    /// <summary>Where the window and the buttons that never move are.</summary>
+    private static string Places(Window window) =>
+        string.Join(
+            "; ",
+            new[] { $"window {window.Bounds}" }.Concat(
+                new[] { "Deny", "AllowOnce", "Approve" }.Select(name => window.FindControl<Button>(name)!)
+                    .Select(button => $"{button.Name} {button.TranslatePoint(default, window)} {button.Bounds.Size}")));
+
+    private static (ApprovalWindow Window, string Layout) Layout(string reason, ProjectScope? alwaysFor = null)
     {
-        var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", reason, 3600, Label);
+        var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", reason, 3600, Label) with { AlwaysFor = alwaysFor };
         var window = new ApprovalWindow(new ApprovalViewModel(prompt));
         window.Show();
         WindowInput.Drain();
@@ -593,9 +736,9 @@ public sealed class DesktopApprovalTests
         return (window, layout);
     }
 
-    /// <summary>The window's own buttons; a scrolling reason box adds its scroll bar's, which move nothing that matters.</summary>
+    /// <summary>The window's own buttons on view; a scrolling reason box adds its scroll bar's, which move nothing that matters.</summary>
     private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button is not RepeatButton)];
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button is not RepeatButton && button.IsEffectivelyVisible)];
 
     internal static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)!.Text;
 
@@ -760,6 +903,9 @@ public sealed class DesktopApprovalTests
 
         internal string Vault { get; }
 
+        /// <summary>The keypaste home the app's session reads <c>clients.toml</c> from.</summary>
+        internal string Home => _fixture.Home;
+
         internal string SessionId { get; private set; } = string.Empty;
 
         internal List<Window> Windows { get; } = [];
@@ -780,6 +926,7 @@ public sealed class DesktopApprovalTests
                 created.AddTag(new EntryName("services", "Stripe"), "env:ci:prod");
                 created.AddEntry(new VaultEntry { GroupPath = "api", Title = "OpenAI", Password = Sentinel });
                 Assert.True(created.SetFields(new EntryName("api", "OpenAI"), [new FieldWrite("OPENAI_API_KEY", ApiKeySentinel)]));
+                TempVault.Sees(created, Label);
                 created.Save();
             }
 
@@ -835,11 +982,12 @@ public sealed class DesktopApprovalTests
         }
 
         /// <summary>Lets the arming delay pass, as a person reading the prompt does, and waits for the prompt to arm.</summary>
+        /// <param name="allow">The allow button that arms: Allow once on a request's prompt, Allow on a change's.</param>
         /// <remarks>The delay's continuation runs on the thread pool, so the arming is posted some time after the clock moves.</remarks>
-        internal async Task ArmAsync()
+        internal async Task ArmAsync(string allow = "AllowOnce")
         {
             Clock.Advance(PromptViewModel.ArmingDelay);
-            await Until(() => Windows[^1].FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            await Until(() => Windows[^1].FindControl<Button>(allow)!.IsEffectivelyEnabled);
         }
 
         internal static async Task WithdrawnAsync(Window window) => await Until(() => !window.IsVisible);

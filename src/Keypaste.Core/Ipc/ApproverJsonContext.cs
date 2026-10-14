@@ -30,6 +30,11 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(RunRequestFrame))]
 [JsonSerializable(typeof(RunReplyFrame))]
 [JsonSerializable(typeof(WithdrawFrame))]
+[JsonSerializable(typeof(AccessListRequestFrame))]
+[JsonSerializable(typeof(AccessListReplyFrame))]
+[JsonSerializable(typeof(AccessRowFrame))]
+[JsonSerializable(typeof(AccessChangeRequestFrame))]
+[JsonSerializable(typeof(AccessChangeReplyFrame))]
 internal sealed partial class ApproverJsonContext : JsonSerializerContext
 {
 }
@@ -41,6 +46,7 @@ internal sealed class NamesRequestFrame(NamesRequest request)
     public string Vault => request.Vault;
     public string Session => request.Session;
     public IReadOnlyList<string> Exposure => request.Exposure;
+    public string? ClientLabel => request.ClientLabel;
 }
 
 internal sealed class NamesReplyFrame(NamesReply reply)
@@ -276,4 +282,60 @@ internal sealed class RunReplyFrame(RunReply reply)
     public bool Recorded => reply.Recorded;
     public IEnumerable<ProblemRow> Problems => ProblemRow.Of(reply.Set);
     public IEnumerable<VariableRow>? Variables => VariableRow.Of(reply.Set);
+}
+
+internal sealed class AccessListRequestFrame(AccessListRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.AccessListKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public int From => request.From;
+}
+
+internal sealed class AccessListReplyFrame(AccessListReply reply, IEnumerable<AccessRowFrame> agents, bool complete)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.AccessListKind;
+    public bool Answered => reply.Answered;
+    public bool Complete => complete;
+    public string Reason => reply.Reason;
+    public IEnumerable<AccessRowFrame> Agents => agents;
+}
+
+internal sealed class AccessRowFrame(AccessRow row)
+{
+    public string Name => row.Name;
+    public string Record => row.Record;
+    public bool Understood => row.Understood;
+    public int? ProjectsNotShown => row.ProjectsNotShown > 0 ? row.ProjectsNotShown : null;
+}
+
+internal sealed class AccessChangeRequestFrame(AccessChangeRequest request)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.AccessChangeKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public string Agent => request.Agent;
+    public string Reason => request.Reason;
+    public string Origin => ApproverProtocol.OriginWord(request.Origin);
+    public string? Project => request.Project;
+    public string? Mode => request.Mode;
+    public IReadOnlyList<string>? See => request.See;
+    public string? Values => request.Values;
+    public string? Run => request.Run;
+    public string? PerHour => request.PerHour;
+    public string? Until => request.Until;
+    public bool Reset => request.Reset;
+}
+
+internal sealed class AccessChangeReplyFrame(AccessChangeReply reply)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.AccessChangeKind;
+    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
+    public int Method => (int)reply.Method;
+    public string Reason => reply.Reason;
+    public bool Recorded => reply.Recorded;
 }

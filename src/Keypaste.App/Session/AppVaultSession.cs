@@ -183,6 +183,19 @@ internal sealed class AppVaultSession : IDisposable
     /// <summary>keypaste's home, where the vault's claim is kept.</summary>
     internal string Home => _home;
 
+    /// <summary>
+    /// What a project tag change on the open vault does, naming the agents it would let get the entry
+    /// without asking: said on the change, never a reason to refuse it.
+    /// </summary>
+    /// <param name="vault">The open vault.</param>
+    /// <param name="entry">The entry.</param>
+    /// <param name="tags">The tags to add or remove, which read alike.</param>
+    /// <param name="adding">Whether they are added rather than removed.</param>
+    /// <returns>The change, or null when it needs no confirmation.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal ProjectTagChange? PreviewTagChange(Vault vault, EntryName entry, IReadOnlyList<string> tags, bool adding) =>
+        ProjectTagChange.Preview(vault, entry, tags, adding, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
+
     /// <summary>The open vault's identity, or <see langword="null"/> when locked.</summary>
     internal VaultIdentity? Identity
     {

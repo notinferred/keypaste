@@ -37,7 +37,7 @@ public static class EnvProfileNames
         return true;
     }
 
-    /// <summary>Whether every release of this profile through a session is asked about live, with no grant and no policy.</summary>
+    /// <summary>Whether every release of this profile through a session is asked about live, with no grant and no mode.</summary>
     public static bool IsProtected(string profile)
     {
         ArgumentNullException.ThrowIfNull(profile);

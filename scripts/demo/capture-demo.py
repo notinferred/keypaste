@@ -33,7 +33,9 @@ import time
 
 MASTER = "demo-master-pw"
 SECRET = "sk_test_EXAMPLE_ONLY_not_a_real_key_0000"
-ENTRY = "env/demo/STRIPE_KEY"
+PROJECT = "demo"
+KEY = "STRIPE_KEY"
+ENTRY = "env/demo/.env"
 REASON = "deploy the billing service to staging"
 CLIENT = "claude-code"
 COLUMNS, ROWS = 103, 20
@@ -160,7 +162,7 @@ def request(request_id):
         "method": "tools/call",
         "params": {
             "name": "request_credential",
-            "arguments": {"entry": ENTRY, "field": "password", "reason": REASON, "ttl_seconds": 900},
+            "arguments": {"entry": ENTRY, "field": KEY, "reason": REASON, "ttl_seconds": 900},
         },
     }
 
@@ -193,7 +195,7 @@ def main():
         subprocess.run(keypaste + list(args), input=stdin.encode(), env=env, check=True, capture_output=True)
 
     setup("init", vault, stdin=f"{MASTER}\n{MASTER}\n")
-    setup("add", ENTRY, "--vault", vault, stdin=f"{MASTER}\n{SECRET}\n")
+    setup("env", "set", PROJECT, KEY, "--vault", vault, stdin=f"{MASTER}\n{SECRET}\n")
 
     tape = Tape()
     tape.add("top", "prompt")

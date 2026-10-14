@@ -1,6 +1,7 @@
 using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Infrastructure;
@@ -36,11 +37,12 @@ public sealed class SessionAuthorityTests : IDisposable
         Reason = "deploy billing to staging",
         TtlSeconds = 60,
         Exposure = ["env/**"],
+        ClientLabel = ApproverFixture.Agent,
         Vault = vault ?? VaultPath,
         Session = session,
     };
 
-    private NamesRequest Listing(string session) => new(["env/**"]) { Vault = VaultPath, Session = session };
+    private NamesRequest Listing(string session) => new(["env/**"]) { ClientLabel = ApproverFixture.Agent, Vault = VaultPath, Session = session };
 
     [Fact]
     public async Task AnAttachedListing_IsAnsweredFromTheVaultAndNamesTheSession()
@@ -199,7 +201,7 @@ public sealed class SessionAuthorityTests : IDisposable
 
         var respelled = Path.Combine(_directory, ".", "vault.kdbx");
         var attached = await client.AttachAsync(new AttachRequest(respelled), Token);
-        var listing = await client.ListAsync(new NamesRequest(["env/**"]) { Vault = respelled, Session = "session-one" }, Token);
+        var listing = await client.ListAsync(Listing("session-one") with { Vault = respelled }, Token);
 
         Assert.NotNull(attached);
         Assert.True(attached.Attached);
@@ -215,12 +217,12 @@ public sealed class SessionAuthorityTests : IDisposable
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        var pending = client.RequestAsync(Request("session-one") with { ClientLabel = "ci-probe" }, Token);
+        var pending = client.RequestAsync(Request("session-one"), Token);
         await _fixture.Channel.Waiting.WaitAsync(_connectTimeout, Token);
 
         var waiting = Assert.Single(owner.Authority.Activity.Waiting);
         Assert.Equal("env/dev/STRIPE_KEY", waiting.Prompt.Entry, StringComparer.Ordinal);
-        Assert.Equal("ci-probe", waiting.Prompt.Label, StringComparer.Ordinal);
+        Assert.Equal(ApproverFixture.Agent, waiting.Prompt.Label, StringComparer.Ordinal);
         Assert.Empty(owner.Authority.Activity.Grants);
 
         _fixture.Clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
@@ -317,15 +319,16 @@ public sealed class SessionAuthorityTests : IDisposable
     }
 
     [Fact]
-    public async Task APolicyReleaseRacingTheLock_IsRefused()
+    public async Task AnAutomaticReleaseRacingTheLock_IsRefused()
     {
-        using var policed = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        using var policed = new ApproverFixture();
+        policed.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
         policed.Source.During = _lifetime!.End;
         await using var owner = Owner.Start(this, policed.Handler);
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        var reply = await client.RequestAsync(Request("session-one") with { ClientLabel = "billing-bot" }, Token);
+        var reply = await client.RequestAsync(Request("session-one"), Token);
 
         Assert.NotNull(reply);
         Assert.Equal(AuditMethod.VaultLocked, reply.Method);
@@ -441,18 +444,19 @@ public sealed class SessionAuthorityTests : IDisposable
     }
 
     [Fact]
-    public async Task APolicyRelease_IsRefusedAfterAnExternalChange()
+    public async Task AnAutomaticRelease_IsRefusedAfterAnExternalChange()
     {
         using var vault = SavedVault("v1");
-        using var policed = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        using var policed = new ApproverFixture();
+        policed.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
         await using var owner = Owner.Start(this, Over(vault, policed));
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        var request = Request("session-one") with { ClientLabel = "billing-bot" };
+        var request = Request("session-one");
 
         var before = await client.RequestAsync(request, Token);
         Assert.NotNull(before);
-        Assert.Equal(AuditMethod.Policy, before.Method);
+        Assert.Equal(AuditMethod.Automatic, before.Method);
 
         SaveElsewhere("external");
         var after = await client.RequestAsync(request, Token);
@@ -626,7 +630,7 @@ public sealed class SessionAuthorityTests : IDisposable
         return File.ReadAllBytes(VaultPath);
     }
 
-    /// <summary>The fixture's gate, grants and policy in front of a real vault.</summary>
+    /// <summary>The fixture's gate, grants and agent settings in front of a real vault.</summary>
     private ApproverHandler Over(Vault vault, ApproverFixture? fixture = null)
     {
         fixture ??= _fixture;
@@ -636,8 +640,10 @@ public sealed class SessionAuthorityTests : IDisposable
             new VaultEntryNameLister(() => vault),
             fixture.Gate,
             fixture.Grants,
-            fixture.Policy,
-            fixture.Narration.Add);
+            fixture.Settings,
+            fixture.Narration.Add,
+            hourly: fixture.Hourly,
+            clock: fixture.Clock);
     }
 
     /// <summary>Attaches over a raw pipe, sends one frame as written, and says whether the owner hung up unanswered.</summary>

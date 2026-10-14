@@ -381,8 +381,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     }
 
     /// <summary>
-    /// Whether the Agent access card shows: an agent attached here or a standing rule can name this
-    /// entry, or it has left the vault or is being asked for (N.5). False until the first reading,
+    /// Whether the Agent access card shows: an agent attached here whose settings reach this entry
+    /// can name it, or it has left the vault or is being asked for (N.5). False until the first reading,
     /// and always when nothing answers agents.
     /// </summary>
     internal bool ShowsAgentAccess
@@ -981,7 +981,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         try
         {
-            PendingTagChange = ProjectTagChange.Preview(vault, Name, [tag], adding);
+            PendingTagChange = _session.PreviewTagChange(vault, Name, [tag], adding);
         }
         catch (VaultException e)
         {

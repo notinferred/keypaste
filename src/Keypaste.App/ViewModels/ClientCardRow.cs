@@ -1,43 +1,35 @@
+using Keypaste.Core.Agents;
 using Keypaste.Core.Clients;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One MCP client card on the Agents screen: who, whether attached now, and its policy. Never a value.</summary>
+/// <summary>One MCP client card on the Agents screen: who, whether attached now, and whether its settings are open. Never a value.</summary>
 /// <remarks>
 /// Names come from what clients say about themselves and from the labels in their configuration:
-/// display only (THREATS.md T-3). A client without a label is held to the <c>*</c> row's policy and
-/// cannot be given its own; the <c>*</c> card is where the strict policy belongs (T-36).
+/// display only (THREATS.md T-3). Settings follow the label, so a client without one is held to
+/// <c>*</c>'s and cannot be given its own; the <c>*</c> card is where every other agent's belong (T-36).
 /// </remarks>
 internal sealed class ClientCardRow : ObservableObject
 {
-    private readonly Action<ClientCardRow, ClientPolicy>? _choose;
-    private ClientPolicy _policy;
-    private bool _isMenuOpen;
+    private bool _isSettingsOpen;
 
-    internal ClientCardRow(McpClientCard? card, ClientPolicy policy, DateTimeOffset now, Action<ClientCardRow, ClientPolicy>? choose)
+    internal ClientCardRow(McpClientCard? card, DateTimeOffset now)
     {
-        _choose = choose;
-        _policy = policy;
-        Choices = [.. Enum.GetValues<ClientPolicy>().Select(choice => new PolicyChoice(this, choice))];
-
-        DependsOn(nameof(MenuLayer), nameof(IsMenuOpen));
-        DependsOn(nameof(PolicyText), nameof(Policy));
-        DependsOn(nameof(Explanation), nameof(Policy));
-        DependsOn(nameof(HasExplanation), nameof(Explanation));
+        DependsOn(nameof(SettingsIcon), nameof(IsSettingsOpen));
 
         if (card is null)
         {
-            Label = ClientPolicies.AnyClient;
+            Label = AgentNames.Any;
             Name = "Every other client";
             Title = Name;
-            Detail = "Clients without a policy of their own";
+            Detail = "Clients without settings of their own";
             Initials = "*";
             Status = string.Empty;
             StatusTone = StatusTone.Muted;
             LastSeenText = string.Empty;
-            CanSetPolicy = true;
+            HasSettings = true;
             // A label lives in the client's own configuration, which an agent may be able to edit.
-            Hint = "Unlabeled clients and labels without a row here get this policy, so keep it the strictest.";
+            Hint = "Unlabeled clients and labels without settings of their own get these, so keep them the strictest.";
             return;
         }
 
@@ -49,12 +41,12 @@ internal sealed class ClientCardRow : ObservableObject
         Status = card.Status == ClientStatus.Connected ? "Connected" : "Idle";
         StatusTone = card.Status == ClientStatus.Connected ? StatusTone.Ok : StatusTone.Muted;
         LastSeenText = card.Status == ClientStatus.Connected ? "now" : card.LastSeen is { } seen ? UseText.Ago(seen, now) : "never";
-        // A label an older bridge wrote to the log may be one no clients.toml row can hold.
-        CanSetPolicy = card.Label is { } written && ClientPolicies.IsValidLabel(written, out _);
-        Hint = CanSetPolicy ? string.Empty : "Start this client's bridge with --client-label to give it its own policy.";
+        // A label an older bridge wrote to the log may be one no settings can be kept under.
+        HasSettings = AgentNames.IsNamed(card.Label);
+        Hint = HasSettings ? string.Empty : "Start this client's bridge with --client-label to give it settings of its own.";
     }
 
-    /// <summary>The label a policy row is keyed by, <c>*</c> for the catch-all card, or null for an unlabeled client.</summary>
+    /// <summary>The name its settings are kept under, <c>*</c> for the catch-all card, or null for an unlabeled client.</summary>
     internal string? Label { get; }
 
     /// <summary>The program the client says it is, such as <c>Claude Code</c>.</summary>
@@ -75,50 +67,22 @@ internal sealed class ClientCardRow : ObservableObject
 
     internal string LastSeenText { get; }
 
-    internal bool CanSetPolicy { get; }
+    /// <summary>Whether it can have settings of its own: a label one can be kept under, or the <c>*</c> card.</summary>
+    internal bool HasSettings { get; }
 
     internal string Hint { get; }
 
-    /// <summary>What the policy held means beyond its name, or empty.</summary>
-    internal string Explanation => ClientPolicies.Describe(_policy) is var described && described.IndexOf(':', StringComparison.Ordinal) is var colon and >= 0
-        ? described[(colon + 1)..].Trim() + "."
-        : string.Empty;
+    internal bool HasHint => Hint.Length > 0;
 
-    internal bool HasExplanation => Explanation.Length > 0;
-
-    /// <summary>Each policy the card's ⋯ menu offers, the one it holds checked.</summary>
-    internal IReadOnlyList<PolicyChoice> Choices { get; }
-
-    /// <summary>Whether the card's ⋯ menu is open.</summary>
-    internal bool IsMenuOpen
+    /// <summary>Whether its settings are open below the cards.</summary>
+    internal bool IsSettingsOpen
     {
-        get => _isMenuOpen;
-        set => Set(ref _isMenuOpen, value);
+        get => _isSettingsOpen;
+        set => Set(ref _isSettingsOpen, value);
     }
 
-    /// <summary>Lifts the card while its menu is open, so the menu draws over the cards after it.</summary>
-    internal int MenuLayer => _isMenuOpen ? 1 : 0;
-
-    /// <summary>The policy it is held to; choosing another writes <c>clients.toml</c>.</summary>
-    internal ClientPolicy Policy
-    {
-        get => _policy;
-        set
-        {
-            if (value != _policy && CanSetPolicy)
-            {
-                _choose?.Invoke(this, value);
-            }
-        }
-    }
-
-    /// <summary>The words of the policy it is held to: <see cref="ClientPolicies.Describe"/> up to its explanation.</summary>
-    internal string PolicyText => Words(_policy);
-
-    /// <summary>Shows the policy the file now holds.</summary>
-    internal void Held(ClientPolicy policy) => Set(ref _policy, policy, nameof(Policy));
-
-    internal static string Words(ClientPolicy policy) => ClientPolicies.Describe(policy).Split(':')[0];
+    /// <summary>The disclosure's chevron.</summary>
+    internal string SettingsIcon => _isSettingsOpen ? "chevron-down" : "chevron-right";
 
     /// <summary>Two lower-case letters: the first of two words, or the first two of one (<c>cursor</c> is <c>cu</c>).</summary>
     private static string InitialsOf(string title)
@@ -127,15 +91,4 @@ internal sealed class ClientCardRow : ObservableObject
         var initials = words.Length > 1 ? $"{words[0][0]}{words[1][0]}" : words.FirstOrDefault() ?? string.Empty;
         return new string([.. initials.Take(2)]).ToLowerInvariant();
     }
-}
-
-/// <summary>A policy offered for, or chosen on, one client card.</summary>
-/// <param name="Row">The card.</param>
-/// <param name="Policy">The policy.</param>
-internal sealed record PolicyChoice(ClientCardRow Row, ClientPolicy Policy)
-{
-    internal string Words => ClientCardRow.Words(Policy);
-
-    /// <summary>Whether the card is held to it, which its menu checks.</summary>
-    internal bool IsHeld => Row.Policy == Policy;
 }

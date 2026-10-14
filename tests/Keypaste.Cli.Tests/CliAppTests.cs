@@ -98,7 +98,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(21, verbs.Count);
+        Assert.Equal(20, verbs.Count);
 
         foreach (var verb in verbs.Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
@@ -143,7 +143,6 @@ public sealed class CliAppTests
             "  rm        remove an entry",
             "  generate  print a passphrase (--words N); it is not stored",
             "  access    change the master password or keyfile",
-            "  policy    show the standing rules that skip the prompt",
             "",
             "FLAGS",
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",

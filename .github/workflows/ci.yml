@@ -41,6 +41,7 @@ on:
       - 'site/public/fonts/**'
       - 'site/public/demo/**'
       - 'site/public/thanks/**'
+      - 'site/public/acaf/**'
       - 'site/web/**'
       - 'site/.node-version'
   pull_request:

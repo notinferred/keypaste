@@ -11,31 +11,35 @@
 #
 # The first unlock chooses the vault for agents and the CLI (G.1): `keypaste use` prints it and `keypaste
 # grants` reaches the app with no --vault. Cancelling a preview writes nothing. Running it registers exactly
-# the command the preview showed, which names no vault, and the check starts that command, which finds the
-# chosen vault, raises the app's prompt, and after Approve the audit file holds a prompted grant naming the
-# app's session and the chosen label. With another vault chosen, Connect pins this one with --vault, and
-# that bridge still reaches the app; with two names listed the person picks, and Deny is recorded too.
-# Removing leaves the client listing no keypaste. For Cursor the preview is the one edit of keypaste's entry
-# and Cancel writes nothing; Run it changes no byte outside that entry and keeps the seed as the backup, the
-# check reaches the app's prompt through what it registered, and Remove gives back the seed's bytes, leaves
-# the backup alone, and a second Preview remove says Cursor is not connected. No configuration ever holds the
-# master password, a keyfile, the session or a credential.
+# the command the preview showed, which names no vault and offers run with the exposure given, and the check
+# starts that command, which finds the chosen vault, raises the app's prompt, and after Approve the audit
+# file holds a prompted grant naming the app's session and the chosen label. With another vault chosen and
+# no exposure given, Connect pins this one with --vault and registers run and every item in reach, and that
+# bridge still reaches the app, which holds an agent with no settings of its own to the tagged entries; with
+# two names listed the person picks, and Deny is recorded too. Removing leaves the client listing no
+# keypaste. For Cursor the preview is the one edit of keypaste's entry and Cancel writes nothing; Run it
+# changes no byte outside that entry and keeps the seed as the backup, the check reaches the app's prompt
+# through what it registered, and Remove gives back the seed's bytes, leaves the backup alone, and a second
+# Preview remove says Cursor is not connected. No configuration ever holds the master password, a keyfile,
+# the session or a credential.
 #
 # NEGATIVE CONTROL: this fails if the first unlock chooses nothing, if the CLI without --vault does not reach
-# the app, if a cancelled preview writes, if what is registered differs from what was shown, if the chosen
-# vault is written into the client or another vault is not, if the check does not reach the app's prompt
-# through the registered bridge, if the audit record names another session or label, if removal leaves
-# keypaste listed, if Cursor's preview or Cancel writes its file, if Run it changes a byte outside keypaste's
-# entry or keeps no backup equal to the seed, if Cursor's registration does not reach the app's prompt, if
-# removal does not give back the seed's bytes or touches the backup, if a second removal does not say Cursor
-# is not connected, or if a secret reaches a client's configuration or the driver's output. These checks
-# must never be skipped or soft-passed.
+# the app, if a cancelled preview writes, if what is registered differs from what was shown, if a
+# registration does not offer run or, with no exposure given, does not reach every item, if an agent with no
+# settings is listed an untagged entry, if the chosen vault is written into the client or another vault is
+# not, if the check does not reach the app's prompt through the registered bridge, if the audit record names
+# another session or label, if removal leaves keypaste listed, if Cursor's preview or Cancel writes its
+# file, if Run it changes a byte outside keypaste's entry or keeps no backup equal to the seed, if Cursor's
+# registration does not reach the app's prompt, if removal does not give back the seed's bytes or touches
+# the backup, if a second removal does not say Cursor is not connected, or if a secret reaches a client's
+# configuration or the driver's output. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-connect-master-pw'
 readonly SECRET='SENTINEL-CONNECT-CLIENT-7a41e2'
 readonly OTHER_SECRET='SENTINEL-CONNECT-OTHER-3d90b6'
 readonly LABEL='ci-connect'
+readonly UNSET_LABEL='ci-connect-unset'
 readonly CURSOR_LABEL='ci-cursor'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -137,6 +141,11 @@ for project in alpha beta; do
   printf '%s\n' "$MASTER" | "$CLI" env set "$project" "$(printf '%s' "$project" | tr a-z A-Z)_KEY=$OTHER_SECRET" --vault "$VAULT" >/dev/null 2>&1 \
     || die "could not store project ${project}'s variable"
 done
+# The untagged entries are seen only once a person lets an agent see env/**, confirmed at keypaste agent's
+# terminal before the app holds the vault; an agent with no settings of its own still sees only tagged ones,
+# however wide its connection is registered.
+agent_settings "$CLI" "$VAULT" "$MASTER" "$LABEL --see env/**" "$CURSOR_LABEL --see env/**" \
+  || die "could not save $LABEL's and $CURSOR_LABEL's settings in the vault"
 
 exec 7>&-
 exec 7> >(PATH="$CLIENT_PATH" KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
@@ -160,8 +169,8 @@ PREVIEW="$(last_preview)"
 ADD="$(printf '%s\n' "$PREVIEW" | sed -n 2p)"
 case "$ADD" in
   *" --vault "*) die "the preview writes the chosen vault into the client: [$ADD]" ;;
-  "claude mcp add --scope user --transport stdio keypaste -- "*" --client-label $LABEL --expose env/ci/**") ;;
-  *) die "the preview does not add the bridge with the label and the exposure: [$ADD]" ;;
+  "claude mcp add --scope user --transport stdio keypaste -- "*" --client-label $LABEL --allow-run --expose env/ci/**") ;;
+  *) die "the preview does not add the bridge with the label, run offered and the exposure: [$ADD]" ;;
 esac
 
 say '^message ' cancel
@@ -192,19 +201,22 @@ last_audit --arg s "$FIRST" --arg l "$LABEL" \
 # ------------------------- with another vault chosen, Connect pins this one, and that bridge still reaches it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$OTHER_VAULT" >/dev/null 2>&1 || die "could not create the other vault"
 "$CLI" use "$OTHER_VAULT" >/dev/null 2>&1 || die "keypaste use did not choose the other vault"
-say '^preview end' connect claude-code "label=$LABEL" 'expose='
-case "$(last_preview)" in *--expose*) die "an empty exposure still passed --expose" ;; esac
-case "$(last_preview | sed -n 2p)" in *" --vault "*vault.kdbx" --client-label $LABEL") ;; *) die "Connect did not pin the app's vault while another is chosen: [$(last_preview)]" ;; esac
+say '^preview end' connect claude-code "label=$UNSET_LABEL" 'expose='
+case "$(last_preview | sed -n 2p)" in
+  *" --vault "*vault.kdbx" --client-label $UNSET_LABEL --allow-run --expose **") ;;
+  *) die "Connect did not pin the app's vault while another is chosen, offering run with every item in reach: [$(last_preview)]" ;;
+esac
 say '^message ' confirm
 case "$(last_message)" in Connected.*) ;; *) die "reconnecting failed: $(last_message)" ;; esac
 [ "$(registered)" = "$(last_preview | sed -n 2p | sed 's/.*keypaste -- //')" ] || die "the reconnection is not what the preview showed"
 clean_config "$CONFIG"
 
-# The default exposure lists the two projects' tagged entries, not the untagged ones, and asks for a variable.
+# Through a bridge that reaches every item, an agent with no settings is listed the two projects' tagged
+# entries, not the untagged ones, and asks for a variable.
 say '^check-entry n=2' check
 grep -qx 'check-entry n=1 env/alpha/.env' "$HOLD_OUT" || die "the picker does not list the first tagged entry"
 grep -qx 'check-entry n=2 env/beta/.env' "$HOLD_OUT" || die "the picker does not list the second tagged entry"
-grep -q '^check-entry n=3' "$HOLD_OUT" && die "the picker lists an entry the default exposure does not reach"
+grep -q '^check-entry n=3' "$HOLD_OUT" && die "the picker lists an entry an agent with no settings does not see"
 say '^prompt client' pick 2
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=env/beta/.env field=BETA_KEY" || die "the prompt is not for the picked entry's variable"
 say '^check end' deny
@@ -212,7 +224,7 @@ case "$(last_check)" in
   "Connected: the request for env/beta/.env reached you and was refused."*) ;;
   *) die "the check did not report the refusal: $(last_check)" ;;
 esac
-last_audit --arg s "$FIRST" --arg l "$LABEL" '.decision == "denied" and .method == "prompt" and .session == $s and .client.label == $l' \
+last_audit --arg s "$FIRST" --arg l "$UNSET_LABEL" '.decision == "denied" and .method == "prompt" and .session == $s and .client.label == $l' \
   || die "the audit file does not hold the refusal"
 
 # ------------------------------------------------------------- removing leaves no keypaste in the client
@@ -248,8 +260,8 @@ case "$EDIT" in
 esac
 ENTRY="${EDIT#*set mcpServers.keypaste }"
 ENTRY="${ENTRY%; keeps the original as *}"
-printf '%s' "$ENTRY" | jq -e --arg l "$CURSOR_LABEL" '.args | index("--client-label") as $i | .[$i + 1] == $l' >/dev/null \
-  || die "the Cursor preview does not register the chosen label: [$ENTRY]"
+printf '%s' "$ENTRY" | jq -e --arg l "$CURSOR_LABEL" '.args | index("--client-label") as $i | .[$i:] == ["--client-label", $l, "--allow-run", "--expose", "env/ci/**"]' >/dev/null \
+  || die "the Cursor preview does not register the chosen label, run offered and the exposure: [$ENTRY]"
 
 say '^message ' cancel
 [ "$(last_message)" = 'Cancelled. Nothing was changed.' ] || die "Cancel did not say it changed nothing"
@@ -305,8 +317,9 @@ HOLD_PID=""
 echo "ok: the first unlock chose the vault and the CLI reached the app without --vault; a cancelled preview wrote"
 echo "    nothing, Connect registered exactly the command shown with no vault in it, the check raised the app's"
 echo "    prompt through that bridge and the audit file holds its prompted grant under the app's session and the"
-echo "    chosen label; with another vault chosen Connect pinned this one and its bridge still reached the app,"
-echo "    its default exposure listed only the tagged entries and the picker asked for the chosen one's variable,"
+echo "    chosen label; with another vault chosen Connect pinned this one, offering run with every item in reach,"
+echo "    its bridge still reached the app, an agent with no settings was listed only the tagged entries and the"
+echo "    picker asked for the chosen one's variable,"
 echo "    and removal left the client listing no keypaste; Cursor's file changed only in keypaste's entry, its"
 echo "    first original was kept, its registration reached the app's prompt, and removal gave back its bytes and"
 echo "    then said it was not connected, with no secret or session in any configuration"

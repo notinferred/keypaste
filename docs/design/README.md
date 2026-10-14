@@ -72,9 +72,10 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 
 **2. Agents**: padding 28/32, max-width 1080.
 - **Active grants** table: agent (13.5/600), secrets · scope (mono 12), time left (mono 11 secondary) over a 3px muted progress bar, and "Revoke" (danger-tint button). Revoke removes the row and shows a toast.
-- **MCP clients** cards (auto-fill, min 240; `#18191C`; radius 10):
-  - 32px initials tile, name and client, status dot, and a 30px ⋯ toggle.
-  - POLICY, the policy held, as text. The ⋯ menu offers "Session grants up to 1h", "Ask every time" and "Inject only", the held one checked in the text colour; it is disabled for a client with no label.
+- **MCP clients** cards (auto-fill, min 240; `#18191C`; radius 10), then the **Every other client** card, `*` in its tile, whose settings every unlabeled client and every label without its own gets:
+  - 32px initials tile, the label (14/600) over the client and its kind (12 muted), and the status dot with Connected or Idle.
+  - A ghost "Settings" button (sm) with a 13px chevron that opens that agent's settings below the cards (D-0380); a client with no label shows instead a caption saying to start its bridge with `--client-label`.
+- **Agent settings** panel (filled card below the cards, one agent at a time; D-0443): the title "Settings for <agent>" and a caption saying the settings follow that name, then rows with a 140px label column. Mode (Ask every time, Ask, allow for a while, Automatic, as chips), Give values, May run commands, Can see (All projects or Only these, the picks applied with Apply as one change, and "Advanced: patterns"), Project rows (each with its mode, its limit and Remove, then "Add a row") and Limits (per hour, until a day and time, Apply); `*`'s panel offers no Automatic and no commands. The panel holds no primary: each choice is one change, applied at once when it gives the agent nothing more, otherwise confirmed in the prompt window. "Use the vault's settings" appears beside a line naming what this computer's ceilings hold back.
 
 **3. Activity log** (Settings › Advanced; Agents › History is the same table held to Agents, with no filter and no Verify chain)
 - Segmented filter: All / Agents / You / Denied.

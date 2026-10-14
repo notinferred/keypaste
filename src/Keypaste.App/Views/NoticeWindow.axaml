@@ -1,0 +1,50 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.NoticeWindow"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: Always for did not take effect"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Said where the person answered, after a release they allowed: it asks nothing, so Close is its
+       default, and every word in it is keypaste's own. Opening the agent's settings widens nothing:
+       any change made there is confirmed as every change from the panel is. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="info" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Classes="prompt-title" Text="Allowed once" />
+          <TextBlock Classes="prompt-sub" Text="Always for did not take effect" />
+        </StackPanel>
+      </Grid>
+
+      <TextBlock Name="NoticeText" Classes="prompt-note" Foreground="{DynamicResource KpTextSecondary}" />
+
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Name="OpenSettings" Classes="prompt" MaxWidth="340">
+          <TextBlock Name="OpenSettingsText" TextTrimming="CharacterEllipsis" />
+        </Button>
+        <Button Name="Dismiss" Classes="prompt ghost" Content="Close" IsCancel="True" IsDefault="True" />
+      </StackPanel>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

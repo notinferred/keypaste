@@ -1,6 +1,7 @@
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -41,6 +42,18 @@ public sealed class LogRowTests
         Assert.Equal("env/acme-api/dev", row.Where);
         Assert.Equal("claude-code", row.Actor);
         Assert.False(row.ByYou);
+    }
+
+    /// <summary>A release nobody was asked about says which kind it was: an agent's Automatic mode, or a rule in a line written before agents had modes.</summary>
+    [Theory]
+    [InlineData("automatic", "Automatic")]
+    [InlineData("policy", "By rule")]
+    public void A_release_nobody_was_asked_about_says_so(string method, string result)
+    {
+        var row = Row(Entry("request_credential", "granted", method) with { Entry = "env/acme-api/.env", Field = "DATABASE_URL" });
+
+        Assert.Equal(result, row.Result);
+        Assert.Equal(LogTone.Ok, row.Tone);
     }
 
     [Fact]
@@ -111,6 +124,38 @@ public sealed class LogRowTests
         Assert.Equal("Link · 24h", row.Result);
     }
 
+    /// <summary>A change to an agent's settings reads as made only when it was; one refused or unanswered was only asked for, as a run reads.</summary>
+    [Theory]
+    [InlineData("granted", "prompt", "Changed settings")]
+    [InlineData("granted", "narrowing", "Changed settings")]
+    [InlineData("denied", "prompt", "Asked to change settings")]
+    [InlineData("denied", "timed-out", "Asked to change settings")]
+    [InlineData("denied", "cooldown", "Asked to change settings")]
+    public void A_settings_change_reads_as_made_only_when_it_was(string decision, string method, string action)
+    {
+        var row = Row(Entry("access_change", decision, method) with { Reason = "a person confirmed it (claude-code: mode automatic)" });
+
+        Assert.Equal(action, row.Action);
+    }
+
+    /// <summary>
+    /// A settings change's end reads on this computer's clock with its offset, as every other place shows
+    /// it, while the log keeps UTC; another tool's reason is shown as it was recorded.
+    /// </summary>
+    [Fact]
+    public void A_settings_changes_end_reads_on_this_computers_clock()
+    {
+        var zoned = new ZonedClock(_now, TestZones.PlusTwo);
+        var change = LogRow.From(
+            Entry("access_change", "granted", "prompt") with { Reason = "a person confirmed it (claude-code: mode automatic, until 2026-12-31T21:59:59Z, per-hour none)" },
+            verified: true,
+            zoned);
+        var credential = LogRow.From(Entry("request_credential", "granted", "prompt") with { Reason = "until 2026-12-31T21:59:59Z" }, verified: true, zoned);
+
+        Assert.StartsWith("a person confirmed it (claude-code: mode automatic, until 2026-12-31 23:59 +02:00, per-hour none)", change.Detail, StringComparison.Ordinal);
+        Assert.StartsWith("until 2026-12-31T21:59:59Z", credential.Detail, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_listing_names_no_secret()
     {
@@ -148,5 +193,12 @@ public sealed class LogRowTests
         public override DateTimeOffset GetUtcNow() => now;
 
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+    }
+
+    private sealed class ZonedClock(DateTimeOffset now, TimeZoneInfo zone) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+
+        public override TimeZoneInfo LocalTimeZone => zone;
     }
 }

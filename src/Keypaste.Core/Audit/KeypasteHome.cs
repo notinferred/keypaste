@@ -13,7 +13,7 @@ public static class KeypasteHome
     /// <summary>The audit log's file name.</summary>
     public const string AuditFileName = "audit.jsonl";
 
-    /// <summary>The policy file's name.</summary>
+    /// <summary>The retired policy file's name, which keypaste no longer reads.</summary>
     public const string PolicyFileName = "policy.toml";
 
     /// <summary>The desktop app's list of vaults it has opened on this machine.</summary>
@@ -47,20 +47,15 @@ public static class KeypasteHome
     public static string AuditPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), AuditFileName);
 
-    /// <summary>Resolves the policy file's path. keypaste never writes it.</summary>
-    /// <remarks>
-    /// The reason it is not beside the vault is stronger here than for the log: the log is a
-    /// <em>record</em> of this machine, the policy file an <em>authorization</em> over it, and a
-    /// synced directory would let another machine grant an agent silent access to this one's
-    /// credentials (THREATS.md T-15).
-    /// </remarks>
+    /// <summary>Resolves where the retired policy file was kept, so <c>keypaste agent</c> can say it no longer reads one there.</summary>
+    /// <remarks>Agents' settings are kept in the vault now, and this computer's ceilings in <see cref="ClientsPath"/>.</remarks>
     public static string PolicyPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), PolicyFileName);
 
     /// <summary>Resolves the recent-vaults list. The file is not created.</summary>
     /// <remarks>
-    /// Unlike <see cref="PolicyPath"/>, keypaste writes this one: it is a convenience keypaste
-    /// maintains rather than an authorization a human wrote, and deleting it loses only a shortcut.
+    /// keypaste writes this one: it is a convenience keypaste maintains rather than an authorization,
+    /// and deleting it loses only a shortcut.
     /// </remarks>
     public static string RecentPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), RecentFileName);
@@ -86,13 +81,14 @@ public static class KeypasteHome
     public static string RecommendationsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), RecommendationsFileName);
 
-    /// <summary>The per-client policies, keyed by each bridge's <c>--client-label</c>.</summary>
+    /// <summary>This computer's ceilings on each agent, keyed by each bridge's <c>--client-label</c>.</summary>
     public const string ClientsFileName = "clients.toml";
 
-    /// <summary>Resolves the per-client policy file. The file is not created.</summary>
+    /// <summary>Resolves this computer's ceilings on agents. The file is not created.</summary>
     /// <remarks>
-    /// Not <c>policy.toml</c>, whose every table is an allow rule, and not <c>app.toml</c>, which holds
-    /// preferences: <c>keypaste agent</c> enforces the same file (D-0360).
+    /// Every setting in it only takes away from what the vault's settings give, so a hand or a script
+    /// that edits it can only narrow, and a narrowing kept here outlives a restore or a merge of the
+    /// vault. Not <c>app.toml</c>, which holds preferences: <c>keypaste agent</c> enforces the same file.
     /// </remarks>
     public static string ClientsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), ClientsFileName);

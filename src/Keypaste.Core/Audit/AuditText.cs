@@ -7,9 +7,8 @@ namespace Keypaste.Core.Audit;
 /// </summary>
 /// <remarks>
 /// <para>
-/// It lives in the core for the same reason <see cref="Policy.PolicyText"/> does: <c>keypaste log</c>
-/// and the GUI's activity feed must say the same thing about the same file, and docs/PRODUCT.md law 4.3 does
-/// not allow that sentence to be written twice.
+/// It lives in the core because <c>keypaste log</c> and the GUI's activity feed must say the same
+/// thing about the same file, and docs/PRODUCT.md law 4.3 does not allow that sentence to be written twice.
 /// </para>
 /// <para>
 /// <b>ASCII only, and no colour.</b> The output survives every terminal, code page and CI log, and

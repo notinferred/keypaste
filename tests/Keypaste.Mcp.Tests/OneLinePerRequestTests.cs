@@ -1,11 +1,9 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
@@ -56,8 +54,8 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
             CurrentLifetime = () => _lifetime,
             UnlockedFor = asked => ReferenceEquals(asked, _lifetime) && asked.IsLive ? _vault : null,
             Channel = _person,
-            Policy = PolicyGate.None,
-            Clients = new ClientPolicySource(KeypasteHome.ClientsPath(Home)),
+            Settings = TestSession.Settings(),
+            Hourly = new HourlyLimit(TimeProvider.System),
             Audit = () => _unwritable ? null : _log?.Log,
             WatchEdits = _ => { },
             UnwatchEdits = _ => { },

@@ -1,9 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 
 namespace Keypaste.App.Session;
 
@@ -13,10 +14,11 @@ namespace Keypaste.App.Session;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Listing is answered under the bridge's own exposure, and a credential request, or a
-/// <c>keypaste run --session</c> request for an env set, is put to the person through the channel
-/// the app composes, which launch makes <see cref="WindowApprovalChannel"/> (D-0326, D-0341). No
-/// standing rule is consulted, so nothing is released from the app without a person's answer.
+/// Listing is answered under the bridge's own exposure and the agent's settings, and a credential
+/// request, or a <c>keypaste run --session</c> request for an env set, is put to the person through the
+/// channel the app composes, which launch makes <see cref="WindowApprovalChannel"/> (D-0326, D-0341),
+/// unless the person set the agent to Automatic for what it asked. A change to an agent's settings
+/// that the person confirms, or one that gives it nothing more, is saved through the session's own save.
 /// </para>
 /// <para>
 /// Everything that answers agents is built per unlock and belongs to that unlock's
@@ -35,10 +37,16 @@ namespace Keypaste.App.Session;
 /// </remarks>
 internal sealed class SessionHost : IDisposable
 {
+    /// <summary>What an agent's settings changed in this app are recorded as having been asked by.</summary>
+    internal const string Surface = "keypaste app";
+
+    private const string _notAnswering = "this app is not answering agents for this vault";
+
     private readonly AppVaultSession _session;
     private readonly string? _approverOverride;
     private readonly Func<IApprovalChannel> _approvals;
     private readonly Action? _requestLock;
+    private readonly HourlyLimit _hourly;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
     private bool _disposed;
@@ -60,6 +68,9 @@ internal sealed class SessionHost : IDisposable
         _approverOverride = approverOverride;
         _approvals = approvals;
         _requestLock = requestLock;
+
+        // One for the app's life, so locking and unlocking again does not refill an hourly limit.
+        _hourly = new HourlyLimit(session.Clock);
         _session.Opened += OnOpened;
         _session.Locked += OnLocked;
 
@@ -129,6 +140,77 @@ internal sealed class SessionHost : IDisposable
                 return _hosted?.Released ?? [];
             }
         }
+    }
+
+    /// <summary>What applies to an agent's requests now, or null when nothing here answers or its settings cannot be read.</summary>
+    /// <param name="label">The bridge's raw label, or null.</param>
+    /// <returns>What applies, or null.</returns>
+    internal EffectiveAccess? Access(string? label)
+    {
+        lock (_gate)
+        {
+            return _hosted?.Access(label);
+        }
+    }
+
+    /// <summary>One agent's settings as the person's own screen shows them.</summary>
+    /// <param name="agent">The agent's name, or <c>*</c>.</param>
+    /// <param name="settings">Its settings, when they could be read.</param>
+    /// <param name="problem">Why not, otherwise empty.</param>
+    /// <returns>Whether they were read; never while nothing here answers agents.</returns>
+    internal bool TrySettings(string agent, [NotNullWhen(true)] out AgentSettingsState? settings, out string problem)
+    {
+        Hosted? hosted;
+
+        lock (_gate)
+        {
+            hosted = _hosted;
+        }
+
+        // Outside the lock, which a lock of the session takes: reading the settings reads the session's vault.
+        if (hosted is null)
+        {
+            settings = null;
+            problem = _notAnswering;
+            return false;
+        }
+
+        return hosted.TrySettings(agent, out settings, out problem);
+    }
+
+    /// <summary>Changes an agent's settings for the person at this app, recorded on its own line as keypaste app.</summary>
+    /// <param name="agent">The agent's name, or <c>*</c>.</param>
+    /// <param name="edit">The change.</param>
+    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws a confirmation on screen.</param>
+    /// <returns>What became of it.</returns>
+    internal ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, AccessEdit edit, CancellationToken cancellationToken)
+    {
+        Hosted? hosted;
+
+        lock (_gate)
+        {
+            hosted = _hosted;
+        }
+
+        // Outside the lock: a change that gives more waits for the person, and a lock must not wait for it.
+        return hosted?.ChangeAccessAsync(agent, edit, cancellationToken)
+            ?? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering));
+    }
+
+    /// <summary>Resets this computer's ceilings, which keypaste cannot read, once the person confirms what each agent then gets.</summary>
+    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws the confirmation.</param>
+    /// <returns>What became of it.</returns>
+    internal ValueTask<AccessChangeReply> ResetCapsAsync(CancellationToken cancellationToken)
+    {
+        Hosted? hosted;
+
+        lock (_gate)
+        {
+            hosted = _hosted;
+        }
+
+        return hosted?.ResetCapsAsync(cancellationToken)
+            ?? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering));
     }
 
     /// <summary>Ends every grant given to a bridge started with this label.</summary>
@@ -234,7 +316,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), _requestLock, out var failure);
+            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), _requestLock, _hourly, out var failure);
             _hosted = hosted;
             Endpoint = hosted is null ? null : pipe;
             Failure = failure;
@@ -300,6 +382,30 @@ internal sealed class SessionHost : IDisposable
 
         internal void RevokeClient(string label) => _server.Authority.RevokeClient(label);
 
+        internal EffectiveAccess? Access(string? label) => _run.IsCompleted ? null : _server.Authority.Access(label);
+
+        internal bool TrySettings(string agent, [NotNullWhen(true)] out AgentSettingsState? settings, out string problem)
+        {
+            if (_run.IsCompleted)
+            {
+                settings = null;
+                problem = _notAnswering;
+                return false;
+            }
+
+            return _server.Authority.TrySettings(agent, out settings, out problem);
+        }
+
+        internal ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, AccessEdit edit, CancellationToken cancellationToken) =>
+            _run.IsCompleted
+                ? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering))
+                : _server.Authority.ChangeAccessAsync(agent, edit, Surface, cancellationToken);
+
+        internal ValueTask<AccessChangeReply> ResetCapsAsync(CancellationToken cancellationToken) =>
+            _run.IsCompleted
+                ? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering))
+                : _server.Authority.ResetCapsAsync(Surface, cancellationToken);
+
         internal void Revoke(GrantKey key) => _server.Authority.Revoke(key);
 
         internal void RevokeEnvGrant(string key) => _server.Authority.RevokeEnvGrant(key);
@@ -313,6 +419,7 @@ internal sealed class SessionHost : IDisposable
             SessionLifetime lifetime,
             IApprovalChannel channel,
             Action? requestLock,
+            HourlyLimit hourly,
             out string? failure)
         {
             AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home));
@@ -326,8 +433,11 @@ internal sealed class SessionHost : IDisposable
                     CurrentLifetime = () => session.Lifetime,
                     UnlockedFor = session.UnlockedFor,
                     Channel = channel,
-                    Policy = PolicyGate.None,
-                    Clients = new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)),
+                    Settings = new VaultAgentSettings(
+                        () => session.UnlockedFor(lifetime),
+                        edit => Saved(session.Write(edit, changed => changed)),
+                        new AccessCapsSource(KeypasteHome.ClientsPath(session.Home))),
+                    Hourly = hourly,
                     Audit = audit.Open,
                     WatchEdits = edited => session.Edited += edited,
                     UnwatchEdits = edited => session.Edited -= edited,
@@ -350,6 +460,16 @@ internal sealed class SessionHost : IDisposable
                 audit?.Dispose();
             }
         }
+
+        /// <summary>What saving an agent's settings through the session's own save came to.</summary>
+        private static AgentSave Saved(WriteResult<bool> written) => written.Outcome switch
+        {
+            WriteOutcome.Saved => AgentSave.Saved,
+            WriteOutcome.NothingToSave => AgentSave.Unchanged,
+            WriteOutcome.Locked => new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
+            WriteOutcome.ChangedOnDisk => new AgentSave(AgentSaveOutcome.ChangedOnDisk, "another program changed the vault since the app opened it; reload it in the app first"),
+            _ => new AgentSave(AgentSaveOutcome.Failed, written.Reason ?? "the vault could not be saved"),
+        };
 
         public void Dispose()
         {

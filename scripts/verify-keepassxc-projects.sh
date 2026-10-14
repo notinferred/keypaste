@@ -60,9 +60,24 @@
 # names what the tag reaches before putting it back; KeePassXC reads env:billing again, with one more
 # revision.
 #
+# A seventh vault KeePassXC makes from the first document holds agents' settings as ACAF records (G.8),
+# which keypaste writes through `keypaste agent` and confirmed `keypaste mcp policy` changes: one entry
+# per agent in .keypaste/agents, each entry and both groups under the UUID their names derive (AcafIds),
+# the vault staying KDBX 4.0. KeePassXC edits an entry, adds one and saves, keeping every record and tag
+# byte for byte, and keypaste applies what it reads. Two copies then change apart: keypaste changes one
+# agent in each and the same agent in both, creates the same agent in both, the second later each time,
+# and tags an entry in the first; KeePassXC edits an entry in the second. `keepassxc-cli merge` either
+# way leaves every change and tag and one entry per agent, the newer record of each agent changed or
+# created in both whole with the older in its history, and a real `keypaste agent` applies the newer.
+# keypaste then narrows both agents in one merged copy; merged either way again, each narrowing holds,
+# with the record before it in the history. Two copies of the vault before keypaste wrote anything each
+# create the same agent, and merged either way they hold one .keypaste group, one agents group and one
+# entry, the newer record whole and the older in its history.
+#
 # NEGATIVE CONTROL: a corrupted expectation must fail the comparison the listing check rests on, a
 # child holding OLD_KEY must fail the one the runs rest on, and the hour must be honoured for an entry
-# no tag protects.
+# no tag protects. The two copies' records of each agent changed or created in both must differ, so the
+# merge can show which one won.
 #
 # Usage:  scripts/verify-keepassxc-projects.sh <work-directory>
 # Env:    KP_COMPAT_PASSWORD   master password for the vaults        (required)
@@ -249,6 +264,10 @@ pipe="keypaste-projects-$$-$(date +%s)"
 audit="$KEYPASTE_HOME/audit.jsonl"
 logged=$(lines_in "$audit")
 agent_err="$dir/agent.err"
+# projects-probe sees services/** and env/** by path, as a person confirmed at keypaste agent's
+# terminal; with no settings it would see only project variables, never a password.
+agent_settings "$kp" "$(native "$grouped")" "$pw" 'projects-probe --see services/** --see env/**' \
+  || die "could not save projects-probe's settings in the KeePassXC vault"
 # One answer per request, in order: the hour for the dev entry, once then the hour for the prod entry
 # (once first, because refusing the hour cools that field down for every bridge, D-0425), the hour for
 # the entry KeePassXC tagged through the merge, and the hour for env/billing/prod/DB.
@@ -408,6 +427,10 @@ expose_err="$dir/exposed-agent.err"
 logged=$(lines_in "$audit")
 expose_out="$dir/exposed.out"
 trap 'cleanup; kill "${expose_pid:-}" 2>/dev/null || true' EXIT
+# exposed-probe keeps the default view and may run commands, each still asked about, as a person
+# confirmed at keypaste agent's terminal; with no settings its run would be refused unasked.
+agent_settings "$kp" "$(native "$exposed")" "$pw" 'exposed-probe --run on' \
+  || die "could not turn exposed-probe's commands on in the KeePassXC vault"
 # The hour for STRIPE_SECRET_KEY, then once for the run; the password is refused before anyone is asked.
 printf '%s\nh\no\n' "$pw" | "$kp" agent --vault "$(native "$exposed")" --approver "$expose_pipe" --approval-timeout 30 \
   >/dev/null 2>"$expose_err" &
@@ -905,10 +928,312 @@ grep -qF 'asked Joining billing/dev: STRIPE_SECRET_KEY.' <<<"$said" || die "the 
 said=$(drive tags-review "$(native "$v11")") || die "the review failed: ${said}"
 grep -qx 'count 0' <<<"$said" || die "a restored tag is still listed: ${said}"
 
+step "ACAF: keypaste keeps agents' settings in a vault KeePassXC made, one entry each in .keypaste/agents under the UUID its name derives, and the vault stays KDBX 4.0"
+acaf="$dir/acaf.kdbx"
+fresh="$dir/acaf-fresh.kdbx"
+seed '' >"$dir/acaf.xml"
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/acaf.xml")" "$(native "$acaf")" \
+  || die "keepassxc-cli could not import the ACAF seed"
+cp "$acaf" "$fresh"
+agent_settings "$kp" "$(native "$acaf")" "$pw" 'acaf-first --project billing --mode automatic' \
+  'acaf-second --project billing --mode automatic' 'acaf-both --project billing --mode automatic' \
+  || die "could not save the ACAF agents' settings in the KeePassXC vault"
+[ "$(version "$acaf")" = 000004 ] || die "keeping agents' settings raised the vault above KDBX 4.0: $(version "$acaf")"
+
+sha1() { if command -v sha1sum >/dev/null 2>&1; then sha1sum | cut -d' ' -f1; else shasum -a 1 | cut -d' ' -f1; fi; }
+# RFC 9562's version 5 UUID of $1 in ACAF v1's namespace, as 32 hex digits: the UUID of the entry of the
+# agent named $1, or, for a slash and a path, of keypaste's group at that path.
+acaf_id() {
+  local hash
+  hash=$({ printf '919d7b746e775fb099eb74758c119d7d' | xxd -r -p; printf '%s' "$1"; } | sha1)
+  printf '%s5%s%x%s\n' "${hash:0:12}" "${hash:13:3}" $(( (16#${hash:16:1} & 3) | 8 )) "${hash:17:15}"
+}
+# The UUID KeePassXC reads for the entry of the agent $2 in the vault $1, as 32 hex digits.
+uuid_of() { kx show "$1" ".keypaste/agents/$2" -a Uuid | tr -d '{}-' | tr '[:upper:]' '[:lower:]'; }
+# The UUID of every group named $2 in the vault $1, one per line, as KeePassXC's XML writes it.
+groups_named() {
+  kx export "$1" -f xml | awk -v name="<Name>$2</Name>" '
+    /<UUID>/ { id = $0; sub(/^.*<UUID>/, "", id); sub(/<\/UUID>.*$/, "", id) }
+    index($0, name) { print id }'
+}
+# Whether the vault $1 holds one .keypaste group and one agents group, each under the UUID its path derives.
+groups_derived() {
+  [ "$(groups_named "$1" .keypaste)" = "$(acaf_id /.keypaste | xxd -r -p | base64)" ] \
+    && [ "$(groups_named "$1" agents)" = "$(acaf_id /.keypaste/agents | xxd -r -p | base64)" ]
+}
+# The names KeePassXC lists in .keypaste/agents of the vault $1, one per entry, sorted, on one line.
+agents_in() { local listed; listed=$(kx ls "$1" .keypaste/agents) || return 1; sort <<<"$listed" | paste -sd' ' -; }
+# The ACAF record KeePassXC reads in the entry for the agent $2 of the vault $1.
+record_of() { kx show "$1" ".keypaste/agents/$2" -a acaf; }
+canonical() { jq -cS . | tr -d '\r'; }
+# Whether two records say the same, whatever the order of their members.
+same() { jq -en --argjson a "$1" --argjson b "$2" '$a == $b' >/dev/null 2>&1; }
+# The record of each revision KeePassXC keeps for the agent $2 of the vault $1, one per line, in canonical
+# form. The whole export is read, since leaving the stream early breaks kx's pipe (F.16).
+revisions_of() {
+  local id
+  id=$(uuid_of "$1" "$2" | xxd -r -p | base64) || die "KeePassXC cannot read the UUID of $2's entry"
+  kx export "$1" -f xml | awk -v id="<UUID>$id</UUID>" '
+    done { next }
+    /<History>/ { inhist = 1; next }
+    /<\/History>/ { inhist = 0; if (mine) done = 1; next }
+    !inhist && /<UUID>/ { mine = index($0, id) > 0 }
+    inhist && mine && index($0, "<Key>acaf</Key>") { want = 1 }
+    want && (v = index($0, "<Value")) {
+      text = substr($0, v); sub(/^<Value[^>]*>/, "", text); sub(/<\/Value>.*$/, "", text)
+      gsub(/&quot;/, "\"", text); gsub(/&lt;/, "<", text); gsub(/&gt;/, ">", text); gsub(/&apos;/, "\047", text); gsub(/&amp;/, "\\&", text)
+      print text; want = 0
+    }' | canonical
+}
+merge_into() { # target, source
+  printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$1")" "$(native "$2")" >/dev/null || die "keepassxc-cli could not merge $2 into $1"
+}
+# That the merged vault $1 holds one entry for the agent $2, under the UUID its name derives, with the newer
+# record $4 whole and the older $3 in its history.
+newer_kept() {
+  same "$(record_of "$1" "$2")" "$4" || die "$(basename "$1"): $2 is not the newer copy's record whole: $(record_of "$1" "$2")"
+  grep -qxF "$(canonical <<<"$3")" <<<"$(revisions_of "$1" "$2")" \
+    || die "$(basename "$1"): $2's history does not hold the older copy's record: $(revisions_of "$1" "$2")"
+  [ "$(uuid_of "$1" "$2")" = "$(acaf_id "$2")" ] || die "$(basename "$1"): $2's entry has the UUID $(uuid_of "$1" "$2")"
+}
+
+[ "$(agents_in "$acaf")" = "acaf-both acaf-first acaf-second" ] || die "KeePassXC lists the agents $(agents_in "$acaf")"
+for agent in acaf-both acaf-first acaf-second; do
+  same "$(record_of "$acaf" "$agent")" \
+    '{"acaf":1,"see":["tag:env:*"],"values":true,"run":false,"mode":"allow-for-a-while","projects":[{"project":"billing","mode":"automatic"}]}' \
+    || die "KeePassXC reads ${agent}'s record as $(record_of "$acaf" "$agent")"
+  [ "$(uuid_of "$acaf" "$agent")" = "$(acaf_id "$agent")" ] || die "${agent}'s entry has the UUID $(uuid_of "$acaf" "$agent"), not $(acaf_id "$agent")"
+done
+groups_derived "$acaf" || die "the groups keypaste made are $(groups_named "$acaf" .keypaste) and $(groups_named "$acaf" agents), not their paths' UUIDs"
+
+step "ACAF: KeePassXC edits an entry, adds one and saves, and every record and tag is kept byte for byte"
+records_now() { local agent; for agent in acaf-both acaf-first acaf-second; do record_of "$1" "$agent"; done; }
+tags_now() { local entry; for entry in services/Stripe services/Database services/Odd services/Other; do tags "$1" "$entry" | paste -sd' ' -; done; }
+records_was=$(records_now "$acaf")
+tags_was=$(tags_now "$acaf")
+kx edit "$acaf" services/Other -u kpxc-edit >/dev/null || die "KeePassXC could not edit services/Other"
+kx add "$acaf" services/Added -u kpxc-added >/dev/null || die "KeePassXC could not add services/Added"
+[ "$(kx show "$acaf" services/Other -a UserName)" = kpxc-edit ] || die "KeePassXC did not save its edit"
+[ "$(kx show "$acaf" services/Added -a UserName)" = kpxc-added ] || die "KeePassXC did not save the entry it added"
+[ "$(records_now "$acaf")" = "$records_was" ] || die "KeePassXC's save changed a record: $(records_now "$acaf")"
+[ "$(tags_now "$acaf")" = "$tags_was" ] || die "KeePassXC's save changed a tag: $(tags_now "$acaf")"
+[ "$(agents_in "$acaf")" = "acaf-both acaf-first acaf-second" ] || die "after KeePassXC's save it lists the agents $(agents_in "$acaf")"
+[ "$(uuid_of "$acaf" acaf-first)" = "$(acaf_id acaf-first)" ] || die "KeePassXC's save changed acaf-first's UUID"
+
+held_pid=
+holds=0
+asks=0
+trap 'cleanup_fields; kill "${held_pid:-}" 2>/dev/null || true' EXIT
+# Holds the vault $1 with a real keypaste agent of the gate's home, answering its prompts with the keys in $2.
+hold() {
+  release
+  holds=$((holds + 1))
+  held=$1
+  held_pipe="keypaste-acaf-$$-$(date +%s)-$holds"
+  held_err="$dir/acaf-agent-$holds.err"
+  printf '%s\n%b' "$pw" "$2" | "$kp" agent --vault "$(native "$held")" --approver "$held_pipe" --approval-timeout 30 \
+    >/dev/null 2>"$held_err" &
+  held_pid=$!
+  for _ in $(seq 1 100); do
+    grep -q 'listening on' "$held_err" && break
+    kill -0 "$held_pid" 2>/dev/null || die "keypaste agent exited before it listened on ${held}: $(cat "$held_err")"
+    sleep 0.2
+  done
+  grep -q 'listening on' "$held_err" || die "keypaste agent never started listening on ${held}"
+}
+release() {
+  [ -n "$held_pid" ] || return 0
+  kill "$held_pid" 2>/dev/null || true
+  wait "$held_pid" 2>/dev/null || true
+  held_pid=
+}
+# Asks the held vault through a real keypaste mcp labelled $1, registered as keypaste setup registers
+# one, for Stripe's STRIPE_SECRET_KEY; the answer is left in reply.
+ask_as() {
+  local label=$1 id out call
+  asks=$((asks + 1))
+  id=$((asks + 1))
+  out="$dir/acaf-$id.out"
+  call=$(jq -cn --argjson id "$id" \
+    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:"services/Stripe",field:"STRIPE_SECRET_KEY",reason:"ACAF gate",ttl_seconds:60}}}')
+  : >"$out"
+  {
+    jq -cn --arg name "$label" '{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:$name,version:"1.0.0"}}}'
+    printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+    printf '%s\n' "$call"
+    await_replies "${WAIT_SECONDS:-30}" "$out" "$id" || true
+  } | "$kp" mcp --vault "$(native "$held")" --expose '**' --allow-run --audit-log "$(native "$audit")" --approver "$held_pipe" \
+        --client-label "$label" >"$out" 2>"$dir/acaf-$id.err" || die "keypaste mcp exited non-zero: $(cat "$dir/acaf-$id.err")"
+  reply=$(tr -d '\r' <"$out" | jq -c --argjson id "$id" 'select(.id == $id)' | tr -d '\r')
+}
+released() { jq -e '.result.isError == false and .result.structuredContent.value == "sk_test_projects"' <<<"$reply" >/dev/null; }
+refused() { jq -e '.result.isError == true' <<<"$reply" >/dev/null && ! grep -qF sk_test_projects <<<"$reply"; }
+# How many of the agent's terminal lines match $1.
+said_held() { tr -d '\r' <"$held_err" | grep -c "$1" || true; }
+# The credential requests the owner recorded after the log held $1 lines: label, tool, decision, method.
+answered() {
+  lines_after "$audit" "$1" \
+    | jq -c -s 'map(select(.tool == "request_credential") | [.client.label, .tool, .decision, .method])' | tr -d '\r'
+}
+# Every agent's record keypaste reads through the owner holding the vault, as name and record.
+read_held() {
+  "$kp" mcp policy --json --vault "$(native "$held")" --approver "$held_pipe" 2>"$dir/acaf-policy.err" | tr -d '\r' \
+    | jq -c '[.[] | select(.kind == "agent") | {name, record}] | sort'
+}
+# The same list from a name and a record's text for each.
+records_list() { jq -cn '[$ARGS.positional as $p | range(0; $p | length; 2) | {name: $p[.], record: ($p[. + 1] | fromjson)}] | sort' --args "$@"; }
+
+logged=$(lines_in "$audit")
+hold "$acaf" ''
+same "$(read_held)" "$(records_list acaf-both "$(record_of "$acaf" acaf-both)" acaf-first "$(record_of "$acaf" acaf-first)" acaf-second "$(record_of "$acaf" acaf-second)")" \
+  || die "keypaste does not read the records KeePassXC saved: $(read_held) $(cat "$dir/acaf-policy.err")"
+ask_as acaf-first
+released || die "acaf-first, Automatic for billing, was not given STRIPE_SECRET_KEY after KeePassXC's save: ${reply}"
+[ "$(said_held 'an agent is asking for a credential')" = 0 ] || die "an Automatic release put a prompt in front of the person"
+[ "$(answered "$logged")" = '[["acaf-first","request_credential","granted","automatic"]]' ] \
+  || die "the release was not recorded as acaf-first's Automatic one: $(lines_after "$audit" "$logged")"
+release
+
+step "ACAF: two copies change apart: one agent in each, the same agent in both, a tag in the first, and the same agent created in both"
+first="$dir/acaf-first.kdbx"
+second="$dir/acaf-second.kdbx"
+cp "$acaf" "$first"
+cp "$acaf" "$second"
+agent_settings "$kp" "$(native "$first")" "$pw" 'acaf-first --values no' 'acaf-both --values no' 'acaf-twin --values no' \
+  || die "could not change the first copy's agents"
+said=$(kp_on "$first" env tag billing services/Other -p qa --yes 2>&1) || die "env tag on the first copy failed: ${said}"
+# A merge orders an entry's versions by modification time, which the file keeps to the second.
+sleep 2
+agent_settings "$kp" "$(native "$second")" "$pw" 'acaf-second --project billing --mode ask' 'acaf-both --run on' \
+  'acaf-twin --project billing --mode automatic' || die "could not change the second copy's agents"
+kx edit "$second" services/Stripe -u kpxc-second >/dev/null || die "KeePassXC could not edit the second copy's services/Stripe"
+first_only=$(record_of "$first" acaf-first)
+both_first=$(record_of "$first" acaf-both)
+twin_first=$(record_of "$first" acaf-twin)
+second_only=$(record_of "$second" acaf-second)
+both_second=$(record_of "$second" acaf-both)
+twin_second=$(record_of "$second" acaf-twin)
+jq -e '.values == false and .projects == [{"project":"billing","mode":"automatic"}]' <<<"$first_only" >/dev/null \
+  || die "the first copy's acaf-first reads ${first_only}"
+jq -e '.values == false and .run == false' <<<"$both_first" >/dev/null || die "the first copy's acaf-both reads ${both_first}"
+jq -e '.mode == "allow-for-a-while" and .values == false and (has("projects") | not)' <<<"$twin_first" >/dev/null \
+  || die "the first copy's acaf-twin reads ${twin_first}"
+jq -e '.projects == [{"project":"billing","mode":"ask"}]' <<<"$second_only" >/dev/null || die "the second copy's acaf-second reads ${second_only}"
+jq -e '.values == true and .run == true' <<<"$both_second" >/dev/null || die "the second copy's acaf-both reads ${both_second}"
+jq -e '.values == true and .projects == [{"project":"billing","mode":"automatic"}]' <<<"$twin_second" >/dev/null \
+  || die "the second copy's acaf-twin reads ${twin_second}"
+same "$both_first" "$both_second" && die "the copies' records of acaf-both agree, so a merge cannot show which one won"
+same "$twin_first" "$twin_second" && die "the copies' records of acaf-twin agree, so a merge cannot show which one won"
+for copy in "$first" "$second"; do
+  [ "$(version "$copy")" = 000004 ] || die "$(basename "$copy") left KDBX 4.0: $(version "$copy")"
+  [ "$(uuid_of "$copy" acaf-twin)" = "$(acaf_id acaf-twin)" ] || die "$(basename "$copy") created acaf-twin under $(uuid_of "$copy" acaf-twin)"
+done
+
+step "ACAF: KeePassXC merges the copies both ways; each holds every change and one entry per agent, the newer record of acaf-both and acaf-twin whole with the older in its history"
+into_first="$dir/acaf-into-first.kdbx"
+into_second="$dir/acaf-into-second.kdbx"
+cp "$first" "$into_first"
+merge_into "$into_first" "$second"
+cp "$second" "$into_second"
+merge_into "$into_second" "$first"
+for merged in "$into_first" "$into_second"; do
+  name=$(basename "$merged")
+  [ "$(version "$merged")" = 000004 ] || die "${name}: the merge left KDBX 4.0: $(version "$merged")"
+  [ "$(agents_in "$merged")" = "acaf-both acaf-first acaf-second acaf-twin" ] || die "${name}: KeePassXC lists the agents $(agents_in "$merged")"
+  same "$(record_of "$merged" acaf-first)" "$first_only" || die "${name}: acaf-first, changed in the first copy only, reads $(record_of "$merged" acaf-first)"
+  same "$(record_of "$merged" acaf-second)" "$second_only" || die "${name}: acaf-second, changed in the second copy only, reads $(record_of "$merged" acaf-second)"
+  newer_kept "$merged" acaf-both "$both_first" "$both_second"
+  newer_kept "$merged" acaf-twin "$twin_first" "$twin_second"
+  groups_derived "$merged" || die "${name}: KeePassXC holds the groups $(groups_named "$merged" .keypaste) and $(groups_named "$merged" agents)"
+  [ "$(tags_now "$merged")" = $'env:billing finance\nenv:billing:prod\nenv:billing:Prod\nenv:billing:qa finance' ] \
+    || die "${name}: KeePassXC reads the tags $(tags_now "$merged")"
+  [ "$(kx show "$merged" services/Stripe -a UserName)" = kpxc-second ] || die "${name}: KeePassXC's edit in the second copy did not survive"
+done
+
+step "ACAF: keypaste reads one record per agent in each merge and applies the newer acaf-both and acaf-twin"
+for merged in "$into_first" "$into_second"; do
+  name=$(basename "$merged")
+  logged=$(lines_in "$audit")
+  # Once for acaf-second, whose billing row is Ask every time; nothing else may reach the person.
+  hold "$merged" 'o\n'
+  same "$(read_held)" "$(records_list acaf-both "$both_second" acaf-first "$first_only" acaf-second "$second_only" acaf-twin "$twin_second")" \
+    || die "${name}: keypaste does not read the records KeePassXC merged: $(read_held) $(cat "$dir/acaf-policy.err")"
+  ask_as acaf-first
+  refused || die "${name}: acaf-first, given no values in the first copy, was released STRIPE_SECRET_KEY: ${reply}"
+  ask_as acaf-second
+  released || die "${name}: acaf-second, allowed once, was not released STRIPE_SECRET_KEY: ${reply}"
+  ask_as acaf-both
+  released || die "${name}: acaf-both, Automatic for billing in the newer copy, was not released STRIPE_SECRET_KEY: ${reply}"
+  ask_as acaf-twin
+  released || die "${name}: acaf-twin, Automatic for billing in the newer copy, was not released STRIPE_SECRET_KEY: ${reply}"
+  [ "$(answered "$logged")" = '[["acaf-first","request_credential","denied","inject-only"],["acaf-second","request_credential","granted","prompt"],["acaf-both","request_credential","granted","automatic"],["acaf-twin","request_credential","granted","automatic"]]' ] \
+    || die "${name}: the owner did not record what each record says: $(answered "$logged")"
+  [ "$(said_held 'an agent is asking for a credential')" = 1 ] || die "${name}: keypaste agent was not asked exactly once: $(cat "$held_err")"
+  [ "$(said_held 'this agent is set to Ask every time')" = 1 ] || die "${name}: acaf-second's prompt did not say it is asked every time: $(cat "$held_err")"
+  release
+done
+
+step "ACAF: keypaste narrows acaf-twin and acaf-both in one merged copy, and merged either way again the narrowing holds in the one entry of each"
+agent_settings "$kp" "$(native "$into_first")" "$pw" 'acaf-twin --values no' 'acaf-both --project billing --mode ask' \
+  || die "could not narrow acaf-twin and acaf-both in the merged copy"
+twin_narrowed=$(record_of "$into_first" acaf-twin)
+both_narrowed=$(record_of "$into_first" acaf-both)
+jq -e '.values == false and .projects == [{"project":"billing","mode":"automatic"}]' <<<"$twin_narrowed" >/dev/null \
+  || die "the narrowed acaf-twin reads ${twin_narrowed}"
+jq -e '.projects == [{"project":"billing","mode":"ask"}] and .run == true and .values == true' <<<"$both_narrowed" >/dev/null \
+  || die "the narrowed acaf-both reads ${both_narrowed}"
+again="$dir/acaf-into-second-again.kdbx"
+cp "$into_second" "$again"
+merge_into "$again" "$into_first"
+merge_into "$into_first" "$into_second"
+for merged in "$again" "$into_first"; do
+  name=$(basename "$merged")
+  logged=$(lines_in "$audit")
+  [ "$(agents_in "$merged")" = "acaf-both acaf-first acaf-second acaf-twin" ] || die "${name}: KeePassXC lists the agents $(agents_in "$merged")"
+  newer_kept "$merged" acaf-both "$both_second" "$both_narrowed"
+  newer_kept "$merged" acaf-twin "$twin_second" "$twin_narrowed"
+  # Once for acaf-both, now asked every time for billing.
+  hold "$merged" 'o\n'
+  ask_as acaf-both
+  released || die "${name}: acaf-both, allowed once, was not released STRIPE_SECRET_KEY: ${reply}"
+  ask_as acaf-twin
+  refused || die "${name}: acaf-twin, given no values by the narrowing, was released STRIPE_SECRET_KEY: ${reply}"
+  [ "$(answered "$logged")" = '[["acaf-both","request_credential","granted","prompt"],["acaf-twin","request_credential","denied","inject-only"]]' ] \
+    || die "${name}: the owner did not record what each record says: $(answered "$logged")"
+  [ "$(said_held 'this agent is set to Ask every time')" = 1 ] || die "${name}: acaf-both's prompt did not say it is asked every time: $(cat "$held_err")"
+  release
+done
+grep -qF sk_test_projects "$audit" && die "a released value reached the audit log"
+trap cleanup_fields EXIT
+
+step "ACAF: two copies of a vault that held no agents' settings each create the same agent, and KeePassXC merges them both ways into one .keypaste/agents and one entry, the newer record whole"
+new_first="$dir/acaf-new-first.kdbx"
+new_second="$dir/acaf-new-second.kdbx"
+cp "$fresh" "$new_first"
+cp "$fresh" "$new_second"
+[ -z "$(groups_named "$fresh" .keypaste)" ] || die "the vault KeePassXC made already holds a .keypaste group"
+agent_settings "$kp" "$(native "$new_first")" "$pw" 'acaf-new --values no' || die "could not create acaf-new in the first fresh copy"
+sleep 2
+agent_settings "$kp" "$(native "$new_second")" "$pw" 'acaf-new --mode ask' || die "could not create acaf-new in the second fresh copy"
+new_older=$(record_of "$new_first" acaf-new)
+new_newer=$(record_of "$new_second" acaf-new)
+jq -e '.values == false and .mode == "allow-for-a-while"' <<<"$new_older" >/dev/null || die "the first fresh copy's acaf-new reads ${new_older}"
+jq -e '.values == true and .mode == "ask"' <<<"$new_newer" >/dev/null || die "the second fresh copy's acaf-new reads ${new_newer}"
+cp "$new_first" "$dir/acaf-new-into-first.kdbx"
+merge_into "$dir/acaf-new-into-first.kdbx" "$new_second"
+cp "$new_second" "$dir/acaf-new-into-second.kdbx"
+merge_into "$dir/acaf-new-into-second.kdbx" "$new_first"
+for merged in "$dir/acaf-new-into-first.kdbx" "$dir/acaf-new-into-second.kdbx"; do
+  name=$(basename "$merged")
+  groups_derived "$merged" || die "${name}: KeePassXC holds the groups $(groups_named "$merged" .keypaste) and $(groups_named "$merged" agents)"
+  [ "$(agents_in "$merged")" = acaf-new ] || die "${name}: KeePassXC lists the agents $(agents_in "$merged")"
+  newer_kept "$merged" acaf-new "$new_older" "$new_newer"
+done
+
 step "NEGATIVE CONTROL: the listing and run comparisons must be able to fail"
 [ "$listed" = "${expected}-CORRUPTED" ] && die "a deliberately corrupted expectation still matched — this gate is not gating"
 out=$(printf '%s\n' "$pw" | OLD_KEY=old-c1b "$kp" run billing --vault "$fields" -- "$child" -c "$probe" 2>"$dir/run.err" | tr -d '\r') \
   || die "keypaste run with OLD_KEY inherited failed: $(cat "$dir/run.err")"
 [ "$out" = "$dev_set" ] && die "a child holding OLD_KEY still matched the dev set — the run comparisons cannot see OLD_KEY"
 
-printf '\nPROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, and a tag KeePassXC dropped with another change is flagged and restored.\n'
+printf '\n%s\n' "PROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, a tag KeePassXC dropped with another change is flagged and restored, and agents' settings survive KeePassXC's saves and merge into one entry per agent, the newer record whole."

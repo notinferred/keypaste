@@ -1,20 +1,19 @@
 using System.Security.Cryptography;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 using Xunit;
+using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An agent's run over a real pipe (D-0358): the owner releases the variables only to a connection of
-/// its current session, only within the bridge's exposure and the client's policy, after the person
-/// approves the exact program, command, directory and names, or under a timed grant that same
-/// connection holds for that same command line.
+/// its current session, only when the agent's settings let it run commands, only within what the agent
+/// can see, after the person approves the exact program, command, directory and names, or under a timed
+/// grant that same connection holds for that same command line.
 /// </summary>
 public sealed class SessionAuthorityRunTests : IDisposable
 {
@@ -60,13 +59,18 @@ public sealed class SessionAuthorityRunTests : IDisposable
                 Assert.True(created.AddTag(wide, "env:wide"));
             }
 
+            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(created).Write(_label, Runs));
             created.Save();
         }
 
         _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _grants = new EnvGrantCache(_fixture.Clock);
         _log = new OwnerLog(_directory);
+        _fixture.Settings.Records[_label] = Runs;
     }
+
+    /// <summary>What the test's agent may do: see as far as its bridge exposes, and run commands.</summary>
+    private static AgentAccess Runs { get; } = ApproverFixture.SeesAll with { Run = true };
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -481,7 +485,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     [Fact]
     public async Task AskEveryTime_OffersNoTimedChoice_AndUsesNoGrant()
     {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\npolicy = \"ask\"\n");
+        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\nmode = \"ask\"\n");
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         await using var owner = Owner.Start(this, clients: true);
         await using var client = await AttachedAsync(owner);
@@ -491,14 +495,14 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         Assert.Equal(2, _fixture.Channel.Asked);
         Assert.Equal(0, _fixture.Channel.LastRunPrompt!.GrantSeconds);
-        Assert.Equal(OnceOnly.ClientPolicy, _fixture.Channel.LastRunPrompt.OnceOnly);
+        Assert.Equal(OnceOnly.AskEveryTime, _fixture.Channel.LastRunPrompt.OnceOnly);
         Assert.Empty(owner.Authority.Activity.EnvGrants);
     }
 
     [Fact]
-    public async Task InjectOnly_StillRuns()
+    public async Task NoValues_StillRuns()
     {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"*\"\npolicy = \"inject-only\"\n");
+        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"*\"\nvalues = \"no\"\n");
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this, clients: true);
         await using var client = await AttachedAsync(owner);
@@ -511,7 +515,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
     [Fact]
     public async Task AnUnreadableClientsFile_RefusesUnasked()
     {
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\npolicy = \"sometimes\"\n");
+        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\npolicy = \"ask\"\n");
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         await using var owner = Owner.Start(this, clients: true);
         await using var client = await AttachedAsync(owner);
@@ -725,14 +729,10 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
-    public async Task NoStandingRuleReleasesARun()
+    public async Task AutomaticNeverReleasesARun()
     {
-        Assert.True(Toml.TryParse(
-            "[[allow]]\nclient = \"claude-code\"\nentries = [\"**\"]\nfields = [\"password\"]\nmax_ttl_seconds = 60\n",
-            out var syntax,
-            out var syntaxError), syntaxError);
-        Assert.True(PolicyDocument.TryCreate(syntax, out var rules, out var error), error);
-        using var fixture = new ApproverFixture(rules);
+        using var fixture = new ApproverFixture();
+        fixture.Settings.Records[_label] = Runs with { Mode = AgentMode.Automatic };
         fixture.Channel.Answer = ApprovalAnswer.Denied;
         await using var owner = Owner.Start(this, fixture);
         await using var client = await AttachedAsync(owner);
@@ -741,6 +741,60 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         AssertNothingReleased(reply);
         Assert.Equal(1, fixture.Channel.Asked);
+    }
+
+    /// <summary>An agent whose settings do not let it run commands is refused before anything is resolved or anybody asked, an unnamed bridge's included.</summary>
+    [Fact]
+    public async Task RunOff_IsRefusedUnasked_AndSoIsAnUnnamedBridge()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Settings.Records[_label] = ApproverFixture.SeesAll;
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this, fixture);
+        await using var client = await AttachedAsync(owner);
+
+        var off = await client.ReleaseRunAsync(Run(), Token);
+        var unnamed = await client.ReleaseRunAsync(Run() with { ClientLabel = null }, Token);
+
+        AssertNothingReleased(off);
+        AssertNothingReleased(unnamed);
+        Assert.Equal((AuditMethod.RunOff, AuditMethod.RunOff), (off!.Method, unnamed!.Method));
+        Assert.Equal(0, fixture.Channel.Asked);
+        Assert.Contains(_narration, said => said.Contains("its settings do not let it run commands", StringComparison.Ordinal));
+    }
+
+    /// <summary>A run is held to what the agent can see as a credential request is: a variable outside it is out of scope, unasked.</summary>
+    [Fact]
+    public async Task ARunOutsideWhatTheAgentSees_IsOutOfScopeUnasked()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Settings.Records[_label] = Runs with { See = See("env/billing/**") };
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this, fixture);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseRunAsync(Run(), Token);
+
+        AssertNothingReleased(reply);
+        Assert.Equal(AuditMethod.OutOfScope, reply!.Method);
+        Assert.Equal(0, fixture.Channel.Asked);
+    }
+
+    /// <summary>The settings the vault holds, read by the owner itself, decide a run: run on asks, and a ceiling of run off on this computer refuses.</summary>
+    [Fact]
+    public async Task TheVaultsRecord_AndThisComputersCeiling_DecideARun()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this, clients: true);
+        await using var client = await AttachedAsync(owner);
+
+        var allowed = await client.ReleaseRunAsync(Run(), Token);
+        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"claude-code\"\nrun = \"off\"\n");
+        var capped = await client.ReleaseRunAsync(Run(), Token);
+
+        Assert.Equal(EnvOutcome.Resolved, allowed!.Set.Outcome);
+        Assert.Equal(AuditMethod.RunOff, capped!.Method);
+        Assert.Equal(1, _fixture.Channel.Asked);
     }
 
     [Fact]
@@ -860,13 +914,17 @@ public sealed class SessionAuthorityRunTests : IDisposable
         internal static Owner Start(SessionAuthorityRunTests test, ApproverFixture? fixture = null, bool clients = false, bool vaultSource = false)
         {
             var used = fixture ?? test._fixture;
+            IAgentSettings settings = clients
+                ? new VaultAgentSettings(() => test._vault, _ => AgentSave.Unchanged, new AccessCapsSource(test.ClientsPath))
+                : used.Settings;
             var handler = new ApproverHandler(
                 vaultSource ? new VaultCredentialSource(() => test._vault) : used.Source,
                 vaultSource ? new VaultEntryNameLister(() => test._vault) : used.Source,
                 used.Gate,
                 used.Grants,
-                used.Policy,
-                clients: clients ? new ClientPolicySource(test.ClientsPath) : null);
+                settings,
+                hourly: used.Hourly,
+                clock: used.Clock);
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._directory, test.VaultPath),

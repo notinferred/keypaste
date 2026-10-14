@@ -23,8 +23,9 @@
 # NEGATIVE CONTROL: this script fails if scripts/demo/deploy.sh exits zero with no STRIPE_KEY set,
 # if it exits non-zero with one, if any of the key beyond its masked prefix and suffix reaches its
 # output, if the approval dialog the shipped agent draws differs by one character from the block in
-# EITHER page, if the `[d] deny  [o] once  [h] 1 hour` choice line is missing from either, if either
-# stops carrying the dialog at all, if a request allowed for an hour or once does not return the
+# EITHER page, if the `[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev` choice line or the two
+# lines the agent draws to say what `[a]` does are missing from either, if either stops carrying the
+# dialog at all, if a request allowed for an hour or once does not return the
 # credential with the lifetime the person chose, if a refused one does, if
 # the credential reaches the audit log, if the rendered `keypaste log` table header differs from
 # either page's, if either committed fixture is missing or not executable, if an option the page
@@ -36,7 +37,9 @@ set -euo pipefail
 readonly MASTER='ci-demo-master-pw'
 readonly SECRET='sk_test_EXAMPLE_ONLY_not_a_real_key_0000'
 readonly MASKED='sk_test_...0000'
-readonly ENTRY='env/demo/STRIPE_KEY'
+readonly PROJECT='demo'
+readonly KEY='STRIPE_KEY'
+readonly ENTRY='env/demo/.env'
 readonly REASON='deploy the billing service to staging'
 readonly LABEL='claude-code'
 
@@ -136,8 +139,8 @@ grep -q 'abc123' "$OUT" && die "the deploy fixture showed part of a key too shor
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null \
   || die "could not create the demo vault"
 
-printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
-  || die "could not store the demo credential"
+# A project variable, as the page makes it, which an agent with no settings of its own can see.
+project_var "$CLI" "$VAULT" "$MASTER" "$PROJECT" "$KEY" "$SECRET" || die "could not store the demo credential"
 
 # --------------------------------------------------------------------------- start the approver
 # One answer per request on stdin: h, then o, then d. ConsoleSecretPrompt reads redirected input a
@@ -171,9 +174,9 @@ ask() {
     done
 
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"$REASON\",\"ttl_seconds\":900}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"$KEY\",\"reason\":\"$REASON\",\"ttl_seconds\":900}}}"
     await_replies 8 "$out" "$id" || true
-  } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
+  } | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
         >"$out" 2>"$err" || die "keypaste mcp exited non-zero"
 
   grep -q '"id":1' "$out" || die "keypaste mcp never answered initialize"
@@ -234,7 +237,17 @@ done
 # ends on, which is why the page must carry them and why this check is not dropped. Only the prefix
 # is matched: the countdown and its mark are drawn live.
 for page in $TRANSCRIPT_PAGES; do
-  grep -qF '[d] deny  [o] once  [h] 1 hour' "$page" || die "$page does not show the choices a person actually answers"
+  grep -qF "[d] deny  [o] once  [h] 1 hour  [a] always for $PROJECT:dev" "$page" \
+    || die "$page does not show the choices a person actually answers"
+done
+
+# What [a] does is drawn below the dialog, after the block compared above, so it is held line by line.
+always="$(tr -d '\r' <"$AGENT_ERR" | grep -a -A1 -m1 '^  \[a\] allows this once' || true)"
+[ "$(printf '%s\n' "$always" | grep -c .)" -eq 2 ] || die "the approver did not say what [a] does: |$always|"
+for page in $TRANSCRIPT_PAGES; do
+  while IFS= read -r line; do
+    in_doc "$line" "what [a] does" "$page"
+  done <<<"$always"
 done
 grep -qF 'Master password:' "$DOC" || die "$DOC does not show the master password prompt"
 

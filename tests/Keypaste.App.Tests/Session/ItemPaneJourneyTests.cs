@@ -47,6 +47,7 @@ public sealed class ItemPaneJourneyTests
                 created.AddEntry(new VaultEntry { GroupPath = "Work", Title = "bookmarklet", Password = "bm-pane", Url = "javascript:alert(document.cookie)" });
                 created.AddEntry(new VaultEntry { GroupPath = "Work", Title = "calculator", Password = "calc-pane", Url = "file:///C:/Windows/System32/calc.exe" });
                 created.AddEntry(new VaultEntry { GroupPath = "Personal", Title = "pane-bank", Password = "bank-pane", Url = "bank.example" });
+                TempVault.Sees(created, "n5");
                 created.Save();
             }
 

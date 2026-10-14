@@ -37,6 +37,7 @@ public sealed class CurrentStateTests : IDisposable
         {
             vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "v1" });
             vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "KEEP", Password = "k" });
+            TempVault.Sees(vault, TempVault.Agent);
             vault.Save();
         }
 
@@ -315,6 +316,7 @@ public sealed class CurrentStateTests : IDisposable
                     Reason = "deploy",
                     TtlSeconds = 60,
                     Exposure = ["env/**"],
+                    ClientLabel = TempVault.Agent,
                     Vault = _vault,
                     Session = _session,
                 },

@@ -166,13 +166,29 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Contains("--vault", model.Preview, StringComparison.Ordinal);
         Assert.DoesNotContain("--audit-log", model.Preview, StringComparison.Ordinal);
         Assert.DoesNotContain("--approver", model.Preview, StringComparison.Ordinal);
-        Assert.Contains("--expose servers/staging/*", model.Preview, StringComparison.Ordinal);
+        Assert.EndsWith("--client-label claude-code --allow-run --expose env/** --expose servers/staging/*", model.Preview, StringComparison.Ordinal);
+        Assert.DoesNotContain("--expose **", model.Preview, StringComparison.Ordinal);
         Assert.Empty(_runner.Changes);
         Assert.True(model.ConfirmCommand.CanExecute(null));
     }
 
+    /// <summary>The owner holds the agent to its settings, so a connection with no exposure offers run and reaches every item.</summary>
     [Fact]
-    public async Task Under_another_home_the_vault_the_log_and_the_apps_own_pipe_are_pinned()
+    public async Task With_no_exposure_the_client_is_registered_offering_run_with_every_item_in_reach()
+    {
+        using var model = Model();
+
+        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.ConfirmCommand.ExecuteAsync();
+
+        var registered = model.Registered!;
+        Assert.EndsWith("--client-label claude-code --allow-run --expose **", _runner.Changes[^1], StringComparison.Ordinal);
+        Assert.Equal([McpServerRegistration.WideExposure], registered.Expose);
+        Assert.Equal(["--allow-run", "--expose", "**"], registered.CommandLine().TakeLast(3));
+    }
+
+    [Fact]
+    public async Task Under_another_home_the_vault_the_log_the_ceilings_and_the_apps_own_pipe_are_pinned()
     {
         using var model = Model(home: _fixture.Home);
         var session = _sessions[^1];
@@ -182,9 +198,10 @@ public sealed class ConnectClientViewModelTests : IDisposable
         var pins = new McpServerPins(
             _fixture.Path_,
             Core.Audit.KeypasteHome.AuditPath(_fixture.Home),
-            Core.Ipc.ApproverEndpoint.Resolve(null, null, session.Identity));
+            Core.Ipc.ApproverEndpoint.Resolve(null, null, session.Identity),
+            Core.Audit.KeypasteHome.ClientsPath(_fixture.Home));
         Assert.Equal(Plan("claude-code", Registration(_server, pins, "claude-code")), model.Preview);
-        Assert.Contains($"--audit-log {pins.AuditLogPath}", model.Preview, StringComparison.Ordinal);
+        Assert.Contains($"--audit-log {pins.AuditLogPath} --clients {pins.ClientsPath}", model.Preview, StringComparison.Ordinal);
     }
 
     [Fact]

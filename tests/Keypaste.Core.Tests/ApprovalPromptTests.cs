@@ -44,8 +44,11 @@ public sealed class ApprovalPromptTests
     /// put either. They are set from the sanitizer's own result rather than from anything the agent
     /// sends, so a reason cannot choose their value — it can only cause its own to be true by
     /// containing something that had to be scrubbed, which is precisely the fact being reported.
-    /// <c>OnceOnly</c> is an enum the approver sets from the entry's profile and the client's policy
-    /// file, never from the request's text: it says why no timed grant is offered, and nothing else.
+    /// <c>OnceOnly</c> is an enum the approver sets from the entry's profile and the agent's settings,
+    /// never from the request's text: it says why no timed grant is offered, and nothing else.
+    /// <c>AlwaysFor</c> is the project environment the approver reads from the entry's own tag for a
+    /// named agent, never from the request's text: it adds one choice that still asks for its own
+    /// confirmation, and leaves the default a denial and the deadline where it was.
     /// </remarks>
     [Fact]
     public void ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline()
@@ -57,6 +60,7 @@ public sealed class ApprovalPromptTests
 
         Assert.Equal(
             [
+                "AlwaysFor",
                 "Client",
                 "Entry",
                 "EntryWasAltered",
@@ -198,11 +202,11 @@ public sealed class ApprovalPromptTests
     }
 
     /// <summary>
-    /// A standing rule's release lasts what the agent asked for, never past the operator's ceiling.
+    /// An Automatic release lasts what the agent asked for, never past the operator's ceiling.
     /// A person's timed grant is not bounded this way: they chose its length on screen.
     /// </summary>
     [Fact]
-    public void ARulesReleaseIsBoundedByTheRequestAndTheCeiling()
+    public void AnAutomaticReleaseIsBoundedByTheRequestAndTheCeiling()
     {
         var limits = ApprovalLimits.Default with { MaximumTtlSeconds = 300 };
 
@@ -221,6 +225,39 @@ public sealed class ApprovalPromptTests
         Assert.True(ApprovalLimits.DefaultWindowSeconds < 60);
         Assert.True(ApprovalLimits.MaximumWindowSeconds < 60);
         Assert.True(ApprovalLimits.MinimumWindowSeconds <= ApprovalLimits.DefaultWindowSeconds);
+    }
+
+    /// <summary>A change asked for with no reason, as Always for and the app's own settings ask, shows none rather than a placeholder.</summary>
+    [Fact]
+    public void AChangeWithNoReason_ShowsNone_AndOneScrubbedAwayIsSaidToBe()
+    {
+        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { Run = true });
+
+        var none = AccessChangePrompt.For("claude-code", change, AccessOrigin.Prompt, string.Empty, TimeZoneInfo.Utc);
+        var scrubbed = AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "\u202e\u200b", TimeZoneInfo.Utc);
+
+        Assert.Equal((string.Empty, false, false), (none.Reason, none.ReasonWasAltered, none.ReasonWasTruncated));
+        Assert.True(scrubbed.ReasonWasAltered);
+        Assert.NotEmpty(scrubbed.Reason);
+    }
+
+    /// <summary>
+    /// The selectors an agent asks to see are shown in the confirmation with each character that could
+    /// hide or reorder text as an escape, so a pattern cannot pass for another or push what follows out
+    /// of view.
+    /// </summary>
+    [Fact]
+    public void AChangesGains_ShowEveryCharacterOfWhatItWouldSee()
+    {
+        var hidden = "x" + new string('\u2028', 20) + "**";
+        Assert.True(EntryExposure.TryCreate(["tag:env:billing", hidden, "\u202Eprod/**"], out var see, out var error), error);
+        var change = Agents.AccessChange.Classify(Agents.EffectiveAccess.Defaults, Agents.AgentAccess.Defaults with { See = see });
+
+        var gain = Assert.Single(AccessChangePrompt.For("claude-code", change, AccessOrigin.Agent, "to deploy", TimeZoneInfo.Utc).Gains);
+
+        Assert.Equal($"sees tag:env:billing, x{string.Concat(Enumerable.Repeat("\\u2028", 20))}**, \\u202Eprod/**", gain);
+        Assert.DoesNotContain('\u2028', gain);
+        Assert.DoesNotContain('\u202E', gain);
     }
 
     [Fact]

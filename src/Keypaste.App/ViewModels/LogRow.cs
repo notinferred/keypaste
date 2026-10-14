@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
 using Keypaste.Core.Tokens;
@@ -113,7 +114,7 @@ internal sealed record LogRow
             Where = where,
             Result = result,
             Tone = tone,
-            Detail = DetailOf(entry, verified),
+            Detail = DetailOf(entry, verified, clock.LocalTimeZone),
             Verified = verified,
             ByYou = byYou,
         };
@@ -145,6 +146,7 @@ internal sealed record LogRow
         {
             "list_entry_names" => "Listed names",
             "run" => entry.Granted ? "Injected" : "Requested",
+            "access_change" => entry.Granted ? "Changed settings" : "Asked to change settings",
             "token bundle" => "Bundled",
             "" => _none,
             var tool when tool.EndsWith("_credential", StringComparison.Ordinal) => "Requested",
@@ -212,7 +214,10 @@ internal sealed record LogRow
                 0 => "Approved once",
                 var seconds => $"Approved {Span(seconds.Value)}",
             }, LogTone.Ok),
+            "automatic" => ("Automatic", LogTone.Ok),
+            // Released by a policy.toml rule, in a line written before agents had modes.
             "policy" => ("By rule", LogTone.Ok),
+            "narrowing" => ("Narrowed", LogTone.Muted),
             "token" => ("Token", LogTone.Info),
             "share-created" => ("Link", LogTone.Muted),
             "share-revoked" => ("Revoked", LogTone.Muted),
@@ -220,7 +225,7 @@ internal sealed record LogRow
         };
     }
 
-    private static string? DetailOf(AuditEntry entry, bool verified)
+    private static string? DetailOf(AuditEntry entry, bool verified, TimeZoneInfo zone)
     {
         var lines = new List<string>();
 
@@ -229,9 +234,10 @@ internal sealed record LogRow
             lines.Add(UnverifiedWords);
         }
 
+        // A settings change's reason is keypaste's own words, whose end the log keeps in UTC, shown here as every other place shows it.
         if (entry.Reason.Length > 0)
         {
-            lines.Add(entry.Reason);
+            lines.Add(Is(entry.Tool, "access_change") ? UntilTime.OnThisClock(entry.Reason, zone) : entry.Reason);
         }
 
         if (entry.Command.Length > 0)

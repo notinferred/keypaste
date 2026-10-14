@@ -1,5 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Session;
+using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 
@@ -43,7 +45,10 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private readonly Action<Action> _post;
     private readonly Action<string> _toast;
     private readonly ITimer _timer;
+    private readonly CancellationTokenSource _closing = new();
     private bool _isConnectOpen;
+    private bool _isResetting;
+    private AgentSettingsViewModel? _settings;
 
     private string _status = string.Empty;
     private string _serving = string.Empty;
@@ -75,20 +80,15 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _clientsPath = KeypasteHome.ClientsPath(home);
         _clock = clock ?? TimeProvider.System;
         _post = post ?? (run => run());
-        SetPolicyCommand = new RelayCommand<PolicyChoice>(chosen =>
-        {
-            if (chosen is not null)
-            {
-                SetPolicy(chosen.Row, chosen.Policy);
-            }
-        });
-        ResetClientsCommand = new RelayCommand(ResetClients, () => _clientsProblem.Length > 0);
+        ToggleSettingsCommand = new RelayCommand<ClientCardRow>(ToggleSettings, card => card is { HasSettings: true } && _authority is not null);
+        ResetClientsCommand = new RelayCommand(() => Resetting = ResetClientsAsync(), () => _clientsProblem.Length > 0 && _authority is not null && !_isResetting);
 
         RefreshCommand = new RelayCommand(Refresh);
         RevokeCommand = new RelayCommand<ActivityRow>(Revoke, row => row?.Id is not null);
         RevokeAllCommand = new RelayCommand(RevokeAll, () => _grants.Count > 0);
 
         DependsOn(nameof(HasClientsProblem), nameof(ClientsProblem));
+        DependsOn(nameof(HasSettings), nameof(Settings));
         DependsOn(nameof(ConnectIsPrimary), nameof(HasWaiting), nameof(IsConnectOpen));
         DependsOn(nameof(FormsArePrimary), nameof(HasWaiting));
         DependsOn(nameof(IsServing), nameof(Serving));
@@ -100,7 +100,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         DependsOn(nameof(HasGrants), nameof(Grants));
         DependsOn(nameof(HasHistory), nameof(History));
         DependsOn(nameof(HasHistoryMessage), nameof(HistoryMessage));
-        DependsOn(ResetClientsCommand, nameof(ClientsProblem));
+        DependsOn(ResetClientsCommand, nameof(ClientsProblem), nameof(IsResetting));
         DependsOn(RevokeAllCommand, nameof(Grants));
 
         Refresh();
@@ -108,14 +108,32 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _timer = _clock.CreateTimer(_ => _post(Tick), null, _tick, _tick);
     }
 
-    /// <summary>The MCP clients of this vault, with the policy each is held to; the <c>*</c> card last.</summary>
+    /// <summary>The MCP clients of this vault; the <c>*</c> card last.</summary>
     internal IReadOnlyList<ClientCardRow> Clients => _clients;
 
-    /// <summary>Gives a client the policy chosen from its card's ⋯ menu, writing <c>clients.toml</c>.</summary>
-    internal RelayCommand<PolicyChoice> SetPolicyCommand { get; }
+    /// <summary>Opens a card's settings below the cards, or closes them when they are open.</summary>
+    internal RelayCommand<ClientCardRow> ToggleSettingsCommand { get; }
 
-    /// <summary>Replaces a clients file that cannot be read with an empty one.</summary>
+    /// <summary>The settings open below the cards, at most one agent's at a time, or null.</summary>
+    internal AgentSettingsViewModel? Settings => _settings;
+
+    internal bool HasSettings => _settings is not null;
+
+    /// <summary>
+    /// Sets a clients file keypaste cannot parse aside and starts an empty one, once the person confirms, in
+    /// the window that confirms any change giving agents more, what each agent then gets.
+    /// </summary>
     internal RelayCommand ResetClientsCommand { get; }
+
+    /// <summary>The reset in progress, or a completed task.</summary>
+    internal Task Resetting { get; private set; } = Task.CompletedTask;
+
+    /// <summary>Whether a reset is waiting for the person's answer.</summary>
+    internal bool IsResetting
+    {
+        get => _isResetting;
+        private set => Set(ref _isResetting, value);
+    }
 
     /// <summary>Why <c>clients.toml</c> cannot be used, or empty. While it is set, every agent request is refused.</summary>
     internal string ClientsProblem
@@ -221,15 +239,23 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     /// <summary>Reads the authority and the log again.</summary>
     internal void Refresh() => Read(forceHistory: true);
 
+    /// <summary>The status as the screen says it, with no agent Automatic.</summary>
+    internal static string Describe(AuthorityStatus status) => Describe(status, []);
+
     /// <summary>The status as the screen says it.</summary>
-    internal static string Describe(AuthorityStatus status) => status switch
+    /// <param name="status">Who answers agents.</param>
+    /// <param name="automatic">Each agent released to without asking now, with where, as <see cref="AutomaticAgents.Named"/> names it.</param>
+    internal static string Describe(AuthorityStatus status, IReadOnlyList<string> automatic) => status switch
     {
         AuthorityStatus.Serving serving =>
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"This app (process {serving.Owner.ProcessId}) holds this vault for agents, in session {serving.Session}. ")
             + "MCP clients set up for this vault reach it here and can list the entry names they are allowed to see. "
-            + "Each credential request is asked about in a prompt window, and nothing is released unless you press Approve.",
+            + "Each credential request is asked about in a prompt window, and nothing is released unless you allow it, "
+            + (automatic.Count == 0
+                ? "or you set that agent to Automatic for it in its settings."
+                : $"except what these agents are Automatic for: {string.Join("; ", automatic)}."),
         AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason}",
         AuthorityStatus.HeldBy held => held.Sentence,
         _ => "Agents cannot reach this vault right now.",
@@ -246,7 +272,6 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private void Read(bool forceHistory)
     {
         var status = _authority?.Status ?? new AuthorityStatus.Locked();
-        Status = Describe(status);
         Serving = status is AuthorityStatus.Serving answering
             ? string.Create(CultureInfo.InvariantCulture, $"Answering agents from this app · process {answering.Owner.ProcessId} · session {answering.Session}")
             : string.Empty;
@@ -281,11 +306,33 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         Raise(nameof(Grants));
 
         ReadHistory(session, forceHistory);
-        ReadClients(forceHistory);
+        var caps = ReadClients(forceHistory);
+
+        // With clients.toml unreadable every agent request is refused, so nobody is answered without asking.
+        Status = Describe(status, status is AuthorityStatus.Serving && caps is not null ? Automatic(caps) : []);
     }
 
-    /// <summary>Builds the client cards from who is attached, this vault's audit lines and <c>clients.toml</c>.</summary>
-    private void ReadClients(bool force)
+    /// <summary>
+    /// Each agent the vault the app holds releases to without asking now, beneath this computer's
+    /// ceilings, with where; read from the open vault, so a change not yet saved is named as it will apply.
+    /// </summary>
+    private IReadOnlyList<string> Automatic(AccessCaps caps)
+    {
+        try
+        {
+            return _authority?.Session.Unlocked is { } vault
+                ? AutomaticAgents.Named(new AgentAccessStore(vault).List(), caps, _clock.GetUtcNow())
+                : [];
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Builds the client cards from who is attached, this vault's audit lines and <c>clients.toml</c>, keeping the open settings open.</summary>
+    /// <returns>This computer's ceilings, or null when <c>clients.toml</c> cannot be read.</returns>
+    private AccessCaps? ReadClients(bool force)
     {
         var file = new FileInfo(_auditPath);
         (long, DateTime)? stamp = file.Exists ? (file.Length, file.LastWriteTimeUtc) : null;
@@ -296,17 +343,17 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             _auditEntries = stamp is not null && AuditReader.TryRead(_auditPath, out var entries, out _, out _) ? entries : [];
         }
 
-        ClientPolicies policies;
+        AccessCaps caps;
 
-        if (ClientPolicies.TryLoad(_clientsPath, out var loaded, out var problem))
+        if (AccessCaps.TryLoad(_clientsPath, out var loaded, out var problem))
         {
-            policies = loaded;
+            caps = loaded;
             ClientsProblem = string.Empty;
         }
         else
         {
-            policies = ClientPolicies.Empty;
-            ClientsProblem = $"{_clientsPath}: {problem}. Every agent request is refused until it is fixed, deleted or reset.";
+            caps = AccessCaps.Empty;
+            ClientsProblem = $"{_clientsPath}: {problem}. Every agent request is refused until it is fixed or reset; Reset shows what each agent then gets before anything changes.";
         }
 
         var now = _clock.GetUtcNow();
@@ -314,76 +361,116 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             _authority?.Clients ?? [],
             _auditEntries,
             _authority?.Session.Identity?.Key ?? string.Empty,
-            policies,
+            caps,
             now);
-
-        var signature = string.Join('\n', cards.Select(card => $"{card.Key}|{card.Status}|{card.Connections}|{card.Policy}|{card.LastSeen}"))
-            + "\n*|" + policies.For(ClientPolicies.AnyClient) + "|" + ClientsProblem;
+        var signature = string.Join('\n', cards.Select(card => $"{card.Key}|{card.Status}|{card.Connections}|{card.LastSeen}"))
+            + "\n*|" + ClientsProblem;
 
         if (!force && string.Equals(signature, _clientsSignature, StringComparison.Ordinal))
         {
-            return;
+            return loaded;
         }
 
         _clientsSignature = signature;
         _clients =
         [
-            .. cards.Select(card => new ClientCardRow(card, card.Policy, now, (row, policy) => SetPolicy(row, policy))),
-            new ClientCardRow(null, policies.For(ClientPolicies.AnyClient), now, (row, policy) => SetPolicy(row, policy)),
+            .. cards.Select(card => new ClientCardRow(card, now)),
+            new ClientCardRow(null, now),
         ];
+
+        foreach (var card in _clients)
+        {
+            card.IsSettingsOpen = _settings is { } open && string.Equals(card.Label, open.Agent, StringComparison.Ordinal);
+        }
+
         Raise(nameof(Clients));
+
+        if (force)
+        {
+            _settings?.Read();
+        }
+
+        return loaded;
     }
 
-    private void SetPolicy(ClientCardRow row, ClientPolicy policy)
+    /// <summary>Opens the named agent's settings below the cards, closing any others, whether or not a card shows it yet.</summary>
+    /// <param name="agent">The agent's name, or <c>*</c>.</param>
+    internal void OpenSettings(string agent)
     {
-        if (row.Label is not { } label || !row.CanSetPolicy)
+        ArgumentNullException.ThrowIfNull(agent);
+
+        if (_settings is { } open && string.Equals(open.Agent, agent, StringComparison.Ordinal))
         {
             return;
         }
 
-        if (!ClientPolicies.TryLoad(_clientsPath, out var current, out var problem))
+        if (AgentNames.IsValid(agent, out _))
         {
-            ClientsProblem = $"{_clientsPath}: {problem}. Every agent request is refused until it is fixed, deleted or reset.";
-            return;
+            ShowSettings(agent);
         }
-
-        var before = row.Label == ClientPolicies.AnyClient ? current.For(null) : current.For(label);
-
-        if (!ClientPolicies.TrySave(_clientsPath, current.With(label, policy), out var error))
-        {
-            ClientsProblem = $"{_clientsPath} could not be written: {error}";
-            return;
-        }
-
-        row.Held(policy);
-
-        // A stricter policy also ends what that client already holds, so this list matches it.
-        // The catch-all row cannot name the clients it covers, so it ends every grant instead.
-        if (policy != ClientPolicy.SessionGrants && policy != before)
-        {
-            if (label == ClientPolicies.AnyClient)
-            {
-                _authority?.RevokeAll();
-            }
-            else
-            {
-                _authority?.RevokeClient(label);
-            }
-        }
-
-        Read(forceHistory: false);
     }
 
-    private void ResetClients()
+    /// <summary>Opens a card's settings, closing any others, or closes them when they are open.</summary>
+    private void ToggleSettings(ClientCardRow? card)
     {
-        if (ClientPolicies.TrySave(_clientsPath, ClientPolicies.Empty, out var error))
+        if (card?.Label is not { } label || !card.HasSettings)
         {
-            ClientsProblem = string.Empty;
+            return;
+        }
+
+        ShowSettings(_settings is { } open && string.Equals(open.Agent, label, StringComparison.Ordinal) ? null : label);
+    }
+
+    /// <summary>Shows one agent's settings, or none.</summary>
+    private void ShowSettings(string? agent)
+    {
+        if (_authority is null)
+        {
+            return;
+        }
+
+        _settings?.Dispose();
+        _settings = agent is null ? null : new AgentSettingsViewModel(_authority, agent, () => Read(forceHistory: false));
+
+        foreach (var row in _clients)
+        {
+            row.IsSettingsOpen = agent is not null && string.Equals(row.Label, agent, StringComparison.Ordinal);
+        }
+
+        Raise(nameof(Settings));
+    }
+
+    /// <summary>Asks the authority to reset the clients file, which the person confirms, then reads it again.</summary>
+    private async Task ResetClientsAsync()
+    {
+        if (_authority is null || _disposed)
+        {
+            return;
+        }
+
+        IsResetting = true;
+        string said;
+
+        try
+        {
+            var reply = await _authority.ResetCapsAsync(_closing.Token).ConfigureAwait(true);
+            said = reply.Decision == AuditDecision.Granted
+                ? $"Reset: {_clientsPath} was set aside as {Path.GetFileName(reply.Kept ?? _clientsPath + AccessCaps.KeptSuffix)}, and every agent gets what the vault's settings say."
+                : $"Not reset: {reply.Reason}.";
+        }
+        catch (OperationCanceledException)
+        {
+            said = "Not reset: the screen closed before the reset had an answer.";
+        }
+        finally
+        {
+            IsResetting = false;
+        }
+
+        if (!_disposed)
+        {
             ReadClients(force: true);
-        }
-        else
-        {
-            ClientsProblem = $"{_clientsPath} could not be written: {error}";
+            _toast(said);
         }
     }
 
@@ -464,7 +551,10 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _closing.Cancel();
+        _closing.Dispose();
         _timer.Dispose();
         Connect?.Dispose();
+        _settings?.Dispose();
     }
 }

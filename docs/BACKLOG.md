@@ -35,7 +35,7 @@ These are retained feature ideas, not discarded features or promises for the fir
 | Command palette and additional generator recipes | Add when they improve an observed frequent task; existing CLI recipe controls are not proof of desktop controls. |
 | Deleting a group, and moving one to another parent | Core has neither, so neither front end can offer them and a group made by mistake is removed in KeePassXC. A deletion has to decide what happens to what is inside it — recycle each entry, or refuse a group that is not empty — and that is its own design with its own refusals. Select it when somebody actually reorganizes deeply enough to need it. |
 | Pasting the master password | A local input choice needing explicit clipboard handling and tests; entry-field paste support does not establish it for unlock fields. |
-| Policy editing/storage in the vault and unusual-request notices | Policy is authorization. Avoid automatic broadening, circular unlock rules or inferred trust from a client label. |
+| Unusual-request notices | Agents' settings are kept and edited in the vault since G.8; a notice that an agent's requests look unusual is not authorization. Avoid automatic broadening, circular unlock rules or inferred trust from a client label. |
 | Git secret hooks and conflict guidance | Potential project tooling; a warning or file-sync guide does not implement merge or guarantee secret removal from history. |
 | Extra vulnerability channel, reproducible builds, independent review and bounty | Useful trust work when operationally supported. Keep the working private contact and current provenance checks; do not claim review or reproducibility from a draft page. |
 | Repository rulesets and fork-CI observation | Administrative improvements may be selected separately. A fixture or policy document is not an observation of a real fork run. Former K.4/K.5. |
@@ -49,8 +49,7 @@ These observations were previously in DECISIONS. They are not completed fixes or
 
 | Observation | What must be established |
 |---|---|
-| A policy allowance is consumed before an oversized approved response fails delivery | Decide and test whether the allowance counts authorization or delivery; retain audit truth and refusal behavior. |
-| Policy rate-limit windows use wall time | Reproduce a clock-jump effect on allowance, then bound it without weakening approval expiry. |
+| An Automatic hourly limit is spent before an oversized release fails delivery, as a policy allowance was | Decide and test whether the limit counts authorization or delivery; retain audit truth and refusal behavior. |
 | `projects.json` is written only by the desktop but read by `keypaste run`, `env export` and `env diff` | Establish whether a CLI-only user can map a directory to a project at all, and whether a command given no project then fails without saying why. |
 | Listing source failures are recorded as `no-approver` | Reproduce the wrong audit classification while a listener exists; distinguish unavailable transport from failed vault access. |
 | Exposure parse errors lose detail when a reply is too large | Bound diagnostics at their source if a reproducible operator problem needs it; preserve the transport limit. |

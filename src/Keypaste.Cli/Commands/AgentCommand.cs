@@ -2,13 +2,13 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using Keypaste.Cli.Approval;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.Cli.Commands;
 
@@ -30,7 +30,8 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// <b>It holds the vault's claim for as long as it runs</b>, taken before the password is asked
 /// for, so a vault the desktop app or another agent already holds is refused by name and never
-/// opened (D-0309).
+/// opened (D-0309). Under that claim it applies each agent's settings from the vault and saves a
+/// change to them that the person confirms in this terminal.
 /// </para>
 /// <para>
 /// <b>It writes the audit line of every request it answers</b>, in its own home's log, before it
@@ -53,7 +54,6 @@ internal static class AgentCommand
     internal const string ApproverOption = "approver";
     internal const string TimeoutOption = "approval-timeout";
     internal const string MaxTtlOption = "max-ttl";
-    internal const string PolicyOption = "policy";
 
     private static readonly OptionSpec[] _options =
     [
@@ -62,7 +62,6 @@ internal static class AgentCommand
         new(ApproverOption, TakesValue: true),
         new(TimeoutOption, TakesValue: true),
         new(MaxTtlOption, TakesValue: true),
-        new(PolicyOption, TakesValue: true),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -117,13 +116,6 @@ internal static class AgentCommand
             return CliApp.ExitUsageError;
         }
 
-        // Loaded before the vault is opened, so what the policy file says cannot depend on anything
-        // the vault did; reported later in Announce, which runs inside VaultSession.Open. Nothing
-        // here is fatal: every failure means no rules, so every request is shown to a person.
-        var policy = PolicyLoader.Load(
-            line.Value(PolicyOption)
-            ?? KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
-
         if (!AuditLog.TryOpen(
                 KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)),
                 TimeProvider.System,
@@ -141,18 +133,30 @@ internal static class AgentCommand
                 context.Stderr.WriteLine($"keypaste: tightened permissions on {audit.Path} to owner-only.");
             }
 
-            if (!VaultClaim.TryAcquire(home, vaultPath, OwnerKind.TerminalAgent, out var claim, out var refusal))
-            {
-                context.Stderr.WriteLine($"keypaste: {refusal}");
-                return CliApp.ExitInternalError;
-            }
+            var retired = KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+            var caps = new AccessCapsSource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
 
-            using (claim)
-            {
-                var clients = new ClientPolicySource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
-                return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, audit, pipeName, limits, policy, clients, context));
-            }
+            return VaultSession.OpenHeld(
+                vaultPath,
+                line,
+                context,
+                OwnerKind.TerminalAgent,
+                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, caps, File.Exists(retired) ? retired : null, Reach(vaultPath, pipeName, home, context), context));
         }
+    }
+
+    /// <summary>
+    /// What <c>keypaste mcp policy</c> must be told to reach this agent: its vault when that is not the
+    /// chosen one, and its pipe when that is not the one its vault's owner listens on unasked.
+    /// </summary>
+    private static (string? Vault, string? Approver) Reach(string vaultPath, string pipeName, string home, CliContext context)
+    {
+        var chosen = ChosenVault.Read(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+        var unasked = ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(home, vaultPath));
+
+        return (
+            ChosenVault.Same(chosen, vaultPath) ? null : vaultPath,
+            string.Equals(pipeName, unasked, StringComparison.Ordinal) ? null : pipeName);
     }
 
     private static int Serve(
@@ -161,8 +165,9 @@ internal static class AgentCommand
         AuditLog audit,
         string pipeName,
         ApprovalLimits limits,
-        PolicyLoad policy,
-        ClientPolicySource clients,
+        AccessCapsSource caps,
+        string? retiredPolicy,
+        (string? Vault, string? Approver) reach,
         CliContext context)
     {
         var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive, context.ConsoleStyle);
@@ -170,6 +175,43 @@ internal static class AgentCommand
 
         using var lifetime = new SessionLifetime();
         using var stop = new CancellationTokenSource();
+
+        // The agent saves only what a person confirmed, or a narrowing, under the claim it holds, so no
+        // save here can land under another owner (D-0317).
+        AgentSave Save(Func<Vault, bool> edit)
+        {
+            try
+            {
+                if (!lifetime.IsLive)
+                {
+                    return new AgentSave(AgentSaveOutcome.Locked, "the vault is locked");
+                }
+
+                if (!edit(vault))
+                {
+                    return AgentSave.Unchanged;
+                }
+
+                vault.Save();
+                return AgentSave.Saved;
+            }
+            catch (VaultChangedOnDiskException)
+            {
+                return new AgentSave(
+                    AgentSaveOutcome.ChangedOnDisk,
+                    "another program changed the vault file since keypaste agent opened it; restart keypaste agent to read it again");
+            }
+            catch (VaultException ex)
+            {
+                return new AgentSave(AgentSaveOutcome.Failed, ex.Message);
+            }
+            catch (ObjectDisposedException)
+            {
+                return new AgentSave(AgentSaveOutcome.Locked, "the vault is locked");
+            }
+        }
+
+        Vault? Unlocked() => lifetime.IsLive ? vault : null;
 
         SessionServer server;
 
@@ -183,10 +225,10 @@ internal static class AgentCommand
                 Lifetime = lifetime,
                 CurrentLifetime = () => lifetime,
                 UnlockedFor = asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
-                Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
+                Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System) { Vault = reach.Vault, Approver = reach.Approver },
                 Limits = limits,
-                Policy = new PolicyGate(policy.Rules, TimeProvider.System),
-                Clients = clients,
+                Settings = new VaultAgentSettings(Unlocked, Save, caps),
+                Hourly = new HourlyLimit(TimeProvider.System),
                 Audit = () => audit,
                 WatchEdits = edited => vault.Edited += edited,
                 UnwatchEdits = edited => vault.Edited -= edited,
@@ -212,7 +254,12 @@ internal static class AgentCommand
 
             try
             {
-                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, policy, console);
+                var automatic = AutomaticAgents.Named(
+                    new AgentAccessStore(vault).List(),
+                    caps.TryCurrent(out var ceilings, out _) ? ceilings : AccessCaps.Empty,
+                    TimeProvider.System.GetUtcNow());
+
+                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, automatic, console);
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
@@ -270,43 +317,45 @@ internal static class AgentCommand
     }
 
     /// <summary>
-    /// The four lines a person reads before leaving this running, one of which changes meaning
-    /// entirely depending on whether a policy is in force.
+    /// The lines a person reads before leaving this running, one of which changes meaning entirely
+    /// when the vault sets an agent to Automatic.
     /// </summary>
     /// <remarks>
-    /// All six states a policy file can be in — absent, empty, in force, malformed, unreadable, too
-    /// permissive — reach an agent as the same thing, which is required: telling them apart would
-    /// let a request work out whether the human has a policy at all. They are distinct <em>here</em>,
-    /// because "I wrote a rule and it is not working" and "I have no rules" need different next
-    /// steps, and a rejected file says so twice as loudly as the rest.
-    /// </remarks>
-    /// <remarks>
-    /// <c>internal</c> so the six states are assertable. The command itself blocks on a pipe until
+    /// <para>
+    /// The claim changes when an agent is Automatic, because with one it is no longer true. Saying
+    /// "nothing is released without you saying yes" while an agent's requests are released silently
+    /// is the kind of small untruth this product cannot afford to print, so each such agent is named,
+    /// with where.
+    /// </para>
+    /// <para>
+    /// A <c>policy.toml</c> left from before agents' settings moved into the vault is named once, so a
+    /// person who wrote rules there learns they no longer apply rather than wondering why they ask.
+    /// </para>
+    /// <para>
+    /// <c>internal</c> so what it says is assertable. The command itself blocks on a pipe until
     /// Ctrl+C, so the only way to test what it tells a person is to call the part that tells them.
+    /// </para>
     /// </remarks>
     internal static void Announce(
         string vaultPath,
         string pipeName,
         string session,
         ApprovalLimits limits,
-        PolicyLoad policy,
+        string? retiredPolicy,
+        IReadOnlyList<string> automatic,
         AgentConsole console)
     {
         console.WriteLine($"keypaste: watching {vaultPath}");
 
-        if (policy.Status == PolicyStatus.Rejected)
+        if (retiredPolicy is not null)
         {
-            console.WriteLine($"keypaste: policy: {policy.Reason}");
             console.WriteLine(
-                "keypaste: policy: every request will be shown to you. Fix it and restart, or run `keypaste policy ls`.");
+                $"keypaste: {retiredPolicy} is no longer read: each agent's settings are kept in the vault. `keypaste mcp policy` shows them.");
         }
-        else if (policy.HasRules)
+
+        if (automatic.Count > 0)
         {
-            console.WriteLine($"keypaste: policy: {policy.Reason}. `keypaste policy ls` shows them.");
-        }
-        else
-        {
-            console.WriteLine($"keypaste: policy: {policy.Reason}.");
+            console.WriteLine($"keypaste: set to Automatic in the vault: {string.Join("; ", automatic)}");
         }
 
         console.WriteLine(
@@ -314,12 +363,9 @@ internal static class AgentCommand
                 CultureInfo.InvariantCulture,
                 $"keypaste: listening on {pipeName} for session {session}, {limits.Window.TotalSeconds:0} seconds to answer, grants last at most {limits.MaximumTtlSeconds} seconds"));
 
-        // The claim changes when a rule is in force, because with one it is no longer true. Saying
-        // "nothing is released without you saying yes" while a standing rule releases things
-        // silently is the kind of small untruth this product cannot afford to print.
         console.WriteLine(
-            policy.HasRules
-                ? "keypaste: nothing is released without you saying yes, unless a policy rule covers it. Press Ctrl+C to stop."
+            automatic.Count > 0
+                ? "keypaste: nothing is released without you saying yes, except what an agent above is Automatic for. Press Ctrl+C to stop."
                 : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
     }
 
@@ -389,7 +435,6 @@ internal static class AgentCommand
     {
         writer.WriteLine("usage: keypaste agent [--vault <path>] [--keyfile <path>] [--approver <name>]");
         writer.WriteLine("                      [--approval-timeout <seconds>] [--max-ttl <seconds>]");
-        writer.WriteLine("                      [--policy <path>]");
         writer.WriteLine();
         writer.WriteLine("Unlocks your vault and waits. When an AI agent asks keypaste mcp for a");
         writer.WriteLine("credential, the request appears here and nothing is released until you say yes.");
@@ -400,10 +445,10 @@ internal static class AgentCommand
         writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
         writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
         writer.WriteLine($"  --max-ttl <secs>           how long an [h] grant lasts, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
-        writer.WriteLine($"  --policy <path>            standing rules, default ~/{KeypasteHome.DirectoryName}/{KeypasteHome.PolicyFileName}");
         writer.WriteLine();
-        writer.WriteLine("A rule in the policy file releases a credential without asking. Anything wrong");
-        writer.WriteLine("with that file means the whole of it is ignored and every request asks you.");
+        writer.WriteLine("Each agent's settings, kept in the vault, decide what it can see and how it is");
+        writer.WriteLine("asked; an agent you set to Automatic is answered without asking you, and every");
+        writer.WriteLine("release is recorded. `keypaste mcp policy` shows and changes them.");
         writer.WriteLine();
         writer.WriteLine("Your master password is typed here, never in a window an agent caused to appear.");
     }

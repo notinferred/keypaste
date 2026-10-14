@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Proves the shipped run tool end to end, across two real processes: a real `keypaste agent` holds a
 # real vault and asks a person, and a real `keypaste mcp --allow-run` starts the command with the
-# approved value in its environment and returns its output scrubbed (D-0358, D-0359).
+# approved value in its environment and returns its output scrubbed (D-0358, D-0359). An agent's
+# commands are off until the person turns them on, which they confirm in the agent's terminal.
 #
-# NEGATIVE CONTROL: this script fails if the approved run does not return the command's exit code,
-# if either stream is anything but the value's marker, if the sentinel appears anywhere in the
-# transcript or the audit log, if the same run on the same connection is asked about again instead
-# of served from the grant, if a denied run starts anything, or if the audit lines do not name the
-# entry, the grant, the session and the vault. These checks must never be skipped or soft-passed.
+# NEGATIVE CONTROL: this script fails if a run is asked about or started while the agent's settings
+# keep its commands off, if `--run on` applies without the person, if the approved run does not return
+# the command's exit code, if either stream is anything but the value's marker, if the sentinel
+# appears anywhere in the transcript or the audit log, if the same run on the same connection is asked
+# about again instead of served from the grant, if a denied run starts anything, or if the audit lines
+# do not name the entry, the grant, the session and the vault. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-run-master-pw'
@@ -39,6 +41,7 @@ PROJECT_DIR="$(cd "$WORK/project" && pwd -P)"
 PROJECT_DIR="$(native "$PROJECT_DIR")"
 readonly PROJECT_DIR
 readonly MARKER="$WORK/project/denied-run-ran"
+readonly OFF_MARKER="$WORK/project/run-off-ran"
 
 AGENT_PID=""
 cleanup() {
@@ -59,9 +62,10 @@ printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT
   || die "could not store the test credential"
 
 # ------------------------------------------------------------------------------- start the owner
-# The master password, then one answer per prompt: h for the first run, d for the third. The
-# second is served from the grant the h gave, so nothing reads an answer for it.
-printf '%s\nh\nd\n' "$MASTER" \
+# The master password, then one answer per prompt: y to turning ci-probe's commands on, h for the
+# first run, d for the third. The second is served from the grant the h gave, so nothing reads an
+# answer for it.
+printf '%s\ny\nh\nd\n' "$MASTER" \
   | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
@@ -92,6 +96,30 @@ wait_for_reply() {
 readonly PRINTS='["sh","-c","printf %s \"$DEPLOY_KEY\"; printf %s \"$DEPLOY_KEY\" >&2; exit 3"]'
 DENIED="$(jq -cn --arg marker "$(native "$MARKER")" '["sh","-c",("printf ran > \"" + $marker + "\"")]')"
 readonly DENIED
+OFF="$(jq -cn --arg marker "$(native "$OFF_MARKER")" '["sh","-c",("printf ran > \"" + $marker + "\"")]')"
+readonly OFF
+
+prompts_drawn() { grep -c 'tool       keypaste.run' "$AGENT_ERR" 2>/dev/null || true; }
+
+# ----------------------------------------------------------- commands are off until the person says
+# An agent with no settings runs nothing: its run is refused before anything resolves, and nobody is asked.
+: >"$OUT"
+{
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
+  wait_for_reply 1 || true
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  call 2 "$OFF"
+  wait_for_reply 2 || true
+} | "$CLI" mcp --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --allow-run \
+      >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero"
+
+jq -se 'any(.[]; .id == 2 and .result.isError == true)' <"$OUT" >/dev/null || die "a run was not refused while the agent's commands are off"
+[ -e "$OFF_MARKER" ] && die "a run started while the agent's commands are off"
+[ "$(prompts_drawn)" -eq 0 ] || die "a run was asked about while the agent's commands are off"
+
+"$CLI" mcp policy ci-probe --run on --vault "$VAULT" --approver "$PIPE" 2>"$ERR" \
+  || die "turning ci-probe's commands on, confirmed in the agent's terminal, was not applied"
+grep -q 'a change would give an agent more' "$AGENT_ERR" || die "turning commands on did not wait for the person"
 
 # ------------------------------------------------------------------------- one bridge, three runs
 : >"$OUT"
@@ -133,15 +161,18 @@ grep -q "$CORE" "$ERR" && die "the bridge's stderr carries the injected value"
 [ -f "$AUDIT" ] || die "no audit log was written"
 grep -q "$CORE" "$AUDIT" && die "the audit log carries the injected value"
 
-# 5. One line per run, naming the entry, the grant, the session and the vault.
+# 5. One line per run, naming the entry, the grant, the session and the vault, and one for the change between them.
 jq -e -s --arg s "$SESSION" '
-  length == 3
-  and all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16))
-  and .[0].decision == "granted" and .[0].method == "prompt" and .[0].granted_seconds == 900
-  and .[0].entries == ["env/ci/.env"] and (.[0].command | startswith("sh -c"))
-  and .[1].decision == "granted" and .[1].method == "grant-cache" and .[1].entries == ["env/ci/.env"]
-  and .[2].decision == "denied" and .[2].method == "prompt"' <"$AUDIT" >/dev/null \
-  || die "the audit lines do not show a prompted grant, a grant-served run and a denial in session $SESSION"
+  length == 5
+  and .[0].tool == "run" and .[0].decision == "denied" and .[0].method == "run-off"
+  and .[1].tool == "access_change" and .[1].decision == "granted" and .[1].client.label == "ci-probe"
+  and (.[2:] | all(.[]; .tool == "run" and .session == $s and (.vault | type == "string" and length == 16)))
+  and .[0].session == $s
+  and .[2].decision == "granted" and .[2].method == "prompt" and .[2].granted_seconds == 900
+  and .[2].entries == ["env/ci/.env"] and (.[2].command | startswith("sh -c"))
+  and .[3].decision == "granted" and .[3].method == "grant-cache" and .[3].entries == ["env/ci/.env"]
+  and .[4].decision == "denied" and .[4].method == "prompt"' <"$AUDIT" >/dev/null \
+  || die "the audit lines do not show a run refused while off, the change, a prompted grant, a grant-served run and a denial in session $SESSION"
 
 # 6. The person was shown the exact command and the claim, and the owner narrated the grant's use.
 grep -q 'tool       keypaste.run' "$AGENT_ERR" || die "the run dialog was not shown"

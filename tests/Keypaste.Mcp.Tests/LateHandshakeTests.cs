@@ -21,8 +21,8 @@ namespace Keypaste.Mcp.Tests;
 /// client. A real client cannot produce that ordering in process (<see cref="HandshakeGraceTests"/>);
 /// a server whose client is unnamed the first time anybody asks and named every time after can, and
 /// each tool is called on it as the server's dispatch would call it. A credential request and a run
-/// carry the name in the request; a listing carries nothing, so the owner records it under the client
-/// its connection attached as, which is read after the wait too.
+/// carry the name in the request; a listing and a change to the agent's settings carry nothing, so the
+/// owner records them under the client their connection attached as, which is read after the wait too.
 /// </remarks>
 public sealed class LateHandshakeTests
 {
@@ -89,6 +89,22 @@ public sealed class LateHandshakeTests
 
         var run = Assert.Single(asked);
         Assert.Equal((McpHarness.ClientName, McpHarness.ClientVersion), (run.ClientName, run.ClientVersion));
+        Assert.Empty(harness.AuditLines());
+    }
+
+    [Fact]
+    public async Task AnAccessChange_ThatOvertookTheHandshake_AttachesToTheOwnerUnderTheNameItGave()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.AccessAnswer = _ => new AccessChangeReply(AuditDecision.Granted, AuditMethod.Narrowing, "applied at once on this computer");
+        harness.Approver.Start();
+        harness.Serve();
+
+        await CallAsync(harness, ToolText.AccessToolName, new() { ["mode"] = "ask", ["reason"] = "keep asking me" });
+
+        Assert.Single(harness.Approver.AccessReceived);
+        var attached = Assert.Single(harness.Approver.Attached).Client;
+        Assert.Equal((McpHarness.ClientName, McpHarness.ClientVersion, McpHarness.ClientLabel), (attached?.Name, attached?.Version, attached?.Label));
         Assert.Empty(harness.AuditLines());
     }
 

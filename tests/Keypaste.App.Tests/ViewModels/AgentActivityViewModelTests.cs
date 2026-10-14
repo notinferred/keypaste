@@ -1,5 +1,7 @@
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -50,6 +52,35 @@ public sealed class AgentActivityViewModelTests
 
         Assert.Empty(model.Waiting);
         Assert.True(model.NothingWaiting);
+    }
+
+    /// <summary>
+    /// The status names each agent the vault releases to without asking and where, beneath this
+    /// computer's ceilings, rather than a sentence that could be true of any agent.
+    /// </summary>
+    [Fact]
+    public async Task The_status_names_each_agent_on_Automatic_and_for_what()
+    {
+        await using var app = await App.StartAsync(vault =>
+        {
+            Assert.True(ProjectScope.TryCreate("billing", "dev", out var dev, out var error), error);
+            var store = new AgentAccessStore(vault);
+            Assert.Equal(AgentAccessWrite.Written, store.Write("claude-code", AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }));
+            Assert.Equal(AgentAccessWrite.Written, store.Write("held", AgentAccess.Defaults with { Mode = AgentMode.Automatic }));
+        });
+        File.WriteAllText(KeypasteHome.ClientsPath(app.Fixture.Home), "[[client]]\nlabel = \"held\"\nmode = \"ask\"\n");
+
+        using var model = app.Model();
+
+        Assert.EndsWith(
+            "nothing is released unless you allow it, except what these agents are Automatic for: claude-code (billing:dev).",
+            model.Status,
+            StringComparison.Ordinal);
+
+        File.Delete(KeypasteHome.ClientsPath(app.Fixture.Home));
+        model.Refresh();
+
+        Assert.EndsWith("except what these agents are Automatic for: claude-code (billing:dev); held (by default).", model.Status, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -324,9 +355,19 @@ public sealed class AgentActivityViewModelTests
 
         internal string Session { get; }
 
-        internal static async Task<App> StartAsync()
+        /// <param name="arrange">Writes into the vault before the app unlocks it, which then saves it.</param>
+        internal static async Task<App> StartAsync(Action<Vault>? arrange = null)
         {
             var fixture = new TempVault();
+            fixture.Sees();
+
+            if (arrange is not null)
+            {
+                using var vault = Vault.Open(fixture.Path_, TempVault.Password);
+                arrange(vault);
+                vault.Save();
+            }
+
             var clock = new ManualClock(AppClock.Start);
             var person = new ScriptedPerson();
 #pragma warning disable CA2000

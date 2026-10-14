@@ -164,6 +164,9 @@ finish_denied() {
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
 printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
+# The entry is not tagged into a project, so the agent sees it only once a person lets it see env/**,
+# confirmed at keypaste agent's terminal before the app holds the vault.
+agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-probe --see env/**' || die "could not save ci-probe's settings in the vault"
 
 # -------------------------------------------- launched with no terminal, unlocking serves agents
 launch "$WORK/hold-1.txt" --locked --held-prompt

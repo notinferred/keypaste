@@ -1,9 +1,8 @@
 using System.Security.Cryptography;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -63,8 +62,8 @@ public sealed class SessionServerTests : IDisposable
         CurrentLifetime = () => lifetime,
         UnlockedFor = _ => null,
         Channel = new FakeChannel(),
-        Policy = PolicyGate.None,
-        Clients = new ClientPolicySource(Path.Combine(_directory, "clients.toml")),
+        Settings = IAgentSettings.Defaults,
+        Hourly = new HourlyLimit(TimeProvider.System),
         Audit = () => null,
         WatchEdits = watching.Add,
         UnwatchEdits = handler => watching.Remove(handler),

@@ -4,7 +4,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 
 namespace Keypaste.Cli.Tests;
 
@@ -14,7 +14,8 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 /// <remarks>
 /// The grants verbs never open the vault, so no vault is unlocked here: the owner answers from its
-/// grant cache, which is where a person's approvals live.
+/// grant cache, which is where a person's approvals live, and from agents' settings a test holds in
+/// memory. It records in the harness home's log only when a test asks it to.
 /// </remarks>
 internal sealed class SessionOwner : IAsyncDisposable
 {
@@ -26,21 +27,27 @@ internal sealed class SessionOwner : IAsyncDisposable
     private readonly ApproverListener _listener;
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _running;
+    private readonly AuditLog? _log;
 
-    private SessionOwner(CliHarness harness, LockKind locking)
+    private SessionOwner(CliHarness harness, LockKind locking, bool records)
     {
         Pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
         harness.Environment[ApproverEndpoint.EnvironmentVariable] = Pipe;
         Lifetime.Own(_grants);
 
-        _gate = new ApprovalGate(new NobodyAsked(), TimeProvider.System, ApprovalLimits.Default);
+        if (records && !AuditLog.TryOpen(KeypasteHome.AuditPath(harness.Environment[KeypasteHome.EnvironmentVariable]), TimeProvider.System, out _log, out var error))
+        {
+            throw new InvalidOperationException(error);
+        }
+
+        _gate = new ApprovalGate(Asked, TimeProvider.System, ApprovalLimits.Default);
 
         var handler = new ApproverHandler(
             new VaultCredentialSource(() => null),
             new VaultEntryNameLister(() => null),
             _gate,
             _grants,
-            PolicyGate.None);
+            Settings);
 
         Action? lockNow = locking switch
         {
@@ -53,7 +60,7 @@ internal sealed class SessionOwner : IAsyncDisposable
             VaultIdentity.Of(KeypasteHome.Resolve(harness.Environment[KeypasteHome.EnvironmentVariable]), harness.VaultPath),
             () => Lifetime,
             handler,
-            audit: () => null,
+            audit: () => _log,
             lockNow: lockNow);
 
         _listener = new ApproverListener(Pipe, Authority);
@@ -75,6 +82,12 @@ internal sealed class SessionOwner : IAsyncDisposable
 
     internal string Pipe { get; }
 
+    /// <summary>The agents' settings this owner reads and writes.</summary>
+    internal FakeAgentSettings Settings { get; } = new();
+
+    /// <summary>Where a person would be asked: every credential is refused, and a change is answered as a test says.</summary>
+    internal NobodyAsked Asked { get; } = new();
+
     internal SessionAuthority Authority { get; }
 
     internal SessionLifetime Lifetime { get; } = new();
@@ -82,7 +95,7 @@ internal sealed class SessionOwner : IAsyncDisposable
     /// <summary>Stops listening once the lifetime has ended and the listener has wound down.</summary>
     internal Task Stopped => _running;
 
-    internal static SessionOwner Start(CliHarness harness, LockKind locking = LockKind.None) => new(harness, locking);
+    internal static SessionOwner Start(CliHarness harness, LockKind locking = LockKind.None, bool records = false) => new(harness, locking, records);
 
     /// <summary>Gives a grant, as a person approving an agent's request would.</summary>
     /// <returns>The id <c>keypaste grants</c> names it by.</returns>
@@ -120,15 +133,28 @@ internal sealed class SessionOwner : IAsyncDisposable
         Lifetime.Dispose();
         _gate.Dispose();
         _grants.Dispose();
+        _log?.Dispose();
         _stop.Dispose();
     }
 
-    private sealed class NobodyAsked : IApprovalChannel
+    internal sealed class NobodyAsked : IApprovalChannel
     {
+        /// <summary>How a confirmation of a change that gives an agent more is answered; a no unless a test says otherwise.</summary>
+        internal ApprovalAnswer Change { get; set; } = ApprovalAnswer.Denied;
+
+        /// <summary>The last such confirmation asked.</summary>
+        internal AccessChangePrompt? LastChange { get; private set; }
+
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ApprovalAnswer.Denied);
 
         public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ApprovalAnswer.Denied);
+
+        public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
+        {
+            LastChange = prompt;
+            return ValueTask.FromResult(Change);
+        }
     }
 }

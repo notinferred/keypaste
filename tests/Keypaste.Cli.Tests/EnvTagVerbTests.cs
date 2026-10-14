@@ -1,4 +1,6 @@
 using Keypaste.Core;
+using Keypaste.Core.Agents;
+using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -78,6 +80,44 @@ public sealed class EnvTagVerbTests : IDisposable
         _harness.Prompt.Enqueue(_master, "y");
         _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("env", "tag", "billing", "services/Stripe", "-p", "prod", "--vault", _harness.VaultPath));
         Assert.Equal(["env:billing:prod"], Tags(_stripe));
+    }
+
+    /// <summary>
+    /// Before y/N, as the app does, the verb names an agent set to Automatic where the tag puts the entry,
+    /// and with this computer's <c>clients.toml</c> unreadable it names the agent the vault's settings
+    /// would release it to once the file reads again.
+    /// </summary>
+    [Theory]
+    [InlineData(null, "Automatic: claude-code would get services/Stripe without asking, each release recorded in history.")]
+    [InlineData("this is not a clients file\n", "Automatic: by the vault's settings, claude-code would get services/Stripe without asking, each release recorded in history, once this computer's clients.toml can be read again; until then every agent request is refused.")]
+    public void Tag_names_an_agent_set_to_Automatic_there_before_asking(string? clients, string said)
+    {
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            Assert.True(ProjectScope.TryCreate("billing", "dev", out var dev, out var error), error);
+            Assert.Equal(
+                AgentAccessWrite.Written,
+                new AgentAccessStore(vault).Write("claude-code", AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }));
+            vault.Save();
+        }
+
+        if (clients is not null)
+        {
+            var path = KeypasteHome.ClientsPath(_harness.Environment[KeypasteHome.EnvironmentVariable]);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, clients);
+        }
+
+        _harness.Prompt.Interactive = true;
+        _harness.Stderr.GetStringBuilder().Clear();
+        _harness.Prompt.Enqueue(_master, "n");
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("env", "tag", "billing", "services/Stripe", "--vault", _harness.VaultPath));
+
+        var shown = _harness.Err.ReplaceLineEndings("\n");
+        Assert.Contains(said, shown, StringComparison.Ordinal);
+        Assert.True(shown.IndexOf(said, StringComparison.Ordinal) < shown.IndexOf("Cancelled; nothing was written.", StringComparison.Ordinal));
+        Assert.Empty(Tags(_stripe));
     }
 
     [Fact]

@@ -1,10 +1,12 @@
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Xunit;
+using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>The Agents screen's MCP clients: attached now, seen in this vault's log, or named by a policy row.</summary>
+/// <summary>The Agents screen's MCP clients: attached now, seen in this vault's log, or named by a row of <c>clients.toml</c>.</summary>
 public sealed class McpClientCardsTests
 {
     private const string _vault = "0123456789abcdef";
@@ -28,11 +30,11 @@ public sealed class McpClientCardsTests
     [Fact]
     public void AConnectedBridge_IsConnected()
     {
-        var cards = McpClientCards.Build([Connected("c1", "Claude Code", "claude-code")], [], _vault, ClientPolicies.Empty, _now);
+        var cards = McpClientCards.Build([Connected("c1", "Claude Code", "claude-code")], [], _vault, AccessCaps.Empty, _now);
 
         var card = Assert.Single(cards);
         Assert.Equal(("claude-code", ClientStatus.Connected, 1, "MCP stdio"), (card.Key, card.Status, card.Connections, card.Kind));
-        Assert.Equal(ClientPolicy.SessionGrants, card.Policy);
+        Assert.Empty(card.Ceiling.Rows);
     }
 
     [Fact]
@@ -40,7 +42,7 @@ public sealed class McpClientCardsTests
     {
         var token = Line(string.Empty, "keypaste run --token", 1, tool: "run") with { Method = "token" };
 
-        Assert.Empty(McpClientCards.Build([], [token], _vault, ClientPolicies.Empty, _now));
+        Assert.Empty(McpClientCards.Build([], [token], _vault, AccessCaps.Empty, _now));
     }
 
     /// <summary>The owner records every <c>keypaste run --session</c> request under the runner's name, refused ones included: no card is a runner's.</summary>
@@ -51,14 +53,14 @@ public sealed class McpClientCardsTests
             .Select(method => Line(string.Empty, RequestRecords.SessionRunner, 1, tool: "run") with { Method = method });
         var labelled = Line("claude-code", RequestRecords.SessionRunner, 1, tool: "run") with { Method = "prompt" };
 
-        Assert.Empty(McpClientCards.Build([], [.. runs], _vault, ClientPolicies.Empty, _now));
-        Assert.Equal("claude-code", Assert.Single(McpClientCards.Build([], [labelled], _vault, ClientPolicies.Empty, _now)).Key);
+        Assert.Empty(McpClientCards.Build([], [.. runs], _vault, AccessCaps.Empty, _now));
+        Assert.Equal("claude-code", Assert.Single(McpClientCards.Build([], [labelled], _vault, AccessCaps.Empty, _now)).Key);
     }
 
     [Fact]
     public void SeenOnlyInTheLog_IsIdle_WithLastSeen()
     {
-        var cards = McpClientCards.Build([], [Line("cursor", "Cursor", 5), Line("cursor", "Cursor", 2)], _vault, ClientPolicies.Empty, _now);
+        var cards = McpClientCards.Build([], [Line("cursor", "Cursor", 5), Line("cursor", "Cursor", 2)], _vault, AccessCaps.Empty, _now);
 
         var card = Assert.Single(cards);
         Assert.Equal(ClientStatus.Idle, card.Status);
@@ -72,33 +74,38 @@ public sealed class McpClientCardsTests
             [],
             [Line("elsewhere", "X", 1, vault: "ffffffffffffffff"), Line("ancient", "Y", 24 * 40), Line("listed", "Z", 1, tool: "run --token")],
             _vault,
-            ClientPolicies.Empty,
+            AccessCaps.Empty,
             _now);
 
         Assert.Empty(cards);
     }
 
     [Fact]
-    public void APolicyRowWithoutActivity_IsListed()
+    public void ACeilingRowWithoutActivity_IsListed()
     {
-        var policies = ClientPolicies.Empty.With("cursor", ClientPolicy.AskEveryTime).With(ClientPolicies.AnyClient, ClientPolicy.InjectOnly);
+        var caps = Caps(
+            new CapsRow { Label = "cursor", Mode = AgentMode.Ask },
+            new CapsRow { Label = "cursor", Project = Scope("billing"), Mode = AgentMode.Ask },
+            new CapsRow { Label = AgentNames.Any, Values = false });
 
-        var card = Assert.Single(McpClientCards.Build([], [], _vault, policies, _now));
+        var card = Assert.Single(McpClientCards.Build([], [], _vault, caps, _now));
 
-        Assert.Equal(("cursor", ClientPolicy.AskEveryTime, ClientStatus.Idle), (card.Key, card.Policy, card.Status));
+        Assert.Equal(("cursor", ClientStatus.Idle), (card.Key, card.Status));
+        Assert.Equal(2, card.Ceiling.Rows.Count);
+        Assert.True(card.Ceiling.Values);
         Assert.Null(card.LastSeen);
     }
 
     [Fact]
     public void UnlabeledClients_AreKeyedByName_AndHeldToTheStarRow()
     {
-        var policies = ClientPolicies.Empty.With(ClientPolicies.AnyClient, ClientPolicy.AskEveryTime);
+        var caps = Caps(new CapsRow { Label = AgentNames.Any, Values = false });
 
-        var card = Assert.Single(McpClientCards.Build([Connected("c1", "Zed", null)], [], _vault, policies, _now));
+        var card = Assert.Single(McpClientCards.Build([Connected("c1", "Zed", null)], [], _vault, caps, _now));
 
         Assert.Equal("name:Zed", card.Key);
         Assert.Null(card.Label);
-        Assert.Equal(ClientPolicy.AskEveryTime, card.Policy);
+        Assert.False(card.Ceiling.Values);
     }
 
     [Fact]
@@ -115,7 +122,7 @@ public sealed class McpClientCardsTests
             [Connected("c1", "Zed", "zed")],
             [Line("older", "Older", 10), Line("newer", "Newer", 1)],
             _vault,
-            ClientPolicies.Empty.With("quiet", ClientPolicy.AskEveryTime),
+            Caps(new CapsRow { Label = "quiet", Mode = AgentMode.Ask }),
             _now);
 
         Assert.Equal(["zed", "newer", "older", "quiet"], cards.Select(card => card.Key));

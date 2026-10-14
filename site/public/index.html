@@ -195,15 +195,17 @@
 keypaste: an agent is asking for a credential.
 
   client   claude-code
-  entry    env/demo/STRIPE_KEY
-  field    password
+  entry    env/demo/.env
+  field    STRIPE_KEY
 
   the agent says it needs this because:
     deploy the billing service to staging
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-[d] deny  [o] once  [h] 1 hour  45s ›
+  [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
+      released without asking you from then on, and recorded in history.
+[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
 </pre>
         </div>
         <figcaption>The approval as the next release draws it, in source today; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
@@ -251,7 +253,7 @@ keypaste run dev -- npm start</pre>
       <figure class="demo">
         <img src="/demo/keypaste-demo.gif" width="960" height="734" loading="lazy"
              alt="An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.">
-        <figcaption>Rendered from the current source's output, for the next release, with a scripted MCP client in place of the agent; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
+        <figcaption>Rendered from the source's output for the next release before its prompt offered Always for, with a scripted MCP client in place of the agent; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
       </figure>
     </div>
   </section>
@@ -397,10 +399,10 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
       <div class="terminal">
         <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste log</div>
 <pre>
-  time (UTC)           client       entry                decision  method
-  2026-07-26 14:03:09  claude-code  -                    granted   exposure
-  2026-07-26 14:03:11  claude-code  env/demo/STRIPE_KEY  granted   prompt
-  2026-07-26 14:07:44  claude-code  env/demo/STRIPE_KEY  denied    out-of-scope
+  time (UTC)           client       entry          decision  method
+  2026-07-26 14:03:09  claude-code  -              granted   exposure
+  2026-07-26 14:03:11  claude-code  env/demo/.env  granted   prompt
+  2026-07-26 14:07:44  claude-code  env/demo/.env  denied    prompt
 </pre>
       </div>
     </div>

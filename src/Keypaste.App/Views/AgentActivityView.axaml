@@ -3,6 +3,7 @@
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
              xmlns:clients="using:Keypaste.Core.Clients"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.AgentActivityView"
              x:DataType="vm:AgentActivityViewModel"
              Background="{DynamicResource KpBgApp}">
@@ -69,7 +70,7 @@
                 <StackPanel Spacing="4">
                   <TextBlock Classes="dialog-title" Text="Connect a client" />
                   <TextBlock Classes="caption" MaxWidth="640" HorizontalAlignment="Left"
-                             Text="Points an AI client at this vault. It can then list the names its exposure allows and ask for one credential at a time, which you answer here." />
+                             Text="Points an AI client at this vault. It can then list the names its settings let it see and ask for one credential at a time, which you answer here." />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="icon ghost sm" VerticalAlignment="Top"
                         Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ToggleConnectCommand}"
@@ -95,11 +96,11 @@
                 <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Label}" AutomationProperties.Name="Label" />
                 <TextBox Grid.Row="1" Grid.Column="2" Classes="mono"
                          Text="{Binding Exposure}"
-                         PlaceholderText="tag:env:*"
+                         PlaceholderText="**"
                          AutomationProperties.Name="Exposure" />
               </Grid>
               <TextBlock Classes="caption" Margin="0,-6,0,0"
-                         Text="Exposure is which entries the client may list: tag:env:*, the variables of entries tagged into a project, unless you name others. Separate patterns with commas." />
+                         Text="Exposure narrows which items this client can reach, whatever its settings say: tag:env:&lt;project&gt; or a place such as api/**, separated by commas. Left empty, its settings alone decide what it sees, as they decide whether it may run commands." />
 
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Content="Preview connect" Command="{Binding PreviewConnectCommand}" />
@@ -212,8 +213,8 @@
           </Border>
         </StackPanel>
 
-        <!-- Who reaches this vault and how each is asked (D-0360, D-0361). Names are what clients say
-             about themselves and the labels in their configuration: display only (T-3, T-36). -->
+        <!-- Who reaches this vault, and each one's settings (D-0361). Names are what clients say about
+             themselves and the labels in their configuration: display only (T-3, T-36). -->
         <StackPanel Spacing="10">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <ctl:KpIcon Icon="plug" Size="15" Foreground="{DynamicResource KpTextMuted}" />
@@ -226,11 +227,6 @@
             </Grid>
           </Border>
           <ItemsControl Name="ClientCards" ItemsSource="{Binding Clients}">
-            <ItemsControl.Styles>
-              <Style Selector="ItemsControl#ClientCards > ContentPresenter" x:DataType="vm:ClientCardRow">
-                <Setter Property="ZIndex" Value="{Binding MenuLayer}" />
-              </Style>
-            </ItemsControl.Styles>
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <ctl:AutoFillPanel MinColumnWidth="240" Spacing="12" />
@@ -240,7 +236,7 @@
               <DataTemplate x:DataType="vm:ClientCardRow">
                 <Border Classes="card filled">
                   <StackPanel Spacing="14">
-                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                       <Border Classes="tile">
                         <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                    FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextPrimary}" />
@@ -257,49 +253,20 @@
                         <TextBlock Text="{Binding Status}" FontSize="11.5" FontWeight="Medium"
                                    Classes.ok="{Binding IsConnected}" Classes.muted="{Binding !IsConnected}" />
                       </StackPanel>
-                      <ToggleButton Grid.Column="3"
-                                    Name="ClientMenu"
-                                    Classes="more"
-                                    IsChecked="{Binding IsMenuOpen}"
-                                    IsEnabled="{Binding CanSetPolicy}"
-                                    ToolTip.Tip="Change the policy"
-                                    AutomationProperties.Name="{Binding Title, StringFormat='Policy for {0}'}">
-                        <ctl:KpIcon Icon="ellipsis" Size="14" />
-                      </ToggleButton>
                     </Grid>
-
-                    <!-- A canvas takes no room, so the open menu lies over what is below it, the card's own policy included. -->
-                    <Canvas Height="0" Margin="0,-8,0,-6" ZIndex="1">
-                      <Border Name="ClientMenuPanel"
-                              Classes="menu"
-                              Canvas.Right="0"
-                              Canvas.Top="0"
-                              MinWidth="230"
-                              IsVisible="{Binding IsMenuOpen}">
-                        <ItemsControl ItemsSource="{Binding Choices}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PolicyChoice">
-                              <Button Classes="ghost menu-item"
-                                      Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).SetPolicyCommand}"
-                                      CommandParameter="{Binding}"
-                                      AutomationProperties.Name="{Binding Words}">
-                                <Grid ColumnDefinitions="16,*" ColumnSpacing="8">
-                                  <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsHeld}" Foreground="{DynamicResource KpTextPrimary}" />
-                                  <TextBlock Grid.Column="1" Text="{Binding Words}" VerticalAlignment="Center" />
-                                </Grid>
-                              </Button>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </Border>
-                    </Canvas>
-                    <!-- The choice is made from the card's ⋯ menu; the card says which one holds. -->
+                    <!-- The settings open below the cards, where they have the screen's width. -->
                     <StackPanel Spacing="4">
-                      <TextBlock Classes="th" Text="POLICY" />
-                      <TextBlock Name="PolicyHeld" Text="{Binding PolicyText}" FontSize="13" Foreground="{DynamicResource KpTextPrimary}" />
-                      <TextBlock Classes="caption" Text="{Binding Explanation}" FontSize="11.5" IsVisible="{Binding HasExplanation}" />
-                      <TextBlock Classes="caption" Text="{Binding Hint}" FontSize="11.5"
-                                 IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <Button Name="ClientSettings" Classes="ghost sm" HorizontalAlignment="Left" Padding="6,0"
+                              IsVisible="{Binding HasSettings}"
+                              Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ToggleSettingsCommand}"
+                              CommandParameter="{Binding}"
+                              AutomationProperties.Name="{Binding Title, StringFormat='Settings for {0}'}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="{Binding SettingsIcon}" Size="13" />
+                          <TextBlock Text="Settings" />
+                        </StackPanel>
+                      </Button>
+                      <TextBlock Classes="caption" Text="{Binding Hint}" FontSize="11.5" TextWrapping="Wrap" IsVisible="{Binding HasHint}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -307,6 +274,9 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <TextBlock Classes="caption" Text="A client appears here once its bridge has asked for something." />
+          <Border Name="AgentSettingsPanel" Classes="card filled" IsVisible="{Binding HasSettings}">
+            <views:AgentSettingsView DataContext="{Binding Settings}" />
+          </Border>
         </StackPanel>
 
         <!-- This session's audit records as `keypaste log` renders them (D-0331); the activity log in

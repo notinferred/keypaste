@@ -21,6 +21,11 @@
     <Compile Include="../Keypaste.Core.Tests/Reporter.cs" Link="Reporter.cs" />
     <!-- The owner's own log, which these tests read beside the bridge's. -->
     <Compile Include="../Keypaste.Core.Tests/OwnerLog.cs" Link="OwnerLog.cs" />
+    <!-- Agents' settings in memory, for the owners these tests start. -->
+    <Compile Include="../Keypaste.Core.Tests/FakeAgentSettings.cs" Link="FakeAgentSettings.cs" />
+    <!-- The core's hand-moved clock and time zones a test names on any runner, for an agent's end to Automatic. -->
+    <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
+    <Compile Include="../Keypaste.Core.Tests/TestZones.cs" Link="TestZones.cs" />
   </ItemGroup>
 
   <!-- The child an agent's run starts in the capture tests: built beside these tests, never referenced. -->

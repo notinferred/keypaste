@@ -268,7 +268,7 @@ public static class AuditReader
     /// A grant is scoped to one client, entry and field, so that triple is what identifies the
     /// approval a cached release is drawing on. The comparison is between hashes rather than
     /// excerpts, because an excerpt is truncated and two reasons that differ past 200 characters
-    /// differ. A <c>policy</c> release is not flagged: there is no earlier approval it could be
+    /// differ. An <c>automatic</c> release is not flagged: there is no earlier approval it could be
     /// diverging from, which THREATS.md T-12 says is the worse case rather than the better one.
     /// </remarks>
     private static void MarkUnreadReasons(List<AuditEntry> entries)

@@ -59,6 +59,7 @@ export default defineConfig({
           items: [
             { label: 'Overview', link: '/how-it-works/' },
             { label: 'Security model', link: '/how-it-works/security/' },
+            { label: 'Access format (ACAF v1)', link: '/acaf/v1/' },
           ],
         },
         {

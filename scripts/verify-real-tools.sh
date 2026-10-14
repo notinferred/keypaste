@@ -3,7 +3,7 @@
 # pinned versions: Claude Code, Codex, Gemini CLI, Devin, VS Code and Cursor on every runner, and Claude Desktop on
 # macOS and Windows. It writes those tools' own configuration in the runner account's home, so it refuses to run
 # anywhere but GitHub Actions. keypaste runs with a KEYPASTE_HOME of its own and a vault chosen with keypaste use,
-# so setup pins --vault, --audit-log and --approver (D-0389), and the bridge is the built keypaste.
+# so setup pins --vault, --audit-log, --clients and --approver (D-0389), and the bridge is the built keypaste.
 #
 # Seeded first: VS Code's, Cursor's and Claude Desktop's files each hold another server and another top-level key,
 # VS Code's a comment too, in directories created as each app's first run would, since none has run. On Windows the
@@ -16,21 +16,23 @@
 # and the pinned audit log then exists while the default home's does not; claude mcp get, codex mcp get --json and
 # devin mcp get find the entry; and Cursor's agent mcp list lists it on Linux and macOS. VS Code's code --add-mcp
 # writes the same entry from the same fields into a throwaway profile, but VS Code never reads the real file back.
-# Every tool's entry starts the bridge with the pinned vault, audit log and approver and the tool's id as its label,
-# and each seeded file keeps everything else. VS Code, Claude Desktop and, on Windows, Cursor are checked at the
-# file level only. setup --remove --dry-run then finds every registration, so each of keypaste's readers
-# reads the file its tool wrote on this runner, and on Windows starts Codex and Gemini CLI through node.exe, never
-# cmd.exe. The backups equal the seeds. A second connect changes no entry and no backup. Removing leaves no tool
-# listing keypaste and gives each seeded file back byte for byte, and a second removal calls every tool not
-# connected. No configuration or backup holds the master password or names a keyfile.
+# Every tool's entry starts the bridge with the pinned vault, audit log, ceilings and approver, the tool's id as its label, run
+# offered and every item in reach, which each agent's settings narrow, and each seeded file keeps everything else.
+# VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. setup --remove --dry-run then
+# finds every registration, so each of keypaste's readers reads the file its tool wrote on this runner, and on
+# Windows starts Codex and Gemini CLI through node.exe, never cmd.exe. The backups equal the seeds. A second connect
+# changes no entry and no backup. Removing leaves no tool listing keypaste and gives each seeded file back byte for
+# byte, and a second removal calls every tool not connected. No configuration or backup holds the master password
+# or names a keyfile.
 #
 # NEGATIVE CONTROL: this fails if setup changes a file without --yes, if a removal with nothing to remove runs a
 # tool or changes a byte, if any tool is not configured, if a tool's reader does not find keypaste, if Gemini CLI's
-# bridge does not reach the pinned audit log, if an entry names another program, vault, audit log, approver or
-# label, if a seeded file loses another entry, if VS Code would write the entry differently, if keypaste's reader
-# for a tool misses the entry that tool wrote, if Windows starts a tool through cmd.exe, if a backup differs from
-# its seed or changes on a second connect, if removal leaves keypaste anywhere or a seeded file changed, if a second
-# removal is not a no-op, or if a secret reaches a configuration. These checks must never be skipped or soft-passed.
+# bridge does not reach the pinned audit log, if an entry names another program, vault, audit log, ceilings, approver or
+# label or leaves out run or every item's reach, if a seeded file loses another entry, if VS Code would write the
+# entry differently, if keypaste's reader for a tool misses the entry that tool wrote, if Windows starts a tool
+# through cmd.exe, if a backup differs from its seed or changes on a second connect, if removal leaves keypaste
+# anywhere or a seeded file changed, if a second removal is not a no-op, or if a secret reaches a configuration.
+# These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-real-tools-master-pw'
@@ -157,8 +159,8 @@ header() { sed -n -E "s/^$1 +//p" "$OUT" | head -n 1; }
 
 # The arguments every tool's entry starts the bridge with, labelled with the tool's id.
 expected_args() {
-  jq -cn --arg vault "$PIN_VAULT" --arg audit "$PIN_AUDIT" --arg approver "$PIN_APPROVER" --arg label "$1" \
-    '["mcp", "--vault", $vault, "--audit-log", $audit, "--approver", $approver, "--client-label", $label]'
+  jq -cn --arg vault "$PIN_VAULT" --arg audit "$PIN_AUDIT" --arg clients "$PIN_CLIENTS" --arg approver "$PIN_APPROVER" --arg label "$1" \
+    '["mcp", "--vault", $vault, "--audit-log", $audit, "--clients", $clients, "--approver", $approver, "--client-label", $label, "--allow-run", "--expose", "**"]'
 }
 
 # The first object in a tool's JSON that names a command and its arguments.
@@ -282,9 +284,10 @@ every_tool 'configured(;|$)' configured
 BRIDGE="$(header 'keypaste mcp')"
 PIN_VAULT="$(header vault)"
 PIN_AUDIT="$(header 'audit log')"
+PIN_CLIENTS="$(header ceilings)"
 PIN_APPROVER="$(header approver)"
-[ -n "$BRIDGE" ] && [ -n "$PIN_AUDIT" ] && [ -n "$PIN_APPROVER" ] \
-  || die "setup under a KEYPASTE_HOME of its own did not pin an audit log and an approver"
+[ -n "$BRIDGE" ] && [ -n "$PIN_AUDIT" ] && [ -n "$PIN_CLIENTS" ] && [ -n "$PIN_APPROVER" ] \
+  || die "setup under a KEYPASTE_HOME of its own did not pin an audit log, ceilings and an approver"
 [ "$PIN_VAULT" = "$CHOSEN" ] || die "setup pinned the vault [$PIN_VAULT], not the chosen [$CHOSEN]"
 for id in $FILE_TOOLS; do
   grep -Eq "^  $id +configured; the original is kept as .*\\.keypaste-backup" "$OUT" || die "setup did not name $id's backup"

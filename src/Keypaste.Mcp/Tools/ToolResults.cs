@@ -37,11 +37,20 @@ internal static class ToolResults
         Content = [new TextContentBlock { Text = explanation }],
     };
 
+    /// <summary>A change to the agent's settings that was made.</summary>
+    /// <param name="explanation">What to tell the agent. Trusted text written by keypaste.</param>
+    /// <returns>A result carrying the explanation and nothing else.</returns>
+    internal static CallToolResult Changed(string explanation) => new()
+    {
+        IsError = false,
+        Content = [new TextContentBlock { Text = explanation }],
+    };
+
     /// <summary>The one result in keypaste that carries a credential.</summary>
     /// <param name="field">Which field was released.</param>
     /// <param name="value">Its value, as a person approved it.</param>
     /// <param name="ttlSeconds">How long the grant lasts.</param>
-    /// <param name="method">Whether a person answered this request or a standing rule covered it.</param>
+    /// <param name="method">Whether a person answered this request or the agent's Automatic mode covered it.</param>
     /// <returns>A success result carrying exactly one field value and nothing else.</returns>
     /// <remarks>
     /// <para>
@@ -69,7 +78,7 @@ internal static class ToolResults
                 // claim keypaste asks to be trusted on.
                 Text = (method switch
                 {
-                    AuditMethod.Policy => ToolText.ReleasedByPolicy(field, ttlSeconds),
+                    AuditMethod.Automatic => ToolText.ReleasedAutomatically(field, ttlSeconds),
                     AuditMethod.Prompt when ttlSeconds == 0 => ToolText.ReleasedOnce(field),
                     _ => ToolText.Released(field, ttlSeconds),
                 }) + value,

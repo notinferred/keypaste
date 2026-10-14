@@ -7,11 +7,10 @@ namespace Keypaste.Core.Approval;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Three, not eight. Rate limits, per-client pauses, use caps and minimum display times are all
-/// real mitigations for prompt fatigue (THREATS.md T-11) and all of them are policy — which is
-/// Stage 2.3's subject and, for the pause switch, Stage 4.3's feature. What is kept here is the
-/// pair without which a single agent loop becomes a prompt storm: one request in front of a human
-/// at a time, and a cooldown after a refusal.
+/// Three, not eight. Hourly limits, per-agent modes, use caps and minimum display times are all
+/// real mitigations for prompt fatigue (THREATS.md T-11), and the first two belong to each agent's
+/// settings. What is kept here is the pair without which a single agent loop becomes a prompt storm:
+/// one request in front of a human at a time, and a cooldown after a refusal.
 /// </para>
 /// <para>
 /// <b>Why the window is 45 seconds and not the 60 the specification asks for.</b> MCP clients
@@ -39,11 +38,10 @@ public sealed record ApprovalLimits
     /// <summary>How long the same refused request is auto-denied for.</summary>
     public const int DefaultCooldownSeconds = 60;
 
-    /// <summary>The longest lifetime an agent, or a policy rule, may even ask for.</summary>
+    /// <summary>The longest lifetime an agent may even ask for.</summary>
     /// <remarks>
     /// The ceiling on the <em>request</em>, not on the grant: what is actually issued is this
-    /// clamped again by <see cref="MaximumTtlSeconds"/>, and by a rule's own ceiling when one
-    /// applies. It lives here rather than in the tool schema or the agent's argument parser because
+    /// clamped again by <see cref="MaximumTtlSeconds"/>. It lives here rather than in the tool schema or the agent's argument parser because
     /// all three have to agree about it and docs/PRODUCT.md law 4.3 does not allow a number that means one
     /// thing to be written down three times.
     /// </remarks>
@@ -65,25 +63,11 @@ public sealed record ApprovalLimits
     /// <param name="requestedSeconds">What the agent asked for.</param>
     /// <returns>The requested value, clamped to at least one second and at most <see cref="MaximumTtlSeconds"/>.</returns>
     /// <remarks>
-    /// What a standing rule's release is bounded by. A person's timed grant is not: they chose its
+    /// What an Automatic release is bounded by. A person's timed grant is not: they chose its
     /// length on screen, and it is always <see cref="MaximumTtlSeconds"/>.
     /// </remarks>
     public int EffectiveTtlSeconds(int requestedSeconds) =>
         Math.Clamp(requestedSeconds, 1, MaximumTtlSeconds);
-
-    /// <summary>The TTL that will actually apply when a policy rule covers the request.</summary>
-    /// <param name="requestedSeconds">What the agent asked for.</param>
-    /// <param name="ruleCeilingSeconds">The rule's own <c>max_ttl_seconds</c>.</param>
-    /// <returns>The smaller of the two ceilings, applied to the request.</returns>
-    /// <remarks>
-    /// <b>Both ceilings apply, and a rule may only lower.</b> A rule saying <c>max_ttl_seconds =
-    /// 3600</c> under an approver started <c>--max-ttl 60</c> grants 60. This overload exists so
-    /// that the policy path does no arithmetic of its own: a hand-written
-    /// <c>Math.Min(ruleCeiling, requested)</c> at the call site is exactly how a file in the user's
-    /// home directory would come to raise a ceiling the operator set on the command line.
-    /// </remarks>
-    public int EffectiveTtlSeconds(int requestedSeconds, int ruleCeilingSeconds) =>
-        Math.Min(EffectiveTtlSeconds(requestedSeconds), Math.Max(ruleCeilingSeconds, 1));
 
     /// <summary>A number of seconds as a person reads a duration: <c>1 hour</c>, <c>5 minutes</c>, <c>90 seconds</c>.</summary>
     /// <param name="seconds">The duration.</param>

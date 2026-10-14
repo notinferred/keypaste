@@ -47,12 +47,12 @@ public sealed class TagProtectionTests : IDisposable
     }
 
     [Fact]
-    public async Task A_handler_given_no_rule_asks_every_time_for_a_tagged_entry_and_grants_the_hour_otherwise()
+    public async Task A_handler_asks_every_time_for_a_protected_entry_and_grants_the_hour_otherwise()
     {
         using var vault = Seeded();
         using var fixture = new ApproverFixture();
         var source = new VaultCredentialSource(() => vault);
-        var handler = new ApproverHandler(source, new VaultEntryNameLister(() => vault), fixture.Gate, fixture.Grants, fixture.Policy);
+        var handler = new ApproverHandler(source, new VaultEntryNameLister(() => vault), fixture.Gate, fixture.Grants, fixture.Settings);
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         var first = await handler.RequestAsync(Request("services/Database"), "conn-1", _token);
@@ -102,5 +102,6 @@ public sealed class TagProtectionTests : IDisposable
         TtlSeconds = 900,
         Exposure = ["services/**"],
         ClientName = "claude-code",
+        ClientLabel = ApproverFixture.Agent,
     };
 }

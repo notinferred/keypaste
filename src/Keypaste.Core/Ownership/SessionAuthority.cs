@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -31,18 +32,19 @@ namespace Keypaste.Core.Ownership;
 /// (THREATS.md T-34).
 /// </para>
 /// <para>
-/// An agent's <c>run</c> is resolved the same way, against the bridge's exposure and the client's
-/// policy, and asked about as the exact program, command line, directory and variable names, unless a
-/// timed grant that person gave the same command line on the same connection still covers the same
-/// names (D-0358). The owner runs nothing: the bridge starts the command.
+/// An agent's <c>run</c> is refused unasked unless the agent's settings let it run commands, and is
+/// otherwise resolved the same way, against what the agent can see, and asked about as the exact
+/// program, command line, directory and variable names, unless a timed grant that person gave the same
+/// command line on the same connection still covers the same names (D-0358). No mode releases a run.
+/// The owner runs nothing: the bridge starts the command.
 /// </para>
 /// <para>
-/// Every listing, credential, run and token request it reads is recorded in this owner's own log
-/// before it is answered, a request refused at admission, withdrawn or failed while deciding included,
-/// and a release whose line cannot be written is refused (THREATS.md T-6). While that log will not
-/// open, every request is refused before anybody is asked. Nothing the asker sends moves that log, so
-/// a bridge configured to log elsewhere, or a program speaking the pipe directly, is recorded all the
-/// same (T-14). Attaching, listing grants and locking release nothing and
+/// Every listing, credential, run, token and settings-change request it reads is recorded in this
+/// owner's own log before it is answered, a request refused at admission, withdrawn or failed while
+/// deciding included, and a release whose line cannot be written is refused (THREATS.md T-6). While
+/// that log will not open, every request is refused before anybody is asked. Nothing the asker sends
+/// moves that log, so a bridge configured to log elsewhere, or a program speaking the pipe directly, is
+/// recorded all the same (T-14). Attaching, listing grants or settings and locking release nothing and
 /// are not recorded.
 /// </para>
 /// <para>
@@ -161,7 +163,7 @@ public sealed class SessionAuthority : IApproverHandler
 
     /// <summary>Ends every grant given to a bridge started with this <c>--client-label</c>, credential and run alike.</summary>
     /// <param name="label">The raw label.</param>
-    /// <remarks>What a stricter policy for that client does to what it already holds, so the Agents list matches the policy.</remarks>
+    /// <remarks>What a stricter ceiling for that agent does to what it already holds, so the Agents list matches it.</remarks>
     public void RevokeClient(string label)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -329,6 +331,18 @@ public sealed class SessionAuthority : IApproverHandler
             CredentialRefused,
             withdrawn.Token).ConfigureAwait(false);
 
+        AlwaysForNotice? unmade = null;
+
+        // Asked before the commit, so a lock while the person decides still withdraws the release, and
+        // in the slot the release's prompt kept, which is given back whatever became of it.
+        using (reply.Kept)
+        {
+            if (reply is { Decision: AuditDecision.Granted, AlwaysFor: { } scope } && request.ClientLabel is { } agent)
+            {
+                unmade = await AlwaysAsync(request, agent, scope, reply.Kept, lifetime, withdrawn.Token).ConfigureAwait(false);
+            }
+        }
+
         if (!lifetime.TryCommit() && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
         {
             // The released string is dropped here, never sent: the lock came before the release.
@@ -345,6 +359,12 @@ public sealed class SessionAuthority : IApproverHandler
         if (answered is { Decision: AuditDecision.Granted, Entry: { } entry })
         {
             Record(lifetime, [entry], client, AuditLog.Wire(answered.Method));
+
+            // Only now, so "allowed once" is said of a release that left.
+            if (unmade is not null)
+            {
+                _inner.Tell(unmade);
+            }
         }
         else if (delivered.Decision == AuditDecision.Granted)
         {
@@ -353,6 +373,203 @@ public sealed class SessionAuthority : IApproverHandler
 
         return answered;
     }
+
+    /// <summary>
+    /// After a person chose Always for on a release: asks them to confirm making that project
+    /// environment Automatic for the agent, as any change that gives an agent more is confirmed, and
+    /// records the change on its own line.
+    /// </summary>
+    /// <returns>What to tell them once the release has left when the change did not take effect, otherwise null.</returns>
+    /// <remarks>Whatever they answer, the release they already allowed stands as allowed once.</remarks>
+    private async ValueTask<AlwaysForNotice?> AlwaysAsync(
+        CredentialRequest request,
+        string agent,
+        ProjectScope scope,
+        KeptSlot? kept,
+        SessionLifetime lifetime,
+        CancellationToken cancellationToken)
+    {
+        var client = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
+
+        var reply = await Decided(
+            token => _inner.ChangeAccessAsync(agent, AccessEdit.Automatic(scope), AccessOrigin.Prompt, string.Empty, kept, token),
+            lifetime,
+            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason) { Unapplied = reason },
+            cancellationToken).ConfigureAwait(false);
+
+        _recorder.Recorded(
+            reply,
+            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, request.Session, VaultNamed(request.Vault)));
+
+        return AlwaysForNotice.For(agent, scope, reply);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Reading settings releases nothing, so it is not recorded, as listing grants is not. The listing
+    /// starts after the rows the request says it already has, so one too long for a frame is read in turns.
+    /// </remarks>
+    public ValueTask<AccessListReply> ListAccessAsync(AccessListRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
+        {
+            return ValueTask.FromResult(new AccessListReply(false, [], true, refusal.Reason));
+        }
+
+        var listed = _inner.ListAccess();
+
+        return ValueTask.FromResult(listed with { Agents = [.. listed.Agents.Skip(request.From)] });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para>
+    /// Recorded under the surface that asked, with the agent the change is for as its label: a bridge's
+    /// client when one attached, otherwise <c>keypaste mcp policy</c>, or no name for one that says an
+    /// agent asked. Beyond that, the origin the request claims only chooses where a narrowing is kept
+    /// and what the person is told it came from.
+    /// </para>
+    /// <para>
+    /// A request that says an agent asked through its own tool is admitted only for the agent its
+    /// connection attached as, so the person is never told an agent asked about another's settings.
+    /// That is a check of the claim, not of the agent: any program can attach under any label (THREATS.md T-3).
+    /// </para>
+    /// <para>
+    /// The log is asked for before anything is decided, so a change is never made that its line could
+    /// not follow; one whose line then fails to append still says so in its reply.
+    /// </para>
+    /// </remarks>
+    public async ValueTask<AccessChangeReply> ChangeAccessAsync(AccessChangeRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        var attached = _attached.TryGetValue(connectionId, out var attachment) ? attachment.Client : null;
+        var client = attached is not null ? AuditClient.Of(attached.Name, attached.Version, request.Agent)
+            : request.Origin == AccessOrigin.Agent ? AuditClient.Of(null, null, request.Agent)
+            : AuditClient.Of("keypaste mcp policy", CoreInfo.Version, request.Agent);
+
+        AccessChangeReply Answer(AccessChangeReply reply) => _recorder.Recorded(
+            reply,
+            RequestRecords.AccessChange(client, request.Reason, reply.Decision, reply.Method, reply.Reason, request.Session, VaultNamed(request.Vault)));
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
+        {
+            return Answer(new AccessChangeReply(AuditDecision.Denied, refusal.Method, refusal.Reason));
+        }
+
+        if (request.Origin == AccessOrigin.Agent && !string.Equals(attached?.Label, request.Agent, StringComparison.Ordinal))
+        {
+            return Answer(new AccessChangeReply(
+                AuditDecision.Denied,
+                AuditMethod.InvalidRequest,
+                "an agent may ask only about its own settings, and this connection did not attach as that agent"));
+        }
+
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+
+        return Answer(await Decided(
+            token => _inner.ChangeAccessAsync(request, token),
+            lifetime,
+            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
+            withdrawn.Token).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Changes an agent's settings for the person at this owner's own screen: at once when the change
+    /// gives the agent nothing more, otherwise only once they confirm it, as a terminal's change is.
+    /// </summary>
+    /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
+    /// <param name="edit">The change.</param>
+    /// <param name="surface">What the line records the screen as.</param>
+    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws a confirmation on screen.</param>
+    /// <returns>What became of it, recorded on its own line before it returns.</returns>
+    /// <remarks>
+    /// Kept to the live session as a request from a pipe is: a locked owner changes nothing, and a lock
+    /// while the person decides withdraws the confirmation.
+    /// </remarks>
+    public async ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, AccessEdit edit, string surface, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(edit);
+        ArgumentNullException.ThrowIfNull(surface);
+
+        var lifetime = Live();
+        var client = AuditClient.Of(surface, CoreInfo.Version, agent);
+
+        AccessChangeReply Answer(AccessChangeReply reply) => _recorder.Recorded(
+            reply,
+            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, lifetime?.Id, _vault.Key));
+
+        if (lifetime is null)
+        {
+            return Answer(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _lockedReason));
+        }
+
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+
+        return Answer(await Decided(
+            token => _inner.ChangeAccessAsync(agent, edit, AccessOrigin.Settings, string.Empty, token),
+            lifetime,
+            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
+            withdrawn.Token).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Resets this computer's ceilings for the person at this owner's own screen, when <c>clients.toml</c>
+    /// holds what keypaste cannot parse: only once they confirm what each agent then gets.
+    /// </summary>
+    /// <param name="surface">What the line records the screen as.</param>
+    /// <param name="cancellationToken">Cancelled when the screen stops waiting, which withdraws a confirmation on screen.</param>
+    /// <returns>What became of it, recorded on its own line, under <c>*</c> for every agent, before it returns.</returns>
+    public async ValueTask<AccessChangeReply> ResetCapsAsync(string surface, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(surface);
+
+        var lifetime = Live();
+        var client = AuditClient.Of(surface, CoreInfo.Version, AgentNames.Any);
+
+        AccessChangeReply Answer(AccessChangeReply reply) => _recorder.Recorded(
+            reply,
+            RequestRecords.AccessChange(client, string.Empty, reply.Decision, reply.Method, reply.Reason, lifetime?.Id, _vault.Key));
+
+        if (lifetime is null)
+        {
+            return Answer(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _lockedReason));
+        }
+
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+
+        return Answer(await Decided(
+            token => _inner.ResetCapsAsync(token),
+            lifetime,
+            (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
+            withdrawn.Token).ConfigureAwait(false));
+    }
+
+    /// <summary>One agent's settings as the person's own screen shows them.</summary>
+    /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
+    /// <param name="settings">Its settings, when a session is live and they could be read.</param>
+    /// <param name="problem">Why not, otherwise empty.</param>
+    /// <returns>Whether they were read.</returns>
+    public bool TrySettings(string agent, [NotNullWhen(true)] out AgentSettingsState? settings, out string problem)
+    {
+        if (Live() is null)
+        {
+            settings = null;
+            problem = _lockedReason;
+            return false;
+        }
+
+        return _inner.TrySettings(agent, out settings, out problem);
+    }
+
+    /// <summary>What applies to an agent's requests now, or null when its settings cannot be read, which refuses them all.</summary>
+    /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>
+    /// <returns>What applies, or null.</returns>
+    public EffectiveAccess? Access(string? label) => _inner.TryAccess(label, out var access, out _) ? access : null;
 
     /// <inheritdoc/>
     public async ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken)
@@ -496,16 +713,18 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>
     /// <para>
     /// The order is the security property. Admitted, then the request's rules, then the exposure and
-    /// the client's policy, then resolved under the admitted lifetime; the person is asked about the
-    /// names the set holds once exposure, the name rule and the audit line's room are checked, unless
-    /// a timed grant this connection holds for the same command line covers the same names. The set is
-    /// read again after the answer, so an edit saved meanwhile is what leaves. A release whose names are
-    /// not the ones the request named, or that one frame cannot carry, is refused before it is recorded.
+    /// the agent's settings, a run refused unresolved when they do not let it run commands, then
+    /// resolved under the admitted lifetime; the person is asked about the names the set holds once
+    /// what the agent can see, the name rule and the audit line's room are checked, unless a timed grant
+    /// this connection holds for the same command line covers the same names. The set is read again
+    /// after the answer, so an edit saved meanwhile is what leaves. A release whose names are not the
+    /// ones the request named, or that one frame cannot carry, is refused before it is recorded.
     /// </para>
     /// <para>
     /// A missing project, a missing profile, an unusable set and one outside the exposure all come back
     /// as <see cref="AuditMethod.OutOfScope"/>, so a run cannot map the vault (THREATS.md T-4); the
-    /// reason, which only the audit line keeps, says which. No standing rule releases a run.
+    /// reason, which only the audit line keeps, says which. No mode releases a run: Automatic asks, and
+    /// Ask every time offers no timed grant.
     /// </para>
     /// </remarks>
     public async ValueTask<RunReply> ReleaseRunAsync(RunRequest request, string connectionId, CancellationToken cancellationToken)
@@ -598,10 +817,17 @@ public sealed class SessionAuthority : IApproverHandler
             return Refuse(EnvOutcome.Invalid, AuditMethod.Failed, $"the exposure this bridge was configured with is not usable: {globError}");
         }
 
-        if (!_inner.TryPolicyFor(request.ClientLabel, out var policy, out var clientsProblem))
+        if (!_inner.TryAccess(request.ClientLabel, out var access, out var settingsProblem))
         {
-            environments.Narrate?.Invoke($"refused a run: the clients file is not usable: {clientsProblem}");
-            return Refuse(EnvOutcome.Unreadable, AuditMethod.Failed, $"the clients file is not usable: {clientsProblem}");
+            environments.Narrate?.Invoke($"refused a run: agent settings are not usable: {settingsProblem}");
+            return Refuse(EnvOutcome.Unreadable, AuditMethod.Failed, $"agent settings are not usable: {settingsProblem}");
+        }
+
+        // Before anything is resolved, so an agent that may not run commands learns nothing of the vault from a run.
+        if (!access.Run)
+        {
+            environments.Narrate?.Invoke($"refused a run for {ClientName(request.ClientLabel, request.ClientName)}: its settings do not let it run commands");
+            return Refuse(EnvOutcome.Unauthorized, AuditMethod.RunOff, "this agent's settings do not let it run commands");
         }
 
         EnvReferenceDocument? document = null;
@@ -646,10 +872,10 @@ public sealed class SessionAuthority : IApproverHandler
             // A reply carries only entries its line can hold, so a refusal of a larger set is still recorded.
             shown = recordable ? named : [];
 
-            // Exposure first, so a set outside it is refused as out of scope whatever its size (T-4).
-            if (entries.Any(entry => !exposure.Permits(entry.Name, _inner.Tags(entry.Name), entry.Field)))
+            // What the agent can see first, so a set outside it is refused as out of scope whatever its size (T-4).
+            if (entries.Any(entry => !EntryExposure.Permits(access.Reach(exposure, entry.Name, _inner.Tags(entry.Name)), entry.Field)))
             {
-                (refused, refusedMethod) = ("a variable's entry or field is outside this bridge's configured exposure", AuditMethod.OutOfScope);
+                (refused, refusedMethod) = ("a variable's entry or field is outside what this agent can see through this bridge", AuditMethod.OutOfScope);
                 return false;
             }
 
@@ -665,9 +891,10 @@ public sealed class SessionAuthority : IApproverHandler
                 return false;
             }
 
+            var now = environments.Clock.GetUtcNow();
             var onceOnly = preview.RequiresLiveApproval || entries.Any(entry => _inner.RequiresLiveApproval(entry.Name))
                 ? OnceOnly.ProtectedProfile
-                : policy == ClientPolicy.AskEveryTime ? OnceOnly.ClientPolicy : OnceOnly.None;
+                : entries.Any(entry => access.Item(_inner.Tags(entry.Name), now).Mode == AgentMode.Ask) ? OnceOnly.AskEveryTime : OnceOnly.None;
             var grantSeconds = onceOnly == OnceOnly.None ? EnvGrantCache.GrantSeconds(environments.Gate.Limits) : 0;
 
             // Names only: the resolver reads again after this, so a grant releases the latest saved

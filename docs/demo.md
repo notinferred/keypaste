@@ -21,7 +21,7 @@ Use a disposable vault. The tool returns credentials as text and structured data
 ```sh
 keypaste init ~/keypaste-demo.kdbx
 export KEYPASTE_VAULT=~/keypaste-demo.kdbx
-keypaste add env/demo/STRIPE_KEY
+keypaste env set demo STRIPE_KEY
 ```
 
 ```
@@ -29,14 +29,11 @@ New master password:
 Confirm master password:
 Created /home/you/keypaste-demo.kdbx
 Master password:
-Username:
-URL:
-Notes:
-Password:
-Added env/demo/STRIPE_KEY
+Value for STRIPE_KEY:
+Set STRIPE_KEY on env/demo/.env, created and tagged env:demo
 ```
 
-The key is an entry of its own, the one the request below names. Press Enter at Username, URL and Notes; nothing is echoed at the password prompts. When it asks for the password, paste this:
+The key is a variable of the project `demo`: a protected field named `STRIPE_KEY` on the entry `env/demo/.env`, which the tag `env:demo` puts in the project's `dev` environment. That is the field the request below names, and one an agent with no settings of its own can see. Nothing is echoed at the prompts. When it asks for the value, paste this:
 
 ```
 sk_test_EXAMPLE_ONLY_not_a_real_key_0000
@@ -50,8 +47,7 @@ This is a fake value shaped like a Stripe test key so the masked output is recog
 claude mcp add --transport stdio --scope local keypaste \
   -- /absolute/path/to/keypaste mcp \
      --vault /absolute/path/to/keypaste-demo.kdbx \
-     --client-label claude-code \
-     --expose 'env/**'
+     --client-label claude-code
 ```
 
 The equivalent by hand, in `.mcp.json`:
@@ -61,13 +57,13 @@ The equivalent by hand, in `.mcp.json`:
   "mcpServers": {
     "keypaste": {
       "command": "/absolute/path/to/keypaste",
-      "args": ["mcp", "--vault", "/absolute/path/to/keypaste-demo.kdbx", "--client-label", "claude-code", "--expose", "env/**"]
+      "args": ["mcp", "--vault", "/absolute/path/to/keypaste-demo.kdbx", "--client-label", "claude-code"]
     }
   }
 }
 ```
 
-`--scope local` applies only to this machine. `--expose 'env/**'` makes the demo's entry available; in source, a bridge without `--expose` reaches only the project variables of tagged entries (`tag:env:*`). The master password is entered in the approver, never in client configuration; see [Connecting keypaste to Claude](mcp-setup.md).
+`--scope local` applies only to this machine. In source, a bridge without `--expose` reaches only the project variables of tagged entries (`tag:env:*`), and so does an agent with no settings of its own, which is where `env set` put the key; an `--expose` you add can only narrow that further, and the agent's settings say what it gets ([agent settings](policy.md)). `--client-label claude-code` is the name those settings follow. The master password is entered in the approver, never in client configuration; see [Connecting keypaste to Claude](mcp-setup.md).
 
 Work in a small scratch project rather than a real one. Copy `scripts/demo/deploy.sh` from this repository into it; that is the deploy Claude will run.
 
@@ -86,7 +82,6 @@ keypaste agent --vault ~/keypaste-demo.kdbx
 ```
 Master password:
 keypaste: watching /home/you/keypaste-demo.kdbx
-keypaste: policy: no file at /home/you/.keypaste/policy.toml, so every request is shown to you.
 keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for session 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, grants last at most 3600 seconds
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
@@ -139,20 +134,22 @@ Claude calls `request_credential`, and your left terminal stops being idle:
 keypaste: an agent is asking for a credential.
 
   client   claude-code
-  entry    env/demo/STRIPE_KEY
-  field    password
+  entry    env/demo/.env
+  field    STRIPE_KEY
 
   the agent says it needs this because:
     deploy the billing service to staging
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-[d] deny  [o] once  [h] 1 hour  45s ›
+  [a] allows this once, then asks you to make demo:dev Automatic for claude-code:
+      released without asking you from then on, and recorded in history.
+[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev  45s ›
 ```
 
-Your run may use different arguments. Claude writes the reason. `client` is the sanitized, unauthenticated MCP handshake name; it can differ from the configured audit and policy label. `entry` is the resolved vault entry, and `field` is the requested allowed field.
+Your run may use different arguments. Claude writes the reason. `client` is the sanitized, unauthenticated MCP handshake name; it can differ from `--client-label`, the name the audit log records and the agent's settings follow. `entry` is the resolved vault entry, and `field` is the requested allowed field.
 
-`o` releases it for this request only. `h` also lets the same client ask for the same field again for an hour without asking you. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
+`o` releases it for this request only. `h` also lets the same client ask for the same field again for an hour without asking you. `a` releases it once and then asks you, in a confirmation of its own, whether to make `demo:dev` Automatic for claude-code, so that what it can see there is released without asking from then on and each release is still recorded; deny that confirmation and it stays one release. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
 
 Claude may call `list_entry_names` first to find the entry, or go straight to the credential. Either is fine, and both appear in the log.
 
@@ -165,7 +162,7 @@ Press `h`:
 ```
 keypaste: allowed for 1 hour.
 ────────────────────────────────────────────────────────────
-keypaste: released env/demo/STRIPE_KEY to claude-code for 3600s
+keypaste: released env/demo/.env to claude-code for 3600s
 ```
 
 Claude sets the variable for the child process and runs the deploy again:
@@ -209,9 +206,9 @@ keypaste log --since 5m
 ```
 2 records of 2 in /home/you/.keypaste/audit.jsonl, since 2026-07-27 09:53:07Z
 
-  time (UTC)           client       entry                decision  method
-  2026-07-27 09:57:42  claude-code  -                    granted   exposure
-  2026-07-27 09:57:42  claude-code  env/demo/STRIPE_KEY  granted   prompt
+  time (UTC)           client       entry          decision  method
+  2026-07-27 09:57:42  claude-code  -              granted   exposure
+  2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
 This run logged a listing (`exposure`) followed by an approved credential request (`prompt`). The returned field value is excluded from the log; names and reason excerpts remain logged metadata and should not contain secrets.
@@ -236,8 +233,8 @@ Repeat the credential request on the same MCP connection while its approval rema
 | What you see | What it is |
 |---|---|
 | `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste agent` from starting on it; lock the vault in the app first. |
-| Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read env/demo/STRIPE_KEY`. |
-| `DENIED. That entry is outside what this server was configured to expose` | The entry is not under `env/`, which the demo's `--expose 'env/**'` names, and approval cannot widen it. |
+| Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read STRIPE_KEY from env/demo/.env`. |
+| `DENIED. That entry is outside what this agent can see` (`v0.3.0`: `outside what this server was configured to expose`) | The request named something other than `STRIPE_KEY` on `env/demo/.env`, the key was stored some other way than `env set`, or an `--expose` was added to the bridge. Approval cannot widen it. |
 | The dialog never appears | Your MCP client is running somewhere you are not looking. The approval prompt is that terminal: `v0.3.0` has no native dialog. |
 | The server shows as failed to start | Check the absolute executable path and permissions, then whether `~/.keypaste` is writable for auditing. |
 
@@ -245,7 +242,7 @@ Repeat the credential request on the same MCP connection while its approval rema
 
 ## Limits
 
-The tool returns the credential as both text and structured data. Claude can retain either in context and session files, which is why this demo uses a fake value. Claude may place the value on a command line when starting a child process. keypaste does not control that use or retention. TTL limits cached approval reuse; it cannot erase returned copies or revoke credentials at their provider. keypaste sanitizes, truncates and labels the reason beside the resolved entry name. It cannot verify whether the claim is true. Claude may choose another entry, ask for clarification or inspect the script first. This recording does not establish behavior in future runs. The approver keeps its vault unlocked until stopped with Ctrl+C; it has no idle auto-lock. A matching [policy rule](policy.md) bypasses the dialog. This demo assumes no policy file.
+The tool returns the credential as both text and structured data. Claude can retain either in context and session files, which is why this demo uses a fake value. Claude may place the value on a command line when starting a child process. keypaste does not control that use or retention. TTL limits cached approval reuse; it cannot erase returned copies or revoke credentials at their provider. keypaste sanitizes, truncates and labels the reason beside the resolved entry name. It cannot verify whether the claim is true. Claude may choose another entry, ask for clarification or inspect the script first. This recording does not establish behavior in future runs. The approver keeps its vault unlocked until stopped with Ctrl+C; it has no idle auto-lock. In source, an agent you set to Automatic for an item's project or environment is not asked about it ([agent settings](policy.md)); the demo's claude-code has no settings of its own, so every request comes to you.
 
 ## Verifying it yourself
 

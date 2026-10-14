@@ -59,6 +59,40 @@ public static class DisplayTextSanitizer
     }
 
     /// <summary>
+    /// Writes each character that could make one line misrepresent itself, every control character, line
+    /// break and invisible character included, as a <c>\u</c> escape a person can see, and keeps the rest.
+    /// </summary>
+    /// <param name="raw">Text holding no <c>\</c> of its own, as a selector and a project name cannot, so every escape is one.</param>
+    /// <returns>The text, with nothing removed: a pattern an agent sent reads as exactly what it matches.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="raw"/> is null.</exception>
+    /// <remarks>
+    /// For what grants something, where the person must see every character rather than a cleaned copy:
+    /// removing a zero-width character would show a pattern other than the one that applies.
+    /// </remarks>
+    public static string Escaped(string raw)
+    {
+        ArgumentNullException.ThrowIfNull(raw);
+
+        var builder = new StringBuilder(raw.Length);
+        Span<char> utf16 = stackalloc char[2];
+
+        foreach (var rune in raw.EnumerateRunes())
+        {
+            if (rune.Value is '\n' or '\t' || !IsSafe(rune))
+            {
+                builder.Append(rune.IsBmp
+                    ? string.Create(CultureInfo.InvariantCulture, $"\\u{rune.Value:X4}")
+                    : string.Create(CultureInfo.InvariantCulture, $"\\U{rune.Value:X8}"));
+                continue;
+            }
+
+            builder.Append(utf16[..rune.EncodeToUtf16(utf16)]);
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
     /// The scan. Iteration is over runes for the reason <see cref="EntryNameSanitizer"/> gives: the
     /// tag block U+E0000–U+E007F carries an ASCII sentence inside one glyph and every character in
     /// it is astral, so a loop over <see cref="char"/> misses all of them.

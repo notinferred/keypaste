@@ -309,7 +309,7 @@ public sealed class EntryExposureTests
                 new VaultEntryNameLister(() => vault),
                 fixture.Gate,
                 fixture.Grants,
-                fixture.Policy);
+                fixture.Settings);
 
             var reply = await handler.RequestAsync(
                 new CredentialRequest

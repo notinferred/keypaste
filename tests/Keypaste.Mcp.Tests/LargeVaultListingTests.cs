@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
-using Keypaste.Core.Policy;
 using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
@@ -92,7 +91,7 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
                     new VaultEntryNameLister(() => _vault),
                     _gate,
                     _grants,
-                    PolicyGate.None),
+                    TestSession.Settings()),
                 _log.Log));
 
         _serving = _listener.RunAsync(_stop.Token);

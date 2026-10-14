@@ -1,8 +1,7 @@
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
-using Keypaste.Core.Policy;
 
 namespace Keypaste.Core.Ownership;
 
@@ -27,11 +26,11 @@ public sealed record SessionServerOptions
     /// <summary>How many requests wait for a person, and for how long.</summary>
     public ApprovalLimits Limits { get; init; } = ApprovalLimits.Default;
 
-    /// <summary>The standing rules consulted before a person is asked; <see cref="PolicyGate.None"/> asks the person every time.</summary>
-    public required PolicyGate Policy { get; init; }
+    /// <summary>Each agent's settings in the vault, and this computer's ceilings in <c>clients.toml</c>.</summary>
+    public required IAgentSettings Settings { get; init; }
 
-    /// <summary>Per-client policy, from <c>clients.toml</c>.</summary>
-    public required ClientPolicySource Clients { get; init; }
+    /// <summary>The owner's hourly limits on Automatic, which outlive one unlock and end with the owner's process.</summary>
+    public required HourlyLimit Hourly { get; init; }
 
     /// <summary>Opens the audit log the owner records each request it answers in, or returns null when it cannot, which refuses the request before anybody is asked.</summary>
     public required Func<AuditLog?> Audit { get; init; }
@@ -113,9 +112,10 @@ public sealed class SessionServer : IDisposable
                 new VaultEntryNameLister(() => options.UnlockedFor(lifetime)),
                 gate,
                 grants,
-                options.Policy,
+                options.Settings,
                 options.Narrate,
-                clients: options.Clients);
+                hourly: options.Hourly,
+                clock: options.Clock);
 
             var authority = new SessionAuthority(
                 options.Vault,

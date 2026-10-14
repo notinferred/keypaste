@@ -1,8 +1,9 @@
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -10,8 +11,9 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// Agents › MCP clients: who reaches this vault and how each is asked, written to <c>clients.toml</c>
-/// (D-0360, D-0361). Identities are display only; a stricter policy also ends what that client holds.
+/// Agents › MCP clients: who reaches this vault, and each one's settings opened from its card below the
+/// cards (D-0361). Identities are display only, and settings follow the label a client's bridge was
+/// started with, so an unlabeled client has none of its own.
 /// </summary>
 public sealed class AgentClientsTests
 {
@@ -19,8 +21,14 @@ public sealed class AgentClientsTests
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
+    private static AccessCaps Caps(string path)
+    {
+        Assert.True(AccessCaps.TryLoad(path, out var caps, out var problem), problem);
+        return caps;
+    }
+
     [Fact]
-    public async Task Cards_ListConnectedAndSeenClients_WithPolicy()
+    public async Task Cards_ListConnectedAndSeenClients_EachWithItsSettings()
     {
         await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "claude-code"));
         app.Audit("cursor", app.Authority.Session.Identity!.Key);
@@ -31,51 +39,98 @@ public sealed class AgentClientsTests
         Assert.Equal(["Claude Code", "Cursor", "Every other client"], model.Clients.Select(card => card.Name));
         var connected = model.Clients[0];
         Assert.Equal(("claude-code", "cc", "Connected", "Claude Code · MCP stdio"), (connected.Title, connected.Initials, connected.Status, connected.Detail));
-        Assert.Equal("Session grants up to 1h", connected.PolicyText);
         Assert.Equal(("cursor", "cu", "Idle"), (model.Clients[1].Title, model.Clients[1].Initials, model.Clients[1].Status));
-        Assert.Equal(["Session grants up to 1h", "Ask every time", "Inject only"], connected.Choices.Select(choice => choice.Words));
-        Assert.Equal([ClientPolicy.SessionGrants], connected.Choices.Where(choice => choice.IsHeld).Select(choice => choice.Policy));
+        Assert.All(model.Clients, card => Assert.True(card.HasSettings));
+        Assert.False(model.HasSettings);
     }
 
     [Fact]
-    public async Task SettingAskEveryTime_SavesAndEndsThatClientsGrants()
+    public async Task Settings_OpenBelowTheCards_OneAgentAtATime_AndCloseOnASecondPress()
     {
         await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "ci-probe"));
-        app.Person.Answer = ApprovalAnswer.Approved;
-        Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
-        Assert.Single(app.Authority.Activity.Grants);
+        using var model = app.Model();
+        var card = model.Clients.Single(row => row.Label == "ci-probe");
+        var any = model.Clients.Single(row => row.Label == AgentNames.Any);
 
+        model.ToggleSettingsCommand.Execute(card);
+
+        Assert.Equal("ci-probe", model.Settings!.Agent);
+        Assert.True(card.IsSettingsOpen);
+        Assert.Equal("chevron-down", card.SettingsIcon);
+
+        model.ToggleSettingsCommand.Execute(any);
+
+        Assert.Equal(AgentNames.Any, model.Settings!.Agent);
+        Assert.False(card.IsSettingsOpen);
+        Assert.True(any.IsSettingsOpen);
+
+        model.ToggleSettingsCommand.Execute(any);
+
+        Assert.Null(model.Settings);
+        Assert.False(any.IsSettingsOpen);
+    }
+
+    /// <summary>
+    /// The Always for notice opens an agent's settings by name, as its card's button does, and still when
+    /// no card shows that agent yet; a second open of the same agent leaves them open.
+    /// </summary>
+    [Fact]
+    public async Task Settings_OpenByName_WithOrWithoutACard()
+    {
+        await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "ci-probe"));
         using var model = app.Model();
         var card = model.Clients.Single(row => row.Label == "ci-probe");
 
-        model.SetPolicyCommand.Execute(card.Choices.Single(choice => choice.Policy == ClientPolicy.AskEveryTime));
+        model.OpenSettings("ci-probe");
+        var open = model.Settings;
+        model.OpenSettings("ci-probe");
 
-        Assert.True(ClientPolicies.TryLoad(app.ClientsPath, out var written, out _));
-        Assert.Equal(ClientPolicy.AskEveryTime, written!.For("ci-probe"));
-        Assert.Empty(app.Authority.Activity.Grants);
-        Assert.Equal(ClientPolicy.AskEveryTime, model.Clients.Single(row => row.Label == "ci-probe").Policy);
+        Assert.Equal("ci-probe", open!.Agent);
+        Assert.Same(open, model.Settings);
+        Assert.True(card.IsSettingsOpen);
+
+        model.OpenSettings("codex");
+
+        Assert.Equal("codex", model.Settings!.Agent);
+        Assert.False(card.IsSettingsOpen);
+    }
+
+    /// <summary>The cards are rebuilt whenever a client is seen again, and the settings open stay open on the new card.</summary>
+    [Fact]
+    public async Task OpenSettings_StayOpen_WhenTheCardsAreBuiltAgain()
+    {
+        await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "ci-probe"));
+        using var model = app.Model();
+        model.ToggleSettingsCommand.Execute(model.Clients.Single(row => row.Label == "ci-probe"));
+        var open = model.Settings;
+
+        app.Audit("cursor", app.Authority.Session.Identity!.Key);
+        model.Refresh();
+
+        Assert.Same(open, model.Settings);
+        Assert.True(model.Clients.Single(row => row.Label == "ci-probe").IsSettingsOpen);
+        Assert.False(model.Clients.Single(row => row.Label == "cursor").IsSettingsOpen);
     }
 
     [Fact]
-    public async Task AnUnlabeledClient_CannotBeGivenAPolicy_AndIsHeldToTheStarRow()
+    public async Task AnUnlabeledClient_HasNoSettingsOfItsOwn()
     {
         await using var app = await App.StartAsync(new AttachClient("Zed", null, null));
-        File.WriteAllText(app.ClientsPath, "[[client]]\nlabel = \"*\"\npolicy = \"ask\"\n");
 
         using var model = app.Model();
         var card = model.Clients.Single(row => row.Name == "Zed");
 
-        Assert.False(card.CanSetPolicy);
+        Assert.False(card.HasSettings);
         Assert.Contains("--client-label", card.Hint, StringComparison.Ordinal);
-        Assert.Equal(ClientPolicy.AskEveryTime, card.Policy);
+        Assert.False(model.ToggleSettingsCommand.CanExecute(card));
 
-        card.Policy = ClientPolicy.InjectOnly;
+        model.ToggleSettingsCommand.Execute(card);
 
-        Assert.Equal("[[client]]\nlabel = \"*\"\npolicy = \"ask\"\n", File.ReadAllText(app.ClientsPath));
+        Assert.Null(model.Settings);
     }
 
     [Fact]
-    public async Task ALabelNoRowCanHold_CannotBeGivenAPolicy()
+    public async Task ALabelNoSettingsCanBeKeptUnder_HasNone()
     {
         await using var app = await App.StartAsync(null);
         app.Audit("old\"bridge", app.Authority.Session.Identity!.Key);
@@ -83,64 +138,84 @@ public sealed class AgentClientsTests
         using var model = app.Model();
         var card = model.Clients.Single(row => row.Label == "old\"bridge");
 
-        Assert.False(card.CanSetPolicy);
-
-        model.SetPolicyCommand.Execute(card.Choices.Single(choice => choice.Policy == ClientPolicy.AskEveryTime));
-
-        Assert.False(File.Exists(app.ClientsPath));
+        Assert.False(card.HasSettings);
+        Assert.False(model.ToggleSettingsCommand.CanExecute(card));
     }
 
+    /// <summary>
+    /// A file in the form before agents had settings is malformed now: it refuses every agent request, and
+    /// Reset clears it only once the person confirms the reset in the window that confirms any change
+    /// giving agents more, keeping the file beside it under a name no earlier copy holds, which it names;
+    /// refused, the file stays as it was.
+    /// </summary>
     [Fact]
-    public async Task AMalformedFile_IsShown_AndResetWritesAnEmptyOne()
+    public async Task AMalformedFile_IsResetOnlyOnceThePersonConfirms()
     {
-        await using var app = await App.StartAsync(null);
-        File.WriteAllText(app.ClientsPath, "[[client]]\nlabel = \"x\"\npolicy = \"maybe\"\n");
+        const string Malformed = "[[client]]\nlabel = \"x\"\npolicy = \"ask\"\n";
+        const string Later = "[[client]]\nlabel = \"y\"\npolicy = \"ask\"\n";
+        var person = new Confirming();
+        await using var app = await App.StartAsync(null, person);
+        File.WriteAllText(app.ClientsPath, Malformed);
+        List<string> toasts = [];
 
-        using var model = app.Model();
+        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: toasts.Add);
 
         Assert.True(model.HasClientsProblem);
         Assert.Contains("refused", model.ClientsProblem, StringComparison.Ordinal);
 
         model.ResetClientsCommand.Execute(null);
+        await model.Resetting;
+
+        Assert.True(Assert.Single(person.Asked).ResetsCeilings);
+        Assert.True(model.HasClientsProblem);
+        Assert.Equal(Malformed, File.ReadAllText(app.ClientsPath));
+
+        person.Answer = ApprovalAnswer.ApprovedOnce;
+        model.ResetClientsCommand.Execute(null);
+        await model.Resetting;
 
         Assert.False(model.HasClientsProblem);
-        Assert.True(ClientPolicies.TryLoad(app.ClientsPath, out var reset, out _));
-        Assert.Empty(reset!.Rows);
+        Assert.Empty(Caps(app.ClientsPath).Rows);
+        Assert.Equal(Malformed, File.ReadAllText(app.ClientsPath + AccessCaps.KeptSuffix));
+        Assert.Contains($"was set aside as clients.toml{AccessCaps.KeptSuffix},", toasts[^1], StringComparison.Ordinal);
+
+        File.WriteAllText(app.ClientsPath, Later);
+        model.Refresh();
+        model.ResetClientsCommand.Execute(null);
+        await model.Resetting;
+
+        Assert.Equal(Malformed, File.ReadAllText(app.ClientsPath + AccessCaps.KeptSuffix));
+        Assert.Equal(Later, File.ReadAllText(app.ClientsPath + AccessCaps.KeptSuffix + "-2"));
+        Assert.Contains($"was set aside as clients.toml{AccessCaps.KeptSuffix}-2,", toasts[^1], StringComparison.Ordinal);
     }
 
     private sealed class App : IAsyncDisposable
     {
         private readonly ApproverClient _client;
 
-        private App(TempVault fixture, ManualClock clock, Person person, AppAuthority authority, ApproverClient client, string session)
+        private App(TempVault fixture, ManualClock clock, AppAuthority authority, ApproverClient client)
         {
             Fixture = fixture;
             Clock = clock;
-            Person = person;
             Authority = authority;
             _client = client;
-            Session = session;
         }
 
         internal TempVault Fixture { get; }
 
         internal ManualClock Clock { get; }
 
-        internal Person Person { get; }
-
         internal AppAuthority Authority { get; }
-
-        internal string Session { get; }
 
         internal string ClientsPath => KeypasteHome.ClientsPath(Fixture.Home);
 
-        internal static async Task<App> StartAsync(AttachClient? identity)
+        internal static async Task<App> StartAsync(AttachClient? identity, IApprovalChannel? person = null)
         {
             var fixture = new TempVault();
+            fixture.Sees();
             var clock = new ManualClock(AppClock.Start);
-            var person = new Person();
 #pragma warning disable CA2000
-            var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => person);
+            var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => person ?? new NobodyToAsk());
 #pragma warning restore CA2000
 
             using (var master = TempVault.Secret(TempVault.Password))
@@ -153,26 +228,10 @@ public sealed class AgentClientsTests
             Assert.NotNull(client);
             Assert.True((await client.AttachAsync(new AttachRequest(fixture.Path_) { Client = identity }, Token))!.Attached);
 
-            return new App(fixture, clock, person, authority, client, serving.Session);
+            return new App(fixture, clock, authority, client);
         }
 
         internal AgentActivityViewModel Model() => new(Authority, Fixture.Home, Clock);
-
-        internal Task<CredentialReply?> RequestAsync() =>
-            _client.RequestAsync(
-                new CredentialRequest
-                {
-                    Entry = "example",
-                    Field = "password",
-                    Reason = "deploy",
-                    TtlSeconds = 60,
-                    Exposure = ["**"],
-                    ClientName = "claude",
-                    ClientLabel = "ci-probe",
-                    Vault = Fixture.Path_,
-                    Session = Session,
-                },
-                Token).AsTask();
 
         /// <summary>Appends a granted line a bridge labelled <paramref name="label"/> wrote for a vault.</summary>
         internal void Audit(string label, string vaultKey)
@@ -205,11 +264,20 @@ public sealed class AgentClientsTests
         }
     }
 
-    private sealed class Person : IApprovalChannel
+    /// <summary>The person at the app: answers each confirmation as the test says, and keeps what it was shown.</summary>
+    private sealed class Confirming : IApprovalChannel
     {
         internal ApprovalAnswer Answer { get; set; } = ApprovalAnswer.Denied;
 
+        internal List<AccessChangePrompt> Asked { get; } = [];
+
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(Answer);
+            ValueTask.FromResult(ApprovalAnswer.Denied);
+
+        public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
+        {
+            Asked.Add(prompt);
+            return ValueTask.FromResult(Answer);
+        }
     }
 }

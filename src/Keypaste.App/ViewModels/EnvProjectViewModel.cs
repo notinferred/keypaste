@@ -1166,7 +1166,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         try
         {
-            PendingTagChange = ProjectTagChange.Preview(vault, entry, tags, adding);
+            PendingTagChange = _session.PreviewTagChange(vault, entry, tags, adding);
             _report(null);
         }
         catch (VaultException e)

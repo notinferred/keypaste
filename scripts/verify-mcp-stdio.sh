@@ -7,8 +7,9 @@
 # terminal" is the premise of the entire feature. This is the only place that premise is tested.
 # It is the same gap scripts/verify-run-injection.sh exists to close for `keypaste run`.
 #
-# NEGATIVE CONTROL: a stray line on stdout, a missing tool, a granted credential, or a missing
-# audit line each fail this script. These checks must never be skipped or soft-passed.
+# NEGATIVE CONTROL: a stray line on stdout, a missing tool, a granted credential, a change made with
+# nobody to ask, or a missing audit line each fail this script. These checks must never be skipped or
+# soft-passed.
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -42,12 +43,13 @@ readonly ERR="$WORK/stderr.txt"
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"request_credential","arguments":{"entry":"env/dev/STRIPE_KEY","field":"password","reason":"ci probe","ttl_seconds":60}}}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"request_access_change","arguments":{"mode":"automatic","reason":"ci probe"}}}'
 
   # Hold the pipe open until every call is answered. Closing stdin is how an MCP client says
   # goodbye, and the server takes it at its word: closed sooner, it shuts down before it has answered
   # anything, and the gate sees an empty stdout that looks like a protocol failure rather than a race
   # in the harness.
-  await_replies 5 "$OUT" 2 3 4 || true
+  await_replies 5 "$OUT" 2 3 4 5 || true
 } | "$BIN_PATH" mcp --vault "$WORK/vault.kdbx" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe \
       >"$OUT" 2>"$ERR" || die "keypaste mcp exited non-zero"
 
@@ -61,14 +63,14 @@ while IFS= read -r line; do
     || die "a line on stdout is not JSON: $line"
 done <"$OUT"
 
-# 2. Exactly two tools, with the names the documentation promises.
+# 2. Exactly three tools, with the names the documentation promises.
 tools="$(jq -c 'select(.id == 2) | .result.tools' <"$OUT" | head -n 1)"
 [ -n "$tools" ] || die "no tools/list response"
 
 count="$(printf '%s' "$tools" | jq 'length')"
-[ "$count" = "2" ] || die "expected exactly 2 tools, got $count"
+[ "$count" = "3" ] || die "expected exactly 3 tools, got $count"
 
-for want in list_entry_names request_credential; do
+for want in list_entry_names request_credential request_access_change; do
   printf '%s' "$tools" | jq -e --arg n "$want" 'any(.[]; .name == $n)' >/dev/null \
     || die "tool $want is missing"
 done
@@ -79,16 +81,16 @@ printf '%s' "$tools" | jq -e 'all(.[]; .annotations.destructiveHint == false)' >
 printf '%s' "$tools" | jq -e 'all(.[]; .annotations.openWorldHint == false)' >/dev/null \
   || die "a tool is missing openWorldHint=false"
 
-# 4. Both calls refuse, because this script starts no approver — not because the bridge is unable to
+# 4. Every call refuses, because this script starts no approver — not because the bridge is unable to
 #    grant. That distinction matters: read as "the bridge cannot release anything" this assertion
 #    would be evidence for a claim it does not make. scripts/verify-approval-e2e.sh is where a
-#    release is proved possible; here, with nobody to ask, a granted credential would mean the
-#    bridge had decided something itself, which is the one unacceptable outcome.
+#    release is proved possible; here, with nobody to ask, a granted credential or a change made
+#    would mean the bridge had decided something itself, which is the one unacceptable outcome.
 # Slurped deliberately. `select(...) | ...` over a stream leaves jq's -e status depending on
 # whether the LAST input produced output, and jq 1.6 (ubuntu-22.04) and 1.7+ disagree when it
 # did not. `any` over one slurped array yields exactly one value, so the status means the same
 # thing on every runner image.
-for id in 3 4; do
+for id in 3 4 5; do
   jq -se --argjson id "$id" 'any(.[]; .id == $id and .result.isError == true)' <"$OUT" >/dev/null \
     || die "call $id did not return isError=true"
 done
@@ -97,10 +99,11 @@ done
 #    was granted.
 [ -f "$AUDIT" ] || die "no audit log was written"
 lines="$(grep -c . "$AUDIT")"
-[ "$lines" = "2" ] || die "expected 2 audit lines, got $lines"
+[ "$lines" = "3" ] || die "expected 3 audit lines, got $lines"
 
 grep -q '"tool":"list_entry_names"' "$AUDIT" || die "the listing call was not audited"
 grep -q '"tool":"request_credential"' "$AUDIT" || die "the credential call was not audited"
+grep -q '"tool":"access_change"' "$AUDIT" || die "the request for a change to the agent's settings was not audited"
 grep -q '"decision":"denied"' "$AUDIT" || die "no denial was recorded"
 grep -q '"label":"ci-probe"' "$AUDIT" || die "the operator-supplied client label was not recorded"
 
@@ -111,8 +114,8 @@ grep -q '"password"' "$AUDIT" || die "the requested field name was not recorded"
 # 7. A tool call that arrives before the handshake is refused, and refused for that reason.
 #
 #    The client's name is read off `initialize`, so a call that overtakes it would otherwise be
-#    answered for "an unnamed client" - putting a request to a person, or matching it against a
-#    policy rule, with the caller missing from both the dialog and the log. That is a law 3.3 gap
+#    answered for "an unnamed client" - putting a request to a person, or releasing it under an
+#    agent's settings, with the caller missing from both the dialog and the log. That is a law 3.3 gap
 #    and a law 3.7 error path, so it denies (THREATS.md T-3).
 #
 #    This lives here rather than in a unit test on purpose: the in-process tests drive a real
@@ -135,7 +138,7 @@ jq -se 'any(.[]; .id == 7 and .result.isError == true)' <"$NOINIT_OUT" >/dev/nul
   || die "a tool call before initialize did not return isError=true"
 
 # 8. --allow-run adds exactly one tool, and its hints say what it is: it runs a program the agent
-#    names, so it is destructive and open-world, while the other two stay neither.
+#    names, so it is destructive and open-world, while the other three stay neither.
 RUN_OUT="$WORK/run-stdout.txt"
 : >"$RUN_OUT"
 {
@@ -151,7 +154,7 @@ RUN_OUT="$WORK/run-stdout.txt"
       >"$RUN_OUT" 2>/dev/null || die "keypaste mcp --allow-run exited non-zero"
 
 run_tools="$(jq -c 'select(.id == 2) | .result.tools' <"$RUN_OUT" | head -n 1)"
-[ "$(printf '%s' "$run_tools" | jq 'length')" = "3" ] || die "--allow-run did not list exactly 3 tools"
+[ "$(printf '%s' "$run_tools" | jq 'length')" = "4" ] || die "--allow-run did not list exactly 4 tools"
 printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destructiveHint == true and .annotations.openWorldHint == true)' >/dev/null \
   || die "run is missing destructiveHint=true or openWorldHint=true"
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
@@ -184,6 +187,13 @@ policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp policy --json)" || die "ke
 printf '%s' "$policies" | jq -e '. == []' >/dev/null \
   || die "keypaste mcp policy --json printed '$policies' for a home with no clients.toml, not []"
 
-echo "ok: keypaste mcp speaks MCP over stdio, exposes two tools, denies both calls, audits them,"
+# With nothing holding a vault, a lower ceiling is the one change that can be made, and the list shows it as a row.
+KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp policy cursor --mode ask 2>/dev/null \
+  || die "keypaste mcp policy did not lower cursor's ceiling with nothing holding a vault"
+policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp policy --json)" || die "keypaste mcp policy --json exited non-zero"
+printf '%s' "$policies" | jq -e '. == [{"kind":"ceiling","label":"cursor","mode":"ask"}]' >/dev/null \
+  || die "keypaste mcp policy --json printed '$policies', not cursor's one ceiling"
+
+echo "ok: keypaste mcp speaks MCP over stdio, exposes three tools, denies every call, audits them,"
 echo "    refuses a tool call that arrives before the initialize handshake, adds run only with --allow-run,"
 echo "    prints one help for every help form, and hands serve, setup and policy to the CLI's verbs"

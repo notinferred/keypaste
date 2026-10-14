@@ -55,7 +55,10 @@ internal sealed class PromptScreen : IDisposable
         return channel;
     }
 
-    /// <summary>Answers the prompt on screen: <c>approve</c> (the timed allow), <c>once</c>, <c>deny</c> or <c>close</c>.</summary>
+    /// <summary>
+    /// Answers the prompt on screen: <c>approve</c> (the timed allow), <c>once</c>, <c>always</c> (Always for),
+    /// <c>allow</c> (a change's confirmation), <c>deny</c> or <c>close</c>.
+    /// </summary>
     internal Task AnswerAsync(string answer) =>
         Dispatcher.UIThread.InvokeAsync(
             async () =>
@@ -64,8 +67,14 @@ internal sealed class PromptScreen : IDisposable
 
                 switch (answer)
                 {
-                    case "approve" or "once":
-                        var allow = Button(window, answer == "once" ? "AllowOnce" : "Approve");
+                    case "approve" or "once" or "always" or "allow":
+                        var allow = Button(window, answer switch
+                        {
+                            "once" => "AllowOnce",
+                            "always" => "AlwaysFor",
+                            "allow" => "Allow",
+                            _ => "Approve",
+                        });
                         var armedBy = DateTime.UtcNow + _armingWait;
 
                         // A person reads the prompt before allowing it, which is armed a moment after it appears.
@@ -94,8 +103,16 @@ internal sealed class PromptScreen : IDisposable
 
     private void OnShown(object? sender, Window window)
     {
-        _open = window;
         window.CaptureRenderedFrame();
+
+        // A notice asks nothing, so it is printed and left on screen; the next answer is for a prompt.
+        if (window is NoticeWindow)
+        {
+            Console.Out.WriteLine($"notice text={Text(window, "NoticeText")}");
+            return;
+        }
+
+        _open = window;
 
         Console.Out.WriteLine(window switch
         {
@@ -106,10 +123,16 @@ internal sealed class PromptScreen : IDisposable
             RunApprovalWindow =>
                 $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
                 $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")}",
+            AccessChangeWindow =>
+                $"access-prompt agent={Text(window, "AgentText")} asked={Text(window, "OriginText")} " +
+                $"gains={string.Join("; ", Gains(window))} reason={Text(window, "ReasonText")}",
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
-                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")}",
+                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")} " +
+                $"always={(window.FindControl<Button>("AlwaysFor")?.IsVisible == true ? Text(window, "AlwaysText") : "none")}",
         });
+
+        var withdrawn = window is AccessChangeWindow ? "access-prompt withdrawn" : "prompt withdrawn";
 
         window.Closed += (_, _) =>
         {
@@ -118,11 +141,15 @@ internal sealed class PromptScreen : IDisposable
                 _open = null;
             }
 
-            Console.Out.WriteLine("prompt withdrawn");
+            Console.Out.WriteLine(withdrawn);
         };
     }
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
+
+    private static IEnumerable<string?> Gains(Window window) =>
+        window.FindControl<ItemsControl>("GainsList")?.GetVisualDescendants().OfType<TextBlock>()
+            .Where(block => block.Classes.Contains("gain")).Select(block => block.Text) ?? [];
 
     private static IEnumerable<string?> Classed(Window window, string className) =>
         window.FindControl<ItemsControl>("KeysList")?.GetVisualDescendants().OfType<TextBlock>()

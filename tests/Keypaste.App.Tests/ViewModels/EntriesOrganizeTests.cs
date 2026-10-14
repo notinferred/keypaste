@@ -179,14 +179,14 @@ public sealed class EntriesOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// Organizing can change which standing authorization covers an entry, wherever it happens.
+    /// Organizing can change which places an agent sees cover an entry, wherever it happens.
     /// </summary>
     [Fact]
     public void Both_organize_forms_say_what_a_path_change_does_to_access()
     {
         using var context = New();
 
-        Assert.Contains("Policy rules and agent exposures", EntriesViewModel.AccessNoteText, StringComparison.Ordinal);
+        Assert.Contains("What an agent can see by place is matched against paths", EntriesViewModel.AccessNoteText, StringComparison.Ordinal);
         Assert.Equal(EntriesViewModel.AccessNoteText, context.Entries.AccessNote, StringComparer.Ordinal);
     }
 

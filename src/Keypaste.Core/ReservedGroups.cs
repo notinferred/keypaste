@@ -13,6 +13,9 @@ public static class ReservedGroups
     /// <summary>Share links: one entry per link, holding its revoke token and never its key.</summary>
     public const string Shares = Root + "/shares";
 
+    /// <summary>Agents' access: one entry per agent, titled with its name and holding its ACAF record.</summary>
+    public const string Agents = Root + "/agents";
+
     /// <summary>Whether a group path is reserved or inside a reserved group.</summary>
     /// <param name="groupPath">A group path as <see cref="VaultEntry.GroupPath"/> spells it.</param>
     /// <returns><see langword="true"/> for <see cref="Root"/> and everything under it, in any case.</returns>

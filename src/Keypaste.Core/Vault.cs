@@ -18,6 +18,7 @@ public sealed class Vault : IDisposable
     private byte[]? _stamp;
     private DateTimeOffset? _savedAt;
     private bool _pending;
+    private long _changes;
     private bool _writing;
     private bool _disposed;
     private bool _backedUp;
@@ -846,6 +847,150 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>Each entry directly in one of keypaste's own groups, with one of its string fields, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="groupPath">The reserved group, matched exactly.</param>
+    /// <param name="field">The field read from each entry.</param>
+    /// <param name="records">The entries in traversal order when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    /// <exception cref="ArgumentException"><paramref name="groupPath"/> is not reserved.</exception>
+    internal SavedRead ReadSavedRecords(string groupPath, string field, out IReadOnlyList<ReservedRecord>? records)
+    {
+        Reserved(groupPath);
+        ArgumentNullException.ThrowIfNull(field);
+
+        records = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            records = _interop.ReadRecords(groupPath, field);
+            return SavedRead.Current;
+        }
+    }
+
+    /// <summary>Each entry directly in one of keypaste's own groups, with one of its string fields, as this vault holds it now, saved or not.</summary>
+    /// <param name="groupPath">The reserved group, matched exactly.</param>
+    /// <param name="field">The field read from each entry.</param>
+    /// <returns>The entries in traversal order.</returns>
+    /// <exception cref="ArgumentException"><paramref name="groupPath"/> is not reserved.</exception>
+    internal IReadOnlyList<ReservedRecord> ReadRecords(string groupPath, string field)
+    {
+        Reserved(groupPath);
+        ArgumentNullException.ThrowIfNull(field);
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadRecords(groupPath, field);
+        }
+    }
+
+    /// <summary>
+    /// Sets one unprotected string field of the record with this name in one of keypaste's own groups:
+    /// of the entry with the UUID its title derives, and of every other entry there with the title.
+    /// Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="name">The record's entry, in a reserved group.</param>
+    /// <param name="idOf">The UUID of the entry for a title.</param>
+    /// <param name="field">The field.</param>
+    /// <param name="value">What it holds.</param>
+    /// <returns>Whether anything changed.</returns>
+    /// <remarks>
+    /// A new record is created with the title's UUID and no history item; an existing one is edited in
+    /// place, keeping its history, and is moved back into the group from wherever it is.
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is not in a reserved group.</exception>
+    internal bool WriteRecord(EntryName name, Func<string, Guid> idOf, string field, string value) =>
+        WriteRecord(name, idOf, field, value, out _);
+
+    /// <summary>Sets a record's field as <see cref="WriteRecord(EntryName, Func{string, Guid}, string, string)"/> does, and says how to take the write back.</summary>
+    /// <param name="name">The record's entry, in a reserved group.</param>
+    /// <param name="idOf">The UUID of the entry for a title.</param>
+    /// <param name="field">The field.</param>
+    /// <param name="value">What it holds.</param>
+    /// <param name="undo">
+    /// When anything changed, what puts the vault back as it was before the write, for a caller whose save
+    /// then failed, so that no later save writes what that caller said was not made; otherwise null.
+    /// </param>
+    /// <returns>Whether anything changed.</returns>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is not in a reserved group.</exception>
+    internal bool WriteRecord(EntryName name, Func<string, Guid> idOf, string field, string value, out Action? undo)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        Reserved(name.GroupPath);
+        ArgumentNullException.ThrowIfNull(idOf);
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(value);
+
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        KeePassInterop.RecordSnapshot before;
+        bool wasPending;
+        bool written;
+        long changes;
+
+        // Change<T>'s steps, with what it changes taken first under the same lock.
+        lock (_state)
+        {
+            before = _interop.Snapshot(name, idOf);
+            wasPending = _pending;
+            written = _interop.WriteRecord(name, idOf, field, value);
+
+            if (written)
+            {
+                _pending = true;
+                _changes++;
+            }
+
+            changes = _changes;
+        }
+
+        if (!written)
+        {
+            undo = null;
+            return false;
+        }
+
+        Edited?.Invoke(this, VaultEdit.Of(name));
+        undo = () => TakeBack(name, before, wasPending, changes);
+        return true;
+    }
+
+    /// <summary>Puts back what one record write changed, and says the vault matches its file again when nothing else changed or was saved since.</summary>
+    private void TakeBack(EntryName name, KeePassInterop.RecordSnapshot before, bool wasPending, long changes)
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            _interop.Restore(before);
+
+            // Another change, or a save that wrote this one, since: the vault no longer matches its file.
+            _pending = _changes == changes ? wasPending : true;
+            _changes++;
+        }
+
+        Edited?.Invoke(this, VaultEdit.Of(name));
+    }
+
+    private static void Reserved(string groupPath)
+    {
+        ArgumentNullException.ThrowIfNull(groupPath);
+
+        if (!ReservedGroups.IsReserved(groupPath))
+        {
+            throw new ArgumentException($"'{groupPath}' is not one of keypaste's own groups.", nameof(groupPath));
+        }
+    }
+
     /// <summary><see cref="ReadSaved(out IReadOnlyList{VaultEntry}?, out IReadOnlyList{string}?)"/>, with each entry's tags and a tagged entry's variable fields.</summary>
     /// <param name="snapshot">What projects are resolved from when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
     /// <returns>Whether the vault matches its file, and if not, why.</returns>
@@ -936,7 +1081,7 @@ public sealed class Vault : IDisposable
     /// <summary>Finds the one entry at <paramref name="entryPath"/>, for example
     /// <c>servers/production</c>, or <see langword="null"/>.</summary>
     /// <remarks>
-    /// A path is what a person types and what a policy file holds, so it stays addressable, but it is
+    /// A path is what a person types and what an agent names, so it stays addressable, but it is
     /// not an identity: one two entries answer to is refused rather than resolved to whichever the
     /// file lists first. <see cref="Find(EntryName)"/> tells them apart.
     /// </remarks>
@@ -1505,6 +1650,7 @@ public sealed class Vault : IDisposable
         {
             wasPending = _pending;
             _pending = true;
+            _changes++;
         }
 
         Edited?.Invoke(this, VaultEdit.Everything);
@@ -1871,6 +2017,7 @@ public sealed class Vault : IDisposable
                 _stamp = stamp;
                 _savedAt = WrittenAt(Path);
                 _pending = false;
+                _changes++;
                 _writing = false;
             }
 
@@ -1962,6 +2109,7 @@ public sealed class Vault : IDisposable
             if (edit is not null)
             {
                 _pending = true;
+                _changes++;
             }
         }
 

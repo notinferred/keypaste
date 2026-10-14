@@ -49,9 +49,9 @@ public enum ExposureReach
 /// type is allowed to do by accident.
 /// </para>
 /// <para>
-/// Since Stage 2.3 this is also what a <c>policy.toml</c> rule matches with. That is DECISIONS.md
-/// D-0021 being cashed in: the policy file does not define a second matching domain, it constructs
-/// one of these — so every property above is inherited by a rule rather than re-argued for it.
+/// It is also what an agent's settings and this computer's ceilings say the agent may see with: they
+/// do not define a second matching domain, they construct one of these, so every property above is
+/// inherited rather than re-argued.
 /// </para>
 /// </remarks>
 public sealed class EntryExposure
@@ -101,6 +101,9 @@ public sealed class EntryExposure
     /// What a server exposes when nobody said otherwise: the variables of every project, and nothing else.
     /// </summary>
     public static EntryExposure Default { get; } = Create(_defaultGlobs);
+
+    /// <summary>An exposure that reaches nothing: what a setting is read as when it cannot be understood.</summary>
+    internal static EntryExposure Nothing { get; } = Create([]);
 
     /// <summary>The globs this exposure was built from, in the order given.</summary>
     /// <remarks>
@@ -259,6 +262,78 @@ public sealed class EntryExposure
 
         return Reach(name, []) == ExposureReach.Entry
             || (_selectors.Length > 0 && !ReservedGroups.IsReserved(name.GroupPath) && CredentialFields.IsCustom(field));
+    }
+
+    /// <summary>Whether this exposure provably reaches at least as far as another, entry by entry.</summary>
+    /// <param name="other">The other exposure.</param>
+    /// <returns>
+    /// <see langword="true"/> only when each of its patterns equals or lies under one of these: a
+    /// selector under a selector naming as much or more, or under <c>**</c>; a place pattern under a
+    /// place pattern matching every name it can. Anything that cannot be shown so is not covered.
+    /// </returns>
+    internal bool Covers(EntryExposure other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        return other._rules.All(inner => _rules.Any(outer => Covers(outer, inner)))
+            && other._selectors.All(inner => _rules.Any(IsEverything) || _selectors.Any(outer => Covers(outer, inner)));
+    }
+
+    private static bool IsEverything(Rule rule) =>
+        rule.Group is [DoubleStar] && string.Equals(rule.Title, AnyTitle, StringComparison.Ordinal);
+
+    private static bool Covers(Selector outer, Selector inner) =>
+        Covers(outer.Project, inner.Project)
+        && (outer.Environment is null || (inner.Environment is not null && Covers(outer.Environment, inner.Environment)));
+
+    private static bool Covers(Rule outer, Rule inner)
+    {
+        if (IsEverything(outer) || IsPrefixUnder(outer, inner)
+            || (outer.Group.SequenceEqual(inner.Group, StringComparer.Ordinal) && string.Equals(outer.Title, inner.Title, StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return outer.Group.Length == inner.Group.Length
+            && !outer.Group.Contains(DoubleStar, StringComparer.Ordinal)
+            && !inner.Group.Contains(DoubleStar, StringComparer.Ordinal)
+            && outer.Group.Zip(inner.Group).All(pair => Covers(pair.First, pair.Second))
+            && Covers(outer.Title, inner.Title);
+    }
+
+    /// <summary>Whether <paramref name="outer"/> is <c>prefix/**</c> and every name <paramref name="inner"/> matches has a group under that prefix.</summary>
+    private static bool IsPrefixUnder(Rule outer, Rule inner)
+    {
+        if (outer.Group.Length == 0
+            || !string.Equals(outer.Group[^1], DoubleStar, StringComparison.Ordinal)
+            || !string.Equals(outer.Title, AnyTitle, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var prefix = outer.Group[..^1];
+
+        return prefix.Length <= inner.Group.Length
+            && !prefix.Contains(DoubleStar, StringComparer.Ordinal)
+            && prefix.Zip(inner.Group).All(pair => !string.Equals(pair.Second, DoubleStar, StringComparison.Ordinal) && Covers(pair.First, pair.Second));
+    }
+
+    /// <summary>Whether every string <paramref name="inner"/> matches, <paramref name="outer"/> provably matches too.</summary>
+    private static bool Covers(string outer, string inner)
+    {
+        if (string.Equals(outer, inner, StringComparison.Ordinal) || string.Equals(outer, AnyTitle, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!inner.Contains(Wildcard, StringComparison.Ordinal))
+        {
+            return MatchOne(outer, inner);
+        }
+
+        var star = outer.IndexOf(Wildcard, StringComparison.Ordinal);
+
+        return star >= 0 && star == outer.Length - 1 && inner.StartsWith(outer[..star], StringComparison.Ordinal);
     }
 
     private static EntryExposure Create(string[] globs)

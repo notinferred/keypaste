@@ -24,7 +24,7 @@ public enum AppTheme
 /// <para>
 /// <b>An unreadable file costs a preference and never costs a lock.</b> Every failure here — no
 /// file, no permission, a half-finished hand edit — produces <see cref="Default"/>, which locks
-/// after five minutes. That is the same direction the policy loader fails in (docs/PRODUCT.md law 3.7): the
+/// after five minutes. That is the same direction <c>clients.toml</c> fails in (docs/PRODUCT.md law 3.7): the
 /// fallback has to be the state that protects the vault, never the state the file happened to ask
 /// for.
 /// </para>
@@ -43,7 +43,7 @@ public enum AppTheme
 /// </para>
 /// <para>
 /// <b>The boolean is written as 1 and 0.</b> <see cref="Toml"/> refuses <c>true</c> and <c>false</c>
-/// outright, deliberately, so that a policy file cannot say yes in a shape keypaste had to guess at.
+/// outright, deliberately, so that a hand-written file cannot say yes in a shape keypaste had to guess at.
 /// Rather than widen the reader for a window preference, this file writes a number and says so in a
 /// comment beside it — the refusal is worth more than the ergonomics of one line.
 /// </para>

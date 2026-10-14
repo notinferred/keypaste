@@ -1,178 +1,112 @@
-# Pre-approving with a policy file
+# Agent settings and modes
 
-A policy file authorizes matching credential requests without a prompt. The file exists only if you write it. Any error disables all rules, and requests follow the ordinary prompt and cached-approval path.
+In source, for the next release, each agent has settings that say what it can see, whether it is given values, whether it may run commands and how its requests are answered. They are kept in the vault, so they travel with it, and they follow the name the agent's bridge was given with `--client-label`, such as `claude-code`, never the name the agent calls itself. An agent with no settings of its own gets the defaults, which ask you before anything is released.
 
-<a id="the-short-version"></a>
+`v0.3.0` has no settings: it reads standing rules from `~/.keypaste/policy.toml`, which [its guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) describes. In source that file is no longer read and nothing carries its rules over; `keypaste agent` says so when it starts and finds one, and `keypaste policy` and `keypaste agent --policy` are gone.
 
 ```sh
-$EDITOR ~/.keypaste/policy.toml
-keypaste policy ls
-keypaste agent --vault ~/vaults/personal.kdbx
+keypaste mcp policy                                            # every agent's settings
+keypaste mcp policy claude-code --run on                       # waits for your confirmation
+keypaste mcp policy claude-code --project billing:dev --mode automatic --per-hour 20
+keypaste mcp policy claude-code --mode ask                     # gives less, so applies at once
 ```
+
+## What each agent can be given
+
+| Setting | Default | What it does |
+|---|---|---|
+| Can see | Every project's variables (`tag:env:*`) | Which items the agent can name, list and ask for, in [`--expose`'s selectors](mcp-setup.md#what-the-agent-may-see): `tag:env:billing` is every environment of billing's variables, `tag:env:billing:staging` one environment, and a place pattern such as `services/**` reaches whole items. In the app, All projects or a project or environment picked from the vault's tags, with the patterns under Advanced. |
+| Give values | Yes | No keeps values to commands the agent runs: a request for a value is refused before anything in the vault is looked up. |
+| May run commands | Off | On lets the agent ask to run a command with secrets in its environment; every command is still put to you. The bridge must also offer `run`, which `keypaste setup` registers. |
+| Mode | Ask, allow for a while | How a request for a value is answered: Ask every time offers Allow once only; Ask, allow for a while also offers Allow for 1 hour; Automatic releases what the agent can see without asking you, and each release is still recorded. |
+| Project rows | None | A mode, and a limit, for one project (`billing`, every environment of it) or one environment (`billing:staging`), which replaces the agent's mode for what it covers. |
+| Limits | None | On Automatic only: at most so many releases an hour, from 1 to 1000, and Automatic until a time, which you give and read on this computer's clock and the vault keeps in UTC. When either is reached, keypaste asks you instead, with Allow for 1 hour offered. |
+
+Commands are never Automatic, whatever the mode. An item in a protected environment, one whose own tag names `prod`, `production`, `prod-…` or `production-…` in any case, is asked about every time with Allow once only, and no mode, row, limit or Always for releases it unasked.
+
+`*` is every agent without settings of its own, a bridge started with no `--client-label` included. Its settings can only take away from the defaults, so it offers no Automatic, no commands and nothing wider to see, and a bridge with no name is never given more than the defaults.
+
+## Which settings apply to a request
+
+What an agent gets is the least of three things: its settings in the vault, this computer's ceilings in `~/.keypaste/clients.toml`, and the bridge's own arguments (`--expose`, `--allow-run`, `--max-ttl`). None of them can raise another. A bridge that `keypaste setup` or the app's Connect registered has `--allow-run --expose '**'`, so the settings alone decide; an `--expose` you add only narrows them.
+
+For an item, the mode is its environment's row, else its project's row, else the agent's mode. An item tagged into several projects or environments takes the strictest of them, and an item tagged into none takes the agent's mode. A row names its scope as `billing` or `billing:staging`, so `billing` covers every environment of billing, while an item tagged `env:billing` is in billing's `dev` environment alone.
+
+An Automatic release lasts what the agent asked for, at most `--max-ttl`, and keeps no grant, so each later request is decided again and spends the hourly limit again. The hourly count belongs to the app or `keypaste agent` holding the vault: it survives a lock and starts again when that process restarts.
+
+## Changing them
+
+A change that gives an agent nothing more, such as a stricter mode, values off, commands off, seeing less or an end or hourly cap on Automatic, applies at once. A change lifts what this computer's ceilings hold back only where it names it: turning commands off leaves a ceiling on values as it is, while turning values on asks to lift it. Anything else, including turning a limit off or a reset to the defaults that gives more, is a widening, and it takes effect only once you confirm it where the vault is unlocked: in the app's confirmation window, which opens with Deny focused and lets Allow work only after a second on screen, or in `keypaste agent`'s terminal, where `y` allows and every other key, Enter included, denies. The confirmation names the agent, exactly what it would gain, including the limit an Automatic it gives would have, such as `billing:dev: Automatic until 2026-12-31 23:59 +02:00, at most 20 an hour`, and where the request says it came from, which is a claim, and it shows an agent's reason as the agent's own words; a change you made in the app says instead where you chose it. You confirm it once, and the agent gets it from its next request. After you refuse a widening asked for from a terminal, the same one is refused for a minute without asking you again; one you refuse in the app's settings or through Always for can be tried again at once.
+
+There are four ways to ask for a change:
+
+- **The app.** On the Agents screen, each agent's card has a Settings button that opens its settings below the cards: its mode, values, commands, what it can see, project rows and limits. What it can see is All projects or Only these: under Only these you pick projects and environments and Apply sends them as one change, so moving to a few projects never passes through seeing nothing, and with nothing picked it says that applying lets the agent see no items; Advanced takes `--expose`'s patterns, which a change of picks keeps. Automatic's end is a day picked from a calendar and an optional time of day such as `18:00`, or the close of that day, on this computer's clock, and the panel shows the limit in force with the clock's offset from UTC. Each other choice applies on its own, and one that gives more opens the confirmation. When this computer holds the agent back from what the vault gives it, the panel says so and Use the vault's settings asks to lift it, which the audit log records as that, with what it lifted.
+- **Always for.** A credential prompt for an item tagged into one project's environment, from a named agent, has an Always for button (`a` at `keypaste agent`) beside the allows, captioned "Allows once, then asks to make it Automatic". It releases this one request and then opens the same confirmation to make that environment Automatic for the agent; deny that and it stays one release. When the change does not take effect, because the settings cannot be read or take another row, another request was already in front of you, nobody answered, the vault could not be saved or this computer's ceilings could not be lifted, a notice in the app, or a line at `keypaste agent`, says the environment was not made Automatic and why.
+- **`keypaste mcp policy <agent>`**, with `--project <project>[:<environment>]`, `--mode ask|allow-for-a-while|automatic`, `--see <selector>` (repeated), `--values yes|no`, `--run on|off`, `--per-hour <n>|none`, `--until <time>|none` and `--reset`. `--until` takes a date, which ends at the close of that day, or a time such as `2026-12-31 18:00`, both on this computer's clock unless the time ends in `Z` or an offset such as `+02:00`; it is sent and kept in UTC, the audit line keeps it so, as `keypaste log --json` shows, and the list, the confirmation and the app's History show it on this computer's clock with its offset, such as `2026-12-31 23:59 +02:00`, with its seconds when they are not zero. With `--project` only the mode and limit apply, and `--reset` removes that row; without it, `--reset` puts the agent back to the defaults. Any program you run can type this command, so the confirmation says it was asked from a terminal and never that you asked.
+- **The agent itself**, through its `request_access_change` tool, for its own settings only, with a reason. It may ask for Automatic only until a time (`until`, read on this computer's clock unless it names its offset) or at most so many an hour (`per_hour`), and its tool asks it to ask for the shortest time its task needs; it cannot ask for a limit to be removed or for a reset. A change that gives it less applies at once on this computer, even while nothing holds the vault; one that gives it more is put to you, and after you refuse a request for more from it, another agent or a terminal, or leave one unanswered, every request for more from any of them is refused for a minute without asking you and told when to try again, while one for less still applies and the app's agent settings never wait.
+
+With nothing holding the vault unlocked, `keypaste mcp policy` can only lower this computer's ceilings, and says so for anything else; the listing then shows the ceilings alone. An agent's bridge then makes the agent's own request for less the same way and refuses one for more. `keypaste setup` and the app's Connect register a bridge for a home other than `~/.keypaste` with that home's `clients.toml` as `--clients` beside its `--audit-log`, so the AI tool need not pass `KEYPASTE_HOME` on. A bridge with an `--audit-log` outside the keypaste home it runs under and no `--clients` cannot tell which `clients.toml` applies, refuses both and says to run `keypaste setup` again. Every change, made or refused, is one line in the audit log.
+
+Nothing an agent can do, and no keypaste command, gives an agent more without your confirmation in the app or `keypaste agent`. The one other way is editing the vault itself, which takes its master password ([below](#where-they-are-kept)).
+
+## Seeing them
+
+```
+$ keypaste mcp policy
+  AGENT          PROJECT      MODE                           VALUES  RUN  SEES
+  claude-code                 allow-for-a-while              yes     on   tag:env:*
+                 billing:dev  automatic, at most 20 an hour
+  *   (default)               allow-for-a-while              yes     off  tag:env:*
+
+  this computer's ceilings, in clients.toml: nothing above gives more than these
+  AGENT  PROJECT  MODE  VALUES  RUN  SEES
+  codex           ask   no
+```
+
+The vault's settings come from the app or `keypaste agent` holding it; `--json` prints the same as one array of `agent` and `ceiling` objects. `keypaste agent` names, when it starts, each agent released to without asking and where, beneath this computer's ceilings, and prints a line for each release it makes without asking; the app's Agents screen names them in its status, such as `except what these agents are Automatic for: claude-code (billing:dev)`. When a tag change you are making in the app or with `keypaste env tag` would let an Automatic agent get the item without asking, the change names that agent first, before you confirm it, without blocking it; while `clients.toml` cannot be read, it names the agents the vault's settings would release the item to once the file reads again. A tag added in KeePassXC or by a merge says nothing.
+
+## This computer's ceilings
+
+`~/.keypaste/clients.toml` holds only ceilings, keyed by `--client-label`: an agent with rows of its own is held to them, and every other agent to the `*` rows. Each row can only take away, so no value written there, by hand or by a script, gives an agent more than the vault does. A narrowing made in the app or from a terminal is written there as well as in the vault, so restoring the vault or merging it with an older copy cannot undo it on this computer; a narrowing an agent asks for, an end or hourly cap on its Automatic included, is written there alone. When one of the two cannot take a narrowing you make, the other still does and keypaste says which did not: the file holds at most 2048 rows in 256 KiB, and an agent's record at most 256 project rows. A confirmed widening lifts this computer's ceilings exactly as far as it gives.
 
 ```toml
-[[allow]]
-client          = "claude-code"
-entries         = ["env/dev/**"]
-fields          = ["password"]
-max_ttl_seconds = 300
-max_per_hour    = 20
+[[client]]
+label = "codex"
+mode = "ask"
+values = "no"
+
+[[client]]
+label = "claude-code"
+project = "billing:prod-eu"
+mode = "ask"
 ```
 
-`keypaste agent` reads the file but never writes it. There is no command to edit authorization rules that an agent could persuade someone to run. In source, the desktop app does not read it: every credential released from a vault the app holds needs a press of Allow once or Allow for 1 hour in [its prompt](approvals.md#approving-in-the-desktop-app); a scoped token's run is the exception ([T-32](../THREATS.md#t-32--a-scoped-token-is-a-bearer-credential)).
+`mode` is a ceiling on the mode, `values = "no"` keeps values to commands, `run = "off"` refuses commands and `see` is a list of selectors; `values = "yes"` and `run = "on"` set no ceiling. `per_hour = 20` and `until = "2026-12-31T21:59:59Z"`, a time in UTC, limit Automatic where the row's mode applies, as a limit in the vault does, and reaching either asks you. A row with `project` holds only `mode`, `per_hour` and `until`, and an environment's row beats its project's, which beats the agent's row: a project row's mode and limit replace the agent row's for that project, so lowering only the agent row by hand leaves that project as its row says. Lower both, or use `keypaste mcp policy`, which does.
 
-<a id="read-this-part-before-you-write-a-rule"></a>
+The app or `keypaste agent` reads the file at every request, so an edit applies to the next one. A file it cannot read or parse refuses every agent request, naming its line, until it is fixed or deleted; the earlier `policy = …` form is such a file. The app's Agents screen offers Reset for a file it cannot parse: it shows what each agent's settings in the vault then give beyond the defaults, and only once you confirm does it set the file aside as `clients.toml.unreadable`, or `clients.toml.unreadable-2` and on when an earlier reset's copy is there, so no copy is ever replaced, and start an empty one, recorded in the audit log under `*` with the copy's name. A file it could not read at all is left as it is, since it may be well formed.
 
-## Pattern matching
+## Where they are kept
 
-Patterns split into a group path and title. The last segment is the title unless it is exactly `**`. Thus `env/dev*` matches `env/devops_ROOT_TOKEN` but nothing under `env/dev/`.
+Each agent's settings are one entry in the vault's `.keypaste/agents` group, titled with the agent's name, holding an [ACAF v1](../site/web/src/content/docs/acaf/v1.mdx) record, the format keypaste publishes so other KeePass apps can read and keep it. The vault stays KDBX 4.0. keypaste hides the group from agents, listings, search and export, as it hides tokens and share links; KeePassXC shows it.
 
-Use `env/dev/**` for that subtree. Policy uses the same matching language as `--expose`.
-
-`keypaste policy ls` shows the parsed group and title separately:
-
-```
-1. The client labelled "claude-code"
-   may read the password of entries whose
-     group path matches   env
-     title matches        dev*
-   for up to 5 minutes, without asking you.
-   No limit on how often.
-```
-
-Check both parsed parts before enabling the rule.
-
-<a id="the-keys"></a>
-
-## Rule keys
-
-| Key | Required | What it is |
-| --- | --- | --- |
-| `client` | yes | The `--client-label` the bridge was started with. `"*"` means any labelled client. |
-| `entries` | yes | Patterns, in the same syntax as `--expose`. Up to 16, each up to 128 characters. |
-| `fields` | yes | Any of `password`, `username`, `url`, `notes`, or a custom field named like an environment variable, such as `OPENAI_API_KEY`: capitals, digits and `_`, starting with a capital, not starting `KPEX_`, `KPXC_` or `KP2A_`, and no standard field's name. No other custom field can be named. |
-| `max_ttl_seconds` | yes | 1 to 3600. The agent gets the smaller of this and `--max-ttl`. |
-| `max_per_hour` | no | 1 to 1000 releases an hour through this rule. Omitted means no limit. |
-
-Every required key must be present. Missing `fields`, `entries` or `client` disables the file, preventing a misspelled key from widening access.
-
-The first matching rule decides. If its hourly allowance is exhausted, the request is refused without trying another rule or prompting.
-
-<a id="client-is-the-label-you-wrote-not-the-name-the-agent-claims"></a>
-
-### Client labels
-
-The MCP client's self-reported name is unauthenticated and never used for authorization.
-
-What a rule matches is `--client-label`, which you write into your MCP client's configuration:
-
-```json
-{ "command": "keypaste-mcp", "args": ["--client-label", "claude-code", "--expose", "env/**"] }
-```
-
-The configured label prevents the agent from selecting a policy identity. Another local program can still start a bridge with the same arguments and receive the same policy access. THREATS.md T-14 describes this boundary.
-
-A bridge started with no `--client-label` matches no rule at all, including one written `"*"`.
-
-## What a rule cannot do
-
-A rule applies only within `--expose`, which is checked against the resolved entry first. `entries = ["**"]` on a bridge configured with `--expose "env/**"` still reaches only `env/**`. A rule can lower `--max-ttl` but cannot raise it. An hour-long rule under `keypaste agent --max-ttl 60` grants sixty seconds. A recent explicit refusal takes precedence over a policy rule. `list_entry_names` uses `--expose` alone; policy does not affect listing. A rule matches the path an entry has now, so organizing the vault changes which rule covers what: renaming a project moves every credential in it under the rules written for the new name, and out from under the rules written for the old one. Nothing warns about that — [THREATS](../THREATS.md) T-13 records it.
-
-<a id="anything-wrong-means-everything-asks-you"></a>
-
-## Load errors
-
-Only the Usable state supplies rules. Other states follow the ordinary approval path without giving the requester the loading error. The terminal reports the state; policy releases name the rule in the audit and response.
-
-| State | What `keypaste agent` says |
-| --- | --- |
-| No file | `policy: no file at …, so every request is shown to you.` |
-| Empty, or comments only | `policy: no rules in …, so every request is shown to you.` |
-| Usable | `policy: 2 rules from … [sha256:a1b2c3d4]. keypaste policy ls shows them.` |
-| Malformed | `policy: … is NOT in force - line 7: 'entires' is not a key keypaste understands` |
-| Unreadable | `policy: … is NOT in force - it could not be read: …` |
-| Writable by others | `policy: … is NOT in force - it is writable by users other than its owner` |
-
-Any invalid line disables the whole file because a partial interpretation could widen access.
-
-A policy-loading error does not stop the approver from starting.
-
-## The file format
-
-The parser accepts a subset of TOML: `#` comments, `[[allow]]` sections, and `key = value` with double-quoted strings, whole numbers or arrays of double-quoted strings.
-
-Unsupported syntax produces a parse error, including dotted keys, inline tables, single-quoted or multiline strings, floats, booleans, dates, hex, singular `[table]` headers and trailing commas. An unknown `[[deny]]` section also invalidates the file; unsupported rules cannot be silently skipped.
-
-Patterns and labels cannot contain characters that hide their meaning when printed, such as bidi overrides, zero-width spaces or Unicode tags.
-
-## Permissions
-
-Your policy file decides what an agent may take without asking, so anything that can write it can grant that access.
-
-On Linux and macOS, keypaste refuses a policy file or `~/.keypaste` directory writable by anyone except its owner. It leaves permissions unchanged to avoid a repair race and preserve evidence. Run `chmod 600 ~/.keypaste/policy.toml` and `chmod 700 ~/.keypaste`, then restart.
-
-Windows has no equivalent permission check, as with the audit log and `env export`.
-
-Keep the policy file out of synced folders. Pointing `KEYPASTE_HOME` at Dropbox or iCloud lets another machine change this machine's authorizations.
-
-<a id="it-is-read-once-at-startup"></a>
-
-## Reloading policy
-
-`keypaste agent` reads the file once at startup. Changes take effect after restarting and entering the master password again.
-
-`keypaste policy ls` reads the current file, which can differ from a running approver's copy. Both commands print a short hash of the bytes they read:
-
-```
-2 rules, from /home/you/.keypaste/policy.toml [sha256:e75ea9d3]
-```
+Anyone who can open the vault can change a record there, in KeePassXC for example, and keypaste applies it without a confirmation of its own: the master password is the boundary. A record only applies as the vault's file holds it: while the open vault has an unsaved change, or another program has changed the file, and for any record keypaste does not wholly understand, the settings apply only beneath the defaults, so they can take away and never give more. A change made in keypaste rewrites only what it names and keeps the rest of the record as it is, including anything keypaste does not understand, such as another program's settings or a typo from a hand edit; when such a part remains, the confirmation of a change that gives more says the agent gets no more than the defaults until the record is fixed. Such a change is judged by what the agent can then do: one that only takes away, such as turning values off, applies at once even when the record holds a setting that gives more, which stays inactive in it, and a later change that leaves the record wholly understood asks for everything the agent then gets, that setting included. Two copies of the vault that each changed an agent merge, in KeePass and KeePassXC, to the newer change with the older kept in the entry's history, since each agent's entry has a UUID derived from its name.
 
 ## What is written down
 
-Every release through a rule appends a line to `~/.keypaste/audit.jsonl` with `"decision":"granted"` and `"method":"policy"`, and the reason names which rule:
-
-```json
-{"decision":"granted","method":"policy","reason":"pre-authorized by policy rule allow#1 (env/dev/**, password)"}
-```
-
-`method: prompt` is reserved for requests a person was shown. An exhausted rule records `method: policy-limit`.
-
-The agent also prints one line to its own terminal per release:
-
-```
-keypaste: released env/dev/STRIPE_KEY to allow#1 for 300s without asking
-```
-
-<a id="the-honest-limits"></a>
-
-## Narrowing one client
-
-`policy.toml` adds releases; `~/.keypaste/clients.toml` only takes them away, one client at a time, keyed by the same `--client-label`. Each client has one of three policies:
-
-| Policy | What it does |
+| `method` | What happened |
 |---|---|
-| `session` | Session grants up to 1 hour: a person may give a timed grant and, in `keypaste agent`, a rule here may apply. The default. |
-| `ask` | Ask every time: no timed grant is offered or used and no rule here applies. |
-| `inject-only` | `request_credential` is refused before anything is read; `run` under `--allow-run` is still asked about. |
+| `automatic` | Released without asking, because the agent is Automatic for the item. The reason says so. |
+| `inject-only` | A request for a value from an agent whose settings give it no values, refused before anything was looked up. |
+| `run-off` | A command from an agent whose settings do not let it run commands, refused before anything was looked up. |
+| `narrowing` | A change to an agent's settings that gave it nothing more, applied at once. |
+| `prompt` | With a change to settings, a widening you confirmed or refused. |
 
-```sh
-keypaste mcp policy                       # list them; --json prints the rows
-keypaste mcp policy '*' ask               # every client without a row of its own
-keypaste mcp policy claude-code session
-```
-
-On the desktop's Agents screen, each client card's ⋯ menu sets the same file. Unlike this file's `"*"`, the `*` row there also covers a bridge started with no label, because it can only narrow; put the strict policy on `*`, since a label is whatever the client's configuration says and an agent that can edit that configuration can change it ([THREATS.md](../THREATS.md) T-36). The holder of the vault reads the file at every request, so a change applies to the next one. A file it cannot read or parse refuses every agent request until it is fixed or deleted. No policy covers `keypaste run --session` from an agent's own shell.
+A change to settings is recorded under the tool `access_change`, naming the agent and the change. History in the app shows an Automatic release as Automatic, and a change to settings as Changed settings when it was made and Asked to change settings when it was not. A line written by `v0.3.0` keeps its `policy` or `policy-limit`.
 
 ## Limits
 
-A rule covers the vault's current contents. Anyone able to edit or synchronize that subtree can change what it covers. Moving `personal/bank` into `env/dev` makes it match `env/dev/**`. Policy releases show no prompt, and nobody reviews the stated reason at release time. Narrow `entries`, a low `max_per_hour` and a short `--max-ttl` limit access. Each policy request is checked against the rule and its allowance; policy releases do not populate the prompt approval cache. The returned lifetime cannot erase client copies or expire credentials at their provider.
-
-`keypaste policy ls` shows pattern semantics but cannot preview matching entries. That requires an unlocked vault and is deferred to the GUI. The audit log names each applied rule so `keypaste log` can show its past releases.
-
-THREATS.md T-13 through T-17 are the full versions of these.
-
-[Claude asks for a key, you approve, the deploy runs](demo.md) shows the prompt a policy rule replaces.
+An Automatic release has nobody reading the agent's reason, and the agent keeps what it was given: an hourly limit and an end time bound how much leaves, not what is done with it. The settings follow a label, which is whatever the client's configuration says, so another program running as you can start a bridge with an Automatic agent's label and receive its releases ([THREATS](../THREATS.md) T-14, T-36). A row covers what is in its project now, including an item tagged into it later, by the app, KeePassXC or a merge (T-13). A narrowing is kept on the computer that made it; another computer the vault syncs to applies the vault's record, which a restored backup or an older copy can bring back there, as it can here for a narrowing this computer's file could not keep (T-15). An agent can tell an Automatic release from a prompted one by how fast it comes back (T-17).
 
 ## Verifying it yourself
 
-`scripts/verify-policy-e2e.sh` tests real approver and MCP processes on Linux, macOS and Windows. It checks silent policy release, ordinary prompting outside the rule, exposure and TTL ceilings, refusal of unlabelled bridges and malformed policies, and exclusion of credentials from the audit log.
+`scripts/verify-policy-e2e.sh` runs the shipped `keypaste agent` and bridge on Linux, macOS and Windows: an agent with no settings is asked, a change confirmed in the agent's terminal makes it Automatic for one project and releases there with no prompt and an `automatic` line, a refused change applies nothing, the agent's own request waits for the person, a protected environment and other projects still ask, `*` cannot be made Automatic, a ceiling or an unreadable `clients.toml` takes Automatic away, a spent hourly limit asks, and an old `policy.toml` grants nothing. `scripts/verify-keepassxc-projects.sh` has KeePassXC edit, save and merge a vault holding agents' settings and keypaste apply what it reads.

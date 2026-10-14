@@ -675,8 +675,6 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Busy => "busy",
         AuditMethod.Cooldown => "cooldown",
         AuditMethod.Failed => "failed",
-        AuditMethod.Policy => "policy",
-        AuditMethod.PolicyLimit => "policy-limit",
         AuditMethod.NotInitialized => "not-initialized",
         AuditMethod.Undeliverable => "undeliverable",
         AuditMethod.NoSession => "no-session",
@@ -685,6 +683,9 @@ public sealed class AuditLog : IDisposable
         AuditMethod.ShareCreated => "share-created",
         AuditMethod.ShareRevoked => "share-revoked",
         AuditMethod.InjectOnly => "inject-only",
+        AuditMethod.Automatic => "automatic",
+        AuditMethod.RunOff => "run-off",
+        AuditMethod.Narrowing => "narrowing",
         _ => "unknown",
     };
 

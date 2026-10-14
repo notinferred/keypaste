@@ -30,8 +30,8 @@ public sealed record RecentVault(string Path, DateTimeOffset OpenedAt, string? K
 /// </para>
 /// <para>
 /// <b>Paths are stored with forward slashes, including on Windows.</b> Not a style choice:
-/// <see cref="Toml"/> refuses a backslash inside a value, deliberately, so that a glob in a policy
-/// file cannot be written one way and mean another. Rather than weaken that rule for every file the
+/// <see cref="Toml"/> refuses a backslash inside a value, deliberately, so that a selector in
+/// <c>clients.toml</c> cannot be written one way and mean another. Rather than weaken that rule for every file the
 /// reader parses, this one writes <c>C:/Users/…</c>, which .NET accepts everywhere a path is taken
 /// and which <see cref="System.IO.Path.GetFullPath(string)"/> turns back into the native form on the
 /// way in. The file stays readable and the parser keeps its guarantee.
@@ -81,7 +81,7 @@ public static class RecentVaults
     /// <remarks>
     /// <para>
     /// <b>Anything wrong with the file means an empty list, and the file is left alone.</b> The same
-    /// rule the policy loader follows, for a weaker version of the same reason: this is a
+    /// rule <c>clients.toml</c> follows, for a weaker version of the same reason: this is a
     /// convenience, and a convenience that overwrites a file a human may be part-way through editing
     /// has cost more than it saved. An empty list costs one trip through the file picker.
     /// </para>
@@ -114,9 +114,9 @@ public static class RecentVaults
             if (!string.Equals(table.Name, SectionName, StringComparison.Ordinal)
                 || !TryRead(table, out var vault))
             {
-                // One malformed section does not discard the rest. Unlike a policy file, where a
-                // rule nobody can read must void the whole document because it may have been the
-                // rule that said no, a forgotten shortcut is only a forgotten shortcut.
+                // One malformed section does not discard the rest. Unlike clients.toml, where a
+                // row nobody can read refuses every agent request because it may have been the
+                // row that said no, a forgotten shortcut is only a forgotten shortcut.
                 continue;
             }
 

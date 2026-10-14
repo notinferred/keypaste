@@ -11,7 +11,7 @@ namespace Keypaste.Mcp;
 
 /// <summary>
 /// The MCP bridge, which <c>keypaste mcp</c> enters through <see cref="RunAsync"/> before any vault
-/// access (D-0418): two tools, or three with <c>--allow-run</c>, over stdio, denying everything.
+/// access (D-0418): three tools, or four with <c>--allow-run</c>, over stdio, denying everything.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -98,12 +98,13 @@ public static class BridgeEntry
             ToolCollection = [],
         };
 
-        // Registered explicitly rather than by scanning the assembly: two tools is the whole
-        // surface, and run a third only when the person started this bridge with --allow-run, so
+        // Registered explicitly rather than by scanning the assembly: three tools is the whole
+        // surface, and run a fourth only when the person started this bridge with --allow-run, so
         // no existing configuration gains command execution on upgrade (D-0358).
         serverOptions.ToolCollection.Add(
             new ListEntryNamesTool(new ApproverEntryNameSource(approver, options), options, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
+        serverOptions.ToolCollection.Add(new RequestAccessChangeTool(options, approver, audit, TimeProvider.System));
 
         if (options.AllowRun)
         {

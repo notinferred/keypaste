@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Policy;
 
 namespace Keypaste.Core.Tests;
 
@@ -17,6 +17,15 @@ internal sealed class ApproverFixture : IDisposable
 {
     internal const string Sentinel = "sk_live_handler_sentinel";
 
+    /// <summary>The agent a test's requests come from unless it says otherwise.</summary>
+    internal const string Agent = "claude-code";
+
+    /// <summary>
+    /// Settings that see as far as any bridge exposes and are otherwise the defaults, so the bridge's
+    /// own exposure decides what <see cref="Agent"/> reaches, as it did before agents had settings.
+    /// </summary>
+    internal static AgentAccess SeesAll { get; } = AgentAccess.Defaults with { See = AgentAccessBuilders.See("**") };
+
     internal FakeSource Source { get; } = new();
 
     internal FakeChannel Channel { get; } = new();
@@ -29,8 +38,11 @@ internal sealed class ApproverFixture : IDisposable
 
     internal ApproverHandler Handler { get; }
 
-    /// <summary>What is pre-authorized, on the same clock as everything else.</summary>
-    internal PolicyGate Policy { get; }
+    /// <summary>Each agent's settings and this computer's ceilings; every agent gets the defaults until a test sets more.</summary>
+    internal FakeAgentSettings Settings { get; } = new();
+
+    /// <summary>The owner's hourly limits on Automatic, on the same clock as everything else.</summary>
+    internal HourlyLimit Hourly { get; }
 
     /// <summary>Every line the handler printed to the operator's terminal, in order.</summary>
     /// <remarks>
@@ -41,23 +53,19 @@ internal sealed class ApproverFixture : IDisposable
     internal List<string> Narration { get; } = [];
 
     /// <summary>Builds a fixture.</summary>
-    /// <param name="policy">
-    /// The rules in force. Defaults to none, so every test written before this feature existed
-    /// keeps asking a person exactly as it did.
-    /// </param>
     /// <param name="limits">The operator's own ceilings, when a test needs them narrower.</param>
     /// <remarks>
-    /// The policy gate is built here rather than passed in so that it shares <see cref="Clock"/>.
-    /// An hourly allowance measured on a second clock would silently ignore
-    /// <c>ManualClock.Advance</c>, and the test asserting that an allowance comes back would pass
-    /// for the wrong reason.
+    /// The hourly limits and the handler share <see cref="Clock"/>. A limit measured on a second clock
+    /// would silently ignore <c>ManualClock.Advance</c>, and a test asserting that a limit comes back
+    /// would pass for the wrong reason.
     /// </remarks>
-    internal ApproverFixture(PolicyDocument? policy = null, ApprovalLimits? limits = null)
+    internal ApproverFixture(ApprovalLimits? limits = null)
     {
         Grants = new GrantCache(Clock);
         Gate = new ApprovalGate(Channel, Clock, limits ?? ApprovalLimits.Default);
-        Policy = new PolicyGate(policy ?? PolicyDocument.None, Clock);
-        Handler = new ApproverHandler(Source, Source, Gate, Grants, Policy, Narration.Add);
+        Hourly = new HourlyLimit(Clock);
+        Settings.Records[Agent] = SeesAll;
+        Handler = new ApproverHandler(Source, Source, Gate, Grants, Settings, Narration.Add, hourly: Hourly, clock: Clock);
     }
 
     public void Dispose()
@@ -188,6 +196,20 @@ internal sealed class FakeChannel : IApprovalChannel
 
     internal RunPrompt? LastRunPrompt { get; private set; }
 
+    internal AccessChangePrompt? LastAccessPrompt { get; private set; }
+
+    /// <summary>What a confirmation of a change that gives an agent more is answered with; a no unless a test says otherwise.</summary>
+    internal ApprovalAnswer AccessAnswer { get; set; } = ApprovalAnswer.Denied;
+
+    /// <summary>How many confirmations of a change were asked.</summary>
+    internal int AccessAsked { get; private set; }
+
+    /// <summary>Runs while a confirmation of a change is on screen, before it is answered.</summary>
+    internal Action? WhileConfirming { get; set; }
+
+    /// <summary>Every notice that the change Always for asked for did not take effect, in order.</summary>
+    internal List<AlwaysForNotice> Told { get; } = [];
+
     /// <summary>Completes once a held prompt is up.</summary>
     internal Task Waiting => _waiting.Task;
 
@@ -211,6 +233,16 @@ internal sealed class FakeChannel : IApprovalChannel
         LastRunPrompt = prompt;
         return AnswerAsync(cancellationToken);
     }
+
+    public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
+    {
+        LastAccessPrompt = prompt;
+        AccessAsked++;
+        WhileConfirming?.Invoke();
+        return ValueTask.FromResult(AccessAnswer);
+    }
+
+    public void Tell(AlwaysForNotice notice) => Told.Add(notice);
 
     private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
     {

@@ -113,7 +113,7 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
     public async ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken)
     {
         var (reply, outcome, refusal) = await approver
-            .ListAsync(new NamesRequest(options.Exposure.Globs), cancellationToken)
+            .ListAsync(new NamesRequest(options.Exposure.Globs) { ClientLabel = options.ClientLabel }, cancellationToken)
             .ConfigureAwait(false);
 
         // Sharing the pipe with the credential path means sharing its one-at-a-time rule, and

@@ -66,7 +66,7 @@ internal static class ToolSchemas
               "type": "integer",
               "minimum": 1,
               "maximum": 3600,
-              "description": "How long you would like it for. The person chooses once or a timed grant; standing rules honour this number."
+              "description": "How long you would like it for. The person chooses once or a timed grant; a release under an Automatic mode honours this number."
             }
           },
           "required": ["entry", "field", "reason", "ttl_seconds"],
@@ -136,6 +136,65 @@ internal static class ToolSchemas
           "additionalProperties": false
         }
         """;
+
+    /// <summary>The arguments of <c>request_access_change</c>: what to change, and why. No agent's name, since it is always this bridge's own.</summary>
+    /// <remarks>The bounds are <c>AccessChangeRules</c>'s, which the bridge and the owner apply again.</remarks>
+    internal const string AccessChangeInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["ask", "allow-for-a-while", "automatic"],
+              "description": "ask: the person is asked every time. allow-for-a-while: asked, and they may allow for an hour. automatic: released without asking, within until and per_hour. With project, for that project or environment only."
+            },
+            "project": {
+              "type": "string",
+              "minLength": 1,
+              "description": "<project> or <project>:<environment>, as an entry's project tag names it after env:. Holds only a mode and its limits."
+            },
+            "until": {
+              "type": "string",
+              "minLength": 1,
+              "description": "When automatic ends, after which the person is asked again: a time such as 2026-12-31T18:00:00+02:00, on this computer's clock when it has no offset, or a date such as 2026-12-31, which ends at the close of that day on this computer. Ask for the shortest time your task needs."
+            },
+            "per_hour": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "description": "At most this many values released without asking in an hour, after which the person is asked again."
+            },
+            "see": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "minItems": 1,
+              "maxItems": 16,
+              "description": "Everything this agent may see, in place of what it sees now: a place such as env/**, or a project's variables such as tag:env:billing or tag:env:billing:staging."
+            },
+            "values": {
+              "type": "string",
+              "enum": ["yes", "no"],
+              "description": "yes: request_credential may hand this agent values. no: values go only into commands it runs."
+            },
+            "run": {
+              "type": "string",
+              "enum": ["on", "off"],
+              "description": "on: this agent may ask to run commands with secrets, each approved by the person. off: it may not."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the person who confirms or refuses a change that gives you more. Be specific and honest."
+            }
+          },
+          "required": ["reason"],
+          "additionalProperties": false
+        }
+        """;
+
+    /// <summary>The parsed schema for <c>request_access_change</c>.</summary>
+    internal static readonly JsonElement AccessChangeInput = Parse(AccessChangeInputJson);
 
     /// <summary>The parsed schema for <c>run</c>.</summary>
     internal static readonly JsonElement RunInput = Parse(RunInputJson);

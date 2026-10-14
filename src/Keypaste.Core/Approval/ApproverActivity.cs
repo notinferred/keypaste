@@ -29,7 +29,7 @@ public sealed record EnvGrantInForce(string Key, string Project, string Profile,
     /// <summary>The agent client it was given to, as the prompt showed it, or null for <c>keypaste run --session</c>.</summary>
     public string? Client { get; init; }
 
-    /// <summary>The bridge's raw <c>--client-label</c>, so a client's policy change can end it; null when none.</summary>
+    /// <summary>The bridge's raw <c>--client-label</c>, so a stricter ceiling for the agent can end it; null when none.</summary>
     public string? Label { get; init; }
 
     /// <summary>Each entry it releases, as <see cref="ApprovalPrompt.Shown"/> writes it.</summary>

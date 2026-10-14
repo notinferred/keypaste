@@ -1,3 +1,4 @@
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
@@ -35,6 +36,10 @@ public enum ApproverMessageKind
     Run = 10,
     /// <summary>Withdraws the request a connection is waiting on: the owner still sends its reply, then ends the connection.</summary>
     Withdraw = 11,
+    /// <summary>Every agent's settings the vault holds, for <c>keypaste mcp policy</c>.</summary>
+    AccessList = 12,
+    /// <summary>A change to one agent's settings, which the owner applies or puts to the person.</summary>
+    AccessChange = 13,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -94,6 +99,9 @@ public sealed record AttachReply(string? Session, AuditMethod? Refusal, string R
 /// <param name="Exposure">The globs the bridge was configured with, applied again by the approver.</param>
 public sealed record NamesRequest(IReadOnlyList<string> Exposure)
 {
+    /// <summary>The bridge's <c>--client-label</c>, raw, as <see cref="CredentialRequest.ClientLabel"/> is: what the agent can see follows its settings.</summary>
+    public string? ClientLabel { get; init; }
+
     /// <summary>The vault this connection attached to.</summary>
     public string Vault { get; init; } = string.Empty;
 
@@ -176,14 +184,14 @@ public sealed record CredentialRequest
     /// <remarks>
     /// <para>
     /// Unlike <see cref="ClientName"/> this cannot be chosen by whoever <em>connects</em> — whoever
-    /// spawns the bridge chooses it — which is the entire reason a policy rule keys on this and on
-    /// nothing else (THREATS.md T-3). Null when the operator set none, and a null label matches no
-    /// rule, including one written <c>client = "*"</c>.
+    /// spawns the bridge chooses it — which is the entire reason an agent's settings are kept under
+    /// this and nothing else (THREATS.md T-3). Null when the operator set none, and a null label gets
+    /// the defaults, beneath the settings for every other agent, <c>*</c>.
     /// </para>
     /// <para>
     /// <b>Raw, not sanitized.</b> The operator writes <c>--client-label claude-code</c> in one file
-    /// and <c>client = "claude-code"</c> in another, and those two strings have to compare as
-    /// written. <c>EntryNameSanitizer</c> is lossy, and two distinct labels collapsing into one
+    /// and the vault keeps <c>claude-code</c>'s settings under the same name, and those two strings
+    /// have to compare as written. <c>EntryNameSanitizer</c> is lossy, and two distinct labels collapsing into one
     /// identical display string would be a widening. The audit line keeps using the sanitized form,
     /// because that one is for reading.
     /// </para>
@@ -237,6 +245,12 @@ public sealed record CredentialReply
     /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
     /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
     public bool Recorded { get; init; }
+
+    /// <summary>The project environment the person chose Always for on this release, which the owner then asks them to confirm; never sent.</summary>
+    internal ProjectScope? AlwaysFor { get; init; }
+
+    /// <summary>The gate's slot, kept with <see cref="AlwaysFor"/> for that confirmation, which the owner then gives back; never sent.</summary>
+    internal KeptSlot? Kept { get; init; }
 
     /// <summary>A description with the credential left out.</summary>
     /// <returns>The decision and method, and never the value.</returns>
@@ -389,6 +403,105 @@ public sealed record LockRequest
 /// <param name="Locked">Whether the session the request was made under has ended.</param>
 /// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
 public sealed record LockReply(bool Locked, string Reason);
+
+/// <summary>Asks the owner for every agent's settings its vault holds, from where an earlier reply ended.</summary>
+public sealed record AccessListRequest
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+
+    /// <summary>How many of the listing's rows the requester already has; the reply starts after them.</summary>
+    public int From { get; init; }
+}
+
+/// <summary>One agent's settings as the owner reads them from its vault.</summary>
+/// <param name="Name">The agent's name, or <c>*</c>.</param>
+/// <param name="Record">Its ACAF record as keypaste reads it: a part not understood is written at its narrowest.</param>
+/// <param name="Understood">Whether all of the record was understood; one that was not applies only beneath the defaults.</param>
+/// <param name="ProjectsNotShown">
+/// How many project rows <paramref name="Record"/> leaves out because the whole record would not fit one
+/// reply; none for a whole record.
+/// </param>
+public sealed record AccessRow(string Name, string Record, bool Understood, int ProjectsNotShown = 0);
+
+/// <summary>The agents' settings the vault holds, or why none were listed.</summary>
+/// <param name="Answered">Whether the owner admitted the request at all.</param>
+/// <param name="Agents">Each record, by name; a name with two records is listed twice.</param>
+/// <param name="Complete">
+/// Whether the listing ends with these; a reply that would not fit one frame carries the rows that do,
+/// and the rest are asked for from after them.
+/// </param>
+/// <param name="Reason">keypaste's own words for a refusal, or for records that apply only beneath the defaults; otherwise empty.</param>
+public sealed record AccessListReply(bool Answered, IReadOnlyList<AccessRow> Agents, bool Complete, string Reason);
+
+/// <summary>
+/// Asks the owner to change one agent's settings, in <see cref="AccessEdit"/>'s words, which the owner
+/// reads again itself. A change that gives the agent nothing more applies at once; any other is put to
+/// the person.
+/// </summary>
+/// <param name="Agent">The agent's name, or <c>*</c>.</param>
+/// <param name="Reason">The requester's own reason, untrusted, or empty.</param>
+public sealed record AccessChangeRequest(string Agent, string Reason)
+{
+    /// <summary>The longest reason a request may carry, as long as a credential request's.</summary>
+    public const int MaximumReasonLength = CredentialRequestRules.MaximumReasonLength;
+
+    /// <summary>Where the request says it came from: <see cref="AccessOrigin.Terminal"/> or <see cref="AccessOrigin.Agent"/>, which names its reason. A claim, never proof.</summary>
+    public AccessOrigin Origin { get; init; }
+
+    /// <summary>The row a mode and a limit apply to, or null.</summary>
+    public string? Project { get; init; }
+
+    /// <summary>The mode, or null.</summary>
+    public string? Mode { get; init; }
+
+    /// <summary>What the agent may see, or null.</summary>
+    public IReadOnlyList<string>? See { get; init; }
+
+    /// <summary><c>yes</c> or <c>no</c>, or null.</summary>
+    public string? Values { get; init; }
+
+    /// <summary><c>on</c> or <c>off</c>, or null.</summary>
+    public string? Run { get; init; }
+
+    /// <summary>An hourly limit or <c>none</c>, or null.</summary>
+    public string? PerHour { get; init; }
+
+    /// <summary>When Automatic stops or <c>none</c>, or null.</summary>
+    public string? Until { get; init; }
+
+    /// <summary>Whether the change starts from the defaults, or with a project removes its row.</summary>
+    public bool Reset { get; init; }
+
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>What became of a requested change to an agent's settings.</summary>
+/// <param name="Decision">Whether it took effect.</param>
+/// <param name="Method">How: <see cref="AuditMethod.Narrowing"/> applied at once, <see cref="AuditMethod.Prompt"/> for the person's answer, or a refusal's method.</param>
+/// <param name="Reason">keypaste's own words.</param>
+public sealed record AccessChangeReply(AuditDecision Decision, AuditMethod Method, string Reason)
+{
+    /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
+    /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
+    public bool Recorded { get; init; }
+
+    /// <summary>
+    /// Why the change does not apply on this computer as asked, in keypaste's own words: what refused it,
+    /// or what keeps a change the person confirmed from applying here; null when it applies. Never sent.
+    /// </summary>
+    internal string? Unapplied { get; init; }
+
+    /// <summary>Where a reset set an unreadable <c>clients.toml</c> aside; null for every other change. Never sent.</summary>
+    public string? Kept { get; init; }
+}
 
 /// <summary>
 /// Asks the owner to release a set to a runner holding a scoped token, which the owner verifies

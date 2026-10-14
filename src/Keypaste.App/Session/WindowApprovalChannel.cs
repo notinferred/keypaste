@@ -8,14 +8,16 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// Asks the person at this desktop, in a prompt window of its own, whether an agent may have one
-/// field (D-0326) or a <c>keypaste run --session</c> may have a project's variables (D-0341).
+/// field (D-0326) or a <c>keypaste run --session</c> may have a project's variables (D-0341), and
+/// whether a change that gives an agent more may take effect; and tells them, in a window of its own,
+/// when the change Always for asked for did not.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The gate owns the deadline, the cooldown and one prompt at a time; this only puts the prompt on
-/// screen, counts down the gate's window on it and reports the answer. Anything but a press of Allow
-/// once or the timed allow is a denial: Deny, Escape, closing the window, and every withdrawal,
-/// whether the gate's window ran out, the bridge hung up or the vault locked.
+/// screen, counts down the gate's window on it and reports the answer. Anything but a press of an
+/// allow, or of Always for where the prompt offers it, is a denial: Deny, Escape, closing the window,
+/// and every withdrawal, whether the gate's window ran out, the bridge hung up or the vault locked.
 /// </para>
 /// <para>
 /// A withdrawal decides the answer where it happens, on whatever thread that is, and takes the
@@ -26,14 +28,15 @@ namespace Keypaste.App.Session;
 /// </remarks>
 /// <param name="clock">The clock the arming delay and the countdown run on.</param>
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
-internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerWindow) : IApprovalChannel
+/// <param name="openSettings">What the Always for notice's Open settings does with the agent's name, or null to offer Close alone.</param>
+internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerWindow, Action<string>? openSettings = null) : IApprovalChannel
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     private readonly TimeSpan _answerWindow = answerWindow;
 
-    /// <summary>Raised on the UI thread once a prompt window is on screen.</summary>
+    /// <summary>Raised on the UI thread once a prompt window, or a notice, is on screen.</summary>
     internal event EventHandler<Window>? Shown;
 
     public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
@@ -58,6 +61,33 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
 
         var request = new RunApprovalViewModel(prompt);
         return ShowAsync(request, () => new RunApprovalWindow(request), cancellationToken);
+    }
+
+    public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new AccessChangeViewModel(prompt);
+        return ShowAsync(request, () => new AccessChangeWindow(request), cancellationToken);
+    }
+
+    public void Tell(AlwaysForNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                var window = new NoticeWindow(notice, openSettings);
+                window.Show();
+                Shown?.Invoke(this, window);
+            }
+            catch (Exception)
+            {
+                // A notice that cannot be shown changes nothing: the release stands, and the change's line says why it did not.
+            }
+        });
     }
 
     private async ValueTask<ApprovalAnswer> ShowAsync(

@@ -57,6 +57,7 @@ public sealed class SessionAuthorityGrantsTests : IDisposable
                 TtlSeconds = 60,
                 Exposure = ["**"],
                 ClientName = clientName,
+                ClientLabel = ApproverFixture.Agent,
                 Vault = VaultPath,
                 Session = "session-one",
             },

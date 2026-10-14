@@ -45,7 +45,7 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         OnceOnlyText = prompt.OnceOnly switch
         {
             _ when prompt.GrantSeconds > 0 => string.Empty,
-            OnceOnly.ClientPolicy => "This client's policy is Ask every time: no timed grant is offered.",
+            OnceOnly.AskEveryTime => "This agent is set to Ask every time: no timed grant is offered.",
             _ => "This profile is protected: it is asked about every time.",
         };
         TimedSeconds = prompt.GrantSeconds;

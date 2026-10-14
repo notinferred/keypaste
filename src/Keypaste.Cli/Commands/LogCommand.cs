@@ -9,16 +9,14 @@ namespace Keypaste.Cli.Commands;
 /// <summary><c>keypaste log</c> — what agents asked for, and what happened.</summary>
 /// <remarks>
 /// <para>
-/// <b>The bare verb shows the log</b>, rather than printing usage the way <c>keypaste policy</c>
-/// does. <c>policy</c> has nothing to show without a subcommand; this one has the thing the operator
-/// came for, and making them type a second word to see it would be a toll on the command they reach
-/// for when something looks wrong.
+/// <b>The bare verb shows the log</b>, rather than printing usage. It has the thing the operator came
+/// for, and making them type a second word to see it would be a toll on the command they reach for
+/// when something looks wrong.
 /// </para>
 /// <para>
 /// <b>It needs no vault, and <c>--vault</c> is not one of its options.</b> The audit log is
 /// plaintext by design — it is the record that survives the vault being locked — so asking for a
-/// master password to read it would be theatre, in exactly the way <c>keypaste policy ls</c>
-/// already argues.
+/// master password to read it would be theatre.
 /// </para>
 /// <para>
 /// <b>It checks the chain on every run.</b> Not as a separate concern the user has to remember:

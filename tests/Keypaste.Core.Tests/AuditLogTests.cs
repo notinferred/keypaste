@@ -113,14 +113,17 @@ public sealed class AuditLogTests : IDisposable
         Assert.DoesNotContain("unknown", written, StringComparer.Ordinal);
         Assert.Equal(methods.Length, written.Distinct(StringComparer.Ordinal).Count());
 
-        // The four the release paths turn on, named outright: a rename would otherwise slip past
-        // the distinctness check above while changing what every existing log line means. "policy"
-        // matters most of the four — it is the only word in the vocabulary that means a credential
-        // left the machine with nobody watching, so it is the only evidence that it happened.
+        // The three the release paths turn on, named outright: a rename would otherwise slip past
+        // the distinctness check above while changing what every existing log line means.
+        // "automatic" matters most of the three — it is the only word in the vocabulary that means a
+        // credential left the machine with nobody watching, so it is the only evidence that it
+        // happened. The retired "policy" and "policy-limit" are never written again, so a line that
+        // carries them was written before agents had modes.
         Assert.Contains("prompt", written, StringComparer.Ordinal);
         Assert.Contains("grant-cache", written, StringComparer.Ordinal);
-        Assert.Contains("policy", written, StringComparer.Ordinal);
-        Assert.Contains("policy-limit", written, StringComparer.Ordinal);
+        Assert.Contains("automatic", written, StringComparer.Ordinal);
+        Assert.DoesNotContain("policy", written, StringComparer.Ordinal);
+        Assert.DoesNotContain("policy-limit", written, StringComparer.Ordinal);
     }
 
     [Fact]

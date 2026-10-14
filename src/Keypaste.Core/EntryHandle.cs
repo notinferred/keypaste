@@ -15,7 +15,7 @@ public enum EntryAddressKind
     Handle = 1,
 
     /// <summary>
-    /// A slash-separated entry path. Convenient for a human writing a policy, and ambiguous
+    /// A slash-separated entry path. Convenient for a human typing a name, and ambiguous
     /// whenever a title contains a slash — an ambiguous one is refused rather than guessed at.
     /// </summary>
     Path = 2,

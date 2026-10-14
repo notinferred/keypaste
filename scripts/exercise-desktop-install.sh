@@ -386,7 +386,8 @@ env_run() {
 
 approval() {
   local pipe="keypaste-install-check-$$-$RANDOM" agent_pid response audit="$HOME_DIR/audit.jsonl"
-  printf '%s\nh\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  # y lets install-check see the group the app saved into, which is in no project; h then allows the request for the hour.
+  printf '%s\ny\nh\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do
@@ -395,6 +396,7 @@ approval() {
     sleep 0.2
   done
   act agent-listening grep 'listening on' "$OUT/agent-stderr.txt" || { kill "$agent_pid" 2>/dev/null || true; return 0; }
+  act agent-settings "$KP" mcp policy install-check --see "$ENTRY_GROUP/**" --vault "$VAULT_NATIVE" --approver "$pipe" || true
 
   launch second "$pipe" > /dev/null
   if act second-window drive window 120 && act second-unlock drive type "$MASTER" && act second-unlock-enter drive key Return \
@@ -594,8 +596,8 @@ selftest() {
   set_fact edit-unsaved vault_changed_by_edit false
   passing env-mismatch
   set_fact env-mismatch run_output other
-  passing policy-release
-  set_fact policy-release audit_method policy
+  passing automatic-release
+  set_fact automatic-release audit_method automatic
   passing denied
   set_fact denied audit_decision denied
   set_fact denied mcp_error true
@@ -656,7 +658,7 @@ selftest() {
   expect edit-unsaved edit contradiction
   expect env-mismatch env-run contradiction
   expect env-mismatch edit pass
-  expect policy-release approval contradiction
+  expect automatic-release approval contradiction
   expect denied approval contradiction
   expect no-agent-screen approval unreached
   expect unfinished candidate harness-failure

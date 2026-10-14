@@ -28,6 +28,7 @@ public sealed class LockBoundaryTests
     public async Task A_request_waiting_for_a_person_is_denied_as_locked_by_every_kind_of_lock(string kind)
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var clock = new ManualClock(AppClock.Start);
         var prompt = new ScriptedPrompt { Hold = true };
         using var session = new AppVaultSession(clock, home: fixture.Home);
@@ -67,6 +68,7 @@ public sealed class LockBoundaryTests
     public async Task A_lock_answers_a_request_whose_prompt_comes_down_late_before_the_endpoint_stops()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var prompt = new ScriptedPrompt { Hold = true, ComesDownAfter = TimeSpan.FromSeconds(3) };
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => prompt);
@@ -92,6 +94,7 @@ public sealed class LockBoundaryTests
     public async Task A_lock_does_not_wait_for_a_client_that_neither_reads_nor_hangs_up()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var prompt = new ScriptedPrompt { Hold = true };
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
 #pragma warning disable CA2000 // Disposed only once the lock has returned, because disposing waits for a lock still running.
@@ -123,6 +126,7 @@ public sealed class LockBoundaryTests
     public async Task A_request_after_sleeping_past_the_deadline_is_refused_and_locks_the_vault()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var clock = new ManualClock(AppClock.Start);
         var prompt = new ScriptedPrompt { Answer = ApprovalAnswer.Approved };
         using var session = new AppVaultSession(clock, home: fixture.Home);
@@ -146,6 +150,7 @@ public sealed class LockBoundaryTests
     public async Task Agent_requests_do_not_move_the_idle_deadline()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
@@ -159,7 +164,7 @@ public sealed class LockBoundaryTests
         {
             clock.Advance(TimeSpan.FromMinutes(1));
 
-            var listing = await client.ListAsync(new NamesRequest(["**"]) { Vault = fixture.Path_, Session = id }, Token);
+            var listing = await client.ListAsync(new NamesRequest(["**"]) { ClientLabel = TempVault.Agent, Vault = fixture.Path_, Session = id }, Token);
             var refused = await client.RequestAsync(Request(fixture.Path_, id), Token);
 
             Assert.True(listing!.VaultUnlocked);
@@ -175,6 +180,7 @@ public sealed class LockBoundaryTests
     public async Task The_next_unlock_starts_with_no_grant_from_before_the_lock()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var prompt = new ScriptedPrompt { Answer = ApprovalAnswer.Approved };
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => prompt);
@@ -207,6 +213,7 @@ public sealed class LockBoundaryTests
     public void A_lifetime_that_ended_cannot_reach_the_vault_a_later_unlock_opened()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         Unlock(session, fixture.Path_);
         var before = session.Lifetime!;
@@ -226,6 +233,7 @@ public sealed class LockBoundaryTests
         Reason = "deploy",
         TtlSeconds = 60,
         Exposure = ["**"],
+        ClientLabel = TempVault.Agent,
         Vault = vault,
         Session = session,
     };

@@ -1,13 +1,12 @@
 using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -41,7 +40,13 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
 
         _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _log = new OwnerLog(_directory);
+        _fixture.Settings.Records[_agent] = Sees;
     }
+
+    private const string _agent = "billing-bot";
+
+    /// <summary>What the test's agent may do: see as far as its bridge exposes, and run commands.</summary>
+    private static AgentAccess Sees { get; } = ApproverFixture.SeesAll with { Run = true };
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -74,7 +79,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Session = session,
     };
 
-    private NamesRequest Listing(string session = "session-one") => new(["env/**"]) { Vault = VaultPath, Session = session };
+    private NamesRequest Listing(string session = "session-one") => new(["env/**"]) { ClientLabel = _agent, Vault = VaultPath, Session = session };
 
     private RunRequest Run(string session = "session-one") => new()
     {
@@ -102,6 +107,8 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
         using var lifetime = new SessionLifetime();
         var channel = new FakeChannel { Answer = ApprovalAnswer.ApprovedOnce };
+        var settings = new FakeAgentSettings();
+        settings.Records["no-bridge"] = ApproverFixture.SeesAll;
 
         using (var server = SessionServer.Listen(pipe, new SessionServerOptions
         {
@@ -110,8 +117,8 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
             CurrentLifetime = () => lifetime,
             UnlockedFor = asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? _vault : null,
             Channel = channel,
-            Policy = PolicyGate.None,
-            Clients = new ClientPolicySource(Path.Combine(_directory, "clients.toml")),
+            Settings = settings,
+            Hourly = new HourlyLimit(TimeProvider.System),
             Audit = () => _log.Log,
             WatchEdits = _ => { },
             UnwatchEdits = _ => { },
@@ -126,8 +133,8 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
                 var attached = await client.AttachAsync(new AttachRequest(VaultPath) { Client = new AttachClient("no-bridge", "0.1", null) }, Token);
                 Assert.True(attached?.Attached);
 
-                var listing = await client.ListAsync(Listing(lifetime.Id), Token);
-                var reply = await client.RequestAsync(Credential(lifetime.Id) with { ClientName = "no-bridge", ClientVersion = "0.1", ClientLabel = null }, Token);
+                var listing = await client.ListAsync(Listing(lifetime.Id) with { ClientLabel = "no-bridge" }, Token);
+                var reply = await client.RequestAsync(Credential(lifetime.Id) with { ClientName = "no-bridge", ClientVersion = "0.1", ClientLabel = "no-bridge" }, Token);
 
                 Assert.True(listing?.VaultUnlocked);
                 Assert.Equal(_stripe, reply?.Value);
@@ -227,24 +234,25 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     }
 
     /// <summary>
-    /// A release nobody was asked about has the line as its only witness, so it says <c>policy</c>,
-    /// names the rule, and keeps the agent's stated reason that nobody read (T-12).
+    /// A release nobody was asked about has the line as its only witness, so it says <c>automatic</c>,
+    /// names whose mode released it, and keeps the agent's stated reason that nobody read (T-12).
     /// </summary>
     [Fact]
-    public async Task APolicyRelease_IsRecordedAsPolicyAndNamesTheRule()
+    public async Task AnAutomaticRelease_IsRecordedAsAutomatic()
     {
-        using var policed = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
-        await using var owner = Owner.Start(this, policed);
+        using var automatic = new ApproverFixture();
+        automatic.Settings.Records[_agent] = Sees with { Mode = AgentMode.Automatic };
+        await using var owner = Owner.Start(this, automatic);
         await using var client = await AttachedAsync(owner);
 
         var reply = await client.RequestAsync(Credential(), Token);
         var line = Assert.Single(_log.Lines());
 
-        Assert.Equal(AuditMethod.Policy, reply?.Method);
-        Assert.Equal(0, policed.Channel.Asked);
+        Assert.Equal(AuditMethod.Automatic, reply?.Method);
+        Assert.Equal(0, automatic.Channel.Asked);
         Assert.Equal("granted", line.GetProperty("decision").GetString());
-        Assert.Equal("policy", line.GetProperty("method").GetString());
-        Assert.Contains("allow#1", line.GetProperty("reason").GetString()!, StringComparison.Ordinal);
+        Assert.Equal("automatic", line.GetProperty("method").GetString());
+        Assert.Contains("billing-bot's mode for this entry is Automatic", line.GetProperty("reason").GetString()!, StringComparison.Ordinal);
         Assert.NotNull(line.GetProperty("args").GetProperty("reason_sha256").GetString());
         Assert.DoesNotContain(ApproverFixture.Sentinel, _log.Text(), StringComparison.Ordinal);
     }
@@ -329,8 +337,8 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     }
 
     /// <summary>
-    /// A release the owner cannot record is not made: the policy path, which no person witnesses, the
-    /// listing, and a run each come back with nothing in them, say they were not recorded, and leave
+    /// A release the owner cannot record is not made: an Automatic release, which no person witnesses,
+    /// the listing, and a run each come back with nothing in them, say they were not recorded, and leave
     /// the ledger as it was (T-6).
     /// </summary>
     /// <remarks>
@@ -340,7 +348,8 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
     [Fact]
     public async Task AReleaseTheOwnerCannotRecord_IsRefusedWithNothingInIt()
     {
-        using var policed = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        using var policed = new ApproverFixture();
+        policed.Settings.Records[_agent] = Sees with { Mode = AgentMode.Automatic };
         policed.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         await using var owner = Owner.Start(this, policed);
         await using var client = await AttachedAsync(owner);

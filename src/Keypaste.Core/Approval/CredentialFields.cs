@@ -1,6 +1,6 @@
 namespace Keypaste.Core.Approval;
 
-/// <summary>The one rule for which fields leave by name: to an agent, a run's reference, a policy rule or a share.</summary>
+/// <summary>The one rule for which fields leave by name: to an agent, a run's reference or a share.</summary>
 /// <remarks>
 /// A custom field leaves only when it is named like an environment variable
 /// (<see cref="EnvConvention.IsEnvNamedField"/>) and is no standard name in any case, so a field such

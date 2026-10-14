@@ -328,26 +328,49 @@ public sealed class SetupVerbTests
     }
 
     /// <summary>
-    /// Omitted rather than restated: the bridge owns the default, so there is one place a
-    /// reader can learn what it is.
+    /// The owner holds each agent to its settings on every request, so the bridge is registered offering run and
+    /// reaching every item, and the person is told what an agent with no settings gets.
     /// </summary>
     [Fact]
-    public void No_expose_flag_is_passed_unless_one_was_asked_for()
+    public void Each_client_is_registered_with_run_offered_and_every_item_in_reach()
     {
         using var harness = Wired("claude");
 
         harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "claude-code"));
-        Assert.DoesNotContain("--expose", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
+
+        Assert.EndsWith("--client-label claude-code --allow-run --expose **", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
+        Assert.Contains(
+            "exposure       ** (each agent sees what its settings allow: every project's variables until you change them)\n"
+                + "run            offered; each agent runs nothing until you turn run on in its settings\n",
+            harness.Out.ReplaceLineEndings("\n"),
+            StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Each_expose_glob_becomes_its_own_flag()
+    public void Expose_narrows_the_bridge_with_each_glob_as_its_own_flag()
     {
         using var harness = Wired("claude");
 
         harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "claude-code", "--expose", "env/**,deploy/**"));
 
-        Assert.Contains("--expose env/** --expose deploy/**", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
+        var call = Assert.Single(Ran(harness), Adds);
+        Assert.EndsWith("--client-label claude-code --allow-run --expose env/** --expose deploy/**", call, StringComparison.Ordinal);
+        Assert.DoesNotContain("--expose **", call, StringComparison.Ordinal);
+        Assert.Contains("exposure       env/**, deploy/** (no agent these tools start sees beyond these, whatever its settings)", harness.Out, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_client_configured_by_file_starts_the_bridge_offering_run_with_every_item_in_reach()
+    {
+        using var harness = Wired();
+        var cursor = Seed(harness, "cursor", "{}");
+
+        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "cursor"));
+
+        using var written = JsonDocument.Parse(File.ReadAllText(cursor));
+        var arguments = written.RootElement.GetProperty("mcpServers").GetProperty("keypaste").GetProperty("args").EnumerateArray()
+            .Select(argument => argument.GetString() ?? string.Empty);
+        Assert.Equal(["--client-label", "cursor", "--allow-run", "--expose", "**"], arguments.TakeLast(5));
     }
 
     /// <summary>
@@ -494,7 +517,7 @@ public sealed class SetupVerbTests
 
     /// <summary>A client may start the bridge without KEYPASTE_HOME, and Gemini CLI always does, so another home is written into it (D-0389).</summary>
     [Fact]
-    public void Another_home_pins_its_chosen_vault_its_log_and_its_owner()
+    public void Another_home_pins_its_chosen_vault_its_log_its_ceilings_and_its_owner()
     {
         using var harness = Wired("claude");
         var home = Path.Combine(harness.Directory, "elsewhere");
@@ -502,11 +525,16 @@ public sealed class SetupVerbTests
         ChosenVault.Choose(home, harness.VaultPath, onlyIfNone: false);
         var owner = ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(KeypasteHome.Resolve(home), harness.VaultPath));
         var audit = KeypasteHome.AuditPath(home);
+        var ceilings = KeypasteHome.ClientsPath(home);
 
         harness.AssertExit(CliApp.ExitSuccess, harness.Run("setup", "--yes", "--client", "claude-code"));
 
-        Assert.Contains($"-- {ServerPath(harness)} mcp --vault {harness.VaultPath} --audit-log {audit} --approver {owner} --client-label claude-code", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
+        Assert.Contains(
+            $"-- {ServerPath(harness)} mcp --vault {harness.VaultPath} --audit-log {audit} --clients {ceilings} --approver {owner} --client-label claude-code",
+            Assert.Single(Ran(harness), Adds),
+            StringComparison.Ordinal);
         Assert.Contains($"audit log      {audit}", harness.Out, StringComparison.Ordinal);
+        Assert.Contains($"ceilings       {ceilings}", harness.Out, StringComparison.Ordinal);
         Assert.Contains($"approver       {owner}", harness.Out, StringComparison.Ordinal);
     }
 

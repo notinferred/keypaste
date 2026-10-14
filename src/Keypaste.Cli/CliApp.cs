@@ -114,9 +114,6 @@ internal static class CliApp
             case "setup":
                 return SetupCommand.Execute(args, context);
 
-            case "policy":
-                return PolicyCommand.Execute(args, context);
-
             case "log":
                 return LogCommand.Execute(args, context);
 
@@ -193,7 +190,6 @@ internal static class CliApp
             ("rm", "remove an entry"),
             ("generate", "print a passphrase (--words N); it is not stored"),
             ("access", "change the master password or keyfile"),
-            ("policy", "show the standing rules that skip the prompt"),
         ]),
     ];
 

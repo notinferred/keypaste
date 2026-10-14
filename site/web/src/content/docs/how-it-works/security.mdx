@@ -8,13 +8,14 @@ keypaste protects your secrets at rest in an encrypted KDBX file, and it stands 
 ## What it protects
 
 - **The file.** A copied vault is ciphertext under KDBX 4 with Argon2 and AES-256. How long it resists guessing depends on your master password, and a keyfile or a YubiKey can add a second factor.
-- **The approval.** No agent can trigger your master-password prompt, read the vault, or receive more than one field per request. You see who asks, for what and why before anything is released.
+- **The approval.** No agent can trigger your master-password prompt, read the vault, or receive more than one field per request. You see who asks, for what and why before anything is released, unless you set that agent to Automatic for it, a change you confirm first; each such release is still recorded.
 - **The record.** Every agent request leaves a line in a local, hash-chained log that `keypaste log verify` checks.
 - **Your disk.** Project runs put values in a program's environment and write no plaintext file.
 
 ## What it cannot
 
 - **Programs running as you.** Anything running under your user account can read memory, files and keystrokes. That includes an AI agent with its own shell, which can also reach the agent's own configuration and a running program's environment. THREATS.md lists each case.
+- **Anyone who can open the vault.** Each agent's settings are kept in the vault, so whoever can open it, in KeePassXC for example, can change what an agent gets without keypaste asking.
 - **A value already released.** Whoever received a value keeps it. An allowance's time limit ends its reuse, not the copies.
 - **The issuing service.** keypaste cannot revoke a credential at the service that issued it.
 - **The log's history.** The audit log shows edits but cannot prevent them, and removing its last lines goes unnoticed unless you keep a copy of its latest hash elsewhere.

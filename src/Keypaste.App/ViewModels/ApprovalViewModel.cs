@@ -3,11 +3,20 @@ using Keypaste.Core.Approval;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>One credential request in front of the person at this desktop, answered once.</summary>
+/// <remarks>
+/// Always for exists only when the prompt offers it, and is armed with the allows: it allows this one
+/// request and then asks the person to confirm making that project environment Automatic.
+/// </remarks>
 internal sealed class ApprovalViewModel : PromptViewModel
 {
     internal ApprovalViewModel(ApprovalPrompt prompt)
     {
         ArgumentNullException.ThrowIfNull(prompt);
+
+        OffersAlways = prompt.AlwaysFor is not null;
+        AlwaysLabel = prompt.AlwaysFor is { } scope ? $"Always for {scope.Name}" : string.Empty;
+        AlwaysForCommand = new RelayCommand(() => Decide(ApprovalAnswer.AlwaysForProject), () => IsArmed && OffersAlways && !IsAnswered);
+        DependsOn(AlwaysForCommand, nameof(IsArmed), nameof(IsAnswered));
 
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
@@ -16,7 +25,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
         TimedSeconds = prompt.TtlSeconds;
         Lifetime = prompt.TtlSeconds > 0
             ? $"once, or for {ApprovalLimits.Describe(prompt.TtlSeconds)}"
-            : prompt.OnceOnly == OnceOnly.ClientPolicy ? "once only: this client's policy" : "once only: protected profile";
+            : prompt.OnceOnly == OnceOnly.AskEveryTime ? "once only: this agent is set to Ask every time" : "once only: protected profile";
         Reason = prompt.Reason;
         Scrubbed = (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
         {
@@ -27,6 +36,18 @@ internal sealed class ApprovalViewModel : PromptViewModel
         };
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
     }
+
+    /// <summary>Allows this request once, then asks the person to make its project environment Automatic for the agent.</summary>
+    internal RelayCommand AlwaysForCommand { get; }
+
+    /// <summary>Whether the prompt offers Always for, which then has its own place on it.</summary>
+    internal bool OffersAlways { get; }
+
+    /// <summary>What the Always for button says, naming the project environment.</summary>
+    internal string AlwaysLabel { get; }
+
+    /// <summary>What Always for does, said beside it.</summary>
+    internal string AlwaysCaption { get; } = "Allows once, then asks to make it Automatic";
 
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }

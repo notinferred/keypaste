@@ -121,18 +121,19 @@ public sealed class ServerToolsTests
     }
 
     [Fact]
-    public async Task TheServerExposes_ExactlyTwoTools()
+    public async Task TheServerExposes_ExactlyThreeTools()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
 
         var tools = await ToolsAsync(client);
 
-        // The count matters as much as the names: a third tool appearing by accident on a
+        // The count matters as much as the names: a fourth tool appearing by accident on a
         // credential bridge is the failure worth catching.
-        Assert.Equal(2, tools.Count);
+        Assert.Equal(3, tools.Count);
         Assert.Contains(tools, t => t.Name == ToolText.ListToolName);
         Assert.Contains(tools, t => t.Name == ToolText.CredentialToolName);
+        Assert.Contains(tools, t => t.Name == ToolText.AccessToolName);
     }
 
     /// <summary>
@@ -141,7 +142,7 @@ public sealed class ServerToolsTests
     /// them, which is otherwise invisible until a client acts on the defaults.
     /// </summary>
     [Fact]
-    public async Task BothTools_SetTheHintsTheSdkWouldOtherwiseLeaveHostile()
+    public async Task EveryTool_SetsTheHintsTheSdkWouldOtherwiseLeaveHostile()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
@@ -393,14 +394,15 @@ public sealed class ServerToolsTests
     /// <remarks>
     /// keypaste asks a model to be told the truth about who decided and to act accordingly; saying
     /// "a person released this" about something no person saw is the one untruth a credentials tool
-    /// cannot afford. It also names neither the rule nor the pattern, because an agent that learns
-    /// which parts of a vault are pre-authorized has been handed a map of where to aim.
+    /// cannot afford. It also names neither the project nor the setting that covered it, because an
+    /// agent that learns which parts of a vault are released without asking has been handed a map of
+    /// where to aim.
     /// </remarks>
     [Fact]
-    public async Task APolicyRelease_DoesNotClaimAPersonApprovedIt()
+    public async Task AnAutomaticRelease_DoesNotClaimAPersonApprovedIt()
     {
         await using var harness = new McpHarness();
-        harness.Approver.StartPreapproving();
+        harness.Approver.StartAutomatic();
         var client = await harness.StartAsync();
 
         var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
@@ -408,12 +410,12 @@ public sealed class ServerToolsTests
 
         Assert.False(result.IsError);
         Assert.Contains(FakeApprover.Sentinel, text, StringComparison.Ordinal);
-        Assert.Contains("standing rule", text, StringComparison.Ordinal);
+        Assert.Contains("APPROVED without asking, because the user set this agent to Automatic", text, StringComparison.Ordinal);
         Assert.DoesNotContain("A person released", text, StringComparison.Ordinal);
 
-        // Neither the rule's name nor its pattern, even though the approver sent both.
-        Assert.DoesNotContain("allow#1", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("env/dev/**", text, StringComparison.Ordinal);
+        // Neither the project nor the setting, even though the owner's reason names both.
+        Assert.DoesNotContain("billing:dev", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("billing-bot's mode", text, StringComparison.Ordinal);
 
         // And the terms still travel with it, exactly as on the prompted path.
         Assert.Contains("Do not print it", text, StringComparison.Ordinal);
@@ -421,7 +423,7 @@ public sealed class ServerToolsTests
 
     /// <summary>
     /// The bridge sends the label the operator wrote, not the name the client asserted about itself.
-    /// A rule keys on the first and never on the second (THREATS.md T-3).
+    /// An agent's settings are kept under the first and never the second (THREATS.md T-3).
     /// </summary>
     [Fact]
     public async Task TheOperatorsLabel_ReachesTheApproverSeparatelyFromTheAssertedName()
@@ -440,14 +442,14 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// A rule with an hourly allowance that is spent denies rather than escalating to a person, and
-    /// the refusal says so — retrying now cannot help, but the hour rolling forward will.
+    /// An agent whose settings give it no values is told so, and told the way that is left: a command
+    /// it runs, which only the person can allow, and not to retry.
     /// </summary>
     [Fact]
-    public async Task ASpentPolicyAllowance_IsRefusedWithAdviceThatIsActuallyTrue()
+    public async Task AnAgentGivenNoValues_IsRefusedWithAdviceThatIsActuallyTrue()
     {
         await using var harness = new McpHarness();
-        harness.Approver.StartRefusing(AuditMethod.PolicyLimit, "policy rule allow#1 has used its allowance for this hour");
+        harness.Approver.StartRefusing(AuditMethod.InjectOnly, "this agent is given no values; they reach only commands it runs");
         var client = await harness.StartAsync();
 
         var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
@@ -455,8 +457,8 @@ public sealed class ServerToolsTests
 
         Assert.True(result.IsError);
         Assert.DoesNotContain(FakeApprover.Sentinel, text, StringComparison.Ordinal);
-        Assert.Contains("standing rule", text, StringComparison.Ordinal);
-        Assert.Contains("hour", text, StringComparison.Ordinal);
+        Assert.Equal(ToolText.InjectOnly, text);
+        Assert.Contains("Do not retry request_credential", text, StringComparison.Ordinal);
 
         // The owner recorded the refusal it answered; the bridge records nothing of its own.
         Assert.Empty(harness.AuditLines());
@@ -471,7 +473,7 @@ public sealed class ServerToolsTests
     {
         await using var harness = new McpHarness();
         harness.Approver.Records = false;
-        harness.Approver.StartPreapproving();
+        harness.Approver.StartAutomatic();
         var client = await harness.StartAsync();
 
         var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));

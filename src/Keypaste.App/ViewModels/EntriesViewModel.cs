@@ -483,12 +483,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// What organizing can do to an authorization, said wherever organizing happens.
     /// </summary>
     /// <remarks>
-    /// A policy rule and an agent exposure are globs matched against an entry's group path and its
-    /// title (<see cref="EntryExposure"/>, D-0021), so they follow neither the group nor the entry:
-    /// renaming away from a granted path stops the rule matching and renaming onto one starts it.
-    /// THREATS.md T-13 records that keypaste does not prevent this, and D-0275 records why there is
-    /// no check in the write path. Neither is a reason to let somebody do it without being told, so
-    /// this is a line on the form and never a refusal.
+    /// What an agent can see by place, in its settings, its ceilings or its bridge's exposure, is globs
+    /// matched against an entry's group path and its title (<see cref="EntryExposure"/>), so it follows
+    /// neither the group nor the entry: renaming away from a path an agent sees takes the entry out of
+    /// its view, and renaming onto one brings it in. THREATS.md T-13 records that keypaste does not
+    /// prevent this, and D-0275 records why there is no check in the write path. Neither is a reason to
+    /// let somebody do it without being told, so this is a line on the form and never a refusal (D-0276).
     /// </remarks>
     /// <remarks>
     /// An instance property over a static one, because a binding needs one — the same trade
@@ -500,8 +500,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     /// <summary>The wording of <see cref="AccessNote"/>, for a test that has no screen.</summary>
     internal const string AccessNoteText =
-        "Policy rules and agent exposures match paths, so this can stop one applying to these " +
-        "entries and start another.";
+        "What an agent can see by place is matched against paths, so this can take these items " +
+        "out of an agent's view or bring them into one.";
 
     /// <summary>Whether the group being renamed is where keypaste puts a project's new keys.</summary>
     internal bool ShowsProjectRenameNote =>

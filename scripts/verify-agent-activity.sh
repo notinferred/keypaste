@@ -7,12 +7,17 @@
 #
 # A real keypaste mcp request waiting at the unlocked app is listed. After Approve its grant is listed and
 # the history shows the prompted grant from the audit file. Revoke and Revoke all make the same request
-# ask again. A lock empties both lists, and the next session starts with nothing listed. A missing audit
-# log reads as a session with no records yet, and an unreadable one is shown as unavailable.
+# ask again. A lock empties both lists, and the next session starts with nothing listed. A card's settings
+# show what the vault gives the agent; a narrowing chosen there applies at once, to the vault and
+# clients.toml, and a widening opens the app's confirmation window, changes nothing when refused, and once
+# allowed makes the next request Automatic. Each change is one keypaste app line labelled with the agent.
+# A missing audit log reads as a session with no records yet, and an unreadable one is shown as unavailable.
 #
 # NEGATIVE CONTROL: this fails if a waiting request or a grant is not listed, if a revoked grant still
-# answers, if history is missing a request's record or is shown for a log that cannot be read, or if a
-# credential reaches the driver's output. These checks must never be skipped or soft-passed.
+# answers, if history is missing a request's record or is shown for a log that cannot be read, if a
+# narrowing asks or a widening does not, if a refused widening changes anything or an allowed one does not
+# release the next request unasked, or if a credential reaches the driver's output. These checks must never
+# be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-activity-master-pw'
@@ -108,10 +113,40 @@ revoke() {
 
 readonly LISTED="^grant n=1 client=ci-probe label=$LABEL entry=$ENTRY field=password left=ends in [0-9]+ s$"
 
+SETTINGS=0
+SHOWN_SETTINGS=""
+# Opens the probe's settings from its card and keeps the line the driver reads off them in $SHOWN_SETTINGS.
+settings_shown() {
+  SETTINGS=$((SETTINGS + 1))
+  echo "settings $LABEL" >&7
+  wait_for '^settings agent=' "$HOLD_OUT" "$SETTINGS"
+  SHOWN_SETTINGS="$(grep '^settings agent=' "$HOLD_OUT" | tail -1)"
+}
+settings_say() { grep -qF -- "$1" <<<"$SHOWN_SETTINGS" || die "the probe's settings do not show $2: $SHOWN_SETTINGS"; }
+
+CHANGES=0
+# Starts one change on the probe's settings; changed waits for its answer.
+change() {
+  CHANGES=$((CHANGES + 1))
+  echo "setting $LABEL $*" >&7
+}
+changed() { wait_for '^setting-done ' "$HOLD_OUT" "$CHANGES"; }
+confirmations() { grep -c '^access-prompt agent=' "$HOLD_OUT" || true; }
+
+# The last line is the probe's settings change from the panel, with the decision and method given.
+setting_line() {
+  tail -n 1 "$AUDIT" | jq -e --arg l "$LABEL" --arg d "$1" --arg m "$2" \
+    '.tool == "access_change" and .client.name == "keypaste app" and .client.label == $l and .decision == $d and .method == $m' >/dev/null \
+    || die "the settings change was not recorded as $1/$2 under keypaste app: $(tail -n 1 "$AUDIT")"
+}
+
 # ---------------------------------------------------------------- a vault with something in it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
 printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
+# The entry is not tagged into a project, so the agent sees it only once a person lets it see env/**,
+# confirmed at keypaste agent's terminal before the app holds the vault.
+agent_settings "$CLI" "$VAULT" "$MASTER" "$LABEL --see env/**" || die "could not save the probe's settings in the vault"
 
 exec 7>&-
 exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
@@ -208,11 +243,61 @@ omits '^(waiting|grant) ' "a request or grant from before the lock"
 shows '^history-message The audit log has no records from this session yet\.' "the new session's history"
 omits '^history(-heading)? ' "a record from before the lock in the new session's history"
 
+# --------------------------- a card's settings: a narrowing applies at once, a widening only once confirmed
+start_bridge third
+settings_shown
+settings_say "agent=$LABEL mode=allow-for-a-while values=yes run=off see=env/** rows= held=none" "what the vault gives it"
+
+change mode ask
+changed
+[ "$(confirmations)" -eq 0 ] || die "a narrowing asked for confirmation"
+setting_line granted narrowing
+grep -A3 "^label = \"$LABEL\"" "$WORK/home/clients.toml" | grep -qF 'mode = "ask"' || die "the narrowing did not reach clients.toml"
+settings_shown
+settings_say "mode=ask " "the narrowing"
+ask 7
+wait_for '^prompt client' "$HOLD_OUT" 5
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF 'for=once only: this agent is set to Ask every time' \
+  || die "the request after the narrowing was offered a timed grant"
+echo once >&7
+reply 7
+released 7
+
+change mode allow-for-a-while
+wait_for '^access-prompt agent=' "$HOLD_OUT" 1
+grep '^access-prompt agent=' "$HOLD_OUT" | tail -1 \
+  | grep -qF "agent=$LABEL asked=asked from this app's agent settings gains=by default: Ask, allow for a while" \
+  || die "the confirmation does not say who gains what, or where it was asked from"
+echo deny >&7
+changed
+setting_line denied prompt
+settings_shown
+settings_say "mode=ask " "the mode a refused widening left"
+
+change mode automatic
+wait_for '^access-prompt agent=' "$HOLD_OUT" 2
+echo allow >&7
+changed
+setting_line granted prompt
+settings_shown
+settings_say "mode=automatic " "the confirmed mode"
+ask 8
+reply 8
+released 8
+last_audit '.tool == "request_credential" and .decision == "granted" and .method == "automatic"' \
+  || die "the request after Automatic was confirmed was not released as automatic"
+[ "$(prompts)" -eq 5 ] || die "a request under Automatic raised a prompt"
+
 # ----------------------------------------------------------------- an unreadable log is unavailable
+# The app holds the log open from a session's first request until a lock, and Windows deletes no open file.
 exec 8>&-
+echo lock >&7
+wait_for '^locked' "$HOLD_OUT" 2
 for _ in $(seq 1 50); do rm -f "$AUDIT" 2>/dev/null && break; sleep 0.2; done
 [ -e "$AUDIT" ] && die "could not remove the audit log"
 mkdir "$AUDIT"
+echo unlock >&7
+wait_for 'holding session' "$HOLD_OUT" 3
 activity
 shows "^history-message History unavailable: the audit log couldn't be read" "an unreadable log as unavailable"
 omits '^history ' "history from a log that could not be read"

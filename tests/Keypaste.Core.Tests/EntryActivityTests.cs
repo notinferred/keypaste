@@ -129,12 +129,12 @@ public sealed class EntryActivityTests
     }
 
     [Fact]
-    public void AgentsCanSee_WhatAnExposureOrRuleCovers_OrWhatLeftTheVault()
+    public void AgentsCanSee_WhatAnAgentsReachCovers_OrWhatLeftTheVault()
     {
         Assert.True(EntryExposure.TryCreate(["env/**"], out var bridge, out _));
 
         var nothing = Build();
-        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [bridge]);
+        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [bridge.Reach]);
         var released = Build(audit: [Line("personal/github", 300)]);
 
         Assert.False(nothing.AgentsCanSee(_stripe, []));
@@ -147,7 +147,7 @@ public sealed class EntryActivityTests
     [Fact]
     public void AgentsCanSee_AnEntryTheDefaultReachesByItsProjectTag()
     {
-        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [EntryExposure.Default]);
+        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [EntryExposure.Default.Reach]);
 
         Assert.True(reached.AgentsCanSee(_github, ["env:acme-api"]));
         Assert.False(reached.AgentsCanSee(_github, ["personal"]));

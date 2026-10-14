@@ -72,6 +72,38 @@ public sealed class TomlWriter(TomlLimits limits)
         return Append(Line(key, value, comment));
     }
 
+    /// <summary>Whether <paramref name="values"/> can be written as <paramref name="key"/>'s array and read back as themselves.</summary>
+    /// <param name="key">The bare key they would be written under.</param>
+    /// <param name="values">The strings.</param>
+    /// <returns><see langword="true"/> when the line fits the limits and every string holds only characters the reader keeps.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="key"/> or <paramref name="values"/> is null.</exception>
+    public bool CanWriteStrings(string key, IReadOnlyList<string> values)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(values);
+
+        return values.Count <= _limits.Items
+            && values.All(value => value.Length <= _limits.StringLength && IsWritable(value))
+            && Line(key, values).Length <= _limits.LineLength;
+    }
+
+    /// <summary>Writes <c>key = ["value", ...]</c> on one line.</summary>
+    /// <param name="key">The bare key.</param>
+    /// <param name="values">The strings, which <see cref="CanWriteStrings"/> accepts.</param>
+    /// <returns>This writer.</returns>
+    /// <exception cref="ArgumentException">The key is not a bare key, or the strings or the line could not be read back.</exception>
+    public TomlWriter Strings(string key, IReadOnlyList<string> values)
+    {
+        Bare(key, nameof(key));
+
+        if (!CanWriteStrings(key, values))
+        {
+            throw new ArgumentException("the values cannot be written so that they read back as themselves", nameof(values));
+        }
+
+        return Append(Line(key, values));
+    }
+
     /// <summary>Writes <c>key = number</c>.</summary>
     /// <param name="key">The bare key.</param>
     /// <param name="value">A non-negative whole number.</param>
@@ -93,6 +125,9 @@ public sealed class TomlWriter(TomlLimits limits)
 
     private static string Line(string key, string value, string? comment) =>
         WithComment($"{key} = \"{value}\"", comment);
+
+    private static string Line(string key, IReadOnlyList<string> values) =>
+        $"{key} = [{string.Join(", ", values.Select(value => $"\"{value}\""))}]";
 
     private static string WithComment(string line, string? comment) =>
         comment is null ? line : $"{line}  # {Checked(comment, nameof(comment))}";

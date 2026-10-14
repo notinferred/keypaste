@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 
 namespace Keypaste.App.Tests;
 
@@ -28,8 +29,46 @@ internal sealed class TempVault : IDisposable
         vault.Save();
     }
 
+    /// <summary>The agent a test's requests come from when it names no other.</summary>
+    internal const string Agent = "ci-probe";
+
     /// <summary>The vault file.</summary>
     internal string Path_ { get; }
+
+    /// <summary>
+    /// What an agent the tests give settings to may do: see as far as its bridge exposes and run
+    /// commands, so its bridge's own exposure decides what it reaches, as before agents had settings.
+    /// </summary>
+    internal static AgentAccess SeesAll { get; } = AgentAccess.Defaults with
+    {
+        See = EntryExposure.TryCreate(["**"], out var all, out var error) ? all : throw new InvalidOperationException(error),
+        Run = true,
+    };
+
+    /// <summary>Gives agents <see cref="SeesAll"/> in an open vault, as a person confirms it in the app; the caller saves.</summary>
+    /// <param name="vault">The vault.</param>
+    /// <param name="agents">The agents' names.</param>
+    internal static void Sees(Vault vault, params string[] agents)
+    {
+        var store = new AgentAccessStore(vault);
+
+        foreach (var agent in agents)
+        {
+            if (store.Write(agent, SeesAll) is not (AgentAccessWrite.Written or AgentAccessWrite.Unchanged) and var refused)
+            {
+                throw new InvalidOperationException($"{agent}'s settings were refused: {refused}");
+            }
+        }
+    }
+
+    /// <summary>Gives agents <see cref="SeesAll"/> in this fixture's vault, before anything unlocks it.</summary>
+    /// <param name="agents">The agents' names; none gives <see cref="Agent"/>.</param>
+    internal void Sees(params string[] agents)
+    {
+        using var vault = Vault.Open(Path_, Password);
+        Sees(vault, agents.Length == 0 ? [Agent] : agents);
+        vault.Save();
+    }
 
     /// <summary>
     /// A <c>KEYPASTE_HOME</c> pointing inside this fixture, so a test never touches the real one.

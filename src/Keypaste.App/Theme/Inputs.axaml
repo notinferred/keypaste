@@ -49,6 +49,13 @@
     <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
   </Style>
 
+  <Style Selector="CalendarDatePicker">
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+
   <Style Selector="CheckBox">
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
     <Setter Property="FontSize" Value="13" />

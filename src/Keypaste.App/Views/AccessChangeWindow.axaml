@@ -1,0 +1,101 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.AccessChangeWindow"
+                    x:DataType="vm:AccessChangeViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: a change would give an agent more"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Fixed heights, as in the other prompt windows: the agent's name, the gains and the reason come
+       from whoever asked, so none of them can move the claim, the question or the buttons (THREATS.md
+       T-2). Where the change says it came from is said as a claim in a box of its own. No button is
+       the default: Enter allows nothing, and Escape denies. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="settings" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <TextBlock Grid.Column="0" Name="AgentText" Classes="prompt-title" Text="{Binding Agent}"
+                       MaxWidth="220" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Classes="prompt-title" Text=" would get more" />
+          </Grid>
+          <TextBlock Name="SubjectText" Classes="prompt-sub" Text="{Binding Subject}" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="prompt-call" Height="40" Padding="12,0">
+        <TextBlock Name="OriginText" Classes="value" Text="{Binding Origin}" TextWrapping="Wrap" MaxLines="2"
+                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                   FontFamily="{DynamicResource KpSans}" FontSize="12.5" />
+      </Border>
+
+      <StackPanel Spacing="6">
+        <TextBlock Name="GainsCaptionText" Classes="caption" Text="{Binding GainsCaption}" />
+        <Border Classes="prompt-reason" Height="96">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
+            <ItemsControl Name="GainsList" ItemsSource="{Binding Gains}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Classes="gain" Text="{Binding}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+                             Margin="0,0,0,4" Foreground="{DynamicResource KpTextPrimary}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+      </StackPanel>
+
+      <!-- The caption and the line under the box keep their height when a change gave no reason. -->
+      <StackPanel Spacing="6">
+        <TextBlock Name="ReasonCaptionText" Classes="caption" Text="{Binding ReasonCaption}" Height="18" />
+        <Border Classes="prompt-reason" Height="77">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
+            <StackPanel Spacing="6">
+              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
+                         IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="prompt-scrubbed" Text="{Binding Truncation}"
+                         IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Name="AttributionText" Classes="caption" Text="{Binding Attribution}" Height="18" />
+      </StackPanel>
+
+      <TextBlock Name="ExplainerText" Classes="prompt-note" Text="{Binding Explainer}" />
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="Allow" Classes="prompt primary" Content="Allow"
+                HorizontalAlignment="Right" Command="{Binding AllowOnceCommand}" />
+      </Grid>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

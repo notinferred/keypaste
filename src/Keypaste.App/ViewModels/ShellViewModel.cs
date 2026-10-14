@@ -170,7 +170,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         if (authority is not null && _session.Identity is { } identity)
         {
             EntryActivity = new EntryActivitySource(
-                authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post, Core.Audit.KeypasteHome.PolicyPath(home));
+                authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post);
         }
 
         Recommendations = new RecommendationsViewModel(session, home);
@@ -752,6 +752,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
 
         return entries;
+    }
+
+    /// <summary>Shows Agents with one agent's settings open below the cards.</summary>
+    /// <param name="agent">The agent's name.</param>
+    internal void OpenAgentSettings(string agent)
+    {
+        Current = Destinations.Of(DestinationKind.AgentActivity);
+        (Content as AgentActivityViewModel)?.OpenSettings(agent);
     }
 
     private AgentActivityViewModel Activity() =>

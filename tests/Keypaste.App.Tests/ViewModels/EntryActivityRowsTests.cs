@@ -55,7 +55,11 @@ public sealed class EntryActivityRowsTests
         Assert.Equal(text, row.LastUsedText);
     }
 
-    /// <summary>The card belongs to an item agents can see: with nothing released and no rule it is absent, and a standing rule covering the item brings it (N.5).</summary>
+    /// <summary>
+    /// The card belongs to an item agents can see: with nothing released and no bridge attached it is
+    /// absent, a bridge whose agent's settings do not reach the item leaves it absent, and one whose
+    /// settings do brings it (N.5).
+    /// </summary>
     [Fact]
     public async Task TheAgentAccessCard_ShowsOnlyWhenAgentsCanSeeTheItem()
     {
@@ -67,18 +71,16 @@ public sealed class EntryActivityRowsTests
             Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
         }
 
-        var policy = Path.Combine(app.Fixture.Home, "policy.toml");
-        File.WriteAllText(policy, """
-            [[allow]]
-            client          = "claude-code"
-            entries         = ["**"]
-            fields          = ["password"]
-            max_ttl_seconds = 300
-            max_per_hour    = 20
-            """);
-
-        using (var screen = app.Screen(policy))
+        await using (await app.AttachBridgeAsync("no-settings"))
         {
+            using var screen = app.Screen();
+            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
+            Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
+        }
+
+        await using (await app.AttachBridgeAsync(TempVault.Agent))
+        {
+            using var screen = app.Screen();
             screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
             Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
             Assert.Equal("None active", screen.Entries.Detail.AgentAccessSummary);
@@ -148,6 +150,7 @@ public sealed class EntryActivityRowsTests
         internal static async Task<App> StartAsync()
         {
             var fixture = new TempVault();
+            fixture.Sees();
             var clock = new ManualClock(AppClock.Start);
             var person = new Person();
 #pragma warning disable CA2000
@@ -167,14 +170,24 @@ public sealed class EntryActivityRowsTests
             return new App(fixture, clock, person, authority, client, serving.Session);
         }
 
-        internal Screen Screen(string? policyPath = null)
+        internal Screen Screen()
         {
 #pragma warning disable CA2000
-            var activity = new EntryActivitySource(
-                Authority, KeypasteHome.AuditPath(Fixture.Home), Authority.Session.Identity!.Key, Clock, policyPath: policyPath);
+            var activity = new EntryActivitySource(Authority, KeypasteHome.AuditPath(Fixture.Home), Authority.Session.Identity!.Key, Clock);
             var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
             return new Screen(activity, countdown, new EntriesViewModel(Authority.Session, countdown, activity));
 #pragma warning restore CA2000
+        }
+
+        /// <summary>A bridge attached as <paramref name="label"/>'s, announcing that it answers with every entry.</summary>
+        internal async Task<ApproverClient> AttachBridgeAsync(string label)
+        {
+            var serving = Assert.IsType<AuthorityStatus.Serving>(Authority.Status);
+            var bridge = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+            Assert.NotNull(bridge);
+            var request = new AttachRequest(Fixture.Path_) { Client = new AttachClient("claude", "2.0", label), Exposure = ["**"] };
+            Assert.True((await bridge.AttachAsync(request, Token))!.Attached);
+            return bridge;
         }
 
         internal Task<CredentialReply?> RequestAsync() =>

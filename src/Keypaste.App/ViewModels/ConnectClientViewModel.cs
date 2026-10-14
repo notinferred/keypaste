@@ -109,7 +109,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Extra globs, comma-separated; empty leaves the bridge's default of <c>tag:env:*</c>.</summary>
+    /// <summary>Globs that narrow this connection, comma-separated; empty registers every item, so the agent's settings decide.</summary>
     internal string Exposure
     {
         get => _exposure;

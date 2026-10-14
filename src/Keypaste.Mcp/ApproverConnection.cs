@@ -126,6 +126,17 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             cancellationToken,
             retry: false);
 
+    /// <summary>Asks the owner to change this bridge's agent's settings, which may wait for the person to confirm it.</summary>
+    /// <param name="request">The change. Its vault and session are filled in here.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
+    /// <returns>The owner's answer, and what became of the exchange.</returns>
+    /// <remarks>Never sent twice, as a run is not: a change whose reply was lost may already have been confirmed or applied.</remarks>
+    internal ValueTask<Exchange<AccessChangeReply>> ChangeAccessAsync(AccessChangeRequest request, CancellationToken cancellationToken) =>
+        ExchangeAsync(
+            (client, session, token) => client.ChangeAccessAsync(request with { Vault = vaultPath, Session = session }, token),
+            cancellationToken,
+            retry: false);
+
     /// <summary>Asks the owner to decide one credential request.</summary>
     /// <param name="request">What the agent asked for. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>

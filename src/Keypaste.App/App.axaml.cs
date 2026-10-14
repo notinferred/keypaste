@@ -86,7 +86,7 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window),
+            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings),
             AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)));
 
         _window = new MainWindow();
@@ -171,6 +171,14 @@ internal sealed partial class App : Application, IDisposable
         }
 
         _window.Activate();
+    }
+
+    /// <summary>Shows the window on Agents with one agent's settings open, as the Always for notice asks.</summary>
+    /// <param name="agent">The agent's name.</param>
+    internal void OpenAgentSettings(string agent)
+    {
+        OpenWindow();
+        _shell?.OpenAgentSettings(agent);
     }
 
     /// <summary>Closes the window into the menu bar or tray; closing still ends the session, so the process stays locked and holds no secret (D-0385).</summary>

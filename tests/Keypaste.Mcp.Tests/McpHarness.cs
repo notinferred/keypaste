@@ -49,11 +49,23 @@ internal sealed class McpHarness : IAsyncDisposable
     private StreamServerTransport? _transport;
     private Task? _serving;
 
+    /// <summary>The <c>--client-label</c> the server is started with, or null to start it with none.</summary>
+    internal string? Label { get; init; } = ClientLabel;
+
     /// <summary>The vault the server will be pointed at. Never opened: nothing opens a vault here.</summary>
     internal string VaultPath => _vaultPath ?? Path.Combine(_directory, "vault.kdbx");
 
+    /// <summary>Whether the server is started with this harness's directory as its <c>KEYPASTE_HOME</c>, whose log <see cref="AuditPath"/> is.</summary>
+    internal bool InItsOwnHome { get; init; }
+
+    /// <summary>The clock and time zone the bridge reads an agent's end time on.</summary>
+    internal TimeProvider Clock { get; init; } = TimeProvider.System;
+
     /// <summary>Where this bridge records the calls no owner recorded.</summary>
-    internal string AuditPath => Path.Combine(_directory, "audit.jsonl");
+    internal string AuditPath => KeypasteHome.AuditPath(_directory);
+
+    /// <summary>The ceilings a server in its own home lowers.</summary>
+    internal string ClientsPath => KeypasteHome.ClientsPath(_directory);
 
     /// <summary>Every byte the server has sent the client, as text.</summary>
     /// <remarks>
@@ -132,11 +144,12 @@ internal sealed class McpHarness : IAsyncDisposable
     /// </remarks>
     internal HarnessChannels Serve(params string[] argv)
     {
+        string[] label = Label is null ? [] : ["--client-label", Label];
         var arguments = (argv.Contains("--expose") ? argv : ["--expose", "env/**", .. argv])
-            .Concat(["--vault", VaultPath, "--audit-log", AuditPath, "--client-label", ClientLabel])
+            .Concat(["--vault", VaultPath, "--audit-log", AuditPath, .. label])
             .ToArray();
 
-        if (!ServerOptions.TryParse(arguments, null, null, _approverPipeName ?? Approver.PipeName, null, out var options, out var error))
+        if (!ServerOptions.TryParse(arguments, null, InItsOwnHome ? _directory : null, _approverPipeName ?? Approver.PipeName, null, out var options, out var error))
         {
             throw new InvalidOperationException($"the harness could not start the server: {error}");
         }
@@ -166,6 +179,7 @@ internal sealed class McpHarness : IAsyncDisposable
                 ? new ListEntryNamesTool(Source, options, _audit)
                 : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
+        serverOptions.ToolCollection.Add(new RequestAccessChangeTool(options, _approver, _audit, Clock));
 
         if (options.AllowRun)
         {

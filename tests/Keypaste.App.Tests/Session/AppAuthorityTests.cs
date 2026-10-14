@@ -122,6 +122,7 @@ public sealed class AppAuthorityTests
     public async Task Quitting_answers_a_waiting_request_as_locked_before_the_endpoint_stops()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var prompt = new HeldPrompt();
         var authority = Launch(fixture, prompt: () => prompt);
 
@@ -213,6 +214,7 @@ public sealed class AppAuthorityTests
         Reason = "deploy",
         TtlSeconds = 60,
         Exposure = ["**"],
+        ClientLabel = TempVault.Agent,
         Vault = vault,
         Session = session,
     };

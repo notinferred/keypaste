@@ -44,7 +44,7 @@ keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an 
 
 ## T3 — AI requests in the app
 
-Every release still needs a person's answer or a rule they wrote, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
+Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
 - [ ] **N.3 — Show apps, requests, allowances and history on Agents.** Needs: N.1a, G.2.
   - Each detected tool gets one Connect.
@@ -61,14 +61,11 @@ Every release still needs a person's answer or a rule they wrote, and the bridge
   - the owner answers;
   - the settings files parse;
   - `keypaste` is on PATH.
-- [ ] **G.8 — Set in the app what each agent can see and run.** Needs: G.1, C.5b.
-  - Each connected app's row says what the app can see and whether it may run commands.
-  - The owner applies the intersection with the bridge's flags, so a flag an agent edits into its own configuration can only narrow access.
 - [ ] **N.8 — Make `keypaste` alone show where things stand.** Needs: G.1.
   - On a terminal it shows the version, the chosen vault and who holds it, the connected tools and one next step.
   - It asks for no password.
 - [ ] **N.9 — Give each CLI concept one name.** Needs: none.
-  - `approve` for the terminal approver, `rules` for `policy.toml`, and `clients` for per-client choices.
+  - `approve` for the terminal approver, and `clients` for per-client choices.
   - The old spellings are removed, with no aliases (D-0416).
 
 ## T5 — Desktop delivery
@@ -204,7 +201,7 @@ PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, v1.10 (D-04
 - [ ] **X.17 — Let an agent organize the vault without seeing values.** Needs: none.
   - By default the agent sees names and structure only, never a value, and note text counts as a value; the person may allow it to read a vault's note text, told that the text then reaches the agent's provider (PRODUCT §2).
   - It proposes changes such as classifying notes, moving keys into fields or tagging entries for projects; each change is applied only once the person approves it in the app, and one that moves an item into or out of an agent's reach, such as tagging it into a project an agent can see, is flagged as such before the person approves it.
-  - Every name the agent reads reaches its provider, and a planted entry name can steer it, for example into proposing a move under a standing rule (T-13).
+  - Every name the agent reads reaches its provider, and a planted entry name can steer it, for example into proposing a move into a project an agent is Automatic for (T-13).
 
 ## T8 — Cloud vault and team projects
 

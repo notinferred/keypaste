@@ -209,7 +209,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Write(
             Bridge(AuditDecision.Granted, AuditMethod.Prompt, "env/acme-api/dev/DATABASE_URL"),
-            Bridge(AuditDecision.Granted, AuditMethod.Policy, "env/acme-api/dev/REDIS_URL"),
+            Bridge(AuditDecision.Granted, AuditMethod.Automatic, "env/acme-api/dev/REDIS_URL"),
             Bridge(AuditDecision.Denied, AuditMethod.TimedOut, "env/infra/prod/AWS_SECRET_ACCESS_KEY"),
             Bridge(AuditDecision.Denied, AuditMethod.Prompt, "Work/github"),
             new AuditRecord

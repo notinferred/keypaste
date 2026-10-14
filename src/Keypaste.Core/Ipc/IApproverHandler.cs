@@ -103,6 +103,22 @@ public interface IApproverHandler
             "this keypaste process does not run commands for agents"));
     }
 
+    /// <summary>Lists every agent's settings the vault holds.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The settings, or why none were listed. A handler that keeps no settings refuses.</returns>
+    ValueTask<AccessListReply> ListAccessAsync(AccessListRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new AccessListReply(false, [], true, "this keypaste process keeps no agent settings"));
+
+    /// <summary>Changes one agent's settings: at once when the change gives it nothing more, otherwise only once the person confirms.</summary>
+    /// <param name="request">The change, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>What became of it. A handler that keeps no settings refuses.</returns>
+    ValueTask<AccessChangeReply> ChangeAccessAsync(AccessChangeRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new AccessChangeReply(Audit.AuditDecision.Denied, Audit.AuditMethod.NoSession, "this keypaste process keeps no agent settings"));
+
     /// <summary>Tells the handler a connection has gone, so its grants can go with it.</summary>
     /// <param name="connectionId">The connection that ended.</param>
     void Disconnected(string connectionId);

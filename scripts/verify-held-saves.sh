@@ -151,6 +151,9 @@ printf '%s\n%s\n' "$MASTER" 'gh-held' | "$CLI" add Work/github --vault "$VAULT" 
 printf '%s\n%s\n' "$SOURCE_PW" "$SOURCE_PW" | "$CLI" init "$SOURCE" >/dev/null || die "could not create the import source"
 printf '%s\n%s\n' "$SOURCE_PW" 'old-held' | "$CLI" add Imported/old --vault "$SOURCE" >/dev/null || die "could not fill the import source"
 printf 'PULLED_KEY=held\n' >"$DOTENV"
+# The entry is not tagged into a project, so each probe sees it only once a person lets it see env/**,
+# confirmed at keypaste agent's terminal before anything holds the vault.
+agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-held-app --see env/**' 'ci-held-agent --see env/**' || die "could not save the two probes' settings in the vault"
 
 # ------------------------------------------------------------------------------- the app holds it
 exec 7>&-

@@ -64,6 +64,10 @@ printf '%s\n%s\n%s\n' "$MASTER" "$API_KEY" "$RECOVERY" \
   | "$CLI" set "$API_ENTRY" --field OPENAI_API_KEY --field 'Recovery codes' --vault "$VAULT" >/dev/null \
   || die "could not set the entry's custom fields"
 
+# ci-probe sees every entry and may run commands, each still asked about, as a person confirmed at
+# keypaste agent's terminal; without them it would see only what is tagged into a project and run nothing.
+agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-probe --see ** --run on' || die "could not save ci-probe's settings in the vault"
+
 # ------------------------------------------------------------- a reference names one custom field
 # `keypaste run --env-file` puts exactly that field in the child; a field that never leaves starts nothing.
 CHILD=${BASH:-/bin/bash}

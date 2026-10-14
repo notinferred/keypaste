@@ -1,6 +1,6 @@
-using Keypaste.Core.Infrastructure;
-using Keypaste.Core.Policy;
+using Keypaste.Core.Agents;
 using Xunit;
+using static Keypaste.Core.Tests.AgentAccessBuilders;
 
 namespace Keypaste.Core.Tests;
 
@@ -378,21 +378,19 @@ public sealed class VaultOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// The cost of renaming a group, asserted rather than described. A rule is a standing human
-    /// authorization over a <em>path</em>, so carrying a group into a granted namespace carries
-    /// its credentials under that rule with nobody prompted (THREATS.md T-13). keypaste does not
+    /// The cost of renaming a group, asserted rather than described. What an agent sees by place is a
+    /// standing human authorization over a <em>path</em>, so carrying a group into a place it sees
+    /// carries its credentials into its reach with nobody prompted (THREATS.md T-13). keypaste does not
     /// prevent this; it must not be able to happen without this test going red.
     /// </summary>
     [Fact]
-    public void APolicyRule_FollowsTheGroupPath_SoARenameMovesEntriesUnderTheRuleForTheNewName()
+    public void APlaceAnAgentSees_FollowsTheGroupPath_SoARenameMovesEntriesIntoIt()
     {
         using var vault = Seeded(NewVaultPath());
+        var access = EffectiveAccess.Create("claude-code", Own(AgentAccess.Defaults with { See = See("env/dev/**") }), AccessCaps.Empty);
+        var bridge = See("**");
 
-        var granted = Rule("env/dev/**");
-        var abandoned = Rule("env/billing/**");
-
-        Assert.False(granted.Matches("claude-code", _token, [], "password"));
-        Assert.True(abandoned.Matches("claude-code", _token, [], "password"));
+        Assert.Equal(ExposureReach.None, access.Reach(bridge, _token, []));
 
         Assert.Equal(GroupOutcome.Renamed, vault.RenameGroup("env/billing", "dev", out _));
 
@@ -402,24 +400,33 @@ public sealed class VaultOrganizeTests : IDisposable
             .ToList();
 
         Assert.Equal(2, names.Count);
-        Assert.All(names, name => Assert.True(granted.Matches("claude-code", name, [], "password")));
-        Assert.All(names, name => Assert.False(abandoned.Matches("claude-code", name, [], "password")));
+        Assert.All(names, name => Assert.Equal(ExposureReach.Entry, access.Reach(bridge, name, [])));
+    }
+
+    /// <summary>
+    /// A project row follows the entry's tags and never its path, so moving or renaming where it lives
+    /// changes nothing, and a project renamed in its tags leaves the row with nothing to release: it
+    /// fails closed to the agent's default (D-0275).
+    /// </summary>
+    [Fact]
+    public void AProjectRow_FollowsTheEntrysTags_NotItsPath()
+    {
+        using var vault = Seeded(NewVaultPath());
+        Assert.True(vault.AddTag(_token, "env:billing"));
+        var access = EffectiveAccess.Create("claude-code", Own(AgentAccess.Defaults with { Projects = [Row("billing", AgentMode.Automatic)] }), AccessCaps.Empty);
+        var now = DateTimeOffset.UtcNow;
+
+        Assert.Equal(AgentMode.Automatic, access.Item(vault.Tags(_token)!, now).Mode);
+
+        Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(_token, "keys", out var moved));
+        Assert.Equal(AgentMode.Automatic, access.Item(vault.Tags(moved!)!, now).Mode);
+
+        Assert.True(vault.RemoveTags(moved!, ["env:billing"]));
+        Assert.True(vault.AddTag(moved!, "env:invoicing"));
+        Assert.Equal(AgentMode.AllowForAWhile, access.Item(vault.Tags(moved!)!, now).Mode);
     }
 
     // ---------------------------------------------------------------- helpers
-
-    private static PolicyRule Rule(string glob)
-    {
-        var text = "[[allow]]\n"
-            + "client          = \"claude-code\"\n"
-            + "entries         = [\"" + glob + "\"]\n"
-            + "fields          = [\"password\"]\n"
-            + "max_ttl_seconds = 300\n";
-
-        Assert.True(Toml.TryParse(text, out var syntax, out var syntaxError), syntaxError);
-        Assert.True(PolicyDocument.TryCreate(syntax, out var document, out var error), error);
-        return Assert.Single(document.Rules);
-    }
 
     /// <summary>The KDBX minor version of the saved file: byte 8, little-endian.</summary>
     private static int MinorVersion(string path)

@@ -90,6 +90,20 @@
       <TextBlock Classes="prompt-note"
                  Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
 
+      <!-- Always for has a place of its own, kept whether the prompt offers it or not, so Deny and the
+           allows never move (D-0326, T-2). It is armed with them. Its caption wraps to two lines at
+           most inside the same height. -->
+      <Grid Name="AlwaysSlot" Height="34" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+        <Button Grid.Column="0" Name="AlwaysFor" Classes="prompt" MaxWidth="220"
+                IsVisible="{Binding OffersAlways}" Command="{Binding AlwaysForCommand}"
+                AutomationProperties.Name="{Binding AlwaysLabel}">
+          <TextBlock Name="AlwaysText" Text="{Binding AlwaysLabel}" TextTrimming="CharacterEllipsis" />
+        </Button>
+        <TextBlock Grid.Column="1" Name="AlwaysCaptionText" Classes="prompt-note" Text="{Binding AlwaysCaption}"
+                   TextWrapping="Wrap" MaxLines="2" LineHeight="16" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                   IsVisible="{Binding OffersAlways}" />
+      </Grid>
+
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                 IsCancel="True" Command="{Binding DenyCommand}" />

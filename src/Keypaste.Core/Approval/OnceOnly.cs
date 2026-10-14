@@ -9,6 +9,6 @@ public enum OnceOnly
     /// <summary>What is asked for lives in a protected profile, which is asked about every time.</summary>
     ProtectedProfile = 1,
 
-    /// <summary>The client's policy is Ask every time.</summary>
-    ClientPolicy = 2,
+    /// <summary>The agent's mode for what is asked for is Ask every time.</summary>
+    AskEveryTime = 2,
 }

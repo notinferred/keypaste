@@ -4,7 +4,6 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
@@ -176,7 +175,7 @@ public sealed class OwnerDenialTests : IDisposable
                 new VaultEntryNameLister(() => _vault),
                 _gate,
                 _grants,
-                PolicyGate.None);
+                TestSession.Settings());
 
             IApproverHandler authority = new SessionAuthority(
                 VaultIdentity.Of(test._directory, holds), () => _lifetime, handler, audit: () => Log.Log);

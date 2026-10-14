@@ -239,6 +239,34 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out LockReply? reply) ? reply : null;
     }
 
+    /// <summary>Asks the owner for every agent's settings its vault holds.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<AccessListReply?> ListAccessAsync(AccessListRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out AccessListReply? reply) ? reply : null;
+    }
+
+    /// <summary>Asks the owner to change one agent's settings, which may wait for the person to confirm it.</summary>
+    /// <param name="request">The change, and the attachment it is made under.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent, and any question with it; its reply is still returned.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<AccessChangeReply?> ChangeAccessAsync(AccessChangeRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out AccessChangeReply? reply) ? reply : null;
+    }
+
     /// <summary>Asks for a set under a scoped token.</summary>
     /// <param name="request">The token, the set, the command and directory.</param>
     /// <param name="cancellationToken">Cancels the exchange, which withdraws any question.</param>

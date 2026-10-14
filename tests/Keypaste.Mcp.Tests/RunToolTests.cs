@@ -4,12 +4,11 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol;
@@ -442,7 +441,7 @@ public sealed class RunToolTests : IDisposable
 
         var tools = await client.ListToolsAsync(cancellationToken: Token);
 
-        Assert.Equal([ToolText.ListToolName, ToolText.CredentialToolName], tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
+        Assert.Equal([ToolText.ListToolName, ToolText.AccessToolName, ToolText.CredentialToolName], tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -459,10 +458,27 @@ public sealed class RunToolTests : IDisposable
         Assert.False(run.ProtocolTool.Annotations.IdempotentHint);
     }
 
+    /// <summary>A command the agent's settings do not let it run is refused before anybody is asked, and the agent is told who can allow it.</summary>
     [Fact]
-    public async Task InjectOnly_RefusesRequestCredential_WithTheRunHint()
+    public async Task ARunTheAgentMayNotMake_IsRefused_NamingWhoCanAllowIt()
     {
-        await using var owner = Owner.Start(this, ApprovalAnswer.Approved, clients: "[[client]]\nlabel = \"*\"\npolicy = \"inject-only\"\n");
+        await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce, clients: "[[client]]\nlabel = \"test-label\"\nrun = \"off\"\n");
+        await using var harness = new McpHarness(owner.PipeName, VaultPath);
+        var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
+
+        var result = await client.CallToolAsync(ToolText.RunToolName, Run("--stdout", "DATABASE_URL"), cancellationToken: Token);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ToolText.RunOff, TextOf(result));
+        Assert.Equal(0, owner.Asked);
+        Assert.Equal("run-off", Assert.Single(owner.Log.Lines()).GetProperty("method").GetString());
+        Assert.Empty(harness.AuditLines());
+    }
+
+    [Fact]
+    public async Task NoValues_RefusesRequestCredential_WithTheRunHint()
+    {
+        await using var owner = Owner.Start(this, ApprovalAnswer.Approved, clients: "[[client]]\nlabel = \"*\"\nvalues = \"no\"\n");
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
         var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
 
@@ -538,17 +554,17 @@ public sealed class RunToolTests : IDisposable
             _vault.SetFields(token, [new FieldWrite("TOKEN", "tok-" + _core)]);
             _vault.AddTag(token, "env:acme-api");
             _vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "bank", Password = "bank-" + _core });
+            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(_vault).Write(McpHarness.ClientLabel, TestSession.Sees));
             _vault.Save();
 
             _gate = new ApprovalGate(this, TimeProvider.System, ApprovalLimits.Default);
 
-            ClientPolicySource? source = null;
+            // The settings as an owner reads them: the record saved in the vault, beneath this computer's ceilings.
+            var path = Path.Combine(test._directory, "clients.toml");
 
             if (clients is not null)
             {
-                var path = Path.Combine(test._directory, "clients.toml");
                 File.WriteAllText(path, clients);
-                source = new ClientPolicySource(path);
             }
 
             var handler = new ApproverHandler(
@@ -556,8 +572,7 @@ public sealed class RunToolTests : IDisposable
                 new VaultEntryNameLister(() => _vault),
                 _gate,
                 _grants,
-                PolicyGate.None,
-                clients: source);
+                new VaultAgentSettings(() => _vault, _ => AgentSave.Unchanged, new AccessCapsSource(path)));
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(KeypasteHome.Resolve(null), test.VaultPath),

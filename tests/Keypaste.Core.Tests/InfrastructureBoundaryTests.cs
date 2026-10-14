@@ -45,7 +45,7 @@ public sealed partial class InfrastructureBoundaryTests
 
         const string Source = """
             using System.Text;
-            using Keypaste.Core.Policy;
+            using Keypaste.Core.Agents;
 
             namespace Keypaste.Core.Infrastructure;
 
@@ -60,7 +60,7 @@ public sealed partial class InfrastructureBoundaryTests
 
         Assert.Equal(
             [
-                "Probe.cs: using Keypaste.Core.Policy",
+                "Probe.cs: using Keypaste.Core.Agents",
                 "Probe.cs: names Keypaste.Core.Audit.KeypasteHome.EnvironmentVariable",
                 "Probe.cs: names DotEnv",
                 "Probe.cs: names DotEnv",

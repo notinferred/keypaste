@@ -26,6 +26,10 @@
     <Compile Include="../Keypaste.Core.Tests/ProjectVariables.cs" Link="ProjectVariables.cs" />
     <!-- The core's /api/share fake, so the share verb is tested against the same server. -->
     <Compile Include="../Keypaste.Core.Tests/FakeShareServer.cs" Link="FakeShareServer.cs" />
+    <!-- Agents' settings in memory, for the owners these tests start. -->
+    <Compile Include="../Keypaste.Core.Tests/FakeAgentSettings.cs" Link="FakeAgentSettings.cs" />
+    <!-- Time zones a test names on any runner, for the end of Automatic on this computer's clock. -->
+    <Compile Include="../Keypaste.Core.Tests/TestZones.cs" Link="TestZones.cs" />
   </ItemGroup>
 
 </Project>

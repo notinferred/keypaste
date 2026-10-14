@@ -6,15 +6,15 @@ namespace Keypaste.App.ViewModels;
 /// <summary>One question in a prompt window, answered once.</summary>
 /// <remarks>
 /// <para>
-/// The answer is a latch. The first of Deny, Allow once, the timed allow, closing the window and a
-/// withdrawal decides it and nothing afterwards changes it, so a click that lands after a lock, a
-/// timeout or a hang-up approves nothing.
+/// The answer is a latch. The first of Deny, an allow, closing the window and a withdrawal decides
+/// it and nothing afterwards changes it, so a click that lands after a lock, a timeout or a hang-up
+/// approves nothing.
 /// </para>
 /// <para>
-/// Both allow buttons are armed only after the prompt has been up for <see cref="ArmingDelay"/>:
-/// the window can appear under a pointer that was about to click something else, and that click is
-/// not an approval (D-0326). Denying needs no delay. The timed allow exists only when the prompt
-/// offers a timed grant.
+/// Every allow is armed only after the prompt has been up for <see cref="ArmingDelay"/>: the window
+/// can appear under a pointer that was about to click something else, and that click is not an
+/// approval (D-0326). Denying needs no delay. The timed allow exists only when the prompt offers a
+/// timed grant.
 /// </para>
 /// </remarks>
 internal abstract class PromptViewModel : ObservableObject
@@ -66,10 +66,11 @@ internal abstract class PromptViewModel : ObservableObject
     /// <summary>How long the timed grant lasts, or zero when the prompt offers only "allow once".</summary>
     protected abstract int TimedSeconds { get; }
 
-    private bool IsArmed
+    /// <summary>Whether the prompt has been up long enough for an allow to be pressed.</summary>
+    protected bool IsArmed
     {
         get => _armed;
-        set => Set(ref _armed, value);
+        private set => Set(ref _armed, value);
     }
 
     /// <summary>Lets the allow buttons be pressed. Called on the UI thread once the prompt has been up long enough.</summary>
@@ -91,7 +92,9 @@ internal abstract class PromptViewModel : ObservableObject
     /// <summary>The prompt could not be put in front of anybody. Safe from any thread.</summary>
     internal void Fail() => _answer.TrySetResult(ApprovalAnswer.Failed);
 
-    private void Decide(ApprovalAnswer answer)
+    /// <summary>Answers the prompt, unless something already has.</summary>
+    /// <param name="answer">The answer.</param>
+    protected void Decide(ApprovalAnswer answer)
     {
         if (_answer.TrySetResult(answer))
         {

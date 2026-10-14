@@ -1,5 +1,6 @@
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -11,8 +12,9 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// The tag is <c>env:&lt;project&gt;</c> for <c>dev</c> and <c>env:&lt;project&gt;:&lt;environment&gt;</c>
 /// otherwise (D-0370), which KeePassXC shows and edits as an ordinary tag. Each change is one edit
-/// with one revision. Before it is written the verb names the environment it reaches and the fields
-/// that join or leave, never a value, and asks (D-0415).
+/// with one revision. Before it is written the verb names the environment it reaches, the fields
+/// that join or leave, never a value, and any agent set to Automatic there that would then get the
+/// entry without asking, and asks (D-0415).
 /// </remarks>
 internal static class EnvTagCommand
 {
@@ -101,7 +103,9 @@ internal static class EnvTagCommand
 
             IReadOnlyList<string> changing = tagging ? [tag] : matching;
 
-            foreach (var sentence in ProjectTagChange.Preview(vault, name, changing, tagging)!.Describe())
+            var clients = KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+
+            foreach (var sentence in ProjectTagChange.Preview(vault, name, changing, tagging, clients, context.Clock.GetUtcNow())!.Describe())
             {
                 context.Stderr.WriteLine(sentence);
             }

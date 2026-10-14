@@ -170,7 +170,7 @@ public sealed record TomlLimits
     /// <summary>The longest a single string may be, in UTF-16 code units.</summary>
     public required int StringLength { get; init; }
 
-    /// <summary>What <c>policy.toml</c> has always been held to.</summary>
+    /// <summary>The limits chosen for the retired <c>policy.toml</c>, which a file keeps unless its reader sets its own.</summary>
     public static TomlLimits Policy { get; } = new()
     {
         Bytes = Toml.MaximumBytes,

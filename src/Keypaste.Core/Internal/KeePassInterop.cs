@@ -7,6 +7,7 @@ using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
 using KeePassLib.Utility;
+using Keypaste.Core.Agents;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 using Keypaste.Core.Recommendations;
@@ -767,6 +768,204 @@ internal sealed class KeePassInterop : IDisposable
         return Locate(name) is { } found && !PwDefs.IsStandardField(field)
             ? found.Entry.Strings.Get(field)?.ReadString()
             : null;
+    }
+
+    /// <summary>Each live entry directly in each group at this path by its groups' own names, by UUID and title, with one of its string fields, in traversal order.</summary>
+    internal IReadOnlyList<ReservedRecord> ReadRecords(string groupPath, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return
+        [
+            .. InNamedGroups(groupPath).Select(found => new ReservedRecord(
+                new Guid(found.Entry.Uuid.UuidBytes, bigEndian: true),
+                ReadField(found.Entry, PwDefs.TitleField),
+                found.Entry.Strings.Get(field)?.ReadString())),
+        ];
+    }
+
+    /// <summary>
+    /// Sets one unprotected string field of the entry with the UUID of this name's title, keeping it
+    /// directly in the name's group under that title, and the same field of every other entry there
+    /// with the title.
+    /// </summary>
+    /// <param name="name">Where the entry belongs, and its title.</param>
+    /// <param name="idOf">The UUID of the entry for a title.</param>
+    /// <param name="field">The field.</param>
+    /// <param name="value">What it holds.</param>
+    /// <returns>Whether anything changed: false when every entry with the title already holds the value where it belongs.</returns>
+    /// <remarks>
+    /// <para>
+    /// Every copy of the vault that writes the title writes that one entry, so a merge, KeePass's or
+    /// KeePassXC's, settles it by time and keeps the older version in its history. It is found wherever
+    /// it is: from the recycle bin or another group it is moved back, stamped as moved so a merge
+    /// carries the move too. Titled otherwise in the group it is that title's record, so before it is
+    /// retitled a copy keeps the other title there, under that title's UUID where no object holds it.
+    /// Created, it takes the UUID unless a group holds it, and any record of its deletion is dropped; where
+    /// a group holds it, the entry made under a random one is found again by its title in the group, so a
+    /// later write changes it rather than making another.
+    /// </para>
+    /// <para>
+    /// Every other entry with the title, which a person or another program made, is given the value
+    /// rather than a tombstone: KeePassXC's merge applies no deletion and would bring it back
+    /// (verify-keepassxc-projects.sh), while one holding the value settles by time like the first.
+    /// </para>
+    /// </remarks>
+    internal bool WriteRecord(EntryName name, Func<string, Guid> idOf, string field, string value)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        PwUuid id = ToPwUuid(idOf(name.Title));
+        List<(PwGroup Group, PwEntry Entry)> inGroup = InNamedGroups(name.GroupPath);
+        PwEntry? kept = _database.RootGroup.FindEntry(id, true)
+            ?? (Holds(id) ? inGroup.Select(found => found.Entry).FirstOrDefault(IsTitled) : null);
+        bool placed = kept is not null && inGroup.Exists(found => ReferenceEquals(found.Entry, kept));
+        bool titled = kept is not null && IsTitled(kept);
+        List<PwEntry> others = [.. inGroup.Select(found => found.Entry).Where(entry => !ReferenceEquals(entry, kept) && IsTitled(entry))];
+
+        if (kept is not null && placed && titled && !Tombstoned(kept.Uuid) && others.Prepend(kept).All(HoldsValue))
+        {
+            return false;
+        }
+
+        if (kept is null)
+        {
+            kept = new PwEntry(false, true) { Uuid = Holds(id) ? new PwUuid(true) : id };
+            SetField(kept, PwDefs.TitleField, name.Title);
+            SetField(kept, PwDefs.UserNameField, string.Empty);
+            SetField(kept, PwDefs.PasswordField, string.Empty);
+            SetField(kept, PwDefs.UrlField, string.Empty);
+            SetField(kept, PwDefs.NotesField, string.Empty);
+            kept.Strings.Set(field, new ProtectedString(false, value));
+            EnsureGroup(name.GroupPath).AddEntry(kept, true);
+        }
+        else
+        {
+            if (placed && !titled)
+            {
+                PwUuid otherId = ToPwUuid(idOf(ReadField(kept, PwDefs.TitleField)));
+                PwEntry copy = kept.CloneDeep();
+                copy.SetUuid(Holds(otherId) ? new PwUuid(true) : otherId, true);
+                Untombstone(copy.Uuid);
+                kept.ParentGroup.AddEntry(copy, true, true);
+            }
+
+            if (!placed)
+            {
+                kept.ParentGroup.Entries.Remove(kept);
+                kept.PreviousParentGroup = PwUuid.Zero;
+                EnsureGroup(name.GroupPath).AddEntry(kept, true, true);
+            }
+
+            if (!titled || !HoldsValue(kept))
+            {
+                kept.CreateBackup(_database);
+                SetField(kept, PwDefs.TitleField, name.Title);
+                kept.Strings.Set(field, new ProtectedString(false, value));
+                MarkEdited(kept);
+            }
+        }
+
+        Untombstone(kept.Uuid);
+
+        foreach (PwEntry other in others.Where(entry => !HoldsValue(entry)))
+        {
+            other.CreateBackup(_database);
+            other.Strings.Set(field, new ProtectedString(false, value));
+            MarkEdited(other);
+        }
+
+        return true;
+
+        bool IsTitled(PwEntry entry) => string.Equals(ReadField(entry, PwDefs.TitleField), name.Title, StringComparison.Ordinal);
+
+        bool HoldsValue(PwEntry entry) =>
+            entry.Strings.Get(field) is { IsProtected: false } current
+            && string.Equals(current.ReadString(), value, StringComparison.Ordinal);
+
+        bool Tombstoned(PwUuid uuid) => _database.DeletedObjects.Any(tombstone => tombstone.Uuid.Equals(uuid));
+    }
+
+    /// <summary>
+    /// What <see cref="WriteRecord"/> for this name can change, taken before it: each entry it may edit or
+    /// move, where it was and a copy of it, the groups at the path, every group's times and the tombstones.
+    /// </summary>
+    /// <param name="name">Where the record belongs, and its title.</param>
+    /// <param name="idOf">The UUID of the entry for a title.</param>
+    /// <returns>What <see cref="Restore"/> puts back.</returns>
+    internal RecordSnapshot Snapshot(EntryName name, Func<string, Guid> idOf)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        IEnumerable<PwEntry> candidates = InNamedGroups(name.GroupPath).Select(found => found.Entry);
+
+        if (_database.RootGroup.FindEntry(ToPwUuid(idOf(name.Title)), true) is { } kept)
+        {
+            candidates = candidates.Prepend(kept);
+        }
+
+        List<PwGroup> groups = [_database.RootGroup, .. _database.RootGroup.GetGroups(true)];
+
+        return new RecordSnapshot(
+            [
+                .. candidates
+                    .Distinct<PwEntry>(ReferenceEqualityComparer.Instance)
+                    .Select(entry => new EntrySnapshot(entry, entry.ParentGroup, entry.ParentGroup.Entries.IndexOf(entry), entry.CloneDeep())),
+            ],
+            name.GroupPath,
+            new HashSet<PwGroup>(NamedLevels(name.GroupPath).SelectMany(level => level), ReferenceEqualityComparer.Instance),
+            [.. groups.Select(group => new GroupTimes(group, group.LastModificationTime, group.LastAccessTime, group.UsageCount))],
+            [.. _database.DeletedObjects]);
+    }
+
+    /// <summary>Puts back what a record write changed since <see cref="Snapshot"/>, for a write no save could keep.</summary>
+    /// <param name="snapshot">What the vault held before the write.</param>
+    internal void Restore(RecordSnapshot snapshot)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        foreach (EntrySnapshot held in snapshot.Entries)
+        {
+            if (!ReferenceEquals(held.Entry.ParentGroup, held.Parent))
+            {
+                held.Entry.ParentGroup?.Entries.Remove(held.Entry);
+                held.Parent.AddEntry(held.Entry, true, false);
+                held.Parent.Entries.Remove(held.Entry);
+                held.Parent.Entries.Insert((uint)Math.Clamp(held.Index, 0, (int)held.Parent.Entries.UCount), held.Entry);
+            }
+
+            held.Entry.AssignProperties(held.Copy, false, true, true);
+        }
+
+        HashSet<PwEntry> known = new(snapshot.Entries.Select(held => held.Entry), ReferenceEqualityComparer.Instance);
+
+        foreach (PwGroup group in NamedLevels(snapshot.Path)[^1])
+        {
+            foreach (PwEntry made in group.Entries.Where(entry => !known.Contains(entry)).ToList())
+            {
+                group.Entries.Remove(made);
+            }
+        }
+
+        // Deepest first, so a group the write made inside another it made goes before its parent.
+        foreach (PwGroup made in NamedLevels(snapshot.Path).SelectMany(level => level).Where(group => !snapshot.Groups.Contains(group)).Reverse().ToList())
+        {
+            made.ParentGroup?.Groups.Remove(made);
+        }
+
+        foreach (GroupTimes times in snapshot.Times)
+        {
+            times.Group.LastModificationTime = times.Modified;
+            times.Group.LastAccessTime = times.Accessed;
+            times.Group.UsageCount = times.Used;
+        }
+
+        _database.DeletedObjects.Clear();
+
+        foreach (PwDeletedObject tombstone in snapshot.Deleted)
+        {
+            _database.DeletedObjects.Add(tombstone);
+        }
     }
 
     /// <summary>Applies every write to one entry as one edit with one history revision.</summary>
@@ -2412,6 +2611,8 @@ internal sealed class KeePassInterop : IDisposable
         return entry.Strings.ReadSafe(field);
     }
 
+    private static PwUuid ToPwUuid(Guid id) => new(id.ToByteArray(bigEndian: true));
+
     private static string ChildPath(string groupPath, string name)
     {
         return groupPath.Length == 0 ? name : groupPath + "/" + name;
@@ -2465,7 +2666,10 @@ internal sealed class KeePassInterop : IDisposable
     /// refusal, because it is asking whether putting an entry back would create the ambiguity
     /// rather than whether one is already there.
     /// </remarks>
-    private List<(PwGroup Group, PwEntry Entry)> Matches(EntryName name)
+    private List<(PwGroup Group, PwEntry Entry)> Matches(EntryName name) => InGroup(name.GroupPath, name.Title);
+
+    /// <summary>Every live entry directly in the group at this path, or only those with this title, in traversal order.</summary>
+    private List<(PwGroup Group, PwEntry Entry)> InGroup(string groupPath, string? title)
     {
         List<(PwGroup Group, PwEntry Entry)> found = [];
         PwGroup? bin = Bin();
@@ -2473,13 +2677,13 @@ internal sealed class KeePassInterop : IDisposable
         Search(_database.RootGroup, string.Empty);
         return found;
 
-        void Search(PwGroup group, string groupPath)
+        void Search(PwGroup group, string path)
         {
-            if (string.Equals(groupPath, name.GroupPath, StringComparison.Ordinal))
+            if (string.Equals(path, groupPath, StringComparison.Ordinal))
             {
                 foreach (PwEntry candidate in group.Entries)
                 {
-                    if (string.Equals(ReadField(candidate, PwDefs.TitleField), name.Title, StringComparison.Ordinal))
+                    if (title is null || string.Equals(ReadField(candidate, PwDefs.TitleField), title, StringComparison.Ordinal))
                     {
                         found.Add((group, candidate));
                     }
@@ -2493,9 +2697,41 @@ internal sealed class KeePassInterop : IDisposable
                     continue;
                 }
 
-                Search(child, ChildPath(groupPath, child.Name));
+                Search(child, ChildPath(path, child.Name));
             }
         }
+    }
+
+    /// <summary>
+    /// Every live entry directly in each group reached from the root by exactly the path's names, one group
+    /// per segment, outside the recycle bin, in traversal order.
+    /// </summary>
+    /// <remarks>
+    /// For keypaste's own records, which a group whose own name holds a <c>/</c> must not stand in for: a
+    /// root group named <c>.keypaste/agents</c> joins to the same path as <c>agents</c> inside
+    /// <c>.keypaste</c>, and only the second is where ACAF v1 keeps agents' settings.
+    /// </remarks>
+    private List<(PwGroup Group, PwEntry Entry)> InNamedGroups(string groupPath) =>
+        [.. NamedLevels(groupPath)[^1].SelectMany(group => group.Entries.Select(entry => (group, entry)))];
+
+    /// <summary>For each segment of the path in turn, every group reached from the root by the names so far, outside the recycle bin.</summary>
+    private List<List<PwGroup>> NamedLevels(string groupPath)
+    {
+        PwGroup? bin = Bin();
+        List<PwGroup> level = [_database.RootGroup];
+        List<List<PwGroup>> levels = [];
+
+        foreach (string segment in groupPath.Split('/'))
+        {
+            level =
+            [
+                .. level.SelectMany(group => group.Groups)
+                    .Where(child => !ReferenceEquals(child, bin) && string.Equals(child.Name, segment, StringComparison.Ordinal)),
+            ];
+            levels.Add(level);
+        }
+
+        return levels;
     }
 
     /// <summary>Resolves a group path, creating any segment that does not exist yet.</summary>
@@ -2507,6 +2743,10 @@ internal sealed class KeePassInterop : IDisposable
     /// A path that leads into the recycle bin is refused before anything is created: every read
     /// skips the bin, so an entry written there would be reported created and then never found,
     /// and stepping past the bin to a sibling of its name would draw two trash cans.
+    /// One of keypaste's own groups is created with the UUID its path derives (<see cref="AcafIds.Group"/>)
+    /// where no object holds it, so two copies that each create it create the same group and a merge
+    /// leaves one; a group holding it elsewhere, renamed or recycled, is not brought back, since what
+    /// it holds was set aside.
     /// </remarks>
     private PwGroup EnsureGroup(string groupPath)
     {
@@ -2517,9 +2757,11 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         PwGroup? bin = Bin();
+        string path = string.Empty;
 
         foreach (string segment in groupPath.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
+            path = ChildPath(path, segment);
             PwGroup? next = null;
             foreach (PwGroup child in current.Groups)
             {
@@ -2539,6 +2781,13 @@ internal sealed class KeePassInterop : IDisposable
             if (next is null)
             {
                 next = new PwGroup(true, true, segment, PwIcon.Folder);
+
+                if (ReservedGroups.IsReserved(path) && ToPwUuid(AcafIds.Group(path)) is var id && !Holds(id))
+                {
+                    next.Uuid = id;
+                    Untombstone(id);
+                }
+
                 current.AddGroup(next, true);
             }
 
@@ -2546,6 +2795,38 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         return current;
+    }
+
+    /// <summary>Whether any group or entry of the vault, the root and the recycle bin's included, has this UUID.</summary>
+    private bool Holds(PwUuid id) =>
+        _database.RootGroup.Uuid.Equals(id) || _database.RootGroup.FindGroup(id, true) is not null || _database.RootGroup.FindEntry(id, true) is not null;
+
+    /// <summary>What a record write can change, as <see cref="Snapshot"/> took it before the write.</summary>
+    /// <param name="Entries">Each entry the write may edit or move.</param>
+    /// <param name="Path">The record's group path.</param>
+    /// <param name="Groups">The groups at each step of that path then.</param>
+    /// <param name="Times">Every group's times then, which an edit touches up to the root.</param>
+    /// <param name="Deleted">The vault's tombstones then.</param>
+    internal sealed record RecordSnapshot(
+        IReadOnlyList<EntrySnapshot> Entries,
+        string Path,
+        IReadOnlySet<PwGroup> Groups,
+        IReadOnlyList<GroupTimes> Times,
+        IReadOnlyList<PwDeletedObject> Deleted);
+
+    /// <summary>One entry as it was: where it sat, and a copy of everything in it, its history included.</summary>
+    internal sealed record EntrySnapshot(PwEntry Entry, PwGroup Parent, int Index, PwEntry Copy);
+
+    /// <summary>One group's times as they were.</summary>
+    internal sealed record GroupTimes(PwGroup Group, DateTime Modified, DateTime Accessed, ulong Used);
+
+    /// <summary>Drops every record that the object with this UUID was deleted, as KeePass's own merge drops one an object has outlived.</summary>
+    private void Untombstone(PwUuid id)
+    {
+        foreach (PwDeletedObject tombstone in _database.DeletedObjects.Where(deleted => deleted.Uuid.Equals(id)).ToList())
+        {
+            _database.DeletedObjects.Remove(tombstone);
+        }
     }
 
     /// <summary>The longest outer header a probe reads.</summary>

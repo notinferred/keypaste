@@ -45,6 +45,43 @@ project_var() {
 # A path as a Windows program must be given it from Git Bash; unchanged elsewhere.
 native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 
+# Saves agents' settings in a vault as a person confirms them at `keypaste agent`'s terminal, before
+# anything else holds the vault: a short-lived agent with a home of its own answers yes to each change
+# and stops, so the gate's log and ceilings hold only what the gate itself does.
+#   agent_settings <keypaste> <vault> <master> '<keypaste mcp policy words>'...
+# Each change's words are split on spaces and never globbed, so `--see **` reaches keypaste as written.
+agent_settings() {
+  local cli=$1 vault=$2 master=$3 home pipe err pid change status=0 answers=''
+  local -a words
+  shift 3
+  home=$(mktemp -d)
+  pipe="keypaste-settings-$$-${RANDOM}"
+  err="$home/agent-stderr.txt"
+  for change in "$@"; do answers="${answers}y"$'\n'; done
+  printf '%s\n%s' "$master" "$answers" \
+    | KEYPASTE_HOME="$(native "$home")" "$cli" agent --vault "$vault" --approver "$pipe" >/dev/null 2>"$err" &
+  pid=$!
+  for _ in $(seq 1 100); do
+    grep -q 'listening on' "$err" 2>/dev/null && break
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.2
+  done
+  if grep -q 'listening on' "$err" 2>/dev/null; then
+    for change in "$@"; do
+      read -r -a words <<<"$change"
+      KEYPASTE_HOME="$(native "$home")" "$cli" mcp policy "${words[@]}" --vault "$vault" --approver "$pipe" >/dev/null 2>>"$err" \
+        || { status=1; break; }
+    done
+  else
+    status=1
+  fi
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  [ "$status" -eq 0 ] || cat "$err" >&2
+  rm -rf "$home" 2>/dev/null || true
+  return "$status"
+}
+
 # A file's bytes as one hex string, so a refusal can be shown to leave it unchanged.
 bytes() { od -An -v -tx1 "$1" | tr -d ' \n'; }
 

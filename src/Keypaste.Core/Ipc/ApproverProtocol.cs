@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Infrastructure;
@@ -52,6 +53,8 @@ public static class ApproverProtocol
     internal const string TokenEnvKind = "token-env";
     internal const string RunKind = "run";
     internal const string WithdrawKind = "withdraw";
+    internal const string AccessListKind = "access-list";
+    internal const string AccessChangeKind = "access-change";
 
     /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
     /// <remarks>
@@ -74,7 +77,7 @@ public static class ApproverProtocol
     /// <param name="authority">The method the release was granted under.</param>
     /// <returns>keypaste's own words, naming which authority allowed it.</returns>
     /// <remarks>
-    /// Selected by the authority rather than written once, because a release a standing rule allowed
+    /// Selected by the authority rather than written once, because a release an Automatic mode allowed
     /// must never be recorded as a human act (THREATS.md T-16). This is the only path in keypaste
     /// where a denial follows an authorization, so it is the only place where naming the authority
     /// on a denied line is meaningful at all.
@@ -83,7 +86,7 @@ public static class ApproverProtocol
     {
         AuditMethod.Prompt => "a person approved this release and it was too large to send in one reply",
         AuditMethod.GrantCache => "a person had already approved this release and it was too large to send in one reply",
-        AuditMethod.Policy => "a standing rule authorized this release and it was too large to send in one reply",
+        AuditMethod.Automatic => "the agent's Automatic mode authorized this release and it was too large to send in one reply",
         _ => "this release was authorized and it was too large to send in one reply",
     };
 
@@ -404,6 +407,8 @@ public static class ApproverProtocol
                 TokenEnvKind => ApproverMessageKind.TokenEnv,
                 RunKind => ApproverMessageKind.Run,
                 WithdrawKind => ApproverMessageKind.Withdraw,
+                AccessListKind => ApproverMessageKind.AccessList,
+                AccessChangeKind => ApproverMessageKind.AccessChange,
                 _ => ApproverMessageKind.Unknown,
             };
         }
@@ -434,7 +439,7 @@ public static class ApproverProtocol
                 return false;
             }
 
-            request = new NamesRequest(exposure) { Vault = vault, Session = session };
+            request = new NamesRequest(exposure) { ClientLabel = Optional(root, "client_label"), Vault = vault, Session = session };
             return true;
         }
     }
@@ -1067,6 +1072,258 @@ public static class ApproverProtocol
             reply = new LockReply(locked, reason);
             return true;
         }
+    }
+
+    /// <summary>The most agents' records one access list reply carries.</summary>
+    public const int MaximumAccessRows = 256;
+
+    /// <summary>Encodes a request for every agent's settings.</summary>
+    /// <param name="request">The attachment it is made under, and where the listing continues.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(AccessListRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return JsonSerializer.SerializeToUtf8Bytes(new AccessListRequestFrame(request), Wire.AccessListRequestFrame);
+    }
+
+    /// <summary>Encodes every agent's settings, bounded to what one frame can carry.</summary>
+    /// <param name="reply">The settings, or why none were listed.</param>
+    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// Rows are dropped whole from the end, as a grants reply's are, and <c>complete</c> is then false, so
+    /// the requester asks for the rest from after the ones it got. A first row too long for a frame of its
+    /// own is sent without its project rows, saying how many it left out, so every agent is listed.
+    /// </remarks>
+    public static byte[] Encode(AccessListReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var rows = reply.Agents.Take(MaximumAccessRows).Select(row => new AccessRowFrame(row)).ToList();
+        var envelope = WriteAccessList(reply, [], false).Length;
+        var kept = Fit(envelope, rows, Wire.AccessRowFrame);
+
+        if (kept == 0 && rows.Count > 0)
+        {
+            rows[0] = new AccessRowFrame(WithoutProjects(reply.Agents[0]));
+            kept = Fit(envelope, rows.Take(1), Wire.AccessRowFrame);
+        }
+
+        var frame = WriteAccessList(reply, rows.Take(kept), reply.Complete && kept == reply.Agents.Count);
+
+        return frame.Length <= MessageFramer.MaximumPayloadBytes
+            ? frame
+            : WriteAccessList(reply with { Reason = Undersized }, [], false);
+    }
+
+    private static byte[] WriteAccessList(AccessListReply reply, IEnumerable<AccessRowFrame> agents, bool complete) =>
+        JsonSerializer.SerializeToUtf8Bytes(new AccessListReplyFrame(reply, agents, complete), Wire.AccessListReplyFrame);
+
+    /// <summary>An agent's row with its settings for the whole agent alone, saying how many project rows it leaves out.</summary>
+    private static AccessRow WithoutProjects(AccessRow row)
+    {
+        var access = AcafRecord.Read(row.Record).Access;
+
+        return row with { Record = AcafRecord.Write(access with { Projects = [] }), ProjectsNotShown = access.Projects.Count };
+    }
+
+    /// <summary>Encodes a request to change one agent's settings.</summary>
+    /// <param name="request">The change.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(AccessChangeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return JsonSerializer.SerializeToUtf8Bytes(new AccessChangeRequestFrame(request), Wire.AccessChangeRequestFrame);
+    }
+
+    /// <summary>Encodes what became of a change.</summary>
+    /// <param name="reply">The answer.</param>
+    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(AccessChangeReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var frame = JsonSerializer.SerializeToUtf8Bytes(new AccessChangeReplyFrame(reply), Wire.AccessChangeReplyFrame);
+
+        return frame.Length <= MessageFramer.MaximumPayloadBytes
+            ? frame
+            : JsonSerializer.SerializeToUtf8Bytes(new AccessChangeReplyFrame(reply with { Reason = Oversized }), Wire.AccessChangeReplyFrame);
+    }
+
+    /// <summary>Decodes a request for every agent's settings.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed access list request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out AccessListRequest? request)
+    {
+        request = null;
+
+        if (!TryAttached(frame, AccessListKind, out var vault, out var session, out var root))
+        {
+            return false;
+        }
+
+        var from = 0;
+
+        if (root.TryGetProperty("from", out _) && (!TryInteger(root, "from", out from) || from < 0))
+        {
+            return false;
+        }
+
+        request = new AccessListRequest { Vault = vault, Session = session, From = from };
+        return true;
+    }
+
+    /// <summary>Decodes every agent's settings.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed access list reply of at most <see cref="MaximumAccessRows"/> rows.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out AccessListReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, AccessListKind)
+                || !TryBoolean(root, "answered", out var answered)
+                || !TryString(root, "reason", out var reason)
+                || !root.TryGetProperty("agents", out var rows)
+                || rows.ValueKind != JsonValueKind.Array
+                || rows.GetArrayLength() > MaximumAccessRows)
+            {
+                return false;
+            }
+
+            var agents = new List<AccessRow>(rows.GetArrayLength());
+
+            foreach (var row in rows.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object
+                    || !TryString(row, "name", out var name)
+                    || !TryString(row, "record", out var record)
+                    || !TryBoolean(row, "understood", out var understood))
+                {
+                    return false;
+                }
+
+                var notShown = 0;
+
+                if (row.TryGetProperty("projects_not_shown", out _)
+                    && (!TryInteger(row, "projects_not_shown", out notShown) || notShown is < 1 or > AgentAccess.MaximumProjects))
+                {
+                    return false;
+                }
+
+                agents.Add(new AccessRow(name, record, understood, notShown));
+            }
+
+            reply = new AccessListReply(answered, agents, TrueOnly(root, "complete"), reason);
+            return true;
+        }
+    }
+
+    /// <summary>Decodes a request to change one agent's settings.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request, its words still to be read by the owner.</param>
+    /// <returns><see langword="true"/> when the frame was well formed; an optional member of the wrong type reads as absent.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out AccessChangeRequest? request)
+    {
+        request = null;
+
+        if (!TryAttached(frame, AccessChangeKind, out var vault, out var session, out var root)
+            || !TryString(root, "agent", out var agent)
+            || !TryString(root, "reason", out var reason)
+            || !TryString(root, "origin", out var originWord)
+            || !TryOrigin(originWord, out var origin)
+            || !TryOptionalStrings(root, "see", out var see))
+        {
+            return false;
+        }
+
+        request = new AccessChangeRequest(agent, reason)
+        {
+            Origin = origin,
+            Project = Optional(root, "project"),
+            Mode = Optional(root, "mode"),
+            See = see,
+            Values = Optional(root, "values"),
+            Run = Optional(root, "run"),
+            PerHour = Optional(root, "per_hour"),
+            Until = Optional(root, "until"),
+            Reset = TrueOnly(root, "reset"),
+            Vault = vault,
+            Session = session,
+        };
+
+        return true;
+    }
+
+    /// <summary>Decodes what became of a change.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed access change reply.</returns>
+    /// <remarks>An unrecognised method decodes to <see cref="AuditMethod.Failed"/>, and a grant under one to a refusal: nothing is read as applied that the owner did not say was.</remarks>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out AccessChangeReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, AccessChangeKind)
+                || !TryString(root, "decision", out var decision)
+                || !TryInteger(root, "method", out var method)
+                || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            var known = Enum.IsDefined((AuditMethod)method);
+
+            reply = new AccessChangeReply(
+                known && string.Equals(decision, "granted", StringComparison.Ordinal) ? AuditDecision.Granted : AuditDecision.Denied,
+                known ? (AuditMethod)method : AuditMethod.Failed,
+                reason)
+            {
+                Recorded = TrueOnly(root, "recorded"),
+            };
+
+            return true;
+        }
+    }
+
+    /// <summary>The word a request carries for where it says it came from.</summary>
+    internal static string OriginWord(AccessOrigin origin) => origin == AccessOrigin.Agent ? "agent" : "terminal";
+
+    /// <summary>Reads where a request says it came from; only a terminal and an agent ask over the pipe.</summary>
+    private static bool TryOrigin(string word, out AccessOrigin origin)
+    {
+        (var known, origin) = word switch
+        {
+            "terminal" => (true, AccessOrigin.Terminal),
+            "agent" => (true, AccessOrigin.Agent),
+            _ => (false, AccessOrigin.Terminal),
+        };
+
+        return known;
     }
 
     private static byte[] WriteAttached(string kind, string vault, string session) =>

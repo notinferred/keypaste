@@ -147,8 +147,9 @@ public static class McpServerLocator
     /// <c>KEYPASTE_APPROVER</c> adds <c>--approver</c>.
     /// </para>
     /// <para>
-    /// Under any other home all three are pinned: the vault named, else the chosen one; that home's log; and the
-    /// approver, else the pipe that home's owner of that vault listens on. The machine's home is read from the machine
+    /// Under any other home all four are pinned: the vault named, else the chosen one; that home's log; that home's
+    /// ceilings, so an agent's own narrowing lowers the file that home's owner reads; and the approver, else the pipe
+    /// that home's owner of that vault listens on. The machine's home is read from the machine
     /// rather than the real profile, so a test never compares against a developer's own.
     /// </para>
     /// </remarks>
@@ -180,7 +181,8 @@ public static class McpServerLocator
         pins = new McpServerPins(
             pinned,
             KeypasteHome.AuditPath(home),
-            approver ?? ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(KeypasteHome.Resolve(home), pinned)));
+            approver ?? ApproverEndpoint.Resolve(null, null, VaultIdentity.Of(KeypasteHome.Resolve(home), pinned)),
+            KeypasteHome.ClientsPath(home));
         return true;
     }
 

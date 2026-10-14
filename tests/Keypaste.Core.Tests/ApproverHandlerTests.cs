@@ -1,7 +1,7 @@
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
-using Keypaste.Core.Policy;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -32,7 +32,10 @@ public sealed class ApproverHandlerTests
             TtlSeconds = ttl,
             Exposure = exposure.Length == 0 ? ["env/**"] : exposure,
             ClientName = "claude-code",
+            ClientLabel = ApproverFixture.Agent,
         };
+
+    private static NamesRequest Listing(params string[] exposure) => new(exposure) { ClientLabel = ApproverFixture.Agent };
 
     [Fact]
     public async Task AnApprovedRequest_ReleasesTheFieldAndRecordsWhy()
@@ -284,7 +287,7 @@ public sealed class ApproverHandlerTests
         using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
-        await fixture.Handler.RequestAsync(Request() with { ClientLabel = "deploy-bot" }, "conn-1", Token);
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
         var activity = fixture.Handler.Activity();
         var grant = Assert.Single(activity.Grants);
@@ -292,7 +295,7 @@ public sealed class ApproverHandlerTests
         Assert.Empty(activity.Waiting);
         Assert.Equal(new GrantKey("conn-1", EntryHandle.For(new EntryName("env/dev", "STRIPE_KEY")), "password"), grant.Key);
         Assert.Equal(fixture.Channel.LastPrompt, grant.Approved);
-        Assert.Equal("deploy-bot", grant.Approved.Label, StringComparer.Ordinal);
+        Assert.Equal(ApproverFixture.Agent, grant.Approved.Label, StringComparer.Ordinal);
         Assert.Equal(TimeSpan.FromSeconds(ApprovalLimits.Default.MaximumTtlSeconds), grant.Remaining);
         Assert.DoesNotContain(Sentinel, grant.ToString(), StringComparison.Ordinal);
     }
@@ -349,9 +352,9 @@ public sealed class ApproverHandlerTests
     {
         using var fixture = new ApproverFixture();
 
-        await fixture.Handler.RequestAsync(Request() with { ClientLabel = "deploy-bot" }, "conn-1", Token);
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
 
-        Assert.Equal("deploy-bot", fixture.Channel.LastPrompt!.Label, StringComparer.Ordinal);
+        Assert.Equal(ApproverFixture.Agent, fixture.Channel.LastPrompt!.Label, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -401,7 +404,7 @@ public sealed class ApproverHandlerTests
     {
         using var fixture = new ApproverFixture();
 
-        var reply = await fixture.Handler.ListAsync(new NamesRequest(["env/**"]), "conn-1", Token);
+        var reply = await fixture.Handler.ListAsync(Listing("env/**"), "conn-1", Token);
 
         Assert.True(reply.VaultUnlocked);
         Assert.Equal([new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password", "STRIPE_SECRET_KEY"], [])], reply.Names);
@@ -414,7 +417,7 @@ public sealed class ApproverHandlerTests
         using var fixture = new ApproverFixture();
         fixture.Source.Tagged[new EntryName("personal", "bank")] = ["env:billing:prod"];
 
-        var reply = await fixture.Handler.ListAsync(new NamesRequest([EntryExposure.DefaultGlob]), "conn-1", Token);
+        var reply = await fixture.Handler.ListAsync(Listing(EntryExposure.DefaultGlob), "conn-1", Token);
 
         Assert.Equal([new ListedEntry(new EntryName("personal", "bank"), ["STRIPE_SECRET_KEY"], ["env:billing:prod"])], reply.Names);
     }
@@ -462,7 +465,7 @@ public sealed class ApproverHandlerTests
         using var fixture = new ApproverFixture();
         fixture.Source.Locked = true;
 
-        var reply = await fixture.Handler.ListAsync(new NamesRequest(["env/**"]), "conn-1", Token);
+        var reply = await fixture.Handler.ListAsync(Listing("env/**"), "conn-1", Token);
 
         Assert.False(reply.VaultUnlocked);
         Assert.Empty(reply.Names);
@@ -662,29 +665,32 @@ public sealed class ApproverHandlerTests
     }
 
     [Fact]
-    public async Task ALiveOnlyEntry_IsNeverReleasedByPolicy()
+    public async Task ALiveOnlyEntry_IsNeverReleasedAutomatically()
     {
-        using var fixture = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        using var fixture = new ApproverFixture();
+        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
         fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
 
-        var reply = await LiveOnly(fixture).RequestAsync(Request() with { ClientLabel = "billing-bot" }, "conn-1", Token);
+        var reply = await LiveOnly(fixture).RequestAsync(Request(), "conn-1", Token);
 
         Assert.Equal(1, fixture.Channel.Asked);
         Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
         Assert.Equal(AuditMethod.Prompt, reply.Method);
 
-        // The same rule does release without asking once the entry is not live-only.
-        var ruled = await fixture.Handler.RequestAsync(Request() with { ClientLabel = "billing-bot" }, "conn-1", Token);
-        Assert.Equal(AuditMethod.Policy, ruled.Method);
+        // The same mode does release without asking once the entry is not live-only.
+        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        Assert.Equal(AuditMethod.Automatic, released.Method);
+        Assert.Equal(1, fixture.Channel.Asked);
     }
 
     [Fact]
     public async Task WithoutAPredicate_AnEntryTheSourceProtectsIsStillLiveOnly()
     {
-        using var fixture = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        using var fixture = new ApproverFixture();
+        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
         fixture.Channel.Answer = ApprovalAnswer.Approved;
         fixture.Source.Protected.Add(new EntryName("env/dev", "STRIPE_KEY"));
-        var request = Request() with { ClientLabel = "billing-bot" };
+        var request = Request();
 
         var first = await fixture.Handler.RequestAsync(request, "conn-1", Token);
         var second = await fixture.Handler.RequestAsync(request, "conn-1", Token);
@@ -734,7 +740,7 @@ public sealed class ApproverHandlerTests
     }
 
     private static ApproverHandler LiveOnly(ApproverFixture fixture) =>
-        new(fixture.Source, fixture.Source, fixture.Gate, fixture.Grants, fixture.Policy, fixture.Narration.Add, _ => true);
+        new(fixture.Source, fixture.Source, fixture.Gate, fixture.Grants, fixture.Settings, fixture.Narration.Add, _ => true, fixture.Hourly, fixture.Clock);
 
     [Fact]
     public void TheHandlerRejectsNulls()
@@ -744,7 +750,7 @@ public sealed class ApproverHandlerTests
         var s = fixture.Source;
         var g = fixture.Gate;
         var c = fixture.Grants;
-        var p = PolicyGate.None;
+        var p = IAgentSettings.Defaults;
 
         Assert.Throws<ArgumentNullException>(() => new ApproverHandler(null!, s, g, c, p));
         Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, null!, g, c, p));

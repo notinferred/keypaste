@@ -15,6 +15,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Tests;
@@ -200,14 +201,14 @@ public sealed class ScreenRenderer
         var waiting = AskAsync(cursor, serving, demo.Path, "cursor", Allowing.HeldEntry, Allowing.HeldField);
         await WaitUntilAsync(() => authority.Activity.Waiting.Count == 1);
 
-        Assert.True(Core.Clients.ClientPolicies.TrySave(
+        Assert.True(Core.Agents.AccessCaps.TrySave(
             Core.Audit.KeypasteHome.ClientsPath(demo.Home),
-            // The strict policy sits on every other client (T-36); the two holding grants keep session grants, as they must to hold them.
-            Core.Clients.ClientPolicies.Empty
-                .With(Core.Clients.ClientPolicies.AnyClient, Core.Clients.ClientPolicy.AskEveryTime)
-                .With("claude-code", Core.Clients.ClientPolicy.SessionGrants)
-                .With("cursor", Core.Clients.ClientPolicy.SessionGrants)
-                .With("local-evals", Core.Clients.ClientPolicy.InjectOnly),
+            // The strict ceiling sits on every other client (T-36); the two holding grants keep timed grants, as they must to hold them.
+            Core.Agents.AccessCaps.Empty
+                .With(new Core.Agents.CapsRow { Label = Core.Agents.AgentNames.Any, Mode = Core.Agents.AgentMode.Ask })
+                .With(new Core.Agents.CapsRow { Label = "claude-code", Mode = Core.Agents.AgentMode.Automatic })
+                .With(new Core.Agents.CapsRow { Label = "cursor", Mode = Core.Agents.AgentMode.Automatic })
+                .With(new Core.Agents.CapsRow { Label = "local-evals", Values = false }),
             out var saveError), saveError);
 
         using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
@@ -229,10 +230,10 @@ public sealed class ScreenRenderer
         window.Height = 1500;
 
         agents.RevokeCommand.Execute(agents.Grants[0]);
-        agents.Clients.Single(card => card.Label == "claude-code").IsMenuOpen = true;
-        Save(window, output!, "27-agents-client-menu");
+        agents.ToggleSettingsCommand.Execute(agents.Clients.Single(card => card.Label == "claude-code"));
+        Save(window, output!, "27-agents-settings");
 
-        agents.Clients.Single(card => card.Label == "claude-code").IsMenuOpen = false;
+        agents.ToggleSettingsCommand.Execute(agents.Clients.Single(card => card.Label == "claude-code"));
         agents.ToggleConnectCommand.Execute(null);
         Save(window, output!, "24-agents-connect");
 
@@ -661,6 +662,29 @@ public sealed class ScreenRenderer
             0,
             null);
         DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt)), output, "91d-approval-once-only");
+
+        Assert.True(ProjectScope.TryCreate("acme-api", "dev", out var dev, out var error), error);
+        var asked = ApprovalPrompt.For(
+            "claude-code",
+            new EntryName("env/acme-api", ".env"),
+            "STRIPE_SECRET_KEY",
+            "Run the webhook tests against the dev Stripe account.",
+            3600,
+            "work laptop");
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(asked with { AlwaysFor = dev })), output, "91e-approval-always-for");
+
+        var change = AccessChangePrompt.For(
+            "work laptop",
+            AccessChange.Classify(EffectiveAccess.Defaults, AgentAccess.Defaults with { Projects = [new ProjectAccess(dev, AgentMode.Automatic)] }),
+            AccessOrigin.Prompt,
+            string.Empty,
+            TimeZoneInfo.Utc);
+        DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(change)), output, "91f-access-change");
+
+        var notice = new NoticeWindow(new AlwaysForNotice("work laptop", "acme-api:dev", "another request was already in front of a person"), _ => { });
+        notice.Show();
+        Save(notice, output, "91g-always-for-notice");
+        notice.Close();
     }
 
     private static void DrawWindow(PromptWindow window, string output, string name)
@@ -1084,7 +1108,7 @@ public sealed class ScreenRenderer
             Row(Text("MCP clients and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
             Row(Button("Connect client", ""), Button("Allow for 1 hour", "primary"), Button("Deny", "ghost"), Button("Revoke", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
-            Row(new ComboBox { ItemsSource = new[] { "Ask every time", "Session grants up to 1h", "Inject only" }, SelectedIndex = 1, Width = 240 }, new CheckBox { Content = "Require a passphrase", IsChecked = true }, new CheckBox { Content = "Unchecked" }, new ToggleSwitch { IsChecked = true, Content = "Keep editing in place" }, new ToggleSwitch { IsChecked = false }),
+            Row(new ComboBox { ItemsSource = new[] { "As the vault's settings say", "Ask every time", "No values, only commands" }, SelectedIndex = 1, Width = 240 }, new CheckBox { Content = "Require a passphrase", IsChecked = true }, new CheckBox { Content = "Unchecked" }, new ToggleSwitch { IsChecked = true, Content = "Keep editing in place" }, new ToggleSwitch { IsChecked = false }),
             Row(segments, Box("chip", Text("dev", "")), Box("chip outline", Text("inject-only", "")), Box("chip amber", Text("approval required", "")), Box("keycap", Text("Ctrl K", ""))),
             Row(Box("dot ok"), Text("Granted", "ok medium"), Box("dot danger"), Text("Denied", "danger medium"), Box("dot info"), Text("Token", "info medium"), Box("dot idle"), Text("Idle", "muted"), Box("dot waiting"), Text("0:28", "mono sm amber"), new ProgressBar { Classes = { "thin" }, Value = 70, Width = 150 }),
             Row(
@@ -1260,15 +1284,15 @@ public sealed class ScreenRenderer
                     Reason = "share 3a11: 1 view, expires 2026-07-29T08:30:53Z, to maya@acme.dev, passphrase",
                 });
                 Write(TimeSpan.FromMinutes(14), Credential(cursor, "env/acme-web/.env", "VERCEL_TOKEN", AuditDecision.Denied, AuditMethod.TimedOut, "nobody answered within 60 seconds"));
-                Write(TimeSpan.FromMinutes(20), Credential(claude, "Work/github", "username", AuditDecision.Granted, AuditMethod.Policy, "rule 'github-username' in policy.toml"));
+                Write(TimeSpan.FromMinutes(20), Credential(claude, "Work/github", "username", AuditDecision.Granted, AuditMethod.Automatic, "released without asking: claude-code's mode for this entry is Automatic"));
                 Write(TimeSpan.FromMinutes(3), new AuditRecord
                 {
                     Tool = "run",
                     Client = new AuditClient("windsurf-cascade-background-agent", "0.9.2", null),
                     Args = AuditArgs.ForRun("env/acme-api-background-worker-queue/staging", "Run the nightly re-index."),
                     Decision = AuditDecision.Granted,
-                    Method = AuditMethod.Policy,
-                    Reason = "rule 'reindex' in policy.toml",
+                    Method = AuditMethod.Prompt,
+                    Reason = "approved once",
                     Entries = ["env/acme-api/OPENAI_API_KEY_FOR_EMBEDDINGS", "env/acme-api/JWT_SIGNING_KEY", "env/acme-api/SENTRY_DSN"],
                 });
             }

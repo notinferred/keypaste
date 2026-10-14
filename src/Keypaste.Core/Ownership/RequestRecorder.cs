@@ -19,7 +19,21 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
     private const string _unrecorded = "the audit log could not be written";
 
     /// <summary>Whether the log opens, checked before anybody is asked, so nobody answers a request this owner cannot record (T-6).</summary>
-    internal bool Opens => audit() is not null;
+    internal bool Opens
+    {
+        get
+        {
+            try
+            {
+                return audit() is not null;
+            }
+            catch (ObjectDisposedException)
+            {
+                // The owner closed its log as the session ended.
+                return false;
+            }
+        }
+    }
 
     /// <summary>A listing once its line is written; one naming anything whose line cannot be written names nothing.</summary>
     /// <param name="reply">The reply as it will leave.</param>
@@ -67,6 +81,14 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
         TryAppend(record) || reply.Set.Outcome != EnvOutcome.Resolved
             ? reply
             : new EnvReply(EnvResolved.Refused(reply.Set.Project, EnvOutcome.Unreadable, profile: reply.Set.Profile), _unrecorded);
+
+    /// <summary>A change to an agent's settings once its line is written, saying whether it was.</summary>
+    /// <param name="reply">The reply as it will leave.</param>
+    /// <param name="record">Its line.</param>
+    /// <returns>The reply to send.</returns>
+    /// <remarks>A change releases nothing, and the owner asks whether the log <see cref="Opens"/> before it decides one.</remarks>
+    internal AccessChangeReply Recorded(AccessChangeReply reply, AuditRecord record) =>
+        reply with { Recorded = TryAppend(record) };
 
     private bool TryAppend(AuditRecord record)
     {

@@ -163,6 +163,7 @@ public sealed class ShellStatusTests
     public async Task TheAgentsRow_KeepsTheClientCountWhileARequestWaits()
     {
         using var fixture = new TempVault();
+        fixture.Sees("cc");
         var clock = new ManualClock(AppClock.Start);
 #pragma warning disable CA2000
         using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NeverAnswers());

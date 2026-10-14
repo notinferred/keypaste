@@ -15,6 +15,9 @@ public static class AuditTools
 
     /// <summary>A command run with released values in its environment: an agent's, or <c>keypaste run --session</c>'s or <c>--token</c>'s.</summary>
     public const string Run = "run";
+
+    /// <summary>A change to an agent's settings, from whichever surface asked for it.</summary>
+    public const string AccessChange = "access_change";
 }
 
 /// <summary>The audit line of each kind of agent request, built here for every process that writes one.</summary>
@@ -193,6 +196,41 @@ public static class RequestRecords
             Entries = entries,
             Command = shown.Length > AuditRecord.CommandLength ? shown[..(AuditRecord.CommandLength - 1)] + "…" : shown,
             CommandSha256 = asked.Command.Count == 0 ? null : AuditRecord.HashOf([program ?? asked.Command[0], .. asked.Command.Skip(1)]),
+        };
+    }
+
+    /// <summary>The line for a request to change an agent's settings.</summary>
+    /// <param name="client">Who asked: the surface's own name, or the agent's client, with the label of the agent the change is for.</param>
+    /// <param name="statedReason">The requester's own reason, verbatim, or empty when it gave none.</param>
+    /// <param name="decision">Whether the change took effect.</param>
+    /// <param name="method">How that was decided: a person's confirmation, a narrowing applied at once, or a refusal.</param>
+    /// <param name="reason">keypaste's own explanation, naming the change. Trusted text.</param>
+    /// <param name="session">The unlocked session that answered, or null.</param>
+    /// <param name="vault">The vault's identity key, or null when none was named.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord AccessChange(
+        AuditClient client,
+        string statedReason,
+        AuditDecision decision,
+        AuditMethod method,
+        string reason,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(statedReason);
+        ArgumentNullException.ThrowIfNull(reason);
+
+        return new AuditRecord
+        {
+            Tool = AuditTools.AccessChange,
+            Client = client,
+            Args = statedReason.Length == 0 ? AuditArgs.None : AuditArgs.ForRun(null, statedReason),
+            Decision = decision,
+            Method = method,
+            Reason = reason,
+            Session = session,
+            Vault = vault,
         };
     }
 

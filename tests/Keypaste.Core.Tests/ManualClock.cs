@@ -32,6 +32,11 @@ internal sealed class ManualClock : TimeProvider
     /// <summary>One tick is one nanosecond, so a timestamp difference is easy to reason about.</summary>
     public override long TimestampFrequency => 1_000_000_000;
 
+    /// <summary>The time zone of the computer this clock is on: the runner's, unless a test names one.</summary>
+    internal TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Local;
+
+    public override TimeZoneInfo LocalTimeZone => Zone;
+
     public override DateTimeOffset GetUtcNow()
     {
         lock (_gate)

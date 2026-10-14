@@ -1,7 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -10,8 +9,8 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Keypaste.Core.Tokens;
@@ -23,7 +22,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// V-N.1b: through the app as launch composes it (D-0342), each advanced feature is reached from its
 /// one home: scoped tokens, the log's hash check and diagnostics from Settings' Advanced card, and a
-/// client's policy from its card's ⋯ menu on Agents; none of them is left on Agents or on Settings' page.
+/// client's settings from its card on Agents; none of them is left on Agents or on Settings' page.
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="FourPlacesJourneyTests"/> is, pressing controls where the window draws them.
@@ -124,7 +123,7 @@ public sealed class OneHomeJourneyTests
             Assert.Contains(DiagnosticsViewModel.Version, facts);
             AmberElements.AssertOne(main, null, "Diagnostics");
 
-            // A client's policy, from its card's ⋯ menu on Agents, which carries no dropdown for it.
+            // A client's settings, opened from its card on Agents, which carries no dropdown until they are.
             await using var bridge = await ConnectAsync(app.Authority, vault);
             Chord(main, PhysicalKey.Digit2);
             await Until(() => Card(main) is not null, () => "no card for the bridge");
@@ -132,12 +131,13 @@ public sealed class OneHomeJourneyTests
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
             AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents");
             Press(main, Card(main)!);
-            Assert.True(Named<Border>(main, "ClientMenuPanel").IsEffectivelyVisible);
-            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, a card's menu open");
-            Press(main, Choice(main, ClientPolicy.AskEveryTime));
-            await Until(() => Policy(home) == ClientPolicy.AskEveryTime, () => $"clients.toml holds {Policy(home)}");
-            await Until(() => !main.GetVisualDescendants().OfType<Border>().Any(panel => panel.Name == "ClientMenuPanel" && panel.IsEffectivelyVisible));
-            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, the policy changed");
+            await Until(
+                () => main.GetVisualDescendants().OfType<Border>().Any(panel => panel is { Name: "AgentSettingsPanel", IsEffectivelyVisible: true }),
+                () => "the settings did not open");
+            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, a client's settings open");
+            Press(main, Choice(main, "Ask every time"));
+            await Until(() => Ceiling(home) == AgentMode.Ask, () => $"clients.toml holds {Ceiling(home)}");
+            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, the mode changed");
 
             // History shows the records and leaves the check to the activity log.
             Press(main, Named<Button>(main, "AgentHistory"));
@@ -168,17 +168,18 @@ public sealed class OneHomeJourneyTests
     private static Button VisibleButton(Window window, string content) =>
         window.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Content as string == content);
 
-    /// <summary>The ⋯ toggle of this journey's client card, once the screen lists it.</summary>
-    private static ToggleButton? Card(Window window) =>
-        window.GetVisualDescendants().OfType<ToggleButton>()
-            .SingleOrDefault(toggle => toggle is { Name: "ClientMenu", DataContext: ClientCardRow { Label: _label }, IsEffectivelyVisible: true });
-
-    private static Button Choice(Window window, ClientPolicy policy) =>
+    /// <summary>The Settings button of this journey's client card, once the screen lists it.</summary>
+    private static Button? Card(Window window) =>
         window.GetVisualDescendants().OfType<Button>()
-            .Single(button => button.IsEffectivelyVisible && button.DataContext is PolicyChoice { Row.Label: _label } choice && choice.Policy == policy);
+            .SingleOrDefault(button => button is { Name: "ClientSettings", DataContext: ClientCardRow { Label: _label }, IsEffectivelyVisible: true });
 
-    private static ClientPolicy? Policy(string? home) =>
-        ClientPolicies.TryLoad(KeypasteHome.ClientsPath(home), out var policies, out _) ? policies.For(_label) : null;
+    /// <summary>One of the open settings' mode choices for the agent's default.</summary>
+    private static Button Choice(Window window, string words) =>
+        window.GetVisualDescendants().OfType<Button>()
+            .Single(button => button.IsEffectivelyVisible && button.DataContext is SettingChoice { Setting: "mode", Project: null } choice && choice.Words == words);
+
+    private static AgentMode? Ceiling(string? home) =>
+        AccessCaps.TryLoad(KeypasteHome.ClientsPath(home), out var caps, out _) ? caps.For(_label).Rows.FirstOrDefault(row => row.Project is null)?.Mode : null;
 
     /// <summary>A record of this journey's own, so the log has a table to check.</summary>
     private static void Record(string vault)

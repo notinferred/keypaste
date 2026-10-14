@@ -38,14 +38,14 @@ flowchart LR
 flowchart TD
   request["A request for one field of one entry"] --> exposed{"Is the entry exposed to this agent?"}
   exposed -->|no| refused["Refused and logged"]
-  exposed -->|yes| allowance{"A live allowance, or a rule you wrote?"}
+  exposed -->|yes| allowance{"A live allowance, or Automatic for this agent?"}
   allowance -->|yes| released["One field released and logged"]
   allowance -->|no| ask["You are asked"]
   ask -->|deny, or no answer| refused
   ask -->|allow| released
 ```
 
-Every error on this path refuses. If the audit record cannot be written, the value is not released.
+Automatic is a setting you confirm for one agent, for a project or environment it can see; commands and production environments are always asked. Every error on this path refuses. If the audit record cannot be written, the value is not released.
 
 ## What locking does
 
@@ -74,7 +74,7 @@ Agent approvals use the first today: one approved field goes back to the agent. 
 ## Rules that never change
 
 - Your master key never leaves your machine, not even inside an encrypted backup.
-- Agents never get the vault. Each release is one credential with one scope and a time limit, after your answer or a rule you wrote. The default is no.
+- Agents never get the vault. Each release is one credential with one scope and a time limit, after your answer or a setting you confirmed. The default is no.
 - Every agent request is logged on your machine, allowed or refused.
 - keypaste never writes a secret to disk unencrypted.
 - Telemetry never includes a secret or an entry name, and any usage count is opt-in.

@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Core.Policy;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -441,7 +441,7 @@ public sealed class RunSessionTests : IDisposable
                 new VaultEntryNameLister(() => _vault),
                 _gate,
                 _grants,
-                PolicyGate.None);
+                IAgentSettings.Defaults);
 
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._harness.Directory, test._harness.VaultPath),

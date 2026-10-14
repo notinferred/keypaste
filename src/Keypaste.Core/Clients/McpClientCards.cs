@@ -1,3 +1,4 @@
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Clients;
@@ -8,7 +9,7 @@ public enum ClientStatus
     /// <summary>At least one of its bridges is attached to the live session.</summary>
     Connected = 0,
 
-    /// <summary>Seen in this vault's audit lines or named by a policy row, and not attached now.</summary>
+    /// <summary>Seen in this vault's audit lines or named by a row of <c>clients.toml</c>, and not attached now.</summary>
     Idle = 1,
 }
 
@@ -20,7 +21,7 @@ public enum ClientStatus
 /// <param name="Status">Whether it is attached now.</param>
 /// <param name="Connections">How many of its bridges are attached now.</param>
 /// <param name="LastSeen">When it last asked for anything, or null when never.</param>
-/// <param name="Policy">The policy its requests are held to.</param>
+/// <param name="Ceiling">This computer's ceilings on what it may get.</param>
 public sealed record McpClientCard(
     string Key,
     string Name,
@@ -29,11 +30,11 @@ public sealed record McpClientCard(
     ClientStatus Status,
     int Connections,
     DateTimeOffset? LastSeen,
-    ClientPolicy Policy);
+    AccessCeiling Ceiling);
 
 /// <summary>
-/// The MCP clients of one vault: those attached now, those its audit lines name, and those a policy
-/// row names (D-0361). What a client says about itself decides nothing (THREATS.md T-3).
+/// The MCP clients of one vault: those attached now, those its audit lines name, and those a row of
+/// <c>clients.toml</c> names (D-0361). What a client says about itself decides nothing (THREATS.md T-3).
 /// </summary>
 public static class McpClientCards
 {
@@ -49,20 +50,20 @@ public static class McpClientCards
     /// <param name="connected">The clients attached to the live session.</param>
     /// <param name="audit">Audit entries read so far.</param>
     /// <param name="vaultKey">The vault's identity key; lines of other vaults are ignored.</param>
-    /// <param name="policies">The policies in force.</param>
+    /// <param name="caps">This computer's ceilings.</param>
     /// <param name="now">The time the window is measured from.</param>
     /// <returns>Connected clients first, then the most recently seen, then by key.</returns>
     public static IReadOnlyList<McpClientCard> Build(
         IReadOnlyList<ConnectedClient> connected,
         IReadOnlyList<AuditEntry> audit,
         string vaultKey,
-        ClientPolicies policies,
+        AccessCaps caps,
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(connected);
         ArgumentNullException.ThrowIfNull(audit);
         ArgumentNullException.ThrowIfNull(vaultKey);
-        ArgumentNullException.ThrowIfNull(policies);
+        ArgumentNullException.ThrowIfNull(caps);
 
         var cards = new Dictionary<string, Draft>(StringComparer.Ordinal);
 
@@ -109,7 +110,7 @@ public static class McpClientCards
             Card(key, Nonempty(entry.Label), entry.Name).Seen(at);
         }
 
-        foreach (var row in policies.Rows.Where(row => !string.Equals(row.Label, ClientPolicies.AnyClient, StringComparison.Ordinal)))
+        foreach (var row in caps.Rows.Where(row => !string.Equals(row.Label, AgentNames.Any, StringComparison.Ordinal)))
         {
             Card(row.Label, row.Label, null);
         }
@@ -125,7 +126,7 @@ public static class McpClientCards
                     draft.Connections > 0 ? ClientStatus.Connected : ClientStatus.Idle,
                     draft.Connections,
                     draft.LastSeen,
-                    policies.For(draft.Label)))
+                    caps.For(draft.Label)))
                 .OrderBy(card => card.Status)
                 .ThenByDescending(card => card.LastSeen ?? DateTimeOffset.MinValue)
                 .ThenBy(card => card.Key, StringComparer.Ordinal),

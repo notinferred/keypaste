@@ -1,15 +1,14 @@
 using System.Text;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
-using Keypaste.Core.Policy;
 using Keypaste.Core.Sharing;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>An env-named custom field leaves by name to an agent, a reference, a rule or a share; no other custom field does (C.5a).</summary>
+/// <summary>An env-named custom field leaves by name to an agent, a reference or a share; no other custom field does (C.5a).</summary>
 public sealed class CustomFieldReleaseTests : IDisposable
 {
     private const string _master = "correct horse battery staple";
@@ -122,29 +121,29 @@ public sealed class CustomFieldReleaseTests : IDisposable
     }
 
     [Fact]
-    public async Task ARuleNamingTheField_ReleasesItAsPolicy_WhileThePasswordStillReachesAPerson()
+    public async Task AnAutomaticMode_ReleasesTheField_WithNobodyAsked()
     {
-        using var approver = new Approver(_vault, Rule("\"OPENAI_API_KEY\""));
+        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
         approver.Channel.Answer = ApprovalAnswer.Denied;
 
-        var ruled = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
+        var released = await approver.Handler.RequestAsync(Request("OPENAI_API_KEY"), "conn-1", Token);
 
-        Assert.Equal(AuditMethod.Policy, ruled.Method);
-        Assert.Equal(_apiKey, ruled.Value);
+        Assert.Equal(AuditMethod.Automatic, released.Method);
+        Assert.Equal(_apiKey, released.Value);
         Assert.Equal(0, approver.Channel.Asked);
-
-        var password = await approver.Handler.RequestAsync(Request("password"), "conn-1", Token);
-
-        Assert.Equal(1, approver.Channel.Asked);
-        Assert.Null(password.Value);
     }
 
+    /// <summary>No mode reaches a field that never leaves: the field's name is refused before Automatic is considered.</summary>
     [Fact]
-    public void ARuleNamingAFieldThatNeverLeaves_IsRefused()
+    public async Task AnAutomaticMode_NeverReleasesAFieldThatNeverLeaves()
     {
-        Assert.True(Toml.TryParse(Rule("\"Recovery codes\""), out var syntax, out var syntaxError), syntaxError);
-        Assert.False(PolicyDocument.TryCreate(syntax, out _, out var error));
-        Assert.Contains(CredentialFields.Rule, error, StringComparison.Ordinal);
+        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+
+        var refused = await approver.Handler.RequestAsync(Request("Recovery codes"), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.InvalidRequest, refused.Method);
+        Assert.Null(refused.Value);
+        Assert.Equal(0, approver.Channel.Asked);
     }
 
     [Fact]
@@ -278,15 +277,6 @@ public sealed class CustomFieldReleaseTests : IDisposable
         }
     }
 
-    private static string Rule(string field) =>
-        $"""
-        [[allow]]
-        client  = "*"
-        entries = ["api/**"]
-        fields  = [{field}]
-        max_ttl_seconds = 300
-        """;
-
     private static CredentialRequest Request(string field) => new()
     {
         Entry = "api/OpenAI",
@@ -301,17 +291,9 @@ public sealed class CustomFieldReleaseTests : IDisposable
     /// <summary>A real handler over the real vault, with only the person faked.</summary>
     private sealed class Approver : IDisposable
     {
-        internal Approver(Vault vault, string? policy = null)
+        internal Approver(Vault vault, AgentAccess? access = null)
         {
-            var rules = PolicyDocument.None;
-
-            if (policy is not null)
-            {
-                Assert.True(Toml.TryParse(policy, out var syntax, out var syntaxError), syntaxError);
-                Assert.True(PolicyDocument.TryCreate(syntax, out var parsed, out var error), error);
-                rules = parsed;
-            }
-
+            Settings.Records["claude-code"] = access ?? ApproverFixture.SeesAll;
             Grants = new GrantCache(Clock);
             Gate = new ApprovalGate(Channel, Clock, ApprovalLimits.Default);
             Handler = new ApproverHandler(
@@ -319,8 +301,11 @@ public sealed class CustomFieldReleaseTests : IDisposable
                 new VaultEntryNameLister(() => vault),
                 Gate,
                 Grants,
-                new PolicyGate(rules, Clock));
+                Settings,
+                clock: Clock);
         }
+
+        internal FakeAgentSettings Settings { get; } = new();
 
         internal FakeChannel Channel { get; } = new();
 

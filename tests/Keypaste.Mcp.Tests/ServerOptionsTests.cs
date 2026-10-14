@@ -1,9 +1,10 @@
 using Keypaste.Core;
+using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.Mcp.Tests;
 
-/// <summary>What <c>keypaste mcp</c> accepts on its command line for help, the run tool and the client label.</summary>
+/// <summary>What <c>keypaste mcp</c> accepts on its command line for help, the run tool, the client label and the ceilings it may lower.</summary>
 public sealed class ServerOptionsTests
 {
     private static bool Parse(out ServerOptions? options, out string error, params string[] argv) =>
@@ -52,6 +53,32 @@ public sealed class ServerOptionsTests
     {
         Assert.True(Parse(out _, out _, "--client-label", new string('a', 64)));
         Assert.False(Parse(out _, out _, "--client-label", new string('a', 65)));
+    }
+
+    /// <summary>
+    /// The ceilings an agent's request for less lowers while nothing holds the vault are the ones
+    /// <c>--clients</c> names, as setup pins them beside the log for a home whose variable a client may
+    /// strip; without it, the home's, and only while the bridge's log is the home's too, since a log
+    /// pinned elsewhere leaves it none it can tell the owner reads.
+    /// </summary>
+    [Fact]
+    public void TheCeilingsTheBridgeLowers_AreTheOnesPinned_ElseItsHomesWhileItsLogIsTheHomesToo()
+    {
+        var home = Path.GetFullPath("bridge-home");
+        var custom = Path.GetFullPath("custom-home");
+
+        Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx"], null, home, null, null, out var plain, out _));
+        Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx", "--audit-log", KeypasteHome.AuditPath(home)], null, home, null, null, out var pinned, out _));
+        Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx", "--audit-log", Path.Combine(home, "other", KeypasteHome.AuditFileName)], null, home, null, null, out var elsewhere, out _));
+        Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx", "--audit-log", KeypasteHome.AuditPath(home)], null, null, null, null, out var stripped, out _));
+        Assert.True(ServerOptions.TryParse(
+            ["--vault", "v.kdbx", "--audit-log", KeypasteHome.AuditPath(custom), "--clients", KeypasteHome.ClientsPath(custom)], null, null, null, null, out var setUp, out _));
+
+        Assert.Equal(KeypasteHome.ClientsPath(home), plain!.ClientsPath);
+        Assert.Equal(KeypasteHome.ClientsPath(home), pinned!.ClientsPath);
+        Assert.Null(elsewhere!.ClientsPath);
+        Assert.Null(stripped!.ClientsPath);
+        Assert.Equal(KeypasteHome.ClientsPath(custom), setUp!.ClientsPath);
     }
 
     [Fact]

@@ -158,7 +158,11 @@ public sealed record McpServerCommand(string Path, IReadOnlyList<string> Argumen
 /// </param>
 /// <param name="AuditLogPath">The log for <c>--audit-log</c>, or null for the one under the bridge's own home.</param>
 /// <param name="ApproverName">The pipe for <c>--approver</c>, or null for the one the bridge derives.</param>
-public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, string? ApproverName)
+/// <param name="ClientsPath">
+/// This computer's ceilings for <c>--clients</c>, which the bridge lowers for an agent's own narrowing while nothing
+/// holds the vault, or null for the ones under the bridge's own home.
+/// </param>
+public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, string? ApproverName, string? ClientsPath = null)
 {
     /// <summary>Nothing pinned: the bridge follows the chosen vault, under the home it resolves.</summary>
     public static McpServerPins None { get; } = new(VaultPath: null, AuditLogPath: null, ApproverName: null);
@@ -167,26 +171,33 @@ public sealed record McpServerPins(string? VaultPath, string? AuditLogPath, stri
 /// <summary>
 /// What keypaste asks a client to launch: the bridge, and the flags that bound it.
 /// </summary>
+/// <remarks>
+/// The bridge is registered with <c>--allow-run</c> and, unless the person narrowed it, <see cref="WideExposure"/>,
+/// because what an agent sees, receives and runs is decided by its settings, which the owner applies to every
+/// request: an agent with none sees every project's variables, is given a value only when the person allows it and
+/// runs nothing.
+/// </remarks>
 /// <param name="Server">How to start <c>keypaste mcp</c>.</param>
 /// <param name="VaultPath">The absolute vault the bridge is pinned to with <c>--vault</c>, or null for none.</param>
 /// <param name="AuditLogPath">The absolute log the bridge is pinned to with <c>--audit-log</c>, or null for none.</param>
+/// <param name="ClientsPath">The absolute ceilings file the bridge is pinned to with <c>--clients</c>, or null for none.</param>
 /// <param name="ApproverName">The pipe the bridge is pinned to with <c>--approver</c>, or null for none.</param>
 /// <param name="ClientLabel">What this client is called in the audit log.</param>
-/// <param name="Expose">
-/// Extra globs. Empty means the flag is omitted entirely, so the bridge's own default
-/// (<see cref="EntryExposure.DefaultGlob"/>) applies — stated by absence rather than restated here,
-/// so there is one place a reader can learn what the default is.
-/// </param>
+/// <param name="Expose">The globs the bridge may name through: <see cref="WideExposure"/>, or the narrower ones the person gave.</param>
 public sealed record McpServerRegistration(
     McpServerCommand Server,
     string? VaultPath,
     string? AuditLogPath,
+    string? ClientsPath,
     string? ApproverName,
     string ClientLabel,
     IReadOnlyList<string> Expose)
 {
     /// <summary>The longest label the audit log keeps as written.</summary>
     public const int MaximumLabelLength = 64;
+
+    /// <summary>What a bridge may name when the person gives no globs: every item outside keypaste's own groups.</summary>
+    public const string WideExposure = "**";
 
     /// <summary>
     /// Builds a registration the bridge will accept, or says why not before anything is written.
@@ -235,9 +246,10 @@ public sealed record McpServerRegistration(
             server,
             Absolute(pins.VaultPath),
             Absolute(pins.AuditLogPath),
+            Absolute(pins.ClientsPath),
             pins.ApproverName,
             clientLabel,
-            [.. expose]);
+            expose.Count == 0 ? [WideExposure] : [.. expose]);
         error = string.Empty;
         return true;
     }
@@ -259,6 +271,12 @@ public sealed record McpServerRegistration(
             line.Add(AuditLogPath);
         }
 
+        if (ClientsPath is not null)
+        {
+            line.Add("--clients");
+            line.Add(ClientsPath);
+        }
+
         if (ApproverName is not null)
         {
             line.Add("--approver");
@@ -267,6 +285,7 @@ public sealed record McpServerRegistration(
 
         line.Add("--client-label");
         line.Add(ClientLabel);
+        line.Add("--allow-run");
 
         foreach (var glob in Expose)
         {

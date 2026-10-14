@@ -20,6 +20,17 @@ public sealed class DisplayTextSanitizerTests
     /// <summary>A character from the Unicode tag block, which is astral.</summary>
     private static readonly string _tag = char.ConvertFromUtf32(0xE0041);
 
+    /// <summary>What grants something is shown whole: every character that could hide or reorder a line is an escape, and nothing is removed.</summary>
+    [Fact]
+    public void Escaped_shows_each_hidden_character_and_removes_none()
+    {
+        Assert.Equal("env/**", DisplayTextSanitizer.Escaped("env/**"));
+        Assert.Equal("x\\u2028\\u2029**", DisplayTextSanitizer.Escaped("x" + _lineSeparator + _paragraphSeparator + "**"));
+        Assert.Equal("\\u202Eprod/**\\u200B", DisplayTextSanitizer.Escaped(_bidi + "prod/**" + _zwsp));
+        Assert.Equal("a\\U000E0041\\u000A\\u0009", DisplayTextSanitizer.Escaped("a" + _tag + "\n\t"));
+        Assert.Equal("café 東京", DisplayTextSanitizer.Escaped("café 東京"));
+    }
+
     [Fact]
     public void A_url_survives_whole()
     {

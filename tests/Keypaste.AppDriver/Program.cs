@@ -93,8 +93,10 @@ internal static class Program
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
-        "             prompt: approve, once, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
-        "             connect-remove <client>, confirm, cancel, check, pick <n>)\n" +
+        "             prompt: approve, once, always, allow, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
+        "             connect-remove <client>, confirm, cancel, check, pick <n>; settings <label>,\n" +
+        "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
+        "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault)\n" +
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
@@ -1055,7 +1057,7 @@ internal sealed class Driver(string home)
                 Console.Out.WriteLine("locked");
             })));
 #pragma warning restore CA2000
-        using var connect = new ConnectScreen(this, authority);
+        using var agents = new AgentsScreen(this, authority);
 
         if (startLocked)
         {
@@ -1071,7 +1073,7 @@ internal sealed class Driver(string home)
             switch (command.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             {
                 case ["lock"]:
-                    connect.Close();
+                    agents.Close();
                     session.Lock(VaultLockReason.Manual);
                     Console.Out.WriteLine("locked");
                     Report(authority);
@@ -1119,30 +1121,38 @@ internal sealed class Driver(string home)
                     break;
 
                 case ["connect", var client, .. var rest]:
-                    await connect.PreviewConnectAsync(client, rest).ConfigureAwait(true);
+                    await agents.PreviewConnectAsync(client, rest).ConfigureAwait(true);
                     break;
 
                 case ["connect-remove", var client]:
-                    await connect.PreviewRemoveAsync(client).ConfigureAwait(true);
+                    await agents.PreviewRemoveAsync(client).ConfigureAwait(true);
                     break;
 
                 case ["confirm"]:
-                    await connect.ConfirmAsync().ConfigureAwait(true);
+                    await agents.ConfirmAsync().ConfigureAwait(true);
                     break;
 
                 case ["cancel"]:
-                    connect.Cancel();
+                    agents.Cancel();
                     break;
 
                 case ["check"]:
-                    connect.Check();
+                    agents.Check();
                     break;
 
                 case ["pick", var which]:
-                    connect.Pick(which);
+                    agents.Pick(which);
                     break;
 
-                case [("approve" or "once" or "deny" or "close") and var answer]:
+                case ["settings", var label]:
+                    agents.ShowSettings(label);
+                    break;
+
+                case ["setting", var label, .. var change]:
+                    agents.Change(label, change);
+                    break;
+
+                case [("approve" or "once" or "always" or "allow" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
                     break;
@@ -1153,7 +1163,7 @@ internal sealed class Driver(string home)
         }
 
         // Standard input closing is quitting, as the app quits.
-        connect.Close();
+        agents.Close();
         authority.Dispose();
         Console.Out.WriteLine("shut down");
         Report(authority);
@@ -1222,30 +1232,114 @@ internal sealed class Driver(string home)
     private AgentActivityViewModel OpenActivity(AppAuthority authority) => new(authority, home, TimeProvider.System, _ => { });
 
     /// <summary>
-    /// Agent Activity's Connect section, kept open across lines as the screen stays open, and closed
-    /// by a lock as the shell closes it.
+    /// The Agents screen's Connect section and a card's settings, kept open across lines as the screen
+    /// stays open, and closed by a lock as the shell closes it.
     /// </summary>
     /// <remarks>
-    /// It uses the programs the app would: each client's own command on PATH, and the
+    /// Connecting uses the programs the app would: each client's own command on PATH, and the
     /// <c>keypaste mcp</c> the app finds. What the section says is printed as it changes, so the check
-    /// can be started on one line and its prompt answered on the next.
+    /// can be started on one line and its prompt answered on the next. A change to an agent's settings
+    /// is made the same way, so the confirmation it opens can be answered on the next line.
     /// </remarks>
-    private sealed class ConnectScreen(Driver driver, AppAuthority authority) : IDisposable
+    private sealed class AgentsScreen(Driver driver, AppAuthority authority) : IDisposable
     {
         private AgentActivityViewModel? _screen;
 
-        private ConnectClientViewModel Model
-        {
-            get
-            {
-                if (_screen is null)
-                {
-                    _screen = driver.OpenActivity(authority);
-                    _screen.Connect!.PropertyChanged += (_, changed) => Print(changed.PropertyName);
-                }
+        private AgentActivityViewModel Screen => _screen ??= OpenScreen();
 
-                return _screen.Connect!;
+        private ConnectClientViewModel Model => Screen.Connect!;
+
+        private AgentActivityViewModel OpenScreen()
+        {
+            var screen = driver.OpenActivity(authority);
+            screen.Connect!.PropertyChanged += (_, changed) => Print(changed.PropertyName);
+            return screen;
+        }
+
+        /// <summary>Opens a card's settings, as pressing its Settings button does, and prints what they hold.</summary>
+        internal void ShowSettings(string label)
+        {
+            var settings = Settings(label);
+            settings.Read();
+            string Chosen(IReadOnlyList<SettingChoice> choices) => choices.FirstOrDefault(choice => choice.IsChosen)?.Word ?? "none";
+
+            Console.Out.WriteLine(
+                $"settings agent={settings.Agent} mode={Chosen(settings.ModeChoices)} values={Chosen(settings.ValueChoices)} " +
+                $"run={Chosen(settings.RunChoices)} see={settings.SeePattern} " +
+                $"rows={string.Join(',', settings.Rows.Select(row => $"{row.Name}:{Chosen(row.Modes)}"))} " +
+                $"held={(settings.IsHeldBack ? settings.HeldBack : "none")}" +
+                (settings.HasProblem ? $" problem={settings.Problem}" : string.Empty));
+        }
+
+        /// <summary>Starts one change on a card's settings and returns; <c>setting-done</c> and what the panel then says follow once it has its answer.</summary>
+        internal void Change(string label, string[] change)
+        {
+            var settings = Settings(label);
+            var changing = change switch
+            {
+                [("mode" or "values" or "run") and var setting, var word] => settings.ChooseAsync(Offered(settings, setting, word, null)),
+                ["see", var selectors] => See(settings, selectors),
+                ["row", var scope] => AddRow(settings, scope),
+                ["row-mode", var scope, var word] => settings.ChooseAsync(Offered(settings, "mode", word, scope)),
+                ["use-vault"] => settings.UseVaultAsync(),
+                _ => throw new DriverException($"setting does not understand '{string.Join(' ', change)}'"),
+            };
+
+            _ = changing.ContinueWith(_ => Console.Out.WriteLine($"setting-done {settings.Message}"), TaskScheduler.Default);
+        }
+
+        private static Task See(AgentSettingsViewModel settings, string selectors)
+        {
+            settings.SeePattern = selectors;
+            return settings.ApplySeeAsync();
+        }
+
+        private static Task AddRow(AgentSettingsViewModel settings, string scope)
+        {
+            settings.NewRowScope = settings.NewRowScopes.Contains(scope, StringComparer.Ordinal)
+                ? scope
+                : throw new DriverException($"the settings offer no new row for {scope}");
+            return settings.AddRowAsync();
+        }
+
+        /// <summary>The settings open below the cards for a label, opened from its card if they are not.</summary>
+        private AgentSettingsViewModel Settings(string label)
+        {
+            var screen = Screen;
+
+            if (screen.Settings is { } open && string.Equals(open.Agent, label, StringComparison.Ordinal))
+            {
+                return open;
             }
+
+            // Read again, as the screen does each second, so a client that asked since it opened has its card.
+            screen.Refresh();
+            var card = screen.Clients.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))
+                ?? throw new DriverException($"Agents shows no card for {label}");
+
+            if (!screen.ToggleSettingsCommand.CanExecute(card))
+            {
+                throw new DriverException($"{label}'s card has no settings");
+            }
+
+            screen.ToggleSettingsCommand.Execute(card);
+            return screen.Settings!;
+        }
+
+        private static SettingChoice Offered(AgentSettingsViewModel settings, string setting, string word, string? row)
+        {
+            var choices = row is null
+                ? setting switch
+                {
+                    "mode" => settings.ModeChoices,
+                    "values" => settings.ValueChoices,
+                    _ => settings.RunChoices,
+                }
+                : settings.Rows.FirstOrDefault(listed => string.Equals(listed.Name, row, StringComparison.Ordinal))?.Modes
+                    ?? throw new DriverException($"the settings have no row for {row}");
+
+            return choices.FirstOrDefault(choice => string.Equals(choice.Word, word, StringComparison.Ordinal))
+                ?? throw new DriverException($"the settings offer no {setting} {word}");
         }
 
         internal async Task PreviewConnectAsync(string client, string[] rest)

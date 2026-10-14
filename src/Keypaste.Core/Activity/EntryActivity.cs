@@ -56,9 +56,9 @@ public sealed class EntryActivity
     private readonly HashSet<string> _waiting = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<GrantSummary>> _envGrants = new(StringComparer.Ordinal);
     private readonly ApproverActivity _live;
-    private readonly IReadOnlyList<EntryExposure> _reach;
+    private readonly IReadOnlyList<Func<EntryName, IReadOnlyList<string>, ExposureReach>> _reach;
 
-    private EntryActivity(ApproverActivity live, IReadOnlyList<EntryExposure> reach, DateTimeOffset now)
+    private EntryActivity(ApproverActivity live, IReadOnlyList<Func<EntryName, IReadOnlyList<string>, ExposureReach>> reach, DateTimeOffset now)
     {
         _live = live;
         _reach = reach;
@@ -71,7 +71,7 @@ public sealed class EntryActivity
     /// <param name="live">What the owner holds now.</param>
     /// <param name="session">What the owner released this session.</param>
     /// <param name="now">The time the recent window is measured from.</param>
-    /// <param name="reach">What agents can name without having asked yet: the exposures attached bridges announced and the scopes of standing rules.</param>
+    /// <param name="reach">What each attached agent can name without having asked yet: the least of its bridge's announced exposure and its settings.</param>
     /// <returns>The picture.</returns>
     public static EntryActivity Build(
         IReadOnlyList<AuditEntry> audit,
@@ -79,7 +79,7 @@ public sealed class EntryActivity
         ApproverActivity live,
         IReadOnlyList<ReleaseSeen> session,
         DateTimeOffset now,
-        IReadOnlyList<EntryExposure>? reach = null)
+        IReadOnlyList<Func<EntryName, IReadOnlyList<string>, ExposureReach>>? reach = null)
     {
         ArgumentNullException.ThrowIfNull(audit);
         ArgumentNullException.ThrowIfNull(vaultKey);
@@ -176,7 +176,7 @@ public sealed class EntryActivity
     }
 
     /// <summary>
-    /// Whether agents can see an entry: an attached bridge's exposure or a standing rule covers it,
+    /// Whether agents can see an entry: an attached agent's reach covers it,
     /// or it has been released, is covered by a grant or is waiting on a person (N.5).
     /// </summary>
     /// <param name="entry">The entry.</param>
@@ -187,7 +187,7 @@ public sealed class EntryActivity
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(tags);
 
-        if (_reach.Any(exposure => exposure.Reach(entry, tags) != ExposureReach.None))
+        if (_reach.Any(reach => reach(entry, tags) != ExposureReach.None))
         {
             return true;
         }

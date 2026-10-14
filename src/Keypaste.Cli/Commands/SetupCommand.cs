@@ -1,4 +1,3 @@
-using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Infrastructure;
@@ -25,9 +24,10 @@ namespace Keypaste.Cli.Commands;
 /// no keypaste entry is not connected and is left alone.
 /// </para>
 /// <para>
-/// Nothing here touches a vault or a secret. <c>setup</c> writes a path into a configuration file;
-/// what that path can release is still bounded by the bridge's own exposure default, and
-/// still needs a running <c>keypaste agent</c> and a human saying yes.
+/// Nothing here touches a vault or a secret. <c>setup</c> writes a path into a configuration file, with run offered
+/// and every item in reach unless <c>--expose</c> narrows it, because what that path can release is decided by each
+/// agent's settings, which the app or <c>keypaste agent</c> holding the vault applies, and a person's answer or a mode
+/// they set.
 /// </para>
 /// </remarks>
 internal static class SetupCommand
@@ -366,14 +366,20 @@ internal static class SetupCommand
             context.Stdout.WriteLine($"audit log      {auditLog}");
         }
 
+        if (registration.ClientsPath is { } ceilings)
+        {
+            context.Stdout.WriteLine($"ceilings       {ceilings}");
+        }
+
         if (registration.ApproverName is { } approver)
         {
             context.Stdout.WriteLine($"approver       {approver}");
         }
 
-        context.Stdout.WriteLine(registration.Expose.Count == 0
-            ? $"exposure       {EntryExposure.DefaultGlob} (the default: the variables of tagged entries, and nothing else)"
-            : $"exposure       {string.Join(", ", registration.Expose)}");
+        context.Stdout.WriteLine(registration.Expose is [McpServerRegistration.WideExposure]
+            ? $"exposure       {McpServerRegistration.WideExposure} (each agent sees what its settings allow: every project's variables until you change them)"
+            : $"exposure       {string.Join(", ", registration.Expose)} (no agent these tools start sees beyond these, whatever its settings)");
+        context.Stdout.WriteLine("run            offered; each agent runs nothing until you turn run on in its settings");
 
         if (note is not null)
         {
@@ -426,7 +432,7 @@ internal static class SetupCommand
         writer.WriteLine("  --vault <path>      pin the clients to this vault instead of the chosen one");
         writer.WriteLine("  --client <a,b>      only these, from: " + KnownClientIds(McpClientMachine.CurrentPlatform));
         writer.WriteLine("  --label <name>      what the audit log calls the client (default: its id)");
-        writer.WriteLine($"  --expose <globs>    widen what may be named. Default is {EntryExposure.DefaultGlob} and nothing else");
+        writer.WriteLine("  --expose <globs>    narrow what agents may see through these tools; by default their settings decide");
         writer.WriteLine("  --dry-run           print every step and change nothing");
         writer.WriteLine("  --remove            take keypaste out again, leaving everything else alone");
         writer.WriteLine("  --yes               change without asking; required when stdin is not a terminal");

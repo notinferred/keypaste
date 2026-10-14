@@ -15,7 +15,8 @@ namespace Keypaste.Core.Approval;
 /// dialog left on screen for a request nobody is waiting for is how somebody approves something
 /// into the void. It must never return <see cref="ApprovalAnswer.Approved"/> or
 /// <see cref="ApprovalAnswer.ApprovedOnce"/> for anything except that explicit choice, and never
-/// <see cref="ApprovalAnswer.Approved"/> when the prompt offered no timed grant; a closed window, an ignored prompt, a stray keystroke and an unreadable answer are
+/// <see cref="ApprovalAnswer.Approved"/> when the prompt offered no timed grant, nor
+/// <see cref="ApprovalAnswer.AlwaysForProject"/> when it offered no Always for; a closed window, an ignored prompt, a stray keystroke and an unreadable answer are
 /// all denials. And it must not enforce its own deadline as though it were the deadline:
 /// <see cref="ApprovalGate"/> owns the window, so that a channel which forgets still cannot leave a
 /// request open forever.
@@ -44,4 +45,19 @@ public interface IApprovalChannel
     /// <remarks>A channel that cannot show this has asked nobody, which is a no.</remarks>
     ValueTask<ApprovalAnswer> AskAsync(RunPrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(ApprovalAnswer.NoChannel);
+
+    /// <summary>Asks a human to confirm a change that gives an agent more, and waits for their answer.</summary>
+    /// <param name="prompt">What to show. Already sanitized; render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the human said, or why they were not asked.</returns>
+    /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing widens.</remarks>
+    ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ApprovalAnswer.NoChannel);
+
+    /// <summary>Tells a human, where they chose Always for, that the change it asked for did not take effect, and why.</summary>
+    /// <param name="notice">What to say. Already sanitized; render it as inert text.</param>
+    /// <remarks>It asks nothing and must not wait for anything. A channel that cannot show it says nothing.</remarks>
+    void Tell(AlwaysForNotice notice)
+    {
+    }
 }

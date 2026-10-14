@@ -126,7 +126,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
         try
         {
-            row.Confirmation = ProjectTagChange.Preview(vault, row.Finding.Entry, [row.Finding.Tag], adding: true)?.Describe() ?? [];
+            row.Confirmation = _session.PreviewTagChange(vault, row.Finding.Entry, [row.Finding.Tag], adding: true)?.Describe() ?? [];
             Message = string.Empty;
         }
         catch (VaultException e)

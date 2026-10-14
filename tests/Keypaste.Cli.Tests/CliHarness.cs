@@ -71,10 +71,11 @@ internal sealed class CliHarness : IDisposable
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
-    internal CliContext NewContext() => new()
+    /// <param name="stderr">Where its errors go instead of <see cref="Stderr"/>, for a verb a test runs on another thread.</param>
+    internal CliContext NewContext(TextWriter? stderr = null) => new()
     {
         Stdout = Stdout,
-        Stderr = Stderr,
+        Stderr = stderr ?? Stderr,
         Prompt = Prompt,
         Clipboard = Clipboard,
         ClipboardClear = ClearStrategy,
@@ -323,7 +324,12 @@ internal sealed class FakeClock : TimeProvider
     /// <summary>What time it is. Fixed by default, so a filter's boundary is assertable.</summary>
     internal DateTimeOffset Now { get; set; } = new(2026, 7, 26, 15, 0, 0, TimeSpan.Zero);
 
+    /// <summary>The time zone of the computer this clock is on: the runner's, unless a test names one.</summary>
+    internal TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Local;
+
     public override DateTimeOffset GetUtcNow() => Now;
+
+    public override TimeZoneInfo LocalTimeZone => Zone;
 }
 
 /// <summary>An environment backed by a dictionary.</summary>

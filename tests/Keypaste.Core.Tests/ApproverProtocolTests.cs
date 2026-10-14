@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Infrastructure;
@@ -133,11 +134,131 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void ANamesRequestSurvivesTheRoundTrip()
     {
-        var request = new NamesRequest(["env/**", "servers/staging/*"]);
+        var request = new NamesRequest(["env/**", "servers/staging/*"]) { ClientLabel = "billing-bot" };
 
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(request), out NamesRequest? decoded));
 
         Assert.Equal(request.Exposure, decoded.Exposure);
+        Assert.Equal("billing-bot", decoded.ClientLabel);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new NamesRequest(["env/**"])), out NamesRequest? unlabeled));
+        Assert.Null(unlabeled.ClientLabel);
+    }
+
+    /// <summary>A change to an agent's settings crosses as its words, every one of them, and none that was not sent.</summary>
+    [Fact]
+    public void AnAccessChangeRequestSurvivesTheRoundTrip()
+    {
+        var request = new AccessChangeRequest("claude-code", "so deploys stop asking")
+        {
+            Origin = AccessOrigin.Agent,
+            Project = "billing:staging",
+            Mode = "automatic",
+            See = ["tag:env:billing"],
+            Values = "yes",
+            Run = "off",
+            PerHour = "20",
+            Until = "2026-12-31",
+            Reset = false,
+            Vault = "/v.kdbx",
+            Session = "s1",
+        };
+
+        Assert.Equal(ApproverMessageKind.AccessChange, ApproverProtocol.KindOf(ApproverProtocol.Encode(request)));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(request), out AccessChangeRequest? decoded));
+        Assert.Equal(request.Agent, decoded.Agent);
+        Assert.Equal(request.Reason, decoded.Reason);
+        Assert.Equal(AccessOrigin.Agent, decoded.Origin);
+        Assert.Equal(("billing:staging", "automatic", "yes", "off", "20", "2026-12-31"), (decoded.Project, decoded.Mode, decoded.Values, decoded.Run, decoded.PerHour, decoded.Until));
+        Assert.Equal(["tag:env:billing"], decoded.See);
+        Assert.False(decoded.Reset);
+        Assert.Equal(("/v.kdbx", "s1"), (decoded.Vault, decoded.Session));
+
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new AccessChangeRequest("*", string.Empty) { Reset = true, Vault = "/v.kdbx", Session = "s1" }),
+            out AccessChangeRequest? bare));
+        Assert.Equal(AccessOrigin.Terminal, bare.Origin);
+        Assert.True(bare.Reset);
+        Assert.Null(bare.Mode);
+        Assert.Null(bare.See);
+    }
+
+    /// <summary>Only a terminal and an agent ask over the pipe: a frame naming any other origin, the prompt's included, is refused.</summary>
+    [Fact]
+    public void AnAccessChangeRequestNamingAnotherOrigin_IsRefused()
+    {
+        var frame = Encoding.UTF8.GetString(ApproverProtocol.Encode(new AccessChangeRequest("claude-code", string.Empty) { Mode = "ask", Vault = "/v", Session = "s" }));
+
+        Assert.Contains("\"origin\":\"terminal\"", frame, StringComparison.Ordinal);
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame.Replace("\"terminal\"", "\"prompt\"", StringComparison.Ordinal)), out AccessChangeRequest? _));
+    }
+
+    /// <summary>A change's answer is read as applied only when the owner said so under a method this side knows.</summary>
+    [Fact]
+    public void AnAccessChangeReply_UnderAnUnknownMethod_IsReadAsARefusal()
+    {
+        var granted = ApproverProtocol.Encode(new AccessChangeReply(AuditDecision.Granted, AuditMethod.Narrowing, "applied") { Recorded = true });
+
+        Assert.True(ApproverProtocol.TryDecode(granted, out AccessChangeReply? reply));
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing, "applied", true), (reply.Decision, reply.Method, reply.Reason, reply.Recorded));
+
+        var unknown = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(granted).Replace("\"method\":25", "\"method\":999", StringComparison.Ordinal));
+
+        Assert.True(ApproverProtocol.TryDecode(unknown, out AccessChangeReply? future));
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Failed), (future.Decision, future.Method));
+    }
+
+    /// <summary>Every agent's records cross whole, and a reply too large for one frame drops rows from the end and says so.</summary>
+    [Fact]
+    public void AnAccessListReply_SurvivesTheRoundTrip_AndIsBounded()
+    {
+        var reply = new AccessListReply(true, [new AccessRow("claude-code", "{\"acaf\":1,\"mode\":\"ask\"}", true), new AccessRow("*", "{\"acaf\":1}", false)], true, string.Empty);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out AccessListReply? decoded));
+        Assert.True(decoded.Answered && decoded.Complete);
+        Assert.Equal(reply.Agents, decoded.Agents);
+
+        var many = reply with { Agents = [.. Enumerable.Range(0, 200).Select(i => new AccessRow($"agent-{i}", new string('x', 5000), true))] };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(many), out AccessListReply? bounded));
+        Assert.False(bounded.Complete);
+        Assert.InRange(bounded.Agents.Count, 1, many.Agents.Count - 1);
+        Assert.True(ApproverProtocol.Encode(many).Length <= MessageFramer.MaximumPayloadBytes);
+    }
+
+    /// <summary>
+    /// A listing continues from where the requester says its rows end, and an agent whose record alone would
+    /// not fit one frame is still listed: its settings for the whole agent, with how many project rows it left out.
+    /// </summary>
+    [Fact]
+    public void AnAccessListing_ContinuesFromTheRowsAlreadyShown_AndListsARecordTooLongForAFrame()
+    {
+        var request = ApproverProtocol.Encode(new AccessListRequest { Vault = "v.kdbx", Session = "s", From = 7 });
+
+        Assert.True(ApproverProtocol.TryDecode(request, out AccessListRequest? next));
+        Assert.Equal(7, next.From);
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(request).Replace("\"from\":7", "\"from\":-1", StringComparison.Ordinal)), out AccessListRequest? _));
+
+        var huge = AcafRecord.Write(AgentAccess.Defaults with
+        {
+            Mode = AgentMode.Ask,
+            Projects = [.. Enumerable.Range(0, AgentAccess.MaximumProjects).Select(i => AgentAccessBuilders.Row($"{new string('é', 100)}{i}", AgentMode.Automatic))],
+        });
+        var reply = new AccessListReply(true, [new AccessRow("claude-code", huge, true), new AccessRow("codex", "{\"acaf\":1}", true)], true, string.Empty);
+        var frame = ApproverProtocol.Encode(reply);
+
+        Assert.True(frame.Length <= MessageFramer.MaximumPayloadBytes);
+        Assert.True(ApproverProtocol.TryDecode(frame, out AccessListReply? first));
+        Assert.False(first.Complete);
+        var row = Assert.Single(first.Agents);
+        Assert.Equal(("claude-code", AgentAccess.MaximumProjects), (row.Name, row.ProjectsNotShown));
+        var shown = AcafRecord.Read(row.Record).Access;
+        Assert.Equal(AgentMode.Ask, shown.Mode);
+        Assert.Empty(shown.Projects);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply with { Agents = [.. reply.Agents.Skip(1)] }), out AccessListReply? rest));
+        Assert.True(rest.Complete);
+        Assert.Equal(("codex", 0), (Assert.Single(rest.Agents).Name, rest.Agents[0].ProjectsNotShown));
     }
 
     /// <summary>An ordinary entry with no fields or tags, encoding to ninety-eight bytes with its separating comma.</summary>
@@ -534,14 +655,14 @@ public sealed class ApproverProtocolTests
     /// The refusal says which authority the release had, and never invents one it did not have.
     /// </summary>
     /// <remarks>
-    /// THREATS.md T-16: a release a standing rule authorized must never be written up as a human
+    /// THREATS.md T-16: a release an Automatic mode authorized must never be written up as a human
     /// act, and this is the one path where a denial follows an authorization — so the sentence has
     /// to be chosen by the method the reply arrived with rather than written once for all three.
     /// </remarks>
     [Theory]
     [InlineData(AuditMethod.Prompt)]
     [InlineData(AuditMethod.GrantCache)]
-    [InlineData(AuditMethod.Policy)]
+    [InlineData(AuditMethod.Automatic)]
     public void AnUndeliverableReply_NamesTheAuthorityItHad(AuditMethod authority)
     {
         var frame = ApproverProtocol.Encode(
@@ -552,7 +673,7 @@ public sealed class ApproverProtocolTests
         Assert.Equal(ApproverProtocol.UndeliverableReason(authority), reply.Reason, StringComparer.Ordinal);
 
         Assert.Equal(
-            authority != AuditMethod.Policy,
+            authority != AuditMethod.Automatic,
             reply.Reason.Contains("person", StringComparison.Ordinal));
     }
 

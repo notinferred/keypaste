@@ -434,6 +434,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                 Reason = "deploy",
                 TtlSeconds = 60,
                 Exposure = ["env/**"],
+                ClientLabel = ApproverFixture.Agent,
                 Vault = VaultPath,
                 Session = "session-one",
             },
@@ -827,7 +828,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
             new VaultEntryNameLister(() => _vault),
             _fixture.Gate,
             _fixture.Grants,
-            _fixture.Policy);
+            _fixture.Settings);
 
     private async Task<ApproverClient> AttachedAsync(Owner owner)
     {

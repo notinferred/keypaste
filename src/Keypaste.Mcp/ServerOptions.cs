@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
@@ -26,7 +26,7 @@ internal sealed record ServerOptions
 {
     internal const string Usage = """
         usage: keypaste mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
-                            [--allow-run] [--audit-log <path>] [--approver <name>]
+                            [--allow-run] [--audit-log <path>] [--clients <path>] [--approver <name>]
                keypaste mcp serve | setup | policy [options]
 
         An MCP server that lets an AI agent ask for one credential, with your approval and a full
@@ -35,27 +35,32 @@ internal sealed record ServerOptions
 
           serve    approve agents' requests in this terminal (same as keypaste agent)
           setup    point this machine's AI clients at your vault (same as keypaste setup)
-          policy   show or set how each client is asked: session, ask or inject-only
+          policy   show or change each agent's settings: what it sees, values, run and mode
 
           --vault <path>        which vault to expose, or set KEYPASTE_VAULT. Without either,
                                 the vault chosen in the keypaste app or with `keypaste use`
           --expose <glob>       what may be named, repeatable: a group/title glob reaches whole
                                 entries, tag:env:<project>[:<environment>] the variables of
                                 entries tagged into it. Defaults to tag:env:*
-          --client-label <name> what to call this client in the audit log and in clients.toml
+          --client-label <name> the agent's name: its settings follow it, and the audit log uses it
           --allow-run           offer the run tool: start a command you approve with secrets
-                                in its environment. A command can still reveal them.
+                                in its environment, if the agent's settings let it run commands.
+                                A command can still reveal them.
           --audit-log <path>    where this bridge records a call it refuses itself or that
                                 nothing holding the vault answered, or set KEYPASTE_HOME; the
                                 app or keypaste agent records the calls it answers in its own log
+          --clients <path>      this computer's ceilings, clients.toml, which an agent's change that
+                                gives it less lowers while nothing holds the vault; or set KEYPASTE_HOME
           --approver <name>     which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER
           -h, --help            print this help
 
-        Nothing is released unless a person says yes to that specific request, or a rule they wrote
-        in advance covers it. Requests go to whichever keypaste process holds the vault unlocked:
-        the desktop app or a `keypaste agent` the person started in their own terminal - so no agent
-        can cause a master password prompt to appear. With nothing holding the vault, every request
-        is denied. `keypaste policy ls` shows the standing rules, if there are any.
+        Nothing is released unless a person says yes to that specific request, or set this agent to
+        Automatic for it. Requests go to whichever keypaste process holds the vault unlocked: the
+        desktop app or a `keypaste agent` the person started in their own terminal - so no agent can
+        cause a master password prompt to appear. With nothing holding the vault, every request is
+        denied but an agent's change that gives it less. `keypaste mcp policy` shows each agent's
+        settings. An agent may ask for a change to its own; one that gives it more waits for the
+        person to confirm it, and one that gives it less applies at once on this computer.
         """;
 
     private static readonly OptionSpec[] _options =
@@ -65,6 +70,7 @@ internal sealed record ServerOptions
         new("client-label", TakesValue: true),
         new("allow-run", TakesValue: false),
         new("audit-log", TakesValue: true),
+        new("clients", TakesValue: true),
         new("approver", TakesValue: true),
     ];
 
@@ -77,6 +83,18 @@ internal sealed record ServerOptions
 
     /// <summary>Where the audit trail is appended.</summary>
     internal required string AuditPath { get; init; }
+
+    /// <summary>
+    /// This computer's ceilings, which an agent's own change that gives it nothing more lowers while
+    /// nothing holds the vault; null when the bridge cannot tell they are the ones the vault's owner reads.
+    /// </summary>
+    /// <remarks>
+    /// The file <c>--clients</c> names, which a registration for a home other than the default pins
+    /// beside its log; otherwise its home's, and only while its log is its home's too, since a client
+    /// that strips <c>KEYPASTE_HOME</c> from a bridge pinned to another home's log would leave it
+    /// lowering a file that home's owner never reads while the agent was told its change applied.
+    /// </remarks>
+    internal string? ClientsPath { get; init; }
 
     /// <summary>Which pipe the vault's owner is expected on, or null when no vault was named.</summary>
     /// <remarks>
@@ -141,6 +159,7 @@ internal sealed record ServerOptions
         var vault = line.Value("vault");
         var label = line.Value("client-label");
         var auditPath = line.Value("audit-log");
+        var clientsPath = line.Value("clients");
         var approver = line.Value("approver");
         var allowRun = line.HasFlag("allow-run");
         var globs = line.Values("expose");
@@ -154,12 +173,11 @@ internal sealed record ServerOptions
             return false;
         }
 
-        // The same rule a clients.toml row is held to, so a label a policy can name is the only kind a
-        // bridge starts with, and one the owner would reject on attach never reaches it.
-        if (label is not null && (string.Equals(label, ClientPolicies.AnyClient, StringComparison.Ordinal)
-            || !ClientPolicies.IsValidLabel(label, out _)))
+        // The rule an agent's settings are kept under, so a bridge starts only with a name settings
+        // can be kept for, and one the owner would reject on attach never reaches it.
+        if (label is not null && !AgentNames.IsNamed(label))
         {
-            error = $"--client-label must be 1 to {ClientPolicies.MaximumLabelLength} characters with no quote, backslash, slash or control character, and not \"*\"";
+            error = $"--client-label must be 1 to {AgentNames.MaximumLength} characters with no quote, backslash, slash or control character, and not \"*\"";
             return false;
         }
 
@@ -181,6 +199,9 @@ internal sealed record ServerOptions
             return false;
         }
 
+        var homeLog = KeypasteHome.AuditPath(homeFromEnvironment);
+        var log = auditPath is { Length: > 0 } ? Path.GetFullPath(auditPath) : homeLog;
+
         options = new ServerOptions
         {
             VaultPath = vaultPath,
@@ -189,9 +210,10 @@ internal sealed record ServerOptions
             ApproverName = pipeName,
             AllowRun = allowRun,
             VaultKey = identity?.Key,
-            AuditPath = auditPath is { Length: > 0 }
-                ? Path.GetFullPath(auditPath)
-                : KeypasteHome.AuditPath(homeFromEnvironment),
+            AuditPath = log,
+            ClientsPath = clientsPath is { Length: > 0 } ? Path.GetFullPath(clientsPath)
+                : PathIdentity.SameFile(log, homeLog) ? KeypasteHome.ClientsPath(homeFromEnvironment)
+                : null,
         };
 
         return true;

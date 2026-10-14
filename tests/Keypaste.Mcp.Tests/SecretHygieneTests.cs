@@ -1,9 +1,8 @@
 using System.Security.Cryptography;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
-using Keypaste.Core.Policy;
 using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
@@ -58,17 +57,17 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     internal const string SentinelOutOfScope = "SENTINEL-OUT-OF-SCOPE-e51b70";
 
     /// <summary>
-    /// A secret inside the exposure but outside every policy rule, so it is reachable by asking a
-    /// person and never by a standing rule.
+    /// A secret inside the exposure but in no project the agent is Automatic for, so it is reachable
+    /// by asking a person and never without one.
     /// </summary>
     /// <remarks>
-    /// This one is load-bearing, and it is why the count went from five to six. "The rule did not
+    /// This one is load-bearing, and it is why the count went from five to six. "Automatic did not
     /// widen" asserted against <see cref="SentinelOutOfScope"/> alone would be asserted against a
-    /// value the exposure already blocks, so it would pass for a policy check that did nothing at
-    /// all — exactly the vacuous-sentinel trap this class's own doc comment says the repository has
-    /// fallen into before.
+    /// value the exposure already blocks, so it would pass for a mode check that did nothing at all —
+    /// exactly the vacuous-sentinel trap this class's own doc comment says the repository has fallen
+    /// into before.
     /// </remarks>
-    internal const string SentinelOutsideTheRule = "SENTINEL-OUTSIDE-THE-RULE-f62c81";
+    internal const string SentinelOutsideTheRow = "SENTINEL-OUTSIDE-THE-RULE-f62c81";
 
     private static readonly string[] _everySentinel =
     [
@@ -79,22 +78,21 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         SentinelApiKey,
         SentinelRecovery,
         SentinelOutOfScope,
-        SentinelOutsideTheRule,
+        SentinelOutsideTheRow,
     ];
 
     /// <summary>
-    /// The rule the second approver runs with. It keys on the label the <em>operator</em> gave the
-    /// bridge, never on the name the client asserts (THREATS.md T-3), and it covers one field of one
-    /// subtree — so three of the six sentinels are inside the exposure and outside it.
+    /// What the agent may do through the first approver: see as far as the bridge exposes, and run
+    /// commands. Kept under the label the <em>operator</em> gave the bridge, never the name the client
+    /// asserts (THREATS.md T-3).
     /// </summary>
-    private static string Policy =>
-        $"""
-        [[allow]]
-        client          = "{McpHarness.ClientLabel}"
-        entries         = ["env/dev/**"]
-        fields          = ["password"]
-        max_ttl_seconds = 300
-        """;
+    private static AgentAccess Sees { get; } = AgentAccess.Defaults with { See = Everything(), Run = true };
+
+    /// <summary>
+    /// What the second approver holds for the same agent: Automatic for the billing project only, which
+    /// the stripe entry is tagged into, so the root token is inside the exposure and outside the row.
+    /// </summary>
+    private static AgentAccess AutomaticForBilling { get; } = Sees with { Projects = [new ProjectAccess(Billing(), AgentMode.Automatic)] };
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -108,17 +106,20 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     private CancellationTokenSource? _stop;
     private Task? _serving;
 
-    private GrantCache? _ruleGrants;
-    private ApprovalGate? _ruleGate;
-    private ApproverListener? _ruleListener;
-    private CancellationTokenSource? _ruleStop;
-    private Task? _ruleServing;
+    private GrantCache? _automaticGrants;
+    private ApprovalGate? _automaticGate;
+    private ApproverListener? _automaticListener;
+    private CancellationTokenSource? _automaticStop;
+    private Task? _automaticServing;
+
+    private readonly FakeAgentSettings _settings = new();
+    private readonly FakeAgentSettings _automaticSettings = new();
 
     private string PipeName { get; } =
         "keypaste-hygiene-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
 
-    private string RulePipeName { get; } =
-        "keypaste-hygiene-rule-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+    private string AutomaticPipeName { get; } =
+        "keypaste-hygiene-automatic-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
 
     public ValueTask InitializeAsync()
     {
@@ -148,18 +149,23 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Password = SentinelOutOfScope,
         });
 
-        // Inside the exposure and outside every rule: reachable by asking a person, never by a
-        // standing one. This is the entry that makes "a rule cannot widen" a claim about the policy
-        // check rather than about the exposure quietly doing all the work.
+        // Inside the exposure and in no project the agent is Automatic for: reachable by asking a
+        // person, never without one. This is the entry that makes "Automatic cannot widen" a claim
+        // about the mode rather than about the exposure quietly doing all the work.
         _vault.AddEntry(new VaultEntry
         {
             GroupPath = "env/prod",
             Title = "ROOT_TOKEN",
-            Password = SentinelOutsideTheRule,
+            Password = SentinelOutsideTheRow,
         });
+
+        Assert.True(_vault.AddTag(new EntryName("env/dev", "STRIPE_KEY"), "env:billing"));
 
         // What an agent is answered from is the vault as saved (D-0317).
         _vault.Save();
+
+        _settings.Records[McpHarness.ClientLabel] = Sees;
+        _automaticSettings.Records[McpHarness.ClientLabel] = AutomaticForBilling;
 
         _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
@@ -170,42 +176,39 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             new VaultEntryNameLister(() => _vault),
             _gate,
             _grants,
-            PolicyGate.None);
+            _settings);
 
         _stop = new CancellationTokenSource();
         _listener = new ApproverListener(PipeName, TestSession.Over(_vault, handler, _log.Log));
         _serving = _listener.RunAsync(_stop.Token);
 
-        // A second approver over the same vault, with a rule in force. Two listeners rather than one
-        // whose policy can be changed per test, because a rule set that shifts under a running
-        // approver is precisely what reading the file once rules out — a fixture that allowed it
-        // would be modelling something the product does not do.
-        Assert.True(Toml.TryParse(Policy, out var syntax, out var syntaxError), syntaxError);
-        Assert.True(PolicyDocument.TryCreate(syntax, out var rules, out var ruleError), ruleError);
+        // A second approver over the same vault, where the agent is Automatic for billing. Two
+        // listeners rather than one whose settings change per test, so neither test's answers depend
+        // on what another left behind.
 
-        _ruleGrants = new GrantCache(TimeProvider.System);
-        _ruleGate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
-        _ruleStop = new CancellationTokenSource();
-        _ruleListener = new ApproverListener(
-            RulePipeName,
+        _automaticGrants = new GrantCache(TimeProvider.System);
+        _automaticGate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
+        _automaticStop = new CancellationTokenSource();
+        _automaticListener = new ApproverListener(
+            AutomaticPipeName,
             TestSession.Over(
                 _vault,
                 new ApproverHandler(
                     new VaultCredentialSource(() => _vault),
                     new VaultEntryNameLister(() => _vault),
-                    _ruleGate,
-                    _ruleGrants,
-                    new PolicyGate(rules, TimeProvider.System)),
+                    _automaticGate,
+                    _automaticGrants,
+                    _automaticSettings),
                 _log.Log));
 
-        _ruleServing = _ruleListener.RunAsync(_ruleStop.Token);
+        _automaticServing = _automaticListener.RunAsync(_automaticStop.Token);
 
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var stop in new[] { _stop, _ruleStop })
+        foreach (var stop in new[] { _stop, _automaticStop })
         {
             if (stop is not null)
             {
@@ -213,7 +216,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             }
         }
 
-        foreach (var serving in new[] { _serving, _ruleServing })
+        foreach (var serving in new[] { _serving, _automaticServing })
         {
             if (serving is null)
             {
@@ -231,13 +234,13 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         }
 
         _listener?.Dispose();
-        _ruleListener?.Dispose();
+        _automaticListener?.Dispose();
         _stop?.Dispose();
-        _ruleStop?.Dispose();
+        _automaticStop?.Dispose();
         _gate?.Dispose();
-        _ruleGate?.Dispose();
+        _automaticGate?.Dispose();
         _grants?.Dispose();
-        _ruleGrants?.Dispose();
+        _automaticGrants?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
 
@@ -250,10 +253,10 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         return (harness, await harness.StartAsync());
     }
 
-    /// <summary>A bridge talking to the approver that has a standing rule in force.</summary>
-    private async Task<(McpHarness Harness, McpClient Client)> StartPreapprovedAsync()
+    /// <summary>A bridge talking to the approver where the agent is Automatic for billing.</summary>
+    private async Task<(McpHarness Harness, McpClient Client)> StartAutomaticAsync()
     {
-        var harness = new McpHarness(RulePipeName, _vault!.Path);
+        var harness = new McpHarness(AutomaticPipeName, _vault!.Path);
         return (harness, await harness.StartAsync());
     }
 
@@ -492,9 +495,9 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     /// prompt was drawn.
     /// </summary>
     [Fact]
-    public async Task OnAPolicyGrant_TheRequestedFieldComesBack_AndOnlyThat()
+    public async Task OnAnAutomaticRelease_TheRequestedFieldComesBack_AndOnlyThat()
     {
-        var (harness, client) = await StartPreapprovedAsync();
+        var (harness, client) = await StartAutomaticAsync();
 
         await using (harness)
         {
@@ -510,59 +513,54 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
             foreach (var other in _everySentinel.Where(s => !string.Equals(s, SentinelPassword, StringComparison.Ordinal)))
             {
-                AssertNowhere(harness, other, text, "a policy grant");
+                AssertNowhere(harness, other, text, "an Automatic release");
             }
 
             // The owner's log records that it happened — which, with no human witness, is the only
-            // record that it happened at all — and records it as a policy release, never as an approval.
-            Assert.Contains("\"method\":\"policy\"", _log!.Text(), StringComparison.Ordinal);
+            // record that it happened at all — and records it as Automatic, never as an approval.
+            Assert.Contains("\"method\":\"automatic\"", _log!.Text(), StringComparison.Ordinal);
             Assert.DoesNotContain(SentinelPassword, _log.Text(), StringComparison.Ordinal);
             Assert.Empty(harness.AuditLines());
         }
     }
 
-    /// <summary>
-    /// A field the rule does not name is not covered by it, so a person is asked — and if they say
-    /// no, nothing leaves. The rule covers <c>password</c>; this asks for the other three.
-    /// </summary>
+    /// <summary>Automatic covers the entry, and still releases only the one field asked for, whichever it is.</summary>
     [Theory]
     [InlineData("username", SentinelUsername)]
     [InlineData("url", SentinelUrl)]
     [InlineData("notes", SentinelNotes)]
-    public async Task ARuleForAFieldTheAgentDidNotAskFor_ReleasesNothing(string field, string sentinel)
+    public async Task AnAutomaticRelease_IsOfTheOneFieldAsked(string field, string sentinel)
     {
-        _human.Answer = ApprovalAnswer.Denied;
-
-        var (harness, client) = await StartPreapprovedAsync();
+        var (harness, client) = await StartAutomaticAsync();
 
         await using (harness)
         {
             var result = await client.CallToolAsync(
                 ToolText.CredentialToolName, Ask(field: field), cancellationToken: Token);
+            var text = TextOf(result);
 
-            Assert.True(result.IsError);
-            Assert.Equal(1, _human.Asked);
+            Assert.False(result.IsError, text);
+            Assert.Contains(sentinel, text, StringComparison.Ordinal);
+            Assert.Equal(0, _human.Asked);
 
-            foreach (var each in _everySentinel)
+            foreach (var each in _everySentinel.Where(each => !string.Equals(each, sentinel, StringComparison.Ordinal)))
             {
-                AssertNowhere(harness, each, TextOf(result), $"a rule that does not cover {field}");
+                AssertNowhere(harness, each, text, $"an Automatic release of {field}");
             }
-
-            Assert.NotEmpty(sentinel);
         }
     }
 
     /// <summary>
-    /// An entry inside the bridge's exposure and outside the rule. This is the sentinel that makes
-    /// "a rule cannot widen" a claim about the policy check: the exposure permits this entry, so
-    /// nothing but the rule's own pattern is standing between the agent and it.
+    /// An entry inside the bridge's exposure and in no project the agent is Automatic for. This is the
+    /// sentinel that makes "Automatic cannot widen" a claim about the mode: the exposure permits this
+    /// entry, so nothing but the row's own project is standing between the agent and it.
     /// </summary>
     [Fact]
-    public async Task AnEntryInsideTheExposureAndOutsideTheRule_StillNeedsAPerson()
+    public async Task AnEntryInsideTheExposureAndOutsideTheRow_StillNeedsAPerson()
     {
         _human.Answer = ApprovalAnswer.Denied;
 
-        var (harness, client) = await StartPreapprovedAsync();
+        var (harness, client) = await StartAutomaticAsync();
 
         await using (harness)
         {
@@ -572,18 +570,18 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Assert.True(result.IsError);
             Assert.Equal(1, _human.Asked);
 
-            AssertNowhere(harness, SentinelOutsideTheRule, TextOf(result), "outside the rule");
+            AssertNowhere(harness, SentinelOutsideTheRow, TextOf(result), "outside the row");
         }
     }
 
     /// <summary>
-    /// A rule reaching past <c>--expose</c>, asked for both ways the entry can be named. The rule
-    /// here covers only <c>env/dev/**</c>, so this also proves a handle is not a way around it.
+    /// Settings that see everything, for an entry outside <c>--expose</c>, asked for both ways the
+    /// entry can be named: the bridge's exposure still bounds what the agent reaches.
     /// </summary>
     [Fact]
-    public async Task APolicyRuleForAnEntryOutsideTheExposure_YieldsNothingByEitherName()
+    public async Task AnAutomaticAgentAskingOutsideTheExposure_YieldsNothingByEitherName()
     {
-        var (harness, client) = await StartPreapprovedAsync();
+        var (harness, client) = await StartAutomaticAsync();
 
         await using (harness)
         {
@@ -598,10 +596,10 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Assert.True(byPath.IsError);
             Assert.True(byHandle.IsError);
 
-            AssertNowhere(harness, SentinelOutOfScope, TextOf(byPath) + TextOf(byHandle), "out of scope, with a rule");
+            AssertNowhere(harness, SentinelOutOfScope, TextOf(byPath) + TextOf(byHandle), "out of scope, Automatic");
 
-            // Not even asked about, exactly as without a policy: the exposure is checked first and
-            // a rule is never a reason to put an unexposed entry name in front of somebody.
+            // Not even asked about: what the agent can see is checked first, and a mode is never a
+            // reason to put an unexposed entry name in front of somebody.
             Assert.Equal(0, _human.Asked);
         }
     }
@@ -661,7 +659,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         var authority = new Keypaste.Core.Ownership.SessionAuthority(
             Keypaste.Core.Ownership.VaultIdentity.Of(Path.GetDirectoryName(_vault!.Path)!, _vault.Path),
             () => lifetime,
-            new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), gate, grants, PolicyGate.None),
+            new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), gate, grants, _settings),
             audit: () => _log!.Log,
             new Keypaste.Core.Ownership.SessionEnvironments(gate, _ => _vault, TimeProvider.System, envGrants));
         using var stop = new CancellationTokenSource();
@@ -714,6 +712,18 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         {
             // Tearing the listener down is how it stops.
         }
+    }
+
+    private static EntryExposure Everything()
+    {
+        Assert.True(EntryExposure.TryCreate(["**"], out var exposure, out var error), error);
+        return exposure;
+    }
+
+    private static ProjectScope Billing()
+    {
+        Assert.True(ProjectScope.TryCreate("billing", null, out var scope, out var error), error);
+        return scope;
     }
 
     private sealed class ScriptedHuman : IApprovalChannel

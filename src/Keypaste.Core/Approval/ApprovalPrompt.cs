@@ -1,3 +1,5 @@
+using Keypaste.Core.Agents;
+
 namespace Keypaste.Core.Approval;
 
 /// <summary>
@@ -82,6 +84,14 @@ public sealed record ApprovalPrompt
 
     /// <summary>Why <see cref="TtlSeconds"/> is zero, when it is.</summary>
     public OnceOnly OnceOnly { get; init; }
+
+    /// <summary>The project environment the person may make Automatic for this agent from here, or null when that is not offered.</summary>
+    /// <remarks>
+    /// Offered for a named agent asking for an entry in exactly one project and no protected
+    /// environment. Choosing it allows this request once and then asks the person to confirm the
+    /// change, as any change that gives an agent more is confirmed.
+    /// </remarks>
+    public ProjectScope? AlwaysFor { get; init; }
 
     /// <summary>An entry as every prompt, grant and audit line shows it.</summary>
     /// <param name="entry">The entry.</param>

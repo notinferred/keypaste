@@ -15,9 +15,9 @@ public enum AuditDecision
 /// An agent reads a refusal and decides whether to try again: <see cref="OutOfScope"/> means never,
 /// <see cref="Prompt"/> with <see cref="AuditDecision.Denied"/> means a person said no, and only
 /// <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got to it.
-/// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="GrantCache"/> and
-/// <see cref="Policy"/> ever accompany <see cref="AuditDecision.Granted"/>.
-/// <see cref="Policy"/> is the one grant no person saw, so it must never be logged as
+/// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="GrantCache"/>, <see cref="Automatic"/>,
+/// <see cref="Token"/> and <see cref="Narrowing"/> ever accompany <see cref="AuditDecision.Granted"/>.
+/// <see cref="Automatic"/> is the one release no person saw, so it must never be logged as
 /// <see cref="Prompt"/> or <see cref="GrantCache"/>, which both claim a person acted.
 /// Adding a member means adding a case to <c>AuditLog.Wire</c>.
 /// </remarks>
@@ -37,7 +37,7 @@ public enum AuditMethod
     InvalidRequest = 3,
 
     /// <summary>Allowed because everything named lay inside the configured exposure. Listing names
-    /// only; releasing a credential always needs a person or a policy.</summary>
+    /// only; releasing a credential always needs a person or a mode the person set.</summary>
     Exposure = 4,
 
     /// <summary>A person was shown this specific request and answered it (docs/PRODUCT.md law 3.2).</summary>
@@ -65,23 +65,11 @@ public enum AuditMethod
     /// <summary>Asking, resolving or reading went wrong. Fail closed (docs/PRODUCT.md law 3.7).</summary>
     Failed = 12,
 
-    /// <summary>Pre-authorized by a rule in the user's policy file, so nobody was asked. The
-    /// record's reason names which rule.</summary>
-    Policy = 13,
-
-    /// <summary>A policy rule covered this request but had spent its hourly allowance.</summary>
-    /// <remarks>
-    /// Denied rather than escalated to a person: falling through to a prompt turns a quota into a
-    /// prompt generator, one per request once the allowance is burned (THREATS.md T-11), and makes
-    /// <c>keypaste policy ls</c> lie about what <c>max_per_hour</c> means.
-    /// </remarks>
-    PolicyLimit = 14,
-
     /// <summary>A tool was called before the <c>initialize</c> handshake completed, so nothing is
     /// known about who is calling.</summary>
     /// <remarks>
     /// A client that ignores the protocol still gets its request read. Answering would put it to a
-    /// person, or match it against a rule, with the caller missing from both the dialog and the log —
+    /// person, or release it under the caller's mode, with the caller missing from both the dialog and the log —
     /// the one field the human judges by.
     /// </remarks>
     NotInitialized = 15,
@@ -91,7 +79,7 @@ public enum AuditMethod
     /// <remarks>
     /// A word of its own rather than a reuse: <see cref="Failed"/> says asking went wrong and here it
     /// went right, while <see cref="Prompt"/> beside <see cref="AuditDecision.Denied"/> already means
-    /// a person said no. The reason names which authority the release had, so a rule's release is
+    /// a person said no. The reason names which authority the release had, so an Automatic release is
     /// never written up as a human act. The only method where a denial follows an authorization.
     /// </remarks>
     Undeliverable = 16,
@@ -112,7 +100,7 @@ public enum AuditMethod
     /// </remarks>
     VaultChanged = 18,
 
-    /// <summary>Released or refused under a scoped token rather than a prompt or a rule.</summary>
+    /// <summary>Released or refused under a scoped token rather than a prompt or a mode.</summary>
     Token = 19,
 
     /// <summary>A share link was created.</summary>
@@ -121,8 +109,18 @@ public enum AuditMethod
     /// <summary>A share link was revoked.</summary>
     ShareRevoked = 21,
 
-    /// <summary>The client's policy is inject only, so a request for a value was refused before anything was resolved (D-0360).</summary>
+    /// <summary>The agent's settings give it no values, so a request for one was refused before anything was resolved.</summary>
     InjectOnly = 22,
+
+    /// <summary>Released without asking because the agent's mode for the entry is Automatic, a setting the person confirmed.</summary>
+    /// <remarks>Nobody was shown this request, so it is never written as <see cref="Prompt"/> or <see cref="GrantCache"/>.</remarks>
+    Automatic = 23,
+
+    /// <summary>The agent's settings do not let it run commands, so a run was refused before anything was resolved.</summary>
+    RunOff = 24,
+
+    /// <summary>A change to an agent's settings that gives it nothing more, applied at once without asking.</summary>
+    Narrowing = 25,
 }
 
 /// <summary>Who asked.</summary>

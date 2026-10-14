@@ -246,6 +246,7 @@ public sealed class ClosingTheMainWindowTests
 
         using var created = Core.Vault.Create(vault, TempVault.Password);
         created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = _sentinel });
+        TempVault.Sees(created, "f21");
         created.Save();
 
         return vault;
@@ -258,6 +259,7 @@ public sealed class ClosingTheMainWindowTests
         using var key = new HardwareKey(new SoftwareYubiKey(_keySecret), 2);
         using var created = Core.Vault.CreateWith(vault, TempVault.Password, null, key);
         created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = _sentinel });
+        TempVault.Sees(created, "f21");
         created.Save();
 
         return vault;

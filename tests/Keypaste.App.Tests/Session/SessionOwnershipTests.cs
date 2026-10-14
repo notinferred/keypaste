@@ -95,6 +95,7 @@ public sealed class SessionOwnershipTests
     public async Task The_unlocked_vault_is_served_on_its_endpoint_and_stops_being_served_on_lock()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
 
@@ -132,6 +133,7 @@ public sealed class SessionOwnershipTests
     public async Task A_log_that_could_not_be_opened_is_tried_again_on_the_next_request()
     {
         using var fixture = new TempVault();
+        fixture.Sees();
         var log = KeypasteHome.AuditPath(fixture.Home);
         Directory.CreateDirectory(log);
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
@@ -229,7 +231,7 @@ public sealed class SessionOwnershipTests
     }
 
     private static NamesRequest Listing(string vault, string session) =>
-        new(["**"]) { Vault = vault, Session = session };
+        new(["**"]) { ClientLabel = TempVault.Agent, Vault = vault, Session = session };
 
     /// <summary>A log's lines, read as a reader must while the app holds it open.</summary>
     private static string[] ReadShared(string path)
