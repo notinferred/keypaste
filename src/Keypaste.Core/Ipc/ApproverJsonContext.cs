@@ -134,6 +134,7 @@ internal sealed class EnvRequestFrame(EnvRequest request)
     public string Profile => request.Profile;
     public IReadOnlyList<string>? Keys => request.Keys;
     public IReadOnlyList<string>? FileLines => request.FileLines;
+    public string? Launch => request.Launch;
 }
 
 internal sealed class EnvReplyFrame(EnvReply reply)

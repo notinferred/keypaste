@@ -81,7 +81,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Clipboard = clipboard;
         Name = name;
 
-        CopyRunCommandCommand = new AsyncRelayCommand(CopyRunCommandAsync);
+        CopyRunCommandCommand = new AsyncRelayCommand(CopyRunCommandAsync, () => HasRunCommand);
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
@@ -136,7 +136,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         DependsOn(CancelTagChangeCommand, nameof(PendingTagChange));
 
         Import = new EnvImportViewModel(session, name, picker, report, _announce, imported ?? Reload);
-        Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(), report, _announce);
+        Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(authority: null), report, _announce);
         Launch.PropertyChanged += OnLaunchChanged;
 
         Reload();
@@ -176,12 +176,18 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>What the card says under its name.</summary>
     internal string Summary => Count == 1 ? "1 variable" : $"{Count} variables";
 
-    /// <summary>The command that injects the selected profile, for the copy helper and the card.</summary>
+    /// <summary>The command that injects the selected profile, for the copy helper and the card, or null when the project's name gets none.</summary>
     /// <remarks>
     /// It names the project as well as the profile, so it runs from any directory and not only the
     /// one <c>projects.json</c> maps; the command is the mapped one, or <c>npm start</c> to edit.
     /// </remarks>
-    internal string RunCommand => $"keypaste run -p {SelectedProfile} {Name} -- {Launch.Mapping?.Command ?? "npm start"}";
+    internal string? RunCommand => CopiedRunCommand.For(Name, SelectedProfile, Launch.Mapping?.Command ?? "npm start");
+
+    /// <summary>Whether the card offers <see cref="RunCommand"/>, which a name a terminal could run never gets (D-0453).</summary>
+    internal bool HasRunCommand => CopiedRunCommand.IsCopyable(Name, OperatingSystem.IsWindows());
+
+    /// <summary>What the card says in place of <see cref="RunCommand"/> when it offers none, or empty.</summary>
+    internal string RunCommandNote => HasRunCommand ? string.Empty : CopiedRunCommand.NoCommandNote;
 
     /// <summary>The project's profiles: <c>dev</c> first, protected ones last.</summary>
     internal IReadOnlyList<EnvProfileInfo> Profiles
@@ -852,8 +858,13 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Launch.Dispose();
     }
 
-    private async Task CopyRunCommandAsync() =>
-        await Clipboard.CopyPlainAsync(RunCommand, "Run command").ConfigureAwait(true);
+    private async Task CopyRunCommandAsync()
+    {
+        if (RunCommand is { } command)
+        {
+            await Clipboard.CopyPlainAsync(command, "Run command").ConfigureAwait(true);
+        }
+    }
 
     private void BeginAdd()
     {

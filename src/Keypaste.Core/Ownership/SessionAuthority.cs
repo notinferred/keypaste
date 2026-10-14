@@ -5,6 +5,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Launch;
 using Keypaste.Core.Tokens;
 
 namespace Keypaste.Core.Ownership;
@@ -29,7 +30,11 @@ namespace Keypaste.Core.Ownership;
 /// An env set for <c>keypaste run --session</c> is admitted the same way and resolved under the
 /// lifetime the runner attached to, never a later one, with the person asked through the owner's
 /// own gate (D-0341) unless a timed grant they gave the same run still covers the same names
-/// (THREATS.md T-34).
+/// (THREATS.md T-34). A request carrying the launch pass the app's own Run confirmation issued is
+/// that person's answer: it is released unasked only when it is exactly the request the confirmation
+/// named and the set still has the names, items and protection it showed (D-0452). The app's launch
+/// endpoint hands this authority nothing else, and a request it reads without a pass is refused
+/// unasked (D-0451).
 /// </para>
 /// <para>
 /// An agent's <c>run</c> is refused unasked unless the agent's settings let it run commands, and is
@@ -57,6 +62,8 @@ public sealed class SessionAuthority : IApproverHandler
 {
     private const string _lockedReason = "the vault is locked";
     private const string _unrecordedNarration = "the audit log could not be written, so nothing was sent";
+    private const string _launchSpent = "the run you confirmed in the app expired or was already used";
+    private const string _launchOnly = "this connection is only for a run confirmed in the keypaste app";
 
     private readonly VaultIdentity _vault;
     private readonly Func<SessionLifetime?> _lifetime;
@@ -203,6 +210,35 @@ public sealed class SessionAuthority : IApproverHandler
         {
             _environments?.Grants?.Revoke(key);
         }
+    }
+
+    /// <summary>Issues the pass that lets exactly one <c>keypaste run --session</c> request through as the app's Run confirmation answered it (D-0452).</summary>
+    /// <param name="claim">The request the confirmation named, and the set it showed.</param>
+    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <returns>The pass, or null when that session is no longer the live one or this owner takes no passes.</returns>
+    /// <exception cref="ArgumentException">The claim is one <see cref="TerminalLaunch.ClaimProblem"/> refuses.</exception>
+    public string? IssueLaunch(LaunchClaim claim, string lifetimeId)
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        ArgumentNullException.ThrowIfNull(lifetimeId);
+
+        if (TerminalLaunch.ClaimProblem(claim) is { } problem)
+        {
+            throw new ArgumentException(problem, nameof(claim));
+        }
+
+        return Live() is { } lifetime && string.Equals(lifetime.Id, lifetimeId, StringComparison.Ordinal)
+            ? _environments?.Launches?.Issue(claim, lifetime.Id)
+            : null;
+    }
+
+    /// <summary>Forgets a pass the app could not hand to Terminal, so nothing can present it.</summary>
+    /// <param name="pass">The pass <see cref="IssueLaunch"/> returned.</param>
+    public void WithdrawLaunch(string pass)
+    {
+        ArgumentNullException.ThrowIfNull(pass);
+
+        _environments?.Launches?.Withdraw(pass);
     }
 
     /// <summary>Ends every grant of the current session, agents' and runs' alike.</summary>
@@ -572,7 +608,18 @@ public sealed class SessionAuthority : IApproverHandler
     public EffectiveAccess? Access(string? label) => _inner.TryAccess(label, out var access, out _) ? access : null;
 
     /// <inheritdoc/>
-    public async ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken)
+    public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ReleaseSetAsync(request, connectionId, launchOnly: false, cancellationToken);
+
+    /// <summary>Decides one env request read on the app's launch endpoint, which only a run carrying a launch pass uses (D-0451).</summary>
+    /// <param name="request">The project, and the command and directory the runner will start it in.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>For a request carrying a pass, what <see cref="ReleaseEnvAsync"/> answers it; for one without, a refusal given unasked and recorded.</returns>
+    public ValueTask<EnvReply> ReleaseLaunchAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ReleaseSetAsync(request, connectionId, launchOnly: true, cancellationToken);
+
+    private async ValueTask<EnvReply> ReleaseSetAsync(EnvRequest request, string connectionId, bool launchOnly, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -584,13 +631,15 @@ public sealed class SessionAuthority : IApproverHandler
                 RequestRecords.EnvRun(request.Project, request.Profile, refusal.Method, unadmitted, session: null, VaultNamed(request.Vault)));
         }
 
-        var (method, decided) = await Decided(
-            token => DecideEnvAsync(request, admitted, token),
+        var (method, decided, confirmedInApp) = await Decided(
+            token => DecideEnvAsync(request, admitted, launchOnly, token),
             admitted,
-            (how, reason) => (how, Refused(request.Project, request.Profile, OutcomeOf(how), reason)),
+            (how, reason) => (how, Refused(request.Project, request.Profile, OutcomeOf(how), reason), false),
             cancellationToken).ConfigureAwait(false);
 
-        var reply = _recorder.Recorded(decided, RequestRecords.EnvRun(request.Project, request.Profile, method, decided, request.Session, _vault.Key));
+        var reply = _recorder.Recorded(
+            decided,
+            RequestRecords.EnvRun(request.Project, request.Profile, method, decided, request.Session, _vault.Key, confirmedInApp));
 
         if (_environments is { } environments)
         {
@@ -600,34 +649,57 @@ public sealed class SessionAuthority : IApproverHandler
         return reply;
     }
 
-    private async ValueTask<(AuditMethod Method, EnvReply Reply)> DecideEnvAsync(
+    private async ValueTask<(AuditMethod Method, EnvReply Reply, bool ConfirmedInApp)> DecideEnvAsync(
         EnvRequest request,
         SessionLifetime admitted,
+        bool launchOnly,
         CancellationToken cancellationToken)
     {
+        if (launchOnly && request.Launch is null)
+        {
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchOnly), false);
+        }
+
         if (_environments is not { } environments)
         {
             return (
                 AuditMethod.NoSession,
-                Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets"));
+                Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets"),
+                false);
         }
 
-        if (EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory) is { } problem)
+        LaunchClaim? launch = null;
+
+        // Spent on its first admitted presentation, before anything else is checked, so no pass is tried twice.
+        if (request.Launch is { } pass && environments.Launches?.TryTake(pass, admitted.Id, out launch) != true)
         {
-            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem));
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchSpent), false);
+        }
+
+        var confirmedInApp = launch is not null;
+
+        // A request carrying a pass is never shown on a prompt, and Claims holds its command to the one IssueLaunch bounded.
+        if (EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory, boundCommandLine: launch is null) is { } problem)
+        {
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem), confirmedInApp);
         }
 
         if (!EnvProfileNames.IsValid(request.Profile, out var invalid))
         {
-            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid));
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid), confirmedInApp);
         }
 
         foreach (var key in request.Keys ?? [])
         {
             if (!EnvConvention.IsValidKey(key, out invalid))
             {
-                return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid));
+                return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid), confirmedInApp);
             }
+        }
+
+        if (launch is not null && !Claims(launch, request))
+        {
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchSpent), confirmedInApp);
         }
 
         // Every run is a new connection, so the cooldown names the request and not the connection:
@@ -640,6 +712,7 @@ public sealed class SessionAuthority : IApproverHandler
         var answer = ApprovalAnswer.NoChannel;
         var fromGrant = false;
         string? refused = null;
+        var refusedOutcome = EnvOutcome.Invalid;
 
         var resolver = new SessionEnvResolver(
             () => ReferenceEquals(Live(), admitted) ? admitted : null,
@@ -653,9 +726,21 @@ public sealed class SessionAuthority : IApproverHandler
             async (preview, withdrawn) =>
             {
                 // Checked before anybody is asked, so a person never approves a set its audit line cannot record.
-                if (AuditedLength([.. EntriesOf(preview).Select(entry => ApprovalPrompt.Shown(entry.Name)).Distinct(StringComparer.Ordinal)]) > MaximumAuditedEntriesBytes)
+                if (Unrecordable(preview) is { } unrecordable)
                 {
-                    refused = "the run names more entries than one audit line can record";
+                    refused = unrecordable;
+                    return false;
+                }
+
+                // The person answered the app's card about exactly these names, items and protection, and nothing else.
+                if (launch is not null)
+                {
+                    if (preview.SameAs(launch.Preview))
+                    {
+                        return true;
+                    }
+
+                    (refused, refusedOutcome) = (ChangedSince(launch), EnvOutcome.ChangedWhileAsked);
                     return false;
                 }
 
@@ -694,9 +779,15 @@ public sealed class SessionAuthority : IApproverHandler
             },
             cancellationToken).ConfigureAwait(false);
 
+        var reason = resolved.Outcome switch
+        {
+            EnvOutcome.Declined => Declined(answer),
+            EnvOutcome.ChangedWhileAsked when launch is not null => ChangedSince(launch),
+            _ => resolved.Refusal,
+        };
         var delivered = refused is not null
-            ? Refused(request.Project, request.Profile, EnvOutcome.Invalid, refused)
-            : Deliverable(new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal));
+            ? Refused(request.Project, request.Profile, refusedOutcome, refused)
+            : Deliverable(new EnvReply(resolved, reason));
 
         // As the run path records them; an approval the runner hung up on before it was used is a cancellation.
         var method = delivered.Set.Outcome switch
@@ -706,7 +797,7 @@ public sealed class SessionAuthority : IApproverHandler
             _ => MethodOf(delivered.Set.Outcome),
         };
 
-        return (method, delivered);
+        return (method, delivered, confirmedInApp);
     }
 
     /// <inheritdoc/>
@@ -867,7 +958,7 @@ public sealed class SessionAuthority : IApproverHandler
             var entries = EntriesOf(preview);
             var perKey = entries.Select(entry => ApprovalPrompt.Shown(entry.Name)).ToList();
             List<string> named = [.. perKey.Distinct(StringComparer.Ordinal)];
-            var recordable = AuditedLength(named) <= MaximumAuditedEntriesBytes;
+            var recordable = AuditedLength(named) <= MaximumAgentRunEntriesBytes;
 
             // A reply carries only entries its line can hold, so a refusal of a larger set is still recorded.
             shown = recordable ? named : [];
@@ -887,7 +978,7 @@ public sealed class SessionAuthority : IApproverHandler
 
             if (!recordable)
             {
-                (refused, refusedMethod) = ("the run names more entries than one audit line can record", AuditMethod.InvalidRequest);
+                (refused, refusedMethod) = ("the run names more entries than an agent's run can carry back in one reply", AuditMethod.InvalidRequest);
                 return false;
             }
 
@@ -1096,12 +1187,49 @@ public sealed class SessionAuthority : IApproverHandler
         _ => EnvOutcome.Unreadable,
     };
 
+    /// <summary>Whether a request asks for exactly what a Run confirmation named: no other project, environment, directory, command or subset.</summary>
+    private static bool Claims(LaunchClaim claim, EnvRequest request) =>
+        string.Equals(claim.Project, request.Project, StringComparison.Ordinal)
+        && string.Equals(claim.Profile, request.Profile, StringComparison.Ordinal)
+        && claim.Command.SequenceEqual(request.Command, StringComparer.Ordinal)
+        && request.Keys is null
+        && request.FileLines is null
+        && PathIdentity.SameFile(claim.Directory, request.Directory);
+
+    private static string ChangedSince(LaunchClaim claim) =>
+        $"{claim.Project}'s variables changed after you confirmed in the app";
+
     /// <summary>Each source entry of a released set, once, as every prompt and audit line writes it.</summary>
     private static List<string> EntriesOf(EnvResolved set) =>
         [.. set.Entries.Select(ApprovalPrompt.Shown)];
 
-    /// <summary>The most bytes a run line's <c>entries</c> may take, so the line fits after the person has answered.</summary>
-    public const int MaximumAuditedEntriesBytes = 2048;
+    /// <summary>The most bytes a <c>keypaste run --session</c> or <c>--token</c> line's <c>entries</c> may take: the record cap less the 2 KiB the rest of the line keeps, so the line fits after the person has answered.</summary>
+    public const int MaximumAuditedEntriesBytes = AuditLog.MaximumRecordBytes - 2048;
+
+    /// <summary>The most bytes an agent's run line's <c>entries</c> may take, because its reply carries them back to the bridge in one ordinary frame.</summary>
+    public const int MaximumAgentRunEntriesBytes = 2048;
+
+    /// <summary>Why a run of this set is refused before anyone is asked, because one audit line could not name its entries; null when it could.</summary>
+    /// <param name="preview">The set's names and the entries they come from, as a confirmation shows them.</param>
+    /// <returns>The refusal, or null.</returns>
+    public static string? Unrecordable(EnvPreview preview)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+
+        return AuditedLength([.. EntriesOf(preview).Select(entry => ApprovalPrompt.Shown(entry.Name)).Distinct(StringComparer.Ordinal)]) > MaximumAuditedEntriesBytes
+            ? "the run names more entries than one audit line can record"
+            : null;
+    }
+
+    /// <summary>Whether a released set fits the one reply that carries it to a run; a set that does not is refused whole.</summary>
+    /// <param name="set">The set, as this owner would release it.</param>
+    /// <returns><see langword="true"/> when it fits.</returns>
+    public static bool Sendable(EnvResolved set)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+
+        return ApproverProtocol.Fits(new EnvReply(set, set.Refusal));
+    }
 
     /// <summary>The entry and field behind each name a run would inject, in the preview's order.</summary>
     private static List<(EntryName Name, string Field)> EntriesOf(EnvPreview preview) =>
@@ -1185,7 +1313,8 @@ public sealed class SessionAuthority : IApproverHandler
     /// <para>
     /// This owner, not the runner, writes the audit line of every request it reads before it replies,
     /// one refused at admission or as invalid included: a runner is the untrusted side that could skip
-    /// it. A release whose line cannot be written is refused and nothing is sent (T-6).
+    /// it. A set naming more items than that line can is refused before anybody is asked, and a release
+    /// whose line cannot be written is refused and nothing is sent (T-6).
     /// </para>
     /// </remarks>
     public async ValueTask<EnvReply> ReleaseTokenEnvAsync(TokenEnvRequest request, string connectionId, CancellationToken cancellationToken)
@@ -1291,19 +1420,27 @@ public sealed class SessionAuthority : IApproverHandler
             environments.Clock);
 
         var needsProd = false;
+        string? unrecordable = null;
 
         // A set holding a member of a protected environment, by tag, needs the token to allow it and then a live answer.
         async ValueTask<bool> AskLive(EnvPreview preview, CancellationToken withdrawn)
         {
-            if (!preview.RequiresLiveApproval)
-            {
-                return true;
-            }
-
-            if (!info.AllowProd)
+            if (preview.RequiresLiveApproval && !info.AllowProd)
             {
                 needsProd = true;
                 return false;
+            }
+
+            // Checked before anybody is asked, so a person never approves a set its audit line cannot record.
+            if (Unrecordable(preview) is { } refusal)
+            {
+                unrecordable = refusal;
+                return false;
+            }
+
+            if (!preview.RequiresLiveApproval)
+            {
+                return true;
             }
 
             var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with
@@ -1332,6 +1469,11 @@ public sealed class SessionAuthority : IApproverHandler
                 request.Profile,
                 EnvOutcome.Unauthorized,
                 $"the token's scope does not cover {request.Project}/{request.Profile}: it holds an entry of a protected environment");
+        }
+
+        if (unrecordable is not null)
+        {
+            return Refused(request.Project, request.Profile, EnvOutcome.Invalid, unrecordable);
         }
 
         return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);

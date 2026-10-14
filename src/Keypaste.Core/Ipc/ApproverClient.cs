@@ -192,7 +192,8 @@ public sealed class ApproverClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+        var frame = await ExchangeAsync(
+            ApproverProtocol.Encode(request), cancellationToken, replyFrameBytes: ApproverProtocol.MaximumEnvReplyFrameBytes).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
     }
@@ -276,7 +277,8 @@ public sealed class ApproverClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+        var frame = await ExchangeAsync(
+            ApproverProtocol.Encode(request), cancellationToken, replyFrameBytes: ApproverProtocol.MaximumEnvReplyFrameBytes).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
     }
@@ -295,7 +297,11 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out RunReply? reply) ? reply : null;
     }
 
-    private async ValueTask<byte[]?> ExchangeAsync(byte[] request, CancellationToken cancellationToken, bool withdrawable = false)
+    private async ValueTask<byte[]?> ExchangeAsync(
+        byte[] request,
+        CancellationToken cancellationToken,
+        bool withdrawable = false,
+        int replyFrameBytes = MessageFramer.MaximumFrameBytes)
     {
         if (_disposed || _withdrawn)
         {
@@ -330,11 +336,11 @@ public sealed class ApproverClient : IAsyncDisposable
 
             if (!withdrawable)
             {
-                return await _framer.ReadAsync(cancellationToken).ConfigureAwait(false);
+                return await _framer.ReadAsync(replyFrameBytes, cancellationToken).ConfigureAwait(false);
             }
 
             // Not read under the caller's token: a withdrawn request's reply is still read, below.
-            var reading = _framer.ReadAsync(CancellationToken.None).AsTask();
+            var reading = _framer.ReadAsync(replyFrameBytes, CancellationToken.None).AsTask();
 
             try
             {

@@ -2,9 +2,10 @@
 # Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle release-targets.json declares.
 #
 # The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste it
-# gives clients; the icon and licences go to Contents/Resources. Nothing is signed or notarized while the app's
-# signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool also accepts, and the
-# bundle is then checked as unzipped from that archive, including a --selftest started through LaunchServices.
+# gives clients; the icon, licences and Terminal's launcher go to Contents/Resources. Nothing is signed or
+# notarized while the app's signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool
+# also accepts, and the bundle is then checked as unzipped from that archive, including a --selftest started
+# through LaunchServices.
 #
 # Build logs go to stderr; the path of the archive is the only line on stdout.
 #
@@ -44,15 +45,16 @@ app="$work/keypaste.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp -R "$payload"/. "$app/Contents/MacOS/"
 mv "$app/Contents/MacOS/LICENSE" "$app/Contents/MacOS/THIRD_PARTY_NOTICES.md" "$app/Contents/Resources/"
-cp "$ROOT/packaging/macos/keypaste.icns" "$app/Contents/Resources/"
+cp "$ROOT/packaging/macos/keypaste.icns" "$ROOT/packaging/macos/keypaste-launch.command" "$app/Contents/Resources/"
 sed "s/{version}/$bundle_version/g" "$ROOT/packaging/macos/Info.plist" > "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >&2
-# The runtime pack's files arrive 0744, and only a Mach-O executable needs an exec bit.
+# The runtime pack's files arrive 0744, and only a Mach-O executable and the launcher Terminal runs need an exec bit.
 find "$app" -type d -exec chmod 755 {} +
 find "$app" -type f -exec chmod 644 {} +
 while IFS= read -r -d '' path; do
   case "$(file -b "$path")" in *Mach-O*executable*) chmod 755 "$path" ;; esac
 done < <(find "$app/Contents/MacOS" -type f -print0)
+chmod 755 "$app/Contents/Resources/keypaste-launch.command"
 
 mkdir -p "$out"
 rm -f "$out/$name"
@@ -65,6 +67,9 @@ plist() { plutil -extract "$1" raw -o - "$contents/Info.plist"; }
 executable="$contents/MacOS/$(plist CFBundleExecutable)"
 [ -x "$executable" ] || die "$name names CFBundleExecutable $(plist CFBundleExecutable), which is not executable in Contents/MacOS"
 [ -x "$contents/MacOS/keypaste" ] || die "$name carries no executable keypaste"
+[ -x "$contents/Resources/keypaste-launch.command" ] || die "$name carries no executable Contents/Resources/keypaste-launch.command"
+cmp -s "$ROOT/packaging/macos/keypaste-launch.command" "$contents/Resources/keypaste-launch.command" \
+  || die "$name's keypaste-launch.command differs from packaging/macos's"
 [ -f "$contents/Resources/$(plist CFBundleIconFile).icns" ] || die "$name names icon $(plist CFBundleIconFile) and carries no such .icns"
 
 reported="$("$executable" --version | tr -d '[:space:]')"

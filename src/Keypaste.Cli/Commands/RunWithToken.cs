@@ -22,8 +22,8 @@ namespace Keypaste.Cli.Commands;
 /// creation was audited, and the machine running CI is not the person's log.
 /// </para>
 /// <para>
-/// Either way the child's environment is the parent's without <c>KEYPASTE_TOKEN</c>, so the token
-/// is not handed on to whatever the command starts.
+/// Either way the child's environment is the parent's without <c>KEYPASTE_TOKEN</c> or
+/// <c>KEYPASTE_LAUNCH</c>, so neither the token nor a launch pass is handed on to whatever the command starts.
 /// </para>
 /// </remarks>
 internal static class RunWithToken
@@ -42,7 +42,9 @@ internal static class RunWithToken
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
 
-        if (line.Operands.Count > 1)
+        var projects = RunCommand.Projects(line);
+
+        if (projects.Count > 1)
         {
             return Fail(context, "expected at most one project name");
         }
@@ -69,7 +71,7 @@ internal static class RunWithToken
             return exit;
         }
 
-        var project = line.Operands.Count == 1 ? line.Operands[0] : null;
+        var project = projects.Count == 1 ? projects[0] : null;
 
         return line.Value(BundleOption) is { } bundle
             ? FromBundle(bundle, token, id, project, profile, command, context)
@@ -295,7 +297,7 @@ internal static class RunWithToken
             : "the keypaste process holding the vault did not answer");
     }
 
-    /// <summary>Starts the child with the released set over this environment less the token, and reports its exit code as keypaste's own.</summary>
+    /// <summary>Starts the child with the released set over this environment less the token and any launch pass, and reports its exit code as keypaste's own.</summary>
     private static int Start(IReadOnlyList<string> command, EnvResolved resolved, string id, CliContext context)
     {
         if (resolved.Outcome != EnvOutcome.Resolved)
@@ -321,14 +323,8 @@ internal static class RunWithToken
         // Everything keypaste has to say is said before the child owns the console.
         context.Stderr.Flush();
 
-        var parent = new Dictionary<string, string>(EnvironmentMerge.Comparer);
-        foreach (var (name, value) in context.Environment.All())
-        {
-            if (!EnvironmentMerge.Comparer.Equals(name, EnvironmentVariable))
-            {
-                parent[name] = value;
-            }
-        }
+        var parent = RunCommand.Inherited(context);
+        parent.Remove(EnvironmentVariable);
 
         var result = EnvLaunch.Start(
             resolved,

@@ -19,10 +19,14 @@ namespace Keypaste.Core.Infrastructure;
 /// limit ends the connection rather than being truncated, because a truncated frame is a message
 /// that says something other than what was sent.
 /// </para>
+/// <para>
+/// A call may name a larger bound for the one frame it reads or writes; every other call keeps
+/// <see cref="MaximumFrameBytes"/>, so a reader widens only what it chose to receive.
+/// </para>
 /// </remarks>
 public sealed class MessageFramer : IDisposable
 {
-    /// <summary>The largest frame either side will send or accept.</summary>
+    /// <summary>The largest frame either side will send or accept, unless a call names its own bound.</summary>
     public const int MaximumFrameBytes = 64 * 1024;
 
     /// <summary>The largest payload one frame can carry, once the delimiter is paid for.</summary>
@@ -40,6 +44,7 @@ public sealed class MessageFramer : IDisposable
     private readonly bool _ownsStream;
     private byte[] _pending = [];
     private int _pendingLength;
+    private int _searched;
     private bool _disposed;
 
     /// <summary>Wraps a duplex stream.</summary>
@@ -60,14 +65,25 @@ public sealed class MessageFramer : IDisposable
     /// <returns>A task that completes when the frame has been flushed.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="payload"/> is null.</exception>
     /// <exception cref="InvalidOperationException">The frame is over <see cref="MaximumFrameBytes"/>.</exception>
-    public async ValueTask WriteAsync(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken)
+    public ValueTask WriteAsync(ReadOnlyMemory<byte> payload, CancellationToken cancellationToken) =>
+        WriteAsync(payload, MaximumFrameBytes, cancellationToken);
+
+    /// <summary>Sends one frame under a bound of its own.</summary>
+    /// <param name="payload">The frame's bytes, which must contain no newline.</param>
+    /// <param name="maximumFrameBytes">The largest this frame may be, its delimiter included.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the frame has been flushed.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maximumFrameBytes"/> is not positive.</exception>
+    /// <exception cref="InvalidOperationException">The frame is over <paramref name="maximumFrameBytes"/>.</exception>
+    public async ValueTask WriteAsync(ReadOnlyMemory<byte> payload, int maximumFrameBytes, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumFrameBytes);
 
-        if (payload.Length > MaximumPayloadBytes)
+        if (payload.Length > maximumFrameBytes - 1)
         {
             throw new InvalidOperationException(
-                $"a frame of {payload.Length} bytes is over the {MaximumFrameBytes}-byte limit");
+                $"a frame of {payload.Length} bytes is over the {maximumFrameBytes}-byte limit");
         }
 
         var buffer = ArrayPool<byte>.Shared.Rent(payload.Length + 1);
@@ -84,21 +100,40 @@ public sealed class MessageFramer : IDisposable
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+            // Cleared here, because the pool clears only an array it keeps.
+            Array.Clear(buffer, 0, payload.Length + 1);
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 
     /// <summary>Reads the next frame.</summary>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The frame's bytes without its delimiter, or null once the peer has gone away.</returns>
-    /// <exception cref="InvalidOperationException">The peer sent more than <see cref="MaximumFrameBytes"/> without a delimiter.</exception>
-    public async ValueTask<byte[]?> ReadAsync(CancellationToken cancellationToken)
+    /// <exception cref="InvalidOperationException">The peer sent a frame over <see cref="MaximumFrameBytes"/>.</exception>
+    public ValueTask<byte[]?> ReadAsync(CancellationToken cancellationToken) =>
+        ReadAsync(MaximumFrameBytes, cancellationToken);
+
+    /// <summary>Reads the next frame under a bound of its own.</summary>
+    /// <param name="maximumFrameBytes">The largest this frame may be, its delimiter included.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The frame's bytes without its delimiter, or null once the peer has gone away.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maximumFrameBytes"/> is not positive.</exception>
+    /// <exception cref="InvalidOperationException">The peer sent a frame over <paramref name="maximumFrameBytes"/>.</exception>
+    public async ValueTask<byte[]?> ReadAsync(int maximumFrameBytes, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumFrameBytes);
 
         while (true)
         {
-            var end = Array.IndexOf(_pending, Delimiter, 0, _pendingLength);
+            // Only bytes not yet searched, so a frame read in many chunks is searched once rather than once a chunk.
+            var end = Array.IndexOf(_pending, Delimiter, _searched, _pendingLength - _searched);
+
+            if (end >= maximumFrameBytes)
+            {
+                throw new InvalidOperationException(
+                    $"the peer sent a frame of {end + 1} bytes, over the {maximumFrameBytes}-byte limit");
+            }
 
             if (end >= 0)
             {
@@ -107,10 +142,12 @@ public sealed class MessageFramer : IDisposable
                 return frame;
             }
 
-            if (_pendingLength >= MaximumFrameBytes)
+            _searched = _pendingLength;
+
+            if (_pendingLength >= maximumFrameBytes)
             {
                 throw new InvalidOperationException(
-                    $"the peer sent {_pendingLength} bytes with no frame delimiter, over the {MaximumFrameBytes}-byte limit");
+                    $"the peer sent {_pendingLength} bytes with no frame delimiter, over the {maximumFrameBytes}-byte limit");
             }
 
             var chunk = ArrayPool<byte>.Shared.Rent(ReadChunkBytes);
@@ -153,6 +190,7 @@ public sealed class MessageFramer : IDisposable
     {
         _pending.AsSpan(count, _pendingLength - count).CopyTo(_pending);
         _pendingLength -= count;
+        _searched = 0;
 
         // Zero what is now past the end. A reply frame carries a credential, and leaving its bytes
         // in the tail of this buffer would keep a copy alive for as long as the connection.

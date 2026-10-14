@@ -285,14 +285,14 @@ public static class ApproverProtocol
 
     /// <summary>Whether <see cref="Encode(EnvReply)"/> would send this reply as it is.</summary>
     /// <param name="reply">The reply the owner is about to record and return.</param>
-    /// <returns><see langword="true"/> when it fits one frame.</returns>
+    /// <returns><see langword="true"/> when it fits one env reply's frame.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
     /// <remarks>Asked before a release is audited or recorded, so neither claims values the runner never received.</remarks>
     internal static bool Fits(EnvReply reply)
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return WriteEnv(reply).Length <= MessageFramer.MaximumPayloadBytes;
+        return WriteEnv(reply).Length <= MaximumEnvReplyPayloadBytes;
     }
 
     /// <summary>Whether <see cref="Encode(RunReply)"/> would send this reply as it is.</summary>
@@ -330,6 +330,24 @@ public static class ApproverProtocol
     private static byte[] WriteCredential(CredentialReply reply) =>
         JsonSerializer.SerializeToUtf8Bytes(new CredentialReplyFrame(reply), Wire.CredentialReplyFrame);
 
+    /// <summary>The largest frame carrying a set to <c>keypaste run --session</c> or <c>--token</c>, the one reply over <see cref="MessageFramer.MaximumFrameBytes"/> (D-0454).</summary>
+    /// <remarks>
+    /// <para>
+    /// Only the runner reads one, and every frame the owner reads stays at
+    /// <see cref="MessageFramer.MaximumFrameBytes"/>, so what this costs the owner is the set it chose to
+    /// release, never a peer's bytes.
+    /// </para>
+    /// <para>
+    /// The smallest round bound that carries any set macOS can start a program with: <c>execve</c>
+    /// takes at most 1 MiB of arguments and environment together, and the encoder writes no byte of a
+    /// value in more than six (<c>\uXXXX</c>).
+    /// </para>
+    /// </remarks>
+    public const int MaximumEnvReplyFrameBytes = 8 * 1024 * 1024;
+
+    /// <summary>The largest payload an env reply's frame carries, once the delimiter is paid for.</summary>
+    public const int MaximumEnvReplyPayloadBytes = MaximumEnvReplyFrameBytes - 1;
+
     /// <summary>The most keys or file lines one env request names.</summary>
     public const int MaximumEnvListLength = 1024;
 
@@ -347,9 +365,9 @@ public static class ApproverProtocol
         return JsonSerializer.SerializeToUtf8Bytes(new EnvRequestFrame(request), Wire.EnvRequestFrame);
     }
 
-    /// <summary>Encodes the answer to an env request, bounded to one frame.</summary>
+    /// <summary>Encodes the answer to an env request, bounded to one env reply's frame.</summary>
     /// <param name="reply">The set, or why none of it.</param>
-    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    /// <returns>The frame's bytes. Never over <see cref="MaximumEnvReplyPayloadBytes"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
     /// <remarks>
     /// A set that will not fit is refused whole as <see cref="EnvOutcome.TooLarge"/>, never trimmed:
@@ -361,7 +379,7 @@ public static class ApproverProtocol
 
         var frame = WriteEnv(reply);
 
-        if (frame.Length <= MessageFramer.MaximumPayloadBytes)
+        if (frame.Length <= MaximumEnvReplyPayloadBytes)
         {
             return frame;
         }
@@ -369,7 +387,7 @@ public static class ApproverProtocol
         var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge, profile: reply.Set.Profile);
         var refusal = WriteEnv(new EnvReply(tooLarge, tooLarge.Refusal));
 
-        return refusal.Length <= MessageFramer.MaximumPayloadBytes
+        return refusal.Length <= MaximumEnvReplyPayloadBytes
             ? refusal
             : WriteEnv(new EnvReply(EnvResolved.Refused(string.Empty, EnvOutcome.TooLarge), Oversized));
     }
@@ -706,7 +724,7 @@ public static class ApproverProtocol
     /// <remarks>
     /// An <c>env</c> frame is the whole default profile. An <c>env-profile</c> frame must name a
     /// profile keypaste resolves, and any keys and file lines it carries are bounded here, before
-    /// anything is resolved or shown.
+    /// anything is resolved or shown. A launch pass, when there is one, has a pass's shape.
     /// </remarks>
     public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out EnvRequest? request)
     {
@@ -740,13 +758,14 @@ public static class ApproverProtocol
                 || keys?.Count > MaximumEnvListLength
                 || keys?.Any(key => !EnvConvention.IsValidKey(key, out _)) == true
                 || lines?.Count > MaximumEnvListLength
-                || lines?.Any(line => line.Length > MaximumFileLineLength) == true)
+                || lines?.Any(line => line.Length > MaximumFileLineLength) == true
+                || !TryOptionalPass(root, out var launch))
             {
                 request = null;
                 return false;
             }
 
-            request = request with { Profile = profile, Keys = keys, FileLines = lines };
+            request = request with { Profile = profile, Keys = keys, FileLines = lines, Launch = launch };
             return true;
         }
     }
@@ -755,6 +774,12 @@ public static class ApproverProtocol
     {
         values = null;
         return !root.TryGetProperty(name, out _) || TryStrings(root, name, out values);
+    }
+
+    private static bool TryOptionalPass(JsonElement root, out string? pass)
+    {
+        pass = null;
+        return !root.TryGetProperty("launch", out _) || (TryString(root, "launch", out pass) && LaunchPasses.IsWellFormed(pass));
     }
 
     /// <summary>Decodes the answer to an env request.</summary>

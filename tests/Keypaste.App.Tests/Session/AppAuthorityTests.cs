@@ -1,8 +1,10 @@
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -77,6 +79,49 @@ public sealed class AppAuthorityTests
         var status = Assert.IsType<AuthorityStatus.NotServing>(authority.Status);
         Assert.Contains("cannot name a pipe", status.Reason, StringComparison.Ordinal);
         Assert.StartsWith("Agents cannot reach this vault:", AgentActivityViewModel.Describe(status), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// On macOS each unlock serves the app's own Runs on its launch endpoint, though agents cannot reach
+    /// the vault, a lock ends it and the next unlock serves the same name again (D-0451); elsewhere the
+    /// app's launches need none, so none is served.
+    /// </summary>
+    [Fact]
+    public async Task On_macOS_each_unlock_serves_the_launch_endpoint_whatever_agents_meet_and_a_lock_ends_it()
+    {
+        using var fixture = new TempVault();
+        using var authority = Launch(fixture, approverOverride: "not/a/pipe");
+        Unlock(authority.Session, fixture.Path_);
+        Assert.IsType<AuthorityStatus.NotServing>(authority.Status);
+        var claim = new LaunchClaim(
+            "dev", EnvProfileNames.Default, fixture.Home, ["/bin/sh", "-c", TerminalLaunch.RunScript, "keypaste", "make"], new EnvPreview("dev", []));
+        var unlock = authority.Session.Lifetime!.Id;
+
+        if (!OperatingSystem.IsMacOS())
+        {
+            Assert.Null(authority.IssueLaunch(claim, unlock));
+            return;
+        }
+
+        Assert.Null(authority.LaunchFailure);
+        var first = authority.IssueLaunch(claim, unlock)?.Endpoint ?? throw new InvalidOperationException("no pass was issued");
+        Assert.StartsWith(LaunchEndpoint.Prefix, first, StringComparison.Ordinal);
+
+        await using (var client = await ApproverClient.TryConnectAsync(first, _connect, Token))
+        {
+            Assert.NotNull(client);
+            Assert.Equal(unlock, (await client.AttachAsync(new AttachRequest(fixture.Path_), Token))?.Session);
+        }
+
+        authority.Session.Lock(VaultLockReason.Manual);
+        Assert.Null(authority.IssueLaunch(claim, unlock));
+        await AssertAbsentAsync(first);
+
+        Unlock(authority.Session, fixture.Path_);
+        Assert.Equal(first, authority.IssueLaunch(claim, authority.Session.Lifetime!.Id)?.Endpoint);
+
+        await using var again = await ApproverClient.TryConnectAsync(first, _connect, Token);
+        Assert.NotNull(again);
     }
 
     [Fact]

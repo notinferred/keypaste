@@ -50,7 +50,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         _session = session;
         _clipboard = clipboard;
         _picker = picker;
-        _launching = launching ?? ProjectLaunching.ForThisMachine();
+        _launching = launching ?? ProjectLaunching.ForThisMachine(authority: null);
         _toast = toast;
 
         OpenCommand = new RelayCommand<string>(Open);
@@ -256,12 +256,17 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The command that injects a project, for the card's copy helper.</summary>
-    internal static string RunCommandFor(string project) => $"keypaste run {project} -- ";
+    /// <summary>The command that injects a project, for the card's copy helper, for the person to finish, or null when the name gets none (D-0453).</summary>
+    internal static string? RunCommandFor(string project) => CopiedRunCommand.For(project, environment: null, command: string.Empty);
 
-    /// <summary>Copies a project's run command, plainly and with no countdown.</summary>
-    internal async Task CopyRunCommandAsync(string project) =>
-        await _clipboard.CopyPlainAsync(RunCommandFor(project), "Run command").ConfigureAwait(true);
+    /// <summary>Copies a project's run command, plainly and with no countdown, when it has one.</summary>
+    internal async Task CopyRunCommandAsync(string project)
+    {
+        if (RunCommandFor(project) is { } command)
+        {
+            await _clipboard.CopyPlainAsync(command, "Run command").ConfigureAwait(true);
+        }
+    }
 
     /// <summary>Nothing derived from the vault outlives this.</summary>
     public void Dispose()

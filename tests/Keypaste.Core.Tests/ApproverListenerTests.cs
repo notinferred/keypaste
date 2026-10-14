@@ -363,6 +363,77 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>
+    /// A request is read under one frame, however large an env set's reply may be, so a peer's bytes
+    /// past it cost that connection and nothing else (D-0454). The request is one the owner would
+    /// answer if it read it whole.
+    /// </summary>
+    [Fact]
+    public async Task ARequestPastOneFrame_EndsItsConnection_AndTheOthersAreServed()
+    {
+        var handler = new RecordingHandler();
+        await using var host = Host.Start(handler);
+        var request = ApproverProtocol.Encode(new EnvRequest("billing", ["npm"], new string('d', 100_000)) { Vault = "/v", Session = "s" });
+        byte[] oversized = [.. request, (byte)'\n'];
+        Assert.True(request.Length > MessageFramer.MaximumPayloadBytes);
+
+        await using (var rude = new NamedPipeClientStream(
+            ".", host.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
+        {
+            await rude.ConnectAsync(Token);
+
+            try
+            {
+                await rude.WriteAsync(oversized, Token);
+                await rude.FlushAsync(Token);
+            }
+            catch (IOException)
+            {
+                // The owner hung up before it had read the rest.
+            }
+
+            Assert.True(await HungUpAsync(rude), "the owner answered a request past one frame");
+        }
+
+        Assert.Empty(handler.Envs);
+
+        await using var polite = await ConnectAsync(host.PipeName);
+        Assert.NotNull(await polite.ListAsync(new NamesRequest(["env/**"]), Token));
+    }
+
+    /// <summary>An env set past one frame reaches its runner whole, in the reply only a runner reads, and the connection keeps serving (D-0454).</summary>
+    [Fact]
+    public async Task AnEnvSetPastOneFrame_ReachesItsRunnerWhole_AndTheConnectionSurvives()
+    {
+        var certificate = new string('c', 1024 * 1024);
+        var handler = new RecordingHandler { Value = certificate };
+        await using var host = Host.Start(handler);
+        await using var client = await ConnectAsync(host.PipeName);
+
+        var reply = await client.ReleaseEnvAsync(new EnvRequest("billing", ["npm", "start"], "/d") { Vault = "/v", Session = "s" }, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal(certificate, Assert.Single(reply.Set.Variables).Value, StringComparer.Ordinal);
+
+        handler.Value = RecordingHandler.Sentinel;
+        Assert.Equal(RecordingHandler.Sentinel, (await client.RequestAsync(Request(), Token))?.Value);
+        Assert.Empty(handler.Disconnections);
+    }
+
+    /// <summary>Whether the other end closed the pipe: a read that ends, or one the close tore down.</summary>
+    private static async Task<bool> HungUpAsync(NamedPipeClientStream pipe)
+    {
+        try
+        {
+            return await pipe.ReadAsync(new byte[1], Token) == 0;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
     /// A peer that hangs up while its request waits for a person withdraws that request, so the
     /// prompt comes down rather than waiting out its window for an answer nobody will receive.
     /// </summary>

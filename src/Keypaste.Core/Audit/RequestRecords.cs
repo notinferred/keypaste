@@ -241,6 +241,7 @@ public static class RequestRecords
     /// <param name="reply">The owner's answer; a released set gives the line its entries and its count.</param>
     /// <param name="session">The session the request named.</param>
     /// <param name="vault">The vault's identity key.</param>
+    /// <param name="confirmedInApp">Whether the request carried the launch pass of the app's Run confirmation, which a release's reason then names.</param>
     /// <returns>The record to append.</returns>
     public static AuditRecord EnvRun(
         string project,
@@ -248,8 +249,17 @@ public static class RequestRecords
         AuditMethod method,
         EnvReply reply,
         string? session,
-        string? vault) =>
-        SetRun(new AuditClient(SessionRunner, CoreInfo.Version, null), project, profile, method, reply, said => said, session, vault);
+        string? vault,
+        bool confirmedInApp = false) =>
+        SetRun(
+            new AuditClient(SessionRunner, CoreInfo.Version, null),
+            project,
+            profile,
+            method,
+            reply,
+            said => confirmedInApp && reply.Set.Outcome == EnvOutcome.Resolved ? $"{said}, confirmed in the app" : said,
+            session,
+            vault);
 
     /// <summary>The line for a <c>keypaste run --token</c> request.</summary>
     /// <param name="project">The project asked for.</param>

@@ -18,6 +18,7 @@ using Keypaste.Core.Activity;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Launch;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -921,6 +922,17 @@ public sealed class ScreenRenderer
         var screen = Assert.IsType<EnvSetsViewModel>(shell.Content);
         screen.Reload();
         Save(window, output, "48-env-ignored-tag");
+
+        // A copy of keypaste that does not run as keypaste.app on macOS, whose caption says why Run is off.
+        using (var copyOnly = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker())
+        {
+            Launching = new ProjectLaunching(new TerminalLaunch(launcher: null), new DetachedProcessLauncher(), EnvironmentMerge.Inherited),
+        })
+        {
+            window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = copyOnly };
+            copyOnly.Current = Destinations.Of(DestinationKind.EnvSets);
+            Save(window, output, "49-env-terminal-unavailable");
+        }
 
         window.Close();
 

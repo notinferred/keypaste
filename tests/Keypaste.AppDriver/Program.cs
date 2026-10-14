@@ -45,7 +45,11 @@ namespace Keypaste.AppDriver;
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
 /// comes down, and the lines <c>approve</c> (the timed allow), <c>once</c>, <c>deny</c> and <c>close</c> click its buttons through
 /// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
-/// real request as a person would (4.4).
+/// real request as a person would (4.4). With <c>--terminal-bundle</c> on macOS, the line
+/// <c>terminal</c> saves a project's directory and command on the Env Sets screen and presses Run in
+/// a terminal or Open terminal and then Start, so Terminal opens that <c>keypaste.app</c>'s launcher
+/// and the run it starts asks this hold for the set, which <c>scripts/verify-run-session.sh</c>
+/// watches (E.1d).
 /// </para>
 /// <para>
 /// <c>launch</c> starts the app itself through <c>keypaste-app</c>'s own start, as <see cref="AppLaunch"/> says.
@@ -90,13 +94,14 @@ internal static class Program
         "       tag-restore <vault> <entry-path> <tag>\n" +
         "       tags-dismiss <vault> <entry-path> <tag>\n" +
         "       tags-again <vault> <entry-path> <tag>\n" +
-        "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
+        "       hold <vault> [--locked] [--held-prompt | --approving-prompt] [--terminal-bundle <keypaste.app>]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
         "             prompt: approve, once, always, allow, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
         "             connect-remove <client>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
-        "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault)\n" +
+        "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
+        "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
@@ -186,10 +191,11 @@ internal static class Program
     {
         var locked = false;
         Func<IApprovalChannel>? prompt = null;
+        string? terminalBundle = null;
 
-        foreach (var option in options)
+        for (var i = 0; i < options.Length; i++)
         {
-            switch (option)
+            switch (options[i])
             {
                 case "--locked":
                     locked = true;
@@ -200,6 +206,9 @@ internal static class Program
                 case "--approving-prompt" when prompt is null:
                     prompt = () => new Driver.ApprovingPrompt();
                     break;
+                case "--terminal-bundle" when terminalBundle is null && i + 1 < options.Length:
+                    terminalBundle = Path.GetFullPath(options[++i]);
+                    break;
                 default:
                     return Usage();
             }
@@ -207,11 +216,11 @@ internal static class Program
 
         if (prompt is not null)
         {
-            return await driver.HoldAsync(vault, prompt, locked, screen: null).ConfigureAwait(true);
+            return await driver.HoldAsync(vault, prompt, locked, screen: null, terminalBundle).ConfigureAwait(true);
         }
 
         using var screen = new PromptScreen();
-        return await driver.HoldAsync(vault, screen.Open, locked, screen).ConfigureAwait(true);
+        return await driver.HoldAsync(vault, screen.Open, locked, screen, terminalBundle).ConfigureAwait(true);
     }
 
     // KeePassXC can store a name keypaste refuses to create, so this writes below the product's rules.
@@ -1040,7 +1049,7 @@ internal sealed class Driver(string home)
         }
     }
 
-    internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel> prompt, bool startLocked, PromptScreen? screen)
+    internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel> prompt, bool startLocked, PromptScreen? screen, string? terminalBundle)
     {
         // The authority owns the session from here, and disposing it is quitting.
 #pragma warning disable CA2000
@@ -1157,6 +1166,11 @@ internal sealed class Driver(string home)
                         .AnswerAsync(answer).ConfigureAwait(true);
                     break;
 
+                case ["terminal", ("run" or "open") and var kind, var project, var directory, .. var rest]:
+                    await TerminalAsync(session, authority, terminalBundle, kind == "run", project, directory, rest.Length == 0 ? null : command.Split(' ', 5)[4])
+                        .ConfigureAwait(true);
+                    break;
+
                 default:
                     throw new DriverException($"hold does not understand '{command}'");
             }
@@ -1225,6 +1239,50 @@ internal sealed class Driver(string home)
         }
 
         Console.Out.WriteLine($"revoked {which}, {model.Grants.Count} left");
+    }
+
+    /// <summary>
+    /// Saves a project's directory and command, or keeps the saved command when none is given, on the
+    /// Env Sets screen, presses Run in a terminal or Open terminal and then Start, and prints what the
+    /// card asked and what the screen said.
+    /// </summary>
+    private async Task TerminalAsync(AppVaultSession session, AppAuthority authority, string? bundle, bool run, string project, string directory, string? command)
+    {
+        if (bundle is null || !OperatingSystem.IsMacOS())
+        {
+            throw new DriverException("hold opens Terminal only on macOS, with --terminal-bundle");
+        }
+
+        using var countdown = new ClipboardCountdown(NoClipboard.Instance, TimeProvider.System);
+        using var screen = new EnvSetsViewModel(session, countdown, _picker, ProjectLaunching.ForMacBundle(authority, bundle));
+
+        screen.OpenCommand.Execute(project);
+        var launch = (screen.OpenProject ?? throw new DriverException($"'{project}' did not open: {screen.Error}")).Launch;
+
+        launch.Directory = directory;
+        launch.Command = command ?? launch.Command;
+        Press(launch.SaveCommand, "Save");
+
+        var button = run ? launch.RunProjectCommand : launch.OpenTerminalCommand;
+
+        if (screen.Error is not null || !button.CanExecute(null))
+        {
+            Console.Out.WriteLine($"terminal refused: {screen.Error ?? launch.UnsupportedReason ?? "the button is disabled"}");
+            return;
+        }
+
+        var launching = button.ExecuteAsync();
+
+        if (launch.IsConfirming)
+        {
+            Console.Out.WriteLine(
+                $"terminal-card title={launch.ConfirmTitle} starts={launch.ConfirmStarts} directory={launch.ConfirmDirectory} " +
+                $"keys={launch.ConfirmKeys} sources={launch.ConfirmSources}");
+            Press(launch.ConfirmLaunchCommand, "Start");
+        }
+
+        await launching.ConfigureAwait(true);
+        Console.Out.WriteLine(screen.Error is { } error ? $"terminal refused: {error}" : $"terminal launched: {screen.Notice}");
     }
 
     // Its ticks are posted nowhere: each command reads once, and a timer thread must not rewrite

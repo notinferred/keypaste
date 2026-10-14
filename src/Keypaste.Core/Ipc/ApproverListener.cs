@@ -26,9 +26,19 @@ namespace Keypaste.Core.Ipc;
 /// so it is the last process in keypaste that may be brought down by something a peer sent.
 /// </para>
 /// <para>
+/// Every request is read, and every reply written, under <see cref="MessageFramer.MaximumFrameBytes"/>,
+/// except a reply carrying an env set to its runner, which is written under
+/// <see cref="ApproverProtocol.MaximumEnvReplyFrameBytes"/> (D-0454).
+/// </para>
+/// <para>
 /// <b>At most <see cref="MaxConnections"/> are served at once</b>, and one more is closed as soon as
 /// it connects, so a process opening connections it never uses cannot exhaust the approver. Nothing
 /// closes an idle connection: a bridge waits between an agent's requests, and its grants end with it.
+/// </para>
+/// <para>
+/// A listener may answer only some kinds of request, as the app's launch endpoint does, and then ends a
+/// connection sending any other kind unanswered, as it ends one sending a kind this version does not know
+/// (D-0451).
 /// </para>
 /// </remarks>
 public sealed class ApproverListener : IDisposable
@@ -36,11 +46,15 @@ public sealed class ApproverListener : IDisposable
     /// <summary>How many connections are served at once.</summary>
     public const int MaxConnections = 64;
 
+    private const string _connectionPrefixDefault = "conn-";
+
     private static readonly TimeSpan _deliveryBound = TimeSpan.FromSeconds(1);
 
     private readonly string _pipeName;
     private readonly IApproverHandler _handler;
     private readonly int _maxConnections;
+    private readonly IReadOnlySet<ApproverMessageKind>? _serves;
+    private readonly string _connectionPrefix;
     private NamedPipeServerStream? _pending;
     private int _connections;
     private int _serving;
@@ -58,20 +72,43 @@ public sealed class ApproverListener : IDisposable
     /// race against a pipe that does not exist yet.
     /// </remarks>
     public ApproverListener(string pipeName, IApproverHandler handler)
-        : this(pipeName, handler, MaxConnections)
+        : this(pipeName, handler, MaxConnections, serves: null, _connectionPrefixDefault)
     {
     }
 
     /// <summary>Builds a listener that serves at most <paramref name="maxConnections"/> at once; a test seam.</summary>
     internal ApproverListener(string pipeName, IApproverHandler handler, int maxConnections)
+        : this(pipeName, handler, maxConnections, serves: null, _connectionPrefixDefault)
+    {
+    }
+
+    /// <summary>Builds a listener that answers only the kinds of request in <paramref name="serves"/>.</summary>
+    /// <param name="pipeName">The pipe to listen on.</param>
+    /// <param name="handler">What answers the requests.</param>
+    /// <param name="serves">The kinds answered; a connection sending any other ends unanswered.</param>
+    /// <param name="connectionPrefix">What each connection id starts with, so no id is one another listener gives the same handler.</param>
+    internal ApproverListener(string pipeName, IApproverHandler handler, IReadOnlySet<ApproverMessageKind> serves, string connectionPrefix)
+        : this(pipeName, handler, MaxConnections, serves, connectionPrefix)
+    {
+    }
+
+    private ApproverListener(
+        string pipeName,
+        IApproverHandler handler,
+        int maxConnections,
+        IReadOnlySet<ApproverMessageKind>? serves,
+        string connectionPrefix)
     {
         ArgumentNullException.ThrowIfNull(pipeName);
         ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(connectionPrefix);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxConnections, 1);
 
         _pipeName = pipeName;
         _handler = handler;
         _maxConnections = maxConnections;
+        _serves = serves;
+        _connectionPrefix = connectionPrefix;
         _pending = Create();
     }
 
@@ -125,7 +162,7 @@ public sealed class ApproverListener : IDisposable
                 }
 
                 Interlocked.Increment(ref _serving);
-                var id = string.Create(CultureInfo.InvariantCulture, $"conn-{Interlocked.Increment(ref _connections)}");
+                var id = string.Create(CultureInfo.InvariantCulture, $"{_connectionPrefix}{Interlocked.Increment(ref _connections)}");
 
                 live.RemoveAll(task => task.IsCompleted);
                 live.Add(ServeAsync(pipe, id, cancellationToken));
@@ -162,7 +199,8 @@ public sealed class ApproverListener : IDisposable
                 // reply, so this read ending first means it hung up, withdrew it or spoke out of turn.
                 next = framer.ReadAsync(cancellationToken).AsTask();
 
-                var reply = await AnswerWhileWaitedForAsync(frame, connectionId, next, cancellationToken).ConfigureAwait(false);
+                var kind = ApproverProtocol.KindOf(frame);
+                var reply = await AnswerWhileWaitedForAsync(frame, kind, connectionId, next, cancellationToken).ConfigureAwait(false);
 
                 if (reply is null)
                 {
@@ -178,7 +216,7 @@ public sealed class ApproverListener : IDisposable
                 using var delivery = new CancellationTokenSource();
                 using var stopping = cancellationToken.Register(
                     static state => ((CancellationTokenSource)state!).CancelAfter(_deliveryBound), delivery);
-                await framer.WriteAsync(reply, delivery.Token).ConfigureAwait(false);
+                await framer.WriteAsync(reply, MaximumReplyFrameBytes(kind), delivery.Token).ConfigureAwait(false);
             }
         }
         catch (Exception)
@@ -200,8 +238,15 @@ public sealed class ApproverListener : IDisposable
         }
     }
 
+    /// <summary>The bound a reply to this kind of request is written under: an env set's, which only its runner reads, or one frame.</summary>
+    private static int MaximumReplyFrameBytes(ApproverMessageKind request) =>
+        request is ApproverMessageKind.EnvProfile or ApproverMessageKind.TokenEnv
+            ? ApproverProtocol.MaximumEnvReplyFrameBytes
+            : MessageFramer.MaximumFrameBytes;
+
     /// <summary>Answers one request, withdrawing it if its peer stops waiting first.</summary>
     /// <param name="frame">The request.</param>
+    /// <param name="kind">The request's kind.</param>
     /// <param name="connectionId">The connection it came on.</param>
     /// <param name="peer">The read of the peer's next frame, which ends early only if it hung up, withdrew the request or spoke out of turn.</param>
     /// <param name="cancellationToken">Cancelled when the listener stops.</param>
@@ -220,13 +265,14 @@ public sealed class ApproverListener : IDisposable
     /// </remarks>
     private async Task<byte[]?> AnswerWhileWaitedForAsync(
         byte[] frame,
+        ApproverMessageKind kind,
         string connectionId,
         Task<byte[]?> peer,
         CancellationToken cancellationToken)
     {
         using var exchange = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Withdrawals.Add(exchange.Token);
-        var answering = AnswerAsync(frame, connectionId, exchange.Token).AsTask();
+        var answering = AnswerAsync(frame, kind, connectionId, exchange.Token).AsTask();
 
         if (await Task.WhenAny(answering, peer).ConfigureAwait(false) == peer
             && !cancellationToken.IsCancellationRequested)
@@ -256,9 +302,14 @@ public sealed class ApproverListener : IDisposable
         }
     }
 
-    private async ValueTask<byte[]?> AnswerAsync(byte[] frame, string connectionId, CancellationToken cancellationToken)
+    private async ValueTask<byte[]?> AnswerAsync(byte[] frame, ApproverMessageKind kind, string connectionId, CancellationToken cancellationToken)
     {
-        switch (ApproverProtocol.KindOf(frame))
+        if (_serves?.Contains(kind) == false)
+        {
+            return null;
+        }
+
+        switch (kind)
         {
             case ApproverMessageKind.Attach when ApproverProtocol.TryDecode(frame, out AttachRequest? attach):
                 return ApproverProtocol.Encode(

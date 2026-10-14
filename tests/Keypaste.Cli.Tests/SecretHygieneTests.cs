@@ -466,6 +466,54 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
+    /// A run Terminal starts for the app's Run confirmation says it is starting and summarises the set,
+    /// or says why nothing started. None of those lines may carry a value or the pass, which is a bearer
+    /// for its one run; a malformed pass is not repeated either, since it may be a secret pasted into
+    /// the wrong place.
+    /// </summary>
+    [Fact]
+    public async Task RunConfirmedInTheApp_NeverPrintsAValueOrThePass()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        harness.ConsoleStyle.Terminal = true;
+        var pipe = "keypaste-tests-" + Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8));
+        harness.Environment[Core.Ipc.ApproverEndpoint.EnvironmentVariable] = pipe;
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = harness.Directory;
+        var command = UnlockedOwner.InTerminal("deploy");
+
+        await using var owner = UnlockedOwner.Start(harness, pipe, Master, Core.Approval.ApprovalAnswer.Denied);
+        var released = owner.Confirm("hygiene", EnvProfileNames.Default, harness.WorkingDirectory, command);
+        var changed = owner.Confirm("hygiene", EnvProfileNames.Default, harness.WorkingDirectory, command);
+
+        int RunWith(string pass)
+        {
+            harness.Environment[Core.Approval.LaunchPasses.EnvironmentVariable] = pass;
+            return harness.Run(["run", "--session", "--vault", harness.VaultPath, "hygiene", "--", .. command]);
+        }
+
+        Assert.Equal(CliApp.ExitSuccess, RunWith(released));
+        Assert.Equal(CliApp.ExitInternalError, RunWith(released));
+        owner.Edit(vault => ProjectVariables.Set(vault, "hygiene", "ADDED", SentinelNotes));
+        Assert.Equal(CliApp.ExitInternalError, RunWith(changed));
+        Assert.Equal(CliApp.ExitUsageError, RunWith(SentinelPassword));
+
+        // The positive half: the set was released, and every line under test was printed.
+        Assert.Equal(SentinelPassword, harness.ProcessLauncher.Environment["API_KEY"]);
+        Assert.Contains("starting with hygiene", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("1 injected", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("expired or was already used", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("variables changed after you confirmed", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("does not hold a run confirmed", harness.Err, StringComparison.Ordinal);
+
+        foreach (var sentinel in _everySentinel.Concat([released, changed]))
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
     /// <c>import</c> reads every value of another vault and prints its plan, its refusals and its
     /// count; the swept vault is the source, copied whole and previewed, into a second one.
     /// </summary>

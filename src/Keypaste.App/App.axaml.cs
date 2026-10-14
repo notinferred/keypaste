@@ -154,6 +154,9 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>The link a terminal finds this app's <c>keypaste</c> through; the platform's own unless a test gives another.</summary>
     internal Func<ICliLink?> CliLinkFor { get; init; } = CliLinks.ForThisProcess;
 
+    /// <summary>What a project's Run and Open terminal start with, given the authority; the platform's own unless a test gives another.</summary>
+    internal Func<AppAuthority?, ProjectLaunching> LaunchingFor { get; init; } = ProjectLaunching.ForThisMachine;
+
     /// <summary>Shows the window from the menu bar or tray.</summary>
     internal void OpenWindow()
     {
@@ -499,6 +502,7 @@ internal sealed partial class App : Application, IDisposable
             ShareTransport = ShareTransport,
             LoginItem = LoginItemFor(),
             CliLink = CliLinkFor(),
+            Launching = LaunchingFor(_authority),
         };
 
         _window.FindControl<ContentControl>("Root")!.Content =

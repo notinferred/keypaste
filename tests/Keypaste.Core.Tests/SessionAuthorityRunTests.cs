@@ -50,7 +50,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
                 ProjectVariables.Set(created, "outside-big", $"KEY_{i}", $"v{i}");
             }
 
-            // An entry each, so the run names thirty paths longer together than a whole audit line.
+            // An entry each, so the run names thirty paths longer together than an agent's run line may name.
             foreach (var i in Enumerable.Range(0, 30))
             {
                 var wide = new EntryName("env/wide", $"KEY_{i}_" + new string('W', 120));
@@ -433,12 +433,17 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     /// <summary>
-    /// A set whose entries one audit line cannot hold is refused before anybody is asked, and the
-    /// refusal leaves them out, so its own line is written.
+    /// A set whose entries take more than an agent's run line may name is refused before anybody is
+    /// asked, though a <c>keypaste run --session</c> line could name them, because the reply carries
+    /// them back to the bridge in one ordinary frame, which is the reason it gives; the refusal leaves
+    /// them out, so its own line is written.
     /// </summary>
     [Fact]
-    public async Task EntriesTooLongForOneAuditLine_AreRefusedUnasked_AndTheRefusalIsRecorded()
+    public async Task EntriesOverAnAgentRunsBudget_AreRefusedUnasked_AndTheRefusalIsRecorded()
     {
+        const string Reason = "the run names more entries than an agent's run can carry back in one reply";
+        Assert.Null(SessionAuthority.Unrecordable(EnvResolution.Resolve(_vault, "wide", EnvProfileNames.Default, keys: null, _fixture.Clock).Preview));
+
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
@@ -447,12 +452,14 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         AssertNothingReleased(reply);
         Assert.Equal(AuditMethod.InvalidRequest, reply!.Method);
+        Assert.Equal(Reason, reply.Reason);
         Assert.Equal(0, _fixture.Channel.Asked);
         Assert.Empty(reply.Entries);
         Assert.True(reply.Recorded);
 
         var line = Assert.Single(_log.Lines());
         Assert.Equal(("run", "denied", "invalid-request"), (line.GetProperty("tool").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
+        Assert.Equal(Reason, line.GetProperty("reason").GetString());
     }
 
     /// <summary>

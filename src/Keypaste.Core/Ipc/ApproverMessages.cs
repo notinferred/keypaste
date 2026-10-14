@@ -285,6 +285,14 @@ public sealed record EnvRequest(string Project, IReadOnlyList<string> Command, s
 
     /// <summary>What a reference file makes of the set, as the runner claims it: <c>NAME ← KEY</c> and literal <c>NAME=value</c> lines; null outside reference-file mode.</summary>
     public IReadOnlyList<string>? FileLines { get; init; }
+
+    /// <summary>The launch pass the app's Run confirmation issued for exactly this request, or null to ask the person (D-0452).</summary>
+    public string? Launch { get; init; }
+
+    /// <summary>A description with the launch pass left out.</summary>
+    /// <returns>The set asked for, never the pass.</returns>
+    public override string ToString() =>
+        $"EnvRequest {{ Project = {Project}, Profile = {Profile}, Launch = {(Launch is null ? "none" : "<redacted>")} }}";
 }
 
 /// <summary>The owner's answer to an <see cref="EnvRequest"/>: the whole set, or why none of it.</summary>

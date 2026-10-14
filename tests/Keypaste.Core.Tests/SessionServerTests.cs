@@ -1,3 +1,4 @@
+using System.IO.Pipes;
 using System.Security.Cryptography;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
@@ -27,6 +28,21 @@ public sealed class SessionServerTests : IDisposable
             handler(this, VaultEdit.Of(new EntryName("env/acme", "API_KEY")));
         }
 
+        Assert.Empty(watching);
+    }
+
+    /// <summary>The authority is built before the endpoint is bound, so a name another listener holds leaves no edit watched behind.</summary>
+    [Fact]
+    public void A_name_already_held_leaves_no_edit_watched()
+    {
+        using var lifetime = new SessionLifetime();
+        List<EventHandler<VaultEdit>> watching = [];
+        var name = UniqueName();
+        using var held = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+
+        var refused = Record.Exception(() => SessionServer.Listen(name, Options(lifetime, watching)).Dispose());
+
+        Assert.True(refused is IOException or UnauthorizedAccessException, refused?.ToString());
         Assert.Empty(watching);
     }
 

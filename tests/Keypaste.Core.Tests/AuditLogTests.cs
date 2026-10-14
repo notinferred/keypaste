@@ -35,6 +35,17 @@ public sealed class AuditLogTests : IDisposable
         Exposure = ["env/**"],
     };
 
+    /// <summary>A denial whose line is exactly <paramref name="bytes"/> long, newline included, given the length of the same denial exposing nothing.</summary>
+    private static AuditRecord Sized(int bytes, int unexposed) =>
+        Denial() with { Exposure = [new string('x', bytes - unexposed - 2)] };
+
+    /// <summary>Appends the denial exposing nothing and returns its length, newline included.</summary>
+    private int Unexposed(AuditLog log)
+    {
+        Assert.True(log.TryAppend(Denial() with { Exposure = [] }, out var error), error);
+        return Lines()[^1].Length + 1;
+    }
+
     private AuditLog Open(DateTimeOffset? now = null)
     {
         var clock = new FixedClock(now ?? new DateTimeOffset(2026, 7, 26, 14, 3, 11, 482, TimeSpan.Zero));
@@ -626,6 +637,67 @@ public sealed class AuditLogTests : IDisposable
         // The bytes that were hashed are the bytes that were written, which is the trap in composing
         // a record twice.
         Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(LogPath).Verdict);
+    }
+
+    /// <summary>A record of exactly the cap lands whole, and the next one links to it (D-0454).</summary>
+    [Fact]
+    public void ARecordOfTheFullSize_LandsWhole_AndTheNextLinksToIt()
+    {
+        using (var log = Open())
+        {
+            var unexposed = Unexposed(log);
+            Assert.True(log.TryAppend(Sized(AuditLog.MaximumRecordBytes, unexposed), out var error), error);
+            Assert.True(log.TryAppend(Denial(), out error), error);
+        }
+
+        var lines = Lines();
+        Assert.Equal(AuditLog.MaximumRecordBytes, lines[1].Length + 1);
+
+        using var full = JsonDocument.Parse(lines[1]);
+        using var next = JsonDocument.Parse(lines[2]);
+        Assert.Equal(full.RootElement.GetProperty("hash").GetString(), next.RootElement.GetProperty("prev").GetString());
+        Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(LogPath).Verdict);
+    }
+
+    /// <summary>
+    /// A write cut short just before its end, after a full-size record, is linked past: the writer
+    /// reads back more than the longest fragment and a whole record together.
+    /// </summary>
+    [Fact]
+    public void AFullSizeRecordCutShortAfterAWholeOne_IsLinkedPast()
+    {
+        string whole;
+        using (var log = Open())
+        {
+            var unexposed = Unexposed(log);
+            Assert.True(log.TryAppend(Sized(AuditLog.MaximumRecordBytes, unexposed), out var error), error);
+            whole = Lines()[1];
+        }
+
+        File.AppendAllText(LogPath, whole[..^1]);
+
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial(), out var error), error);
+        }
+
+        var lines = Lines();
+        using var linked = JsonDocument.Parse(whole);
+        using var latest = JsonDocument.Parse(lines[^1]);
+        Assert.Equal(4, lines.Length);
+        Assert.Equal(linked.RootElement.GetProperty("hash").GetString(), latest.RootElement.GetProperty("prev").GetString());
+        Assert.Equal(3, latest.RootElement.GetProperty("seq").GetInt64());
+    }
+
+    [Fact]
+    public void ARecordOneByteOverTheCap_IsRefusedAndNothingIsWritten()
+    {
+        using var log = Open();
+        var unexposed = Unexposed(log);
+
+        Assert.False(log.TryAppend(Sized(AuditLog.MaximumRecordBytes + 1, unexposed), out var error));
+        Assert.Contains($"the record is {AuditLog.MaximumRecordBytes + 1} bytes, over the {AuditLog.MaximumRecordBytes}-byte limit", error, StringComparison.Ordinal);
+        Assert.Single(Lines());
     }
 
     /// <summary>

@@ -102,6 +102,7 @@ public sealed class RunCommandTests
 
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Contains("usage: keypaste run", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("--project <name> names the project as the operand does", harness.Out, StringComparison.Ordinal);
         Assert.Empty(harness.Err);
     }
 
@@ -556,6 +557,50 @@ public sealed class RunCommandTests
 
         Assert.Contains("takes no project", harness.Err, StringComparison.Ordinal);
         Assert.Empty(harness.Prompt.PromptsSeen);
+    }
+
+    /// <summary><c>--project</c> takes its value whole, so a project whose name starts with <c>-</c> runs like any other, and a name of exactly <c>--</c> survives the split written with <c>=</c> (D-0453).</summary>
+    [Theory]
+    [InlineData("-web", false)]
+    [InlineData("acme-api", false)]
+    [InlineData("--help", true)]
+    [InlineData("--", true)]
+    [InlineData("-p", true)]
+    [InlineData("--env-file=x", true)]
+    public void Run_ProjectOption_NamesTheProject_EvenOneStartingWithADash(string project, bool inline)
+    {
+        using var harness = Profiled();
+
+        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
+        {
+            ProjectVariables.Set(vault, project, "PROJECT_KEY", $"{project}-value");
+            vault.Save();
+        }
+
+        string[] named = inline ? [$"--project={project}"] : ["--project", project];
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run(["run", .. named, "--vault", harness.VaultPath, "--", "node", "--", "x"]));
+
+        Assert.Equal($"{project}-value", harness.ProcessLauncher.Environment["PROJECT_KEY"]);
+        var started = Assert.Single(harness.ProcessLauncher.Started);
+        Assert.Equal("node", started.FileName);
+        Assert.Equal(["--", "x"], started.Arguments);
+    }
+
+    [Fact]
+    public void Run_ProjectOptionWithAnOperandOrAnEnvFile_IsAUsageError()
+    {
+        using var harness = Profiled();
+        var file = Write(harness, "refs.env", "DB=kp://acme-api/dev/DATABASE_URL\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--project=acme-api", "acme-api", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Contains("expected at most one project name", harness.Err, StringComparison.Ordinal);
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--project", "acme-api", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+        Assert.Contains("takes no project", harness.Err, StringComparison.Ordinal);
+
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Empty(harness.ProcessLauncher.Started);
     }
 
     [Fact]

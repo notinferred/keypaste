@@ -372,6 +372,34 @@ public sealed class AuditChainTests : IDisposable
         Assert.False(AuditChainVerifier.Verify(LogPath, anchor).Anchored);
     }
 
+    /// <summary>A record of the writer's full size is read whole and verifies, its line well inside the verifier's bound (D-0454).</summary>
+    [Fact]
+    public void ARecordOfTheWritersFullSize_Verifies()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 7, 26, 14, 3, 11, 482, TimeSpan.Zero));
+
+        void Append(AuditRecord record)
+        {
+            Assert.True(AuditLog.TryOpen(LogPath, clock, out var log, out var error), error);
+            using (log)
+            {
+                Assert.True(log.TryAppend(record, out var appendError), appendError);
+            }
+        }
+
+        // One glob of n characters grows the line by exactly n + 2.
+        Append(Record() with { Exposure = [] });
+        Append(Record() with { Exposure = [new string('x', AuditLog.MaximumRecordBytes - (Lines()[0].Length + 1) - 2)] });
+
+        Assert.Equal(AuditLog.MaximumRecordBytes, Lines()[1].Length + 1);
+
+        var report = Verify();
+
+        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
+        Assert.Equal(2, report.Records);
+        Assert.Empty(report.Findings);
+    }
+
     /// <summary>
     /// A single enormous line is classified without being read whole. The file is attacker-writable
     /// (THREATS.md assumption 1), so "read it all to discover it is not a record" is a lever.

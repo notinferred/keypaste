@@ -150,7 +150,7 @@ runtime_helpers() {
   case "$1" in
     tests/Keypaste.Core.Tests) echo tests/Keypaste.TxfContender tests/Keypaste.VaultSaver ;;
     tests/Keypaste.Mcp.Tests) echo tests/Keypaste.PoolStarver ;;
-    tests/Keypaste.App.Tests) echo tests/Keypaste.EnvReporter ;;
+    tests/Keypaste.App.Tests) echo tests/Keypaste.EnvReporter src/Keypaste.Cli ;;
   esac
 }
 
@@ -291,7 +291,7 @@ profile_workflows() {
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh \
     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh \
-    scripts/lib/*.sh
+    scripts/lib/*.sh packaging/macos/keypaste-launch.command
 }
 
 integration_script() { run "$timeout_command" --verbose --kill-after=10s 8m bash "$1"; }

@@ -1,8 +1,11 @@
+using System.Runtime.Versioning;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
+using Keypaste.Core.Ownership;
+using Keypaste.Core.Processes;
 using Keypaste.Core.Projects;
 
 namespace Keypaste.App.ViewModels;
@@ -22,9 +25,16 @@ namespace Keypaste.App.ViewModels;
 /// The released set is held only for the call that starts the terminal. The mapping saved to
 /// <c>projects.json</c> holds a directory and a command and nothing else (D-0339).
 /// </para>
+/// <para>
+/// On macOS the set never reaches Terminal: the confirmation is the same card, and the run
+/// Terminal starts presents the launch pass it earned to the app's launch endpoint, which answers
+/// whether or not agents can reach the vault (D-0451, D-0452).
+/// </para>
 /// </remarks>
 internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
 {
+    private static readonly TimeSpan _openerWait = TimeSpan.FromSeconds(10);
+
     private readonly AppVaultSession _session;
     private readonly string _project;
     private readonly IVaultFilePicker? _picker;
@@ -113,13 +123,11 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
     /// <summary>The profile Run and Open terminal start with; the project card sets it.</summary>
     internal string Profile { get; set; } = EnvProfileNames.Default;
 
-    /// <summary>The project and, for any profile but the default, the profile, as the confirmation names them.</summary>
-    private string Source => string.Equals(Profile, EnvProfileNames.Default, StringComparison.Ordinal)
-        ? Shown(_project)
-        : $"{Shown(_project)} ({Shown(Profile)})";
-
     /// <summary>Whether this platform has a terminal the app can open.</summary>
     internal bool IsSupported => _launching.Terminal.IsSupported;
+
+    /// <summary>Why this copy of the app opens no terminal, or null when it opens one.</summary>
+    internal string? UnsupportedReason => _launching.Terminal.UnsupportedReason;
 
     /// <summary>A launch waiting on the person's answer.</summary>
     internal bool IsConfirming => _answer is not null;
@@ -251,6 +259,12 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
             return;
         }
 
+        if (OperatingSystem.IsMacOS() && _launching.Terminal.Platform == TerminalPlatform.MacOS)
+        {
+            await OpenTerminalAsync(mapping, run).ConfigureAwait(true);
+            return;
+        }
+
         if (!_launching.Terminal.TryPlan(mapping.Directory, run ? mapping.Command : null, out var target, out var refusal))
         {
             _report($"Nothing was started: {refusal}.");
@@ -262,7 +276,12 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         try
         {
             resolved = await _session.Environments
-                .ResolveAsync(_project, Profile, keys: null, (preview, token) => AskAsync(preview, target!, run, token), _withdrawn.Token)
+                .ResolveAsync(
+                    _project,
+                    Profile,
+                    keys: null,
+                    (preview, token) => AskAsync(preview, run ? mapping.Command : target!.FileName, target!.WorkingDirectory ?? string.Empty, run, token),
+                    _withdrawn.Token)
                 .ConfigureAwait(true);
         }
         finally
@@ -291,16 +310,141 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async ValueTask<bool> AskAsync(EnvPreview preview, LaunchTarget target, bool run, CancellationToken token)
+    /// <summary>
+    /// Asks, then hands Terminal the run the person confirmed: the window's <c>keypaste run --session</c>
+    /// presents the launch pass this issues, and the owner releases the set to it unasked.
+    /// </summary>
+    /// <remarks>
+    /// The set is resolved only so the card is the resolver's, and goes no further. Once Start has
+    /// released it the launch is the person's, whatever the screen does next, as on Windows and Linux;
+    /// a lock ends the unlock holding the pass, so a request it leaves behind starts nothing.
+    /// </remarks>
+    [SupportedOSPlatform("macos")]
+    private async Task OpenTerminalAsync(ProjectMapping mapping, bool run)
+    {
+        if (!_launching.Terminal.TryPlanThroughSession(mapping.Directory, run ? mapping.Command : null, _launching.Parent(), out var plan, out var refusal))
+        {
+            _report(Shown($"Nothing was started: {refusal}."));
+            return;
+        }
+
+        if (_session.VaultPath is not { } vault || _session.Lifetime?.Id is not { } lifetime)
+        {
+            _report("The vault was locked, so nothing was started.");
+            return;
+        }
+
+        // The owner's rule reads the request and not the set, which the card has yet to show.
+        if (TerminalLaunch.ClaimProblem(new LaunchClaim(_project, Profile, plan.Directory, plan.Arguments, new EnvPreview(_project, []))) is { } unhandable)
+        {
+            _report(Shown($"Nothing was started: {unhandable}."));
+            return;
+        }
+
+        if (_launching.Requests is not { } requests)
+        {
+            _report("Nothing was started: macOS named no private temporary folder to hand the run to Terminal through. Copy the run command instead.");
+            return;
+        }
+
+        if (_launching.Authority is not { } authority || authority.LaunchFailure is not null)
+        {
+            _report(Unserved(_launching.Authority));
+            return;
+        }
+
+        // The owner refuses a request it cannot record (T-6), so a Run is not confirmed while the log will not open.
+        if (authority.AuditFailure is { } unopened)
+        {
+            _report(Shown($"Nothing was started: a Run from the app on macOS writes a History line, and {unopened.TrimEnd('.')}. Copy the run command to start it in a terminal instead."));
+            return;
+        }
+
+        string? unrecordable = null;
+        EnvResolved resolved;
+
+        // The owner refuses unasked a set its History line could not name, so the card is not shown for one.
+        ValueTask<bool> ConfirmAsync(EnvPreview preview, CancellationToken token)
+        {
+            unrecordable = SessionAuthority.Unrecordable(preview);
+
+            return unrecordable is null
+                ? AskAsync(preview, run ? mapping.Command : TerminalOpen.ShownName, plan.Directory, run, token)
+                : ValueTask.FromResult(false);
+        }
+
+        try
+        {
+            resolved = await _session.Environments
+                .ResolveAsync(_project, Profile, keys: null, ConfirmAsync, _withdrawn.Token)
+                .ConfigureAwait(true);
+        }
+        finally
+        {
+            EndConfirmation();
+        }
+
+        if (unrecordable is not null)
+        {
+            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app on macOS writes one. Copy the run command to start it in a terminal instead."));
+            return;
+        }
+
+        if (resolved.Outcome != EnvOutcome.Resolved)
+        {
+            _report(Refused(resolved));
+            return;
+        }
+
+        if (!SessionAuthority.Sendable(resolved))
+        {
+            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables are too large for keypaste to hand to Terminal."));
+            return;
+        }
+
+        // The set read again after Start, which the resolver held to the card's environment, names, items and protection.
+        var claim = new LaunchClaim(_project, resolved.Profile, plan.Directory, plan.Arguments, resolved.Preview);
+
+        if (authority.IssueLaunch(claim, lifetime) is not { } issued)
+        {
+            _report(Unserved(authority));
+            return;
+        }
+
+        var request = new TerminalRequest(issued.Pass, _session.Home, vault, issued.Endpoint, Path.GetTempPath(), _project, resolved.Profile, plan.Directory, plan.Command);
+
+        if (!requests.TryWrite(request, out var path, out refusal))
+        {
+            authority.WithdrawLaunch(issued.Pass);
+            _report(Shown($"Nothing was started: {refusal}."));
+            return;
+        }
+
+        var opened = await Task.Run(() => _launching.Opener(plan, _openerWait)).ConfigureAwait(true);
+
+        if (!opened.Succeeded)
+        {
+            requests.Withdraw(path);
+            authority.WithdrawLaunch(issued.Pass);
+            _report(Shown($"Nothing was started: Terminal did not open: {OpenerFailure(plan.Opener, opened)}."));
+            return;
+        }
+
+        _announce(run
+            ? $"Started {mapping.Command} in a terminal in {mapping.Directory}."
+            : $"Opened a terminal in {mapping.Directory}.");
+    }
+
+    private async ValueTask<bool> AskAsync(EnvPreview preview, string starts, string directory, bool run, CancellationToken token)
     {
         var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var withdrawn = token.Register(() => answer.TrySetCanceled(token));
 
         ConfirmTitle = run
-            ? $"Run this in a terminal with {Count(preview.Keys.Count)} from {Source}?"
-            : $"Open a terminal with {Count(preview.Keys.Count)} from {Source}?";
-        ConfirmStarts = run ? Shown(_mapping?.Command ?? string.Empty) : Shown(target.FileName);
-        ConfirmDirectory = Shown(target.WorkingDirectory ?? string.Empty);
+            ? $"Run this in a terminal with {Count(preview.Keys.Count)} from {Source(preview.Profile)}?"
+            : $"Open a terminal with {Count(preview.Keys.Count)} from {Source(preview.Profile)}?";
+        ConfirmStarts = DisplayTextSanitizer.Sanitize(starts, ProjectMappings.MaximumCommandLength).Text;
+        ConfirmDirectory = Shown(directory);
         ConfirmKeys = preview.Keys.Count == 0 ? "(none)" : string.Join(", ", preview.Keys.Select(key => EntryNameSanitizer.Sanitize(key).Text));
         ConfirmSources = preview.Sources.Count == 0
             ? string.Empty
@@ -333,6 +477,28 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
             ". Fix or remove them, then try again."),
         _ => Shown($"Nothing was started: {resolved.Refusal}."),
     };
+
+    /// <summary>Why the run Terminal would start could not ask this app for the set.</summary>
+    /// <remarks>A launch endpoint that answers yet issues no pass means the card's unlock ended.</remarks>
+    private static string Unserved(AppAuthority? authority) => authority switch
+    {
+        null => Unreachable("nothing in this app answers Terminal"),
+        { LaunchFailure: { } failure } => Unreachable(failure),
+        _ => "The vault was locked, so nothing was started.",
+    };
+
+    private static string Unreachable(string reason) =>
+        Shown($"Nothing was started: Terminal gets the variables from this app, and {reason}. Copy the run command instead.");
+
+    private static string OpenerFailure(string opener, ProcessResult opened) =>
+        !opened.ToolFound ? $"{opener} could not be started"
+        : opened.StandardError.Trim() is { Length: > 0 } said ? said
+        : $"{opener} exited with {opened.ExitCode}";
+
+    /// <summary>The project and, for any profile but the default, the profile, as the confirmation names them.</summary>
+    private string Source(string profile) => string.Equals(profile, EnvProfileNames.Default, StringComparison.Ordinal)
+        ? Shown(_project)
+        : $"{Shown(_project)} ({Shown(profile)})";
 
     private static string Count(int keys) => keys == 1 ? "1 variable" : $"{keys} variables";
 

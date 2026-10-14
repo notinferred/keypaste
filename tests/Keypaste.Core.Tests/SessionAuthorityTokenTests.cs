@@ -349,48 +349,88 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         Assert.Equal("env/acme-api/staging", lines[0].GetProperty("args").GetProperty("entry").GetString());
     }
 
+    /// <summary>A set past one ordinary frame is released whole under a token, in the reply only a runner reads (D-0454).</summary>
+    [Fact]
+    public async Task ASetOf200KiB_IsReleasedWholeOverTheOwnersPipe()
+    {
+        var large = Enumerable.Range(0, 7).Select(i => new EnvVariable($"BLOB_{i}", new string((char)('a' + i), 30_000))).ToList();
+        foreach (var variable in large)
+        {
+            ProjectVariables.Set(_vault, "acme-api", "staging", variable.Key, variable.Value);
+        }
+
+        _vault.Save();
+        var token = Mint("ci", "read:acme-api/staging/*");
+
+        var reply = await OverThePipeAsync(token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal(
+            [new EnvVariable("API_KEY", _apiKey), .. large, new EnvVariable("DATABASE_URL", _database)],
+            reply.Set.Variables);
+        Assert.Equal("granted", Assert.Single(Lines()).GetProperty("decision").GetString());
+    }
+
     [Fact]
     public async Task ASetTooLargeForOneReply_IsAuditedAndRecordedAsRefused()
     {
-        ProjectVariables.Set(_vault, "acme-api", "staging", "BIG", new string('x', 70_000));
+        ProjectVariables.Set(_vault, "acme-api", "staging", "BIG", new string('+', (ApproverProtocol.MaximumEnvReplyFrameBytes / 6) + 1));
         _vault.Save();
         var token = Mint("ci", "read:acme-api/staging/*");
-        var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
         var authority = Authority();
-        using var stop = new CancellationTokenSource();
-        using var listener = new ApproverListener(pipe, authority);
-        var running = listener.RunAsync(stop.Token);
 
-        try
-        {
-            await using var client = await ApproverClient.TryConnectAsync(pipe, _wait, Cancel);
-            Assert.NotNull(client);
-            var attached = await client.AttachAsync(new AttachRequest(VaultPath), Cancel);
-            Assert.True(attached?.Attached);
+        var reply = await OverThePipeAsync(token, authority);
 
-            var reply = await client.ReleaseTokenEnvAsync(Request(token, "staging") with { Session = attached!.Session! }, Cancel);
-
-            Assert.NotNull(reply);
-            Assert.Equal(EnvOutcome.TooLarge, reply.Set.Outcome);
-            Assert.Empty(reply.Set.Variables);
-        }
-        finally
-        {
-            await stop.CancelAsync();
-            try
-            {
-                await running;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-        }
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.TooLarge, reply.Set.Outcome);
+        Assert.Empty(reply.Set.Variables);
 
         var line = Assert.Single(Lines());
         Assert.Equal("denied", line.GetProperty("decision").GetString());
         Assert.False(line.TryGetProperty("entries", out var entries) && entries.ValueKind == JsonValueKind.Array && entries.GetArrayLength() > 0);
         Assert.Empty(authority.Released);
+    }
+
+    /// <summary>
+    /// A set naming more items than one audit line can record is refused with that reason before anybody is asked, a
+    /// protected one included, and the refusal is recorded naming no item, as a <c>keypaste run --session</c> one is (D-0454).
+    /// </summary>
+    [Fact]
+    public async Task ASetNamingMoreItemsThanOneLineCanRecord_IsRefusedUnasked_AndRecorded()
+    {
+        const string Reason = "the run names more entries than one audit line can record";
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        // Each item's name takes more bytes in the line than its title has characters.
+        var first = Wide((SessionAuthority.MaximumAuditedEntriesBytes / EntryNameSanitizer.MaximumLength) + 1, EntryNameSanitizer.MaximumLength);
+        var plain = Mint("ci", "read:wide/dev/*");
+        var authority = await AttachedAsync();
+
+        var refused = await authority.ReleaseTokenEnvAsync(Request(plain, EnvProfileNames.Default, project: "wide"), _connection, Cancel);
+
+        Assert.True(_vault.AddTag(first, "env:wide:prod"));
+        _vault.Save();
+        var allowed = Mint("prod-ci", "read:wide/dev/*", allowProd: true);
+        var unasked = await authority.ReleaseTokenEnvAsync(Request(allowed, EnvProfileNames.Default, project: "wide"), _connection, Cancel);
+
+        foreach (var reply in new[] { refused, unasked })
+        {
+            Assert.Equal(EnvOutcome.Invalid, reply.Set.Outcome);
+            Assert.Equal(Reason, reply.Reason);
+            Assert.Empty(reply.Set.Variables);
+        }
+
+        Assert.Equal(0, _fixture.Channel.Asked);
+
+        var lines = Lines();
+        Assert.Equal(2, lines.Count);
+        Assert.All(lines, line =>
+        {
+            Assert.Equal("denied", line.GetProperty("decision").GetString());
+            Assert.Contains(Reason, line.GetProperty("reason").GetString(), StringComparison.Ordinal);
+            Assert.False(line.TryGetProperty("entries", out var entries) && entries.ValueKind == JsonValueKind.Array && entries.GetArrayLength() > 0);
+        });
     }
 
     [Fact]
@@ -486,6 +526,37 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         Assert.DoesNotContain(_database, log, StringComparison.Ordinal);
     }
 
+    /// <summary>One <c>keypaste run --token</c> request for staging, sent over a real pipe to an owner listening on it.</summary>
+    private async Task<EnvReply?> OverThePipeAsync(string token, SessionAuthority? authority = null)
+    {
+        var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        using var stop = new CancellationTokenSource();
+        using var listener = new ApproverListener(pipe, authority ?? Authority());
+        var running = listener.RunAsync(stop.Token);
+
+        try
+        {
+            await using var client = await ApproverClient.TryConnectAsync(pipe, _wait, Cancel);
+            Assert.NotNull(client);
+            var attached = await client.AttachAsync(new AttachRequest(VaultPath), Cancel);
+            Assert.True(attached?.Attached);
+
+            return await client.ReleaseTokenEnvAsync(Request(token, "staging") with { Session = attached!.Session! }, Cancel);
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            try
+            {
+                await running;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
+            {
+                // Tearing the listener down is how it stops.
+            }
+        }
+    }
+
     private string Mint(string name, string scopes, TimeSpan? ttl = null, bool allowProd = false)
     {
         Assert.True(TokenScope.TryParseList(scopes, out var parsed, out var error), error);
@@ -494,6 +565,26 @@ public sealed class SessionAuthorityTokenTests : IDisposable
             error);
         _vault.Save();
         return token;
+    }
+
+    /// <summary>Adds <paramref name="count"/> items to the project <c>wide</c>, each named and keyed by a title of <paramref name="length"/> characters.</summary>
+    /// <returns>The first item.</returns>
+    private EntryName Wide(int count, int length)
+    {
+        List<EntryName> items = [];
+
+        foreach (var i in Enumerable.Range(0, count))
+        {
+            var key = $"KEY_{i}_";
+            var wide = new EntryName("env/wide", key + new string('W', length - key.Length));
+            _vault.AddEntry(new VaultEntry { GroupPath = wide.GroupPath, Title = wide.Title });
+            Assert.True(_vault.SetFields(wide, [new FieldWrite(wide.Title, $"w{i}")]));
+            Assert.True(_vault.AddTag(wide, "env:wide"));
+            items.Add(wide);
+        }
+
+        _vault.Save();
+        return items[0];
     }
 
     private TokenEnvRequest Request(string token, string profile, string project = "acme-api", IReadOnlyList<string>? command = null) =>

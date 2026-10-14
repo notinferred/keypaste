@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
@@ -252,6 +255,117 @@ public sealed class EnvProfilesTests : IDisposable
         }
     }
 
+    /// <summary>A project whose name starts with <c>-</c> is copied by <c>--project=</c>, which <c>keypaste run</c> takes whole on every platform, and any other name as the operand (D-0453).</summary>
+    [Fact]
+    public void RunCommand_NamesAProjectStartingWithADashByTheProjectOption()
+    {
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+
+        screen.OpenCommand.Execute("-web");
+        Assert.Equal("keypaste run -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
+
+        screen.OpenCommand.Execute("acme-api");
+        Assert.Equal("keypaste run -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
+
+        Assert.Equal("keypaste run --project=--help -- ", EnvSetsViewModel.RunCommandFor("--help"));
+        Assert.Equal("keypaste run acme-api -- ", EnvSetsViewModel.RunCommandFor("acme-api"));
+    }
+
+    /// <summary>
+    /// A name holding anything but ASCII letters, digits, <c>_</c>, <c>.</c> and <c>-</c> is quoted so that every shell
+    /// commonly used on the platform reads it alike: on macOS and Linux in single quotes, each run of single quotes,
+    /// typographic ones included, alone in double quotes, and on Windows in double quotes, unless the name holds a
+    /// character one of Windows' shells reads inside them, when there is no line (D-0453).
+    /// </summary>
+    [Theory]
+    [InlineData("acme-api", "acme-api", "acme-api")]
+    [InlineData("-web", "--project=-web", "--project=-web")]
+    [InlineData("-web.app", "--project=-web.app", "--project=-web.app")]
+    [InlineData("1e5", "1e5", "1e5")]
+    [InlineData("my app", "'my app'", "\"my app\"")]
+    [InlineData("-my app", "'--project=-my app'", "\"--project=-my app\"")]
+    [InlineData("a&b (c) ^e ~#", "'a&b (c) ^e ~#'", "\"a&b (c) ^e ~#\"")]
+    [InlineData("café ☕", "'café ☕'", "\"café ☕\"")]
+    [InlineData("x‟y", "'x‟y'", "\"x‟y\"")]
+    [InlineData("it's", "--project='it'\"'\"'s'", "\"it's\"")]
+    [InlineData("-it's", "--project='-it'\"'\"'s'", "\"--project=-it's\"")]
+    [InlineData("'q'", "--project=\"'\"'q'\"'\"", "\"'q'\"")]
+    [InlineData("Bob’s ‘x’", "--project='Bob'\"’\"'s '\"‘\"'x'\"’\"", "\"Bob’s ‘x’\"")]
+    [InlineData("it''s ‘’x", "--project='it'\"''\"'s '\"‘’\"'x'", "\"it''s ‘’x\"")]
+    [InlineData("$HOME", "'$HOME'", null)]
+    [InlineData("50$ off", "'50$ off'", null)]
+    [InlineData("`id`", "'`id`'", null)]
+    [InlineData("Hey!", "'Hey!'", null)]
+    [InlineData("50% (off)", "'50% (off)'", null)]
+    [InlineData("say \"hi\"", "'say \"hi\"'", null)]
+    [InlineData("“smart” „low", "'“smart” „low'", null)]
+    [InlineData("it's $(id)", "--project='it'\"'\"'s $(id)'", null)]
+    public void ACopiedRunCommand_QuotesTheNameForEachPlatformsShells_OrHasNone(string project, string posix, string? windows)
+    {
+        Assert.True(CopiedRunCommand.IsCopyable(project, windows: false));
+        Assert.Equal($"keypaste run -p dev {posix} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: false));
+        Assert.Equal($"keypaste run {posix} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: false));
+
+        Assert.Equal(windows is not null, CopiedRunCommand.IsCopyable(project, windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run -p dev {windows} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run {windows} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: true));
+    }
+
+    /// <summary>
+    /// The copied run command hands <c>keypaste</c> the project whole in every shell here it is for, whatever the name
+    /// holds, and a project whose name one of them would run or change however it is quoted gets no command: the card
+    /// shows none and says why in its place (D-0453, T-1).
+    /// </summary>
+    [Theory]
+    [InlineData("acme-api")]
+    [InlineData("--")]
+    [InlineData("-web.app")]
+    [InlineData("-1.5")]
+    [InlineData("-my app")]
+    [InlineData("my app")]
+    [InlineData("1e5")]
+    [InlineData("0x1F")]
+    [InlineData("1kb")]
+    [InlineData("007")]
+    [InlineData("1..5")]
+    [InlineData("a&b|c<d>e;f (g) {h,i} [j]*?~ #k =l @m +n ^o 'p' -- -p")]
+    [InlineData("café ☕ 日本 x‟y")]
+    [InlineData("Bob’s ‘x’ ‚y‛ –dash— it''s ‘’")]
+    [InlineData("-it's 'q'")]
+    [InlineData("!PATH! ^ --% -- -p")]
+    [InlineData("Hey! !! !-1")]
+    [InlineData("50$ off")]
+    [InlineData("-it's $(id) 'q'")]
+    [InlineData("it's \"quoted\" “x” „y‟ ”z”")]
+    [InlineData("$HOME `id` $(id) ${x} @(1) $env:PATH")]
+    [InlineData("%PATH% 100% ^")]
+    [InlineData("say \"100%\" & \"%PATH%\"")]
+    public void ACopiedRunCommand_HandsKeypasteTheProjectWholeInEachShell_OrIsNotOffered(string project)
+    {
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        screen.OpenCommand.Execute(project);
+        var card = screen.OpenProject!;
+
+        if (!CopiedRunCommand.IsCopyable(project, OperatingSystem.IsWindows()))
+        {
+            Assert.False(card.HasRunCommand);
+            Assert.Null(card.RunCommand);
+            Assert.Equal(CopiedRunCommand.NoCommandNote, card.RunCommandNote);
+            Assert.False(card.CopyRunCommandCommand.CanExecute(null));
+            Assert.Null(EnvSetsViewModel.RunCommandFor(project));
+            return;
+        }
+
+        var byOption = project.StartsWith('-') || (!OperatingSystem.IsWindows() && project.Any(c => c is '\'' or '‘' or '’' or '‚' or '‛'));
+        var named = byOption ? "--project=" + project : project;
+
+        Assert.True(card.HasRunCommand);
+        Assert.Empty(card.RunCommandNote);
+        Assert.True(card.CopyRunCommandCommand.CanExecute(null));
+        Assert.Equal(["run", "-p", "dev", named, "--", "npm", "start"], Pasted(card.RunCommand!));
+        Assert.Equal(["run", named, "--", "npm", "start"], Pasted(EnvSetsViewModel.RunCommandFor(project) + "npm start"));
+    }
+
     [Fact]
     public void EntryDetail_ShowsItsEntryReference_UnderEnvToo()
     {
@@ -488,6 +602,135 @@ public sealed class EnvProfilesTests : IDisposable
     {
         screen.OpenCommand.Execute("acme-api");
         return screen.OpenProject!;
+    }
+
+    /// <summary>
+    /// The arguments <c>keypaste</c> gets from a copied line in each shell here it is for, run as it is with
+    /// <c>Keypaste.EnvReporter</c> on PATH as <c>keypaste</c>: Command Prompt, Windows PowerShell, Git Bash and, where
+    /// installed, PowerShell 7 on Windows, and elsewhere <c>sh</c>, <c>bash</c>, <c>zsh</c>, <c>fish</c> and PowerShell 7
+    /// where installed. Each must hand it the same arguments.
+    /// </summary>
+    private static List<string> Pasted(string copied)
+    {
+        var reporter = Helper("Keypaste.EnvReporter");
+        Assert.True(File.Exists(reporter), $"build Keypaste.EnvReporter first: {reporter}");
+        var bin = Directory.CreateTempSubdirectory("keypaste-pasted-").FullName;
+
+        try
+        {
+            foreach (var file in Directory.GetFiles(Path.GetDirectoryName(reporter)!))
+            {
+                File.Copy(file, Path.Combine(bin, Path.GetFileName(file)));
+            }
+
+            var keypaste = Path.Combine(bin, OperatingSystem.IsWindows() ? "keypaste.exe" : "keypaste");
+            File.Copy(reporter, keypaste);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(keypaste, File.GetUnixFileMode(reporter));
+            }
+
+            var windowsPowerShell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+            Assert.True(!OperatingSystem.IsWindows() || File.Exists(windowsPowerShell), $"Windows PowerShell is missing: {windowsPowerShell}");
+
+            List<(ProcessStartInfo Start, string? Input)> shells = [];
+
+            if (OperatingSystem.IsWindows())
+            {
+                shells.Add((new ProcessStartInfo(Environment.GetEnvironmentVariable("ComSpec")!, $"/d /s /c \"{copied}\""), null));
+
+                // Git Bash reads the line on its input, as a paste reaches it, so the MSYS runtime's own reading of a
+                // Windows command line plays no part.
+                shells.Add((new ProcessStartInfo(GitBash()) { ArgumentList = { "-s" } }, copied + "\n"));
+            }
+            else
+            {
+                foreach (var path in new[] { "/bin/sh", "/bin/bash", "/bin/zsh" }.Where(File.Exists))
+                {
+                    shells.Add((new ProcessStartInfo(path) { ArgumentList = { "-c", copied } }, null));
+                }
+
+                if (OnPath("fish") is { } fish)
+                {
+                    shells.Add((new ProcessStartInfo(fish) { ArgumentList = { "--no-config", "-c", copied } }, null));
+                }
+            }
+
+            foreach (var path in new[] { OperatingSystem.IsWindows() ? windowsPowerShell : null, OnPath(OperatingSystem.IsWindows() ? "pwsh.exe" : "pwsh") }.OfType<string>())
+            {
+                var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(copied));
+                shells.Add((new ProcessStartInfo(path) { ArgumentList = { "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded } }, null));
+            }
+
+            List<string>? pasted = null;
+
+            foreach (var (start, input) in shells)
+            {
+                start.WorkingDirectory = bin;
+                start.Environment["PATH"] = bin + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
+                start.RedirectStandardInput = input is not null;
+                start.StandardInputEncoding = input is null ? null : new UTF8Encoding(false);
+                start.RedirectStandardOutput = true;
+                start.RedirectStandardError = true;
+                using var shell = Process.Start(start) ?? throw new InvalidOperationException($"{start.FileName} did not start");
+                if (input is not null)
+                {
+                    shell.StandardInput.Write(input);
+                    shell.StandardInput.Close();
+                }
+
+                var output = shell.StandardOutput.ReadToEnd();
+                var error = shell.StandardError.ReadToEnd();
+                Assert.True(shell.WaitForExit(TimeSpan.FromSeconds(60)), $"{start.FileName} did not exit");
+
+                Assert.True(shell.ExitCode == 0, $"{start.FileName} exited {shell.ExitCode} on {copied}: {error}");
+                var arguments = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(json => JsonSerializer.Deserialize<string>(json.TrimEnd('\r'))!).ToList();
+                Assert.True(pasted is null || pasted.SequenceEqual(arguments), $"{start.FileName} made [{string.Join(", ", arguments)}] of {copied}, where another shell made [{string.Join(", ", pasted ?? [])}]");
+                pasted = arguments;
+            }
+
+            return pasted ?? throw new InvalidOperationException("no shell to paste into was found");
+        }
+        finally
+        {
+            Directory.Delete(bin, recursive: true);
+        }
+    }
+
+    /// <summary>Git for Windows' Git Bash, found above <c>git.exe</c> as <c>verify.ps1</c> finds it, since Windows' own <c>bash.exe</c> starts WSL.</summary>
+    private static string GitBash()
+    {
+        var git = OnPath("git.exe");
+
+        for (var directory = Path.GetDirectoryName(git); directory is not null; directory = Path.GetDirectoryName(directory))
+        {
+            var bash = Path.Combine(directory, "bin", "bash.exe");
+            if (File.Exists(bash))
+            {
+                return bash;
+            }
+        }
+
+        throw new InvalidOperationException($"Git Bash was not found above {git ?? "git.exe, which is not on PATH"}");
+    }
+
+    private static string? OnPath(string name) =>
+        (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Select(directory => Path.Combine(directory, name))
+            .FirstOrDefault(File.Exists);
+
+    private static string Helper(string name)
+    {
+        var directory = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(directory, "keypaste.app.slnx")))
+        {
+            directory = Path.GetDirectoryName(directory.TrimEnd(Path.DirectorySeparatorChar))
+                ?? throw new InvalidOperationException("Could not locate keypaste.app.slnx above " + AppContext.BaseDirectory);
+        }
+
+        var configuration = AppContext.BaseDirectory.Contains("debug", StringComparison.OrdinalIgnoreCase) ? "debug" : "release";
+        return Path.Combine(directory, "artifacts", "bin", name, configuration, OperatingSystem.IsWindows() ? name + ".exe" : name);
     }
 
     private sealed class ReferencePicker(string path) : IVaultFilePicker

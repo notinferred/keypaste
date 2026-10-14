@@ -1,9 +1,12 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Projects;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -11,18 +14,22 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// A <c>keypaste run --session</c> request over a real pipe: the owner releases a project's set only
 /// to a connection attached to its current session, only after the person approves the command it
-/// was shown, and only while that session lasts (E.1c, D-0341).
+/// was shown, in the owner's prompt or in the app's Run confirmation whose launch pass the request
+/// carries, and only while that session lasts (E.1c, D-0341, D-0452).
 /// </summary>
 public sealed class SessionAuthorityEnvTests : IDisposable
 {
     private const string _token1 = "sk_live_env_owner_sentinel";
     private const string _token2 = "postgres://sentinel@db/app";
+    private const string _launchSpent = "the run you confirmed in the app expired or was already used";
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
+    private static readonly string[] _launched = ["/bin/sh", "-c", "eval \"$1\"; exec \"${SHELL:-/bin/sh}\"", "keypaste", "npm start"];
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-authority-env-").FullName;
     private readonly ApproverFixture _fixture = new();
     private readonly Vault _vault;
     private readonly AuditLog _audit;
+    private readonly LaunchPasses _launches;
     private SessionLifetime? _lifetime = new("session-one");
 
     public SessionAuthorityEnvTests()
@@ -38,6 +45,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
         Assert.True(AuditLog.TryOpen(AuditPath, _fixture.Clock, out var audit, out var error), error);
         _audit = audit;
+        _launches = new LaunchPasses(_fixture.Clock);
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -51,6 +59,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     public void Dispose()
     {
         _lifetime?.Dispose();
+        _launches.Dispose();
         _vault.Dispose();
         _audit.Dispose();
         _fixture.Dispose();
@@ -59,6 +68,33 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
     private EnvRequest Request(string session, string project = "dev", IReadOnlyList<string>? command = null) =>
         new(project, command ?? ["deploy", "--to", "staging area"], WorkDirectory) { Vault = VaultPath, Session = session };
+
+    /// <summary>What the app's card showed for one of dev's environments, which its pass names.</summary>
+    private LaunchClaim Claim(string profile = EnvProfileNames.Default) =>
+        new("dev", profile, WorkDirectory, _launched, EnvResolution.Resolve(_vault, "dev", profile, keys: null, _fixture.Clock).Preview);
+
+    /// <summary>The request the window's <c>keypaste run --session</c> sends for a claim.</summary>
+    private EnvRequest Launched(LaunchClaim claim, string pass, string session = "session-one") =>
+        new(claim.Project, claim.Command, claim.Directory) { Vault = VaultPath, Session = session, Profile = claim.Profile, Launch = pass };
+
+    /// <summary>Gives the <c>wide</c> project one variable from each of <paramref name="count"/> items, each titled in <paramref name="length"/> characters, and returns the items as a line names them.</summary>
+    private List<string> Wide(int count, int length)
+    {
+        List<string> items = [];
+
+        foreach (var i in Enumerable.Range(0, count))
+        {
+            var key = $"KEY_{i}_";
+            var wide = new EntryName("env/wide", key + new string('W', length - key.Length));
+            _vault.AddEntry(new VaultEntry { GroupPath = wide.GroupPath, Title = wide.Title });
+            Assert.True(_vault.SetFields(wide, [new FieldWrite(wide.Title, $"w{i}")]));
+            Assert.True(_vault.AddTag(wide, "env:wide"));
+            items.Add(ApprovalPrompt.Shown(wide));
+        }
+
+        _vault.Save();
+        return items;
+    }
 
     /// <summary>The log as the owner still holds it open for writing, which File.ReadAllText cannot share on Windows.</summary>
     private string AuditText()
@@ -139,22 +175,36 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.DoesNotContain(_token2, text, StringComparison.Ordinal);
     }
 
+    /// <summary>A set drawn from 300 items, whose names take far more than 2 KiB, is released and its one line names every item (D-0454).</summary>
+    [Fact]
+    public async Task A_run_whose_set_comes_from_300_items_is_released_and_its_line_names_every_one()
+    {
+        var items = Wide(300, 76);
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseEnvAsync(Request("session-one", project: "wide"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal(300, reply.Set.Variables.Count);
+        Assert.Equal(1, _fixture.Channel.Asked);
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("granted", line.GetProperty("decision").GetString());
+        Assert.Equal(items.Order(StringComparer.Ordinal), line.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()!).Order(StringComparer.Ordinal));
+    }
+
     /// <summary>
-    /// A set naming more entries than one audit line can record is refused before anybody is asked, so
+    /// A set naming more items than one audit line can record is refused before anybody is asked, so
     /// a person never approves a release that is then refused for want of its line.
     /// </summary>
     [Fact]
     public async Task A_run_whose_entries_would_not_fit_its_audit_line_is_refused_unasked()
     {
-        foreach (var i in Enumerable.Range(0, 30))
-        {
-            var wide = new EntryName("env/wide", $"KEY_{i}_" + new string('W', 70));
-            _vault.AddEntry(new VaultEntry { GroupPath = wide.GroupPath, Title = wide.Title });
-            Assert.True(_vault.SetFields(wide, [new FieldWrite(wide.Title, $"w{i}")]));
-            Assert.True(_vault.AddTag(wide, "env:wide"));
-        }
-
-        _vault.Save();
+        // Each item's name takes more bytes in the line than its title has characters.
+        Wide((SessionAuthority.MaximumAuditedEntriesBytes / EntryNameSanitizer.MaximumLength) + 1, EntryNameSanitizer.MaximumLength);
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
@@ -187,6 +237,34 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal("the audit log could not be written", reply.Reason);
         Assert.Empty(reply.Set.Variables);
         Assert.DoesNotContain(_token1, reply.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>A set past one ordinary frame is released whole over the owner's pipe, in the reply only a runner reads, and its line names its items (D-0454).</summary>
+    [Fact]
+    public async Task A_set_of_200_KiB_is_released_whole_and_recorded_with_its_items()
+    {
+        var large = Enumerable.Range(0, 7).Select(i => new EnvVariable($"BLOB_{i}", new string((char)('a' + i), 30_000))).ToList();
+        foreach (var variable in large)
+        {
+            ProjectVariables.Set(_vault, "dev", variable.Key, variable.Value);
+        }
+
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseEnvAsync(Request("session-one"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal([.. large, new EnvVariable("DATABASE_URL", _token2), new EnvVariable("TOKEN", _token1)], reply.Set.Variables);
+        Assert.True(large.Sum(variable => variable.Value.Length) > 200 * 1024);
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("granted", line.GetProperty("decision").GetString());
+        Assert.Equal(["env/dev/.env"], line.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()).Distinct());
+        Assert.DoesNotContain(large[0].Value, AuditText(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -784,6 +862,398 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(2, _fixture.Channel.Asked);
     }
 
+    /// <summary>
+    /// The app's Run confirmation on macOS is the person's answer to the one request its pass names:
+    /// the owner releases the whole set without asking again, and records it as that answer, naming
+    /// the items and never a value (D-0452).
+    /// </summary>
+    [Fact]
+    public async Task A_launch_pass_releases_the_whole_set_unasked_and_is_recorded_as_confirmed_in_the_app()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim();
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        var reply = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal([new EnvVariable("DATABASE_URL", _token2), new EnvVariable("TOKEN", _token1)], reply.Set.Variables);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Empty(owner.Authority.Activity.EnvGrants);
+        Assert.Contains(owner.Authority.Released, seen => seen is { Entry: "env/dev/.env", How: "run --session" });
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("keypaste run --session", line.GetProperty("client").GetProperty("name").GetString());
+        Assert.Equal("granted", line.GetProperty("decision").GetString());
+        Assert.Equal("prompt", line.GetProperty("method").GetString());
+        Assert.Equal("2 variable(s), confirmed in the app", line.GetProperty("reason").GetString());
+        Assert.Equal("session-one", line.GetProperty("session").GetString());
+        Assert.Equal(["env/dev/.env"], line.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+
+        var text = AuditText();
+        Assert.DoesNotContain(_token1, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(_token2, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(pass, text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_spent_pass_is_refused_unasked_and_recorded()
+    {
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim();
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        var first = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+        var again = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+
+        Assert.Equal(EnvOutcome.Resolved, first?.Set.Outcome);
+        Assert.NotNull(again);
+        Assert.Equal(EnvOutcome.Unauthorized, again.Set.Outcome);
+        Assert.Equal(_launchSpent, again.Reason);
+        Assert.Empty(again.Set.Variables);
+        Assert.Equal(0, _fixture.Channel.Asked);
+
+        var lines = AuditLines();
+        Assert.Equal(["granted", "denied"], lines.Select(line => line.GetProperty("decision").GetString()));
+        Assert.Equal("invalid-request", lines[1].GetProperty("method").GetString());
+        Assert.Equal(_launchSpent, lines[1].GetProperty("reason").GetString());
+    }
+
+    [Theory]
+    [InlineData("never issued")]
+    [InlineData("expired")]
+    [InlineData("withdrawn")]
+    public async Task A_pass_never_issued_expired_or_withdrawn_is_refused_unasked(string which)
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim();
+        var pass = which == "never issued"
+            ? Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32))
+            : owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        if (which == "expired")
+        {
+            _fixture.Clock.Advance(LaunchPasses.Lifetime);
+        }
+        else if (which == "withdrawn")
+        {
+            owner.Authority.WithdrawLaunch(pass);
+        }
+
+        var reply = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Unauthorized, reply.Set.Outcome);
+        Assert.Equal(_launchSpent, reply.Reason);
+        Assert.Equal(0, _fixture.Channel.Asked);
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("invalid-request", line.GetProperty("method").GetString());
+        Assert.Equal(_launchSpent, line.GetProperty("reason").GetString());
+    }
+
+    /// <summary>A pass dies with the unlock its card was answered in, and none is issued for a session that is not the live one.</summary>
+    [Fact]
+    public async Task A_pass_belongs_to_the_session_its_card_was_answered_in()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        var claim = Claim();
+
+        Assert.Null(owner.Authority.IssueLaunch(claim, "session-zero"));
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        _lifetime!.End();
+        Assert.Null(owner.Authority.IssueLaunch(claim, "session-one"));
+        _lifetime = new SessionLifetime("session-two");
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseEnvAsync(Launched(claim, pass, "session-two"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Unauthorized, reply.Set.Outcome);
+        Assert.Equal(_launchSpent, reply.Reason);
+        Assert.Equal(0, _fixture.Channel.Asked);
+    }
+
+    /// <summary>Any admitted presentation spends the pass, an invalid one too, so a broken request cannot be retried under it.</summary>
+    [Fact]
+    public async Task An_invalid_request_carrying_a_valid_pass_spends_it()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim();
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        var invalid = await client.ReleaseEnvAsync(Launched(claim, pass) with { Command = [] }, Token);
+        var exact = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+
+        Assert.Equal(EnvOutcome.Invalid, invalid?.Set.Outcome);
+        Assert.Equal(EnvOutcome.Unauthorized, exact?.Set.Outcome);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Equal(["invalid-request", "invalid-request"], AuditLines().Select(line => line.GetProperty("method").GetString()));
+    }
+
+    /// <summary>
+    /// The card shows a mapped command whole up to 4096 characters, so a pass releases Terminal's run of
+    /// one, whose command line is longer than the owner's prompt shows; the same request without the pass
+    /// is still refused before anyone is asked (D-0452, T-30).
+    /// </summary>
+    [Fact]
+    public async Task A_pass_releases_the_longest_command_a_mapping_holds_and_without_it_the_request_is_refused_unasked()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var longest = string.Concat(Enumerable.Repeat("say \"it's\" 'a \"b\"' ", 300))[..ProjectMappings.MaximumCommandLength];
+        var claim = Claim() with { Command = ["/bin/sh", "-c", TerminalLaunch.RunScript, "keypaste", longest] };
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        var released = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+        var unpassed = await client.ReleaseEnvAsync(Launched(claim, pass) with { Launch = null }, Token);
+
+        Assert.NotNull(released);
+        Assert.Equal(EnvOutcome.Resolved, released.Set.Outcome);
+        Assert.Equal([new EnvVariable("DATABASE_URL", _token2), new EnvVariable("TOKEN", _token1)], released.Set.Variables);
+        Assert.NotNull(unpassed);
+        Assert.Equal(EnvOutcome.Invalid, unpassed.Set.Outcome);
+        Assert.Equal($"the command is longer than the {EnvReleasePrompt.MaximumCommandLength} characters a prompt shows whole", unpassed.Reason);
+        Assert.Empty(unpassed.Set.Variables);
+        Assert.Equal(0, _fixture.Channel.Asked);
+
+        var lines = AuditLines();
+        Assert.Equal(["granted", "denied"], lines.Select(line => line.GetProperty("decision").GetString()));
+        Assert.Equal(["prompt", "invalid-request"], lines.Select(line => line.GetProperty("method").GetString()));
+    }
+
+    /// <summary>A pass is issued only for what the card can show and Terminal's run sends: one command a mapping can hold, in Terminal's script (D-0452).</summary>
+    [Fact]
+    public async Task No_pass_is_issued_for_a_command_longer_than_a_mapping_holds_or_one_Terminal_does_not_start()
+    {
+        await using var owner = Owner.Start(this);
+        var claim = Claim();
+        var tooLong = claim with { Command = ["/bin/sh", "-c", TerminalLaunch.RunScript, "keypaste", new string('a', ProjectMappings.MaximumCommandLength + 1)] };
+        var notTerminals = claim with { Command = ["deploy", "--to", "staging area"] };
+
+        Assert.Throws<ArgumentException>(() => owner.Authority.IssueLaunch(tooLong, "session-one"));
+        Assert.Throws<ArgumentException>(() => owner.Authority.IssueLaunch(notTerminals, "session-one"));
+        Assert.NotNull(owner.Authority.IssueLaunch(claim, "session-one"));
+    }
+
+    /// <summary>The pass covers only the request the card named; presented for anything else it is spent and nobody is asked.</summary>
+    [Theory]
+    [InlineData("project")]
+    [InlineData("environment")]
+    [InlineData("directory")]
+    [InlineData("command")]
+    [InlineData("keys")]
+    [InlineData("file lines")]
+    public async Task A_pass_presented_for_anything_the_card_did_not_name_is_spent_and_refused_unasked(string differs)
+    {
+        AddStaging();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim();
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+        var exact = Launched(claim, pass);
+
+        var other = differs switch
+        {
+            "project" => exact with { Project = "other" },
+            "environment" => exact with { Profile = "staging" },
+            "directory" => exact with { Directory = Path.Combine(_directory, "elsewhere") },
+            "command" => exact with { Command = [.. claim.Command.SkipLast(1), "npm test"] },
+            "keys" => exact with { Keys = ["TOKEN"] },
+            _ => exact with { FileLines = ["API_TOKEN ← TOKEN"] },
+        };
+
+        var refused = await client.ReleaseEnvAsync(other, Token);
+        var afterwards = await client.ReleaseEnvAsync(exact, Token);
+
+        foreach (var reply in new[] { refused, afterwards })
+        {
+            Assert.NotNull(reply);
+            Assert.Equal(EnvOutcome.Unauthorized, reply.Set.Outcome);
+            Assert.Equal(_launchSpent, reply.Reason);
+            Assert.Empty(reply.Set.Variables);
+        }
+
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.All(AuditLines(), line =>
+        {
+            Assert.Equal("denied", line.GetProperty("decision").GetString());
+            Assert.Equal("invalid-request", line.GetProperty("method").GetString());
+        });
+    }
+
+    /// <summary>The card showed names, the items they come from and the protection; a set that differs in any of them was not what the person confirmed.</summary>
+    [Theory]
+    [InlineData("a variable added")]
+    [InlineData("a variable moved to another item")]
+    [InlineData("the environment protected")]
+    public async Task A_set_that_changed_after_the_card_is_refused_as_changed_unasked(string change)
+    {
+        var stripe = new EntryName("services", "Stripe");
+        _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe" });
+        Assert.True(_vault.SetFields(stripe, [new FieldWrite("STRIPE_KEY", "stripe-field-sentinel")]));
+        Assert.True(_vault.AddTag(stripe, "env:dev"));
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim();
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        switch (change)
+        {
+            case "a variable added":
+                ProjectVariables.Set(_vault, "dev", "NEW_KEY", "new-key-sentinel");
+                break;
+            case "a variable moved to another item":
+                Assert.True(_vault.RemoveTags(stripe, ["env:dev"]));
+                ProjectVariables.Set(_vault, "dev", "STRIPE_KEY", "stripe-field-sentinel");
+                break;
+            default:
+                Assert.True(_vault.AddTag(stripe, "env:dev:prod"));
+                break;
+        }
+
+        _vault.Save();
+
+        var reply = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.ChangedWhileAsked, reply.Set.Outcome);
+        Assert.Equal("dev's variables changed after you confirmed in the app", reply.Reason);
+        Assert.Empty(reply.Set.Variables);
+        Assert.Equal(0, _fixture.Channel.Asked);
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("vault-changed", line.GetProperty("method").GetString());
+        Assert.Equal("dev's variables changed after you confirmed in the app", line.GetProperty("reason").GetString());
+        Assert.DoesNotContain("sentinel", AuditText(), StringComparison.Ordinal);
+    }
+
+    /// <summary>A protected environment needs a live answer every time (D-0348, D-0391); the card is one, so its pass releases the set once.</summary>
+    [Fact]
+    public async Task A_protected_environment_is_released_once_under_its_pass()
+    {
+        ProjectVariables.Set(_vault, "dev", "prod", "TOKEN", _stagingToken);
+        _vault.Save();
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim("prod");
+        Assert.True(claim.Preview.RequiresLiveApproval);
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        var released = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+        var again = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+
+        Assert.NotNull(released);
+        Assert.Equal(EnvOutcome.Resolved, released.Set.Outcome);
+        Assert.Equal([new EnvVariable("TOKEN", _stagingToken)], released.Set.Variables);
+        Assert.Equal(EnvOutcome.Unauthorized, again?.Set.Outcome);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Empty(owner.Authority.Activity.EnvGrants);
+    }
+
+    /// <summary>
+    /// A pass is one answer, not a grant: it stores nothing a later run could use, a refusal's cooldown
+    /// does not stand in its way, and it sets none.
+    /// </summary>
+    [Fact]
+    public async Task A_pass_neither_stores_a_timed_grant_nor_meets_or_sets_the_cooldown()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+        var claim = Claim();
+        var asked = Launched(claim, "unused") with { Launch = null };
+
+        var first = await RunAsync(authority, Launched(claim, authority.IssueLaunch(claim, "session-one")!));
+        var denied = await RunAsync(authority, asked);
+        var second = await RunAsync(authority, Launched(claim, authority.IssueLaunch(claim, "session-one")!));
+
+        Assert.Equal(EnvOutcome.Resolved, first.Set.Outcome);
+        Assert.Equal(EnvOutcome.Declined, denied.Set.Outcome);
+        Assert.Equal("the person asked said no", denied.Reason);
+        Assert.Equal(EnvOutcome.Resolved, second.Set.Outcome);
+        Assert.Equal(1, _fixture.Channel.Asked);
+        Assert.Empty(grants.InForce());
+    }
+
+    /// <summary>No record, no release: a pass whose release cannot be recorded releases nothing.</summary>
+    [Fact]
+    public async Task A_pass_release_whose_audit_line_cannot_be_written_releases_nothing()
+    {
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim();
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        EnvReply? reply;
+        using (new FileStream(AuditPath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            reply = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+        }
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Unreadable, reply.Set.Outcome);
+        Assert.Equal("the audit log could not be written", reply.Reason);
+        Assert.Empty(reply.Set.Variables);
+        Assert.Equal(0, _fixture.Channel.Asked);
+    }
+
+    /// <summary><c>keypaste agent</c> builds the same server as the app, whose pass store nothing issues to: a pass presented to it is refused unasked.</summary>
+    [Fact]
+    public async Task An_owner_that_issued_no_pass_refuses_one_unasked()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var server = SessionServer.Listen(
+            "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)),
+            new SessionServerOptions
+            {
+                Vault = VaultIdentity.Of(_directory, VaultPath),
+                Lifetime = _lifetime!,
+                CurrentLifetime = () => _lifetime,
+                UnlockedFor = lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
+                Channel = _fixture.Channel,
+                Settings = _fixture.Settings,
+                Hourly = _fixture.Hourly,
+                Audit = () => _audit,
+                WatchEdits = _ => { },
+                UnwatchEdits = _ => { },
+                Clock = _fixture.Clock,
+            });
+        Assert.True((await server.Authority.AttachAsync(new AttachRequest(VaultPath), "runner", Token)).Attached);
+
+        var reply = await server.Authority.ReleaseEnvAsync(
+            Launched(Claim(), Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32))), "runner", Token);
+
+        Assert.Equal(EnvOutcome.Unauthorized, reply.Set.Outcome);
+        Assert.Equal(_launchSpent, reply.Reason);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Equal("invalid-request", Assert.Single(AuditLines()).GetProperty("method").GetString());
+    }
+
     /// <summary>The owner's authority itself, with timed env grants, answering runs without a pipe.</summary>
     private SessionAuthority EnvAuthority(EnvGrantCache grants, Action<string>? narrate = null) =>
         new(
@@ -796,7 +1266,8 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                 lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
                 _fixture.Clock,
                 grants,
-                narrate));
+                narrate,
+                _launches));
 
     /// <summary>One run: a new connection that attaches and asks once, as every <c>keypaste run --session</c> is.</summary>
     private async Task<EnvReply> RunAsync(SessionAuthority authority, EnvRequest request)
@@ -845,14 +1316,17 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         private readonly ApproverListener _listener;
         private readonly Task _running;
 
-        private Owner(string pipeName, ApproverListener listener)
+        private Owner(string pipeName, SessionAuthority authority, ApproverListener listener)
         {
             PipeName = pipeName;
+            Authority = authority;
             _listener = listener;
             _running = listener.RunAsync(_stop.Token);
         }
 
         internal string PipeName { get; }
+
+        internal SessionAuthority Authority { get; }
 
         internal static Owner Start(SessionAuthorityEnvTests test, ApproverHandler? handler = null, bool environments = true)
         {
@@ -866,10 +1340,11 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                     ? new SessionEnvironments(
                         test._fixture.Gate,
                         lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,
-                        test._fixture.Clock)
+                        test._fixture.Clock,
+                        Launches: test._launches)
                     : null);
 
-            return new Owner(name, new ApproverListener(name, authority));
+            return new Owner(name, authority, new ApproverListener(name, authority));
         }
 
         public async ValueTask DisposeAsync()

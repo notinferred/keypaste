@@ -11,7 +11,7 @@ public sealed record SessionServerOptions
     /// <summary>The vault served.</summary>
     public required VaultIdentity Vault { get; init; }
 
-    /// <summary>The unlock this serves, which owns the grants and zeroes them when it ends (D-0313).</summary>
+    /// <summary>The unlock this serves, which owns the grants and launch passes and forgets them when it ends (D-0313).</summary>
     public required SessionLifetime Lifetime { get; init; }
 
     /// <summary>The owner's live lifetime now, which a request must belong to (D-0310).</summary>
@@ -55,17 +55,20 @@ public sealed record SessionServerOptions
 /// The grants, the gate, the handler, the authority and the listener one owner answers agents with for
 /// one unlock, built once so the desktop and <c>keypaste agent</c> cannot assemble them differently.
 /// </summary>
+/// <remarks>
+/// The authority is built before the vault's endpoint is bound, so the app answers its own Runs on its
+/// launch endpoint even when the vault's cannot be bound (D-0451).
+/// </remarks>
 public sealed class SessionServer : IDisposable
 {
-    private readonly ApproverListener _listener;
     private readonly ApprovalGate _gate;
     private readonly GrantCache _grants;
     private readonly EnvGrantCache _envGrants;
     private readonly Action<EventHandler<VaultEdit>> _unwatchEdits;
+    private ApproverListener? _listener;
     private bool _disposed;
 
     private SessionServer(
-        ApproverListener listener,
         SessionAuthority authority,
         ApprovalGate gate,
         GrantCache grants,
@@ -73,7 +76,6 @@ public sealed class SessionServer : IDisposable
         Action<EventHandler<VaultEdit>> watchEdits,
         Action<EventHandler<VaultEdit>> unwatchEdits)
     {
-        _listener = listener;
         Authority = authority;
         _gate = gate;
         _grants = grants;
@@ -85,16 +87,12 @@ public sealed class SessionServer : IDisposable
     /// <summary>What answers each request.</summary>
     public SessionAuthority Authority { get; }
 
-    /// <summary>Builds what answers agents for one unlock and binds its endpoint.</summary>
-    /// <param name="pipeName">The vault's endpoint, as <see cref="ApproverEndpoint"/> names it.</param>
+    /// <summary>Builds what answers agents for one unlock, binding no endpoint.</summary>
     /// <param name="options">How this owner differs.</param>
-    /// <returns>The server, bound and not yet accepting; <see cref="RunAsync"/> accepts.</returns>
-    /// <exception cref="ArgumentNullException">An argument is null.</exception>
-    /// <exception cref="IOException">The name is already taken. Nothing built is left behind.</exception>
-    /// <exception cref="UnauthorizedAccessException">The name cannot be bound. Nothing built is left behind.</exception>
-    public static SessionServer Listen(string pipeName, SessionServerOptions options)
+    /// <returns>The server, whose <see cref="Authority"/> answers before <see cref="Bind"/> binds the vault's endpoint, or if it never does.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is null.</exception>
+    public static SessionServer Build(SessionServerOptions options)
     {
-        ArgumentNullException.ThrowIfNull(pipeName);
         ArgumentNullException.ThrowIfNull(options);
 
         var lifetime = options.Lifetime;
@@ -102,6 +100,7 @@ public sealed class SessionServer : IDisposable
 #pragma warning disable CA2000 // The lifetime owns them and zeroes them when it ends (D-0313).
         var grants = lifetime.Own(new GrantCache(options.Clock));
         var envGrants = lifetime.Own(new EnvGrantCache(options.Clock));
+        var launches = lifetime.Own(new LaunchPasses(options.Clock));
 #pragma warning restore CA2000
         var gate = new ApprovalGate(options.Channel, options.Clock, options.Limits);
 
@@ -122,12 +121,11 @@ public sealed class SessionServer : IDisposable
                 options.CurrentLifetime,
                 handler,
                 options.Audit,
-                new SessionEnvironments(gate, options.UnlockedFor, options.Clock, envGrants, options.Narrate),
+                new SessionEnvironments(gate, options.UnlockedFor, options.Clock, envGrants, options.Narrate, launches),
                 options.LockNow,
                 options.Clock);
 
-            return new SessionServer(
-                new ApproverListener(pipeName, authority), authority, gate, grants, envGrants, options.WatchEdits, options.UnwatchEdits);
+            return new SessionServer(authority, gate, grants, envGrants, options.WatchEdits, options.UnwatchEdits);
         }
         catch
         {
@@ -136,10 +134,58 @@ public sealed class SessionServer : IDisposable
         }
     }
 
-    /// <summary>Accepts connections until cancelled.</summary>
+    /// <summary>Builds what answers agents for one unlock and binds its endpoint.</summary>
+    /// <param name="pipeName">The vault's endpoint, as <see cref="ApproverEndpoint"/> names it.</param>
+    /// <param name="options">How this owner differs.</param>
+    /// <returns>The server, bound and not yet accepting; <see cref="RunAsync"/> accepts.</returns>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    /// <exception cref="IOException">The name is already taken. Nothing built is left behind.</exception>
+    /// <exception cref="UnauthorizedAccessException">The name cannot be bound. Nothing built is left behind.</exception>
+    public static SessionServer Listen(string pipeName, SessionServerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(pipeName);
+
+        SessionServer? server = Build(options);
+
+        try
+        {
+            server.Bind(pipeName);
+            var bound = server;
+            server = null;
+            return bound;
+        }
+        finally
+        {
+            server?.Dispose();
+        }
+    }
+
+    /// <summary>Binds the vault's endpoint, which <see cref="RunAsync"/> then accepts on.</summary>
+    /// <param name="pipeName">The vault's endpoint, as <see cref="ApproverEndpoint"/> names it.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="pipeName"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The vault's endpoint is already bound.</exception>
+    /// <exception cref="IOException">The name is already taken.</exception>
+    /// <exception cref="UnauthorizedAccessException">The name cannot be bound.</exception>
+    /// <exception cref="System.Net.Sockets.SocketException">On Linux and macOS, something at the name's socket path that cannot be replaced.</exception>
+    public void Bind(string pipeName)
+    {
+        ArgumentNullException.ThrowIfNull(pipeName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_listener is not null)
+        {
+            throw new InvalidOperationException("the vault's endpoint is already bound");
+        }
+
+        _listener = new ApproverListener(pipeName, Authority);
+    }
+
+    /// <summary>Accepts connections on the vault's endpoint until cancelled.</summary>
     /// <param name="cancellationToken">Cancelled to stop accepting.</param>
     /// <returns>A task that completes once the listener has stopped accepting.</returns>
-    public Task RunAsync(CancellationToken cancellationToken) => _listener.RunAsync(cancellationToken);
+    /// <exception cref="InvalidOperationException">The vault's endpoint is not bound.</exception>
+    public Task RunAsync(CancellationToken cancellationToken) =>
+        (_listener ?? throw new InvalidOperationException("the vault's endpoint is not bound")).RunAsync(cancellationToken);
 
     /// <summary>Stops watching edits and releases the endpoint and the gate, once <see cref="RunAsync"/> has finished; the lifetime zeroes the grants.</summary>
     public void Dispose()
@@ -151,7 +197,7 @@ public sealed class SessionServer : IDisposable
 
         _disposed = true;
         _unwatchEdits(OnEdited);
-        _listener.Dispose();
+        _listener?.Dispose();
         _gate.Dispose();
     }
 

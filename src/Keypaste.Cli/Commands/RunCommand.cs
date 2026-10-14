@@ -43,7 +43,9 @@ internal readonly record struct RunArguments(
 /// <para>
 /// With <c>--session</c> the first phase is a question instead: the set comes from the process
 /// holding the vault unlocked, over its endpoint, after the person there approves this command, and
-/// nothing here opens the vault or reads a password, then or as a fallback (D-0341).
+/// nothing here opens the vault or reads a password, then or as a fallback (D-0341). A run that
+/// Terminal starts for the app's own Run confirmation on macOS carries that confirmation in
+/// <c>KEYPASTE_LAUNCH</c>, which is sent in place of a second question and handed to no child (D-0452).
 /// </para>
 /// </remarks>
 internal static class RunCommand
@@ -51,9 +53,11 @@ internal static class RunCommand
     internal const string SessionOption = "session";
     internal const string ApproverOption = "approver";
     internal const string EnvFileOption = "env-file";
+    internal const string ProjectOption = "project";
 
     private const int _nameColumn = 20;
     private const int _shownReferences = 3;
+    private const string _pressReturn = "Press Return to finish.";
 
     /// <summary>How long to wait for the owner's answer: its longest window, and time for the reply to arrive.</summary>
     /// <remarks>The owner decides the timeout; this only bounds an owner that never answers.</remarks>
@@ -66,6 +70,7 @@ internal static class RunCommand
         new(SessionOption, TakesValue: false),
         new(ApproverOption, TakesValue: true),
         new(EnvFileOption, TakesValue: true),
+        new(ProjectOption, TakesValue: true),
         EnvCommand.ProfileOption,
         new(RunWithToken.TokenOption, TakesValue: true),
         new(RunWithToken.BundleOption, TakesValue: true),
@@ -103,14 +108,16 @@ internal static class RunCommand
             return RunWithToken.Execute(line, split.Command, context);
         }
 
-        if (line.Operands.Count > 1)
+        var projects = Projects(line);
+
+        if (projects.Count > 1)
         {
             return Fail(context, "expected at most one project name");
         }
 
         var envFile = line.Value(EnvFileOption);
 
-        if (envFile is not null && line.Operands.Count == 1)
+        if (envFile is not null && projects.Count == 1)
         {
             return Fail(context, $"--{EnvFileOption} names the variables to run with, so it takes no project");
         }
@@ -137,7 +144,15 @@ internal static class RunCommand
             return Fail(context, "--approver names the process to ask, which only --session does");
         }
 
-        if (!TryChoose(line, envFile, profile, path, context, out var set, out var exit))
+        var launch = session ? context.Environment.Get(LaunchPasses.EnvironmentVariable) : null;
+
+        // Refused rather than sent without it, which would ask the person a second time.
+        if (launch is not null && !LaunchPasses.IsWellFormed(launch))
+        {
+            return Fail(context, $"{LaunchPasses.EnvironmentVariable} does not hold a run confirmed in the keypaste app, so nothing was started");
+        }
+
+        if (!TryChoose(line, projects, envFile, profile, path, context, out var set, out var exit))
         {
             return exit;
         }
@@ -163,7 +178,7 @@ internal static class RunCommand
 
         if (session)
         {
-            return FromSession(path, line.Value(ApproverOption), set, split.Command, context);
+            return FromSession(path, line.Value(ApproverOption), set, split.Command, launch, context);
         }
 
         return VaultSession.OpenThen(
@@ -203,21 +218,25 @@ internal static class RunCommand
         return new RunArguments(args, [], HasSeparator: false);
     }
 
+    /// <summary>Every project the line names: its operands and <c>--project</c>'s value, which is taken whole even when it starts with <c>-</c> (D-0453).</summary>
+    internal static IReadOnlyList<string> Projects(CommandLine line) =>
+        line.Value(ProjectOption) is { } named ? [.. line.Operands, named] : line.Operands;
+
     /// <summary>
-    /// Decides what runs: the project operand, else <c>--env-file</c>, else the project
+    /// Decides what runs: the named project, else <c>--env-file</c>, else the project
     /// <c>projects.json</c> maps this directory to, with its <c>.env.keypaste</c> only when that file
     /// names nothing but env references to that project and literals.
     /// </summary>
     private static bool TryChoose(
-        CommandLine line, string? envFile, string profile, string vaultPath, CliContext context, out RunSet set, out int exit)
+        CommandLine line, IReadOnlyList<string> projects, string? envFile, string profile, string vaultPath, CliContext context, out RunSet set, out int exit)
     {
         set = null!;
         exit = CliApp.ExitSuccess;
         var profileGiven = line.Value(EnvCommand.ProfileOption.Name) is not null;
 
-        if (line.Operands.Count == 1)
+        if (projects.Count == 1)
         {
-            set = new RunSet(line.Operands[0], profile, null, line.Operands[0]);
+            set = new RunSet(projects[0], profile, null, projects[0]);
             return true;
         }
 
@@ -330,12 +349,42 @@ internal static class RunCommand
             : EnvResolution.Resolve(vault, set.Project, set.Profile, context.Clock);
 
     /// <summary>Asks the process holding the vault for the set, and starts the child only with what it released.</summary>
-    /// <remarks>Every way of not getting the set ends here with a reason and no child; none of them opens the vault.</remarks>
+    /// <remarks>
+    /// A Terminal profile can close the window the app's Run opened as soon as this exits, so a refusal there
+    /// waits for Return while someone can type in it, keeping the reason on screen (T-42).
+    /// </remarks>
     private static int FromSession(
         string vaultPath,
         string? approver,
         RunSet set,
         IReadOnlyList<string> command,
+        string? launch,
+        CliContext context)
+    {
+        var (exit, resolved) = Released(vaultPath, approver, set, command, launch, context);
+
+        if (resolved is not null)
+        {
+            return Start(command, resolved, set, context);
+        }
+
+        if (launch is not null && context.Prompt.IsInteractive)
+        {
+            context.Prompt.ReadLine(_pressReturn);
+        }
+
+        return exit;
+    }
+
+    /// <summary>Asks the process holding the vault for the set.</summary>
+    /// <returns>The set to start with, or the exit code with its reason on stderr.</returns>
+    /// <remarks>Every way of not getting the set ends here with a reason; none of them opens the vault.</remarks>
+    private static (int Exit, EnvResolved? Loaded) Released(
+        string vaultPath,
+        string? approver,
+        RunSet set,
+        IReadOnlyList<string> command,
+        string? launch,
         CliContext context)
     {
         string pipe;
@@ -350,20 +399,20 @@ internal static class RunCommand
         }
         catch (ArgumentException ex)
         {
-            return Fail(context, $"--{ApproverOption}: {ex.Message}");
+            return (Fail(context, $"--{ApproverOption}: {ex.Message}"), null);
         }
 
-        if (!TryRequest(set, command, vaultPath, context, out var request, out var exit))
+        if (!TryRequest(set, command, vaultPath, launch, context, out var request, out var exit))
         {
-            return exit;
+            return (exit, null);
         }
 
         var (reply, refusal) = AskAsync(pipe, vaultPath, request, context).GetAwaiter().GetResult();
 
         if (reply is null)
         {
-            context.Stderr.WriteLine($"keypaste run: {refusal}, so nothing was started");
-            return CliApp.ExitInternalError;
+            context.Stderr.WriteLine($"keypaste run: {refusal}");
+            return (CliApp.ExitInternalError, null);
         }
 
         if (reply.Set.Outcome == EnvOutcome.Resolved
@@ -372,34 +421,27 @@ internal static class RunCommand
             context.Stderr.WriteLine(
                 $"keypaste run: the keypaste process holding {vaultPath} released the '{Shown(reply.Set.Profile)}' profile " +
                 $"when '{request.Profile}' was asked for, so nothing was started");
-            return CliApp.ExitInternalError;
+            return (CliApp.ExitInternalError, null);
         }
 
-        var (admitted, resolved) = Admit(reply.Set, set with { File = null }, reply.Reason, context);
-
-        if (resolved is null)
+        if (request.Launch is not null && reply.Set.Outcome == EnvOutcome.Resolved)
         {
-            return admitted;
+            context.Stderr.WriteLine(
+                $"keypaste run: starting with {OneLine(request.Project)} ({OneLine(request.Profile)}) as you confirmed in the keypaste app");
         }
 
-        if (set.File is { } file)
-        {
-            (admitted, resolved) = Admit(EnvReferenceResolution.Apply(file, resolved), set, refusal: null, context);
+        var admitted = Admit(reply.Set, set with { File = null }, reply.Reason, context);
 
-            if (resolved is null)
-            {
-                return admitted;
-            }
-        }
-
-        return Start(command, resolved, set, context);
+        return set.File is { } file && admitted.Loaded is { } resolved
+            ? Admit(EnvReferenceResolution.Apply(file, resolved), set, refusal: null, context)
+            : admitted;
     }
 
     /// <summary>The request a set makes: a project's profile, or a reference file's keys and lines under one profile.</summary>
     private static bool TryRequest(
-        RunSet set, IReadOnlyList<string> command, string vaultPath, CliContext context, out EnvRequest request, out int exit)
+        RunSet set, IReadOnlyList<string> command, string vaultPath, string? launch, CliContext context, out EnvRequest request, out int exit)
     {
-        request = new EnvRequest(set.Project, command, context.WorkingDirectory) { Vault = vaultPath, Profile = set.Profile };
+        request = new EnvRequest(set.Project, command, context.WorkingDirectory) { Vault = vaultPath, Profile = set.Profile, Launch = launch };
         exit = CliApp.ExitSuccess;
 
         if (set.File is not { } file)
@@ -432,6 +474,7 @@ internal static class RunCommand
             Profile = envs[0].Profile,
             Keys = [.. envs.Select(env => env.Key).Distinct(StringComparer.Ordinal)],
             FileLines = lines,
+            Launch = launch,
         };
 
         // Measured with a session of the length every owner issues, so a request the framer would
@@ -447,7 +490,11 @@ internal static class RunCommand
         return true;
     }
 
-    /// <returns>The reply, or null with the reason ready to print.</returns>
+    /// <returns>The reply, or null with the reason and what follows from it ready to print.</returns>
+    /// <remarks>
+    /// Only the app listens where a run carrying a pass asks, and that pass belongs to the unlock that issued it, so a run
+    /// finding nothing there is told to press Run again rather than to unlock or start <c>keypaste agent</c>.
+    /// </remarks>
     private static async Task<(EnvReply? Reply, string Refusal)> AskAsync(
         string pipe,
         string vaultPath,
@@ -460,28 +507,33 @@ internal static class RunCommand
 
         if (client is null)
         {
-            return (null, $"nothing holds {OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste agent`");
+            return (null, request.Launch is null
+                ? NotStarted($"nothing holds {OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste agent`")
+                : "the keypaste app locked or quit before this window could start, so nothing was started. Press Run in the app again.");
         }
 
         var attached = await client.AttachAsync(new AttachRequest(vaultPath), bound.Token);
 
         if (attached is not { Attached: true, Session: { } session })
         {
-            return (null, attached?.Reason is { } reason ? Shown(reason) : "the keypaste process holding the vault did not answer");
+            return (null, NotStarted(attached?.Reason is { } reason ? Shown(reason) : "the keypaste process holding the vault did not answer"));
         }
 
         var profiled = !string.Equals(request.Profile, EnvProfileNames.Default, StringComparison.Ordinal)
             || request.Keys is not null
             || request.FileLines is not null;
 
-        context.Stderr.WriteLine(profiled
-            ? $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}' profile '{request.Profile}'; answer in its prompt"
-            : $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}'; answer in its prompt");
-        context.Stderr.Flush();
+        if (request.Launch is null)
+        {
+            context.Stderr.WriteLine(profiled
+                ? $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}' profile '{request.Profile}'; answer in its prompt"
+                : $"keypaste run: asking the keypaste process holding {vaultPath} to release '{request.Project}'; answer in its prompt");
+            context.Stderr.Flush();
+        }
 
         var reply = await client.ReleaseEnvAsync(request with { Session = session }, bound.Token);
 
-        return (reply, bound.IsCancellationRequested ? "no answer came in time" : "the keypaste process holding the vault did not answer");
+        return (reply, NotStarted(bound.IsCancellationRequested ? "no answer came in time" : "the keypaste process holding the vault did not answer"));
     }
 
     /// <summary>What a resolved set comes to: the set to start with, or the exit code and a reason on stderr.</summary>
@@ -569,7 +621,7 @@ internal static class RunCommand
         var result = EnvLaunch.Start(
             resolved,
             new LaunchTarget(command[0], arguments),
-            context.Environment.All(),
+            Inherited(context),
             context.ProcessLauncher);
 
         switch (result.Outcome)
@@ -593,6 +645,22 @@ internal static class RunCommand
                 context.Stderr.WriteLine($"keypaste run: {result.Error}");
                 return CliApp.ExitInternalError;
         }
+    }
+
+    /// <summary>The environment a child inherits: this process's, less a launch pass, which belongs to the one run it was issued for (D-0452).</summary>
+    internal static Dictionary<string, string> Inherited(CliContext context)
+    {
+        var parent = new Dictionary<string, string>(EnvironmentMerge.Comparer);
+
+        foreach (var (name, value) in context.Environment.All())
+        {
+            if (!EnvironmentMerge.Comparer.Equals(name, LaunchPasses.EnvironmentVariable))
+            {
+                parent[name] = value;
+            }
+        }
+
+        return parent;
     }
 
     /// <summary>What was injected and where each value came from: names and references, and a literal's own text.</summary>
@@ -656,6 +724,8 @@ internal static class RunCommand
     /// <summary>Another process's words, made safe for this terminal.</summary>
     private static string Shown(string text) => EntryNameSanitizer.SanitizeProse(text, 512).Text;
 
+    private static string NotStarted(string reason) => $"{reason}, so nothing was started";
+
     /// <summary>A path or a file's literal as written, on one line, with nothing that draws anything else.</summary>
     internal static string OneLine(string text) =>
         DisplayTextSanitizer.Sanitize(text.Replace('\n', '\0').Replace('\t', '\0'), 1024).Text;
@@ -679,6 +749,8 @@ internal static class RunCommand
         writer.WriteLine($"-p picks the profile, {EnvProfileNames.Default} by default. with no project, the one projects.json");
         writer.WriteLine($"maps this directory to is used, and its {EnvReferenceFile.FileName} only when that file names");
         writer.WriteLine("nothing but that project's variables; --env-file uses any reference file you name.");
+        writer.WriteLine("--project <name> names the project as the operand does, and takes a name that");
+        writer.WriteLine("starts with -.");
         writer.WriteLine();
         writer.WriteLine("with --session, no password is asked for here: the keypaste app or `keypaste agent`");
         writer.WriteLine("holding the vault unlocked shows you the project, its variable names, the command");

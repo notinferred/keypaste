@@ -726,7 +726,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind)) { Login = LoginItem, CliLink = CliLink },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
-            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
+            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),
             DestinationKind.Trash => new TrashViewModel(_session),
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowToast),
@@ -787,6 +787,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The <c>keypaste</c> a terminal runs, which Settings links to this app's own; none where the platform needs no link.</summary>
     internal ICliLink? CliLink { get; init; }
+
+    /// <summary>What Run and Open terminal start a project's terminal with; the platform's own, answered by <see cref="Authority"/>, unless given.</summary>
+    internal ProjectLaunching? Launching { get; init; }
 
     private HttpMessageHandler? _ownShareTransport;
 

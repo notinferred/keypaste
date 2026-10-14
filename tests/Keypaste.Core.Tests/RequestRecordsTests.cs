@@ -281,7 +281,7 @@ public sealed class RequestRecordsTests : IDisposable
     [Fact]
     public void AnOversizedRunLine_IsRefused()
     {
-        var entries = Enumerable.Range(0, 200).Select(i => $"env/acme-api/KEY_{i}_" + new string('K', 60)).ToList();
+        var entries = Enumerable.Range(0, AuditLog.MaximumRecordBytes / 64).Select(i => $"env/acme-api/KEY_{i}_" + new string('K', 60)).ToList();
 
         using var log = Open();
         Assert.False(log.TryAppend(RunLine(entries), out var error));

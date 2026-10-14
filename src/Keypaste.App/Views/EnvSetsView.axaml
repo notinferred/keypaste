@@ -724,7 +724,7 @@
                         <TextBlock Classes="section" Text="Run with this environment" VerticalAlignment="Center" />
                       </StackPanel>
 
-                      <Border Classes="terminal" CornerRadius="6" Padding="12,5,5,5">
+                      <Border Classes="terminal" CornerRadius="6" Padding="12,5,5,5" IsVisible="{Binding HasRunCommand}">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                           <TextBlock Text="›" FontSize="12.5" Margin="0,0,8,0" VerticalAlignment="Center"
                                      Foreground="{DynamicResource KpAmber}" />
@@ -738,6 +738,7 @@
                           </Button>
                         </Grid>
                       </Border>
+                      <TextBlock Classes="caption" Text="{Binding RunCommandNote}" IsVisible="{Binding !HasRunCommand}" />
 
                       <TextBlock Classes="body muted" FontSize="12.5" LineHeight="18.75"
                                  Text="Values go only into the command's environment and are never written to disk. The command, anything it starts and other programs running as you can read them." />
@@ -767,8 +768,7 @@
                         </Button>
                         <Button Classes="ghost" Content="Open terminal" Command="{Binding Launch.OpenTerminalCommand}" />
                       </StackPanel>
-                      <TextBlock Classes="caption" IsVisible="{Binding !Launch.IsSupported}"
-                                 Text="This app opens terminals on Windows and Linux only. Copy the run command instead." />
+                      <TextBlock Classes="caption" IsVisible="{Binding !Launch.IsSupported}" Text="{Binding Launch.UnsupportedReason}" />
 
                       <!-- The confirmation names the command, the directory and the variables' names, never a value. -->
                       <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" BorderBrush="{DynamicResource KpBorderStrong}"
@@ -776,7 +776,7 @@
                         <StackPanel Spacing="6">
                           <TextBlock Classes="body primary" Text="{Binding Launch.ConfirmTitle}" />
                           <TextBlock Classes="mono primary" Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap" />
-                          <TextBlock Classes="caption" Text="{Binding Launch.ConfirmDirectory, StringFormat='in {0}'}" />
+                          <TextBlock Classes="caption" Text="{Binding Launch.ConfirmDirectory, StringFormat='in {0}'}" TextWrapping="Wrap" />
                           <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding Launch.ConfirmKeys}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="{Binding Launch.ConfirmSources}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="Everything run in that terminal can read these values." />

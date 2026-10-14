@@ -758,6 +758,39 @@ public sealed class ApproverProtocolTests
         Assert.Null(refused.Value);
     }
 
+    /// <summary>An env set's reply that exactly fills its own bound is delivered, and one byte more is refused whole.</summary>
+    [Fact]
+    public void AnEnvReplyThatExactlyFillsItsBound_IsDeliveredAndOneByteMoreIsNot()
+    {
+        static EnvReply Set(string value) => new(EnvResolved.Released("billing", [new EnvVariable("CERTIFICATE", value)]), string.Empty);
+
+        var envelope = ApproverProtocol.Encode(Set(string.Empty)).Length;
+        var exact = new string('a', ApproverProtocol.MaximumEnvReplyPayloadBytes - envelope);
+
+        var fits = ApproverProtocol.Encode(Set(exact));
+
+        Assert.Equal(ApproverProtocol.MaximumEnvReplyPayloadBytes, fits.Length);
+        Assert.True(ApproverProtocol.Fits(Set(exact)));
+        Assert.True(ApproverProtocol.TryDecode(fits, out EnvReply? delivered));
+        Assert.Equal(exact, Assert.Single(delivered.Set.Variables).Value, StringComparer.Ordinal);
+
+        Assert.False(ApproverProtocol.Fits(Set(exact + "a")));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Set(exact + "a")), out EnvReply? refused));
+        Assert.Equal(EnvOutcome.TooLarge, refused.Set.Outcome);
+        Assert.Empty(refused.Set.Variables);
+    }
+
+    /// <summary>Only an env set's reply is bounded past one frame: a credential or an agent's run of the same value is not (D-0454).</summary>
+    [Fact]
+    public void OnlyAnEnvSetsReply_IsBoundedPastOneFrame()
+    {
+        var value = new string('v', 100_000);
+
+        Assert.True(ApproverProtocol.Fits(new EnvReply(EnvResolved.Released("billing", [new EnvVariable("CERTIFICATE", value)]), string.Empty)));
+        Assert.False(ApproverProtocol.Fits(Granted(value)));
+        Assert.False(ApproverProtocol.Fits(Ran(value)));
+    }
+
     /// <summary>
     /// No credential reply, however it is built, encodes to a frame this transport cannot send.
     /// </summary>

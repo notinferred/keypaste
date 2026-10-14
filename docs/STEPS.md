@@ -33,11 +33,6 @@ A variable becomes an env-named custom field on an ordinary entry. The entry's o
 
 keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an untagged entry under `env/<project>`, the layout 0.3.0 wrote, is an ordinary entry and no variable. The syntax of `-p`, of `kp://<project>/<environment>/<KEY>` and of token scopes is kept.
 
-- [ ] **E.1d — Run a project from the app on macOS.** Needs: G.5.
-  - Terminal.app runs the bundle's `keypaste run --session` for the project.
-  - The command is passed as arguments and never spliced into script text.
-  - The app's own run prompt is the only question.
-  - It amends D-0340's "none on macOS".
 - [ ] **P.3b1 — Resolve same-entry placeholders in released values.** Needs: C.1b.
   - `{TITLE}`, `{USERNAME}`, `{PASSWORD}`, `{URL}`, `{NOTES}` and `{S:<field>}` resolve within the entry the person approved, to KeePassXC's depth of 10. So `OPENAI_API_KEY={PASSWORD}` needs no copy.
   - `{REF:…}` stays refused; it is P.3b2 in BACKLOG.

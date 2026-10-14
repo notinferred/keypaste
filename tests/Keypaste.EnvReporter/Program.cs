@@ -11,7 +11,9 @@ namespace Keypaste.EnvReporter;
 /// Reports its process id, its working directory, its own command line and the named variables of
 /// its own environment over the named pipe it is given, waits for the test to hang up, lingers if
 /// told to, then exits. Or, started with flags, it is the child an agent's run starts in the capture
-/// tests: it prints what it is told to, in the forms it is told to, and exits as it is told to.
+/// tests: it prints what it is told to, in the forms it is told to, and exits as it is told to. Or,
+/// copied under the name <c>keypaste</c>, it prints each argument it was given as a JSON string, one
+/// a line, so a test sees what a shell made of a copied run command.
 /// </summary>
 /// <remarks>
 /// The app's Run starts it in a terminal in V-E.1b. It reports over a pipe so the test reads what the
@@ -23,6 +25,18 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        // The whole file name, since this one's, Keypaste.EnvReporter, is "Keypaste" less what looks like an extension.
+        if (string.Equals(Path.GetFileName(Environment.ProcessPath), OperatingSystem.IsWindows() ? "keypaste.exe" : "keypaste", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var argument in args)
+            {
+                Console.Out.WriteLine($"\"{JsonEncodedText.Encode(argument)}\"");
+            }
+
+            Console.Out.Flush();
+            return 0;
+        }
+
         if (args.Length < 1)
         {
             Console.Error.WriteLine("usage: Keypaste.EnvReporter <pipe> [--linger SECONDS] [NAME...] | --<step> ...");

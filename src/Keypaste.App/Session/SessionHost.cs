@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Net.Sockets;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
@@ -23,16 +24,23 @@ namespace Keypaste.App.Session;
 /// <para>
 /// Everything that answers agents is built per unlock and belongs to that unlock's
 /// <see cref="SessionLifetime"/>, so a lock withdraws what is waiting and zeroes the grants given,
-/// before the listener stops (D-0313).
+/// before the listeners stop (D-0313).
 /// </para>
 /// <para>
 /// A failure to listen does not stop the unlock. The app is a password manager without MCP
 /// (docs/PRODUCT.md law 5.6); the failure is reported instead of the endpoint.
 /// </para>
 /// <para>
+/// Where the app's Runs go through Terminal, each unlock is also served on a <see cref="LaunchEndpoint"/>,
+/// under a name this host picks once, which only the run Terminal starts asks, so a Run starts whatever
+/// agents meet: its authority is built before either endpoint is bound, and each failure to bind is
+/// reported apart (D-0451).
+/// </para>
+/// <para>
 /// Every request answered is recorded in the home's audit log before its reply leaves. A log that
 /// cannot be opened does not stop the unlock either: each request is refused before anybody is asked,
-/// and the next one tries the log again, so mending the file needs no new unlock.
+/// and the next one tries the log again, so mending the file needs no new unlock. A Run on macOS, whose
+/// window's request writes a line, tries it the same way before its card (D-0451).
 /// </para>
 /// </remarks>
 internal sealed class SessionHost : IDisposable
@@ -46,6 +54,7 @@ internal sealed class SessionHost : IDisposable
     private readonly string? _approverOverride;
     private readonly Func<IApprovalChannel> _approvals;
     private readonly Action? _requestLock;
+    private readonly string? _launchName;
     private readonly HourlyLimit _hourly;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
@@ -55,11 +64,13 @@ internal sealed class SessionHost : IDisposable
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
     /// <param name="approvals">Where a person is asked, per unlock.</param>
     /// <param name="requestLock">What <c>keypaste lock</c> runs, or null to refuse it.</param>
+    /// <param name="servesLaunches">Whether each unlock is also served on a launch endpoint for the run Terminal starts (D-0451).</param>
     internal SessionHost(
         AppVaultSession session,
         string? approverOverride,
         Func<IApprovalChannel> approvals,
-        Action? requestLock = null)
+        Action? requestLock = null,
+        bool servesLaunches = false)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(approvals);
@@ -68,6 +79,7 @@ internal sealed class SessionHost : IDisposable
         _approverOverride = approverOverride;
         _approvals = approvals;
         _requestLock = requestLock;
+        _launchName = servesLaunches ? LaunchEndpoint.NewName() : null;
 
         // One for the app's life, so locking and unlocking again does not refill an hourly limit.
         _hourly = new HourlyLimit(session.Clock);
@@ -86,6 +98,21 @@ internal sealed class SessionHost : IDisposable
     /// <summary>Why nothing is being served for an unlocked vault, or null.</summary>
     internal string? Failure { get; private set; }
 
+    /// <summary>Why no launch endpoint is served for an unlocked vault that should have one, or null.</summary>
+    internal string? LaunchFailure { get; private set; }
+
+    /// <summary>Why the audit log every request answered here is recorded in does not open now, tried as a request tries it, or null when it opens or nothing is served.</summary>
+    internal string? AuditFailure
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.AuditFailure;
+            }
+        }
+    }
+
     /// <summary>
     /// The session agents reaching <see cref="Endpoint"/> would be answered under, read from the
     /// authority answering them, or null when nothing here answers.
@@ -101,6 +128,22 @@ internal sealed class SessionHost : IDisposable
             lock (_gate)
             {
                 return _hosted?.Serving is { } session && Endpoint is { } endpoint ? (session, endpoint) : null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The session the run Terminal starts would be answered under on the launch endpoint, read from the
+    /// authority answering it, or null when nothing here answers it.
+    /// </summary>
+    /// <remarks>Null once the launch endpoint's accept loop has ended, whatever the vault's endpoint does.</remarks>
+    internal string? Launching
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Launching;
             }
         }
     }
@@ -252,6 +295,28 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>Issues the pass a Run confirmed in the app hands the <c>keypaste run --session</c> Terminal starts on macOS (D-0452).</summary>
+    /// <param name="claim">The request the confirmation named, and the set it showed.</param>
+    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <returns>The pass and the launch endpoint that run must ask, read together, or null when no launch endpoint listens or that session has ended.</returns>
+    internal (string Pass, string Endpoint)? IssueLaunch(LaunchClaim claim, string lifetimeId)
+    {
+        lock (_gate)
+        {
+            return _hosted?.IssueLaunch(claim, lifetimeId);
+        }
+    }
+
+    /// <summary>Forgets a pass Terminal was never handed.</summary>
+    /// <param name="pass">The pass <see cref="IssueLaunch"/> returned.</param>
+    internal void WithdrawLaunch(string pass)
+    {
+        lock (_gate)
+        {
+            _hosted?.WithdrawLaunch(pass);
+        }
+    }
+
     /// <summary>The grants in force, as <c>keypaste grants</c> lists them: names and ids, never a value.</summary>
     internal IReadOnlyList<GrantSummary> Grants() => GrantSummary.Of(Activity);
 
@@ -304,22 +369,11 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            string pipe;
-
-            try
-            {
-                pipe = ApproverEndpoint.Resolve(null, _approverOverride, vault)!;
-            }
-            catch (ArgumentException ex)
-            {
-                Failure = $"the {ApproverEndpoint.EnvironmentVariable} setting cannot name a pipe: {ex.Message}";
-                return;
-            }
-
-            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), _requestLock, _hourly, out var failure);
+            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _approverOverride, _launchName);
             _hosted = hosted;
-            Endpoint = hosted is null ? null : pipe;
-            Failure = failure;
+            Endpoint = hosted.Endpoint;
+            Failure = hosted.Failure;
+            LaunchFailure = hosted.LaunchFailure;
         }
     }
 
@@ -337,6 +391,7 @@ internal sealed class SessionHost : IDisposable
         _hosted = null;
         Endpoint = null;
         Failure = null;
+        LaunchFailure = null;
         hosted?.Dispose();
     }
 
@@ -356,37 +411,58 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
-    /// <summary>One listener and what it answers with, for one unlock.</summary>
+    /// <summary>What answers for one unlock, and the endpoints it is served on.</summary>
     private sealed class Hosted : IDisposable
     {
         private readonly SessionServer _server;
         private readonly AuditOpener _audit;
+        private readonly LaunchEndpoint? _launches;
         private readonly CancellationTokenSource _stop = new();
-        private readonly Task _run;
+        private readonly Task? _agents;
+        private readonly Task? _launching;
 
-        private Hosted(SessionServer server, AuditOpener audit)
+        private Hosted(SessionServer server, AuditOpener audit, string? endpoint, string? failure, LaunchEndpoint? launches, string? launchFailure)
         {
             _server = server;
             _audit = audit;
-            _run = server.RunAsync(_stop.Token);
+            _launches = launches;
+            Endpoint = endpoint;
+            Failure = failure;
+            LaunchFailure = launchFailure;
+            _agents = endpoint is null ? null : server.RunAsync(_stop.Token);
+            _launching = launches?.RunAsync(_stop.Token);
         }
 
-        /// <summary>The session the authority answers under while the listener still accepts, or null.</summary>
-        internal string? Serving => _run.IsCompleted ? null : _server.Authority.Serving;
+        /// <summary>The vault's endpoint, or null when it could not be bound.</summary>
+        internal string? Endpoint { get; }
 
-        internal ApproverActivity Activity => _run.IsCompleted ? ApproverActivity.None : _server.Authority.Activity;
+        internal string? Failure { get; }
 
-        internal IReadOnlyList<ConnectedClient> Clients => _run.IsCompleted ? [] : _server.Authority.Clients;
+        internal string? LaunchFailure { get; }
+
+        internal string? AuditFailure => _audit.Failure;
+
+        /// <summary>The session the authority answers agents under while the vault's endpoint still accepts, or null.</summary>
+        internal string? Serving => AnswersAgents ? _server.Authority.Serving : null;
+
+        /// <summary>The session the authority answers the run Terminal starts under while the launch endpoint still accepts, or null.</summary>
+        internal string? Launching => _launching is { IsCompleted: false } ? _server.Authority.Serving : null;
+
+        internal ApproverActivity Activity => AnswersAgents ? _server.Authority.Activity : ApproverActivity.None;
+
+        internal IReadOnlyList<ConnectedClient> Clients => AnswersAgents ? _server.Authority.Clients : [];
 
         internal IReadOnlyList<ReleaseSeen> Released => _server.Authority.Released;
 
+        private bool AnswersAgents => _agents is { IsCompleted: false };
+
         internal void RevokeClient(string label) => _server.Authority.RevokeClient(label);
 
-        internal EffectiveAccess? Access(string? label) => _run.IsCompleted ? null : _server.Authority.Access(label);
+        internal EffectiveAccess? Access(string? label) => AnswersAgents ? _server.Authority.Access(label) : null;
 
         internal bool TrySettings(string agent, [NotNullWhen(true)] out AgentSettingsState? settings, out string problem)
         {
-            if (_run.IsCompleted)
+            if (!AnswersAgents)
             {
                 settings = null;
                 problem = _notAnswering;
@@ -397,12 +473,12 @@ internal sealed class SessionHost : IDisposable
         }
 
         internal ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, AccessEdit edit, CancellationToken cancellationToken) =>
-            _run.IsCompleted
+            !AnswersAgents
                 ? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering))
                 : _server.Authority.ChangeAccessAsync(agent, edit, Surface, cancellationToken);
 
         internal ValueTask<AccessChangeReply> ResetCapsAsync(CancellationToken cancellationToken) =>
-            _run.IsCompleted
+            !AnswersAgents
                 ? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering))
                 : _server.Authority.ResetCapsAsync(Surface, cancellationToken);
 
@@ -412,21 +488,31 @@ internal sealed class SessionHost : IDisposable
 
         internal void RevokeAll() => _server.Authority.RevokeAll();
 
-        internal static Hosted? TryStart(
-            string pipe,
+        internal (string Pass, string Endpoint)? IssueLaunch(LaunchClaim claim, string lifetimeId) =>
+            _launches is { } launches && _launching is { IsCompleted: false } && _server.Authority.IssueLaunch(claim, lifetimeId) is { } pass
+                ? (pass, launches.Name)
+                : null;
+
+        internal void WithdrawLaunch(string pass) => _server.Authority.WithdrawLaunch(pass);
+
+        /// <summary>Builds the unlock's authority, then binds its launch endpoint when it has one and the vault's endpoint, each reporting why it could not be bound.</summary>
+        internal static Hosted Start(
             VaultIdentity vault,
             AppVaultSession session,
             SessionLifetime lifetime,
             IApprovalChannel channel,
             Action? requestLock,
             HourlyLimit hourly,
-            out string? failure)
+            string? approverOverride,
+            string? launchName)
         {
             AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home));
+            SessionServer? server = null;
+            LaunchEndpoint? launches = null;
 
             try
             {
-                var server = SessionServer.Listen(pipe, new SessionServerOptions
+                server = SessionServer.Build(new SessionServerOptions
                 {
                     Vault = vault,
                     Lifetime = lifetime,
@@ -445,19 +531,57 @@ internal sealed class SessionHost : IDisposable
                     Clock = session.Clock,
                 });
 
-                failure = null;
-                var hosted = new Hosted(server, audit);
+                string? launchFailure = null;
+
+                if (launchName is not null)
+                {
+                    try
+                    {
+                        launches = LaunchEndpoint.Listen(launchName, server.Authority);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException)
+                    {
+                        launchFailure = $"keypaste could not open a private connection for Terminal: {ex.Message}";
+                    }
+                }
+
+                var (endpoint, failure) = BindForAgents(server, approverOverride, vault);
+                var hosted = new Hosted(server, audit, endpoint, failure, launches, launchFailure);
                 audit = null;
+                server = null;
+                launches = null;
                 return hosted;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                failure = $"keypaste could not listen for agents: {ex.Message}";
-                return null;
             }
             finally
             {
+                launches?.Dispose();
+                server?.Dispose();
                 audit?.Dispose();
+            }
+        }
+
+        /// <summary>Binds the vault's endpoint, returning its name, or why it could not be bound.</summary>
+        private static (string? Endpoint, string? Failure) BindForAgents(SessionServer server, string? approverOverride, VaultIdentity vault)
+        {
+            string pipe;
+
+            try
+            {
+                pipe = ApproverEndpoint.Resolve(null, approverOverride, vault)!;
+            }
+            catch (ArgumentException ex)
+            {
+                return (null, $"the {ApproverEndpoint.EnvironmentVariable} setting cannot name a pipe: {ex.Message}");
+            }
+
+            try
+            {
+                server.Bind(pipe);
+                return (pipe, null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException)
+            {
+                return (null, $"keypaste could not listen for agents: {ex.Message}");
             }
         }
 
@@ -475,25 +599,32 @@ internal sealed class SessionHost : IDisposable
         {
             _stop.Cancel();
 
+            // No time limit (D-0392): reads end on the stop token, each delivery ends a second after it (D-0420), and every handler must finish once withdrawn or stopped.
+            Stopped(_agents);
+            Stopped(_launching);
+
+            _server.Dispose();
+            _launches?.Dispose();
+            _audit.Dispose();
+            _stop.Dispose();
+        }
+
+        private static void Stopped(Task? accepting)
+        {
             try
             {
-                // No time limit (D-0392): reads end on the stop token, each delivery ends a second after it (D-0420), and every handler must finish once withdrawn or stopped.
-                _run.Wait();
+                accepting?.Wait();
             }
             catch (AggregateException)
             {
                 // Stopping is the answer either way; a connection that faulted has already ended.
             }
-
-            _server.Dispose();
-            _audit.Dispose();
-            _stop.Dispose();
         }
     }
 
     /// <summary>
-    /// The home's audit log, opened at the first request, so an unlock creates no log, and tried again
-    /// on the next request after an open that failed.
+    /// The home's audit log, opened at the first request or a macOS Run's check before its card, so an
+    /// unlock alone creates no log, and tried again at the next after an open that failed.
     /// </summary>
     private sealed class AuditOpener(string path) : IDisposable
     {
@@ -501,14 +632,28 @@ internal sealed class SessionHost : IDisposable
         private AuditLog? _log;
         private bool _disposed;
 
+        /// <summary>Why the log does not open now, or null when it opens.</summary>
+        internal string? Failure => TryOpen(out var failure) is null ? failure : null;
+
         /// <summary>The log, or null while it cannot be opened, which refuses every request.</summary>
-        internal AuditLog? Open()
+        internal AuditLog? Open() => TryOpen(out _);
+
+        private AuditLog? TryOpen(out string? failure)
         {
             lock (_gate)
             {
-                if (_log is null && !_disposed && AuditLog.TryOpen(path, TimeProvider.System, out var opened, out _))
+                failure = null;
+
+                if (_log is null && !_disposed)
                 {
-                    _log = opened;
+                    if (AuditLog.TryOpen(path, TimeProvider.System, out var opened, out var error))
+                    {
+                        _log = opened;
+                    }
+                    else
+                    {
+                        failure = error;
+                    }
                 }
 
                 return _log;

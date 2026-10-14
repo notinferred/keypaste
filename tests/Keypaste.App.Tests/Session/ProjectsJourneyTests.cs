@@ -8,6 +8,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
+using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -32,11 +33,12 @@ namespace Keypaste.App.Tests.Session;
 /// Driven as <see cref="OneHomeJourneyTests"/> is, pressing controls where the window draws them,
 /// with every frame held to N.1a2's amber rule. The vault is written through Core with the layout
 /// <c>scripts/verify-keepassxc-projects.sh</c> has KeePassXC make, where KeePassXC then reads every
-/// write. Run uses the machine's terminal as the app finds it: <c>cmd.exe</c> on Windows, and on Linux
+/// write. Run uses the machine's terminal as the app finds it: <c>cmd.exe</c> on Windows, on Linux
 /// a stand-in <c>x-terminal-emulator</c> put first on <c>PATH</c> that runs its <c>-e</c> command, since a
-/// runner has no display; where the app opens no terminal, macOS until E.1d, the journey holds the
-/// refusal instead.
+/// runner has no display, and on macOS Terminal through an assembled <c>keypaste.app</c> and
+/// <see cref="TerminalStandIn"/>, its window's <c>keypaste run --session</c> asking the app's own endpoint.
 /// </remarks>
+[Collection(nameof(TerminalRequestFolder))]
 public sealed class ProjectsJourneyTests
 {
     private const string _webKey = "web-journey-c4";
@@ -69,8 +71,8 @@ public sealed class ProjectsJourneyTests
 
             var webDirectory = Directory.CreateDirectory(Path.Combine(fixture.Home, "web")).FullName;
             var billingDirectory = Directory.CreateDirectory(Path.Combine(fixture.Home, "billing")).FullName;
-            var webPipe = "kp-c4-web-" + Guid.NewGuid().ToString("N");
-            var billingPipe = "kp-c4-billing-" + Guid.NewGuid().ToString("N");
+            var webPipe = "kp-c4-web-" + Guid.NewGuid().ToString("N")[..16];
+            var billingPipe = "kp-c4-billing-" + Guid.NewGuid().ToString("N")[..16];
             Map(vault, "web", webDirectory, Reporter(webPipe));
 
             var dotEnv = Path.Combine(fixture.Home, "billing.env");
@@ -80,6 +82,7 @@ public sealed class ProjectsJourneyTests
 
             var path = Environment.GetEnvironmentVariable("PATH");
             var stubs = Directory.CreateDirectory(Path.Combine(fixture.Home, "terminal")).FullName;
+            var terminal = OperatingSystem.IsMacOS() ? new TerminalStandIn(stubs) : null;
             List<int> started = [];
 
             try
@@ -92,7 +95,13 @@ public sealed class ProjectsJourneyTests
 
                 using var lifetime = new ClassicDesktopStyleApplicationLifetime();
                 Attach(lifetime);
-                using var app = new App { Pickers = _ => picker };
+                using var app = new App
+                {
+                    Pickers = _ => picker,
+                    LaunchingFor = authority => OperatingSystem.IsMacOS()
+                        ? ProjectLaunching.ForMacBundle(authority, terminal!.Bundle, terminal.Open)
+                        : ProjectLaunching.ForThisMachine(authority),
+                };
                 app.Launch(lifetime);
                 lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
 
@@ -203,25 +212,17 @@ public sealed class ProjectsJourneyTests
                 Press(main, ByCommand(main, project.Launch.SaveCommand));
                 Assert.True(project.Launch.IsMapped, screen.Error);
 
-                if (!project.Launch.IsSupported)
-                {
-                    Assert.False(ByName<Button>(main, "Run in a terminal").IsEffectivelyEnabled);
-                    Assert.Contains("This app opens terminals on Windows and Linux only. Copy the run command instead.", AutomationNames(main));
-                }
-                else
-                {
-                    var billing = await RunAsync(main, shell, billingPipe, "From env/billing/.env, services/Stripe", started);
-                    Assert.Equal(
-                        [$"STRIPE_KEY={_replaced}", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY=" + unlocked.ReadField(home, "NEW_KEY"), $"IMPORTED_KEY={_imported}", "WEB_KEY unset"],
-                        billing);
+                var billing = await RunAsync(main, shell, billingPipe, "From env/billing/.env, services/Stripe", started, terminal);
+                Assert.Equal(
+                    [$"STRIPE_KEY={_replaced}", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY=" + unlocked.ReadField(home, "NEW_KEY"), $"IMPORTED_KEY={_imported}", "WEB_KEY unset"],
+                    billing);
 
-                    // The project projects.json maps runs where it is mapped.
-                    Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "web" }));
-                    Assert.Equal("web", Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject?.Name);
-                    Assert.Equal(
-                        ["STRIPE_KEY unset", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY unset", "IMPORTED_KEY unset", $"WEB_KEY={_webKey}"],
-                        await RunAsync(main, shell, webPipe, "From apps/Web", started));
-                }
+                // The project projects.json maps runs where it is mapped.
+                Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "web" }));
+                Assert.Equal("web", Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject?.Name);
+                Assert.Equal(
+                    ["STRIPE_KEY unset", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY unset", "IMPORTED_KEY unset", $"WEB_KEY={_webKey}"],
+                    await RunAsync(main, shell, webPipe, "From apps/Web", started, terminal));
 
                 Chord(main, PhysicalKey.L);
                 await Until(() => root.Content is UnlockView);
@@ -231,11 +232,13 @@ public sealed class ProjectsJourneyTests
             {
                 Environment.SetEnvironmentVariable("PATH", path);
                 started.ForEach(End);
+                terminal?.Dispose();
             }
         });
 
     /// <summary>Presses Run in a terminal and Start, reads what the child reports, and hangs up so it exits.</summary>
-    private static async Task<List<string>> RunAsync(Window main, ShellViewModel shell, string pipeName, string sources, List<int> started)
+    /// <remarks>On macOS Start opens a window of <paramref name="terminal"/>, which ends it.</remarks>
+    private static async Task<List<string>> RunAsync(Window main, ShellViewModel shell, string pipeName, string sources, List<int> started, TerminalStandIn? terminal)
     {
         using var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
         var connected = pipe.WaitForConnectionAsync(Token);
@@ -249,11 +252,21 @@ public sealed class ProjectsJourneyTests
         await Until(() => project.Launch.IsConfirming, () => screen.Error ?? $"no confirmation and no error; the press reached {Hit(main, run)}");
         Assert.Contains(sources, AutomationNames(main));
         AssertOneRevealed(main, ByCommand(main, project.Launch.ConfirmLaunchCommand), "the run confirmation");
+        var windows = terminal?.Windows.Count ?? 0;
         Press(main, ByCommand(main, project.Launch.ConfirmLaunchCommand));
-        await Until(() => project.Launch.LastStart is not null);
-        var start = Assert.IsType<ChildResult>(project.Launch.LastStart);
-        Assert.Equal(ChildOutcome.Started, start.Outcome);
-        started.Add(start.ProcessId);
+
+        if (terminal is not null)
+        {
+            await Until(() => terminal.Windows.Count > windows || screen.Error is not null, () => screen.Error ?? "Terminal was not opened");
+            Assert.Null(screen.Error);
+        }
+        else
+        {
+            await Until(() => project.Launch.LastStart is not null);
+            var start = Assert.IsType<ChildResult>(project.Launch.LastStart);
+            Assert.Equal(ChildOutcome.Started, start.Outcome);
+            started.Add(start.ProcessId);
+        }
 
         await connected.WaitAsync(TimeSpan.FromSeconds(60), Token);
         List<string> report = [];

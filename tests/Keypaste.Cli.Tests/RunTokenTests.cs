@@ -69,6 +69,19 @@ public sealed class RunTokenTests : IDisposable
     }
 
     [Fact]
+    public void Bundle_HandsTheChildNoLaunchPass()
+    {
+        _harness.Environment[RunWithToken.EnvironmentVariable] = Bundled("read:acme-api/staging/*");
+        _harness.Environment[LaunchPasses.EnvironmentVariable] = new string('A', LaunchPasses.Length);
+        _harness.Environment.Remove(VaultLocator.EnvironmentVariable);
+
+        _harness.AssertExit(0, _harness.Run("run", "--bundle", BundlePath, "--", "deploy"));
+
+        Assert.Equal(TokenVerbTests.Value, _harness.ProcessLauncher.Environment["DATABASE_URL"]);
+        Assert.False(_harness.ProcessLauncher.Environment.ContainsKey(LaunchPasses.EnvironmentVariable));
+    }
+
+    [Fact]
     public void Bundle_StoppedBeforeItsChildStarted_ExitsWithTheSignalsCodeAndSaysSo()
     {
         _harness.Environment[RunWithToken.EnvironmentVariable] = Bundled("read:acme-api/staging/*");
@@ -123,6 +136,32 @@ public sealed class RunTokenTests : IDisposable
         Assert.Single(_harness.ProcessLauncher.Started);
     }
 
+    /// <summary><c>--project</c> picks a bundle's set as the operand does, including one whose project starts with <c>-</c> (D-0453).</summary>
+    [Fact]
+    public void Bundle_ProjectOption_PicksThatSet_EvenOneStartingWithADash()
+    {
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            ProjectVariables.Set(vault, "-web", "staging", "KEY", "dash-web-key");
+            vault.Save();
+        }
+
+        _harness.Environment[RunWithToken.EnvironmentVariable] = Bundled("read:web/staging/*,read:-web/staging/*");
+
+        _harness.AssertExit(0, _harness.Run("run", "--bundle", BundlePath, "--project=-web", "--", "deploy"));
+        Assert.Equal("dash-web-key", _harness.ProcessLauncher.Environment["KEY"]);
+
+        _harness.AssertExit(0, _harness.Run("run", "--bundle", BundlePath, "--project", "-web", "--", "deploy"));
+        Assert.Equal("dash-web-key", _harness.ProcessLauncher.Environment["KEY"]);
+
+        _harness.AssertExit(0, _harness.Run("run", "--bundle", BundlePath, "--project", "web", "--", "deploy"));
+        Assert.Equal("web-key", _harness.ProcessLauncher.Environment["KEY"]);
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--bundle", BundlePath, "--project=-web", "web", "--", "deploy"));
+        Assert.Contains("expected at most one project name", _harness.Err, StringComparison.Ordinal);
+        Assert.Equal(3, _harness.ProcessLauncher.Started.Count);
+    }
+
     [Fact]
     public async Task Session_Releases_AndTheOwnerAudited()
     {
@@ -142,6 +181,33 @@ public sealed class RunTokenTests : IDisposable
         Assert.Contains("\"decision\":\"granted\"", line, StringComparison.Ordinal);
         Assert.Contains("keypaste run --token", line, StringComparison.Ordinal);
         Assert.False(File.Exists(KeypasteHome.AuditPath(RunnerHome)));
+    }
+
+    /// <summary>A set past one ordinary frame reaches the child whole under a token, in the reply only a runner reads (D-0454).</summary>
+    [Fact]
+    public async Task Session_ASetOf200KiB_ReachesTheChildWhole()
+    {
+        var large = Enumerable.Range(0, 7).Select(i => new EnvVariable($"BLOB_{i}", new string((char)('a' + i), 30_000))).ToList();
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            foreach (var variable in large)
+            {
+                ProjectVariables.Set(vault, "acme-api", "staging", variable.Key, variable.Value);
+            }
+
+            vault.Save();
+        }
+
+        var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*");
+        await using var owner = Owner.Start(this, audited: true);
+        RunAsARunner(token);
+
+        _harness.AssertExit(0, Run("-p", "staging", "acme-api"));
+
+        var child = _harness.ProcessLauncher.Environment;
+        Assert.All(large, variable => Assert.Equal(variable.Value, child[variable.Key]));
+        Assert.Equal(TokenVerbTests.Value, child["DATABASE_URL"]);
+        Assert.Contains("\"decision\":\"granted\"", Assert.Single(owner.AuditLines()), StringComparison.Ordinal);
     }
 
     [Fact]

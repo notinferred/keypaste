@@ -5,7 +5,7 @@ using Keypaste.Core.Ipc;
 namespace Keypaste.App.Session;
 
 /// <summary>
-/// The app's session authority: the unlocked session and the endpoint it is served on, started,
+/// The app's session authority: the unlocked session and the endpoints it is served on, started,
 /// held and ended together (D-0309, D-0313).
 /// </summary>
 /// <remarks>
@@ -17,6 +17,11 @@ namespace Keypaste.App.Session;
 /// <see cref="Status"/> is read from the authority answering agents, never from whether a pipe of
 /// the vault's name accepts a connection: another process can listen on a name, and a listener can
 /// outlive the lifetime it answered for.
+/// </para>
+/// <para>
+/// On macOS each unlock is also served on a launch endpoint of its own, which only the run Terminal
+/// starts for a Run asks, so <see cref="LaunchFailure"/> and <see cref="IssueLaunch"/> do not depend on
+/// what agents meet (D-0451).
 /// </para>
 /// </remarks>
 internal sealed class AppAuthority : IDisposable
@@ -36,7 +41,7 @@ internal sealed class AppAuthority : IDisposable
         ArgumentNullException.ThrowIfNull(session);
 
         Session = session;
-        _host = new SessionHost(session, approverOverride, approvals, requestLock);
+        _host = new SessionHost(session, approverOverride, approvals, requestLock, servesLaunches: OperatingSystem.IsMacOS());
     }
 
     /// <summary>What <c>keypaste lock</c> does to the app: locks the session as requested, on the thread <paramref name="post"/> runs it on.</summary>
@@ -83,6 +88,27 @@ internal sealed class AppAuthority : IDisposable
             return new AuthorityStatus.NotServing(_host.Failure ?? "keypaste is not listening for agents on this vault");
         }
     }
+
+    /// <summary>Why the run Terminal starts for a Run on macOS could not ask this app for its set now, or null when it could or no vault is unlocked here.</summary>
+    /// <remarks>Read from the authority answering the launch endpoint, as <see cref="Status"/> is from the one answering agents.</remarks>
+    internal string? LaunchFailure
+    {
+        get
+        {
+            if (!Session.IsUnlocked || Session.Lifetime?.Id is not { } current)
+            {
+                return null;
+            }
+
+            return string.Equals(_host.Launching, current, StringComparison.Ordinal)
+                ? null
+                : _host.LaunchFailure ?? "keypaste is not listening for Terminal";
+        }
+    }
+
+    /// <summary>Why the audit log the owner records a Run's request in does not open now, or null when it opens or no vault is unlocked here.</summary>
+    /// <remarks>Tried through the owner's own opener, as the request will be, so a log mended since the last try needs no new unlock.</remarks>
+    internal string? AuditFailure => _host.AuditFailure;
 
     /// <summary>What the authority answering agents has waiting for a person and has granted, never a value.</summary>
     /// <remarks>Nothing while it answers no session: a lock ends the lifetime that held both (D-0313).</remarks>
@@ -142,6 +168,16 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
     /// <returns>Whether a grant with that id was in force.</returns>
     internal bool Revoke(string id) => _host.Revoke(id);
+
+    /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as this Run confirmation answered it (D-0452).</summary>
+    /// <param name="claim">The request the confirmation named, and the set it showed.</param>
+    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <returns>The pass and the launch endpoint that run asks, or null when no launch endpoint listens or that session has ended.</returns>
+    internal (string Pass, string Endpoint)? IssueLaunch(LaunchClaim claim, string lifetimeId) => _host.IssueLaunch(claim, lifetimeId);
+
+    /// <summary>Forgets a pass Terminal was never handed, so nothing can present it.</summary>
+    /// <param name="pass">The pass <see cref="IssueLaunch"/> returned.</param>
+    internal void WithdrawLaunch(string pass) => _host.WithdrawLaunch(pass);
 
     /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint (D-0313).</summary>
     public void Dispose()

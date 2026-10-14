@@ -30,7 +30,7 @@ public interface IProcessRunner
     /// <param name="fileName">Executable path.</param>
     /// <param name="arguments">Arguments, passed without shell interpretation.</param>
     /// <param name="stdin">Text written to the tool's standard input, or null to write nothing.</param>
-    /// <param name="stdinEncoding">Encoding for <paramref name="stdin"/>.</param>
+    /// <param name="stdinEncoding">Encoding for <paramref name="stdin"/>, with no preamble: one is written as the tool starts, even when <paramref name="stdin"/> is null, and fails the start once the tool has closed its input.</param>
     /// <param name="timeout">How long to wait before giving up.</param>
     ProcessResult Run(
         string fileName,
@@ -41,7 +41,8 @@ public interface IProcessRunner
 }
 
 /// <summary>Runs tools as real child processes.</summary>
-public sealed class SystemProcessRunner : IProcessRunner
+/// <param name="environment">Exactly the environment each tool runs with, or null for this process's own.</param>
+public sealed class SystemProcessRunner(IReadOnlyDictionary<string, string>? environment = null) : IProcessRunner
 {
     /// <inheritdoc/>
     public ProcessResult Run(
@@ -69,6 +70,16 @@ public sealed class SystemProcessRunner : IProcessRunner
         foreach (var argument in arguments)
         {
             info.ArgumentList.Add(argument);
+        }
+
+        if (environment is not null)
+        {
+            info.Environment.Clear();
+
+            foreach (var (name, value) in environment)
+            {
+                info.Environment[name] = value;
+            }
         }
 
         Process? process;

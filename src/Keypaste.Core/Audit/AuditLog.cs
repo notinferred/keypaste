@@ -64,15 +64,16 @@ public sealed class AuditLog : IDisposable
     /// The most bytes one record may occupy, newline included.
     /// </summary>
     /// <remarks>
-    /// A single small write is atomic against other appenders on a local filesystem, which is what
-    /// lets two servers share one log. That guarantee thins out as records grow, so every field is
-    /// capped and the total is checked; a record that somehow exceeds this is rewritten without the
-    /// agent's reason, and if it still does not fit it is refused rather than written torn.
-    /// Unchanged by the chain, which spends <see cref="AuditChain.ChainOverheadBytes"/> of it: the
-    /// atomicity argument is about total bytes written, so raising the cap to absorb the chain would
-    /// be a number chosen to hide a change rather than to state one.
+    /// Two appenders are kept apart by the sidecar lock every keypaste appender takes, not by the size
+    /// of a write. The cap bounds the readers instead, since anything running as the person can write
+    /// the file (THREATS.md assumption 1): the writer reads <see cref="TailWindowBytes"/> back to find
+    /// the line a record links to, and the verifier buffers no line past four times the cap. It
+    /// matches the 64 KiB the owner reads a request under, which lets a run's line name about a
+    /// thousand items (D-0454). A record over it is rewritten without the agent's reason, then
+    /// without a run's command head, and refused if it still does not fit. The chain spends
+    /// <see cref="AuditChain.ChainOverheadBytes"/> of it.
     /// </remarks>
-    public const int MaximumRecordBytes = 4096;
+    public const int MaximumRecordBytes = 64 * 1024;
 
     /// <summary>How much of the end of the file is read to find the record a new one links to.</summary>
     /// <remarks>
