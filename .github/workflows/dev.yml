@@ -65,6 +65,8 @@ jobs:
         shell: bash
         env:
           FILTER_CLASS: ${{ inputs.filter_class }}
+          # ScreenRenderer draws its frames only when this names a folder; other classes ignore it.
+          KEYPASTE_SCREENS_OUT: ${{ runner.temp }}/screens
         run: |
           set -euo pipefail
           [[ "$FILTER_CLASS" =~ ^[A-Za-z0-9_.]+$ ]] || { echo "::error::filter_class must be a fully qualified test class"; exit 1; }
@@ -77,6 +79,14 @@ jobs:
             *) echo "::error::filter_class must begin with a test project's namespace, such as Keypaste.Core.Tests."; exit 1 ;;
           esac
           bash scripts/verify.sh "$profile" --project "$project" --filter-class "$FILTER_CLASS"
+
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: screens-${{ matrix.os }}
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: ignore
+          retention-days: 7
 
   # A development machine has no SDK, so a changed dependency or RuntimeIdentifiers list gets its lock
   # files here: the same SDK as ci.yml and app.yml restores every locked project against what it now declares.

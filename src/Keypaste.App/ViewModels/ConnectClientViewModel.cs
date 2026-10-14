@@ -5,19 +5,24 @@ using Keypaste.Core.Settings;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// Connects an MCP client to the vault this app has unlocked, checks the connection and removes it.
+/// The pane under an AI tool's row on Agents: connects the tool to the vault this app has unlocked, checks
+/// the connection, or disconnects it.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Nothing is written before the person has seen it.</b> Preview composes the plan in core
-/// (<see cref="McpClientSetup"/>) and shows its display; Connect runs that same plan object, so the
-/// steps confirmed and the steps run cannot differ. A client with no command of its own has only
+/// <b>Nothing is written before the person has seen it.</b> The pane composes its plan in core
+/// (<see cref="McpClientSetup"/>) when it opens and shows its display; Run it runs that same plan object, so
+/// the steps confirmed and the steps run cannot differ. A tool with no command of its own has only
 /// keypaste's entry in its file changed, with the first original kept beside it. Inside an AppImage the
-/// link a client starts is made or replaced first, as a step of the same plan.
+/// link a tool starts is made or replaced first, as a step of the same plan.
 /// </para>
 /// <para>
-/// <b>The check goes through the bridge a client would start.</b> It launches that registration's
-/// command line and asks as a client would, so the request meets this app's session, its prompt
+/// <b>The tool is registered under its own id</b>, offering run and every item, because the owner holds
+/// each agent to its settings, which follow that name (D-0455).
+/// </para>
+/// <para>
+/// <b>The check goes through the bridge the tool would start.</b> It launches that registration's
+/// command line and asks as the tool would, so the request meets this app's session, its prompt
 /// window and its audit log. The value it is released is discarded unread.
 /// </para>
 /// </remarks>
@@ -25,11 +30,10 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClientConnector _connector;
+    private readonly Action? _ran;
+    private readonly Action? _cancelled;
     private readonly CancellationTokenSource _closing = new();
 
-    private McpClient _client;
-    private string _label;
-    private string _exposure = string.Empty;
     private McpSetupPlan? _pending;
     private McpServerRegistration? _pendingRegistration;
     private McpServerRegistration? _registered;
@@ -40,23 +44,30 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     private IReadOnlyList<McpListedEntry> _checkEntries = [];
     private McpListedEntry? _checkEntry;
     private string _checkMessage = string.Empty;
+    private bool _isRunning;
     private bool _disposed;
 
-    internal ConnectClientViewModel(AppVaultSession session, ClientConnector connector)
+    /// <param name="session">The vault the tool is connected to.</param>
+    /// <param name="connector">The machine, the tools' own commands, the bridge and the check.</param>
+    /// <param name="client">The tool.</param>
+    /// <param name="removes">Whether the pane disconnects the tool rather than connecting it.</param>
+    /// <param name="ran">Called once Run it has run a plan, whatever came of it.</param>
+    /// <param name="cancelled">Called once Cancel has dropped the plan.</param>
+    internal ConnectClientViewModel(AppVaultSession session, ClientConnector connector, McpClient client, bool removes, Action? ran = null, Action? cancelled = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(connector);
+        ArgumentNullException.ThrowIfNull(client);
 
         _session = session;
         _connector = connector;
-        Clients = McpClientCatalog.For(connector.Machine.Platform);
-        _client = Clients[0];
-        _label = _client.Id;
+        _ran = ran;
+        _cancelled = cancelled;
+        Client = client;
+        Removes = removes;
 
-        PreviewConnectCommand = new AsyncRelayCommand(PreviewConnectAsync, () => !IsChecking);
-        PreviewRemoveCommand = new AsyncRelayCommand(PreviewRemoveAsync, () => !IsChecking);
-        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => _pending is not null);
-        CancelCommand = new RelayCommand(Cancel, () => _pending is not null);
+        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => _pending is not null && !_isRunning);
+        CancelCommand = new RelayCommand(Cancel, () => _pending is not null && !_isRunning);
         CheckCommand = new AsyncRelayCommand(CheckAsync, () => _registered is not null && !IsChecking);
         AskCommand = new AsyncRelayCommand(AskAsync, () => _check is not null && _checkEntry is not null && _checkEntries.Count > 0);
 
@@ -64,63 +75,22 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         DependsOn(nameof(HasMessage), nameof(Message));
         DependsOn(nameof(IsPicking), nameof(CheckEntries), nameof(IsChecking));
         DependsOn(nameof(HasCheckMessage), nameof(CheckMessage));
-        DependsOn(nameof(NeedsRegistration), nameof(Registered));
-        DependsOn(PreviewConnectCommand, nameof(IsChecking));
-        DependsOn(PreviewRemoveCommand, nameof(IsChecking));
-        DependsOn(ConfirmCommand, nameof(Pending));
-        DependsOn(CancelCommand, nameof(Pending));
+        DependsOn(nameof(OffersCheck), nameof(Registered), nameof(IsChecking), nameof(CheckMessage));
+        DependsOn(nameof(IsBusy), nameof(IsRunning), nameof(IsChecking));
+        DependsOn(ConfirmCommand, nameof(Pending), nameof(IsRunning));
+        DependsOn(CancelCommand, nameof(Pending), nameof(IsRunning));
         DependsOn(CheckCommand, nameof(Registered), nameof(IsChecking));
         DependsOn(AskCommand, nameof(IsChecking), nameof(SelectedCheckEntry), nameof(CheckEntries));
     }
 
-    /// <summary>Every client keypaste knows how to connect on this machine.</summary>
-    internal IReadOnlyList<McpClient> Clients { get; }
+    /// <summary>The tool this pane connects or disconnects.</summary>
+    internal McpClient Client { get; }
 
-    internal McpClient SelectedClient
-    {
-        get => _client;
-        set
-        {
-            var previous = _client;
-            if (value is null || !Set(ref _client, value))
-            {
-                return;
-            }
+    /// <summary>Whether this pane disconnects the tool.</summary>
+    internal bool Removes { get; }
 
-            if (_label == previous.Id)
-            {
-                Label = value.Id;
-            }
-
-            Forget();
-        }
-    }
-
-    /// <summary>What the audit log and the prompt will call this client.</summary>
-    internal string Label
-    {
-        get => _label;
-        set
-        {
-            if (Set(ref _label, value ?? string.Empty))
-            {
-                Forget();
-            }
-        }
-    }
-
-    /// <summary>Globs that narrow this connection, comma-separated; empty registers every item, so the agent's settings decide.</summary>
-    internal string Exposure
-    {
-        get => _exposure;
-        set
-        {
-            if (Set(ref _exposure, value ?? string.Empty))
-            {
-                Forget();
-            }
-        }
-    }
+    /// <summary>What the pane is headed by.</summary>
+    internal string Title => Removes ? $"Disconnect {Client.DisplayName}" : $"Connect {Client.DisplayName}";
 
     /// <summary>Exactly what Connect or Remove will run, as core composed it.</summary>
     internal string Preview => _preview;
@@ -161,19 +131,25 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     internal bool IsChecking => _check is not null;
 
+    /// <summary>Whether Run it is running the plan.</summary>
+    internal bool IsRunning
+    {
+        get => _isRunning;
+        private set => Set(ref _isRunning, value);
+    }
+
+    /// <summary>Whether a plan or a check is running, which no other pane may interrupt.</summary>
+    internal bool IsBusy => _isRunning || IsChecking;
+
+    /// <summary>Whether the check is offered: once a Connect has registered the tool, and while its words remain.</summary>
+    internal bool OffersCheck => !Removes && (_registered is not null || IsChecking || HasCheckMessage);
+
     /// <summary>The registration Connect ran, which the check starts.</summary>
     internal McpServerRegistration? Registered
     {
         get => _registered;
         private set => Set(ref _registered, value);
     }
-
-    /// <summary>Whether Check waits for a Connect to start from.</summary>
-    internal bool NeedsRegistration => _registered is null;
-
-    internal AsyncRelayCommand PreviewConnectCommand { get; }
-
-    internal AsyncRelayCommand PreviewRemoveCommand { get; }
 
     /// <summary>Runs the plan on screen, and only that.</summary>
     internal AsyncRelayCommand ConfirmCommand { get; }
@@ -191,15 +167,18 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         set => Set(ref _pending, value);
     }
 
+    /// <summary>Composes the plan the pane shows, which Run it runs; nothing is written.</summary>
+    internal Task PreviewAsync() => Removes ? PreviewRemoveAsync() : PreviewConnectAsync();
+
     private async Task PreviewConnectAsync()
     {
         Forget();
 
-        // A client may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both (D-0389).
+        // A tool may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both (D-0389).
         if (_session.VaultPath is not { } vault
             || !McpServerLocator.TryPin(_connector.Machine, _session.Home, _connector.ApproverOverride, vault, ChosenVault.Read(_session.Home), out var pins))
         {
-            Message = "Unlock a vault before connecting a client to it.";
+            Message = $"Unlock a vault before connecting {Client.DisplayName} to it.";
             return;
         }
 
@@ -211,15 +190,13 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var globs = _exposure.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        if (!McpServerRegistration.TryCreate(target.Server, pins, _label, globs, out var registration, out var error))
+        if (!McpServerRegistration.TryCreate(target.Server, pins, Client.Id, [], out var registration, out var error))
         {
             Message = Sentence(error);
             return;
         }
 
-        var client = _client;
+        var client = Client;
         var machine = _connector.Machine;
         var detection = await Task.Run(() => McpClientSetup.Detect(client, machine, _connector.Runner)).ConfigureAwait(true);
 
@@ -244,7 +221,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     {
         Forget();
 
-        var client = _client;
+        var client = Client;
         var machine = _connector.Machine;
         var detection = await Task.Run(() => McpClientSetup.Detect(client, machine, _connector.Runner)).ConfigureAwait(true);
 
@@ -283,7 +260,17 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         }
 
         var registration = _pendingRegistration;
-        var result = await Task.Run(() => McpClientSetup.Apply(plan, _connector.Runner)).ConfigureAwait(true);
+        IsRunning = true;
+        McpSetupResult result;
+
+        try
+        {
+            result = await Task.Run(() => McpClientSetup.Apply(plan, _connector.Runner)).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsRunning = false;
+        }
 
         Forget();
 
@@ -303,12 +290,14 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         };
 
         Registered = result.Status == McpSetupStatus.Done && !removing ? registration : null;
+        _ran?.Invoke();
     }
 
     private void Cancel()
     {
         Forget();
         Message = "Cancelled. Nothing was changed.";
+        _cancelled?.Invoke();
     }
 
     private async Task CheckAsync()
@@ -318,7 +307,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             return;
         }
 
-        CheckMessage = "Starting keypaste mcp as the client would…";
+        CheckMessage = $"Starting keypaste mcp as {Client.DisplayName} would…";
         var check = await Task.Run(() => _connector.StartCheck(registration)).ConfigureAwait(true);
         if (check is null)
         {
@@ -353,7 +342,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         switch (listing.Entries.Count)
         {
             case 0:
-                await EndCheckAsync("The bridge reached this vault and lists nothing this client may name, so there is nothing to ask for.")
+                await EndCheckAsync($"The bridge reached this vault and lists nothing {Client.DisplayName} may see, so there is nothing to ask for.")
                     .ConfigureAwait(true);
                 return;
             case 1:
@@ -363,7 +352,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
                 _checkEntries = listing.Entries;
                 Raise(nameof(CheckEntries));
                 SelectedCheckEntry = listing.Entries[0];
-                CheckMessage = $"The bridge lists {listing.Entries.Count} entries. Pick the one to ask for.";
+                CheckMessage = $"The bridge lists {listing.Entries.Count} items. Pick the one to ask for.";
                 return;
         }
     }
@@ -395,7 +384,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         await EndCheckAsync(answer.Outcome switch
         {
             McpCheckOutcome.Granted => $"Connected: you approved {entry.Name}, and {Shown(entry.Field)} was released to the check, which discarded it unread. "
-                + "The audit record is in this session's history below.",
+                + "Its record is under Since you unlocked, below.",
             McpCheckOutcome.Denied => $"Connected: the request for {entry.Name} reached you and was refused. {answer.Said}",
             _ => $"The check failed: {answer.Said}",
         }).ConfigureAwait(true);

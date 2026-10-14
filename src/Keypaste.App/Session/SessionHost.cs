@@ -256,6 +256,23 @@ internal sealed class SessionHost : IDisposable
             ?? ValueTask.FromResult(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _notAnswering));
     }
 
+    /// <summary>
+    /// Brings the prompt waiting for the person forward with its allows disarmed for another second (D-0456).
+    /// Called on the UI thread; nothing on the endpoint reaches it.
+    /// </summary>
+    /// <returns>Whether a prompt was waiting on screen.</returns>
+    internal bool ShowPrompt()
+    {
+        Hosted? hosted;
+
+        lock (_gate)
+        {
+            hosted = _hosted;
+        }
+
+        return hosted?.ShowPrompt() == true;
+    }
+
     /// <summary>Ends every grant given to a bridge started with this label.</summary>
     /// <param name="label">The raw label.</param>
     internal void RevokeClient(string label)
@@ -416,15 +433,17 @@ internal sealed class SessionHost : IDisposable
     {
         private readonly SessionServer _server;
         private readonly AuditOpener _audit;
+        private readonly IApprovalChannel _channel;
         private readonly LaunchEndpoint? _launches;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task? _agents;
         private readonly Task? _launching;
 
-        private Hosted(SessionServer server, AuditOpener audit, string? endpoint, string? failure, LaunchEndpoint? launches, string? launchFailure)
+        private Hosted(SessionServer server, AuditOpener audit, IApprovalChannel channel, string? endpoint, string? failure, LaunchEndpoint? launches, string? launchFailure)
         {
             _server = server;
             _audit = audit;
+            _channel = channel;
             _launches = launches;
             Endpoint = endpoint;
             Failure = failure;
@@ -457,6 +476,8 @@ internal sealed class SessionHost : IDisposable
         private bool AnswersAgents => _agents is { IsCompleted: false };
 
         internal void RevokeClient(string label) => _server.Authority.RevokeClient(label);
+
+        internal bool ShowPrompt() => AnswersAgents && _channel is WindowApprovalChannel prompt && prompt.BringForward();
 
         internal EffectiveAccess? Access(string? label) => AnswersAgents ? _server.Authority.Access(label) : null;
 
@@ -546,7 +567,7 @@ internal sealed class SessionHost : IDisposable
                 }
 
                 var (endpoint, failure) = BindForAgents(server, approverOverride, vault);
-                var hosted = new Hosted(server, audit, endpoint, failure, launches, launchFailure);
+                var hosted = new Hosted(server, audit, channel, endpoint, failure, launches, launchFailure);
                 audit = null;
                 server = null;
                 launches = null;

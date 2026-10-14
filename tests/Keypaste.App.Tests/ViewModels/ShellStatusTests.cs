@@ -1,6 +1,8 @@
+using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
@@ -223,6 +225,41 @@ public sealed class ShellStatusTests
         }
     }
 
+    /// <summary>A change waiting for the person's confirmation counts in the sidebar as Agents lists it, under Waiting for you.</summary>
+    [Fact]
+    public async Task TheAgentsRow_CountsAChangeWaitingForConfirmation()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NeverAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var changing = authority.ChangeAccessAsync("claude-code", edit, stop.Token).AsTask();
+
+        using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(Token))
+        {
+            deadline.CancelAfter(_connect);
+
+            while (authority.Activity.WaitingChanges.Count == 0)
+            {
+                await Task.Delay(20, deadline.Token);
+            }
+        }
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal("Answering agents · 1 waiting · no clients", shell.AgentsDetail);
+        Assert.Equal("1", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity).Count);
+
+        await stop.CancelAsync();
+        await Task.WhenAny(changing, Task.Delay(_connect, Token));
+    }
+
     private static void Unlock(AppVaultSession session, TempVault fixture)
     {
         using var master = TempVault.Secret(TempVault.Password);
@@ -239,6 +276,12 @@ public sealed class ShellStatusTests
     private sealed class NeverAnswers : IApprovalChannel
     {
         public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return ApprovalAnswer.Denied;
+        }
+
+        public async ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
         {
             await Task.Delay(Timeout.Infinite, cancellationToken);
             return ApprovalAnswer.Denied;

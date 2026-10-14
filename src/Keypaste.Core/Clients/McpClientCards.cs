@@ -13,8 +13,8 @@ public enum ClientStatus
     Idle = 1,
 }
 
-/// <summary>One MCP client as the Agents screen shows it: never a value.</summary>
-/// <param name="Key">Its label, or <c>name:</c> and the name it gave when it has no label.</param>
+/// <summary>One agent or AI tool as the Agents screen shows it: never a value.</summary>
+/// <param name="Key">Its label, or <c>name:</c> and the name it gave when it has no label; a found tool's is its id, and every other agent's <c>*</c>.</param>
 /// <param name="Name">What a person reads.</param>
 /// <param name="Label">Its <c>--client-label</c>, or null.</param>
 /// <param name="Kind">How it reaches keypaste.</param>
@@ -30,11 +30,19 @@ public sealed record McpClientCard(
     ClientStatus Status,
     int Connections,
     DateTimeOffset? LastSeen,
-    AccessCeiling Ceiling);
+    AccessCeiling Ceiling)
+{
+    /// <summary>The catalogue's tool this card is, when its key is a tool's id.</summary>
+    public McpClient? Tool { get; init; }
+
+    /// <summary>Whether the tool was found on this computer and holds keypaste; null when it was not found, or the card is no tool's.</summary>
+    public McpToolPresence? Presence { get; init; }
+}
 
 /// <summary>
-/// The MCP clients of one vault: those attached now, those its audit lines name, and those a row of
-/// <c>clients.toml</c> names (D-0361). What a client says about itself decides nothing (THREATS.md T-3).
+/// The agents and AI tools of one vault: the agents attached now, those its audit lines name and those a
+/// row of <c>clients.toml</c> names (D-0361), the tools found on this computer, and every other agent
+/// last. What an agent says about itself decides nothing (THREATS.md T-3).
 /// </summary>
 public static class McpClientCards
 {
@@ -44,26 +52,37 @@ public static class McpClientCards
     /// <summary>How a client that reaches keypaste through a bridge is described.</summary>
     public const string StdioKind = "MCP stdio";
 
+    /// <summary>What the card whose settings every agent without its own gets is called.</summary>
+    public const string EveryOtherAgent = "Every other agent";
+
     private static readonly HashSet<string> _bridgeTools = new([AuditTools.List, AuditTools.Credential, AuditTools.Run], StringComparer.Ordinal);
 
-    /// <summary>Builds the cards.</summary>
+    /// <summary>Builds the cards: each agent, each tool found on this computer, and every other agent.</summary>
     /// <param name="connected">The clients attached to the live session.</param>
     /// <param name="audit">Audit entries read so far.</param>
     /// <param name="vaultKey">The vault's identity key; lines of other vaults are ignored.</param>
     /// <param name="caps">This computer's ceilings.</param>
+    /// <param name="findings">The tools <see cref="McpToolSurvey"/> found; a tool's card is keyed by its id, so an agent of that name shares it.</param>
     /// <param name="now">The time the window is measured from.</param>
-    /// <returns>Connected clients first, then the most recently seen, then by key.</returns>
+    /// <param name="settings">The names the vault holds settings under, each listed though it has not asked.</param>
+    /// <returns>
+    /// Agents attached now, then the most recently seen, then found tools not yet used (connected first, in
+    /// catalogue order), then agents with settings alone by key, then every other agent.
+    /// </returns>
     public static IReadOnlyList<McpClientCard> Build(
         IReadOnlyList<ConnectedClient> connected,
         IReadOnlyList<AuditEntry> audit,
         string vaultKey,
         AccessCaps caps,
-        DateTimeOffset now)
+        IReadOnlyList<McpToolFinding> findings,
+        DateTimeOffset now,
+        IReadOnlyList<string>? settings = null)
     {
         ArgumentNullException.ThrowIfNull(connected);
         ArgumentNullException.ThrowIfNull(audit);
         ArgumentNullException.ThrowIfNull(vaultKey);
         ArgumentNullException.ThrowIfNull(caps);
+        ArgumentNullException.ThrowIfNull(findings);
 
         var cards = new Dictionary<string, Draft>(StringComparer.Ordinal);
 
@@ -115,21 +134,48 @@ public static class McpClientCards
             Card(row.Label, row.Label, null);
         }
 
+        foreach (var name in (settings ?? []).Where(AgentNames.IsNamed))
+        {
+            Card(name, name, null);
+        }
+
+        foreach (var finding in findings)
+        {
+            Card(finding.Tool.Id, finding.Tool.Id, null).Finding = finding;
+        }
+
+        var everyOther = cards.Remove(AgentNames.Any, out var star) ? star : new Draft(AgentNames.Any, AgentNames.Any);
+        everyOther.Name = EveryOtherAgent;
+
+        McpClientCard Built(Draft draft)
+        {
+            return new McpClientCard(
+                draft.Key,
+                (draft.Label is { } label ? McpClientCatalog.Find(label)?.DisplayName : null) ?? draft.Name ?? draft.Label ?? draft.Key,
+                draft.Label,
+                StdioKind,
+                draft.Connections > 0 ? ClientStatus.Connected : ClientStatus.Idle,
+                draft.Connections,
+                draft.LastSeen,
+                caps.For(draft.Label))
+            {
+                Tool = draft.Finding?.Tool ?? McpClientCatalog.All.FirstOrDefault(known => string.Equals(known.Id, draft.Label, StringComparison.Ordinal)),
+                Presence = draft.Finding?.Presence,
+            };
+        }
+
         return
         [
             .. cards.Values
-                .Select(draft => new McpClientCard(
-                    draft.Key,
-                    (draft.Label is { } label ? McpClientCatalog.Find(label)?.DisplayName : null) ?? draft.Name ?? draft.Label ?? draft.Key,
-                    draft.Label,
-                    StdioKind,
-                    draft.Connections > 0 ? ClientStatus.Connected : ClientStatus.Idle,
-                    draft.Connections,
-                    draft.LastSeen,
-                    caps.For(draft.Label)))
+                .Select(Built)
                 .OrderBy(card => card.Status)
+                .ThenBy(card => card.LastSeen is null)
                 .ThenByDescending(card => card.LastSeen ?? DateTimeOffset.MinValue)
+                .ThenBy(card => card.Presence is null)
+                .ThenBy(card => card.Presence?.State != McpToolState.Connected)
+                .ThenBy(card => CatalogueOrder(card.Tool))
                 .ThenBy(card => card.Key, StringComparer.Ordinal),
+            Built(everyOther),
         ];
     }
 
@@ -149,6 +195,19 @@ public static class McpClientCards
 
     private static string? Nonempty(string? text) => text is { Length: > 0 } ? text : null;
 
+    private static int CatalogueOrder(McpClient? tool)
+    {
+        for (var i = 0; i < McpClientCatalog.All.Count; i++)
+        {
+            if (ReferenceEquals(McpClientCatalog.All[i], tool))
+            {
+                return i;
+            }
+        }
+
+        return int.MaxValue;
+    }
+
     private sealed class Draft(string key, string? label)
     {
         internal string Key { get; } = key;
@@ -158,6 +217,8 @@ public static class McpClientCards
         internal string? Name { get; set; }
 
         internal int Connections { get; set; }
+
+        internal McpToolFinding? Finding { get; set; }
 
         internal DateTimeOffset? LastSeen { get; private set; }
 

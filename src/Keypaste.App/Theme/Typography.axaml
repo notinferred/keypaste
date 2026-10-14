@@ -32,7 +32,7 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
-  <!-- A section heading inside a screen: "Active grants", "MCP clients". -->
+  <!-- A section heading inside a screen: "Allowances", "AI tools". -->
   <Style Selector=":is(TextBlock).section">
     <Setter Property="FontSize" Value="13" />
     <Setter Property="FontWeight" Value="SemiBold" />

@@ -6,15 +6,21 @@ using Keypaste.Core.Ipc;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// A request waiting for a person, or a grant in force, as Agent Activity lists it: who, what and
-/// for how long, never a value.
+/// A request waiting for a person, or an allowance in force, as Agents lists it: who, what and for how
+/// long, never a value, and never the reason an agent gave, which only the prompt shows (T-2).
 /// </summary>
 /// <remarks>
-/// Every string comes from the <see cref="ApprovalPrompt"/> the person was shown, which sanitized
-/// the client's name, its label and the entry once, so the list says exactly what the prompt said.
+/// Every string comes from the prompt the person was shown, which sanitized the agent's name, its
+/// label and the item once, so the list says exactly what the prompt said. Read again, the same request
+/// or allowance updates its row in place, so the row's buttons are not made again while it counts down.
 /// </remarks>
-internal sealed class ActivityRow
+internal sealed class ActivityRow : ObservableObject
 {
+    private int _number;
+    private string _left;
+    private string _leftText = string.Empty;
+    private double _fraction;
+
     private ActivityRow(int number, ApprovalPrompt prompt, TimeSpan remaining, string lifetime, GrantKey? grant)
         : this(number, prompt.Client, prompt.Label ?? "none configured", prompt.Entry, prompt.Field, lifetime + " " + Seconds(remaining))
     {
@@ -27,16 +33,20 @@ internal sealed class ActivityRow
 
     private ActivityRow(int number, string client, string label, string entry, string field, string left)
     {
-        Number = number;
+        _number = number;
         Client = client;
         Label = label;
         Entry = entry;
         Field = field;
-        Left = left;
+        _left = left;
     }
 
     /// <summary>The row's place in its list, from 1, which is how the driver names one to revoke.</summary>
-    internal int Number { get; }
+    internal int Number
+    {
+        get => _number;
+        private set => Set(ref _number, value);
+    }
 
     internal string Client { get; }
 
@@ -47,7 +57,11 @@ internal sealed class ActivityRow
     internal string Field { get; }
 
     /// <summary>How long is left, and of what.</summary>
-    internal string Left { get; }
+    internal string Left
+    {
+        get => _left;
+        private set => Set(ref _left, value);
+    }
 
     /// <summary>The agent's grant to revoke, or null for a waiting request or a run's grant.</summary>
     internal GrantKey? Grant { get; }
@@ -59,16 +73,44 @@ internal sealed class ActivityRow
     internal string Detail { get; private init; } = string.Empty;
 
     /// <summary>A grant's or a waiting request's time left as the Agents screen says it: <c>42m left</c>.</summary>
-    internal string LeftText { get; private init; } = string.Empty;
+    internal string LeftText
+    {
+        get => _leftText;
+        private set => Set(ref _leftText, value);
+    }
 
     /// <summary>The share of a grant's length still to run, from 0 to 1, for its bar.</summary>
-    internal double Fraction { get; private init; }
+    internal double Fraction
+    {
+        get => _fraction;
+        private set => Set(ref _fraction, value);
+    }
+
+    /// <summary>What the same request or allowance is known by when it is read again: a grant's id, else what the row names.</summary>
+    internal string Key => Id ?? string.Join('\n', Client, Label, Entry, Field);
 
     /// <summary>The client and its label on one line.</summary>
     internal string Who => $"{Client} · label {Label}";
 
     /// <summary>The entry and field on one line.</summary>
     internal string What => $"{Entry} · {Field}";
+
+    /// <summary>What a waiting row says was asked for: the item and field, a run's command, or a change to an agent's settings.</summary>
+    internal string Asked => Detail.Length > 0 ? Detail : What;
+
+    /// <summary>What End is announced as: whose allowance, for what.</summary>
+    internal string EndName => $"End {Client}'s allowance for {Detail}";
+
+    /// <summary>Takes the place and time left of the same request or allowance read again.</summary>
+    internal void Update(ActivityRow read)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+
+        Number = read.Number;
+        Left = read.Left;
+        LeftText = read.LeftText;
+        Fraction = read.Fraction;
+    }
 
     internal static ActivityRow Waiting(int number, WaitingRequest waiting) =>
         new(number, waiting.Prompt, waiting.Remaining, "answered for you in", grant: null);
@@ -117,6 +159,28 @@ internal sealed class ActivityRow
         {
             LeftText = Humanized(waiting.Remaining),
         };
+
+    /// <summary>
+    /// A confirmation of a change that gives an agent more, named by where the request says it came from,
+    /// as a claim: a terminal or the agent's own tool may have sent it, and only the person's own change is theirs.
+    /// </summary>
+    internal static ActivityRow WaitingChange(int number, WaitingChange waiting)
+    {
+        var prompt = waiting.Prompt;
+        var what = prompt switch
+        {
+            { ResetsCeilings: true } => "Your reset of this computer's ceilings",
+            { Origin: AccessOrigin.Terminal } => $"A change to {prompt.Agent}'s settings, asked from a terminal",
+            { Origin: AccessOrigin.Agent } => $"A change to {prompt.Agent}'s settings, asked by {prompt.Agent} through its keypaste tool",
+            _ => $"Your change to {prompt.Agent}'s settings",
+        };
+
+        return new(number, prompt.Agent, "none configured", what, "settings", "answered for you in " + Seconds(waiting.Remaining))
+        {
+            Detail = what,
+            LeftText = Humanized(waiting.Remaining),
+        };
+    }
 
     /// <summary>The entries a run's grant releases and its set, or the command a <c>keypaste run --session</c> grant repeats.</summary>
     private static string EnvDetail(EnvGrantInForce grant)

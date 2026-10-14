@@ -9,6 +9,7 @@
       icon                          a 30px square for an icon alone; add ghost for no fill
       link                          text colour, no box: "Choose…"
       more                          the 30px ⋯ toggle that opens a menu
+      disclosure                    an Expander's header toggle: ghost, whether open or not
       menu-item                     a row in a menu (Border.menu); add danger for Delete
       sm / lg                       28px / 34px tall instead of 30px
     Put a KpIcon and a TextBlock in a StackPanel (Orientation Horizontal, Spacing 6) for an icon
@@ -156,6 +157,25 @@
   <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+  </Style>
+
+  <!-- An Expander's header, which stays a ghost button whether it is open or not. -->
+  <Style Selector="ToggleButton.disclosure">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="6,0" />
+  </Style>
+  <Style Selector="ToggleButton.disclosure /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.disclosure:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector="ToggleButton.disclosure:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="ToggleButton.disclosure:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
   </Style>
 
   <!-- The ⋯ button, which stays #2A2C30 whether its menu is open or not. -->

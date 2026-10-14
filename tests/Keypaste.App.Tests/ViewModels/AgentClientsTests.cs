@@ -11,9 +11,9 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// Agents › MCP clients: who reaches this vault, and each one's settings opened from its card below the
-/// cards (D-0361). Identities are display only, and settings follow the label a client's bridge was
-/// started with, so an unlabeled client has none of its own.
+/// Agents › AI tools: who reaches this vault, each on its row with its settings under its Settings
+/// disclosure (D-0361, D-0455). Identities are display only, and settings follow the name a bridge was
+/// started with, so an agent with no name has none of its own (T-36).
 /// </summary>
 public sealed class AgentClientsTests
 {
@@ -28,7 +28,7 @@ public sealed class AgentClientsTests
     }
 
     [Fact]
-    public async Task Cards_ListConnectedAndSeenClients_EachWithItsSettings()
+    public async Task Rows_ListAttachedAndSeenAgents_EachWithItsSettingsAndWhatTheyGive()
     {
         await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "claude-code"));
         app.Audit("cursor", app.Authority.Session.Identity!.Key);
@@ -36,97 +36,107 @@ public sealed class AgentClientsTests
 
         using var model = app.Model();
 
-        Assert.Equal(["Claude Code", "Cursor", "Every other client"], model.Clients.Select(card => card.Name));
-        var connected = model.Clients[0];
-        Assert.Equal(("claude-code", "cc", "Connected", "Claude Code · MCP stdio"), (connected.Title, connected.Initials, connected.Status, connected.Detail));
-        Assert.Equal(("cursor", "cu", "Idle"), (model.Clients[1].Title, model.Clients[1].Initials, model.Clients[1].Status));
-        Assert.All(model.Clients, card => Assert.True(card.HasSettings));
-        Assert.False(model.HasSettings);
+        // ci-probe has settings in the vault and has not asked.
+        Assert.Equal(["Claude Code", "Cursor", "ci-probe", "Every other agent"], model.Rows.Select(row => row.Title));
+        var attached = model.Rows[0];
+        Assert.Equal(("claude-code", "cc", "in use now", true), (attached.Label, attached.Initials, attached.Status, attached.IsLive));
+        Assert.Equal(("cursor", "cu", "last asked just now", false), (model.Rows[1].Label, model.Rows[1].Initials, model.Rows[1].Status, model.Rows[1].IsLive));
+        Assert.Equal(("cp", "hasn't asked in the last 30 days"), (model.Rows[2].Initials, model.Rows[2].Status));
+        Assert.Equal(("*", "Agents without settings of their own"), (model.Rows[^1].Initials, model.Rows[^1].Status));
+        Assert.All(model.Rows, row => Assert.True(row.HasSettings));
+        Assert.Equal(
+            ["Ask, allow for a while · sees all projects", "Ask, allow for a while · sees all projects", "Ask, allow for a while · sees every item · may run commands", "Ask, allow for a while · sees all projects"],
+            model.Rows.Select(row => row.Summary));
+        Assert.All(model.Rows, row => Assert.False(row.OffersConnect));
+        Assert.All(model.Rows, row => Assert.Null(row.Settings));
     }
 
     [Fact]
-    public async Task Settings_OpenBelowTheCards_OneAgentAtATime_AndCloseOnASecondPress()
+    public async Task Settings_OpenOnTheirRows_SeveralAtOnce_AndCloseAgain()
     {
         await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "ci-probe"));
         using var model = app.Model();
-        var card = model.Clients.Single(row => row.Label == "ci-probe");
-        var any = model.Clients.Single(row => row.Label == AgentNames.Any);
+        var row = model.Rows.Single(row => row.Label == "ci-probe");
+        var any = model.Rows.Single(row => row.Label == AgentNames.Any);
 
-        model.ToggleSettingsCommand.Execute(card);
+        row.IsOpen = true;
+        any.IsOpen = true;
 
-        Assert.Equal("ci-probe", model.Settings!.Agent);
-        Assert.True(card.IsSettingsOpen);
-        Assert.Equal("chevron-down", card.SettingsIcon);
+        Assert.Equal("ci-probe", row.Settings!.Agent);
+        Assert.Equal(AgentNames.Any, any.Settings!.Agent);
+        Assert.True(row.IsOpen);
 
-        model.ToggleSettingsCommand.Execute(any);
+        row.IsOpen = false;
 
-        Assert.Equal(AgentNames.Any, model.Settings!.Agent);
-        Assert.False(card.IsSettingsOpen);
-        Assert.True(any.IsSettingsOpen);
-
-        model.ToggleSettingsCommand.Execute(any);
-
-        Assert.Null(model.Settings);
-        Assert.False(any.IsSettingsOpen);
+        Assert.False(row.IsOpen);
+        Assert.True(any.IsOpen);
     }
 
     /// <summary>
-    /// The Always for notice opens an agent's settings by name, as its card's button does, and still when
-    /// no card shows that agent yet; a second open of the same agent leaves them open.
+    /// The Always for notice opens an agent's settings by name, as its row's Settings does, and still when no
+    /// row shows that agent yet, which then gets one; a second open leaves the same settings open.
     /// </summary>
     [Fact]
-    public async Task Settings_OpenByName_WithOrWithoutACard()
+    public async Task Settings_OpenByName_WithOrWithoutARow()
     {
         await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "ci-probe"));
         using var model = app.Model();
-        var card = model.Clients.Single(row => row.Label == "ci-probe");
+        var row = model.Rows.Single(row => row.Label == "ci-probe");
 
         model.OpenSettings("ci-probe");
-        var open = model.Settings;
+        var open = row.Settings;
         model.OpenSettings("ci-probe");
 
         Assert.Equal("ci-probe", open!.Agent);
-        Assert.Same(open, model.Settings);
-        Assert.True(card.IsSettingsOpen);
+        Assert.Same(open, row.Settings);
+        Assert.True(row.IsOpen);
 
         model.OpenSettings("codex");
 
-        Assert.Equal("codex", model.Settings!.Agent);
-        Assert.False(card.IsSettingsOpen);
+        var codex = model.Rows.Single(row => row.Label == "codex");
+        Assert.True(codex.IsOpen);
+        Assert.Equal("codex", codex.Settings!.Agent);
+        Assert.True(row.IsOpen);
+        Assert.Equal(AgentNames.Any, model.Rows[^1].Label);
     }
 
-    /// <summary>The cards are rebuilt whenever a client is seen again, and the settings open stay open on the new card.</summary>
+    /// <summary>The rows are read again whenever an agent is seen again, and each keeps its open settings, so no unsaved edit is dropped.</summary>
     [Fact]
-    public async Task OpenSettings_StayOpen_WhenTheCardsAreBuiltAgain()
+    public async Task OpenSettings_StayOpen_WhenTheRowsAreReadAgain()
     {
         await using var app = await App.StartAsync(new AttachClient("claude", "2.0", "ci-probe"));
         using var model = app.Model();
-        model.ToggleSettingsCommand.Execute(model.Clients.Single(row => row.Label == "ci-probe"));
-        var open = model.Settings;
+        var row = model.Rows.Single(row => row.Label == "ci-probe");
+        row.IsOpen = true;
+        var open = row.Settings;
 
         app.Audit("cursor", app.Authority.Session.Identity!.Key);
         model.Refresh();
+        app.Clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Same(open, model.Settings);
-        Assert.True(model.Clients.Single(row => row.Label == "ci-probe").IsSettingsOpen);
-        Assert.False(model.Clients.Single(row => row.Label == "cursor").IsSettingsOpen);
+        Assert.Same(row, model.Rows.Single(listed => listed.Label == "ci-probe"));
+        Assert.Same(open, row.Settings);
+        Assert.True(row.IsOpen);
+        Assert.False(model.Rows.Single(listed => listed.Label == "cursor").IsOpen);
     }
 
     [Fact]
-    public async Task AnUnlabeledClient_HasNoSettingsOfItsOwn()
+    public async Task AnAgentWithNoName_HasNoSettingsOfItsOwn()
     {
         await using var app = await App.StartAsync(new AttachClient("Zed", null, null));
 
         using var model = app.Model();
-        var card = model.Clients.Single(row => row.Name == "Zed");
+        var row = model.Rows.Single(row => row.Title == "Zed");
 
-        Assert.False(card.HasSettings);
-        Assert.Contains("--client-label", card.Hint, StringComparison.Ordinal);
-        Assert.False(model.ToggleSettingsCommand.CanExecute(card));
+        Assert.False(row.HasSettings);
+        Assert.Equal("?", row.Initials);
+        Assert.Contains("Every other agent's settings apply", row.Status, StringComparison.Ordinal);
 
-        model.ToggleSettingsCommand.Execute(card);
+        row.IsOpen = true;
 
-        Assert.Null(model.Settings);
+        Assert.False(row.IsOpen);
+        Assert.Null(row.Settings);
+        Assert.Empty(row.Summary);
     }
 
     [Fact]
@@ -136,10 +146,10 @@ public sealed class AgentClientsTests
         app.Audit("old\"bridge", app.Authority.Session.Identity!.Key);
 
         using var model = app.Model();
-        var card = model.Clients.Single(row => row.Label == "old\"bridge");
+        var row = model.Rows.Single(row => row.Key == "old\"bridge");
 
-        Assert.False(card.HasSettings);
-        Assert.False(model.ToggleSettingsCommand.CanExecute(card));
+        Assert.False(row.HasSettings);
+        Assert.Null(row.Label);
     }
 
     /// <summary>

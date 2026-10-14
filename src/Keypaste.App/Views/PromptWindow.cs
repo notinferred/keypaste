@@ -6,8 +6,8 @@ namespace Keypaste.App.Views;
 
 /// <summary>
 /// A prompt window whose whole client area is the dialog card and its shadow: no system chrome,
-/// moved by dragging the card, focused on Deny when it opens and answered with a denial however it
-/// closes.
+/// moved by dragging the card, focused on Deny when it opens or is brought forward, and answered with
+/// a denial however it closes.
 /// </summary>
 internal abstract class PromptWindow : Window
 {
@@ -27,9 +27,23 @@ internal abstract class PromptWindow : Window
             }
 
             // Focus starts on Deny, so a keystroke meant for another window can only refuse.
-            this.FindControl<Button>("Deny")?.Focus();
+            FocusDeny();
         };
     }
+
+    /// <summary>Raises the window over the others with focus on Deny, as it opened.</summary>
+    internal void BringForward()
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+        FocusDeny();
+    }
+
+    private void FocusDeny() => this.FindControl<Button>("Deny")?.Focus();
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {

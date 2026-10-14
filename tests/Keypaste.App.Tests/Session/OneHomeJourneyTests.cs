@@ -1,6 +1,7 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -21,8 +22,9 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// V-N.1b: through the app as launch composes it (D-0342), each advanced feature is reached from its
-/// one home: scoped tokens, the log's hash check and diagnostics from Settings' Advanced card, and a
-/// client's settings from its card on Agents; none of them is left on Agents or on Settings' page.
+/// one home: scoped tokens, the log's hash check and diagnostics from Settings' Advanced card, and an
+/// agent's settings from the Settings disclosure on its row on Agents; none of them is left on Agents or
+/// on Settings' page.
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="FourPlacesJourneyTests"/> is, pressing controls where the window draws them.
@@ -123,21 +125,21 @@ public sealed class OneHomeJourneyTests
             Assert.Contains(DiagnosticsViewModel.Version, facts);
             AmberElements.AssertOne(main, null, "Diagnostics");
 
-            // A client's settings, opened from its card on Agents, which carries no dropdown until they are.
+            // An agent's settings, opened from its row's Settings on Agents, which carries no dropdown until they are.
             await using var bridge = await ConnectAsync(app.Authority, vault);
             Chord(main, PhysicalKey.Digit2);
-            await Until(() => Card(main) is not null, () => "no card for the bridge");
+            await Until(() => Disclosure(main) is not null, () => "no row for the bridge");
             AssertNamesNone(main, "Agents");
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
-            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents");
-            Press(main, Card(main)!);
+            AmberElements.AssertOne(main, null, "Agents");
+            Press(main, Disclosure(main)!);
             await Until(
-                () => main.GetVisualDescendants().OfType<Border>().Any(panel => panel is { Name: "AgentSettingsPanel", IsEffectivelyVisible: true }),
+                () => main.GetVisualDescendants().OfType<AgentSettingsView>().Any(panel => panel is { IsEffectivelyVisible: true, DataContext: AgentSettingsViewModel { Agent: _label } }),
                 () => "the settings did not open");
-            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, a client's settings open");
+            AmberElements.AssertOne(main, null, "Agents, an agent's settings open");
             Press(main, Choice(main, "Ask every time"));
             await Until(() => Ceiling(home) == AgentMode.Ask, () => $"clients.toml holds {Ceiling(home)}");
-            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, the mode changed");
+            AmberElements.AssertOne(main, null, "Agents, the mode changed");
 
             // History shows the records and leaves the check to the activity log.
             Press(main, Named<Button>(main, "AgentHistory"));
@@ -168,10 +170,10 @@ public sealed class OneHomeJourneyTests
     private static Button VisibleButton(Window window, string content) =>
         window.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Content as string == content);
 
-    /// <summary>The Settings button of this journey's client card, once the screen lists it.</summary>
-    private static Button? Card(Window window) =>
-        window.GetVisualDescendants().OfType<Button>()
-            .SingleOrDefault(button => button is { Name: "ClientSettings", DataContext: ClientCardRow { Label: _label }, IsEffectivelyVisible: true });
+    /// <summary>The header of the Settings disclosure on this journey's agent's row, once the screen lists it.</summary>
+    private static ToggleButton? Disclosure(Window window) =>
+        window.GetVisualDescendants().OfType<ToggleButton>()
+            .SingleOrDefault(toggle => toggle is { Name: "PART_ExpanderHeader", TemplatedParent: Expander { DataContext: AgentRow { Label: _label } }, IsEffectivelyVisible: true });
 
     /// <summary>One of the open settings' mode choices for the agent's default.</summary>
     private static Button Choice(Window window, string words) =>

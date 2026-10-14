@@ -11,11 +11,12 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// Connecting a client from Agent Activity: what is shown, what runs, and what the check keeps.
+/// The pane under an AI tool's row on Agents: the plan it shows when it opens, what Run it runs, and what the check
+/// keeps. Each tool is registered under its own id, offering run and every item.
 /// </summary>
 /// <remarks>
-/// Client commands go to a recording runner, the client's command and files are under the fixture's directory, the
-/// AppImage's link is a fake, and the check goes to a scripted bridge, so no test reaches a real client's configuration
+/// Tool commands go to a recording runner, the tool's command and files are under the fixture's directory, the
+/// AppImage's link is a fake, and the check goes to a scripted bridge, so no test reaches a real tool's configuration
 /// or links anything. The session's home is the machine home's <c>.keypaste</c> unless a test says otherwise. The real
 /// bridge and the real prompt window are <c>scripts/verify-connect-client.sh</c>.
 /// </remarks>
@@ -67,9 +68,13 @@ public sealed class ConnectClientViewModelTests : IDisposable
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private ConnectClientViewModel Model(
+        string tool = "claude-code",
+        bool removes = false,
         Func<McpBridgeTargetResult>? findServer = null,
         string? home = null,
         string? approver = null,
+        Action? ran = null,
+        Action? cancelled = null,
         params string[] listed) =>
         new(
             Unlocked(home ?? DefaultHome),
@@ -83,7 +88,11 @@ public sealed class ConnectClientViewModelTests : IDisposable
                     var bridge = new ScriptedBridge(listed.Length == 0 ? ["env/ci/DEPLOY_KEY"] : listed);
                     _bridges.Add(bridge);
                     return bridge.Check();
-                }));
+                }),
+            McpClientCatalog.Find(tool)!,
+            removes,
+            ran,
+            cancelled);
 
     private static Func<McpBridgeTargetResult> Serving(McpServerCommand server) =>
         () => new McpBridgeTargetResult(new McpBridgeTarget(server, Link: null, Note: null), Error: null);
@@ -101,12 +110,12 @@ public sealed class ConnectClientViewModelTests : IDisposable
         return session;
     }
 
-    private McpServerRegistration Expected(string label, params string[] expose) =>
-        Registration(_server, new McpServerPins(_fixture.Path_, null, null), label, expose);
+    private McpServerRegistration Expected(string label) =>
+        Registration(_server, new McpServerPins(_fixture.Path_, null, null), label);
 
-    private static McpServerRegistration Registration(McpServerCommand server, McpServerPins pins, string label, params string[] expose)
+    private static McpServerRegistration Registration(McpServerCommand server, McpServerPins pins, string label)
     {
-        Assert.True(McpServerRegistration.TryCreate(server, pins, label, expose, out var registration, out var error), error);
+        Assert.True(McpServerRegistration.TryCreate(server, pins, label, [], out var registration, out var error), error);
         return registration;
     }
 
@@ -145,7 +154,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal(Core.Settings.ChooseOutcome.Chosen, Core.Settings.ChosenVault.Choose(DefaultHome, _fixture.Path_, onlyIfNone: false));
         using var model = Model();
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal(Plan("claude-code", Registration(_server, McpServerPins.None, "claude-code")), model.Preview);
         Assert.DoesNotContain("--vault", model.Preview, StringComparison.Ordinal);
@@ -155,30 +164,29 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task The_preview_is_the_plan_core_composed_with_the_vault_and_the_exposure()
+    public async Task The_pane_shows_the_plan_core_composed_with_the_vault_when_it_opens()
     {
         using var model = Model();
-        model.Exposure = "env/**, servers/staging/*";
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
-        Assert.Equal(Plan("claude-code", Expected("claude-code", "env/**", "servers/staging/*")), model.Preview);
+        Assert.Equal("Connect Claude Code", model.Title);
+        Assert.Equal(Plan("claude-code", Expected("claude-code")), model.Preview);
         Assert.Contains("--vault", model.Preview, StringComparison.Ordinal);
         Assert.DoesNotContain("--audit-log", model.Preview, StringComparison.Ordinal);
         Assert.DoesNotContain("--approver", model.Preview, StringComparison.Ordinal);
-        Assert.EndsWith("--client-label claude-code --allow-run --expose env/** --expose servers/staging/*", model.Preview, StringComparison.Ordinal);
-        Assert.DoesNotContain("--expose **", model.Preview, StringComparison.Ordinal);
         Assert.Empty(_runner.Changes);
         Assert.True(model.ConfirmCommand.CanExecute(null));
+        Assert.False(model.OffersCheck);
     }
 
-    /// <summary>The owner holds the agent to its settings, so a connection with no exposure offers run and reaches every item.</summary>
+    /// <summary>The owner holds the agent to its settings, which follow the tool's id, so the tool is registered under it offering run and reaching every item.</summary>
     [Fact]
-    public async Task With_no_exposure_the_client_is_registered_offering_run_with_every_item_in_reach()
+    public async Task The_tool_is_registered_under_its_own_id_offering_run_with_every_item_in_reach()
     {
         using var model = Model();
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
         await model.ConfirmCommand.ExecuteAsync();
 
         var registered = model.Registered!;
@@ -193,7 +201,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model(home: _fixture.Home);
         var session = _sessions[^1];
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         var pins = new McpServerPins(
             _fixture.Path_,
@@ -210,7 +218,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal(Core.Settings.ChooseOutcome.Chosen, Core.Settings.ChosenVault.Choose(DefaultHome, _fixture.Path_, onlyIfNone: false));
         using var model = Model(approver: "keypaste-connect-test");
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal(Plan("claude-code", Registration(_server, McpServerPins.None with { ApproverName = "keypaste-connect-test" }, "claude-code")), model.Preview);
         Assert.DoesNotContain("--vault", model.Preview, StringComparison.Ordinal);
@@ -220,11 +228,13 @@ public sealed class ConnectClientViewModelTests : IDisposable
     [Fact]
     public async Task Cancelling_the_preview_runs_nothing()
     {
-        using var model = Model();
+        var cancelled = 0;
+        using var model = Model(cancelled: () => cancelled++);
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
         model.CancelCommand.Execute(null);
 
+        Assert.Equal(1, cancelled);
         Assert.Empty(_runner.Changes);
         Assert.False(model.HasPreview);
         Assert.False(model.ConfirmCommand.CanExecute(null));
@@ -233,43 +243,32 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task Running_it_runs_exactly_the_commands_shown()
+    public async Task Running_it_runs_exactly_the_commands_shown_and_says_it_ran()
     {
-        using var model = Model();
-        model.Label = "my-laptop";
+        var ran = 0;
+        using var model = Model(ran: () => ran++);
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
         var shown = model.Preview;
         await model.ConfirmCommand.ExecuteAsync();
 
         Assert.Equal(shown, string.Join('\n', _runner.Changes));
-        Assert.Contains("--client-label my-laptop", shown, StringComparison.Ordinal);
+        Assert.Contains("--client-label claude-code", shown, StringComparison.Ordinal);
         Assert.StartsWith("Connected.", model.Message, StringComparison.Ordinal);
-        Assert.Equal("my-laptop", model.Registered!.ClientLabel);
+        Assert.Equal("claude-code", model.Registered!.ClientLabel);
+        Assert.Equal(1, ran);
+        Assert.False(model.IsBusy);
+        Assert.True(model.OffersCheck);
         Assert.True(model.CheckCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task An_edit_after_the_preview_drops_it_so_an_old_plan_can_never_run()
-    {
-        using var model = Model();
-
-        await model.PreviewConnectCommand.ExecuteAsync();
-        model.Exposure = "servers/**";
-
-        Assert.False(model.HasPreview);
         Assert.False(model.ConfirmCommand.CanExecute(null));
-        await model.ConfirmCommand.ExecuteAsync();
-        Assert.Empty(_runner.Changes);
     }
 
     [Fact]
     public async Task A_client_that_is_not_installed_is_said_to_be_and_nothing_is_offered()
     {
-        using var model = Model();
-        model.SelectedClient = McpClientCatalog.Find("codex")!;
+        using var model = Model("codex");
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal("Codex is not installed here: `codex` could not be started.", model.Message);
         Assert.False(model.HasPreview);
@@ -280,10 +279,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
     public async Task Gemini_cli_is_said_to_start_keypaste_only_in_folders_the_person_trusted()
     {
         const string trusted = "Gemini CLI starts keypaste only in folders you have trusted.";
-        using var model = Model();
-        model.SelectedClient = McpClientCatalog.Find("gemini-cli")!;
+        using var model = Model("gemini-cli");
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal(Plan("gemini-cli", Expected("gemini-cli")), model.Preview);
         Assert.EndsWith(trusted, model.PreviewNote, StringComparison.Ordinal);
@@ -299,11 +297,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
         const string seed = """{"mcpServers": {"other": {"command": "other"}}, "theme": "dark"}""";
         var file = Seed(Path.Combine(".cursor", "mcp.json"), seed);
         var backup = McpConfigFile.BackupPath(file);
-        using var model = Model();
-        model.SelectedClient = McpClientCatalog.Find("cursor")!;
+        using var model = Model("cursor");
 
-        Assert.Equal("cursor", model.Label);
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal(Plan("cursor", Expected("cursor")), model.Preview);
         Assert.EndsWith($"; keeps the original as {backup}", model.Preview, StringComparison.Ordinal);
@@ -328,9 +324,10 @@ public sealed class ConnectClientViewModelTests : IDisposable
     public async Task Removing_previews_and_then_runs_the_clients_own_removal()
     {
         Seed(".claude.json", _holdingKeypaste);
-        using var model = Model();
+        using var model = Model(removes: true);
 
-        await model.PreviewRemoveCommand.ExecuteAsync();
+        await model.PreviewAsync();
+        Assert.Equal("Disconnect Claude Code", model.Title);
         Assert.Equal("claude mcp remove --scope user keypaste", model.Preview);
         Assert.Empty(_runner.Changes);
 
@@ -344,21 +341,26 @@ public sealed class ConnectClientViewModelTests : IDisposable
     [Fact]
     public async Task A_client_holding_no_keypaste_entry_is_not_connected_and_nothing_is_offered()
     {
-        var cursor = Seed(Path.Combine(".cursor", "mcp.json"), """{"mcpServers": {"other": {"command": "other"}}}""");
-        using var model = Model();
+        using var model = Model(removes: true);
 
-        await model.PreviewRemoveCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal("Claude Code is not connected; there is nothing to remove.", model.Message);
         Assert.False(model.HasPreview);
         Assert.False(model.ConfirmCommand.CanExecute(null));
+        Assert.Empty(_runner.Changes);
+    }
 
-        model.SelectedClient = McpClientCatalog.Find("cursor")!;
-        await model.PreviewRemoveCommand.ExecuteAsync();
+    [Fact]
+    public async Task A_file_holding_no_keypaste_entry_is_not_connected_and_is_left_alone()
+    {
+        var cursor = Seed(Path.Combine(".cursor", "mcp.json"), """{"mcpServers": {"other": {"command": "other"}}}""");
+        using var model = Model("cursor", removes: true);
+
+        await model.PreviewAsync();
 
         Assert.Equal("Cursor is not connected; there is nothing to remove.", model.Message);
         Assert.False(model.ConfirmCommand.CanExecute(null));
-        Assert.Empty(_runner.Changes);
         Assert.False(File.Exists(McpConfigFile.BackupPath(cursor)));
     }
 
@@ -368,10 +370,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
         const string seed = """{"mcpServers": {"keypaste": {"command": "k"}, "other": {"command": "other"}}}""";
         var file = Seed(Path.Combine(".cursor", "mcp.json"), seed);
         var backup = McpConfigFile.BackupPath(file);
-        using var model = Model();
-        model.SelectedClient = McpClientCatalog.Find("cursor")!;
+        using var model = Model("cursor", removes: true);
 
-        await model.PreviewRemoveCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal($"edit {file}: remove mcpServers.keypaste; keeps the original as {backup}", model.Preview);
         Assert.Equal($"Remove changes only keypaste's entry in {file}, and keeps the first original as {backup}.", model.PreviewNote);
@@ -391,7 +392,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         _runner.Refusal = "that scope is not writable here";
         using var model = Model();
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
         await model.ConfirmCommand.ExecuteAsync();
 
         Assert.Equal("Claude Code refused: that scope is not writable here", model.Message);
@@ -404,32 +405,20 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Seed(".claude.json", _holdingKeypaste);
         _runner.Refusal = "No MCP server found with name: keypaste";
         _runner.Refuses = "remove";
-        using var model = Model();
+        using var model = Model(removes: true);
 
-        await model.PreviewRemoveCommand.ExecuteAsync();
+        await model.PreviewAsync();
         await model.ConfirmCommand.ExecuteAsync();
 
         Assert.Equal("Claude Code refused: No MCP server found with name: keypaste", model.Message);
     }
 
     [Fact]
-    public async Task An_exposure_the_bridge_would_refuse_is_refused_before_anything_is_shown()
-    {
-        using var model = Model();
-        model.Exposure = new string('x', 200);
-
-        await model.PreviewConnectCommand.ExecuteAsync();
-
-        Assert.StartsWith("Exposure: ", model.Message, StringComparison.Ordinal);
-        Assert.False(model.HasPreview);
-    }
-
-    [Fact]
     public async Task Without_a_bridge_to_start_there_is_nothing_to_connect()
     {
-        using var model = Model(() => new McpBridgeTargetResult(Target: null, "keypaste was not found in the test's directory and on PATH, so there is nothing a client could start"));
+        using var model = Model(findServer: () => new McpBridgeTargetResult(Target: null, "keypaste was not found in the test's directory and on PATH, so there is nothing a client could start"));
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal("keypaste was not found in the test's directory and on PATH, so there is nothing a client could start.", model.Message);
         Assert.Empty(_runner.Calls);
@@ -439,9 +428,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
     public async Task A_link_path_holding_another_program_beside_an_existing_backup_is_refused_before_anything_is_shown()
     {
         var link = FakeCliLink.At(CliLinkState.Foreign, backupExists: true);
-        using var model = Model(Through(link));
+        using var model = Model(findServer: Through(link));
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.Equal(
             $"{link.LinkPath} is another program, and {link.BackupPath} already exists, which keypaste never overwrites. "
@@ -455,9 +444,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
     public async Task Inside_an_appimage_the_link_is_created_first_as_a_step_shown_with_the_rest()
     {
         var link = FakeCliLink.At(CliLinkState.Absent);
-        using var model = Model(Through(link));
+        using var model = Model(findServer: Through(link));
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         var server = new McpServerCommand(link.LinkPath, [McpServerLocator.BridgeArgument]);
         Assert.Equal(
@@ -478,9 +467,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
     public async Task Inside_an_appimage_a_file_keypaste_did_not_write_is_replaced_only_on_run_it()
     {
         var link = FakeCliLink.At(CliLinkState.Foreign);
-        using var model = Model(Through(link));
+        using var model = Model(findServer: Through(link));
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
 
         Assert.StartsWith(
             $"replace {link.LinkPath}, which is another program, with a script that starts {_image} cli; the old file is kept as {link.BackupPath}\n",
@@ -499,9 +488,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
     public async Task A_link_that_is_not_made_registers_nothing()
     {
         var link = FakeCliLink.At(CliLinkState.Absent, answer: new CliLinkResult(CliLinkOutcome.Failed, Reason: "Permission denied"));
-        using var model = Model(Through(link));
+        using var model = Model(findServer: Through(link));
 
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
         await model.ConfirmCommand.ExecuteAsync();
 
         Assert.Equal($"keypaste could not create {link.LinkPath}: Permission denied. Nothing else was changed.", model.Message);
@@ -566,6 +555,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         var model = await ConnectedAsync("env/ci/DEPLOY_KEY", "env/ci/OTHER");
         await model.CheckCommand.ExecuteAsync();
         Assert.True(model.IsChecking);
+        Assert.True(model.IsBusy);
 
         model.Dispose();
 
@@ -576,7 +566,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
     private async Task<ConnectClientViewModel> ConnectedAsync(params string[] listed)
     {
         var model = Model(listed: listed);
-        await model.PreviewConnectCommand.ExecuteAsync();
+        await model.PreviewAsync();
         await model.ConfirmCommand.ExecuteAsync();
         Assert.NotNull(model.Registered);
         return model;

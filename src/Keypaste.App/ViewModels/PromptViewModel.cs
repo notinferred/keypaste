@@ -13,8 +13,9 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// Every allow is armed only after the prompt has been up for <see cref="ArmingDelay"/>: the window
 /// can appear under a pointer that was about to click something else, and that click is not an
-/// approval (D-0326). Denying needs no delay. The timed allow exists only when the prompt offers a
-/// timed grant.
+/// approval (D-0326). Bringing the prompt forward from Agents disarms it for another
+/// <see cref="ArmingDelay"/>, and a wait begun before that arms nothing (D-0456). Denying needs no
+/// delay. The timed allow exists only when the prompt offers a timed grant.
 /// </para>
 /// </remarks>
 internal abstract class PromptViewModel : ObservableObject
@@ -24,6 +25,7 @@ internal abstract class PromptViewModel : ObservableObject
 
     private readonly TaskCompletionSource<ApprovalAnswer> _answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _armed;
+    private int _arming;
     private string _countdown = string.Empty;
 
     protected PromptViewModel()
@@ -73,8 +75,28 @@ internal abstract class PromptViewModel : ObservableObject
         private set => Set(ref _armed, value);
     }
 
-    /// <summary>Lets the allow buttons be pressed. Called on the UI thread once the prompt has been up long enough.</summary>
-    internal void Arm() => IsArmed = true;
+    /// <summary>Which wait to arm the prompt is current; <see cref="Disarm"/> begins another.</summary>
+    internal int Arming => _arming;
+
+    /// <summary>Lets the allow buttons be pressed now.</summary>
+    internal void Arm() => Arm(_arming);
+
+    /// <summary>Lets the allow buttons be pressed, unless the prompt was disarmed after the wait for <paramref name="arming"/> began. Called on the UI thread.</summary>
+    /// <param name="arming">The <see cref="Arming"/> read when the wait began.</param>
+    internal void Arm(int arming)
+    {
+        if (arming == _arming)
+        {
+            IsArmed = true;
+        }
+    }
+
+    /// <summary>Lets no allow be pressed until a wait begun now arms it. Called on the UI thread.</summary>
+    internal void Disarm()
+    {
+        _arming++;
+        IsArmed = false;
+    }
 
     /// <summary>Shows how long is left to answer. Called on the UI thread.</summary>
     internal void Tick(TimeSpan remaining)

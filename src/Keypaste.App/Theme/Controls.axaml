@@ -56,4 +56,36 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </ControlTheme>
 
+  <!-- A disclosure, such as an agent's Settings on Agents: a ghost header with a chevron, and its
+       content below while open. The header toggle carries the Expander's own name, so a reader hears
+       which disclosure it is and whether it is open. -->
+  <ControlTheme x:Key="{x:Type Expander}" TargetType="Expander">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="12">
+          <ToggleButton Name="PART_ExpanderHeader"
+                        Classes="disclosure"
+                        HorizontalAlignment="Left"
+                        IsChecked="{TemplateBinding IsExpanded, Mode=TwoWay}"
+                        AutomationProperties.Name="{Binding $parent[Expander].(AutomationProperties.Name)}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Name="Chevron" Icon="chevron-right" Size="13" />
+              <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ToggleButton>
+          <ContentPresenter Name="PART_ContentPresenter"
+                            IsVisible="{TemplateBinding IsExpanded}"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+
+    <Style Selector="^:expanded /template/ ctl|KpIcon#Chevron">
+      <Setter Property="Icon" Value="chevron-down" />
+    </Style>
+  </ControlTheme>
+
 </ResourceDictionary>

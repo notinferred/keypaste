@@ -11,6 +11,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -30,7 +31,9 @@ namespace Keypaste.App.Tests.Rendering;
 /// <code>
 /// KEYPASTE_SCREENS_OUT=/tmp/screens dotnet test tests/Keypaste.App.Tests -- --filter-class Keypaste.App.Tests.Rendering.ScreenRenderer
 /// </code>
-/// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
+/// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) dev.yml sets it, so
+/// <c>bash scripts/dev.sh --class Keypaste.App.Tests.Rendering.ScreenRenderer --os all</c> draws them on
+/// each runner and uploads them as <c>screens-&lt;runner&gt;</c>. It writes every screen
 /// twice, into <c>dark</c> and <c>light</c> folders, with the system set to each and no theme chosen,
 /// as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Add a
 /// screen by adding a <see cref="Save"/> call.
@@ -171,10 +174,11 @@ public sealed class ScreenRenderer
     }
 
     /// <summary>
-    /// Agents with what a working session holds: two clients attached over the app's own endpoint
-    /// whose requests a person allowed for an hour, a request still waiting at the prompt, a client
-    /// seen only in the log, a policy and two tokens; then the page in a wide window, the token form,
-    /// a minted token, a token revoke being confirmed and the Connect card.
+    /// Agents with what a working session holds: two agents attached over the app's own endpoint whose
+    /// requests a person allowed for an hour, a request still waiting at the prompt, the AI tools found on a
+    /// computer of the test's own, settings and two tokens; then the page in a wide and a narrow window, a row's
+    /// Settings open, a tool's Connect pane while a request waits and while none does, the token form, a minted
+    /// token and a token revoke being confirmed.
     /// </summary>
     [Fact]
     public Task The_agents_screen_is_drawn_with_grants_clients_and_tokens() => HeadlessSession.On(async () =>
@@ -194,12 +198,13 @@ public sealed class ScreenRenderer
 
         var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
         await using var claude = await AgentAsync(serving, demo.Path, new Core.Ipc.AttachClient("claude", "2.0", "claude-code"));
-        await using var cursor = await AgentAsync(serving, demo.Path, new Core.Ipc.AttachClient("cursor", "1.4", "cursor"));
+        // zed is a bridge set up by hand under a name no AI tool found here uses, so it is an agent row of its own.
+        await using var zed = await AgentAsync(serving, demo.Path, new Core.Ipc.AttachClient("zed", "0.160", "zed"));
         await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/.env", "DATABASE_URL");
         await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/.env", "STRIPE_SECRET_KEY");
         clock.Advance(TimeSpan.FromMinutes(18));
-        await AskAsync(cursor, serving, demo.Path, "cursor", "env/acme-web/.env", "NEXT_PUBLIC_API");
-        var waiting = AskAsync(cursor, serving, demo.Path, "cursor", Allowing.HeldEntry, Allowing.HeldField);
+        await AskAsync(zed, serving, demo.Path, "zed", "env/acme-web/.env", "NEXT_PUBLIC_API");
+        var waiting = AskAsync(zed, serving, demo.Path, "zed", Allowing.HeldEntry, Allowing.HeldField);
         await WaitUntilAsync(() => authority.Activity.Waiting.Count == 1);
 
         Assert.True(Core.Agents.AccessCaps.TrySave(
@@ -208,17 +213,23 @@ public sealed class ScreenRenderer
             Core.Agents.AccessCaps.Empty
                 .With(new Core.Agents.CapsRow { Label = Core.Agents.AgentNames.Any, Mode = Core.Agents.AgentMode.Ask })
                 .With(new Core.Agents.CapsRow { Label = "claude-code", Mode = Core.Agents.AgentMode.Automatic })
-                .With(new Core.Agents.CapsRow { Label = "cursor", Mode = Core.Agents.AgentMode.Automatic })
+                .With(new Core.Agents.CapsRow { Label = "zed", Mode = Core.Agents.AgentMode.Automatic })
                 .With(new Core.Agents.CapsRow { Label = "local-evals", Values = false }),
             out var saveError), saveError);
 
-        using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
+        var tools = new FakeTools(Path.Combine(demo.Home, "computer")).ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable();
+        using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock, post: action => Avalonia.Threading.Dispatcher.UIThread.Post(action))
+        {
+            Tools = () => tools.Connector(),
+        };
         var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
 
         shell.Current = Destinations.Of(DestinationKind.AgentActivity);
         var agents = Assert.IsType<AgentActivityViewModel>(shell.Content);
+        await agents.Looking;
+        WindowInput.Drain();
         Save(window, output!, "20-agents");
 
         window.Height = 1500;
@@ -227,16 +238,30 @@ public sealed class ScreenRenderer
         window.Width = 1920;
         window.Height = 1100;
         Save(window, output!, "25-agents-wide");
+        window.Width = 960;
+        Save(window, output!, "29-agents-narrow");
         window.Width = _width;
         window.Height = 1500;
 
-        agents.RevokeCommand.Execute(agents.Grants[0]);
-        agents.ToggleSettingsCommand.Execute(agents.Clients.Single(card => card.Label == "claude-code"));
-        Save(window, output!, "27-agents-settings");
+        agents.EndCommand.Execute(agents.Grants[0]);
+        var claudeRow = agents.Rows.Single(row => row.Key == "claude-code");
+        claudeRow.IsOpen = true;
+        Save(window, output!, "27-agents-settings-open");
+        window.Width = 960;
+        Save(window, output!, "27-agents-settings-narrow");
+        window.Width = _width;
 
-        agents.ToggleSettingsCommand.Execute(agents.Clients.Single(card => card.Label == "claude-code"));
-        agents.ToggleConnectCommand.Execute(null);
+        claudeRow.IsOpen = false;
+        agents.ConnectCommand.Execute(agents.Rows.Single(row => row.Key == "cursor"));
+        await agents.Opening;
         Save(window, output!, "24-agents-connect");
+
+        // With nothing waiting, the open pane's Run it is the frame's one amber.
+        await zed.DisposeAsync();
+        await Assert.ThrowsAnyAsync<Exception>(() => waiting);
+        await WaitUntilAsync(() => authority.Activity.Waiting.Count == 0);
+        agents.Refresh();
+        Save(window, output!, "28-agents-quiet");
 
         // Scoped tokens, under Settings › Advanced.
         window.Height = _height;
@@ -260,8 +285,6 @@ public sealed class ScreenRenderer
         Save(window, output!, "26-settings-tokens-revoke");
 
         window.Close();
-        authority.Session.Lock(VaultLockReason.Manual);
-        await Assert.ThrowsAnyAsync<Exception>(() => waiting);
     });
 
     private static async Task WaitUntilAsync(Func<bool> condition)
@@ -1116,9 +1139,9 @@ public sealed class ScreenRenderer
         page.Children.AddRange(
         [
             Row(new BrandWordmark { Width = 104 }, new BrandMark { Width = 56 }, new BrandMark { Width = 22, Classes = { "mono" } }),
-            Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("Active grants", "section")),
+            Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("Allowances", "section")),
             Row(Text("MCP clients and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
-            Row(Button("Connect client", ""), Button("Allow for 1 hour", "primary"), Button("Deny", "ghost"), Button("Revoke", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
+            Row(Button("Connect", ""), Button("Allow for 1 hour", "primary"), Button("Deny", "ghost"), Button("End", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
             Row(new TextBox { PlaceholderText = "Filter 7 secrets", Width = 260 }, focused, new TextBox { PlaceholderText = "Search secrets", Width = 300, Classes = { "search" } }),
             Row(new ComboBox { ItemsSource = new[] { "As the vault's settings say", "Ask every time", "No values, only commands" }, SelectedIndex = 1, Width = 240 }, new CheckBox { Content = "Require a passphrase", IsChecked = true }, new CheckBox { Content = "Unchecked" }, new ToggleSwitch { IsChecked = true, Content = "Keep editing in place" }, new ToggleSwitch { IsChecked = false }),
             Row(segments, Box("chip", Text("dev", "")), Box("chip outline", Text("inject-only", "")), Box("chip amber", Text("approval required", "")), Box("keycap", Text("Ctrl K", ""))),

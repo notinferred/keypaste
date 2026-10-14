@@ -38,6 +38,11 @@ public sealed class KeptSlot : IDisposable
 /// <param name="Remaining">How long is left before the gate answers for them.</param>
 public sealed record WaitingEnv(EnvReleasePrompt Prompt, TimeSpan Remaining);
 
+/// <summary>A confirmation of a change that gives an agent more, in front of a person, as a list shows it.</summary>
+/// <param name="Prompt">What the person is being shown.</param>
+/// <param name="Remaining">How long is left before the gate answers for them.</param>
+public sealed record WaitingChange(AccessChangePrompt Prompt, TimeSpan Remaining);
+
 /// <summary>
 /// Puts one request in front of a human, enforces the deadline, and denies everything else.
 /// </summary>
@@ -109,6 +114,10 @@ public sealed class ApprovalGate : IDisposable
     public WaitingEnv? WaitingEnv =>
         _asking is { Env: { } env } asking ? new WaitingEnv(env, asking.Window.Remaining(_clock)) : null;
 
+    /// <summary>The confirmation of a change that gives an agent more a person is being asked about now, or null.</summary>
+    public WaitingChange? WaitingChange =>
+        _asking is { Change: { } change } asking ? new WaitingChange(change, asking.Window.Remaining(_clock)) : null;
+
     /// <summary>Asks a human, and answers for them when they cannot be asked.</summary>
     /// <param name="cooldownKey">
     /// What counts as "the same request" for the purposes of the post-denial cooldown. The caller
@@ -126,7 +135,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync([cooldownKey], new Asked(prompt, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync([cooldownKey], new Asked(prompt, null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>
@@ -152,7 +161,7 @@ public sealed class ApprovalGate : IDisposable
         KeptSlot? kept = null;
         var answer = await AskThroughAsync(
             [cooldownKey],
-            new Asked(prompt, null, null),
+            new Asked(prompt, null, null, null),
             token => _channel.AskAsync(prompt, token),
             cancellationToken,
             keep: answered => prompt.AlwaysFor is not null && answered == ApprovalAnswer.AlwaysForProject ? kept = new KeptSlot(this) : null).ConfigureAwait(false);
@@ -178,7 +187,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync([cooldownKey], new Asked(null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync([cooldownKey], new Asked(null, null, prompt, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>Asks a human about an agent's run, under the same window, slot and cooldown.</summary>
@@ -198,7 +207,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKeys);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKeys, new Asked(null, prompt, null), token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync(cooldownKeys, new Asked(null, prompt, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>Asks a human to confirm a change that gives an agent more, under the same window, slot and cooldown.</summary>
@@ -244,7 +253,7 @@ public sealed class ApprovalGate : IDisposable
             throw new ArgumentException("the slot is not this gate's, or was given back", nameof(kept));
         }
 
-        return AskThroughAsync(cooldownKeys, new Asked(null, null, null), token => _channel.AskAsync(prompt, token), cancellationToken, coolUnanswered, inKept: kept is not null);
+        return AskThroughAsync(cooldownKeys, new Asked(null, null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken, coolUnanswered, inKept: kept is not null);
     }
 
     private async ValueTask<ApprovalAnswer> AskThroughAsync(
@@ -279,7 +288,7 @@ public sealed class ApprovalGate : IDisposable
 
         try
         {
-            _asking = new Asking(listed.Prompt, listed.Run, listed.Env, Deadline.Starting(_clock, Limits.Window));
+            _asking = new Asking(listed.Prompt, listed.Run, listed.Env, listed.Change, Deadline.Starting(_clock, Limits.Window));
 
             var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
 
@@ -483,7 +492,7 @@ public sealed class ApprovalGate : IDisposable
         _oneAtATime.Dispose();
     }
 
-    private sealed record Asking(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, Deadline Window);
+    private sealed record Asking(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, AccessChangePrompt? Change, Deadline Window);
 
-    private readonly record struct Asked(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env);
+    private readonly record struct Asked(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, AccessChangePrompt? Change);
 }

@@ -41,10 +41,6 @@ keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an 
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **N.3 — Show apps, requests, allowances and history on Agents.** Needs: N.1a, G.2.
-  - Each detected tool gets one Connect.
-  - The screen shows the waiting request, allowances with their time left and an End button, and the history.
-  - The first level has no more than twelve controls.
 - [ ] **G.4b — Tell the person when a locked app is asked.** Needs: G.4a.
   - A bridge that finds no owner has the running app show one notice, with no password field.
   - Only the person's click opens the unlock screen, and the request itself is still denied.

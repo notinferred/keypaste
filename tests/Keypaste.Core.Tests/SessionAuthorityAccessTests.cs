@@ -335,6 +335,24 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Equal(4, _fixture.Channel.AccessAsked);
     }
 
+    /// <summary>A confirmation of a change is listed while the person is asked, with where it says it came from, and not after.</summary>
+    [Fact]
+    public async Task Activity_ListsTheWaitingChange_WhileThePersonIsAsked()
+    {
+        await using var owner = Owner.Start(this);
+        await using var agent = await owner.AttachAsync();
+        IReadOnlyList<WaitingChange> listed = [];
+        _fixture.Channel.WhileConfirming = () => listed = owner.Authority.Activity.WaitingChanges;
+
+        await agent.ChangeAccessAsync(Asked() with { Mode = "automatic" }, Token);
+
+        var waiting = Assert.Single(listed);
+        Assert.Equal((_agent, AccessOrigin.Agent), (waiting.Prompt.Agent, waiting.Prompt.Origin));
+        Assert.True(waiting.Remaining > TimeSpan.Zero);
+        Assert.Empty(owner.Authority.Activity.WaitingChanges);
+        Assert.Empty(owner.Authority.Activity.Waiting);
+    }
+
     /// <summary>An Always for answer to a prompt that did not offer it is an answer nobody could have meant: nothing is read or changed.</summary>
     [Fact]
     public async Task AnAlwaysForAnswer_ToAPromptThatDidNotOfferIt_ReleasesNothing()
@@ -1015,12 +1033,15 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         private Owner(string pipeName, SessionAuthority authority, string vault)
         {
             PipeName = pipeName;
+            Authority = authority;
             _vault = vault;
             _listener = new ApproverListener(pipeName, authority);
             _running = _listener.RunAsync(_stop.Token);
         }
 
         internal string PipeName { get; }
+
+        internal SessionAuthority Authority { get; }
 
         internal static Owner Start(SessionAuthorityAccessTests test, Func<AuditLog?>? audit = null, ApproverHandler? handler = null) =>
             new(

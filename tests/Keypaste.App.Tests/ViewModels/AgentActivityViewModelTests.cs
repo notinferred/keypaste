@@ -11,8 +11,9 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// Agent Activity lists what the app's session authority holds and what the audit file says this
-/// session answered, over the app's real endpoint, and says so when either cannot be read.
+/// Agents lists what the app's session authority holds, the AI tools found on this computer with the agents
+/// that asked, and what the audit file says was answered since the unlock, over the app's real endpoint, and
+/// says so when any of it cannot be read. Nothing on it answers a request (D-0456).
 /// </summary>
 public sealed class AgentActivityViewModelTests
 {
@@ -40,7 +41,7 @@ public sealed class AgentActivityViewModelTests
         Assert.Empty(model.Grants);
         Assert.True(model.IsAvailable);
         var serving = Assert.IsType<AuthorityStatus.Serving>(app.Authority.Status);
-        Assert.Equal($"Answering agents from this app · process {serving.Owner.ProcessId} · session {serving.Session}", model.Serving);
+        Assert.Equal($"process {serving.Owner.ProcessId} · session {serving.Session}", model.Serving);
 
         app.Clock.Advance(TimeSpan.FromSeconds(5));
 
@@ -99,7 +100,7 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("claude-code · label ci-probe", grant.Who);
         Assert.Equal("ends in 3600 s", grant.Left);
         Assert.NotNull(grant.Grant);
-        Assert.True(model.RevokeAllCommand.CanExecute(null));
+        Assert.True(model.EndAllCommand.CanExecute(null));
 
         app.Clock.Advance(TimeSpan.FromSeconds(10));
 
@@ -110,7 +111,7 @@ public sealed class AgentActivityViewModelTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Revoke_ends_the_grant_in_the_authority_so_the_same_request_is_asked_again(bool all)
+    public async Task End_ends_the_allowance_in_the_authority_so_the_same_request_is_asked_again(bool all)
     {
         await using var app = await App.StartAsync();
         app.Person.Answer = ApprovalAnswer.Approved;
@@ -122,16 +123,16 @@ public sealed class AgentActivityViewModelTests
 
         if (all)
         {
-            model.RevokeAllCommand.Execute(null);
+            model.EndAllCommand.Execute(null);
         }
         else
         {
-            model.RevokeCommand.Execute(Assert.Single(model.Grants));
+            model.EndCommand.Execute(Assert.Single(model.Grants));
         }
 
         Assert.Empty(model.Grants);
         Assert.Empty(app.Authority.Activity.Grants);
-        Assert.False(model.RevokeAllCommand.CanExecute(null));
+        Assert.False(model.EndAllCommand.CanExecute(null));
 
         var again = await app.RequestAsync();
 
@@ -140,7 +141,7 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
-    public async Task RevokeById_EndsThatGrant()
+    public async Task EndById_EndsThatAllowance()
     {
         await using var app = await App.StartAsync();
         app.Person.Answer = ApprovalAnswer.Approved;
@@ -158,7 +159,7 @@ public sealed class AgentActivityViewModelTests
         Assert.All(listed, grant => Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "example", "password", 3600), grant));
 
         var ended = model.Grants[0];
-        model.RevokeCommand.Execute(ended);
+        model.EndCommand.Execute(ended);
 
         var kept = Assert.Single(model.Grants);
         Assert.NotEqual(ended.Id, kept.Id);
@@ -178,7 +179,7 @@ public sealed class AgentActivityViewModelTests
         using var model = app.Model();
 
         Assert.False(model.HasHistoryMessage);
-        Assert.Equal($"1 record of 2 in {AuditHistory.ShortPath(model.AuditPath)}, this session", model.HistoryHeading);
+        Assert.Equal($"1 record of 2 in {AuditHistory.ShortPath(model.AuditPath)}, since you unlocked", model.HistoryHeading);
         Assert.DoesNotContain(app.Session, model.HistoryHeading + model.History, StringComparison.Ordinal);
         Assert.Contains("example", model.History, StringComparison.Ordinal);
         Assert.DoesNotContain("FROM_BEFORE", model.History, StringComparison.Ordinal);
@@ -207,7 +208,7 @@ public sealed class AgentActivityViewModelTests
         using var model = app.Model();
 
         Assert.False(model.HasHistory);
-        Assert.Equal("The audit log has no records from this session yet.", model.HistoryMessage);
+        Assert.Equal("Nothing has been recorded since you unlocked.", model.HistoryMessage);
         Assert.Empty(model.HistoryHeading);
     }
 
@@ -219,7 +220,7 @@ public sealed class AgentActivityViewModelTests
         using var model = app.Model();
 
         Assert.False(model.HasHistory);
-        Assert.Equal("The audit log has no records from this session yet.", model.HistoryMessage);
+        Assert.Equal("Nothing has been recorded since you unlocked.", model.HistoryMessage);
         Assert.DoesNotContain(model.AuditPath, model.HistoryMessage, StringComparison.Ordinal);
     }
 
@@ -298,7 +299,7 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
-    public async Task A_grant_row_says_its_time_left_as_the_table_shows_it_and_a_revoke_says_so()
+    public async Task An_allowance_row_says_its_time_left_as_the_table_shows_it_and_End_says_so()
     {
         await using var app = await App.StartAsync();
         app.Person.Answer = ApprovalAnswer.Approved;
@@ -316,11 +317,256 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("57m left", grant.LeftText);
         Assert.Equal(3419d / 3600, grant.Fraction, 3);
 
-        model.RevokeCommand.Execute(grant);
+        model.EndCommand.Execute(grant);
 
         Assert.Empty(model.Grants);
-        Assert.Equal(["Revoked claude-code's grant"], said);
+        Assert.Equal(["Ended claude-code's allowance."], said);
     }
+
+    /// <summary>
+    /// Show the prompt asks the authority to bring the prompt forward and answers nothing: the request still waits.
+    /// With no window on screen, as here, the person is told the prompt is no longer open.
+    /// </summary>
+    [Fact]
+    public async Task Show_the_prompt_asks_the_authority_and_leaves_the_request_waiting()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Hold = true;
+        var pending = app.RequestAsync();
+        await app.Person.Waiting.WaitAsync(_connect, Token);
+        List<string> said = [];
+        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: said.Add);
+
+        Assert.True(model.ShowPromptCommand.CanExecute(null));
+        model.ShowPromptCommand.Execute(null);
+
+        Assert.Equal(["The prompt window is no longer open."], said);
+        Assert.Single(model.Waiting);
+        Assert.False(pending.IsCompleted);
+        Assert.Equal(1, app.Person.Asked);
+
+        app.Clock.Advance(TimeSpan.FromSeconds(45));
+        await pending.WaitAsync(_connect, Token);
+        model.Refresh();
+
+        Assert.False(model.ShowPromptCommand.CanExecute(null));
+    }
+
+    /// <summary>A confirmation of a change that gives an agent more waits like a request, named by where it says it came from, with no reason shown.</summary>
+    [Fact]
+    public async Task A_waiting_change_is_listed_by_where_it_came_from_with_Show_the_prompt()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Hold = true;
+        Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
+        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var changing = app.Authority.ChangeAccessAsync("claude-code", edit, givingUp.Token).AsTask();
+        await app.Person.Waiting.WaitAsync(_connect, Token);
+
+        using var model = app.Model();
+
+        var waiting = Assert.Single(model.Waiting);
+        Assert.Equal(("claude-code", "Your change to claude-code's settings"), (waiting.Client, waiting.Asked));
+        Assert.EndsWith("s left", waiting.LeftText, StringComparison.Ordinal);
+        Assert.True(model.ShowPromptCommand.CanExecute(null));
+
+        await givingUp.CancelAsync();
+
+        try
+        {
+            await changing.WaitAsync(_connect, Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Withdrawn, as a screen that stops waiting withdraws it.
+        }
+    }
+
+    /// <summary>
+    /// A row's summary follows a change made outside its panel, such as one an agent asked for and the person
+    /// confirmed in the prompt window, which rewrites the agent's record and leaves the number of records as it was.
+    /// </summary>
+    [Fact]
+    public async Task A_rows_summary_follows_a_change_made_outside_its_panel()
+    {
+        await using var app = await App.StartAsync(vault =>
+            Assert.Equal(AgentAccessWrite.Written, new AgentAccessStore(vault).Write("claude-code", AgentAccess.Defaults with { Mode = AgentMode.Ask })));
+        app.Person.Answer = ApprovalAnswer.Approved;
+
+        using var model = app.Model();
+        var claude = model.Rows.Single(row => row.Key == "claude-code");
+        Assert.StartsWith("Ask every time · ", claude.Summary, StringComparison.Ordinal);
+
+        Assert.True(AccessEdit.TryCreate(null, "automatic", null, null, null, null, null, reset: false, out var edit, out var error), error);
+        Assert.Equal(AuditDecision.Granted, (await app.Authority.ChangeAccessAsync("claude-code", edit, Token)).Decision);
+        app.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.StartsWith("Automatic · ", claude.Summary, StringComparison.Ordinal);
+    }
+
+    /// <summary>A row listed only while its settings are open goes on saying what is true of it: once its bridge leaves, it is no longer in use.</summary>
+    [Fact]
+    public async Task A_row_kept_for_its_open_settings_stays_current_after_its_bridge_leaves()
+    {
+        await using var app = await App.StartAsync();
+        using var model = app.Model();
+        await using var bridge = await app.ConnectAsync(new AttachClient("helper", "1.0", "helper"));
+        app.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        var helper = model.Rows.Single(row => row.Key == "helper");
+        Assert.Equal(("in use now", true), (helper.Status, helper.IsLive));
+        helper.IsOpen = true;
+
+        await bridge.DisposeAsync();
+        using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(Token))
+        {
+            deadline.CancelAfter(_connect);
+
+            while (app.Authority.Clients.Any(client => client.Label == "helper"))
+            {
+                await Task.Delay(20, deadline.Token);
+            }
+        }
+
+        app.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Same(helper, model.Rows.Single(row => row.Key == "helper"));
+        Assert.Equal(("hasn't asked in the last 30 days", false), (helper.Status, helper.IsLive));
+    }
+
+    /// <summary>Agents looks for the tools once when it opens, never on its ticks, and a look still running ends with the screen.</summary>
+    [Fact]
+    public async Task The_tools_are_looked_for_once_when_the_screen_opens_and_the_look_ends_with_it()
+    {
+        await using var app = await App.StartAsync();
+        var tools = app.Tools().ClaudeCode(connected: true);
+        using var held = new ManualResetEventSlim();
+        tools.Runner.Hold = held;
+
+        var closed = app.Model(tools.Connector());
+        Assert.True(closed.IsLooking);
+        closed.Dispose();
+        await closed.Looking.WaitAsync(_connect, Token);
+        held.Set();
+
+        Assert.DoesNotContain(closed.Rows, row => row.Presence is not null);
+
+        using var model = app.Model(tools.Connector());
+        await model.Looking.WaitAsync(_connect, Token);
+
+        Assert.False(model.IsLooking);
+        Assert.False(model.HasNoTools);
+        var claude = model.Rows.Single(row => row.Key == "claude-code");
+        Assert.Equal(("Claude Code", "Connected", true), (claude.Title, claude.Status, claude.IsLive));
+
+        var probes = Probes(tools);
+        app.Clock.Advance(TimeSpan.FromSeconds(5));
+        Assert.Equal(probes, Probes(tools));
+    }
+
+    [Fact]
+    public async Task With_no_tool_found_the_screen_names_those_it_looks_for()
+    {
+        await using var app = await App.StartAsync();
+        var tools = app.Tools();
+
+        using var model = app.Model(tools.Connector());
+        await model.Looking.WaitAsync(_connect, Token);
+
+        Assert.True(model.HasNoTools);
+        Assert.StartsWith("None of the AI tools keypaste connects was found on this computer: Claude Code, Codex, ", model.NoTools, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The agents that asked come first, then the tools found, connected before not and in catalogue order,
+    /// then Every other agent; each tool says whether it holds keypaste and offers what fits.
+    /// </summary>
+    [Fact]
+    public async Task Rows_hold_the_agents_that_asked_then_the_tools_found_then_every_other_agent()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Answer = ApprovalAnswer.Approved;
+        await app.RequestAsync();
+        var tools = app.Tools().ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable().VsCodeMoved();
+
+        using var model = app.Model(tools.Connector());
+        await model.Looking.WaitAsync(_connect, Token);
+
+        string[] ours = ["ci-probe", "claude-code", "gemini-cli", "vscode", "cursor", AgentNames.Any];
+        Assert.Equal(ours, model.Rows.Select(row => row.Key).Where(ours.Contains));
+        Assert.Equal(AgentNames.Any, model.Rows[^1].Key);
+
+        var claude = Row(model, "claude-code");
+        Assert.Equal(("Connected", false, true, true), (claude.Status, claude.OffersConnect, claude.OffersConnectAgain, claude.OffersDisconnect));
+        var gemini = Row(model, "gemini-cli");
+        Assert.StartsWith("keypaste can't tell whether Gemini CLI has it: ", gemini.Status, StringComparison.Ordinal);
+        Assert.Equal((true, false, true), (gemini.OffersConnect, gemini.OffersConnectAgain, gemini.OffersDisconnect));
+        var vscode = Row(model, "vscode");
+        Assert.Contains("VSCODE_APPDATA is set", vscode.Status, StringComparison.Ordinal);
+        Assert.Equal((false, false, false), (vscode.OffersConnect, vscode.OffersConnectAgain, vscode.OffersDisconnect));
+        var cursor = Row(model, "cursor");
+        Assert.Equal(("Not connected", true, false, false), (cursor.Status, cursor.OffersConnect, cursor.OffersConnectAgain, cursor.OffersDisconnect));
+        Assert.True(model.ConnectCommand.CanExecute(cursor));
+        Assert.False(model.ConnectCommand.CanExecute(vscode));
+        Assert.False(model.DisconnectCommand.CanExecute(cursor));
+        Assert.Null(Row(model, "ci-probe").Tool);
+    }
+
+    /// <summary>
+    /// One pane is open at a time; while its plan runs no other Connect, Connect again or Disconnect can start and it
+    /// cannot be closed, and once it has run the tools are looked for again.
+    /// </summary>
+    [Fact]
+    public async Task While_a_panes_plan_runs_no_other_Connect_or_Disconnect_can_start()
+    {
+        await using var app = await App.StartAsync();
+        var tools = app.Tools().ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable();
+        using var model = app.Model(tools.Connector());
+        await model.Looking.WaitAsync(_connect, Token);
+        var claude = Row(model, "claude-code");
+        var cursor = Row(model, "cursor");
+        var gemini = Row(model, "gemini-cli");
+
+        model.ConnectCommand.Execute(cursor);
+        await model.Opening.WaitAsync(_connect, Token);
+        var first = model.Connection!;
+        Assert.Same(first, cursor.Connection);
+
+        model.ConnectAgainCommand.Execute(claude);
+        await model.Opening.WaitAsync(_connect, Token);
+
+        Assert.Null(cursor.Connection);
+        Assert.Same(model.Connection, claude.Connection);
+        Assert.True(model.Connection!.HasPreview);
+
+        using var held = new ManualResetEventSlim();
+        tools.Runner.HoldChanges = held;
+        var running = model.Connection.ConfirmCommand.ExecuteAsync();
+
+        Assert.True(model.Connection.IsBusy);
+        Assert.False(model.ConnectCommand.CanExecute(cursor));
+        Assert.False(model.DisconnectCommand.CanExecute(gemini));
+        Assert.False(model.ConnectAgainCommand.CanExecute(claude));
+        Assert.False(model.CloseConnectionCommand.CanExecute(null));
+
+        held.Set();
+        await running.WaitAsync(_connect, Token);
+        await model.Looking.WaitAsync(_connect, Token);
+
+        Assert.StartsWith("Connected.", model.Connection.Message, StringComparison.Ordinal);
+        Assert.True(model.ConnectCommand.CanExecute(cursor));
+        Assert.True(model.CloseConnectionCommand.CanExecute(null));
+        Assert.True(Probes(tools) > 3, "the tools were not looked for again after the plan ran");
+
+        model.CloseConnectionCommand.Execute(null);
+
+        Assert.Null(model.Connection);
+        Assert.Null(claude.Connection);
+    }
+
+    private static AgentRow Row(AgentActivityViewModel model, string key) => model.Rows.Single(row => row.Key == key);
+
+    private static int Probes(FakeTools tools) => tools.Runner.Calls.Count(call => call.EndsWith(" --version", StringComparison.Ordinal));
 
     private static string Everything(AgentActivityViewModel model) =>
         string.Join(
@@ -388,15 +634,19 @@ public sealed class AgentActivityViewModelTests
             return new App(fixture, clock, person, authority, client, serving.Session);
         }
 
-        internal AgentActivityViewModel Model() => new(Authority, Fixture.Home, Clock);
+        internal AgentActivityViewModel Model(ClientConnector? connector = null) => new(Authority, Fixture.Home, Clock, connector: connector);
+
+        /// <summary>A computer of the test's own to look for AI tools on.</summary>
+        internal FakeTools Tools() => new(Path.Combine(Fixture.Home, "computer"));
 
         /// <summary>A second connection attached to the same session, as a second agent would be.</summary>
-        internal async Task<ApproverClient> ConnectAsync()
+        /// <param name="identity">What it says it is, or null for nothing.</param>
+        internal async Task<ApproverClient> ConnectAsync(AttachClient? identity = null)
         {
             var serving = Assert.IsType<AuthorityStatus.Serving>(Authority.Status);
             var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
             Assert.NotNull(client);
-            Assert.True((await client.AttachAsync(new AttachRequest(Fixture.Path_), Token))!.Attached);
+            Assert.True((await client.AttachAsync(new AttachRequest(Fixture.Path_) { Client = identity }, Token))!.Attached);
             return client;
         }
 
@@ -460,7 +710,11 @@ public sealed class AgentActivityViewModelTests
 
         internal Task Waiting => _waiting.Task;
 
-        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) => HoldAsync(cancellationToken);
+
+        public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken) => HoldAsync(cancellationToken);
+
+        private async ValueTask<ApprovalAnswer> HoldAsync(CancellationToken cancellationToken)
         {
             Asked++;
 

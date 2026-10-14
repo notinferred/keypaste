@@ -36,6 +36,9 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     private readonly TimeSpan _answerWindow = answerWindow;
 
+    // Read and written on the UI thread only.
+    private Showing? _showing;
+
     /// <summary>Raised on the UI thread once a prompt window, or a notice, is on screen.</summary>
     internal event EventHandler<Window>? Shown;
 
@@ -71,6 +74,27 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
         return ShowAsync(request, () => new AccessChangeWindow(request), cancellationToken);
     }
 
+    /// <summary>
+    /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
+    /// <see cref="PromptViewModel.ArmingDelay"/> later (D-0456). Called on the UI thread, for the person's
+    /// press of Show the prompt on Agents and nothing else.
+    /// </summary>
+    /// <returns>False when no prompt is on screen or it is already answered.</returns>
+    internal bool BringForward()
+    {
+        Dispatcher.UIThread.VerifyAccess();
+
+        if (_showing is not { } showing || showing.Request.IsAnswered)
+        {
+            return false;
+        }
+
+        showing.Request.Disarm();
+        showing.Window.BringForward();
+        _ = ArmAsync(showing.Request, showing.Withdrawn);
+        return true;
+    }
+
     public void Tell(AlwaysForNotice notice)
     {
         ArgumentNullException.ThrowIfNull(notice);
@@ -92,10 +116,10 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
 
     private async ValueTask<ApprovalAnswer> ShowAsync(
         PromptViewModel request,
-        Func<Window> create,
+        Func<PromptWindow> create,
         CancellationToken cancellationToken)
     {
-        Window? window = null;
+        PromptWindow? window = null;
         var started = _clock.GetTimestamp();
         var withdrawals = Withdrawals.Current;
 
@@ -105,6 +129,12 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
         {
             var shown = window;
             window = null;
+
+            if (ReferenceEquals(_showing?.Request, request))
+            {
+                _showing = null;
+            }
+
             shown?.Close();
         }
 
@@ -130,6 +160,7 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
                 request.Tick(Remaining());
                 window = create();
                 window.Show();
+                _showing = new Showing(request, window, cancellationToken);
                 Shown?.Invoke(this, window);
                 _ = ArmAsync(request, cancellationToken);
             }
@@ -153,6 +184,8 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
 
     private async Task ArmAsync(PromptViewModel request, CancellationToken cancellationToken)
     {
+        var arming = request.Arming;
+
         try
         {
             await Task.Delay(PromptViewModel.ArmingDelay, _clock, cancellationToken).ConfigureAwait(false);
@@ -162,7 +195,7 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
             return;
         }
 
-        Dispatcher.UIThread.Post(request.Arm);
+        Dispatcher.UIThread.Post(() => request.Arm(arming));
     }
 
     private static void OnUiThread(Action action)
@@ -176,4 +209,7 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
             Dispatcher.UIThread.Post(action);
         }
     }
+
+    /// <summary>The prompt on screen, its window, and the token that withdraws it.</summary>
+    private sealed record Showing(PromptViewModel Request, PromptWindow Window, CancellationToken Withdrawn);
 }

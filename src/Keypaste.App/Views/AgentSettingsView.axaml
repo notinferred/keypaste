@@ -95,11 +95,11 @@
           </ItemsControl.ItemsPanel>
         </ItemsControl>
         <TextBlock Name="AlsoSeesText" Classes="caption" Text="{Binding AlsoSees}" IsVisible="{Binding HasAlsoSees}" TextWrapping="Wrap" />
-        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsOnly}">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding IsOnly}">
           <Button Name="ApplyPicks" Content="Apply" Command="{Binding ApplyPicksCommand}"
                   AutomationProperties.Name="Let it see only the projects picked" />
-          <TextBlock Name="PicksCaption" Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding PicksCaption}" />
-        </StackPanel>
+          <TextBlock Grid.Column="1" Name="PicksCaption" Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding PicksCaption}" />
+        </Grid>
         <Button Classes="link" HorizontalAlignment="Left" Content="Advanced: patterns" Command="{Binding ToggleAdvancedCommand}" />
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding IsAdvancedOpen}">
           <TextBox Classes="mono" Text="{Binding SeePattern}" AutomationProperties.Name="Patterns it can see" />
@@ -136,16 +136,17 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
           <ComboBox ItemsSource="{Binding NewRowScopes}" SelectedItem="{Binding NewRowScope}" MinWidth="200"
                     AutomationProperties.Name="Project or environment for a new row" />
           <Button Content="Add a row" Command="{Binding AddRowCommand}" />
-        </StackPanel>
+        </WrapPanel>
       </StackPanel>
 
       <TextBlock Grid.Row="5" Classes="label" Text="Limits" Margin="0,5,0,0" IsVisible="{Binding OffersLimits}" />
       <StackPanel Grid.Row="5" Grid.Column="1" Spacing="6" IsVisible="{Binding OffersLimits}">
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <!-- Wraps, so the panel's narrowest column, inside a row of a table that clips, still shows Apply. -->
+        <WrapPanel ItemSpacing="8" LineSpacing="8">
           <ComboBox ItemsSource="{Binding LimitTargets}" SelectedItem="{Binding LimitTarget}" MinWidth="160"
                     AutomationProperties.Name="Where the limit applies" />
           <TextBox Classes="mono" Width="90" Text="{Binding PerHourText}" PlaceholderText="per hour"
@@ -155,7 +156,7 @@
           <TextBox Classes="mono" Width="100" Text="{Binding UntilTimeText}" PlaceholderText="end of day"
                    AutomationProperties.Name="Automatic until this time of day" />
           <Button Content="Apply" Command="{Binding ApplyLimitCommand}" />
-        </StackPanel>
+        </WrapPanel>
         <TextBlock Classes="caption" Text="{Binding LimitNow}" TextWrapping="Wrap" />
         <TextBlock Classes="caption" TextWrapping="Wrap"
                    Text="Off by default. When a limit is reached, keypaste asks instead of refusing. Automatic ends on the day you pick, at the time of day you give, such as 18:00, or at its close, on this computer's clock; leave a field empty for no limit." />

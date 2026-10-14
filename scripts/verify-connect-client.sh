@@ -1,46 +1,46 @@
 #!/usr/bin/env bash
-# Connecting an MCP client from the app (2.6a, V-2.6a, G.2), across real processes: tests/Keypaste.AppDriver
+# Connecting an AI tool from the app (2.6a, V-2.6a, G.2, N.3), across real processes: tests/Keypaste.AppDriver
 # holds the vault as launch composes the app, with its prompt window drawn on a headless display and clicked,
-# and presses Agent Activity's Connect section. Everything runs with HOME and USERPROFILE at a home of the
-# gate's own and KEYPASTE_HOME at its .keypaste, the default home, so no real client's configuration is ever
-# read or written. The command client is tests/Keypaste.FakeMcpClient, a stand-in named `claude` in an
-# absolute PATH directory that answers Claude Code's `mcp add`, `remove` and `list` and keeps its servers in
-# that home's .claude.json, where the app reads whether Claude Code holds keypaste. The file client is Cursor,
+# and presses the rows of Agents' AI tools. Everything runs with HOME and USERPROFILE at a home of the gate's
+# own and KEYPASTE_HOME at its .keypaste, the default home, so no real tool's configuration is ever read or
+# written. The command tool is tests/Keypaste.FakeMcpClient, a stand-in named `claude` in an absolute PATH
+# directory that answers Claude Code's `--version`, `mcp add`, `remove` and `list` and keeps its servers in
+# that home's .claude.json, where the app reads whether Claude Code holds keypaste. The file tool is Cursor,
 # whose ~/.cursor/mcp.json the gate seeds with another server, a top-level key and a comment. The bridge is
-# the shipped Release keypaste, found on PATH as the app finds it and started as keypaste mcp.
+# the shipped Release keypaste, found on PATH as the app finds it and started as keypaste mcp. A runner image
+# may hold other tools of the catalogue, so only the rows of these two are asserted.
 #
 # The first unlock chooses the vault for agents and the CLI (G.1): `keypaste use` prints it and `keypaste
-# grants` reaches the app with no --vault. Cancelling a preview writes nothing. Running it registers exactly
-# the command the preview showed, which names no vault and offers run with the exposure given, and the check
-# starts that command, which finds the chosen vault, raises the app's prompt, and after Approve the audit
-# file holds a prompted grant naming the app's session and the chosen label. With another vault chosen and
-# no exposure given, Connect pins this one with --vault and registers run and every item in reach, and that
-# bridge still reaches the app, which holds an agent with no settings of its own to the tagged entries; with
-# two names listed the person picks, and Deny is recorded too. Removing leaves the client listing no
-# keypaste. For Cursor the preview is the one edit of keypaste's entry and Cancel writes nothing; Run it
-# changes no byte outside that entry and keeps the seed as the backup, the check reaches the app's prompt
-# through what it registered, and Remove gives back the seed's bytes, leaves the backup alone, and a second
-# Preview remove says Cursor is not connected. No configuration ever holds the master password, a keyfile,
-# the session or a credential.
+# grants` reaches the app with no --vault. Agents finds both tools and offers Connect on each. Cancelling a
+# plan writes nothing. Running it registers exactly the command the plan showed, under the tool's own id,
+# naming no vault and offering run with every item in reach, and the tool's row then says Connected. The check
+# starts that command, which finds the chosen vault, raises the app's prompt for the one item Claude Code's
+# settings let it see, and after Approve the audit file holds a prompted grant naming the app's session and
+# the tool's id. With another vault chosen, Connect again pins this one with --vault and that bridge still
+# reaches the app. Disconnect leaves the tool listing no keypaste and its row offering Connect. For Cursor,
+# which has no settings of its own, the plan is the one edit of keypaste's entry and Cancel writes nothing;
+# Run it changes no byte outside that entry and keeps the seed as the backup, the check is listed only the
+# projects' tagged items, as the defaults give, and asks for the one picked; Disconnect gives back the seed's
+# bytes, leaves the backup alone, and its row offers Connect again. No configuration ever holds the master
+# password, a keyfile, the session or a credential.
 #
 # NEGATIVE CONTROL: this fails if the first unlock chooses nothing, if the CLI without --vault does not reach
-# the app, if a cancelled preview writes, if what is registered differs from what was shown, if a
-# registration does not offer run or, with no exposure given, does not reach every item, if an agent with no
-# settings is listed an untagged entry, if the chosen vault is written into the client or another vault is
-# not, if the check does not reach the app's prompt through the registered bridge, if the audit record names
-# another session or label, if removal leaves keypaste listed, if Cursor's preview or Cancel writes its
-# file, if Run it changes a byte outside keypaste's entry or keeps no backup equal to the seed, if Cursor's
-# registration does not reach the app's prompt, if removal does not give back the seed's bytes or touches
-# the backup, if a second removal does not say Cursor is not connected, or if a secret reaches a client's
-# configuration or the driver's output. These checks must never be skipped or soft-passed.
+# the app, if a tool is not found or its state is wrong before or after Run it or Disconnect, if a cancelled
+# plan writes, if what is registered differs from what was shown, if a registration is not under the tool's
+# id, does not offer run or does not reach every item, if an agent with no settings is listed an untagged
+# item, if the chosen vault is written into the tool or another vault is not, if the check does not reach the
+# app's prompt through the registered bridge, if the audit record names another session or name, if
+# Disconnect leaves keypaste listed, if Cursor's plan or Cancel writes its file, if Run it changes a byte
+# outside keypaste's entry or keeps no backup equal to the seed, if Disconnect does not give back the seed's
+# bytes or touches the backup, or if a secret reaches a tool's configuration or the driver's output. These
+# checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-connect-master-pw'
 readonly SECRET='SENTINEL-CONNECT-CLIENT-7a41e2'
 readonly OTHER_SECRET='SENTINEL-CONNECT-OTHER-3d90b6'
-readonly LABEL='ci-connect'
-readonly UNSET_LABEL='ci-connect-unset'
-readonly CURSOR_LABEL='ci-cursor'
+readonly CLAUDE='claude-code'
+readonly CURSOR_ID='cursor'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='HOLD_OUT CONFIG CURSOR'
@@ -108,6 +108,21 @@ last_preview() {
 }
 
 last_message() { grep '^message ' "$HOLD_OUT" | tail -1 | cut -c9-; }
+
+# The state a new `tools` prints for a tool: connect, connected, cannot-tell or problem. The blocks already
+# printed are counted from the output, since this runs in the subshell of the caller's substitution.
+tool_state() {
+  local before
+  before="$(grep -c '^tools end' "$HOLD_OUT" || true)"
+  echo tools >&7
+  wait_for '^tools end' "$HOLD_OUT" $((before + 1))
+  awk -v n="$before" -v id="$1" '/^tools end/ { seen++; next } seen == n && $1 == "tool" && $2 == "id=" id { sub(/^state=/, "", $3); state = $3 } END { print state }' "$HOLD_OUT"
+}
+expect_state() {
+  local state
+  state="$(tool_state "$1")"
+  [ "$state" = "$2" ] || die "Agents shows $1 as [$state], not $2 ($3)"
+}
 last_check() { grep '^check ' "$HOLD_OUT" | grep -v '^check end' | tail -1 | cut -c7-; }
 last_audit() { tail -n 1 "$AUDIT" | jq -e "$@" >/dev/null; }
 
@@ -141,11 +156,10 @@ for project in alpha beta; do
   printf '%s\n' "$MASTER" | "$CLI" env set "$project" "$(printf '%s' "$project" | tr a-z A-Z)_KEY=$OTHER_SECRET" --vault "$VAULT" >/dev/null 2>&1 \
     || die "could not store project ${project}'s variable"
 done
-# The untagged entries are seen only once a person lets an agent see env/**, confirmed at keypaste agent's
-# terminal before the app holds the vault; an agent with no settings of its own still sees only tagged ones,
+# Claude Code sees the one untagged item once a person lets it see env/ci/**, confirmed at keypaste agent's
+# terminal before the app holds the vault; Cursor, with no settings of its own, sees only the tagged ones,
 # however wide its connection is registered.
-agent_settings "$CLI" "$VAULT" "$MASTER" "$LABEL --see env/**" "$CURSOR_LABEL --see env/**" \
-  || die "could not save $LABEL's and $CURSOR_LABEL's settings in the vault"
+agent_settings "$CLI" "$VAULT" "$MASTER" "$CLAUDE --see env/ci/**" || die "could not save $CLAUDE's settings in the vault"
 
 exec 7>&-
 exec 7> >(PATH="$CLIENT_PATH" KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
@@ -160,81 +174,81 @@ same_file "$CHOSEN" "$VAULT" || die "the first unlock chose [$CHOSEN], not the v
 GRANTS="$(env -u KEYPASTE_VAULT "$CLI" grants 2>&1)" || die "keypaste grants with no --vault failed: $GRANTS"
 case "$GRANTS" in *"nothing holds"*) die "keypaste grants with no --vault did not reach the app holding the chosen vault: $GRANTS" ;; esac
 
-# ---------------------------------------------------------------- a cancelled preview writes nothing
-say '^preview end' connect claude-code "label=$LABEL" 'expose=env/ci/**'
+# ----------------------------------------------- Agents finds both tools; a cancelled plan writes nothing
+expect_state "$CLAUDE" connect "before Connect"
+expect_state "$CURSOR_ID" connect "before Connect"
+
+say '^preview end' connect "$CLAUDE"
 PREVIEW="$(last_preview)"
-[ "$(printf '%s' "$PREVIEW" | grep -c .)" = 2 ] || die "the preview is not the two commands Connect runs: [$PREVIEW]"
+[ "$(printf '%s' "$PREVIEW" | grep -c .)" = 2 ] || die "the plan is not the two commands Connect runs: [$PREVIEW]"
 [ "$(printf '%s\n' "$PREVIEW" | sed -n 1p)" = 'claude mcp remove --scope user keypaste' ] \
-  || die "the preview does not clear an earlier entry first"
+  || die "the plan does not clear an earlier entry first"
 ADD="$(printf '%s\n' "$PREVIEW" | sed -n 2p)"
 case "$ADD" in
-  *" --vault "*) die "the preview writes the chosen vault into the client: [$ADD]" ;;
-  "claude mcp add --scope user --transport stdio keypaste -- "*" --client-label $LABEL --allow-run --expose env/ci/**") ;;
-  *) die "the preview does not add the bridge with the label, run offered and the exposure: [$ADD]" ;;
+  *" --vault "*) die "the plan writes the chosen vault into the tool: [$ADD]" ;;
+  "claude mcp add --scope user --transport stdio keypaste -- "*' --client-label claude-code --allow-run --expose **') ;;
+  *) die "the plan does not add the bridge under the tool's id, offering run with every item in reach: [$ADD]" ;;
 esac
 
 say '^message ' cancel
 [ "$(last_message)" = 'Cancelled. Nothing was changed.' ] || die "Cancel did not say it changed nothing"
-[ -e "$CONFIG" ] && die "a cancelled preview wrote the client's configuration"
+[ -e "$CONFIG" ] && die "a cancelled plan wrote the tool's configuration"
 
-# ------------------------------------------------- running it registers exactly what the preview showed
-say '^preview end' connect claude-code "label=$LABEL" 'expose=env/ci/**'
-[ "$(last_preview)" = "$PREVIEW" ] || die "the same choices previewed something else"
+# ------------------------------------------------- running it registers exactly what the plan showed
+say '^preview end' connect "$CLAUDE"
+[ "$(last_preview)" = "$PREVIEW" ] || die "the same tool planned something else"
 say '^message ' confirm
 case "$(last_message)" in Connected.*) ;; *) die "Run it did not connect: $(last_message)" ;; esac
-[ "$(registered)" = "${ADD#*keypaste -- }" ] || die "the client registered [$(registered)], not what the preview showed"
+[ "$(registered)" = "${ADD#*keypaste -- }" ] || die "the tool registered [$(registered)], not what the plan showed"
 clean_config "$CONFIG"
 
 # ----------------------------------- the check reaches the app's prompt through the registered bridge
 say '^prompt client' check
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$LABEL entry=env/ci/DEPLOY_KEY field=password" \
-  || die "the prompt does not show the check, its label and the one listed entry"
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$CLAUDE entry=env/ci/DEPLOY_KEY field=password" \
+  || die "the prompt does not show the check, the tool's id and the one item its settings let it see"
 say '^check end' approve
 case "$(last_check)" in
   "Connected: you approved env/ci/DEPLOY_KEY"*) ;;
   *) die "the check did not report the approval: $(last_check)" ;;
 esac
-last_audit --arg s "$FIRST" --arg l "$LABEL" \
+last_audit --arg s "$FIRST" --arg l "$CLAUDE" \
   '.tool == "request_credential" and .decision == "granted" and .method == "prompt" and .session == $s and .client.label == $l and .client.name == "keypaste-check"' \
-  || die "the audit file does not hold a prompted grant naming the app's session and the chosen label"
+  || die "the audit file does not hold a prompted grant naming the app's session and the tool's id"
+expect_state "$CLAUDE" connected "after Run it"
 
-# ------------------------- with another vault chosen, Connect pins this one, and that bridge still reaches it
+# ---------------- with another vault chosen, Connect again pins this one, and that bridge still reaches it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$OTHER_VAULT" >/dev/null 2>&1 || die "could not create the other vault"
 "$CLI" use "$OTHER_VAULT" >/dev/null 2>&1 || die "keypaste use did not choose the other vault"
-say '^preview end' connect claude-code "label=$UNSET_LABEL" 'expose='
+say '^preview end' connect "$CLAUDE"
 case "$(last_preview | sed -n 2p)" in
-  *" --vault "*vault.kdbx" --client-label $UNSET_LABEL --allow-run --expose **") ;;
-  *) die "Connect did not pin the app's vault while another is chosen, offering run with every item in reach: [$(last_preview)]" ;;
+  *" --vault "*'vault.kdbx --client-label claude-code --allow-run --expose **') ;;
+  *) die "Connect again did not pin the app's vault while another is chosen: [$(last_preview)]" ;;
 esac
 say '^message ' confirm
-case "$(last_message)" in Connected.*) ;; *) die "reconnecting failed: $(last_message)" ;; esac
-[ "$(registered)" = "$(last_preview | sed -n 2p | sed 's/.*keypaste -- //')" ] || die "the reconnection is not what the preview showed"
+case "$(last_message)" in Connected.*) ;; *) die "connecting again failed: $(last_message)" ;; esac
+[ "$(registered)" = "$(last_preview | sed -n 2p | sed 's/.*keypaste -- //')" ] || die "the reconnection is not what the plan showed"
 clean_config "$CONFIG"
 
-# Through a bridge that reaches every item, an agent with no settings is listed the two projects' tagged
-# entries, not the untagged ones, and asks for a variable.
-say '^check-entry n=2' check
-grep -qx 'check-entry n=1 env/alpha/.env' "$HOLD_OUT" || die "the picker does not list the first tagged entry"
-grep -qx 'check-entry n=2 env/beta/.env' "$HOLD_OUT" || die "the picker does not list the second tagged entry"
-grep -q '^check-entry n=3' "$HOLD_OUT" && die "the picker lists an entry an agent with no settings does not see"
-say '^prompt client' pick 2
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=env/beta/.env field=BETA_KEY" || die "the prompt is not for the picked entry's variable"
+say '^prompt client' check
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "label=$CLAUDE entry=env/ci/DEPLOY_KEY field=password" \
+  || die "the pinned bridge did not reach the app's prompt"
 say '^check end' deny
 case "$(last_check)" in
-  "Connected: the request for env/beta/.env reached you and was refused."*) ;;
+  "Connected: the request for env/ci/DEPLOY_KEY reached you and was refused."*) ;;
   *) die "the check did not report the refusal: $(last_check)" ;;
 esac
-last_audit --arg s "$FIRST" --arg l "$UNSET_LABEL" '.decision == "denied" and .method == "prompt" and .session == $s and .client.label == $l' \
+last_audit --arg s "$FIRST" --arg l "$CLAUDE" '.decision == "denied" and .method == "prompt" and .session == $s and .client.label == $l' \
   || die "the audit file does not hold the refusal"
 
-# ------------------------------------------------------------- removing leaves no keypaste in the client
-say '^preview end' connect-remove claude-code
-[ "$(last_preview)" = 'claude mcp remove --scope user keypaste' ] || die "the removal preview is not the client's own removal"
+# ------------------------------------------------------- Disconnect leaves no keypaste in the tool
+say '^preview end' connect-remove "$CLAUDE"
+[ "$(last_preview)" = 'claude mcp remove --scope user keypaste' ] || die "the Disconnect plan is not the tool's own removal"
 say '^message ' confirm
-case "$(last_message)" in Removed.*) ;; *) die "Remove did not remove: $(last_message)" ;; esac
+case "$(last_message)" in Removed.*) ;; *) die "Disconnect did not remove: $(last_message)" ;; esac
 LISTED="$(PATH="$CLIENT_PATH" "$FAKE" mcp list)"
-case "$LISTED" in *keypaste*) die "the client still lists keypaste after removal: $LISTED" ;; esac
+case "$LISTED" in *keypaste*) die "the tool still lists keypaste after Disconnect: $LISTED" ;; esac
 clean_config "$CONFIG"
+expect_state "$CLAUDE" connect "after Disconnect"
 
 # ------------------------------------- Cursor: only keypaste's entry in its file, with the first original kept
 cat >"$CURSOR" <<'JSON'
@@ -251,25 +265,25 @@ cat >"$CURSOR" <<'JSON'
 JSON
 cp "$CURSOR" "$SEED"
 
-say '^preview end' connect cursor "label=$CURSOR_LABEL" 'expose=env/ci/**'
+say '^preview end' connect "$CURSOR_ID"
 EDIT="$(last_preview)"
-[ "$(printf '%s' "$EDIT" | grep -c .)" = 1 ] || die "the Cursor preview is not the one edit Connect makes: [$EDIT]"
+[ "$(printf '%s' "$EDIT" | grep -c .)" = 1 ] || die "the Cursor plan is not the one edit Connect makes: [$EDIT]"
 case "$EDIT" in
   "edit "*"mcp.json: set mcpServers.keypaste {"*"}; keeps the original as "*"mcp.json.keypaste-backup") ;;
-  *) die "the Cursor preview is not the edit of keypaste's entry naming its backup: [$EDIT]" ;;
+  *) die "the Cursor plan is not the edit of keypaste's entry naming its backup: [$EDIT]" ;;
 esac
 ENTRY="${EDIT#*set mcpServers.keypaste }"
 ENTRY="${ENTRY%; keeps the original as *}"
-printf '%s' "$ENTRY" | jq -e --arg l "$CURSOR_LABEL" '.args | index("--client-label") as $i | .[$i:] == ["--client-label", $l, "--allow-run", "--expose", "env/ci/**"]' >/dev/null \
-  || die "the Cursor preview does not register the chosen label, run offered and the exposure: [$ENTRY]"
+printf '%s' "$ENTRY" | jq -e '.args | index("--client-label") as $i | .[$i:] == ["--client-label", "cursor", "--allow-run", "--expose", "**"]' >/dev/null \
+  || die "the Cursor plan does not register it under its id, offering run with every item in reach: [$ENTRY]"
 
 say '^message ' cancel
 [ "$(last_message)" = 'Cancelled. Nothing was changed.' ] || die "Cancel did not say it changed nothing"
-[ "$(bytes "$CURSOR")" = "$(bytes "$SEED")" ] || die "a cancelled preview changed Cursor's file"
-[ -e "$CURSOR.keypaste-backup" ] && die "a cancelled preview kept a backup"
+[ "$(bytes "$CURSOR")" = "$(bytes "$SEED")" ] || die "a cancelled plan changed Cursor's file"
+[ -e "$CURSOR.keypaste-backup" ] && die "a cancelled plan kept a backup"
 
-say '^preview end' connect cursor "label=$CURSOR_LABEL" 'expose=env/ci/**'
-[ "$(last_preview)" = "$EDIT" ] || die "the same choices previewed another edit"
+say '^preview end' connect "$CURSOR_ID"
+[ "$(last_preview)" = "$EDIT" ] || die "the same tool planned another edit"
 say '^message ' confirm
 case "$(last_message)" in
   "Connected. Cursor starts keypaste mcp for this vault;"*"Restart Cursor to load it.") ;;
@@ -279,33 +293,37 @@ esac
 without_keypaste "$CURSOR" >"$STRIPPED"
 [ "$(bytes "$STRIPPED")" = "$(bytes "$SEED")" ] || die "Run it changed Cursor's file outside keypaste's entry"
 [ "$(grep -v '^ *//' "$CURSOR" | jq -cS '.mcpServers.keypaste')" = "$(printf '%s' "$ENTRY" | jq -cS .)" ] \
-  || die "Cursor's file does not hold the entry the preview showed"
+  || die "Cursor's file does not hold the entry the plan showed"
 clean_config "$CURSOR"
+expect_state "$CURSOR_ID" connected "after Run it"
 
-say '^prompt client' check
-grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$CURSOR_LABEL entry=env/ci/DEPLOY_KEY field=password" \
-  || die "the prompt does not show Cursor's registration asking for the one listed entry"
+# Through a bridge that reaches every item, an agent with no settings is listed the two projects' tagged
+# items, not the untagged ones, and asks for a variable.
+say '^check-entry n=2' check
+grep -qx 'check-entry n=1 env/alpha/.env' "$HOLD_OUT" || die "the picker does not list the first tagged item"
+grep -qx 'check-entry n=2 env/beta/.env' "$HOLD_OUT" || die "the picker does not list the second tagged item"
+grep -q '^check-entry n=3' "$HOLD_OUT" && die "the picker lists an item an agent with no settings does not see"
+say '^prompt client' pick 2
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "client=keypaste-check label=$CURSOR_ID entry=env/beta/.env field=BETA_KEY" \
+  || die "the prompt is not Cursor's registration asking for the picked item's variable"
 say '^check end' approve
 case "$(last_check)" in
-  "Connected: you approved env/ci/DEPLOY_KEY"*) ;;
+  "Connected: you approved env/beta/.env"*) ;;
   *) die "the check through Cursor's registration did not report the approval: $(last_check)" ;;
 esac
-last_audit --arg s "$FIRST" --arg l "$CURSOR_LABEL" '.decision == "granted" and .method == "prompt" and .session == $s and .client.label == $l' \
+last_audit --arg s "$FIRST" --arg l "$CURSOR_ID" '.decision == "granted" and .method == "prompt" and .session == $s and .client.label == $l' \
   || die "the audit file does not hold the grant through Cursor's registration"
 
-say '^preview end' connect-remove cursor
+say '^preview end' connect-remove "$CURSOR_ID"
 case "$(last_preview)" in
   "edit "*"mcp.json: remove mcpServers.keypaste") ;;
-  *) die "the Cursor removal preview is not the edit that removes keypaste's entry: [$(last_preview)]" ;;
+  *) die "the Cursor Disconnect plan is not the edit that removes keypaste's entry: [$(last_preview)]" ;;
 esac
 say '^message ' confirm
-case "$(last_message)" in Removed.*) ;; *) die "Remove did not remove keypaste from Cursor: $(last_message)" ;; esac
-[ "$(bytes "$CURSOR")" = "$(bytes "$SEED")" ] || die "Remove did not give back Cursor's file as it was"
-[ "$(bytes "$CURSOR.keypaste-backup")" = "$(bytes "$SEED")" ] || die "Remove changed the backup"
-say '^preview end' connect-remove cursor
-[ -z "$(last_preview)" ] || die "a second removal previewed a step: [$(last_preview)]"
-[ "$(last_message)" = 'Cursor is not connected; there is nothing to remove.' ] \
-  || die "a second removal did not say Cursor is not connected: $(last_message)"
+case "$(last_message)" in Removed.*) ;; *) die "Disconnect did not remove keypaste from Cursor: $(last_message)" ;; esac
+[ "$(bytes "$CURSOR")" = "$(bytes "$SEED")" ] || die "Disconnect did not give back Cursor's file as it was"
+[ "$(bytes "$CURSOR.keypaste-backup")" = "$(bytes "$SEED")" ] || die "Disconnect changed the backup"
+expect_state "$CURSOR_ID" connect "after Disconnect"
 
 grep -qF -- "$SECRET" "$HOLD_OUT" && die "a credential reached the app's output"
 grep -qF -- "$OTHER_SECRET" "$HOLD_OUT" && die "a credential reached the app's output"
@@ -314,12 +332,11 @@ exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-echo "ok: the first unlock chose the vault and the CLI reached the app without --vault; a cancelled preview wrote"
-echo "    nothing, Connect registered exactly the command shown with no vault in it, the check raised the app's"
-echo "    prompt through that bridge and the audit file holds its prompted grant under the app's session and the"
-echo "    chosen label; with another vault chosen Connect pinned this one, offering run with every item in reach,"
-echo "    its bridge still reached the app, an agent with no settings was listed only the tagged entries and the"
-echo "    picker asked for the chosen one's variable,"
-echo "    and removal left the client listing no keypaste; Cursor's file changed only in keypaste's entry, its"
-echo "    first original was kept, its registration reached the app's prompt, and removal gave back its bytes and"
-echo "    then said it was not connected, with no secret or session in any configuration"
+echo "ok: the first unlock chose the vault and the CLI reached the app without --vault; Agents found both tools,"
+echo "    a cancelled plan wrote nothing, Connect registered exactly the command shown under the tool's id with no"
+echo "    vault in it and the row said Connected, the check raised the app's prompt through that bridge and the"
+echo "    audit file holds its prompted grant under the app's session and the tool's id; with another vault chosen"
+echo "    Connect again pinned this one and its bridge still reached the app, and Disconnect left the tool listing"
+echo "    no keypaste; Cursor's file changed only in keypaste's entry, its first original was kept, its"
+echo "    registration was listed only the tagged items an agent with no settings sees and reached the app's"
+echo "    prompt, and Disconnect gave back its bytes, with no secret or session in any configuration"

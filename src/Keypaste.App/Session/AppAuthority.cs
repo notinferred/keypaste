@@ -124,6 +124,14 @@ internal sealed class AppAuthority : IDisposable
     /// <summary>What the live session has released, newest first, never a value.</summary>
     internal IReadOnlyList<Core.Ownership.ReleaseSeen> Released => _host.Released;
 
+    /// <summary>
+    /// Brings the prompt waiting for the person forward, focused on Deny with its allows disarmed for another
+    /// second, for Show the prompt on Agents (D-0456). Called on the UI thread; in this process only, so no
+    /// agent or pipe message can raise a prompt.
+    /// </summary>
+    /// <returns>Whether a prompt was waiting on screen.</returns>
+    internal bool ShowPrompt() => _host.ShowPrompt();
+
     /// <summary>Ends every grant given to a bridge started with this label, as a stricter ceiling for it does.</summary>
     /// <param name="label">The raw label.</param>
     internal void RevokeClient(string label) => _host.RevokeClient(label);

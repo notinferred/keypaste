@@ -1,25 +1,26 @@
-using System.Text;
+using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Rendering;
 using Keypaste.App.Tests.Session;
+using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
-using Keypaste.Core.Clients;
-using Keypaste.Core.Processes;
 using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// The Connect section in a real visual tree: its nested data context resolves, the clients are
-/// offered by name and the preview a person confirms is the text the model holds.
+/// Agents in a real visual tree: a found tool's row offers Connect by the tool's name, its pane shows the
+/// plan text the model holds, and a row's Settings disclosure hosts the agent's settings panel.
 /// </summary>
 public sealed class AgentActivityViewTests
 {
     [Fact]
-    public Task The_connect_section_offers_the_clients_and_shows_the_preview_it_will_run() => HeadlessSession.On(async () =>
+    public Task A_tools_pane_shows_the_plan_it_will_run_and_its_Settings_host_the_panel() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
         using var authority = new AppAuthority(new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home), null, () => new NobodyToAsk());
@@ -28,42 +29,36 @@ public sealed class AgentActivityViewTests
             Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(fixture.Path_, master.Value));
         }
 
-        var bin = Directory.CreateDirectory(Path.Combine(fixture.Home, "bin")).FullName;
-        var claude = Path.Combine(bin, OperatingSystem.IsWindows() ? "claude.exe" : "claude");
-        File.WriteAllText(claude, "#!/bin/sh\n");
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(claude, UnixFileMode.UserRead | UnixFileMode.UserExecute);
-        }
-
-        var server = new McpServerCommand(Path.Combine(fixture.Home, "keypaste"), [McpServerLocator.BridgeArgument]);
-        var connector = new ClientConnector(
-            new InstalledRunner(),
-            McpClientMachine.From(name => name is "PATH" ? bin : name is "HOME" or "USERPROFILE" ? fixture.Home : null, McpClientMachine.CurrentPlatform),
-            ApproverOverride: null,
-            () => new McpBridgeTargetResult(new McpBridgeTarget(server, Link: null, Note: null), Error: null),
-            _ => null);
-        using var model = new AgentActivityViewModel(authority, fixture.Home, new ManualClock(AppClock.Start), connector: connector);
-        model.ToggleConnectCommand.Execute(null);
+        var tools = new FakeTools(Path.Combine(fixture.Home, "computer")).ClaudeCode(connected: false);
+        using var model = new AgentActivityViewModel(authority, fixture.Home, new ManualClock(AppClock.Start), action => Dispatcher.UIThread.Post(action), tools.Connector());
         var window = new Window { Content = new AgentActivityView { DataContext = model } };
         window.Show();
+        await model.Looking;
+        WindowInput.Drain();
 
-        var offered = McpClientCatalog.For(McpClientMachine.CurrentPlatform);
-        var clients = Assert.Single(window.GetVisualDescendants().OfType<ComboBox>(), box => box.ItemCount == offered.Count);
-        Assert.Equal(offered, clients.Items.Cast<McpClient>());
-        Assert.Same(offered[0], clients.SelectedItem);
+        var row = model.Rows.Single(row => row.Label == "claude-code");
+        var connect = window.GetVisualDescendants().OfType<Button>().Single(button => button is { Name: "ConnectTool", IsEffectivelyVisible: true } && button.DataContext == row);
+        Assert.Equal("Connect Claude Code", AutomationProperties.GetName(connect));
 
-        await model.Connect!.PreviewConnectCommand.ExecuteAsync();
-        window.UpdateLayout();
+        connect.Command!.Execute(connect.CommandParameter);
+        await model.Opening;
+        WindowInput.Drain();
 
-        var shown = window.GetVisualDescendants().OfType<SelectableTextBlock>().Select(block => block.Text).ToList();
-        Assert.Contains(model.Connect.Preview, shown);
-        Assert.Contains("claude mcp add --scope user --transport stdio keypaste --", model.Connect.Preview, StringComparison.Ordinal);
+        var shown = window.GetVisualDescendants().OfType<SelectableTextBlock>().Where(block => block.IsEffectivelyVisible).Select(block => block.Text).ToList();
+        Assert.Contains(model.Connection!.Preview, shown);
+        Assert.Contains("claude mcp add --scope user --transport stdio keypaste --", model.Connection.Preview, StringComparison.Ordinal);
+
+        var settings = window.GetVisualDescendants().OfType<Expander>().Single(expander => expander.IsEffectivelyVisible && expander.DataContext == row);
+        Assert.Equal("Settings for Claude Code", AutomationProperties.GetName(settings));
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<AgentSettingsView>(), panel => panel.IsEffectivelyVisible);
+
+        settings.IsExpanded = true;
+        WindowInput.Drain();
+
+        Assert.True(row.IsOpen);
+        var panel = Assert.Single(window.GetVisualDescendants().OfType<AgentSettingsView>(), panel => panel.IsEffectivelyVisible);
+        Assert.Same(row.Settings, panel.DataContext);
+        Assert.Equal("claude-code", row.Settings!.Agent);
+        window.Close();
     });
-
-    private sealed class InstalledRunner : IProcessRunner
-    {
-        public ProcessResult Run(string fileName, IReadOnlyList<string> arguments, string? stdin, Encoding stdinEncoding, TimeSpan timeout) =>
-            new(ToolFound: true, ExitCode: 0, string.Empty, string.Empty);
-    }
 }

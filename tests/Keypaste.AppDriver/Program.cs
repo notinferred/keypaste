@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using Keypaste.App;
 using Keypaste.App.Clipboard;
@@ -97,8 +98,8 @@ internal static class Program
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt] [--terminal-bundle <keypaste.app>]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
-        "             prompt: approve, once, always, allow, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
-        "             connect-remove <client>, confirm, cancel, check, pick <n>; settings <label>,\n" +
+        "             prompt: approve, once, always, allow, deny, close, show-prompt; activity, revoke <n | all>;\n" +
+        "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
@@ -1129,12 +1130,21 @@ internal sealed class Driver(string home)
                     Revoke(authority, which);
                     break;
 
-                case ["connect", var client, .. var rest]:
-                    await agents.PreviewConnectAsync(client, rest).ConfigureAwait(true);
+                case ["show-prompt"]:
+                    Console.Out.WriteLine(await (screen ?? throw new DriverException("show-prompt needs the app's own prompt"))
+                        .RaiseAsync(() => ShowPrompt(authority)).ConfigureAwait(true));
                     break;
 
-                case ["connect-remove", var client]:
-                    await agents.PreviewRemoveAsync(client).ConfigureAwait(true);
+                case ["tools"]:
+                    await agents.ToolsAsync().ConfigureAwait(true);
+                    break;
+
+                case ["connect", var tool]:
+                    await agents.ConnectAsync(tool).ConfigureAwait(true);
+                    break;
+
+                case ["connect-remove", var tool]:
+                    await agents.DisconnectAsync(tool).ConfigureAwait(true);
                     break;
 
                 case ["confirm"]:
@@ -1142,23 +1152,23 @@ internal sealed class Driver(string home)
                     break;
 
                 case ["cancel"]:
-                    agents.Cancel();
+                    await agents.CancelAsync().ConfigureAwait(true);
                     break;
 
                 case ["check"]:
-                    agents.Check();
+                    await agents.CheckAsync().ConfigureAwait(true);
                     break;
 
                 case ["pick", var which]:
-                    agents.Pick(which);
+                    await agents.PickAsync(which).ConfigureAwait(true);
                     break;
 
                 case ["settings", var label]:
-                    agents.ShowSettings(label);
+                    await agents.ShowSettingsAsync(label).ConfigureAwait(true);
                     break;
 
                 case ["setting", var label, .. var change]:
-                    agents.Change(label, change);
+                    await agents.ChangeAsync(label, change).ConfigureAwait(true);
                     break;
 
                 case [("approve" or "once" or "always" or "allow" or "deny" or "close") and var answer]:
@@ -1184,7 +1194,7 @@ internal sealed class Driver(string home)
         return 0;
     }
 
-    /// <summary>Prints what Agent Activity shows, read by its own view model from the authority and the audit file.</summary>
+    /// <summary>Prints what Agents shows, read by its own view model from the authority and the audit file.</summary>
     private void Activity(AppAuthority authority)
     {
         using var model = OpenActivity(authority);
@@ -1222,23 +1232,30 @@ internal sealed class Driver(string home)
         Console.Out.WriteLine("activity end");
     }
 
-    /// <summary>Presses Revoke on one listed grant, or Revoke all.</summary>
+    /// <summary>Presses End on one listed allowance, or End all.</summary>
     private void Revoke(AppAuthority authority, string which)
     {
         using var model = OpenActivity(authority);
 
         if (which == "all")
         {
-            model.RevokeAllCommand.Execute(null);
+            Press(model.EndAllCommand, "End all");
         }
         else
         {
             var row = model.Grants.SingleOrDefault(grant => grant.Number.ToString(CultureInfo.InvariantCulture) == which)
-                ?? throw new DriverException($"Agent Activity lists no grant {which}");
-            model.RevokeCommand.Execute(row);
+                ?? throw new DriverException($"Agents lists no allowance {which}");
+            model.EndCommand.Execute(row);
         }
 
         Console.Out.WriteLine($"revoked {which}, {model.Grants.Count} left");
+    }
+
+    /// <summary>Presses Show the prompt on Agents, on the prompt's display thread, as the person's click does.</summary>
+    private void ShowPrompt(AppAuthority authority)
+    {
+        using var model = OpenActivity(authority);
+        Press(model.ShowPromptCommand, "Show the prompt");
     }
 
     /// <summary>
@@ -1285,39 +1302,131 @@ internal sealed class Driver(string home)
         Console.Out.WriteLine(screen.Error is { } error ? $"terminal refused: {error}" : $"terminal launched: {screen.Notice}");
     }
 
-    // Its ticks are posted nowhere: each command reads once, and a timer thread must not rewrite
-    // the lists while they are printed.
+    // Its ticks are posted nowhere and it looks for no tools: each command reads once, and a timer thread
+    // must not rewrite the lists while they are printed.
     private AgentActivityViewModel OpenActivity(AppAuthority authority) => new(authority, home, TimeProvider.System, _ => { });
 
+    // The screen a person keeps open: its ticks and what a look finds are posted to a queue this driver
+    // applies before each command, as the window's loop would, and it looks for the tools on this machine.
+    private AgentActivityViewModel OpenAgents(AppAuthority authority, Action<Action> post) =>
+        new(authority, home, TimeProvider.System, post, ClientConnector.ForThisProcess());
+
     /// <summary>
-    /// The Agents screen's Connect section and a card's settings, kept open across lines as the screen
-    /// stays open, and closed by a lock as the shell closes it.
+    /// The Agents screen, kept open across lines as the screen stays open and closed by a lock as the shell
+    /// closes it: the AI tools it finds on this machine, a tool's Connect pane and an agent's settings.
     /// </summary>
     /// <remarks>
-    /// Connecting uses the programs the app would: each client's own command on PATH, and the
-    /// <c>keypaste mcp</c> the app finds. What the section says is printed as it changes, so the check
-    /// can be started on one line and its prompt answered on the next. A change to an agent's settings
-    /// is made the same way, so the confirmation it opens can be answered on the next line.
+    /// Connecting uses the programs the app would: each tool's own command on PATH, and the
+    /// <c>keypaste mcp</c> the app finds. What the pane says is printed as it changes, so the check can be
+    /// started on one line and its prompt answered on the next. A change to an agent's settings is made the
+    /// same way, so the confirmation it opens can be answered on the next line.
     /// </remarks>
     private sealed class AgentsScreen(Driver driver, AppAuthority authority) : IDisposable
     {
+        private readonly ConcurrentQueue<Action> _posted = new();
         private AgentActivityViewModel? _screen;
+        private ConnectClientViewModel? _watched;
 
-        private AgentActivityViewModel Screen => _screen ??= OpenScreen();
-
-        private ConnectClientViewModel Model => Screen.Connect!;
-
-        private AgentActivityViewModel OpenScreen()
+        /// <summary>Waits for the look in progress and applies what the screen posted, as its window's loop would.</summary>
+        private async Task<AgentActivityViewModel> SettledAsync()
         {
-            var screen = driver.OpenActivity(authority);
-            screen.Connect!.PropertyChanged += (_, changed) => Print(changed.PropertyName);
+            var screen = _screen ??= driver.OpenAgents(authority, _posted.Enqueue);
+            await screen.Looking.ConfigureAwait(true);
+
+            while (_posted.TryDequeue(out var posted))
+            {
+                posted();
+            }
+
             return screen;
         }
 
-        /// <summary>Opens a card's settings, as pressing its Settings button does, and prints what they hold.</summary>
-        internal void ShowSettings(string label)
+        /// <summary>Prints each row once the look has finished: a found tool by its id and state, any other by its key.</summary>
+        internal async Task ToolsAsync()
         {
-            var settings = Settings(label);
+            var screen = await SettledAsync().ConfigureAwait(true);
+
+            foreach (var row in screen.Rows)
+            {
+                Console.Out.WriteLine(row is { Tool: not null, Presence: { } presence }
+                    ? $"tool id={row.Key} state={State(presence.State)}"
+                    : $"agent key={row.Key}");
+            }
+
+            Console.Out.WriteLine("tools end");
+        }
+
+        /// <summary>Presses a tool's Connect, or Connect again under its Settings when it is connected, and prints the plan.</summary>
+        internal async Task ConnectAsync(string tool)
+        {
+            var screen = await SettledAsync().ConfigureAwait(true);
+            var row = Row(screen, tool);
+
+            if (screen.ConnectCommand.CanExecute(row))
+            {
+                screen.ConnectCommand.Execute(row);
+            }
+            else if (screen.ConnectAgainCommand.CanExecute(row))
+            {
+                row.IsOpen = true;
+                screen.ConnectAgainCommand.Execute(row);
+            }
+            else
+            {
+                throw new DriverException($"{tool}'s row offers no Connect");
+            }
+
+            await ShownAsync(screen).ConfigureAwait(true);
+        }
+
+        /// <summary>Opens a tool's Settings, presses Disconnect, and prints the plan.</summary>
+        internal async Task DisconnectAsync(string tool)
+        {
+            var screen = await SettledAsync().ConfigureAwait(true);
+            var row = Row(screen, tool);
+            row.IsOpen = true;
+
+            if (!screen.DisconnectCommand.CanExecute(row))
+            {
+                throw new DriverException($"{tool}'s Settings offer no Disconnect");
+            }
+
+            screen.DisconnectCommand.Execute(row);
+            await ShownAsync(screen).ConfigureAwait(true);
+        }
+
+        internal async Task ConfirmAsync()
+        {
+            var model = await PaneAsync().ConfigureAwait(true);
+            await PressAsync(model.ConfirmCommand, "Run it").ConfigureAwait(true);
+            Console.Out.WriteLine($"message {model.Message}");
+        }
+
+        internal async Task CancelAsync()
+        {
+            var model = await PaneAsync().ConfigureAwait(true);
+            Press(model.CancelCommand, "Cancel");
+            Console.Out.WriteLine($"message {model.Message}");
+        }
+
+        /// <summary>Starts the check and returns; what it says arrives as it goes, ending with <c>check end</c>.</summary>
+        internal async Task CheckAsync() => Run((await PaneAsync().ConfigureAwait(true)).CheckCommand, "Check the connection");
+
+        internal async Task PickAsync(string which)
+        {
+            var model = await PaneAsync().ConfigureAwait(true);
+            var index = int.Parse(which, CultureInfo.InvariantCulture) - 1;
+            model.SelectedCheckEntry = index >= 0 && index < model.CheckEntries.Count
+                ? model.CheckEntries[index]
+                : throw new DriverException($"the check lists no item {which}");
+
+            Run(model.AskCommand, "Ask for it");
+        }
+
+        /// <summary>Opens a row's Settings, as pressing its disclosure does, and prints what they hold.</summary>
+        internal async Task ShowSettingsAsync(string label)
+        {
+            var settings = await SettingsAsync(label).ConfigureAwait(true);
             settings.Read();
             string Chosen(IReadOnlyList<SettingChoice> choices) => choices.FirstOrDefault(choice => choice.IsChosen)?.Word ?? "none";
 
@@ -1329,10 +1438,10 @@ internal sealed class Driver(string home)
                 (settings.HasProblem ? $" problem={settings.Problem}" : string.Empty));
         }
 
-        /// <summary>Starts one change on a card's settings and returns; <c>setting-done</c> and what the panel then says follow once it has its answer.</summary>
-        internal void Change(string label, string[] change)
+        /// <summary>Starts one change on a row's settings and returns; <c>setting-done</c> and what the panel then says follow once it has its answer.</summary>
+        internal async Task ChangeAsync(string label, string[] change)
         {
-            var settings = Settings(label);
+            var settings = await SettingsAsync(label).ConfigureAwait(true);
             var changing = change switch
             {
                 [("mode" or "values" or "run") and var setting, var word] => settings.ChooseAsync(Offered(settings, setting, word, null)),
@@ -1360,28 +1469,28 @@ internal sealed class Driver(string home)
             return settings.AddRowAsync();
         }
 
-        /// <summary>The settings open below the cards for a label, opened from its card if they are not.</summary>
-        private AgentSettingsViewModel Settings(string label)
+        /// <summary>The settings open on a row, opened from its disclosure if they are not.</summary>
+        private async Task<AgentSettingsViewModel> SettingsAsync(string label)
         {
-            var screen = Screen;
+            var screen = await SettledAsync().ConfigureAwait(true);
 
-            if (screen.Settings is { } open && string.Equals(open.Agent, label, StringComparison.Ordinal))
+            if (screen.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal)) is { Settings: { } open })
             {
                 return open;
             }
 
-            // Read again, as the screen does each second, so a client that asked since it opened has its card.
+            // Read again, as the screen does each second, so an agent that asked since it opened has its row.
             screen.Refresh();
-            var card = screen.Clients.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))
-                ?? throw new DriverException($"Agents shows no card for {label}");
+            var row = screen.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))
+                ?? throw new DriverException($"Agents shows no row for {label}");
 
-            if (!screen.ToggleSettingsCommand.CanExecute(card))
+            if (!row.HasSettings)
             {
-                throw new DriverException($"{label}'s card has no settings");
+                throw new DriverException($"{label}'s row has no settings");
             }
 
-            screen.ToggleSettingsCommand.Execute(card);
-            return screen.Settings!;
+            row.IsOpen = true;
+            return row.Settings ?? throw new DriverException($"{label}'s settings did not open");
         }
 
         private static SettingChoice Offered(AgentSettingsViewModel settings, string setting, string word, string? row)
@@ -1400,63 +1509,50 @@ internal sealed class Driver(string home)
                 ?? throw new DriverException($"the settings offer no {setting} {word}");
         }
 
-        internal async Task PreviewConnectAsync(string client, string[] rest)
-        {
-            var model = Model;
-            model.SelectedClient = Offered(model, client);
+        private static AgentRow Row(AgentActivityViewModel screen, string key) =>
+            screen.Rows.FirstOrDefault(row => string.Equals(row.Key, key, StringComparison.Ordinal))
+                ?? throw new DriverException($"Agents shows no row for {key}");
 
-            foreach (var option in rest)
+        private static string State(McpToolState state) => state switch
+        {
+            McpToolState.Connected => "connected",
+            McpToolState.NotConnected => "connect",
+            McpToolState.CannotTell => "cannot-tell",
+            _ => "problem",
+        };
+
+        /// <summary>The pane open on the screen, watched so what it says is printed as it changes.</summary>
+        private async Task<ConnectClientViewModel> PaneAsync()
+        {
+            var screen = await SettledAsync().ConfigureAwait(true);
+            var pane = screen.Connection ?? throw new DriverException("no Connect pane is open");
+
+            if (!ReferenceEquals(pane, _watched))
             {
-                switch (option.Split('=', 2))
-                {
-                    case ["label", var label]:
-                        model.Label = label;
-                        break;
-                    case ["expose", var globs]:
-                        model.Exposure = globs;
-                        break;
-                    default:
-                        throw new DriverException($"connect does not understand '{option}'");
-                }
+                _watched = pane;
+                pane.PropertyChanged += (_, changed) => Print(pane, changed.PropertyName);
             }
 
-            await PressAsync(model.PreviewConnectCommand, "Preview connect").ConfigureAwait(true);
-            Shown(model);
+            return pane;
         }
 
-        internal async Task PreviewRemoveAsync(string client)
+        /// <summary>Waits for the pane just opened to compose its plan, then prints it.</summary>
+        private async Task ShownAsync(AgentActivityViewModel screen)
         {
-            var model = Model;
-            model.SelectedClient = Offered(model, client);
+            await screen.Opening.ConfigureAwait(true);
+            var model = await PaneAsync().ConfigureAwait(true);
 
-            await PressAsync(model.PreviewRemoveCommand, "Preview remove").ConfigureAwait(true);
-            Shown(model);
-        }
+            foreach (var line in model.Preview.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                Console.Out.WriteLine($"preview {line}");
+            }
 
-        internal async Task ConfirmAsync()
-        {
-            await PressAsync(Model.ConfirmCommand, "Run it").ConfigureAwait(true);
-            Console.Out.WriteLine($"message {Model.Message}");
-        }
+            if (model.HasMessage)
+            {
+                Console.Out.WriteLine($"message {model.Message}");
+            }
 
-        internal void Cancel()
-        {
-            Press(Model.CancelCommand, "Cancel");
-            Console.Out.WriteLine($"message {Model.Message}");
-        }
-
-        /// <summary>Starts the check and returns; what it says arrives as it goes, ending with <c>check end</c>.</summary>
-        internal void Check() => Run(Model.CheckCommand, "Check the connection");
-
-        internal void Pick(string which)
-        {
-            var model = Model;
-            var index = int.Parse(which, CultureInfo.InvariantCulture) - 1;
-            model.SelectedCheckEntry = index >= 0 && index < model.CheckEntries.Count
-                ? model.CheckEntries[index]
-                : throw new DriverException($"the check lists no entry {which}");
-
-            Run(model.AskCommand, "Ask for it");
+            Console.Out.WriteLine("preview end");
         }
 
         /// <summary>Closes the screen, as a lock or quitting does.</summary>
@@ -1464,6 +1560,7 @@ internal sealed class Driver(string home)
         {
             _screen?.Dispose();
             _screen = null;
+            _watched = null;
         }
 
         public void Dispose() => Close();
@@ -1490,14 +1587,8 @@ internal sealed class Driver(string home)
             });
         }
 
-        private void Print(string? property)
+        private static void Print(ConnectClientViewModel model, string? property)
         {
-            var model = _screen?.Connect;
-            if (model is null)
-            {
-                return;
-            }
-
             switch (property)
             {
                 case nameof(ConnectClientViewModel.CheckMessage) when model.HasCheckMessage:
@@ -1511,25 +1602,6 @@ internal sealed class Driver(string home)
 
                     break;
             }
-        }
-
-        private static McpClient Offered(ConnectClientViewModel model, string id) =>
-            model.Clients.FirstOrDefault(client => string.Equals(client.Id, id, StringComparison.Ordinal))
-                ?? throw new DriverException($"the picker offers no client called {id}");
-
-        private static void Shown(ConnectClientViewModel model)
-        {
-            foreach (var line in model.Preview.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                Console.Out.WriteLine($"preview {line}");
-            }
-
-            if (model.HasMessage)
-            {
-                Console.Out.WriteLine($"message {model.Message}");
-            }
-
-            Console.Out.WriteLine("preview end");
         }
     }
 

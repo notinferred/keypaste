@@ -349,6 +349,96 @@ public sealed class DesktopApprovalTests
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
 
+    /// <summary>
+    /// Show the prompt on Agents raises the waiting prompt with focus on Deny and every allow disarmed, so a click aimed
+    /// at the button cannot land on an allow; they arm again a second later, and nothing moves (D-0456, T-2, T-11).
+    /// </summary>
+    [Fact]
+    public Task Bringing_the_prompt_forward_disarms_it_focuses_Deny_and_arms_it_a_second_later() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            await app.ArmAsync();
+            var places = Places(window);
+            window.FindControl<Button>("AllowOnce")!.Focus();
+
+            Assert.True(app.Authority.ShowPrompt());
+            WindowInput.Drain();
+
+            Assert.All(new[] { "AllowOnce", "Approve", "AlwaysFor" }, name => Assert.False(window.FindControl<Button>(name)!.IsEffectivelyEnabled, $"{name} stayed armed"));
+            Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
+            Assert.Equal(places, Places(window));
+
+            Click(window, "AllowOnce");
+            app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
+            WindowInput.Drain();
+            Click(window, "AllowOnce");
+            await Task.Delay(200, Token);
+            Assert.False(reply.IsCompleted, "a click within a second of bringing the prompt forward answered it");
+
+            app.Clock.Advance(TimeSpan.FromMilliseconds(1));
+            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            Click(window, "AllowOnce");
+
+            Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
+        });
+
+    /// <summary>A prompt brought forward before its first second is up is armed a second after the bring-forward, not by the first showing's wait.</summary>
+    [Fact]
+    public Task Bringing_the_prompt_forward_in_its_first_second_arms_it_a_second_after_the_bring_forward() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            var half = PromptViewModel.ArmingDelay / 2;
+
+            app.Clock.Advance(half);
+            Assert.True(app.Authority.ShowPrompt());
+            app.Clock.Advance(half);
+            WindowInput.Drain();
+            await Task.Delay(200, Token);
+            WindowInput.Drain();
+
+            Assert.False(window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled, "the first showing's wait armed the prompt within a second of bringing it forward");
+
+            app.Clock.Advance(half);
+            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            Click(window, "Deny");
+            await reply.WaitAsync(_wait, Token);
+        });
+
+    [Fact]
+    public Task Bringing_forward_an_answered_or_withdrawn_prompt_does_nothing() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            Assert.False(app.Authority.ShowPrompt());
+
+            using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
+            var withdrawn = app.Ask(cancellationToken: givingUp.Token);
+            var first = await app.PromptAsync();
+            await givingUp.CancelAsync();
+            await withdrawn.WaitAsync(_wait, Token);
+            await PromptedApp.WithdrawnAsync(first);
+
+            Assert.False(app.Authority.ShowPrompt());
+            Assert.False(first.IsVisible);
+
+            // A bridge that withdraws a request hangs up, so the next request comes on another.
+            await using var other = await app.ConnectAsync();
+            var denied = app.Ask(other);
+            var second = await app.PromptAsync(count: 2);
+            Click(second, "Deny");
+
+            Assert.False(app.Authority.ShowPrompt());
+            await denied.WaitAsync(_wait, Token);
+            await PromptedApp.WithdrawnAsync(second);
+            Assert.Equal(2, app.Windows.Count);
+        });
+
     [Fact]
     public Task EnterOnOpen_Denies() =>
         HeadlessSession.On(async () =>

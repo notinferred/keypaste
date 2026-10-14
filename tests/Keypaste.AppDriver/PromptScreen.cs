@@ -101,6 +101,36 @@ internal sealed class PromptScreen : IDisposable
                 }
             });
 
+    /// <summary>
+    /// Waits until the prompt on screen is armed, then presses Show the prompt on Agents through
+    /// <paramref name="press"/> on this display's thread, and says whether the prompt is then armed and which
+    /// of its buttons holds focus: <c>prompt raised armed=false focus=Deny</c> is what a bring-forward must do.
+    /// </summary>
+    internal Task<string> RaiseAsync(Action press) =>
+        Dispatcher.UIThread.InvokeAsync(
+            async () =>
+            {
+                var window = _open ?? throw new DriverException("no prompt is on screen");
+                var allow = new[] { "Approve", "AllowOnce", "Allow" }.Select(window.FindControl<Button>).FirstOrDefault(button => button is { IsVisible: true })
+                    ?? throw new DriverException("the prompt has no allow button");
+                var armedBy = DateTime.UtcNow + _armingWait;
+
+                while (!allow.IsEffectivelyEnabled)
+                {
+                    if (DateTime.UtcNow > armedBy)
+                    {
+                        throw new DriverException($"{allow.Name} never became pressable");
+                    }
+
+                    await Task.Delay(50).ConfigureAwait(true);
+                }
+
+                press();
+                Dispatcher.UIThread.RunJobs();
+                var focus = new[] { "Deny", "AllowOnce", "Approve", "AlwaysFor", "Allow" }.FirstOrDefault(name => window.FindControl<Button>(name)?.IsFocused == true) ?? "elsewhere";
+                return $"prompt raised armed={(allow.IsEffectivelyEnabled ? "true" : "false")} focus={focus}";
+            });
+
     private void OnShown(object? sender, Window window)
     {
         window.CaptureRenderedFrame();

@@ -157,12 +157,12 @@ public sealed class FourPlacesJourneyTests
             var answered = await reply.WaitAsync(Wait, Token);
             Assert.Equal(AuditDecision.Granted, answered!.Decision);
 
-            // Agents: the waiting count and dot, revoking the grant, and History.
+            // Agents: the waiting count and dot, ending the allowance, and History.
             Chord(main, PhysicalKey.Digit2);
             await Until(() => shell.MainNav[1].Count == "1", () => $"grants {app.Authority.Activity.Grants.Count}, row '{shell.MainNav[1].Count}'");
             Assert.True(shell.MainNav[1].DotLive);
-            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, a grant in force");
-            Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Content as string == "Revoke"));
+            AmberElements.AssertOne(main, null, "Agents, an allowance in force");
+            Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "EndAllowance", IsEffectivelyVisible: true }));
             Assert.Empty(app.Authority.Activity.Grants);
             Press(main, Named<Button>(main, "AgentHistory"));
             var history = Assert.IsType<LogViewModel>(shell.Content);

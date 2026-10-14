@@ -922,7 +922,10 @@ public sealed class ApproverHandler
     /// <summary>What a person is being asked about now and the grants they have given that are in force.</summary>
     /// <returns>The waiting request, if any, and every live grant, none carrying a value.</returns>
     public ApproverActivity Activity() =>
-        new(_gate.Waiting is { } waiting ? [waiting] : [], _grants.InForce());
+        new(_gate.Waiting is { } waiting ? [waiting] : [], _grants.InForce())
+        {
+            WaitingChanges = _gate.WaitingChange is { } change ? [change] : [],
+        };
 
     /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
     /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>

@@ -754,7 +754,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         return entries;
     }
 
-    /// <summary>Shows Agents with one agent's settings open below the cards.</summary>
+    /// <summary>Shows Agents with one agent's settings open on its row.</summary>
     /// <param name="agent">The agent's name.</param>
     internal void OpenAgentSettings(string agent)
     {
@@ -763,7 +763,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     private AgentActivityViewModel Activity() =>
-        new(Authority, Home, _clock, _post, toast: ShowToast, openHistory: () => Current = Destinations.Of(DestinationKind.AgentHistory));
+        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.AgentHistory));
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -787,6 +787,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The <c>keypaste</c> a terminal runs, which Settings links to this app's own; none where the platform needs no link.</summary>
     internal ICliLink? CliLink { get; init; }
+
+    /// <summary>What Agents finds and connects AI tools through each time it opens; none looks for no tools.</summary>
+    internal Func<ClientConnector?> Tools { get; init; } = () => null;
 
     /// <summary>What Run and Open terminal start a project's terminal with; the platform's own, answered by <see cref="Authority"/>, unless given.</summary>
     internal ProjectLaunching? Launching { get; init; }
@@ -1027,7 +1030,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         {
             var activity = Authority!.Activity;
             var grants = activity.Grants.Count + activity.EnvGrants.Count;
-            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count;
+            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingChanges.Count;
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
             AgentsServing = true;

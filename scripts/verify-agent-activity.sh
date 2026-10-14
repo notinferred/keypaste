@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
-# Agent Activity shows what the app's session holds and what this session answered (4.3b, V-4.3b), across
-# real processes: the shipped keypaste and keypaste mcp, and tests/Keypaste.AppDriver holding the vault as
-# launch composes the app, with its prompt window drawn on a headless display and clicked. The driver's
+# Agents shows what the app's session holds and what was answered since the unlock (4.3b, V-4.3b, N.3),
+# across real processes: the shipped keypaste and keypaste mcp, and tests/Keypaste.AppDriver holding the vault
+# as launch composes the app, with its prompt window drawn on a headless display and clicked. The driver's
 # `activity` prints what the screen's own view model reads from the authority and the audit file, and its
-# `revoke` presses the screen's buttons.
+# `revoke` and `show-prompt` press the screen's buttons.
 #
-# A real keypaste mcp request waiting at the unlocked app is listed. After Approve its grant is listed and
-# the history shows the prompted grant from the audit file. Revoke and Revoke all make the same request
-# ask again. A lock empties both lists, and the next session starts with nothing listed. A card's settings
+# A real keypaste mcp request waiting at the unlocked app is listed. Show the prompt, pressed once the prompt
+# has armed, brings it forward with Deny focused and its allows disarmed (D-0456), and Approve then releases
+# only once it has armed again. Its allowance is listed and the history shows the prompted grant from the
+# audit file. End and End all make the same request ask again. A lock empties both lists, and the next
+# unlock starts with nothing listed. A row's settings
 # show what the vault gives the agent; a narrowing chosen there applies at once, to the vault and
 # clients.toml, and a widening opens the app's confirmation window, changes nothing when refused, and once
 # allowed makes the next request Automatic. Each change is one keypaste app line labelled with the agent.
 # A missing audit log reads as a session with no records yet, and an unreadable one is shown as unavailable.
 #
-# NEGATIVE CONTROL: this fails if a waiting request or a grant is not listed, if a revoked grant still
+# NEGATIVE CONTROL: this fails if a waiting request or a grant is not listed, if Show the prompt leaves the
+# prompt armed or focus off Deny, if an ended allowance still
 # answers, if history is missing a request's record or is shown for a log that cannot be read, if a
 # narrowing asks or a widening does not, if a refused widening changes anything or an allowed one does not
 # release the next request unasked, or if a credential reaches the driver's output. These checks must never
@@ -115,7 +118,7 @@ readonly LISTED="^grant n=1 client=ci-probe label=$LABEL entry=$ENTRY field=pass
 
 SETTINGS=0
 SHOWN_SETTINGS=""
-# Opens the probe's settings from its card and keeps the line the driver reads off them in $SHOWN_SETTINGS.
+# Opens the probe's settings from its row and keeps the line the driver reads off them in $SHOWN_SETTINGS.
 settings_shown() {
   SETTINGS=$((SETTINGS + 1))
   echo "settings $LABEL" >&7
@@ -160,7 +163,7 @@ FIRST="$(session_of)"
 activity
 omits '^unavailable ' "the authority as unreadable while it serves"
 omits '^(waiting|grant) ' "a request or grant before any agent asked"
-shows '^history-message The audit log has no records from this session yet\.' "a missing log as a session with no records yet"
+shows '^history-message Nothing has been recorded since you unlocked\.' "a missing log as a session with no records yet"
 omits '^history-message History unavailable' "a missing log as unavailable"
 
 # ------------------------------------------ the waiting request, then its grant and its audit record
@@ -171,6 +174,15 @@ activity
 shows "^waiting n=1 client=ci-probe label=$LABEL entry=$ENTRY field=password left=answered for you in [0-9]+ s$" "the waiting request"
 omits '^grant ' "a grant before Approve"
 
+# Show the prompt, pressed once the prompt has armed, disarms it for a second with Deny focused; Approve,
+# which waits for the allow to be pressable, then releases.
+echo show-prompt >&7
+wait_for '^prompt raised ' "$HOLD_OUT"
+RAISED="$(grep '^prompt raised ' "$HOLD_OUT" | tail -1)"
+[ "$RAISED" = 'prompt raised armed=false focus=Deny' ] || die "Show the prompt did not disarm the prompt with Deny focused: $RAISED"
+activity
+shows "^waiting n=1 client=ci-probe label=$LABEL entry=$ENTRY field=password " "the request still waiting after Show the prompt"
+
 echo approve >&7
 reply 3
 released 3
@@ -180,7 +192,7 @@ last_audit --arg s "$FIRST" '.decision == "granted" and .method == "prompt" and 
 activity
 omits '^waiting ' "a request after it was answered"
 shows "$LISTED" "the grant Approve gave"
-shows "^history-heading 1 record of [0-9]+ in .*, this session$" "history kept to this session"
+shows "^history-heading 1 record of [0-9]+ in .*, since you unlocked$" "history kept to this session"
 shows "^history .*DEPLOY_KEY.*granted.*prompt" "the prompted grant from the audit file"
 
 ask 4
@@ -189,10 +201,10 @@ released 4
 last_audit '.method == "grant-cache"'
 [ "$(prompts)" -eq 1 ] || die "a request inside a live grant raised a prompt"
 
-# ------------------------------------------------------ Revoke all, then Revoke one, each ask again
+# ------------------------------------------------------------ End all, then End one, each ask again
 revoke all
 activity
-omits '^grant ' "a grant after Revoke all"
+omits '^grant ' "an allowance after End all"
 
 ask 5
 wait_for '^prompt client' "$HOLD_OUT" 2
@@ -205,7 +217,7 @@ shows "$LISTED" "the grant after asking again"
 
 revoke 1
 activity
-omits '^grant ' "a grant after Revoke"
+omits '^grant ' "an allowance after End"
 
 ask 6
 wait_for '^prompt client' "$HOLD_OUT" 3
@@ -214,7 +226,7 @@ reply 6
 refused 6
 activity
 shows "^history .*DEPLOY_KEY.*denied.*prompt" "the refusal from the audit file"
-shows "^history-heading 4 records of [0-9]+ in .*, this session$" "every record of this session"
+shows "^history-heading 4 records of [0-9]+ in .*, since you unlocked$" "every record of this session"
 
 # ------------------------------------------------ a lock empties both lists; the next session has none
 # Another field, because the refusal above cools the password down for every bridge (D-0425).
@@ -240,10 +252,10 @@ SECOND="$(session_of)"
 activity
 omits '^unavailable ' "the new session as unreadable"
 omits '^(waiting|grant) ' "a request or grant from before the lock"
-shows '^history-message The audit log has no records from this session yet\.' "the new session's history"
+shows '^history-message Nothing has been recorded since you unlocked\.' "the new session's history"
 omits '^history(-heading)? ' "a record from before the lock in the new session's history"
 
-# --------------------------- a card's settings: a narrowing applies at once, a widening only once confirmed
+# ---------------------------- a row's settings: a narrowing applies at once, a widening only once confirmed
 start_bridge third
 settings_shown
 settings_say "agent=$LABEL mode=allow-for-a-while values=yes run=off see=env/** rows= held=none" "what the vault gives it"
@@ -308,6 +320,7 @@ exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-echo "ok: Agent Activity listed a real keypaste mcp request waiting at the app and the grant Approve gave,"
-echo "    showed this session's audit records, made revoked grants ask again, held nothing after a lock,"
+echo "ok: Agents listed a real keypaste mcp request waiting at the app, brought its prompt forward disarmed with"
+echo "    Deny focused, listed the allowance Approve gave, showed the audit records since the unlock, made ended"
+echo "    allowances ask again, held nothing after a lock,"
 echo "    read a missing log as no records yet and said an unreadable log was unavailable"

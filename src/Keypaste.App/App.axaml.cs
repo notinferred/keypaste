@@ -502,6 +502,7 @@ internal sealed partial class App : Application, IDisposable
             ShareTransport = ShareTransport,
             LoginItem = LoginItemFor(),
             CliLink = CliLinkFor(),
+            Tools = ClientConnector.ForThisProcess,
             Launching = LaunchingFor(_authority),
         };
 
