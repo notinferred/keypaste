@@ -37,14 +37,14 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/screenshots/approval-prompt.png" alt="The approval prompt: claude-code wants 1 secret, env/acme-api/DATABASE_URL, with the agent's reason and the choices Deny, Allow once and Allow for 1 hour."></td>
-    <td width="33%"><img src="docs/screenshots/env-profiles.png" alt="Env profiles: a matrix of acme-api's keys across dev, staging and prod, with masked values, and the .env.keypaste preview holding only kp:// references."></td>
-    <td width="33%"><img src="docs/screenshots/agents.png" alt="Agents: a request waiting for you, active grants with the time left and Revoke, and each MCP client's policy."></td>
+    <td width="33%"><img src="docs/screenshots/approval-prompt.png" alt="The approval prompt: claude-code wants 1 secret, the DATABASE_URL field of env/acme-api/.env, with the agent's reason and the choices Deny, Allow once and Allow for 1 hour."></td>
+    <td width="33%"><img src="docs/screenshots/env-profiles.png" alt="The acme-api project: its keys across dev, staging and prod with masked values and the item each comes from, Import .env and Export .env.keypaste."></td>
+    <td width="33%"><img src="docs/screenshots/agents.png" alt="Agents: a request waiting for you with Show the prompt, allowances with the time left and End, and the AI tools found on this computer with each agent's settings."></td>
   </tr>
   <tr>
     <td>An agent's request, in the app</td>
     <td>A project and its <code>.env.keypaste</code></td>
-    <td>Grants, clients and their policies</td>
+    <td>Requests, allowances and AI tools</td>
   </tr>
 </table>
 
