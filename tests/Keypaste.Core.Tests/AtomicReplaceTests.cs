@@ -1,4 +1,5 @@
 using KeePassLib.Serialization;
+using Keypaste.Core.Internal;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -51,15 +52,19 @@ public sealed class AtomicReplaceTests : IDisposable
         var path = Path.Combine(_directory, "vault.kdbx");
         File.WriteAllBytes(path, [1, 2, 3]);
 
-        using (var transaction = new FileTransactionEx(IOConnectionInfo.FromPath(path), true))
+        // Through the save gate, as every save in the process transacts, so on Windows no other
+        // test's save holds the 8.3 alias this temporary needs (D-0122).
+        KeePassInterop.WhileNoSaveReplaces(() =>
         {
+            using var transaction = new FileTransactionEx(IOConnectionInfo.FromPath(path), true);
             using (var written = transaction.OpenWrite())
             {
                 written.Write([4, 5, 6]);
             }
 
             transaction.CommitWrite();
-        }
+            return true;
+        });
 
         Assert.Equal([4, 5, 6], File.ReadAllBytes(path));
         Assert.False(File.Exists(path + ".tmp"));
