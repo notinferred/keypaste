@@ -88,7 +88,7 @@ set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_PREFIX='PROJECTS GATE FAILED: '
-watchdog "${WATCHDOG_SECONDS:-60}" keypaste Keypaste.AppDriver keepassxc-cli
+watchdog "${WATCHDOG_SECONDS:-20}" keypaste Keypaste.AppDriver keepassxc-cli
 
 dir=${1:-}
 [ -n "$dir" ] || die "usage: verify-keepassxc-projects.sh <work-directory>"
