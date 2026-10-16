@@ -15,7 +15,45 @@ die() {
   exit 1
 }
 
-step() { printf '\n--- %s\n' "$*"; }
+step() {
+  printf '\n--- %s\n' "$*"
+  if [ -n "${WATCHDOG_PHASE:-}" ]; then printf '%s\n' "$*" >"$WATCHDOG_PHASE"; fi
+}
+
+# Ends the gate once it has run $1 seconds, after printing the phase it reached and every process, so a
+# hang fails the step with its log kept, which a step its runner cannot cancel never does (F.63). $2... are
+# the gate's executables, ended by name on Windows, where a process whose parent has exited is outside the tree.
+watchdog() {
+  local seconds=$1 gate=$$
+  shift
+  local images=("$@")
+  WATCHDOG_PHASE=$(mktemp)
+  printf 'before its first step\n' >"$WATCHDOG_PHASE"
+  (
+    for _ in $(seq 1 "$seconds"); do
+      sleep 1
+      kill -0 "$gate" 2>/dev/null || exit 0
+    done
+    echo "::error::the gate ran past ${seconds}s, in: $(cat "$WATCHDOG_PHASE")"
+    if [ -r "/proc/$gate/winpid" ]; then
+      powershell -NoProfile -Command 'Get-CimInstance Win32_Process | Sort-Object ParentProcessId | Format-Table ProcessId, ParentProcessId, Name, CommandLine -AutoSize | Out-String -Width 500' || ps -W
+      for image in "${images[@]}"; do taskkill //F //IM "$image.exe" >/dev/null 2>&1 || true; done
+      taskkill //F //T //PID "$(cat "/proc/$gate/winpid")" >/dev/null 2>&1 || true
+    else
+      ps -ef
+      watcher=$(cat "$WATCHDOG_PHASE.watcher")
+      descendants() {
+        local child
+        for child in $(pgrep -P "$1" || true); do
+          if [ "$child" != "$watcher" ]; then descendants "$child"; echo "$child"; fi
+        done
+      }
+      for pid in $(descendants "$gate"); do kill -9 "$pid" 2>/dev/null || true; done
+      kill -9 "$gate" 2>/dev/null || true
+    fi
+  ) &
+  printf '%s\n' "$!" >"$WATCHDOG_PHASE.watcher"
+}
 
 require() { command -v "$1" >/dev/null 2>&1 || die "$1 is required and was not found; this gate must never be skipped"; }
 
