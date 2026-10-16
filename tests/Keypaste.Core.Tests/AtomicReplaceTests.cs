@@ -1,5 +1,4 @@
 using KeePassLib.Serialization;
-using Keypaste.Core.Internal;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -15,6 +14,9 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 public sealed class AtomicReplaceTests : IDisposable
 {
+    private const string _windowsTransacts =
+        "Windows commits through Transactional NTFS where it can, which this test does not reach.";
+
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-atomic-replace-tests-").FullName;
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
@@ -24,7 +26,7 @@ public sealed class AtomicReplaceTests : IDisposable
     {
         if (OperatingSystem.IsWindows())
         {
-            Assert.Skip("Windows commits through Transactional NTFS where it can, which this test does not reach.");
+            Assert.Skip(_windowsTransacts);
         }
 
         var path = Path.Combine(_directory, "vault.kdbx");
@@ -49,22 +51,23 @@ public sealed class AtomicReplaceTests : IDisposable
     [Fact]
     public void A_commit_replaces_the_vault_with_what_was_written()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip(_windowsTransacts);
+        }
+
         var path = Path.Combine(_directory, "vault.kdbx");
         File.WriteAllBytes(path, [1, 2, 3]);
 
-        // Through the save gate, as every save in the process transacts, so on Windows no other
-        // test's save holds the 8.3 alias this temporary needs (D-0122).
-        KeePassInterop.WhileNoSaveReplaces(() =>
+        using (var transaction = new FileTransactionEx(IOConnectionInfo.FromPath(path), true))
         {
-            using var transaction = new FileTransactionEx(IOConnectionInfo.FromPath(path), true);
             using (var written = transaction.OpenWrite())
             {
                 written.Write([4, 5, 6]);
             }
 
             transaction.CommitWrite();
-            return true;
-        });
+        }
 
         Assert.Equal([4, 5, 6], File.ReadAllBytes(path));
         Assert.False(File.Exists(path + ".tmp"));

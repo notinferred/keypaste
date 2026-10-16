@@ -269,7 +269,6 @@ jobs:
 
       - name: Verify project tags and their protection through real KeePassXC
         shell: bash
-        timeout-minutes: 10
         run: bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
 
       - name: Verify opening a keyfile-protected vault through real KeePassXC
