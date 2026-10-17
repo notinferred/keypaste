@@ -267,10 +267,33 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
 
+      - name: Start a bystander keypaste agent
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          cp artifacts/compat/gen.kdbx "$RUNNER_TEMP/bystander.kdbx"
+          mkdir -p "$RUNNER_TEMP/bystander-home"
+          vault="$RUNNER_TEMP/bystander.kdbx"
+          if command -v cygpath >/dev/null; then vault=$(cygpath -w "$vault"); fi
+          (sleep 900 </dev/null >/dev/null 2>&1 | KEYPASTE_HOME="$RUNNER_TEMP/bystander-home" artifacts/bin/Keypaste.Cli/release/keypaste agent --vault "$vault" --approver keypaste-bystander >/dev/null 2>&1 &)
+          sleep 2
+
       - name: Verify project tags and their protection through real KeePassXC
         shell: bash
         timeout-minutes: 15
+        env:
+          WATCHDOG_SECONDS: 30
         run: bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
+
+      - name: List the keypaste processes left
+        if: always()
+        shell: bash
+        run: |
+          if command -v cygpath >/dev/null; then
+            powershell -NoProfile -Command 'Get-CimInstance Win32_Process | Where-Object { $_.Name -match "keypaste|keepassxc" } | Format-Table ProcessId, ParentProcessId, CreationDate, CommandLine -AutoSize | Out-String -Width 400'
+          else
+            ps -A -o pid,ppid,lstart,args | grep -E '[k]eypaste|[k]eepassxc' || echo "none"
+          fi
 
       - name: Verify opening a keyfile-protected vault through real KeePassXC
         shell: bash
