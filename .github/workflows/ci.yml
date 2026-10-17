@@ -275,8 +275,23 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bystander-home"
           vault="$RUNNER_TEMP/bystander.kdbx"
           if command -v cygpath >/dev/null; then vault=$(cygpath -w "$vault"); fi
-          (sleep 900 </dev/null >/dev/null 2>&1 | KEYPASTE_HOME="$RUNNER_TEMP/bystander-home" artifacts/bin/Keypaste.Cli/release/keypaste agent --vault "$vault" --approver keypaste-bystander >/dev/null 2>&1 &)
+          (sleep 900 </dev/null 2>/dev/null | KEYPASTE_HOME="$RUNNER_TEMP/bystander-home" artifacts/bin/Keypaste.Cli/release/keypaste agent --vault "$vault" --approver keypaste-bystander >/dev/null 2>&1 &)
           sleep 2
+          if command -v cygpath >/dev/null; then
+            powershell -NoProfile -Command 'Get-CimInstance Win32_Process | Where-Object { $_.Name -match "keypaste" } | Format-Table ProcessId, ParentProcessId, CommandLine -AutoSize | Out-String -Width 400'
+            for how in stop-taskkill taskkill kill-9 stop-kill-9; do
+              bash -c 'sleep 30; true' &
+              p=$!
+              sleep 1
+              case "$how" in stop-*) kill -STOP "$p" ;; esac
+              case "$how" in *taskkill) taskkill //F //T //PID "$(cat "/proc/$p/winpid")" >/dev/null 2>&1 || true ;; *) kill -9 "$p" ;; esac
+              code=0
+              wait "$p" || code=$?
+              echo "$how: the parent saw exit status $code"
+            done
+          else
+            ps -A -o pid,ppid,args | grep '[k]eypaste' || echo "no bystander"
+          fi
 
       - name: Verify project tags and their protection through real KeePassXC
         shell: bash
