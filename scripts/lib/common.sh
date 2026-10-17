@@ -22,68 +22,67 @@ step() {
 
 # Fails the gate past $1 seconds, printing the phase it reached and every process (F.63); $2... are its programs.
 watchdog() {
-  local seconds=$1
+  local seconds=$1 winpid='' before=''
   shift
   case "$seconds" in '' | 0* | *[!0-9]*) die "the watchdog needs a whole number of seconds, not '$seconds'" ;; esac
   WATCHDOG_PHASE=$(mktemp)
   printf 'before its first step\n' >"$WATCHDOG_PHASE"
+  if [ -r "/proc/$$/winpid" ]; then winpid=$(cat "/proc/$$/winpid"); else before=" $(ps -A -o pid= | tr -s ' \n' '  ') "; fi
   # Detached, so ending the gate's tree does not end the watcher.
-  (watch_gate "$$" "$seconds" "$@" &)
+  (watch_gate "$$" "$(started "$$")" "$seconds" "$winpid" "$before" "$@" &)
 }
 
 watch_gate() {
-  local gate=$1 seconds=$2 deadline winpid='' before='' targets kind pid
-  shift 2
+  local gate=$1 start=$2 seconds=$3 winpid=$4 before=$5 deadline listing targets kind pid
+  shift 5
   set +e
   deadline=$((SECONDS + seconds))
-  if [ -r "/proc/$gate/winpid" ]; then winpid=$(cat "/proc/$gate/winpid"); else before=" $(ps -A -o pid= | tr -s ' \n' '  ') "; fi
-  while [ "$SECONDS" -lt "$deadline" ]; do
-    sleep 1
-    kill -0 "$gate" 2>/dev/null || { rm -f "$WATCHDOG_PHASE"; exit 0; }
-  done
+  while [ "$SECONDS" -lt "$deadline" ] && kill -0 "$gate" 2>/dev/null; do sleep 1; done
+  # A gate that exited may have left its number to another process.
+  if ! kill -0 "$gate" 2>/dev/null || [ "$(started "$gate")" != "$start" ]; then rm -f "$WATCHDOG_PHASE"; exit 0; fi
+  kill -STOP "$gate" 2>/dev/null
   echo "::error::the gate ran past ${seconds}s, in: $(cat "$WATCHDOG_PHASE")"
   if [ -n "$winpid" ]; then
     targets=$(windows_targets "$winpid" "$@")
     # Git Bash's kill, since a Git Bash process ended by taskkill gives its parent exit status 0 (F.63).
     kill -9 "$gate" 2>/dev/null
+    while read -r kind pid; do
+      [ -n "$pid" ] || continue
+      [ "$kind" = child ] || echo "ending process $pid and everything under it, which the gate started and lost track of"
+      taskkill //F //T //PID "$pid" >/dev/null 2>&1
+    done <<<"$targets"
   else
-    kill -STOP "$gate" 2>/dev/null
-    ps -ef
-    targets=$(strays "$before" "$@" | sed 's/^/stray /')
-    end_tree "$gate"
+    listing=$(bounded 60 ps -A -o pid,ppid,args) || echo "the process list did not finish within a minute"
+    printf '%s\n' "$listing"
+    targets=$(strays "$before" "$listing" "$@")
+    for pid in $targets; do echo "ending process $pid and everything under it, which the gate started and lost track of"; done
+    # shellcheck disable=SC2086 # one process id per word
+    end_tree "$gate" $targets
   fi
-  while read -r kind pid; do
-    [ -n "$pid" ] || continue
-    [ "$kind" = child ] || echo "ending process $pid and everything under it, which the gate started and lost track of"
-    if [ -n "$winpid" ]; then taskkill //F //T //PID "$pid" >/dev/null 2>&1; else end_tree "$pid"; fi
-  done <<<"$targets"
   rm -f "$WATCHDOG_PHASE"
 }
 
-# The top of each process chain that holds one of the programs $2..., hangs from init, and was not among the
-# processes $1 running when the watchdog was armed: what the gate started and lost track of.
+# Each chain in listing $2 holding one of $3... that hangs from init and was not among processes $1 at arming.
 strays() {
-  local before=$1
-  shift
-  ps -A -o pid= -o ppid= -o args= | awk -v before="$before" -v names=" $* " '
-    { parent[$1] = $2; name = $3; sub(/.*\//, "", name); if (index(names, " " name " ")) named[$1] = 1 }
+  local before=$1 listing=$2
+  shift 2
+  awk -v before="$before" -v names=" $* " '
+    NR > 1 { parent[$1] = $2; name = $3; sub(/.*\//, "", name); if (index(names, " " name " ")) named[$1] = 1 }
     END {
       for (pid in named) {
         top = pid
         while (parent[top] != 1 && parent[top] != top && (parent[top] in parent)) top = parent[top]
         if (parent[top] == 1 && !index(before, " " top " ") && !seen[top]++) print top
       }
-    }'
+    }' <<<"$listing"
 }
 
-# On Windows, "child <pid>" for each child of the gate's process $1 and "stray <pid>" for each chain top whose parent
-# has exited and that started after the gate; every process goes to standard error first, and a minute bounds the listing.
+# Windows' targets: the children of the gate's process $1, and each chain the gate started that outlived its parent.
 windows_targets() {
-  local gate=$1 out lister
+  local gate=$1
   shift
-  out=$(mktemp)
   # shellcheck disable=SC2016 # PowerShell expands its own variables, not bash.
-  WATCHDOG_GATE=$gate WATCHDOG_NAMES="$*" powershell -NoProfile -NonInteractive -Command '
+  bounded 60 env WATCHDOG_GATE="$gate" WATCHDOG_NAMES="$*" powershell -NoProfile -NonInteractive -Command '
     $all = @(Get-CimInstance Win32_Process)
     [Console]::Error.WriteLine(($all | Sort-Object ParentProcessId | Format-Table ProcessId, ParentProcessId, Name, CommandLine -AutoSize | Out-String -Width 500))
     $by = @{}
@@ -99,12 +98,34 @@ windows_targets() {
       while (($parent = $by[$top.ParentProcessId]) -and $parent.ProcessId -ne $top.ProcessId -and $parent.CreationDate -le $top.CreationDate) { $top = $parent }
       if ($top.CreationDate -gt $gate.CreationDate) { $tops[$top.ProcessId] = 1 }
     }
-    $tops.Keys | ForEach-Object { "stray $_" }' >"$out" &
-  lister=$!
-  for _ in $(seq 1 60); do kill -0 "$lister" 2>/dev/null || break; sleep 1; done
-  if kill -0 "$lister" 2>/dev/null; then end_tree "$lister"; ps -W >&2; fi
+    $tops.Keys | ForEach-Object { "stray $_" }' || ps -W >&2
+}
+
+# What $2... printed, ended and failed once it runs past $1 seconds, since a wedged process can stall even ps.
+bounded() {
+  local seconds=$1 out pid status=0
+  shift
+  out=$(mktemp)
+  "$@" >"$out" &
+  pid=$!
+  for _ in $(seq 1 $((seconds * 5))); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+  if kill -0 "$pid" 2>/dev/null; then end_tree "$pid"; status=1; fi
   tr -d '\r' <"$out"
   rm -f "$out"
+  return "$status"
+}
+
+# A process's start time, so a number another process took over is not mistaken for the one it named.
+started() {
+  local stat
+  if [ -r "/proc/$1/stat" ]; then
+    read -r stat <"/proc/$1/stat" || return 0
+    # shellcheck disable=SC2086 # the fields after the command name, one per word; the start time is field 22
+    set -- ${stat##*') '}
+    printf '%s' "${20:-}"
+  else
+    ps -o lstart= -p "$1" 2>/dev/null
+  fi
 }
 
 require() { command -v "$1" >/dev/null 2>&1 || die "$1 is required and was not found; this gate must never be skipped"; }
@@ -198,19 +219,22 @@ descendants() {
   done
 }
 
-# Ends $1 and every process under it, TERM then KILL a second later; Windows' taskkill walks the tree itself.
+# Ends each process given and everything under it, TERM then KILL a second later; Windows' taskkill walks a tree itself.
 end_tree() {
-  local tree
-  if [ -r "/proc/$1/winpid" ]; then
-    taskkill //F //T //PID "$(cat "/proc/$1/winpid")" >/dev/null 2>&1 || true
-  else
-    tree="$1 $(descendants "$1")"
-    # shellcheck disable=SC2086 # one process id per word
-    kill $tree 2>/dev/null || true
-    sleep 1
-    # shellcheck disable=SC2086
-    kill -9 $tree 2>/dev/null || true
-  fi
+  local tree='' root
+  for root; do
+    if [ -r "/proc/$root/winpid" ]; then
+      taskkill //F //T //PID "$(cat "/proc/$root/winpid")" >/dev/null 2>&1 || true
+    else
+      tree="$tree $root $(descendants "$root")"
+    fi
+  done
+  [ -n "$tree" ] || return 0
+  # shellcheck disable=SC2086 # one process id per word
+  kill $tree 2>/dev/null || true
+  sleep 1
+  # shellcheck disable=SC2086
+  kill -9 $tree 2>/dev/null || true
 }
 
 # Waits until $2 holds $3 (default 1) lines matching $1, for WAIT_SECONDS (default 30).
