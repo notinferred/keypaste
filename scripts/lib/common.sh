@@ -76,9 +76,8 @@ strays() {
     }'
 }
 
-# On Windows, "child <pid>" for each child of the gate's process $1 and "stray <pid>" for each top strays would find,
-# where a chain's top is the process whose parent has exited and starting after the gate is what the gate started.
-# Prints every process to standard error first; a listing not done in a minute is ended.
+# On Windows, "child <pid>" for each child of the gate's process $1 and "stray <pid>" for each chain top whose parent
+# has exited and that started after the gate; every process goes to standard error first, and a minute bounds the listing.
 windows_targets() {
   local gate=$1 out lister
   shift
