@@ -1,6 +1,6 @@
 # F.63 — Skip the atomic-replace commit on Windows and watch the projects gate
 
-Completed 2026-10-16 at `FINAL_SHA` on `task/f63-watchdog`, after the review of its second integration `63983b5`: the dispatched ci FINAL_CI and app FINAL_APP runs passed every job on all three runners; ci's `tools` jobs were not asked for, since F.63 changes nothing `keypaste setup` registers. The integrated commit differs from that tree only in this record.
+Completed 2026-10-16 at `2bf0494` on `task/f63-watchdog`, after the review of its second integration `63983b5`: the dispatched ci 38990470315 and app 38990479089 runs passed every job on all three runners; ci's `tools` jobs were not asked for, since F.63 changes nothing `keypaste setup` registers. The integrated commit differs from that tree only in this record.
 
 It had no STEPS row: two Windows CI failures recorded as open observations in E.1d's and N.3's records. The founder asked on 2026-10-15 for both to be fixed.
 
@@ -31,11 +31,12 @@ It had no STEPS row: two Windows CI failures recorded as open observations in E.
 - The probe: dev 38832734983 at `57c1eb5`, above.
 - The watchdog with its deadline at 30 seconds, beside a `keypaste agent` the gate orphaned and a bystander agent an earlier step started: in ci 38989472375 at `1635e46`, the step on every runner printed the phase and every process, failed with exit code 137, named and ended the orphan's chain and nothing else, and left the bystander running; none of the gate's own agents outlived it. ci 38988628610 at `5fece7a` found the Windows exit status above; its orphan and bystander had exited at once, through a mistake in the probe.
 - ci 38834636867 and app 38834646300 (attempt 2) at `e68c829`, green on all three runners. `AtomicReplaceTests` passed both tests on Linux and macOS and skipped both on Windows.
-- ci FINAL_CI and app FINAL_APP at `FINAL_SHA`, green on all three runners.
+- ci 38990470315 and app 38990479089 at `2bf0494`, green on all three runners.
 
 ## Limits and follow-ups
 
 - The project-tags hang stays open as a BACKLOG investigation until the watchdog reports one.
 - F.57's BACKLOG row on this test is removed, since the probe answers its question.
 - An orphan on Linux hangs from init only where no subreaper adopts it, as on `ubuntu-24.04` (ci 38989472375); under one, such as `systemd --user` on a desktop, the watchdog leaves it running.
+- On Windows, a PowerShell listing not finished in a minute is ended and `ps -W` printed instead; the gate still ends and its step fails, but its children are not known, so they outlive it until the runner's job cleanup.
 - App 38834646300's first attempt failed `desktop gates (windows-2025)`: `verify-run-session.sh`, which F.63 does not touch, printed its last `ok` and exited 1 with no message. The founder chose on 2026-10-15 to re-run that job and keep the failure open as a BACKLOG investigation; the passing re-run does not close it.
