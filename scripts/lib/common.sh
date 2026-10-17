@@ -32,7 +32,7 @@ watchdog() {
 }
 
 watch_gate() {
-  local gate=$1 seconds=$2 deadline winpid='' before='' tops top
+  local gate=$1 seconds=$2 deadline winpid='' before='' targets kind pid
   shift 2
   set +e
   deadline=$((SECONDS + seconds))
@@ -42,13 +42,21 @@ watch_gate() {
     kill -0 "$gate" 2>/dev/null || { rm -f "$WATCHDOG_PHASE"; exit 0; }
   done
   echo "::error::the gate ran past ${seconds}s, in: $(cat "$WATCHDOG_PHASE")"
-  kill -STOP "$gate" 2>/dev/null
-  if [ -n "$winpid" ]; then tops=$(windows_strays "$winpid" "$@"); else ps -ef; tops=$(strays "$before" "$@"); fi
-  end_tree "$gate"
-  for top in $tops; do
-    echo "ending process $top and everything under it, which the gate started and lost track of"
-    if [ -n "$winpid" ]; then taskkill //F //T //PID "$top" >/dev/null 2>&1; else end_tree "$top"; fi
-  done
+  if [ -n "$winpid" ]; then
+    targets=$(windows_targets "$winpid" "$@")
+    # Through Git Bash and never stopped first: a stopped gate ended by taskkill reported success (F.63).
+    kill -9 "$gate" 2>/dev/null
+  else
+    kill -STOP "$gate" 2>/dev/null
+    ps -ef
+    targets=$(strays "$before" "$@" | sed 's/^/stray /')
+    end_tree "$gate"
+  fi
+  while read -r kind pid; do
+    [ -n "$pid" ] || continue
+    [ "$kind" = child ] || echo "ending process $pid and everything under it, which the gate started and lost track of"
+    if [ -n "$winpid" ]; then taskkill //F //T //PID "$pid" >/dev/null 2>&1; else end_tree "$pid"; fi
+  done <<<"$targets"
   rm -f "$WATCHDOG_PHASE"
 }
 
@@ -68,9 +76,10 @@ strays() {
     }'
 }
 
-# strays on Windows, where the top of a chain is the process whose parent has exited, and the gate's own process $1
-# dates what it started. Prints every process to standard error first; a listing not done in a minute is ended.
-windows_strays() {
+# On Windows, "child <pid>" for each child of the gate's process $1 and "stray <pid>" for each top strays would find,
+# where a chain's top is the process whose parent has exited and starting after the gate is what the gate started.
+# Prints every process to standard error first; a listing not done in a minute is ended.
+windows_targets() {
   local gate=$1 out lister
   shift
   out=$(mktemp)
@@ -85,12 +94,13 @@ windows_strays() {
     $names = @($env:WATCHDOG_NAMES -split " " | ForEach-Object { "$_.exe" })
     $tops = @{}
     foreach ($p in $all) {
+      if ($p.ParentProcessId -eq $gate.ProcessId -and $p.CreationDate -ge $gate.CreationDate) { "child $($p.ProcessId)" }
       if ($names -notcontains $p.Name) { continue }
       $top = $p
       while (($parent = $by[$top.ParentProcessId]) -and $parent.ProcessId -ne $top.ProcessId -and $parent.CreationDate -le $top.CreationDate) { $top = $parent }
       if ($top.CreationDate -gt $gate.CreationDate) { $tops[$top.ProcessId] = 1 }
     }
-    $tops.Keys' >"$out" &
+    $tops.Keys | ForEach-Object { "stray $_" }' >"$out" &
   lister=$!
   for _ in $(seq 1 60); do kill -0 "$lister" 2>/dev/null || break; sleep 1; done
   if kill -0 "$lister" 2>/dev/null; then end_tree "$lister"; ps -W >&2; fi
