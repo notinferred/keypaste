@@ -195,8 +195,6 @@ for name in grouped plain; do
 done
 [ "$(version "$plain")" = 000004 ] || die "KeePassXC did not make the plain vault KDBX 4.0: $(version "$plain")"
 grouped_version=$(version "$grouped")
-cp "$grouped" "$dir/orphan.kdbx"
-(sleep 900 </dev/null 2>/dev/null | "$kp" agent --vault "$(native "$dir/orphan.kdbx")" --approver "keypaste-orphan-$$" >/dev/null 2>&1 &)
 exported=$(kx export "$grouped" -f xml) || die "KeePassXC cannot export the group-tagged vault"
 [ "$(grep -c '<Tags>env:billing:staging</Tags>' <<<"$exported")" = 1 ] || die "KeePassXC did not keep the group tag"
 printf '    KeePassXC wrote the group-tagged vault as %s and the other as 000004 (minor, major)\n' "$grouped_version"

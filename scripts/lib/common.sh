@@ -44,7 +44,7 @@ watch_gate() {
   echo "::error::the gate ran past ${seconds}s, in: $(cat "$WATCHDOG_PHASE")"
   if [ -n "$winpid" ]; then
     targets=$(windows_targets "$winpid" "$@")
-    # Through Git Bash and never stopped first: a stopped gate ended by taskkill reported success (F.63).
+    # Git Bash's kill, since a Git Bash process ended by taskkill gives its parent exit status 0 (F.63).
     kill -9 "$gate" 2>/dev/null
   else
     kill -STOP "$gate" 2>/dev/null
