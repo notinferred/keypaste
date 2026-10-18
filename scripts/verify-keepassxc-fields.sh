@@ -8,9 +8,10 @@
 # new one protected and leaves the changed one plain, and the entry keeps its other field, tag,
 # custom data, attachment and `otp` in a file that is still KDBX 4.0. Setting three fields makes one revision.
 # `otp`, `Password` and `password` are refused and the file stays byte-identical with no backup
-# taken, and no listing carries a value. keypaste saves a field twice inside one second of the clock,
-# and after KeePassXC merges in a newer copy of the entry, keypaste reads KeePassXC's value and the
-# entry's history holds both values keypaste saved (F.27).
+# taken, and no listing carries a value. After KeePassXC merges in a version of the entry stamped an
+# hour ahead of the clock, keypaste saves a field twice, each save in a later whole second than the
+# version before it, and after KeePassXC merges in a newer copy of the entry, keypaste reads KeePassXC's
+# value and the entry's history holds both values keypaste saved (D-0387).
 # On a second vault KeePassXC made, `api/OpenAI` holds a password, a protected `OPENAI_API_KEY`,
 # `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste agent` and `keypaste mcp` release
 # `OPENAI_API_KEY` alone and refuse the other names without asking anyone, and the `run` tool naming
@@ -37,6 +38,7 @@ set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_PREFIX='FIELDS GATE FAILED: '
+watchdog "${WATCHDOG_SECONDS:-300}" keypaste Keypaste.AppDriver keepassxc-cli node workerd
 
 dir=${1:-}
 [ -n "$dir" ] || die "usage: verify-keepassxc-fields.sh <work-directory>"
@@ -110,7 +112,39 @@ protection() {
     }'
 }
 
-next_second() { local s; s=$(date +%s); while [ "$(date +%s)" = "$s" ]; do sleep 0.02; done; }
+# Merges into $db a copy of it KeePassXC imports, in which api/Stripe's current version holds $2 for $1 and is stamped $3; $4 names the copy.
+merge_copy() {
+  kx export "$db" -f xml | awk -v id="$(uuid stripe)" -v from="$1" -v to="$2" -v at="$3" '
+    /<History>/ { inside = 1 }
+    !inside && index($0, "<UUID>" id "</UUID>") { mine = 1 }
+    mine && !inside { sub(from, to); sub(/<LastModificationTime>[^<]*</, "<LastModificationTime>" at "<") }
+    /<\/History>/ { inside = 0 }
+    mine && !inside && /<\/Entry>/ { mine = 0 }
+    { print }' >"$dir/$4.xml"
+  grep -qF "$2" "$dir/$4.xml" || die "the $4 copy does not hold $2"
+  printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/$4.xml")" "$(native "$dir/$4.kdbx")" \
+    || die "keepassxc-cli could not import the $4 copy"
+  printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$db")" "$(native "$dir/$4.kdbx")" >/dev/null \
+    || die "keepassxc-cli could not merge the $4 copy"
+}
+
+# Each version of api/Stripe in an export of $db, current first, as "<Unix second> <its MERGED value>".
+# A KDBX 4 export writes a time as the base64 of its little-endian count of seconds since 0001-01-01.
+merged_versions() {
+  kx export "$db" -f xml >"$dir/versions.xml" && node -e '
+    const [file, id] = process.argv.slice(1);
+    const xml = require("node:fs").readFileSync(file, "utf8");
+    const start = xml.indexOf(`<UUID>${id}</UUID>`);
+    const end = xml.indexOf("</History>", start);
+    if (start < 0 || end < 0) throw new Error("the export holds no such entry with a history");
+    for (const version of xml.slice(start, end).split("<Entry>")) {
+      const time = /<LastModificationTime>([^<]*)</.exec(version)[1];
+      const value = /<Key>MERGED<\/Key>\s*<Value[^>]*>([^<]*)<\/Value>/.exec(version);
+      const second = /^\d{4}-/.test(time) ? Date.parse(time) / 1000 : Number(Buffer.from(time, "base64").readBigInt64LE()) - 62135596800;
+      console.log(`${second} ${value ? value[1] : ""}`);
+    }
+  ' "$(native "$dir/versions.xml")" "$(uuid stripe)"
+}
 
 sentinels=(fields-login-pw fields-plain-value fields-other-secret JBSWY3DPEHPK3PXP fields-new-secret fields-plain-changed fields-three-a fields-three-b fields-three-c)
 
@@ -212,37 +246,31 @@ for value in "${sentinels[@]}"; do
   grep -qF "$value" <<<"$listed" && die "a listing printed the value ${value}"
 done
 
-step "keypaste saves a field twice in one second; after KeePassXC merges a newer copy, keypaste reads KeePassXC's value and history keeps both"
-attempts=10
-for ((attempt = 1; ; attempt++)); do
-  first="fields-first-$attempt" saved="fields-before-merge-$attempt"
-  next_second
-  started=$(date +%s)
-  said=$(kp_with "${first}\n" set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
-  said=$(kp_with "${saved}\n" set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
-  [ "$(date +%s)" = "$started" ] && break
-  [ "$attempt" -lt "$attempts" ] || die "${attempts} attempts could not save twice inside one second"
-done
-printf 'saved twice inside one second on attempt %d of %d\n' "$attempt" "$attempts"
+step "after KeePassXC merges a version stamped an hour ahead, keypaste saves a field twice, each in a later second than the version before; after a newer copy merges, keypaste reads KeePassXC's value and history keeps both"
+ahead=fields-stamped-ahead first=fields-first saved=fields-before-merge
+said=$(kp_with 'fields-before-ahead\n' set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
+# As a device whose clock runs an hour fast stamps it: longer than the watchdog or the CI step lets the gate run, so a save stamped by the clock alone always lands before it.
+ahead_at=$(($(date +%s) + 3600))
+stamp=$(node -p 'new Date(process.argv[1] * 1000).toISOString().replace(".000Z", "Z")' "$ahead_at") \
+  || die "could not write Unix second ${ahead_at} as an ISO 8601 time"
+merge_copy fields-before-ahead "$ahead" "$stamp" ahead
+said=$(kp_with "${first}\n" set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
+said=$(kp_with "${saved}\n" set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
+versions=$(merged_versions) || die "could not read api/Stripe's versions from KeePassXC's export"
+second_of() { awk -v value="$1" '$2 == value { print $1 }' <<<"$versions"; }
+[ "$(second_of "$ahead")" = "$ahead_at" ] || die "the entry holds no version of ${ahead} stamped ${stamp}: ${versions}"
+first_at=$(second_of "$first") saved_at=$(second_of "$saved")
+[ "$ahead_at" -lt "$first_at" ] && [ "$first_at" -lt "$saved_at" ] \
+  || die "keypaste's saves are stamped at Unix seconds ${first_at:-none} and ${saved_at:-none}, not each a later second than the version before, which KeePassXC stamped at ${ahead_at}"
+printf "    KeePassXC's version at Unix second %s, keypaste's saves at %s and %s\n" "$ahead_at" "$first_at" "$saved_at"
 history=$(history_xml)
 grep -qF "$saved" <<<"$history" && die "the value about to be merged over is already in history"
-kx export "$db" -f xml | awk -v id="$(uuid stripe)" -v saved="$saved" '
-  /<History>/ { inside = 1 }
-  !inside && index($0, "<UUID>" id "</UUID>") { mine = 1 }
-  mine && !inside { sub(saved, "fields-after-merge"); sub(/<LastModificationTime>[^<]*</, "<LastModificationTime>2037-01-01T00:00:00Z<") }
-  /<\/History>/ { inside = 0 }
-  mine && !inside && /<\/Entry>/ { mine = 0 }
-  { print }' >"$dir/newer.xml"
-grep -qF fields-after-merge "$dir/newer.xml" || die "the newer copy does not hold the new value"
-printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/newer.xml")" "$(native "$dir/newer.kdbx")" \
-  || die "keepassxc-cli could not import the newer copy"
-printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$db")" "$(native "$dir/newer.kdbx")" >/dev/null \
-  || die "keepassxc-cli could not merge the newer copy"
+merge_copy "$saved" fields-after-merge 2037-01-01T00:00:00Z newer
 got=$(kp_with '' get "$entry" --field MERGED --show 2>/dev/null) || die "keypaste cannot read the merged field"
 [ "$(tr -d '\r' <<<"$got")" = fields-after-merge ] || die "after the merge keypaste reads '${got}', not KeePassXC's value"
 history=$(history_xml)
-grep -qF "$first" <<<"$history" || die "after the merge the history lost the first of the two values saved in one second"
-grep -qF "$saved" <<<"$history" || die "after the merge the history lost the second of the two values saved in one second"
+grep -qF "$first" <<<"$history" || die "after the merge the history lost the first of keypaste's two saves"
+grep -qF "$saved" <<<"$history" || die "after the merge the history lost the second of keypaste's two saves"
 
 step "a real keypaste agent and keypaste mcp release the env-named field KeePassXC wrote, and no other"
 openai="$dir/openai.kdbx"
