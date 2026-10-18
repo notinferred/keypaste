@@ -64,27 +64,10 @@ stop_agent() {
   kill -9 "$agent_pid" 2>/dev/null || true
   agent_pid=
 }
-descendants() {
-  local child
-  for child in $(pgrep -P "$1" 2>/dev/null); do
-    descendants "$child"
-    echo "$child"
-  done
-}
 # wrangler runs its CLI and workerd beneath it, so the whole tree goes.
 stop_worker() {
-  local tree
   [ -n "$worker_pid" ] || return 0
-  if [ -r "/proc/$worker_pid/winpid" ]; then
-    taskkill //F //T //PID "$(cat "/proc/$worker_pid/winpid")" >/dev/null 2>&1 || true
-  else
-    tree="$(descendants "$worker_pid") $worker_pid"
-    # shellcheck disable=SC2086 # one process id per word
-    kill $tree 2>/dev/null || true
-    sleep 1
-    # shellcheck disable=SC2086
-    kill -9 $tree 2>/dev/null || true
-  fi
+  end_tree "$worker_pid"
   worker_pid=
 }
 # Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input and 8 the open bridge's.
