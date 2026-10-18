@@ -51,6 +51,12 @@ on:
         description: Also install the real AI tools and connect keypaste to them; a release's dispatch sets it
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      linux_only:
+        description: Run only the Linux jobs, without compat and tools; only dev.yml's linux mode passes it (D-0460)
+        type: boolean
+        default: false
   # Weekly, so a runner image or upstream change shows without a commit.
   schedule:
     - cron: '17 4 * * 1'
@@ -72,6 +78,8 @@ env:
 jobs:
   # Every run runs every job but tools, which runs on the schedule and on a dispatch that asks for it; a dispatch, the
   # schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0423, D-0438).
+  # dev.yml's linux mode calls it with linux_only to run its Linux jobs but compat; that run counts toward
+  # nothing (D-0460).
   checks:
     name: scripts + workflows
     runs-on: ubuntu-24.04
@@ -117,7 +125,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2025","macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -144,7 +152,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2025","macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -169,6 +177,7 @@ jobs:
 
   compat:
     name: compat (${{ matrix.os }})
+    if: ${{ !inputs.linux_only }}
     strategy:
       fail-fast: false
       matrix:

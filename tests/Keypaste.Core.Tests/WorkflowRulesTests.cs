@@ -28,7 +28,7 @@ public sealed class WorkflowRulesTests
 
                 var reference = match.Groups["ref"].Value;
 
-                // A local composite action is this repository's own file, versioned with it.
+                // A local action or reusable workflow is this repository's own file, versioned with it.
                 if (reference.StartsWith('.'))
                 {
                     continue;
@@ -117,6 +117,83 @@ public sealed class WorkflowRulesTests
             found);
     }
 
+    [Fact]
+    public void OnlyDevYmlCanNarrowCiOrAppToLinux()
+    {
+        var workflows = Directory.GetFiles(
+            Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml");
+
+        Assert.NotEmpty(workflows);
+
+        Dictionary<string, string[]> contents = new(StringComparer.Ordinal);
+        foreach (var file in workflows)
+        {
+            contents[Path.GetFileName(file)] = File.ReadAllLines(file);
+        }
+
+        var misuses = LinuxOnlyMisuses(contents).ToList();
+
+        Assert.True(
+            misuses.Count == 0,
+            "a counted ci or app run could run on Linux alone (D-0460):\n  "
+            + string.Join("\n  ", misuses));
+    }
+
+    [Fact]
+    public void LinuxOnlyIsAllowedOnlyAsACiOrAppCallInputOrInDevYml()
+    {
+        var dispatchInputs = """
+            on:
+              workflow_dispatch:
+                inputs:
+                  linux_only:
+                    type: boolean
+                  LINUX_ONLY:
+                    type: boolean
+            """;
+        var aliasedCallInput = """
+            on:
+              workflow_call:
+                inputs: &inputs
+                  linux_only:
+                    type: boolean
+              workflow_dispatch:
+                inputs: *inputs
+              pull_request:
+                <<: [*inputs]
+            """;
+        var callInputAndCaller = """
+            on:
+              workflow_call:
+                inputs:
+                  linux_only:
+                    type: boolean
+            jobs:
+              app:
+                uses: ./.github/workflows/app.yml
+                with:
+                  linux_only: true
+            """;
+        Dictionary<string, string[]> workflows = new(StringComparer.Ordinal)
+        {
+            ["ci.yml"] = dispatchInputs.Split('\n'),
+            ["app.yml"] = aliasedCallInput.Split('\n'),
+            ["release.yml"] = callInputAndCaller.Split('\n'),
+            ["dev.yml"] = callInputAndCaller.Split('\n'),
+        };
+
+        Assert.Equal(
+            [
+                "app.yml:7 reuses a YAML node under on:, which could carry linux_only to another trigger",
+                "app.yml:9 reuses a YAML node under on:, which could carry linux_only to another trigger",
+                "ci.yml:4 sets linux_only outside a ci or app workflow_call input and dev.yml",
+                "ci.yml:6 sets linux_only outside a ci or app workflow_call input and dev.yml",
+                "release.yml:4 sets linux_only outside a ci or app workflow_call input and dev.yml",
+                "release.yml:10 sets linux_only outside a ci or app workflow_call input and dev.yml",
+            ],
+            LinuxOnlyMisuses(workflows));
+    }
+
     private static Dictionary<string, string> DirectScriptInvocations()
     {
         var workflows = Directory.GetFiles(
@@ -188,6 +265,66 @@ public sealed class WorkflowRulesTests
             else
             {
                 yield return (value.Trim('\'', '"'), i + 1);
+            }
+        }
+    }
+
+    private static IEnumerable<string> LinuxOnlyMisuses(Dictionary<string, string[]> workflows)
+    {
+        foreach (var (name, lines) in workflows.OrderBy(w => w.Key, StringComparer.Ordinal))
+        {
+            var root = string.Empty;
+            var trigger = string.Empty;
+            var section = string.Empty;
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i].TrimEnd('\r');
+                var trimmed = line.TrimStart();
+                if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+                {
+                    continue;
+                }
+
+                var indent = line.Length - trimmed.Length;
+                var key = Regex.Match(trimmed, @"^([A-Za-z0-9_-]+):").Groups[1].Value;
+                if (indent == 0)
+                {
+                    root = key;
+                    trigger = string.Empty;
+                    section = string.Empty;
+                }
+                else if (indent == 2)
+                {
+                    trigger = key;
+                    section = string.Empty;
+                }
+                else if (indent == 4)
+                {
+                    section = key;
+                }
+
+                var countedTriggers = (name == "ci.yml" || name == "app.yml") && root == "on";
+                if (countedTriggers
+                    && Regex.IsMatch(trimmed, @"^(?:-\s+)?\*[^\s,\[\]{}]|:\s+\*[^\s,\[\]{}]|(?:^|[{,]\s*)<<\s*:"))
+                {
+                    yield return $"{name}:{i + 1} reuses a YAML node under on:, which could carry linux_only to another trigger";
+                    continue;
+                }
+
+                // GitHub matches input names in any case; outside on:, app.yml's step env LINUX_ONLY must not match.
+                var options = countedTriggers ? RegexOptions.IgnoreCase : RegexOptions.None;
+                if (!Regex.IsMatch(trimmed, @"(?<![\w.-])linux_only['""]?\s*:", options))
+                {
+                    continue;
+                }
+
+                var declaredByCiOrApp = countedTriggers
+                    && trigger == "workflow_call" && section == "inputs"
+                    && indent == 6 && key == "linux_only";
+                if (!declaredByCiOrApp && name != "dev.yml")
+                {
+                    yield return $"{name}:{i + 1} sets linux_only outside a ci or app workflow_call input and dev.yml";
+                }
             }
         }
     }

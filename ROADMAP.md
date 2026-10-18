@@ -47,7 +47,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. It says at once when another program saved the vault. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14, N.16 |
 | An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose, and the app, not the agent's own configuration, sets what each agent may see and run, and the owner records every request itself. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, G.8, G.9, N.10 |
 | A project runs from the app on macOS, and every desktop install puts the CLI on PATH. | E.1d, G.5 |
-| Development builds nothing on the founder's machine, CI runs every check in parallel on every run (D-0423) and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, F.27, F.28, B.1, B.2, B.3, F.35, F.36, F.37, B.4a, B.4b, F.48 |
+| Development builds nothing on the founder's machine, CI runs every check in parallel on every run (D-0423) and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, K.6c, F.27, F.28, B.1, B.2, B.3, F.35, F.36, F.37, B.4a, B.4b, F.48 |
 | Signed, notarized and verified packages for three platforms, with guidance a new user can follow, a guide to running agents safely, and phone apps checked by hand. | F.20, F.32, F.24, F.25, 4.7a2, 3.5b, 4.7e, R.1a, 4.7c2, L.3, R.1b, L.1, R.1 |
 
 Two outside inputs gate this release:

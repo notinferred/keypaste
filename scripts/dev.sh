@@ -5,6 +5,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 usage() {
   cat <<'USAGE'
 Usage: bash scripts/dev.sh [--tools] [--wait]
+       bash scripts/dev.sh --linux [--wait]
        bash scripts/dev.sh --class FQN [--os O] [--wait]
        bash scripts/dev.sh --relock
 
@@ -17,6 +18,8 @@ The first failure ends the wait with that job's log; the runs carry on until the
 
 --tools   also run ci.yml's tools jobs, which install the real AI tools on every runner and connect keypaste
           to them; not with --class or --relock
+--linux   run every Linux job of ci.yml and app.yml but compat and tools, in parallel in one dev.yml run;
+          an intermediate iteration, never integration evidence; not with --class, --os, --relock or --tools
 --class   a fully qualified test class, run through dev.yml in its own project
 --os      the runner for --class: linux (default), windows, macos or all
 --wait    wait for every job and print each failed one's log, rather than stopping at the first
@@ -28,11 +31,12 @@ USAGE
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 die() { echo "dev: $1" >&2; exit 1; }
 
-class='' os='' relock=false wait_all=false tools=false
+class='' os='' relock=false wait_all=false tools=false linux=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
     --relock) relock=true ;;
+    --linux) linux=true ;;
     --tools) tools=true ;;
     --wait) wait_all=true ;;
     --class|--os)
@@ -47,6 +51,8 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+[ "$linux" = false ] || { [ -z "$class" ] && [ -z "$os" ] && [ "$relock" = false ] && [ "$tools" = false ]; } \
+  || bad_usage '--linux is a run of its own; it cannot accompany --class, --os, --relock or --tools'
 [ -z "$os" ] || [ -n "$class" ] || bad_usage '--os chooses the runner for --class'
 [ -z "$class" ] || [ "$relock" = false ] || bad_usage '--class and --relock are separate runs'
 [ "$tools" = false ] || { [ -z "$class" ] && [ "$relock" = false ]; } || bad_usage '--tools runs ci.yml in full; it cannot accompany --class or --relock'
@@ -57,6 +63,10 @@ case "${os:-linux}" in
   all) runner=all ;;
   *) bad_usage "unknown --os ${os}" ;;
 esac
+mode=''
+[ -z "$class" ] || mode=class
+[ "$relock" = false ] || mode=relock
+[ "$linux" = false ] || mode=linux
 
 branch="$(git symbolic-ref --short -q HEAD)" || die 'HEAD is detached; check out a branch'
 [ "$branch" != main ] || die 'refusing to run on main; work on a branch'
@@ -67,9 +77,9 @@ git push -u origin HEAD
 sha="$(git rev-parse HEAD)"
 
 runs=()
-if [ -n "$class" ] || [ "$relock" = true ]; then
+if [ -n "$mode" ]; then
   nonce="$(date +%s)-$$"
-  gh workflow run dev.yml --ref "$branch" -f filter_class="$class" -f os="$runner" -f nonce="$nonce" -f relock="$relock"
+  gh workflow run dev.yml --ref "$branch" -f mode="$mode" -f filter_class="$class" -f os="$runner" -f nonce="$nonce"
   found='' tries=0
   while [ -z "$found" ] && [ "$tries" -lt 30 ]; do
     sleep 3
@@ -103,6 +113,7 @@ else
   done
 fi
 for id in "${runs[@]}"; do gh run view "$id" --json url --jq .url; done
+[ "$linux" = false ] || echo 'linux mode leaves out compat, keepassxc workflows, keepassxc first run, tools and every windows-2025 and macos-15 job, packages included'
 
 # The end of a finished job's log, read while the run goes on, which gh run view refuses. Its colours and
 # other control characters are dropped, and with them the timestamps and the runner's cleanup.
@@ -154,7 +165,9 @@ if [ "${#failed[@]}" -gt 0 ]; then
       *) job_log "${entry%% *}" ;;
     esac
   done
-  echo "dev: ${failed[0]#* } failed after $((SECONDS - start))s. Exit code 8 from the test runner means the filter matched zero tests." >&2
+  hint=''
+  [ -z "$class" ] || hint=' Exit code 8 from the test runner means the filter matched zero tests.'
+  echo "dev: ${failed[0]#* } failed after $((SECONDS - start))s.$hint" >&2
   exit 1
 fi
 
@@ -173,4 +186,8 @@ if [ "$relock" = true ]; then
   exit 0
 fi
 
-echo "green in $((SECONDS - start))s"
+if [ "$linux" = true ]; then
+  echo "green on Linux only in $((SECONDS - start))s; not integration evidence: integrate once a full bash scripts/dev.sh is green"
+else
+  echo "green in $((SECONDS - start))s"
+fi
