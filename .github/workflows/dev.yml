@@ -43,27 +43,9 @@ env:
   MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
-  watchdog-probe:
-    name: watchdog probe (${{ matrix.os }})
-    if: ${{ !inputs.relock }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Fire the watchdog on a fake gate
-        shell: bash
-        run: bash scripts/probe-watchdog.sh
-
   class:
     name: ${{ inputs.filter_class }} (${{ matrix.os }})
-    if: false
+    if: ${{ !inputs.relock }}
     strategy:
       fail-fast: false
       matrix:
