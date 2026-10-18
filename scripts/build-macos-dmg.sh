@@ -50,7 +50,9 @@ ln -s /Applications "$stage/Applications"
 
 mkdir -p "$out"
 rm -f "$out/$name"
-hdiutil create -volname keypaste -srcfolder "$stage" -fs HFS+ -format UDZO "$out/$name" >&2
+# Written with no disk attached: create -srcfolder's temporary disk can fail to eject as busy after its unmount (D-0459).
+hdiutil makehybrid -hfs -hfs-volume-name keypaste -o "$work/image.dmg" "$stage" >&2
+hdiutil convert "$work/image.dmg" -format UDZO -o "$out/$name" >&2
 hdiutil verify "$out/$name" >&2
 
 mkdir -p "$volume"
