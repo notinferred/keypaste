@@ -63,7 +63,11 @@ for _ in $(seq 1 50); do alive kpp-orphan || break; sleep 0.2; done
 sleep 2
 cat "$work/log"
 echo "the gate exited $code; ticks at the error line: $at_error, at its end: $at_end"
-[ "$code" = 137 ] || die "the gate exited $code, not 137"
+if [ -n "$ext" ]; then
+  [ "$code" = 137 ] || die "the gate exited $code, not 137"
+else
+  case "$code" in 137 | 143) ;; *) die "the gate exited $code, not by the watchdog's TERM or KILL" ;; esac
+fi
 [ $((at_end - at_error)) -le 2 ] || die "the gate ran on for $((at_end - at_error)) ticks after its deadline"
 grep -q 'PPID\|ParentProcessId' "$work/log" || die "the watcher printed no process list"
 grep -q 'lost track of' "$work/log" || die "the watcher named no stray"
