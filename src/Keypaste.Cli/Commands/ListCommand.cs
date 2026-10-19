@@ -175,7 +175,7 @@ internal static class ListCommand
     /// The slash is removed before sanitizing and put back after, because an empty trailing segment
     /// is not something <see cref="EntryNameSanitizer.SanitizePath"/> should have to reason about.
     /// </remarks>
-    private static (string Text, bool Altered) Safe(string path)
+    internal static (string Text, bool Altered) Safe(string path)
     {
         var isGroup = path.EndsWith('/');
         var body = isGroup ? path[..^1] : path;

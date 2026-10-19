@@ -86,6 +86,41 @@ public sealed class HostileNameRenderingTests : IDisposable
     }
 
     [Fact]
+    public void Search_DoesNotRenderAnEntryTitleThatCanMisrepresentItself()
+    {
+        _cli.SeedVault(_master, ($"personal/{Spoofed("token")}", "value"));
+        _cli.Prompt.Enqueue(_master);
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("search", "token", "--vault", _cli.VaultPath));
+
+        AssertRenderedSafely(_cli.Out);
+        Assert.Contains("token", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("not what the vault holds", _cli.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Show_DoesNotRenderAnEntryTitleOrFieldNameThatCanMisrepresentItself()
+    {
+        var path = $"personal/{Spoofed("token")}";
+        _cli.SeedVault(_master, (path, "value"));
+
+        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        {
+            Assert.True(vault.SetFields(EntryName.Parse(path), [new FieldWrite(Spoofed("KEY"), "field-value")]));
+            vault.Save();
+        }
+
+        _cli.Prompt.Enqueue(_master);
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("show", path, "--vault", _cli.VaultPath));
+
+        AssertRenderedSafely(_cli.Out);
+        Assert.Contains("token", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("KEY", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("not what the vault holds", _cli.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EnvLs_DoesNotRenderAProjectNameThatCanMisrepresentItself()
     {
         _cli.SeedVault(_master, ("services/Api", "value"));

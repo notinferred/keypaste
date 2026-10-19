@@ -8,14 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 These rows serve every track: a development machine builds nothing, and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-## T1 — Everyday vault use and recovery
-
-Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
-
-- [ ] **N.13 — Search and show fields from the terminal.** Needs: V.7a.
-  - `search` looks at names only (D-0278).
-  - `show` masks values and prints none without `--reveal`.
-
 ## T2 — One shared unlock session
 
 U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). N.16 made the app say when another program saved the vault and reload it in the same session (D-0412). What remains is approving a terminal edit in the unlocked app instead of refusing it.

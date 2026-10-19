@@ -43,6 +43,8 @@ public sealed class KeyfileOptionTests
             // the child, so a keyfile written there would never reach keypaste at all.
             TheoryData<string[]> verbs = [];
             verbs.Add(["ls", _vault, _keyfile]);
+            verbs.Add(["search", "demo", _vault, _keyfile]);
+            verbs.Add(["show", "env/demo/TOKEN", _vault, _keyfile]);
             verbs.Add(["get", "env/demo/TOKEN", _vault, _keyfile]);
             verbs.Add(["get", "env/demo/TOKEN", "--field", "KEY", _vault, _keyfile]);
             verbs.Add(["set", "env/demo/TOKEN", "--field", "KEY", _vault, _keyfile]);

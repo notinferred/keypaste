@@ -42,7 +42,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 
 | Outcome | Tasks |
 |---|---|
-| Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. | V.7a, V.7b, C.2 |
+| Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. The terminal finds items and shows their fields without printing a value unless asked. | V.7a, V.7b, C.2, N.13 |
 | A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project, and nothing else does: keypaste keeps no compatibility with its own releases before 0.5.0. An entry that loses its tag in another app is flagged. | C.1a, C.1b, C.1c, C.6, C.4, V.11 |
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. It says at once when another program saved the vault. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14, N.16 |
 | An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose, and the app, not the agent's own configuration, sets what each agent may see and run, and the owner records every request itself. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, G.8, G.9, N.10 |
@@ -69,7 +69,7 @@ These follow the publication of 0.5.0.
 | A Claude Code plugin, a Claude Desktop extension, an MCP Registry listing, a Gemini CLI extension, and Cursor and VS Code install links | G.6a, G.6b, G.6c, G.6d, G.6e |
 | A one-prompt setup page on keypaste.com, and `keypaste doctor` | G.7, G.3 |
 | A notice when a locked app is asked | G.4b |
-| Terminal status, one name per CLI concept, terminal edits approved in the app, and field search | N.8, N.9, N.11, N.13 |
+| Terminal status, one name per CLI concept, and terminal edits approved in the app | N.8, N.9, N.11 |
 | Same-entry placeholders such as `{PASSWORD}` in released values | P.3b1 |
 | The guides moved onto keypaste.com's Astro pages, with a content security policy (D-0401) | L.2b |
 
