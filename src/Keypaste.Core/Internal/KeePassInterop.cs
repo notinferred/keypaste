@@ -892,7 +892,7 @@ internal sealed class KeePassInterop : IDisposable
     /// </summary>
     /// <param name="name">Where the record belongs, and its title.</param>
     /// <param name="idOf">The UUID of the entry for a title.</param>
-    /// <returns>What <see cref="Restore"/> puts back.</returns>
+    /// <returns>What <see cref="Restore(RecordSnapshot)"/> puts back.</returns>
     internal RecordSnapshot Snapshot(EntryName name, Func<string, Guid> idOf)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
