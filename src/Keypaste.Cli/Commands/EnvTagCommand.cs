@@ -1,6 +1,6 @@
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
-using Keypaste.Core.Audit;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -49,7 +49,7 @@ internal static class EnvTagCommand
         var (project, entryPath) = (line.Operands[0], line.Operands[1]);
         var environment = line.Value(EnvCommand.ProfileOption.Name) ?? EnvProfileNames.Default;
 
-        if (!ProjectTag.TryFor(project, environment, out var tag, out var tagError))
+        if (!ProjectTag.TryFor(project, environment, out _, out var tagError))
         {
             return Fail(context, verb, tagError);
         }
@@ -68,68 +68,63 @@ internal static class EnvTagCommand
             return Fail(context, verb, locateError);
         }
 
+        var edit = new TagItem(project, environment, entryPath, tagging);
+
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            if (vault.Find(entryPath) is not { } entry)
+            var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
+            if (check.Refusal is { } refused)
             {
-                context.Stderr.WriteLine($"keypaste env {verb}: no item '{entryPath}'");
-                return CliApp.ExitNotFound;
+                return EditLines.Refuse(context, $"env {verb}", refused);
             }
 
-            var name = EntryName.Of(entry);
-
-            if (ReservedGroups.IsReserved(name.GroupPath))
+            if (check.Unchanged is { } unchanged)
             {
-                context.Stderr.WriteLine($"keypaste env {verb}: {Shown(entry.Path)} is in keypaste's own group; it belongs to no project");
-                return CliApp.ExitUsageError;
+                return Done(unchanged, project, environment, context);
             }
 
-            var matching = (vault.Tags(name) ?? [])
-                .Where(held => ProjectTag.Read(held) is { Kind: ProjectTagKind.Member } read
-                    && string.Equals(read.Project, project, StringComparison.Ordinal)
-                    && string.Equals(read.Environment, environment, StringComparison.Ordinal))
-                .ToList();
-
-            var style = context.ConsoleStyle;
-            var where = $"{Shown(project)}/{environment}";
-
-            if (tagging ? matching.Count > 0 : matching.Count == 0)
-            {
-                context.Stderr.WriteLine(tagging
-                    ? $"{Shown(entry.Path)} is already in {where}; nothing was written"
-                    : $"{Shown(entry.Path)} is not in {where}; nothing was written");
-                return CliApp.ExitSuccess;
-            }
-
-            IReadOnlyList<string> changing = tagging ? [tag] : matching;
-
-            var clients = KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-
-            foreach (var sentence in ProjectTagChange.Preview(vault, name, changing, tagging, clients, context.Clock.GetUtcNow())!.Describe())
+            foreach (var sentence in check.Preview!.TagSentences)
             {
                 context.Stderr.WriteLine(sentence);
             }
 
             if (!assumeYes)
             {
-                var answer = context.Prompt.ReadLine($"{(tagging ? "Tag" : "Untag")} {Shown(entry.Path)}? [y/N] ");
-                if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
+                var answer = context.Prompt.ReadLine($"{(tagging ? "Tag" : "Untag")} {check.Preview.Item}? [y/N] ");
+                if (!EditLines.Confirmed(answer))
                 {
                     context.Stderr.WriteLine("Cancelled; nothing was written.");
                     return CliApp.ExitUsageError;
                 }
             }
 
-            _ = tagging ? vault.AddTag(name, tag) : vault.RemoveTags(name, matching);
+            var result = TerminalEdits.Apply(vault, edit, EditLines.Scene(context), shown: null);
+            if (result.Refusal is { } late)
+            {
+                return EditLines.Refuse(context, $"env {verb}", late);
+            }
+
             vault.Save();
-
-            var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
-            context.Stderr.WriteLine(tagging
-                ? $"  {done} tagged {Shown(entry.Path)} {tag}"
-                : $"  {done} untagged {Shown(entry.Path)} {string.Join(", ", matching)}");
-
-            return CliApp.ExitSuccess;
+            return Done(result.Done!, project, environment, context);
         });
+    }
+
+    /// <summary>Says which tags the item gained or lost, or that it was already where it was asked to be.</summary>
+    internal static int Done(EditDone done, string project, string environment, CliContext context)
+    {
+        var style = context.ConsoleStyle;
+        var where = $"{Shown(project)}/{environment}";
+        var mark = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
+
+        context.Stderr.WriteLine(done.Outcome switch
+        {
+            EditOutcome.Unchanged when done.Action == EditAction.EnvTag => $"{Shown(done.Item)} is already in {where}; nothing was written",
+            EditOutcome.Unchanged => $"{Shown(done.Item)} is not in {where}; nothing was written",
+            EditOutcome.Tagged => $"  {mark} tagged {Shown(done.Item)} {done.Names[0]}",
+            _ => $"  {mark} untagged {Shown(done.Item)} {string.Join(", ", done.Names)}",
+        });
+
+        return CliApp.ExitSuccess;
     }
 
     private static string Shown(string path) => EntryNameSanitizer.SanitizePath(path).Text;

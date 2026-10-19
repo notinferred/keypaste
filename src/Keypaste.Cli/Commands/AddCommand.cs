@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -85,24 +86,16 @@ internal static class AddCommand
             return CliApp.ExitUsageError;
         }
 
+        var edit = new AddItem(new EntryName(groupPath, title), string.Empty, string.Empty, string.Empty, null);
+
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            var name = new EntryName(groupPath, title);
-            var entryPath = groupPath.Length == 0 ? title : groupPath + "/" + title;
-
-            // An entry is its group and its title. Asking the joined form whether one exists said
-            // "already exists" about identities nothing had — a title of `b/c` in `a` refused a
-            // genuinely different `c` in `a/b` (docs/STEPS.md F.1e).
-            if (vault.Find(name) is not null)
+            // Asked before any prompt, so a refusal costs nobody a password.
+            var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
+            if (check.Refusal is { } refused)
             {
-                context.Stderr.WriteLine($"keypaste add: '{entryPath}' already exists");
-                return CliApp.ExitUsageError;
+                return EditLines.Refuse(context, "add", refused);
             }
-
-            // Throws when the path already names two: a third would deepen a collision `get`
-            // already refuses, and nothing keypaste writes gets to make that worse. Asked before
-            // any prompt, so a refusal costs nobody a password.
-            var sharesPath = vault.Find(entryPath) is not null;
 
             var username = line.Value("username") ?? Ask(context, "Username: ");
             var url = line.Value("url") ?? Ask(context, "URL: ");
@@ -110,45 +103,56 @@ internal static class AddCommand
 
             // The entry password is never a flag: it would land in the shell history and in
             // /proc/<pid>/cmdline. It is prompted, read from stdin when piped, or generated.
-            using var secret = recipe is { } wanted
-                ? GenerateOption.Generate(wanted)
-                : context.Prompt.ReadSecret("Password: ");
-
-            if (secret is null)
+            NewSecret password;
+            if (recipe is { } wanted)
             {
-                context.Stderr.WriteLine("keypaste add: no password given");
-                return CliApp.ExitUsageError;
+                password = NewSecret.Generated(wanted);
+            }
+            else
+            {
+                using var secret = context.Prompt.ReadSecret("Password: ");
+
+                if (secret is null)
+                {
+                    context.Stderr.WriteLine("keypaste add: no password given");
+                    return CliApp.ExitUsageError;
+                }
+
+                password = NewSecret.Of(new string(secret.Value));
             }
 
-            vault.CreateEntryAtPath(new VaultEntry
+            var full = TerminalEdits.Generate(edit with { Username = username, Url = url, Notes = notes, Password = password });
+            var result = TerminalEdits.Apply(vault, full, EditLines.Scene(context), shown: null);
+
+            if (result.Refusal is { } late)
             {
-                Title = title,
-                Username = username,
-                Password = new string(secret.Value),
-                Url = url,
-                Notes = notes,
-                GroupPath = groupPath,
-            });
+                return EditLines.Refuse(context, "add", late);
+            }
 
             vault.Save();
-
-            // A count, never the value. Somebody who wants it runs `keypaste get`, which already
-            // has the clipboard, the --show discipline and the auto-clear.
-            context.Stderr.WriteLine(recipe is { } generated
-                ? $"Added {entryPath} ({generated.Describe("password")} generated)"
-                : $"Added {entryPath}");
-
-            // KeePassXC would make this entry, so keypaste does — and says what it costs, because
-            // from here on nothing can address either one by the path they share.
-            if (sharesPath)
-            {
-                context.Stderr.WriteLine(
-                    $"note: '{entryPath}' now names two items. Address them by group and title; " +
-                    "keypaste get will refuse that path until one is renamed.");
-            }
-
-            return CliApp.ExitSuccess;
+            return Done(result.Done!, recipe, context);
         });
+    }
+
+    /// <summary>Says what was added: a count, never the value.</summary>
+    internal static int Done(EditDone done, SecretRecipe? recipe, CliContext context)
+    {
+        // Somebody who wants the value runs `keypaste get`, which already has the clipboard, the
+        // --show discipline and the auto-clear.
+        context.Stderr.WriteLine(recipe is { } generated
+            ? $"Added {done.Item} ({generated.Describe("password")} generated)"
+            : $"Added {done.Item}");
+
+        // KeePassXC would make this entry, so keypaste does — and says what it costs, because
+        // from here on nothing can address either one by the path they share.
+        if (done.SharesPath)
+        {
+            context.Stderr.WriteLine(
+                $"note: '{done.Item}' now names two items. Address them by group and title; " +
+                "keypaste get will refuse that path until one is renamed.");
+        }
+
+        return CliApp.ExitSuccess;
     }
 
     private static string Ask(CliContext context, string prompt)

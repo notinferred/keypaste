@@ -107,32 +107,6 @@ internal static class GenerateOption
             : TryReadWords(wordsText, separatorText, out recipe, out error);
     }
 
-    /// <summary>
-    /// Generates a secret into a buffer the caller owns and disposes.
-    /// </summary>
-    /// <param name="recipe">What to generate.</param>
-    /// <returns>The buffer holding it.</returns>
-    /// <remarks>
-    /// Handed back in a <see cref="SecretBuffer"/> rather than a string so the caller's
-    /// <c>using</c> zeroes it, exactly as it would a value read from the prompt. The one
-    /// unavoidable <see cref="string"/> is made at the call site, where it is visible.
-    /// </remarks>
-    internal static SecretBuffer Generate(SecretRecipe recipe)
-    {
-        var buffer = new SecretBuffer();
-
-        try
-        {
-            PasswordGenerator.Append(recipe, buffer);
-            return buffer;
-        }
-        catch
-        {
-            buffer.Dispose();
-            throw;
-        }
-    }
-
     private static bool TryReadCharacters(
         CommandLine line,
         string? lengthText,

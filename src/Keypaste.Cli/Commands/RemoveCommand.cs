@@ -1,4 +1,4 @@
-using Keypaste.Core;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -51,24 +51,14 @@ internal static class RemoveCommand
             return CliApp.ExitUsageError;
         }
 
+        var edit = new RemoveItem(entryPath);
+
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            if (vault.Find(entryPath) is null)
+            var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
+            if (check.Refusal is { } refused)
             {
-                var isGroup = false;
-                foreach (var group in vault.ReadGroupPaths(includeReserved: true))
-                {
-                    if (string.Equals(group, entryPath, StringComparison.Ordinal))
-                    {
-                        isGroup = true;
-                        break;
-                    }
-                }
-
-                context.Stderr.WriteLine(isGroup
-                    ? $"keypaste rm: '{entryPath}' is a group; only items can be removed"
-                    : $"keypaste rm: no item '{entryPath}'");
-                return CliApp.ExitNotFound;
+                return EditLines.Refuse(context, "rm", refused);
             }
 
             if (!assumeYes)
@@ -76,34 +66,33 @@ internal static class RemoveCommand
                 // Asked before the act, so it has to come from the vault rather than from what
                 // keypaste would prefer to be true: one vault has a recycle bin and another does
                 // not, and only one of those deletes can be undone.
-                var answer = context.Prompt.ReadLine(vault.RecyclesDeletedEntries
+                var answer = context.Prompt.ReadLine(check.Preview!.Recycles
                     ? $"Move '{entryPath}' to the recycle bin? [y/N] "
                     : $"Remove '{entryPath}'? This vault has no recycle bin. [y/N] ");
-                if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
+                if (!EditLines.Confirmed(answer))
                 {
                     context.Stderr.WriteLine("Cancelled.");
                     return CliApp.ExitUsageError;
                 }
             }
 
-            // Nothing removed means nothing to save. Something wrote to the file between the
-            // check above and here, and the honest answer is that this run did not do it.
-            var outcome = vault.RemoveEntry(entryPath);
-            if (outcome == DeletionOutcome.NothingMatched)
+            var result = TerminalEdits.Apply(vault, edit, EditLines.Scene(context), shown: null);
+            if (result.Refusal is { } late)
             {
-                context.Stderr.WriteLine(
-                    $"keypaste rm: '{entryPath}' was not removed; the vault is unchanged");
-                return CliApp.ExitNotFound;
+                return EditLines.Refuse(context, "rm", late);
             }
 
             vault.Save();
-
-            // Reported after the act, so a vault edited between the question and the answer
-            // cannot make this line wrong.
-            context.Stderr.WriteLine(outcome == DeletionOutcome.Recycled
-                ? $"Moved {entryPath} to the recycle bin"
-                : $"Removed {entryPath}");
-            return CliApp.ExitSuccess;
+            return Done(result.Done!, context);
         });
+    }
+
+    /// <summary>Says where the item went, after the act, so a vault edited between the question and the answer cannot make it wrong.</summary>
+    internal static int Done(EditDone done, CliContext context)
+    {
+        context.Stderr.WriteLine(done.Outcome == EditOutcome.Recycled
+            ? $"Moved {done.Item} to the recycle bin"
+            : $"Removed {done.Item}");
+        return CliApp.ExitSuccess;
     }
 }

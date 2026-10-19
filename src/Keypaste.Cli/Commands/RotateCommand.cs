@@ -1,5 +1,6 @@
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -74,28 +75,28 @@ internal static class RotateCommand
 
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            switch (EntryRotation.Rotate(vault, name, wanted))
+            var result = TerminalEdits.Apply(vault, new RotatePassword(name, wanted), EditLines.Scene(context), shown: null);
+            if (result.Refusal is { } refused)
             {
-                case RotateOutcome.NotFound:
-                    context.Stderr.WriteLine($"keypaste rotate: no item named {Shown(entryPath)}");
-                    return CliApp.ExitNotFound;
-
-                case RotateOutcome.Reserved:
-                    context.Stderr.WriteLine($"keypaste rotate: {Shown(entryPath)} is keypaste's own group; it cannot be written here");
-                    return CliApp.ExitUsageError;
+                return EditLines.Refuse(context, "rotate", refused);
             }
 
             vault.Save();
-
-            var style = context.ConsoleStyle;
-            var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
-            var dot = style.Glyph(context.Stderr, Mark.Dot);
-            var size = wanted.Kind == SecretRecipeKind.Words
-                ? wanted.Describe("password").Split('-')[0] + " words"
-                : wanted.Describe("password").Split('-')[0] + " characters";
-            context.Stderr.WriteLine($"  {done} rotated {Shown(entryPath)} {dot} {size} {dot} the old value stays in history");
-            return CliApp.ExitSuccess;
+            return Done(result.Done!, wanted, context);
         });
+    }
+
+    /// <summary>Says what was rotated and how long the new value is, never the value.</summary>
+    internal static int Done(EditDone done, SecretRecipe recipe, CliContext context)
+    {
+        var style = context.ConsoleStyle;
+        var mark = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
+        var dot = style.Glyph(context.Stderr, Mark.Dot);
+        var size = recipe.Kind == SecretRecipeKind.Words
+            ? recipe.Describe("password").Split('-')[0] + " words"
+            : recipe.Describe("password").Split('-')[0] + " characters";
+        context.Stderr.WriteLine($"  {mark} rotated {Shown(done.Item)} {dot} {size} {dot} the old value stays in history");
+        return CliApp.ExitSuccess;
     }
 
     internal static void WriteUsage(TextWriter writer)

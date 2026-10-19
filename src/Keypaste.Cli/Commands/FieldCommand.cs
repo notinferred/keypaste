@@ -1,6 +1,7 @@
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -165,29 +166,30 @@ internal static class FieldCommand
             return CliApp.ExitUsageError;
         }
 
+        var edit = new RemoveField(entryPath, field);
+
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            if (vault.Find(entryPath) is not { } entry)
+            var result = TerminalEdits.Apply(vault, edit, EditLines.Scene(context), shown: null);
+            if (result.Refusal is { } refused)
             {
-                context.Stderr.WriteLine($"keypaste field rm: no item '{entryPath}'");
-                return CliApp.ExitNotFound;
-            }
-
-            if (!vault.RemoveField(EntryName.Of(entry), field))
-            {
-                context.Stderr.WriteLine($"keypaste field rm: '{Shown(entry.Path)}' has no field '{field}'");
-                return CliApp.ExitNotFound;
+                return EditLines.Refuse(context, "field rm", refused);
             }
 
             vault.Save();
-
-            var style = context.ConsoleStyle;
-            var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
-            context.Stderr.WriteLine(
-                $"  {done} removed {EntryNameSanitizer.Sanitize(field).Text} from {Shown(entry.Path)} {style.Glyph(context.Stderr, Mark.Dot)} its value stays in history");
-
-            return CliApp.ExitSuccess;
+            return Removed(result.Done!, context);
         });
+    }
+
+    /// <summary>Says which field left which item, and that its value stays in history.</summary>
+    internal static int Removed(EditDone done, CliContext context)
+    {
+        var style = context.ConsoleStyle;
+        var mark = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
+        context.Stderr.WriteLine(
+            $"  {mark} removed {EntryNameSanitizer.Sanitize(done.Names[0]).Text} from {Shown(done.Item)} {style.Glyph(context.Stderr, Mark.Dot)} its value stays in history");
+
+        return CliApp.ExitSuccess;
     }
 
     internal static void WriteUsage(TextWriter writer)

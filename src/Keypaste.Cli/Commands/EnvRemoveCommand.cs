@@ -1,5 +1,5 @@
-using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -61,75 +61,41 @@ internal static class EnvRemoveCommand
             return CliApp.ExitUsageError;
         }
 
+        var edit = new EnvRemoveKey(project, profile, key, line.Value(EnvCommand.EntryOption.Name));
+
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            if (!EnvCommand.TryFindEntry(vault, line, out var entry, out var missing))
+            var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
+            if (check.Refusal is { } refused)
             {
-                context.Stderr.WriteLine($"keypaste env rm: {missing}");
-                return CliApp.ExitNotFound;
+                return EditLines.Refuse(context, "env rm", refused);
             }
-
-            var listing = EnvResolution.List(vault, project, profile);
-
-            if (listing.Outcome != EnvOutcome.Resolved)
-            {
-                context.Stderr.WriteLine(listing.Outcome == EnvOutcome.NoProject
-                    ? $"keypaste env rm: no env set for '{project}'"
-                    : $"keypaste env rm: '{project}' has no '{profile}' environment");
-                return CliApp.ExitNotFound;
-            }
-
-            var holding = listing.Sources
-                .Where(source => string.Equals(source.Key, key, StringComparison.Ordinal) && (entry is null || source.Entry == entry))
-                .ToList();
-
-            if (holding.Count == 0)
-            {
-                context.Stderr.WriteLine(string.Equals(profile, EnvProfileNames.Default, StringComparison.Ordinal)
-                    ? $"keypaste env rm: '{project}' has no variable '{key}'"
-                    : $"keypaste env rm: '{project}' has no variable '{key}' in its '{profile}' environment");
-                return CliApp.ExitNotFound;
-            }
-
-            if (holding.Count > 1)
-            {
-                var entries = string.Join(", ", holding.Select(source => ApprovalPrompt.Shown(source.Entry)).Order(StringComparer.Ordinal));
-                context.Stderr.WriteLine($"keypaste env rm: {key} is on more than one item ({entries}); name the one to remove from with --entry");
-                return CliApp.ExitInternalError;
-            }
-
-            var source = holding[0];
-            var shown = ApprovalPrompt.Shown(source.Entry);
 
             if (!assumeYes)
             {
-                var answer = context.Prompt.ReadLine($"Remove {key} from {shown}? Its value stays in the item's history. [y/N] ");
-                if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
+                var answer = context.Prompt.ReadLine($"Remove {key} from {check.Preview!.Item}? Its value stays in the item's history. [y/N] ");
+                if (!EditLines.Confirmed(answer))
                 {
                     context.Stderr.WriteLine("Cancelled.");
                     return CliApp.ExitUsageError;
                 }
             }
 
-            // Nothing removed means nothing to save. Something wrote to the file between the
-            // check above and here, and the honest answer is that this run did not do it.
-            var removal = new EnvStore(vault).Remove(project, profile, key, source.Entry);
-
-            switch (removal.Outcome)
+            var result = TerminalEdits.Apply(vault, edit, EditLines.Scene(context), shown: null);
+            if (result.Refusal is { } late)
             {
-                case EnvRemoveOutcome.NothingMatched:
-                    context.Stderr.WriteLine($"keypaste env rm: '{key}' was not removed; the vault is unchanged");
-                    return CliApp.ExitNotFound;
-                case EnvRemoveOutcome.Ambiguous:
-                case EnvRemoveOutcome.Refused:
-                    context.Stderr.WriteLine($"keypaste env rm: {EntryNameSanitizer.SanitizeProse(removal.Refusal, 1024).Text}");
-                    return CliApp.ExitInternalError;
+                return EditLines.Refuse(context, "env rm", late);
             }
 
             vault.Save();
-
-            context.Stderr.WriteLine($"Removed {key} from {shown} (its value stays in the item's history)");
-            return CliApp.ExitSuccess;
+            return Done(result.Done!, context);
         });
+    }
+
+    /// <summary>Says which item the variable left, and that its value stays in that item's history.</summary>
+    internal static int Done(EditDone done, CliContext context)
+    {
+        context.Stderr.WriteLine($"Removed {done.Names[0]} from {ApprovalPrompt.Shown(done.Entry!)} (its value stays in the item's history)");
+        return CliApp.ExitSuccess;
     }
 }

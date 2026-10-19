@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -93,30 +94,34 @@ internal static class EnvSetCommand
             return CliApp.ExitUsageError;
         }
 
+        var edit = new EnvSetKey(project, profile, key, line.Value(EnvCommand.EntryOption.Name), null);
+
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
-            if (!EnvCommand.TryFindEntry(vault, line, out var entry, out var missing))
+            var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
+            if (check.Refusal is { } refused)
             {
-                context.Stderr.WriteLine($"keypaste env set: {missing}");
-                return CliApp.ExitNotFound;
+                return EditLines.Refuse(context, "env set", refused);
             }
 
-            string value;
+            NewSecret value;
             if (inlineValue is not null)
             {
-                value = inlineValue;
+                value = NewSecret.Of(inlineValue);
 
                 // Said once, where it happened, without the value in it.
                 context.Stderr.WriteLine(
                     "warning: the value came from the command line, where your shell records it");
             }
+            else if (recipe is { } wanted)
+            {
+                value = NewSecret.Generated(wanted);
+            }
             else
             {
                 // Prompted inside the session so the piped protocol stays one line per prompt, in
                 // the order they are asked: master password first, then the value.
-                using var secret = recipe is { } wanted
-                    ? GenerateOption.Generate(wanted)
-                    : context.Prompt.ReadSecret($"Value for {key}: ");
+                using var secret = context.Prompt.ReadSecret($"Value for {key}: ");
 
                 if (secret is null)
                 {
@@ -124,40 +129,42 @@ internal static class EnvSetCommand
                     return CliApp.ExitUsageError;
                 }
 
-                value = new string(secret.Value);
+                value = NewSecret.Of(new string(secret.Value));
             }
 
-            var plan = new EnvStore(vault).Set(project, profile, key, value, entry);
-
-            if (plan.Refusal is { } refusal)
+            var result = TerminalEdits.Apply(vault, TerminalEdits.Generate(edit with { Value = value }), EditLines.Scene(context), shown: null);
+            if (result.Refusal is { } late)
             {
-                context.Stderr.WriteLine($"keypaste env set: {EntryNameSanitizer.SanitizeProse(refusal, 1024).Text}");
-                return CliApp.ExitUsageError;
+                return EditLines.Refuse(context, "env set", late);
             }
 
-            var written = plan.Keys[0];
-            var where = ApprovalPrompt.Shown(written.Entry);
-            var generated = recipe is { } used
-                ? $" ({used.Describe("value")} generated)"
-                : string.Empty;
-
-            if (written.Change == EnvWriteChange.Unchanged)
+            if (result.Done!.Outcome != EditOutcome.Unchanged)
             {
-                context.Stderr.WriteLine($"{where} already holds that value for {key}; nothing was written");
-                return CliApp.ExitSuccess;
+                vault.Save();
             }
 
-            vault.Save();
-
-            context.Stderr.WriteLine(written switch
-            {
-                { Change: EnvWriteChange.New } when plan.CreatesHome => $"Set {key} on {where}, created and tagged {ProjectTagFor(project, profile)}{generated}",
-                { Change: EnvWriteChange.New } => $"Set {key} on {where}{generated}",
-                _ => $"Updated {key} on {where} (previous value kept in item history){generated}",
-            });
-
-            return CliApp.ExitSuccess;
+            return Done(result.Done, project, profile, recipe, context);
         });
+    }
+
+    /// <summary>Says which item the variable is on, and whether that item was created, never the value.</summary>
+    internal static int Done(EditDone done, string project, string profile, SecretRecipe? recipe, CliContext context)
+    {
+        var written = done.Keys[0];
+        var where = ApprovalPrompt.Shown(written.Entry);
+        var generated = recipe is { } used
+            ? $" ({used.Describe("value")} generated)"
+            : string.Empty;
+
+        context.Stderr.WriteLine(written.Change switch
+        {
+            EnvWriteChange.Unchanged => $"{where} already holds that value for {written.Key}; nothing was written",
+            EnvWriteChange.New when done.CreatesHome => $"Set {written.Key} on {where}, created and tagged {ProjectTagFor(project, profile)}{generated}",
+            EnvWriteChange.New => $"Set {written.Key} on {where}{generated}",
+            _ => $"Updated {written.Key} on {where} (previous value kept in item history){generated}",
+        });
+
+        return CliApp.ExitSuccess;
     }
 
     private static string ProjectTagFor(string project, string environment) =>

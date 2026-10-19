@@ -70,29 +70,6 @@ internal static class EnvCommand
     /// <summary>The option the env writers take to name the entry a key is written on or removed from.</summary>
     internal static readonly OptionSpec EntryOption = new("entry", TakesValue: true);
 
-    /// <summary>The entry <c>--entry</c> names, resolved in the open vault; null when the option is absent.</summary>
-    /// <returns>False with the reason when the option names no entry.</returns>
-    /// <exception cref="VaultException">More than one entry answers to the path.</exception>
-    internal static bool TryFindEntry(Vault vault, CommandLine line, out EntryName? entry, out string error)
-    {
-        entry = null;
-        error = string.Empty;
-
-        if (line.Value(EntryOption.Name) is not { } path)
-        {
-            return true;
-        }
-
-        if (vault.Find(path) is not { } found)
-        {
-            error = $"no item '{EntryNameSanitizer.SanitizePath(path).Text}'";
-            return false;
-        }
-
-        entry = EntryName.Of(found);
-        return true;
-    }
-
     /// <summary>The profile a command line names, <c>dev</c> when it names none.</summary>
     /// <returns>False with the reason when the name is not one keypaste resolves.</returns>
     internal static bool TryProfile(CommandLine line, out string profile, out string error)

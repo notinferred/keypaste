@@ -1,5 +1,6 @@
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -106,45 +107,58 @@ internal static class SetCommand
         {
             if (fields.Count > 0)
             {
-                return SetFields(vault, name, entryPath, fields, plain, context);
+                return SetFields(vault, name, fields, plain, context);
             }
 
-            var existing = vault.Find(name);
-
-            if (existing is null && !Vault.IsCreatable(name, out var refusal))
+            var check = TerminalEdits.Check(vault, new SetPassword(name, null), EditLines.Scene(context));
+            if (check.Refusal is { } refused)
             {
-                context.Stderr.WriteLine($"keypaste set: {refusal}");
-                return CliApp.ExitUsageError;
+                return EditLines.Refuse(context, "set", refused);
             }
 
-            using var secret = recipe is { } wanted ? GenerateOption.Generate(wanted) : ReadValue(context);
-
-            if (secret is null)
+            NewSecret password;
+            if (recipe is { } wanted)
             {
-                return CliApp.ExitUsageError;
-            }
-
-            var value = new string(secret.Value);
-
-            if (existing is null)
-            {
-                vault.CreateEntryAtPath(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = value });
+                password = NewSecret.Generated(wanted);
             }
             else
             {
-                vault.UpdateEntry(existing with { Password = value });
+                using var secret = ReadValue(context);
+
+                if (secret is null)
+                {
+                    return CliApp.ExitUsageError;
+                }
+
+                password = NewSecret.Of(new string(secret.Value));
+            }
+
+            var result = TerminalEdits.Apply(vault, TerminalEdits.Generate(new SetPassword(name, password)), EditLines.Scene(context), shown: null);
+            if (result.Refusal is { } late)
+            {
+                return EditLines.Refuse(context, "set", late);
             }
 
             vault.Save();
-
-            var style = context.ConsoleStyle;
-            var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
-            context.Stderr.WriteLine(existing is null
-                ? $"  {done} created {Shown(entryPath)}"
-                : $"  {done} updated {Shown(entryPath)} {style.Glyph(context.Stderr, Mark.Dot)} the old value stays in history");
-
-            return CliApp.ExitSuccess;
+            return Done(result.Done!, context);
         });
+    }
+
+    /// <summary>Says what was set, naming fields and never a value.</summary>
+    internal static int Done(EditDone done, CliContext context)
+    {
+        var style = context.ConsoleStyle;
+        var mark = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
+        var dot = style.Glyph(context.Stderr, Mark.Dot);
+
+        context.Stderr.WriteLine(done.Outcome switch
+        {
+            EditOutcome.Created => $"  {mark} created {Shown(done.Item)}",
+            EditOutcome.FieldsSet => $"  {mark} set {string.Join(", ", done.Names.Select(Shown))} on {Shown(done.Item)} {dot} the item's earlier state stays in history",
+            _ => $"  {mark} updated {Shown(done.Item)} {dot} the old value stays in history",
+        });
+
+        return CliApp.ExitSuccess;
     }
 
     private static bool TryCheckFields(IReadOnlyList<string> fields, bool plain, bool generating, out string error)
@@ -182,19 +196,14 @@ internal static class SetCommand
         return true;
     }
 
-    private static int SetFields(Vault vault, EntryName name, string entryPath, IReadOnlyList<string> fields, bool plain, CliContext context)
+    private static int SetFields(Vault vault, EntryName name, IReadOnlyList<string> fields, bool plain, CliContext context)
     {
-        if (vault.Fields(name) is not { } current)
-        {
-            context.Stderr.WriteLine($"keypaste set: no item '{Shown(entryPath)}'; --field writes to an item that already exists");
-            return CliApp.ExitNotFound;
-        }
+        var edit = new SetFields(name, [.. fields.Select(field => new FieldWrite(field, null, plain ? false : null))]);
 
-        if (plain && fields.FirstOrDefault(field => current.Any(existing => string.Equals(existing.Name, field, StringComparison.Ordinal))) is { } kept)
+        var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
+        if (check.Refusal is { } refused)
         {
-            context.Stderr.WriteLine($"keypaste set: '{Shown(kept)}' already exists and keeps its protection; --plain applies only to a new field");
-            context.Stderr.WriteLine("Nothing was written.");
-            return CliApp.ExitUsageError;
+            return EditLines.Refuse(context, "set", refused);
         }
 
         List<FieldWrite> writes = [];
@@ -212,15 +221,14 @@ internal static class SetCommand
             writes.Add(new FieldWrite(field, new string(secret.Value), plain ? false : null));
         }
 
-        vault.SetFields(name, writes);
+        var result = TerminalEdits.Apply(vault, edit with { Fields = writes }, EditLines.Scene(context), shown: null);
+        if (result.Refusal is { } late)
+        {
+            return EditLines.Refuse(context, "set", late);
+        }
+
         vault.Save();
-
-        var style = context.ConsoleStyle;
-        var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
-        context.Stderr.WriteLine(
-            $"  {done} set {string.Join(", ", fields.Select(Shown))} on {Shown(entryPath)} {style.Glyph(context.Stderr, Mark.Dot)} the item's earlier state stays in history");
-
-        return CliApp.ExitSuccess;
+        return Done(result.Done!, context);
     }
 
     /// <summary>Reads the value from a hidden prompt, twice when a person is typing, or once from stdin.</summary>

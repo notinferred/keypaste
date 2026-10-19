@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -86,7 +87,7 @@ internal static class EnvPullCommand
 
         // Everything about the file is settled before the master password is asked for: a typo in
         // the path should not cost a password entry and a key derivation to discover.
-        if (!TryReadFile(sourcePath, context, out var document, out var source, out var readExit))
+        if (!TryReadFile(sourcePath, context, out var text, out var document, out var source, out var readExit))
         {
             return readExit;
         }
@@ -96,10 +97,8 @@ internal static class EnvPullCommand
             context.Stderr.WriteLine(advisory);
         }
 
-        var exit = VaultSession.OpenHeld(vaultPath, line, context, vault =>
-            EnvCommand.TryFindEntry(vault, line, out var entry, out var missing)
-                ? Import(vault, project, profile, entry, document, assumeYes, context)
-                : Fail(context, missing, CliApp.ExitNotFound));
+        var edit = new EnvPullFile(project, profile, line.Value(EnvCommand.EntryOption.Name), text);
+        var exit = VaultSession.OpenHeld(vaultPath, line, context, vault => Import(vault, edit, assumeYes, context));
 
         if (exit != CliApp.ExitSuccess)
         {
@@ -113,10 +112,12 @@ internal static class EnvPullCommand
     private static bool TryReadFile(
         string sourcePath,
         CliContext context,
+        out string text,
         out DotEnvDocument document,
         out SourceSnapshot source,
         out int exit)
     {
+        text = string.Empty;
         document = null!;
         source = null!;
 
@@ -142,7 +143,7 @@ internal static class EnvPullCommand
             return false;
         }
 
-        if (!DotEnv.TryDecode(bytes, out var text, out var decodeError))
+        if (!DotEnv.TryDecode(bytes, out text, out var decodeError))
         {
             exit = Fail(context, $"'{sourcePath}': {decodeError}");
             return false;
@@ -210,75 +211,84 @@ internal static class EnvPullCommand
         string.Join(", ", document.Notes.Where(n => n.Kind == kind).Select(n => n.Key));
 
     /// <summary>Plans the import, confirms it, and writes it in one save.</summary>
-    private static int Import(
-        Vault vault,
-        string project,
-        string profile,
-        EntryName? entry,
-        DotEnvDocument document,
-        bool assumeYes,
-        CliContext context)
+    private static int Import(Vault vault, EnvPullFile edit, bool assumeYes, CliContext context)
     {
-        var store = new EnvStore(vault);
-        var plan = EnvImport.Plan(store, project, profile, document, entry);
-
-        if (plan.Refusal is { } refusal)
+        var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
+        if (check.Refusal is { } refused)
         {
-            return Fail(context, EntryNameSanitizer.SanitizeProse(refusal, 1024).Text);
+            return EditLines.Refuse(context, "env pull", refused);
         }
 
-        var created = plan.Created;
-        var updated = plan.Updated;
-        var where = $"{project}/{profile}";
+        var where = $"{edit.Project}/{edit.Environment}";
 
-        context.Stderr.WriteLine(
-            $"{where}: {created.Count} new, {updated.Count} updated, {plan.Unchanged} unchanged");
-        WriteKeys(context, "new", plan, EnvWriteChange.New);
-        WriteKeys(context, "updated", plan, EnvWriteChange.Replaces);
-
-        if (created.Count + updated.Count == 0)
+        if (check.Unchanged is { } unchanged)
         {
-            context.Stderr.WriteLine($"{where} already matches the file; nothing to do.");
-            return CliApp.ExitSuccess;
+            return Done(unchanged, context);
         }
+
+        var plan = check.Preview!.Plan!;
+        Summary(context, where, plan.Keys);
 
         if (plan.CreatesHome)
         {
             context.Stderr.WriteLine($"{ApprovalPrompt.Shown(plan.Home)} will be created and tagged into {where}.");
         }
 
-        if (updated.Count > 0)
+        if (plan.Updated.Count > 0)
         {
             context.Stderr.WriteLine(
-                $"{Count(updated.Count, "variable")} will be updated; the previous values stay in the item history.");
+                $"{Count(plan.Updated.Count, "variable")} will be updated; the previous values stay in the item history.");
         }
 
         if (!assumeYes)
         {
             var answer = context.Prompt.ReadLine(
-                $"Import {Count(created.Count + updated.Count, "variable")} into {where}? [y/N] ");
-            if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
+                $"Import {Count(plan.Created.Count + plan.Updated.Count, "variable")} into {where}? [y/N] ");
+            if (!EditLines.Confirmed(answer))
             {
                 context.Stderr.WriteLine("Cancelled.");
                 return CliApp.ExitUsageError;
             }
         }
 
-        if (!store.TryApply(plan, out var rejection))
+        var result = TerminalEdits.Apply(vault, edit, EditLines.Scene(context), shown: null);
+        if (result.Refusal is { } late)
         {
-            // Everything that could be refused was checked before the confirmation, so reaching
-            // here means the check and the writer disagree. Nothing has been saved, so the file on
-            // disk is still untouched — say so and stop rather than write part of the set.
-            context.Stderr.WriteLine($"keypaste env pull: {rejection}");
-            context.Stderr.WriteLine("Nothing was imported.");
-            return CliApp.ExitInternalError;
+            return EditLines.Refuse(context, "env pull", late);
         }
 
         vault.Save();
+        return Imported(result.Done!, context);
+    }
 
-        context.Stderr.WriteLine(
-            $"Imported {Count(created.Count + updated.Count, "variable")} into {where}.");
+    /// <summary>Says what an import found, then that nothing needed writing or what it wrote.</summary>
+    internal static int Done(EditDone done, CliContext context)
+    {
+        Summary(context, done.Item, done.Keys);
+
+        if (done.Outcome == EditOutcome.Unchanged)
+        {
+            context.Stderr.WriteLine($"{done.Item} already matches the file; nothing to do.");
+            return CliApp.ExitSuccess;
+        }
+
+        return Imported(done, context);
+    }
+
+    private static int Imported(EditDone done, CliContext context)
+    {
+        var written = done.Keys.Count(key => key.Change != EnvWriteChange.Unchanged);
+        context.Stderr.WriteLine($"Imported {Count(written, "variable")} into {done.Item}.");
         return CliApp.ExitSuccess;
+    }
+
+    /// <summary>Counts the variables by what happens to them, and names the new and updated ones by item.</summary>
+    private static void Summary(CliContext context, string where, IReadOnlyList<EnvKeyWrite> keys)
+    {
+        context.Stderr.WriteLine(
+            $"{where}: {keys.Count(key => key.Change == EnvWriteChange.New)} new, {keys.Count(key => key.Change == EnvWriteChange.Replaces)} updated, {keys.Count(key => key.Change == EnvWriteChange.Unchanged)} unchanged");
+        WriteKeys(context, "new", keys, EnvWriteChange.New);
+        WriteKeys(context, "updated", keys, EnvWriteChange.Replaces);
     }
 
     /// <summary>Offers to remove the file, and says plainly what removing it does not do.</summary>
@@ -436,9 +446,9 @@ internal static class EnvPullCommand
     }
 
     /// <summary>Names the keys of one kind, each with the entry it is written on.</summary>
-    private static void WriteKeys(CliContext context, string label, EnvWritePlan plan, EnvWriteChange change)
+    private static void WriteKeys(CliContext context, string label, IReadOnlyList<EnvKeyWrite> keys, EnvWriteChange change)
     {
-        foreach (var entry in plan.Keys.Where(key => key.Change == change).GroupBy(key => key.Entry))
+        foreach (var entry in keys.Where(key => key.Change == change).GroupBy(key => key.Entry))
         {
             context.Stderr.WriteLine($"  {label,-9} {string.Join(", ", entry.Select(key => key.Key))} on {ApprovalPrompt.Shown(entry.Key)}");
         }
