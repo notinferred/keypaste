@@ -74,6 +74,14 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
         return ShowAsync(request, () => new AccessChangeWindow(request), cancellationToken);
     }
 
+    public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new TerminalEditViewModel(prompt);
+        return ShowAsync(request, () => new TerminalEditWindow(request), cancellationToken);
+    }
+
     /// <summary>
     /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
     /// <see cref="PromptViewModel.ArmingDelay"/> later (D-0456). Called on the UI thread, for the person's

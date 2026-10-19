@@ -236,6 +236,10 @@ internal static class AgentCommand
                 // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
                 LockNow = () => Stop(lifetime, stop),
                 Narrate = Narrate,
+
+                // A terminal's edit, once the person allows it here, is saved under the same claim (D-0464).
+                WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
+                ClientsPath = caps.Path,
             });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

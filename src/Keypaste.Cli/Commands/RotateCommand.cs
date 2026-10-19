@@ -73,9 +73,12 @@ internal static class RotateCommand
 
         var wanted = recipe ?? SecretRecipe.Default;
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        var edit = new RotatePassword(name, wanted);
+        var route = new OwnerRoute("rotate", _ => edit, (done, asked) => Done(done, wanted, asked));
+
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
-            var result = TerminalEdits.Apply(vault, new RotatePassword(name, wanted), EditLines.Scene(context), shown: null);
+            var result = TerminalEdits.Apply(vault, edit, EditLines.Scene(context), shown: null);
             if (result.Refusal is { } refused)
             {
                 return EditLines.Refuse(context, "rotate", refused);

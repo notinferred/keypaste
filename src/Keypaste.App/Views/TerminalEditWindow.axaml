@@ -1,0 +1,79 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.TerminalEditWindow"
+                    x:DataType="vm:TerminalEditViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: a terminal asks to change this vault"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Fixed heights, as in the other prompt windows: the item and the change come from whoever typed the
+       command, so neither can move the claim, the question or the buttons (THREATS.md T-2). No value is
+       ever drawn. No button is the default: Enter allows nothing, and Escape denies. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="terminal" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Name="ItemText" Classes="prompt-title" Text="{Binding Item}"
+                     MaxWidth="300" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="CommandText" Classes="prompt-sub" Text="{Binding Command}" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="prompt-call" Height="40" Padding="12,0">
+        <TextBlock Name="OriginText" Classes="value" Text="{Binding Origin}" TextWrapping="Wrap" MaxLines="2"
+                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                   FontFamily="{DynamicResource KpSans}" FontSize="12.5" />
+      </Border>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption" Text="It would change" />
+        <Border Classes="prompt-reason" Height="96">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
+            <ItemsControl Name="ChangesList" ItemsSource="{Binding Changes}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Classes="change" Text="{Binding}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+                             Margin="0,0,0,4" Foreground="{DynamicResource KpTextPrimary}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+      </StackPanel>
+
+      <TextBlock Name="ExplainerText" Classes="prompt-note" Text="{Binding Explainer}" />
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="Allow" Classes="prompt primary" Content="Allow"
+                HorizontalAlignment="Right" Command="{Binding AllowOnceCommand}" />
+      </Grid>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

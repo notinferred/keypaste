@@ -98,7 +98,8 @@ internal static class EnvPullCommand
         }
 
         var edit = new EnvPullFile(project, profile, line.Value(EnvCommand.EntryOption.Name), text);
-        var exit = VaultSession.OpenHeld(vaultPath, line, context, vault => Import(vault, edit, assumeYes, context));
+        var route = new OwnerRoute("env pull", _ => edit, Done);
+        var exit = VaultSession.OpenHeld(vaultPath, line, context, route, vault => Import(vault, edit, assumeYes, context));
 
         if (exit != CliApp.ExitSuccess)
         {

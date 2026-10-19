@@ -704,6 +704,15 @@ public sealed class ScreenRenderer
             string.Empty,
             TimeZoneInfo.Utc);
         DrawWindow(new AccessChangeWindow(new AccessChangeViewModel(change)), output, "91f-access-change");
+        DrawWindow(
+            new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
+            {
+                Command = "keypaste set",
+                Item = "work/github",
+                Changes = ["Replaces the password of work/github with the password the terminal sent; the old one stays in its history."],
+            })),
+            output,
+            "91h-terminal-edit");
 
         var notice = new NoticeWindow(new AlwaysForNotice("work laptop", "acme-api:dev", "another request was already in front of a person"), _ => { });
         notice.Show();

@@ -52,8 +52,9 @@ internal static class RemoveCommand
         }
 
         var edit = new RemoveItem(entryPath);
+        var route = new OwnerRoute("rm", _ => edit, Done);
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
             var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
             if (check.Refusal is { } refused)

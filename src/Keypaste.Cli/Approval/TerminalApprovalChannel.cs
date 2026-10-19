@@ -112,6 +112,36 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return answer;
     }
 
+    public async ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        _console.WriteLine(Render(request, RuleLine));
+
+        char? choice;
+
+        try
+        {
+            choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started)), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return Withdrawn("Nothing was written.");
+        }
+
+        var answer = choice == 'y' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
+
+        _console.WriteLine(string.Join(
+            Environment.NewLine,
+            answer == ApprovalAnswer.ApprovedOnce
+                ? _console.Paint(Tone.Ok, "keypaste: allowed. Saving it in the vault.")
+                : _console.Paint(Tone.Danger, "keypaste: denied. Nothing was written."),
+            RuleLine));
+
+        return answer;
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -429,6 +459,28 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             { StaysBeneathDefaults: true } => $"  [y] allow: saved in the vault, but {AccessChangePrompt.BeneathDefaultsText}.",
             _ => "  [y] allow: keypaste saves it in the vault, and the agent gets it from its next request.",
         });
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>A terminal's edit: the command, the item, where it says it came from and what changes, never a value.</summary>
+    internal static string Render(TerminalEditPrompt request, string rule)
+    {
+        List<string> lines =
+        [
+            string.Empty,
+            rule,
+            "keypaste: a terminal asks to change this vault.",
+            string.Empty,
+            $"  command  {request.Command}",
+            $"  item     {request.Item}",
+            $"  asked    {request.OriginText}",
+        ];
+
+        lines.AddRange(request.Changes.Select((change, index) => (index == 0 ? "  changes  " : "           ") + change));
+        lines.Add(string.Empty);
+        lines.Add("  [d] deny: nothing changes.");
+        lines.Add("  [y] allow: keypaste saves this in the vault.");
 
         return string.Join(Environment.NewLine, lines);
     }

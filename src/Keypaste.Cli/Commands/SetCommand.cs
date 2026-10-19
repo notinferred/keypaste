@@ -103,37 +103,42 @@ internal static class SetCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        TerminalEdit? Read(CliContext asked)
         {
             if (fields.Count > 0)
             {
-                return SetFields(vault, name, fields, plain, context);
+                return ReadFields(asked, name, fields, plain);
             }
 
-            var check = TerminalEdits.Check(vault, new SetPassword(name, null), EditLines.Scene(context));
+            if (recipe is { } wanted)
+            {
+                return new SetPassword(name, NewSecret.Generated(wanted));
+            }
+
+            using var secret = ReadValue(asked);
+            return secret is null ? null : new SetPassword(name, NewSecret.Of(new string(secret.Value)));
+        }
+
+        var route = new OwnerRoute("set", Read, Done);
+
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
+        {
+            TerminalEdit named = fields.Count > 0
+                ? new SetFields(name, [.. fields.Select(field => new FieldWrite(field, null, plain ? false : null))])
+                : new SetPassword(name, null);
+
+            var check = TerminalEdits.Check(vault, named, EditLines.Scene(context));
             if (check.Refusal is { } refused)
             {
                 return EditLines.Refuse(context, "set", refused);
             }
 
-            NewSecret password;
-            if (recipe is { } wanted)
+            if (Read(context) is not { } full)
             {
-                password = NewSecret.Generated(wanted);
-            }
-            else
-            {
-                using var secret = ReadValue(context);
-
-                if (secret is null)
-                {
-                    return CliApp.ExitUsageError;
-                }
-
-                password = NewSecret.Of(new string(secret.Value));
+                return CliApp.ExitUsageError;
             }
 
-            var result = TerminalEdits.Apply(vault, TerminalEdits.Generate(new SetPassword(name, password)), EditLines.Scene(context), shown: null);
+            var result = TerminalEdits.Apply(vault, TerminalEdits.Generate(full), EditLines.Scene(context), shown: null);
             if (result.Refusal is { } late)
             {
                 return EditLines.Refuse(context, "set", late);
@@ -196,16 +201,9 @@ internal static class SetCommand
         return true;
     }
 
-    private static int SetFields(Vault vault, EntryName name, IReadOnlyList<string> fields, bool plain, CliContext context)
+    /// <summary>Reads each field's value in turn, as the item's custom fields.</summary>
+    private static SetFields? ReadFields(CliContext context, EntryName name, IReadOnlyList<string> fields, bool plain)
     {
-        var edit = new SetFields(name, [.. fields.Select(field => new FieldWrite(field, null, plain ? false : null))]);
-
-        var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
-        if (check.Refusal is { } refused)
-        {
-            return EditLines.Refuse(context, "set", refused);
-        }
-
         List<FieldWrite> writes = [];
 
         foreach (var field in fields)
@@ -215,20 +213,13 @@ internal static class SetCommand
 
             if (secret is null)
             {
-                return CliApp.ExitUsageError;
+                return null;
             }
 
             writes.Add(new FieldWrite(field, new string(secret.Value), plain ? false : null));
         }
 
-        var result = TerminalEdits.Apply(vault, edit with { Fields = writes }, EditLines.Scene(context), shown: null);
-        if (result.Refusal is { } late)
-        {
-            return EditLines.Refuse(context, "set", late);
-        }
-
-        vault.Save();
-        return Done(result.Done!, context);
+        return new SetFields(name, writes);
     }
 
     /// <summary>Reads the value from a hidden prompt, twice when a person is typing, or once from stdin.</summary>

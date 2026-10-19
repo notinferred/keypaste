@@ -351,12 +351,14 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             var asked = activity.Waiting.Count;
             var run = asked + activity.WaitingRuns.Count;
             var env = run + activity.WaitingEnvs.Count;
+            var change = env + activity.WaitingChanges.Count;
             waiting =
             [
                 .. activity.Waiting.Select((request, i) => ActivityRow.Waiting(i + 1, request)),
                 .. activity.WaitingRuns.Select((request, i) => ActivityRow.WaitingRun(asked + i + 1, request)),
                 .. activity.WaitingEnvs.Select((request, i) => ActivityRow.WaitingEnv(run + i + 1, request)),
                 .. activity.WaitingChanges.Select((request, i) => ActivityRow.WaitingChange(env + i + 1, request)),
+                .. activity.WaitingEdits.Select((request, i) => ActivityRow.WaitingEdit(change + i + 1, request)),
             ];
             grants =
             [

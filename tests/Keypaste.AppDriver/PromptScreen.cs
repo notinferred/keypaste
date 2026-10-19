@@ -156,13 +156,21 @@ internal sealed class PromptScreen : IDisposable
             AccessChangeWindow =>
                 $"access-prompt agent={Text(window, "AgentText")} asked={Text(window, "OriginText")} " +
                 $"gains={string.Join("; ", Gains(window))} reason={Text(window, "ReasonText")}",
+            TerminalEditWindow =>
+                $"edit-prompt command={Text(window, "CommandText")} item={Text(window, "ItemText")} " +
+                $"asked={Text(window, "OriginText")} changes={string.Join("; ", Changes(window))}",
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
                 $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")} " +
                 $"always={(window.FindControl<Button>("AlwaysFor")?.IsVisible == true ? Text(window, "AlwaysText") : "none")}",
         });
 
-        var withdrawn = window is AccessChangeWindow ? "access-prompt withdrawn" : "prompt withdrawn";
+        var withdrawn = window switch
+        {
+            AccessChangeWindow => "access-prompt withdrawn",
+            TerminalEditWindow => "edit-prompt withdrawn",
+            _ => "prompt withdrawn",
+        };
 
         window.Closed += (_, _) =>
         {
@@ -180,6 +188,10 @@ internal sealed class PromptScreen : IDisposable
     private static IEnumerable<string?> Gains(Window window) =>
         window.FindControl<ItemsControl>("GainsList")?.GetVisualDescendants().OfType<TextBlock>()
             .Where(block => block.Classes.Contains("gain")).Select(block => block.Text) ?? [];
+
+    private static IEnumerable<string?> Changes(Window window) =>
+        window.FindControl<ItemsControl>("ChangesList")?.GetVisualDescendants().OfType<TextBlock>()
+            .Where(block => block.Classes.Contains("change")).Select(block => block.Text) ?? [];
 
     private static IEnumerable<string?> Classed(Window window, string className) =>
         window.FindControl<ItemsControl>("KeysList")?.GetVisualDescendants().OfType<TextBlock>()

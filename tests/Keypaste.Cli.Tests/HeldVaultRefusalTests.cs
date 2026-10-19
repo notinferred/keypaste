@@ -6,9 +6,9 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// The seven verbs that used to save without the vault's claim are refused, before any password is read,
-/// while the desktop app or <c>keypaste agent</c> holds the vault, and the refusal names the holder and
-/// what to do next (N.10).
+/// A verb that saves is refused, before any password is read, while the desktop app or <c>keypaste agent</c>
+/// holds the vault and nothing answers on its pipe, and the refusal names the holder and what to do next
+/// (N.10); with the holder answering, a verb that edits items sends it the edit instead (D-0464).
 /// </summary>
 /// <remarks>
 /// The claim here is this test process's own, standing in for the holder, so this is the fast
@@ -29,7 +29,7 @@ public sealed class HeldVaultRefusalTests : IDisposable
     {
         var data = new TheoryData<string, OwnerKind>();
 
-        foreach (var verb in new[] { "add", "rm", "access", "env set", "env rm", "env pull", "import" })
+        foreach (var verb in new[] { "add", "set", "rm", "rotate", "field rm", "access", "env set", "env rm", "env pull", "env tag", "import" })
         {
             data.Add(verb, OwnerKind.DesktopApp);
             data.Add(verb, OwnerKind.TerminalAgent);
@@ -90,7 +90,11 @@ public sealed class HeldVaultRefusalTests : IDisposable
         return verb switch
         {
             "add" => ["add", "Work/new", .. vault],
+            "set" => ["set", "Work/github", .. vault],
             "rm" => ["rm", "Work/github", "--yes", .. vault],
+            "rotate" => ["rotate", "Work/github", .. vault],
+            "field rm" => ["field", "rm", "Work/github", "KEY", .. vault],
+            "env tag" => ["env", "tag", "ci", "Work/github", "--yes", .. vault],
             "access" => ["access", "--password", .. vault],
             "env set" => ["env", "set", "ci", "DEPLOY_KEY=held", .. vault],
             "env rm" => ["env", "rm", "ci", "DEPLOY_KEY", "--yes", .. vault],

@@ -147,6 +147,7 @@ internal sealed record LogRow
             "list_entry_names" => "Listed names",
             "run" => entry.Granted ? "Injected" : "Requested",
             "access_change" => entry.Granted ? "Changed settings" : "Asked to change settings",
+            "terminal_edit" => entry.Granted ? "Changed from a terminal" : "Asked to change from a terminal",
             "token bundle" => "Bundled",
             "" => _none,
             var tool when tool.EndsWith("_credential", StringComparison.Ordinal) => "Requested",
@@ -202,8 +203,14 @@ internal sealed record LogRow
     {
         if (!entry.Granted)
         {
-            // Nobody answered, so nobody refused: still a refusal, but not one a person gave.
-            return Is(entry.Method, "timed-out") ? ("No answer", LogTone.Muted) : ("Denied", LogTone.Danger);
+            // Nobody answered, so nobody refused: still a refusal, but not one a person gave. A terminal's
+            // edit that asked for what the vault already held was refused by nobody either.
+            return entry.Method switch
+            {
+                "timed-out" => ("No answer", LogTone.Muted),
+                "unchanged" => ("Unchanged", LogTone.Muted),
+                _ => ("Denied", LogTone.Danger),
+            };
         }
 
         return entry.Method switch

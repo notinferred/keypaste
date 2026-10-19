@@ -207,6 +207,56 @@ public sealed class AgentCommandTests : IDisposable
         Assert.Equal(AgentMode.Ask, Assert.Single(new AgentAccessStore(vault).Read("claude-code").Own).Access.Mode);
     }
 
+    /// <summary>
+    /// A terminal's edit to the vault <c>keypaste agent</c> holds is asked about in the agent's own terminal
+    /// by name only, saved there under its claim once allowed, and recorded on its own line (D-0464).
+    /// </summary>
+    [Fact]
+    public async Task ATerminalEditConfirmedInItsTerminal_IsSavedInTheVault()
+    {
+        await using var agent = await RunningAgent.StartAsync(_harness, _master, "y");
+        using var terminal = Terminal(agent);
+
+        terminal.Prompt.Enqueue("agent-command-new-value");
+        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("set", "env/dev/TOKEN", "--vault", _harness.VaultPath));
+
+        Assert.Contains("updated env/dev/TOKEN", terminal.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("Master password: ", terminal.Prompt.PromptsSeen);
+        Assert.Contains("keypaste: a terminal asks to change this vault.", agent.Text, StringComparison.Ordinal);
+        Assert.Contains("  command  keypaste set", agent.Text, StringComparison.Ordinal);
+        Assert.Contains("  asked    asked from a terminal; any program you run could have typed it", agent.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("agent-command-new-value", agent.Text, StringComparison.Ordinal);
+
+        await agent.StopAsync(terminal);
+
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            Assert.Equal("agent-command-new-value", vault.Find(new EntryName("env/dev", "TOKEN"))!.Password);
+        }
+
+        var line = Assert.Single(Lines(), line => line.GetProperty("tool").GetString() == AuditTools.Edit);
+        Assert.Equal(("granted", "prompt"), (line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
+        Assert.DoesNotContain("agent-command-new-value", File.ReadAllText(KeypasteHome.AuditPath(Home)), StringComparison.Ordinal);
+    }
+
+    /// <summary>A terminal's edit the person denies at the agent's terminal writes nothing, and the terminal is told.</summary>
+    [Fact]
+    public async Task ATerminalEditDeniedInItsTerminal_ChangesNothing()
+    {
+        await using var agent = await RunningAgent.StartAsync(_harness, _master, "d");
+        using var terminal = Terminal(agent);
+
+        terminal.AssertExit(CliApp.ExitUsageError, terminal.Run("rm", "env/dev/TOKEN", "--yes", "--vault", _harness.VaultPath));
+
+        Assert.Contains("keypaste rm: not saved: a person refused this change", terminal.Err, StringComparison.Ordinal);
+        Assert.Contains("keypaste: denied. Nothing was written.", agent.Text, StringComparison.Ordinal);
+
+        await agent.StopAsync(terminal);
+
+        using var vault = Vault.Open(_harness.VaultPath, _master);
+        Assert.NotNull(vault.Find(new EntryName("env/dev", "TOKEN")));
+    }
+
     private CliHarness Terminal(RunningAgent agent)
     {
         var terminal = new CliHarness();

@@ -167,8 +167,9 @@ internal static class FieldCommand
         }
 
         var edit = new RemoveField(entryPath, field);
+        var route = new OwnerRoute("field rm", _ => edit, Removed);
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
             var result = TerminalEdits.Apply(vault, edit, EditLines.Scene(context), shown: null);
             if (result.Refusal is { } refused)

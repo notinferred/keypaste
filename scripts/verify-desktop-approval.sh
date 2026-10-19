@@ -13,12 +13,16 @@
 # project environment the prompt offers Always for it: pressed, it holds the release while the app's
 # confirmation asks to make that environment Automatic; refused, the request is released once and nothing
 # changes; allowed, the next request for the entry is released with no prompt and recorded as automatic.
+# A terminal's `keypaste set`, piped its value alone, is asked about in the app's own window, which names
+# the command and the item and says where it came from but never draws the value; Allow saves it and
+# records it, and a denied `keypaste rm` changes nothing (D-0464).
 #
 # NEGATIVE CONTROL: this fails if a request is released without a press of Approve, if Approve does not
 # release it, if an audit line names the wrong method, session or label, if an abandoned request leaves
 # no line or two, if a prompt stays up after its request is answered or abandoned, if Always for is not
 # offered or releases before its confirmation is answered, or if a refused confirmation changes anything
-# or an allowed one does not release the next request unasked. These checks must never be skipped or
+# or an allowed one does not release the next request unasked, if a terminal's edit is saved without its
+# Allow, draws its value, or changes anything once denied. These checks must never be skipped or
 # soft-passed.
 set -euo pipefail
 
@@ -35,6 +39,9 @@ readonly RECOVERY='SENTINEL-DESKTOP-RECOVERY-CODES-7e19'
 # Entries in one environment of a project, for Always for: one whose confirmation is refused, one allowed.
 readonly STAGING_ENTRY='env/ci/STAGING_KEY'
 readonly RELEASE_ENTRY='env/ci/RELEASE_KEY'
+
+# A value a terminal sends the app to write, which no prompt and no log line may show.
+readonly EDITED='SENTINEL-DESKTOP-TERMINAL-EDIT-2a90'
 
 readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.'
 
@@ -306,6 +313,34 @@ jq -e 'select(.id == 4) | .result.isError == false' <"$OUT" >/dev/null || die "t
 tail -n 1 "$AUDIT" | jq -e '.tool == "request_credential" and .decision == "granted" and .method == "automatic"' >/dev/null \
   || die "the request after Always for was not recorded as released automatically"
 [ "$(grep -c '^prompt client' "$HOLD_OUT")" -eq "$PROMPTS" ] || die "a request under Automatic drew a prompt"
+
+# ------------------------------------------------- a terminal's edit is asked about in the window (D-0464)
+before="$(sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1)"
+printf '%s\n' "$EDITED" >"$WORK/edit-value.txt"
+"$CLI" set "$API_ENTRY" --vault "$VAULT" <"$WORK/edit-value.txt" >/dev/null 2>"$WORK/edit-stderr.txt" 7>&- 8>&- &
+edit_pid=$!
+wait_for '^edit-prompt command=' "$HOLD_OUT" 1
+grep '^edit-prompt command=' "$HOLD_OUT" | tail -1 \
+  | grep -qF "command=keypaste set item=$API_ENTRY asked=asked from a terminal; any program you run could have typed it" \
+  || die "the window does not name the command and the item, or does not say a terminal asked"
+grep -q "$EDITED" "$HOLD_OUT" && die "the terminal's value reached the app's window"
+echo allow >&7
+wait "$edit_pid" || die "an edit allowed in the window did not exit 0: $(cat "$WORK/edit-stderr.txt")"
+wait_for '^edit-prompt withdrawn' "$HOLD_OUT" 1
+[ "$(sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1)" != "$before" ] || die "an edit allowed in the window was not saved"
+tail -n 1 "$AUDIT" | jq -e '.tool == "terminal_edit" and .decision == "granted" and .method == "prompt"' >/dev/null \
+  || die "the allowed edit was not recorded as a terminal edit allowed at the prompt: $(tail -n 1 "$AUDIT")"
+grep -q "$EDITED" "$AUDIT" && die "the terminal's value reached the audit log"
+
+before="$(sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1)"
+"$CLI" rm "$STAGING_ENTRY" --yes --vault "$VAULT" </dev/null >/dev/null 2>"$WORK/edit-stderr.txt" 7>&- 8>&- &
+edit_pid=$!
+wait_for '^edit-prompt command=' "$HOLD_OUT" 2
+echo deny >&7
+if wait "$edit_pid"; then die "an edit denied in the window exited 0"; fi
+wait_for '^edit-prompt withdrawn' "$HOLD_OUT" 2
+[ "$(sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1)" = "$before" ] || die "an edit denied in the window changed the vault"
+grep -q 'not saved: a person refused this change' "$WORK/edit-stderr.txt" || die "the terminal was not told the change was refused"
 
 # -------------------------------------------------------------------- a lock refuses and withdraws
 raise_prompt lock

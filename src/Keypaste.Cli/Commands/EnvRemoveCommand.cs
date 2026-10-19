@@ -62,8 +62,9 @@ internal static class EnvRemoveCommand
         }
 
         var edit = new EnvRemoveKey(project, profile, key, line.Value(EnvCommand.EntryOption.Name));
+        var route = new OwnerRoute("env rm", _ => edit, Done);
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
             var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
             if (check.Refusal is { } refused)

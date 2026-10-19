@@ -112,6 +112,22 @@ internal static class VaultSession
         Held(path, context, () => Open(path, line, context, body, namesHardwareKeys));
 
     /// <summary>
+    /// Takes the vault's claim, then opens the vault and runs <paramref name="body"/>, for a verb that edits
+    /// items; while the app or <c>keypaste agent</c> holds the vault, sends the edit to it instead (D-0464).
+    /// </summary>
+    /// <remarks>
+    /// The holder asks the person and saves the edit under its own claim, so no master password is read
+    /// here on that path; with nothing answering on its pipe the verb is refused as <see cref="OpenHeld(string, CommandLine, CliContext, Func{Vault, int}, bool)"/> refuses it.
+    /// </remarks>
+    /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
+    /// <param name="line">The parsed command line, for <c>--keyfile</c> and <c>--approver</c>.</param>
+    /// <param name="context">Where prompts and errors go.</param>
+    /// <param name="route">How the verb reads its values and says what was done, for the holder's path.</param>
+    /// <param name="body">What to do with the open vault.</param>
+    internal static int OpenHeld(string path, CommandLine line, CliContext context, OwnerRoute route, Func<Vault, int> body) =>
+        Held(path, context, () => Open(path, line, context, body), (holder, refusal) => OwnerEdit.Ask(path, line, context, holder, route, refusal));
+
+    /// <summary>
     /// Takes the vault's claim, runs <paramref name="first"/> for what the verb needs before the vault's
     /// own password, then opens the vault and runs <paramref name="body"/> with both.
     /// </summary>
@@ -172,13 +188,20 @@ internal static class VaultSession
         _ => refusal,
     };
 
-    private static int Held(string path, CliContext context, Func<int> body)
+    private static int Held(string path, CliContext context, Func<int> body, Func<VaultOwner, string, int>? routed = null)
     {
         var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
 
         if (!VaultClaim.TryAcquire(home, path, OwnerKind.CommandLine, out var claim, out var refusal, out var holder))
         {
-            context.Stderr.WriteLine($"keypaste: {HeldRefusal(refusal, holder)}");
+            var said = HeldRefusal(refusal, holder);
+
+            if (routed is not null && holder is { Kind: OwnerKind.DesktopApp or OwnerKind.TerminalAgent })
+            {
+                return routed(holder, said);
+            }
+
+            context.Stderr.WriteLine($"keypaste: {said}");
             return CliApp.ExitInternalError;
         }
 

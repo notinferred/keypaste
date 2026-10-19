@@ -6,7 +6,8 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// V-N.10's rule: a verb that saves opens the vault through <c>VaultSession.OpenHeld</c>, which takes the
 /// vault's claim before its password is read, so <c>VaultSession.Open</c> and <c>OpenThen</c> are called
-/// only by verbs that never save.
+/// only by verbs that never save. And D-0464's: what a verb hands the vault's holder in place of opening
+/// the vault reaches no master password.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -31,6 +32,16 @@ public sealed class SavingVerbSourceRulesTests
         RegexOptions.Compiled);
 
     private static readonly Regex _called = new(@"(?<![\.\w])(\w+)\s*(?:<[^>()]*>)?\s*\(", RegexOptions.Compiled);
+
+    /// <summary>A local function that reads a verb's values, which takes the context alone.</summary>
+    private static readonly Regex _reader = new(@"(?m)^\s*[\w<>\[\]?,\.]+\s+(\w+)\s*\(\s*CliContext\s+\w+\s*\)\s*\{", RegexOptions.Compiled);
+
+    private static readonly Regex _routes = new(@"new\s+OwnerRoute\s*\(", RegexOptions.Compiled);
+
+    /// <summary>Any name, so a method passed as a value, as a route passes its reader, is followed too.</summary>
+    private static readonly Regex _named = new(@"(?<![\.\w])(\w+)(?!\w)", RegexOptions.Compiled);
+
+    private static readonly string[] _unlocking = ["VaultSession.", "Vault.Open(", "ReadNewMasterPassword("];
 
     [Fact]
     public void Only_OpenHeld_reaches_a_save()
@@ -64,18 +75,50 @@ public sealed class SavingVerbSourceRulesTests
         Assert.NotEmpty(Offenders("ListCommand.cs", list[..body] + " vault.Save(); " + list[body..]));
     }
 
+    /// <summary>A verb's route to the vault's holder, and every method it reaches, opens no vault and reads no master password.</summary>
+    [Fact]
+    public void No_route_opens_the_vault_or_reads_a_master_password()
+    {
+        var routes = Sources().SelectMany(source => Traced(source.Text, _routes).Select(traced => (source.Name, traced.Traced))).ToList();
+
+        Assert.True(routes.Count >= 10, $"only {routes.Count} routes to the vault's holder were found");
+        Assert.All(routes, route => Assert.False(
+            _unlocking.Any(route.Traced.Contains),
+            $"the route in {route.Name} reaches {string.Join(", ", _unlocking.Where(route.Traced.Contains))}"));
+
+        var owner = Blank(Read("OwnerEdit.cs"));
+        Assert.DoesNotContain(_unlocking, owner.Contains);
+    }
+
+    /// <summary>The tracer follows a route into the local function that reads its values, so a master password read there is found.</summary>
+    [Fact]
+    public void A_master_password_read_in_a_route_is_found()
+    {
+        var add = Read("Commands/AddCommand.cs");
+        var reading = add.IndexOf("asked.Prompt.ReadSecret(", StringComparison.Ordinal);
+
+        Assert.True(reading > 0, "AddCommand no longer reads its password where this control expects");
+        Assert.Contains(
+            Traced(add.Insert(reading, "VaultSession.ReadNewMasterPassword(asked); "), _routes),
+            route => route.Traced.Contains("VaultSession.", StringComparison.Ordinal));
+    }
+
     private static IEnumerable<string> Offenders(string name, string text) =>
         Calls(text)
             .Where(call => call.Kind is "Open" or "OpenThen" && _saves.Any(call.Traced.Contains))
             .Select(call => $"{name}:{call.Line}");
 
     /// <summary>Each vault-opening call, with its arguments and every same-file method they reach, strings and comments blanked.</summary>
-    private static IEnumerable<(string Kind, int Line, string Traced)> Calls(string text)
+    private static IEnumerable<(string Kind, int Line, string Traced)> Calls(string text) => Traced(text, _opens, _called);
+
+    /// <summary>Each call <paramref name="calls"/> finds, with its arguments and every same-file method they reach, strings and comments blanked.</summary>
+    private static IEnumerable<(string Kind, int Line, string Traced)> Traced(string text, Regex calls, Regex? follow = null)
     {
+        follow ??= _named;
         var code = Blank(text);
         var methods = Methods(code);
 
-        foreach (Match open in _opens.Matches(code))
+        foreach (Match open in calls.Matches(code))
         {
             var start = open.Index + open.Length - 1;
             var traced = new System.Text.StringBuilder(code[start..Close(code, start, '(', ')')]);
@@ -85,7 +128,7 @@ public sealed class SavingVerbSourceRulesTests
             {
                 grew = false;
 
-                foreach (Match call in _called.Matches(traced.ToString()))
+                foreach (Match call in follow.Matches(traced.ToString()))
                 {
                     var called = call.Groups[1].Value;
 
@@ -137,6 +180,19 @@ public sealed class SavingVerbSourceRulesTests
             }
 
             bodies.Add(body);
+        }
+
+        foreach (Match local in _reader.Matches(code))
+        {
+            var brace = local.Index + local.Length - 1;
+            var name = local.Groups[1].Value;
+
+            if (!methods.TryGetValue(name, out var bodies))
+            {
+                methods[name] = bodies = [];
+            }
+
+            bodies.Add(code[brace..Close(code, brace, '{', '}')]);
         }
 
         return methods;

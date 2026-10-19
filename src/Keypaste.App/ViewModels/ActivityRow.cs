@@ -182,6 +182,19 @@ internal sealed class ActivityRow : ObservableObject
         };
     }
 
+    /// <summary>A terminal's edit a person is being asked about, named by its command as a claim: any program can type one.</summary>
+    internal static ActivityRow WaitingEdit(int number, WaitingEdit waiting)
+    {
+        var prompt = waiting.Prompt;
+        var what = $"A change to {prompt.Item}, asked from a terminal";
+
+        return new(number, prompt.Command, "none configured", what, "edit", "answered for you in " + Seconds(waiting.Remaining))
+        {
+            Detail = what,
+            LeftText = Humanized(waiting.Remaining),
+        };
+    }
+
     /// <summary>The entries a run's grant releases and its set, or the command a <c>keypaste run --session</c> grant repeats.</summary>
     private static string EnvDetail(EnvGrantInForce grant)
     {

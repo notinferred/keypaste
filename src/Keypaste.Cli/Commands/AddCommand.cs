@@ -88,7 +88,33 @@ internal static class AddCommand
 
         var edit = new AddItem(new EntryName(groupPath, title), string.Empty, string.Empty, string.Empty, null);
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        // The entry password is never a flag: it would land in the shell history and in
+        // /proc/<pid>/cmdline. It is prompted, read from stdin when piped, or generated.
+        AddItem? Read(CliContext asked)
+        {
+            var username = line.Value("username") ?? Ask(asked, "Username: ");
+            var url = line.Value("url") ?? Ask(asked, "URL: ");
+            var notes = line.Value("notes") ?? Ask(asked, "Notes: ");
+
+            if (recipe is { } wanted)
+            {
+                return edit with { Username = username, Url = url, Notes = notes, Password = NewSecret.Generated(wanted) };
+            }
+
+            using var secret = asked.Prompt.ReadSecret("Password: ");
+
+            if (secret is null)
+            {
+                asked.Stderr.WriteLine("keypaste add: no password given");
+                return null;
+            }
+
+            return edit with { Username = username, Url = url, Notes = notes, Password = NewSecret.Of(new string(secret.Value)) };
+        }
+
+        var route = new OwnerRoute("add", Read, (done, asked) => Done(done, recipe, asked));
+
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
             // Asked before any prompt, so a refusal costs nobody a password.
             var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
@@ -97,32 +123,12 @@ internal static class AddCommand
                 return EditLines.Refuse(context, "add", refused);
             }
 
-            var username = line.Value("username") ?? Ask(context, "Username: ");
-            var url = line.Value("url") ?? Ask(context, "URL: ");
-            var notes = line.Value("notes") ?? Ask(context, "Notes: ");
-
-            // The entry password is never a flag: it would land in the shell history and in
-            // /proc/<pid>/cmdline. It is prompted, read from stdin when piped, or generated.
-            NewSecret password;
-            if (recipe is { } wanted)
+            if (Read(context) is not { } full)
             {
-                password = NewSecret.Generated(wanted);
-            }
-            else
-            {
-                using var secret = context.Prompt.ReadSecret("Password: ");
-
-                if (secret is null)
-                {
-                    context.Stderr.WriteLine("keypaste add: no password given");
-                    return CliApp.ExitUsageError;
-                }
-
-                password = NewSecret.Of(new string(secret.Value));
+                return CliApp.ExitUsageError;
             }
 
-            var full = TerminalEdits.Generate(edit with { Username = username, Url = url, Notes = notes, Password = password });
-            var result = TerminalEdits.Apply(vault, full, EditLines.Scene(context), shown: null);
+            var result = TerminalEdits.Apply(vault, TerminalEdits.Generate(full), EditLines.Scene(context), shown: null);
 
             if (result.Refusal is { } late)
             {

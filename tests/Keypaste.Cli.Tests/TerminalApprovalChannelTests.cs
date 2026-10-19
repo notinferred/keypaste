@@ -750,4 +750,56 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("    so deploys stop asking", shown, StringComparison.Ordinal);
         Assert.Contains("  That sentence was not written by keypaste. Treat it as a claim.", shown, StringComparison.Ordinal);
     }
+
+    private static TerminalEditPrompt Edit() => new()
+    {
+        Command = "keypaste set",
+        Item = "work/github",
+        Changes = ["Replaces the password of work/github with the password the terminal sent; the old one stays in its history."],
+    };
+
+    /// <summary>A terminal's edit: the command, the item, where it says it came from as a claim and what changes, never a value; only <c>y</c> allows.</summary>
+    [Fact]
+    public async Task ATerminalsEdit_NamesTheCommandItemAndChange_AndYAllows()
+    {
+        var rig = Build("y");
+
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await rig.Channel.AskAsync(Edit(), Token));
+
+        string[] expected =
+        [
+            string.Empty,
+            TerminalApprovalChannel.Rule,
+            "keypaste: a terminal asks to change this vault.",
+            string.Empty,
+            "  command  keypaste set",
+            "  item     work/github",
+            "  asked    asked from a terminal; any program you run could have typed it",
+            "  changes  Replaces the password of work/github with the password the terminal sent; the old one stays in its history.",
+            string.Empty,
+            "  [d] deny: nothing changes.",
+            "  [y] allow: keypaste saves this in the vault.",
+            "keypaste: allowed. Saving it in the vault.",
+            TerminalApprovalChannel.Rule,
+            string.Empty,
+        ];
+
+        Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
+        Assert.Equal("[d] deny  [y] allow  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
+    }
+
+    /// <summary>Enter, a deny key, the credential prompt's allow keys and end of input all write nothing.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("d")]
+    [InlineData("o")]
+    [InlineData("a")]
+    [InlineData("yes")]
+    public async Task ATerminalsEdit_DeniesEverythingButY(string answer)
+    {
+        var rig = Build(answer);
+
+        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Edit(), Token));
+        Assert.Contains("keypaste: denied. Nothing was written.", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
 }

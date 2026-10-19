@@ -190,6 +190,12 @@ public sealed partial class PlainWordsTests
             TimeZoneInfo.Utc);
 
         yield return ("the access-change confirmation", new AccessChangeWindow(new AccessChangeViewModel(change)));
+        yield return ("a terminal's edit", new TerminalEditWindow(new TerminalEditViewModel(new TerminalEditPrompt
+        {
+            Command = "keypaste env set",
+            Item = "env/billing/.env",
+            Changes = ["Adds STRIPE_KEY to billing/dev on env/billing/.env with the value the terminal sent."],
+        })));
         yield return ("the Always for notice", new NoticeWindow(new AlwaysForNotice("work laptop", "billing:dev", "another request was already in front of a person"), _ => { }));
     }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 
 namespace Keypaste.App.Session;
@@ -112,6 +113,13 @@ internal sealed class AppAuthority : IDisposable
 
     /// <summary>What the authority answering agents has waiting for a person and has granted, never a value.</summary>
     /// <remarks>Nothing while it answers no session: a lock ends the lifetime that held both (D-0313).</remarks>
+    /// <summary>Raised, on whichever thread answered it, once a terminal's edit is saved in the vault.</summary>
+    internal event EventHandler<EditDone>? TerminalEdited
+    {
+        add => _host.TerminalEdited += value;
+        remove => _host.TerminalEdited -= value;
+    }
+
     internal ApproverActivity Activity => _host.Activity;
 
     /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>

@@ -69,8 +69,9 @@ internal static class EnvTagCommand
         }
 
         var edit = new TagItem(project, environment, entryPath, tagging);
+        var route = new OwnerRoute($"env {verb}", _ => edit, (done, asked) => Done(done, project, environment, asked));
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
             var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
             if (check.Refusal is { } refused)

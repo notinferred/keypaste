@@ -96,7 +96,37 @@ internal static class EnvSetCommand
 
         var edit = new EnvSetKey(project, profile, key, line.Value(EnvCommand.EntryOption.Name), null);
 
-        return VaultSession.OpenHeld(path, line, context, vault =>
+        EnvSetKey? Read(CliContext asked)
+        {
+            if (inlineValue is not null)
+            {
+                // Said once, where it happened, without the value in it.
+                asked.Stderr.WriteLine(
+                    "warning: the value came from the command line, where your shell records it");
+                return edit with { Value = NewSecret.Of(inlineValue) };
+            }
+
+            if (recipe is { } wanted)
+            {
+                return edit with { Value = NewSecret.Generated(wanted) };
+            }
+
+            // Prompted after the vault is reached, so the piped protocol stays one line per prompt, in
+            // the order they are asked: the master password first, then the value.
+            using var secret = asked.Prompt.ReadSecret($"Value for {key}: ");
+
+            if (secret is null)
+            {
+                asked.Stderr.WriteLine("keypaste env set: no value given");
+                return null;
+            }
+
+            return edit with { Value = NewSecret.Of(new string(secret.Value)) };
+        }
+
+        var route = new OwnerRoute("env set", Read, (done, asked) => Done(done, project, profile, recipe, asked));
+
+        return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
             var check = TerminalEdits.Check(vault, edit, EditLines.Scene(context));
             if (check.Refusal is { } refused)
@@ -104,35 +134,12 @@ internal static class EnvSetCommand
                 return EditLines.Refuse(context, "env set", refused);
             }
 
-            NewSecret value;
-            if (inlineValue is not null)
+            if (Read(context) is not { } full)
             {
-                value = NewSecret.Of(inlineValue);
-
-                // Said once, where it happened, without the value in it.
-                context.Stderr.WriteLine(
-                    "warning: the value came from the command line, where your shell records it");
-            }
-            else if (recipe is { } wanted)
-            {
-                value = NewSecret.Generated(wanted);
-            }
-            else
-            {
-                // Prompted inside the session so the piped protocol stays one line per prompt, in
-                // the order they are asked: master password first, then the value.
-                using var secret = context.Prompt.ReadSecret($"Value for {key}: ");
-
-                if (secret is null)
-                {
-                    context.Stderr.WriteLine("keypaste env set: no value given");
-                    return CliApp.ExitUsageError;
-                }
-
-                value = NewSecret.Of(new string(secret.Value));
+                return CliApp.ExitUsageError;
             }
 
-            var result = TerminalEdits.Apply(vault, TerminalEdits.Generate(edit with { Value = value }), EditLines.Scene(context), shown: null);
+            var result = TerminalEdits.Apply(vault, TerminalEdits.Generate(full), EditLines.Scene(context), shown: null);
             if (result.Refusal is { } late)
             {
                 return EditLines.Refuse(context, "env set", late);

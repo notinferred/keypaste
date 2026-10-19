@@ -60,9 +60,6 @@ public sealed class SessionEditor
         _edited = edited;
     }
 
-    /// <summary>The terminal's edit in front of the person now, or null.</summary>
-    internal WaitingEdit? Waiting => _gate.WaitingEdit;
-
     /// <summary>Decides one edit: checks it, asks the person, then writes and saves it.</summary>
     /// <param name="request">The edit, already admitted to <paramref name="lifetime"/>.</param>
     /// <param name="lifetime">The unlock it was asked under.</param>

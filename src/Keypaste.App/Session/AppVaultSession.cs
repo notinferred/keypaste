@@ -775,12 +775,28 @@ internal sealed class AppVaultSession : IDisposable
     /// cancels.
     /// </para>
     /// </remarks>
-    internal WriteResult<T> Write<T>(Func<Vault, T> edit, Func<T, bool> changed)
+    internal WriteResult<T> Write<T>(Func<Vault, T> edit, Func<T, bool> changed) =>
+        Write(() => Unlocked, edit, changed);
+
+    /// <summary>Runs one edit against the vault <paramref name="lifetime"/> unlocked and saves it, as <see cref="Write{T}(Func{Vault, T}, Func{T, bool})"/> does.</summary>
+    /// <typeparam name="T">What the edit returns.</typeparam>
+    /// <param name="lifetime">The unlock the edit was asked under; once it has ended the edit is refused as locked, never run on a later unlock's vault.</param>
+    /// <param name="edit">The edit, given the open vault.</param>
+    /// <param name="changed">Whether what <paramref name="edit"/> returned is a change to save.</param>
+    /// <returns>What happened.</returns>
+    internal WriteResult<T> WriteFor<T>(SessionLifetime lifetime, Func<Vault, T> edit, Func<T, bool> changed)
+    {
+        ArgumentNullException.ThrowIfNull(lifetime);
+
+        return Write(() => UnlockedFor(lifetime), edit, changed);
+    }
+
+    private WriteResult<T> Write<T>(Func<Vault?> open, Func<Vault, T> edit, Func<T, bool> changed)
     {
         ArgumentNullException.ThrowIfNull(edit);
         ArgumentNullException.ThrowIfNull(changed);
 
-        if (Unlocked is not { } vault)
+        if (open() is not { } vault)
         {
             return new WriteResult<T>(WriteOutcome.Locked);
         }
@@ -809,7 +825,7 @@ internal sealed class AppVaultSession : IDisposable
         {
             return new WriteResult<T>(WriteOutcome.Failed, value, edited, e.Message);
         }
-        catch (ObjectDisposedException) when (!ReferenceEquals(Unlocked, vault))
+        catch (ObjectDisposedException) when (!ReferenceEquals(open(), vault))
         {
             return new WriteResult<T>(WriteOutcome.Locked, value);
         }

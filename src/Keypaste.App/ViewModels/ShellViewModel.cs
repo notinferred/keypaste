@@ -3,6 +3,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
 using Keypaste.Core.Sharing;
@@ -166,6 +167,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.Edited += OnEdited;
         _session.WaitingForTouch += OnWaitingForTouch;
         _session.Saved += OnSaved;
+
+        if (authority is not null)
+        {
+            authority.TerminalEdited += OnTerminalEdited;
+        }
 
         if (authority is not null && _session.Identity is { } identity)
         {
@@ -1030,7 +1036,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         {
             var activity = Authority!.Activity;
             var grants = activity.Grants.Count + activity.EnvGrants.Count;
-            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingChanges.Count;
+            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingChanges.Count + activity.WaitingEdits.Count;
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
             AgentsServing = true;
@@ -1151,6 +1157,31 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
     });
 
+    /// <summary>
+    /// Says a change you allowed from a terminal is saved, and shows it on the screen open now, unless
+    /// you are editing the item there, whose form is left as it is.
+    /// </summary>
+    private void OnTerminalEdited(object? sender, EditDone done) => Post(() =>
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        ShowToast($"Saved keypaste {TerminalEdit.VerbOf(done.Action)} for {EntryNameSanitizer.SanitizePath(done.Item).Text}");
+
+        switch (Content)
+        {
+            case EntriesViewModel entries when entries.Detail is not { IsEditing: true }:
+                entries.Reload();
+                break;
+
+            case EnvSetsViewModel env:
+                env.Reload();
+                break;
+        }
+    });
+
     private void OnEdited(object? sender, VaultEdit edit) => Post(() =>
     {
         Count();
@@ -1192,6 +1223,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.Edited -= OnEdited;
         _session.WaitingForTouch -= OnWaitingForTouch;
         _session.Saved -= OnSaved;
+
+        if (Authority is not null)
+        {
+            Authority.TerminalEdited -= OnTerminalEdited;
+        }
+
         Recommendations.Dispose();
         CloseShare();
 

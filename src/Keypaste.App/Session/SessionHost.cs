@@ -4,6 +4,7 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 
@@ -93,6 +94,9 @@ internal sealed class SessionHost : IDisposable
     }
 
     /// <summary>The endpoint being served, or null.</summary>
+    /// <summary>Raised, on whichever thread answered it, once a terminal's edit is saved in the vault.</summary>
+    internal event EventHandler<EditDone>? TerminalEdited;
+
     internal string? Endpoint { get; private set; }
 
     /// <summary>Why nothing is being served for an unlocked vault, or null.</summary>
@@ -386,7 +390,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _approverOverride, _launchName);
+            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done));
             _hosted = hosted;
             Endpoint = hosted.Endpoint;
             Failure = hosted.Failure;
@@ -525,7 +529,8 @@ internal sealed class SessionHost : IDisposable
             Action? requestLock,
             HourlyLimit hourly,
             string? approverOverride,
-            string? launchName)
+            string? launchName,
+            Action<EditDone> edited)
         {
             AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home));
             SessionServer? server = null;
@@ -550,6 +555,12 @@ internal sealed class SessionHost : IDisposable
                     UnwatchEdits = edited => session.Edited -= edited,
                     LockNow = requestLock,
                     Clock = session.Clock,
+
+                    // A terminal's edit, once the person allows it in the prompt window, is saved
+                    // through this session, never on a later unlock's vault (D-0464).
+                    WriteEdit = (asked, edit) => Saved(session.WriteFor(asked, edit, changed => changed)),
+                    ClientsPath = KeypasteHome.ClientsPath(session.Home),
+                    Edited = edited,
                 });
 
                 string? launchFailure = null;

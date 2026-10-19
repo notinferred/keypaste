@@ -1617,14 +1617,27 @@ internal sealed class Driver(string home)
             Console.Out.WriteLine("approved");
             return ValueTask.FromResult(ApprovalAnswer.Approved);
         }
+
+        public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)
+        {
+            Console.Out.WriteLine($"edit-asking command={prompt.Command} item={prompt.Item}");
+            Console.Out.WriteLine("approved");
+            return ValueTask.FromResult(ApprovalAnswer.ApprovedOnce);
+        }
     }
 
     /// <summary>A person in front of the prompt who never answers.</summary>
     internal sealed class HeldPrompt : IApprovalChannel
     {
-        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
+            HoldAsync($"asking {prompt.Entry}", cancellationToken);
+
+        public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken) =>
+            HoldAsync($"edit-asking command={prompt.Command} item={prompt.Item}", cancellationToken);
+
+        private static async ValueTask<ApprovalAnswer> HoldAsync(string asking, CancellationToken cancellationToken)
         {
-            Console.Out.WriteLine($"asking {prompt.Entry}");
+            Console.Out.WriteLine(asking);
 
             try
             {
