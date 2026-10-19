@@ -8,14 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 These rows serve every track: a development machine builds nothing, and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-## T2 — One shared unlock session
-
-U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). N.16 made the app say when another program saved the vault and reload it in the same session (D-0412). What remains is approving a terminal edit in the unlocked app instead of refusing it.
-
-- [ ] **N.11 — Approve a terminal edit in the unlocked app.** Needs: N.10.
-  - `set`, `add`, `rm` and the env writers send the change to the vault's owner, which asks in its prompt window and writes through its session.
-  - No master password crosses the pipe, and `access` stays refused.
-
 ## T4 — Project environments
 
 A variable becomes an env-named custom field on an ordinary entry. The entry's own tag, `env:<project>` or `env:<project>:<environment>`, puts it in that environment (D-0367). Every set still leaves only through `EnvResolution`, whole or not at all (D-0337), and every child starts through `EnvLaunch`.
