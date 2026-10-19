@@ -81,7 +81,8 @@ public sealed class SavingVerbSourceRulesTests
     {
         var routes = Sources().SelectMany(source => Traced(source.Text, _routes).Select(traced => (source.Name, traced.Traced))).ToList();
 
-        Assert.True(routes.Count >= 10, $"only {routes.Count} routes to the vault's holder were found");
+        // One per verb that edits items, `env tag` and `untag` sharing theirs.
+        Assert.True(routes.Count >= 9, $"only {routes.Count} routes to the vault's holder were found");
         Assert.All(routes, route => Assert.False(
             _unlocking.Any(route.Traced.Contains),
             $"the route in {route.Name} reaches {string.Join(", ", _unlocking.Where(route.Traced.Contains))}"));

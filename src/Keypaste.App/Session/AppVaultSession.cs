@@ -776,7 +776,7 @@ internal sealed class AppVaultSession : IDisposable
     /// </para>
     /// </remarks>
     internal WriteResult<T> Write<T>(Func<Vault, T> edit, Func<T, bool> changed) =>
-        Write(() => Unlocked, edit, changed);
+        WriteTo(() => Unlocked, edit, changed);
 
     /// <summary>Runs one edit against the vault <paramref name="lifetime"/> unlocked and saves it, as <see cref="Write{T}(Func{Vault, T}, Func{T, bool})"/> does.</summary>
     /// <typeparam name="T">What the edit returns.</typeparam>
@@ -788,10 +788,10 @@ internal sealed class AppVaultSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(lifetime);
 
-        return Write(() => UnlockedFor(lifetime), edit, changed);
+        return WriteTo(() => UnlockedFor(lifetime), edit, changed);
     }
 
-    private WriteResult<T> Write<T>(Func<Vault?> open, Func<Vault, T> edit, Func<T, bool> changed)
+    private static WriteResult<T> WriteTo<T>(Func<Vault?> open, Func<Vault, T> edit, Func<T, bool> changed)
     {
         ArgumentNullException.ThrowIfNull(edit);
         ArgumentNullException.ThrowIfNull(changed);
