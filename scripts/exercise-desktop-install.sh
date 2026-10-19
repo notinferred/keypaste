@@ -332,7 +332,7 @@ install_candidate() {
     fact install_prompts "msiexec /i /qn shows no installer UI; per-user scope requested no elevation and no UAC prompt; Zone.Identifier $zone on the MSI, and msiexec does not run SmartScreen, so a browser download's double-click prompt was not observed"
     echo "msiexec /i exited 0; installed $(cygpath -m "$exe")"
   elif [ "$(platform)" = macos ]; then
-    local download volume="$OUT/volume" quarantine
+    local download quarantine
     download="$OUT/download/$(basename "$CANDIDATE")"
     APP=/Applications/keypaste.app
     [ ! -e "$APP" ] || { echo "$APP already exists on this runner"; return 1; }
@@ -340,11 +340,7 @@ install_candidate() {
     cp "$CANDIDATE" "$download"
     quarantine="$(mac_quarantine "$download")" || { echo "$quarantine"; return 1; }
     fact quarantine_dmg "$quarantine"
-    mac_attach "$download" "$volume" || return 1
-    [ -d "$volume/keypaste.app" ] && [ "$(readlink "$volume/Applications")" = /Applications ] \
-      || { echo 'the image holds no keypaste.app beside a link to /Applications'; mac_detach "$volume"; return 1; }
-    ditto "$volume/keypaste.app" "$APP" || { mac_detach "$volume"; return 1; }
-    mac_detach "$volume" || return 1
+    mac_install "$download" "$APP" || return 1
     fact installed_app "$APP"
     fact quarantined_files "$(mac_quarantined "$APP")"
     fact install_prompts "a DMG has no installer: attached read-only and keypaste.app copied to /Applications with ditto, which keeps the quarantine a Finder drag keeps, with no prompt; a person's Finder drag was not performed"

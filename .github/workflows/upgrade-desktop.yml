@@ -1,15 +1,16 @@
 name: upgrade-desktop
 run-name: ${{ inputs.rehearsal && 'upgrade-desktop rehearsal (not release evidence)' || format('upgrade-desktop with CLI/MCP {0}', inputs.cli_version) }}
 
-# 4.7d: builds three unpublished desktop candidates from one commit at distinct numeric versions, then on a
+# 4.7d, 4.7e2: builds three unpublished desktop candidates from one commit at distinct numeric versions, then on a
 # fresh runner installs the lowest, fills a real vault and ~/.keypaste through the published CLI/MCP, upgrades,
 # interrupts an upgrade, refuses a downgrade and uninstalls, checking the user's data after every transition.
 # After each one a new terminal must run the keypaste the installed app carries (G.5): on Windows through the
 # user PATH entry the MSI keeps once and removes on uninstall, on Linux through the link the lower app's
-# Settings made, which a start of the higher image re-points, one handed to the running lower app included.
+# Settings made, which a start of the higher image re-points, one handed to the running lower app included,
+# and on macOS through the /usr/local/bin link, which names the bundle's fixed path that an upgrade replaces.
 #
-# Distinct numeric versions because an MSI ProductVersion is numeric and two candidates of one version cannot
-# be ordered (D-0139, D-0147). Nothing here is attested, published or signed: these candidates exist only to
+# Distinct numeric versions because an MSI ProductVersion and a bundle version are numeric and two candidates of
+# one version cannot be ordered (D-0139, D-0147). Nothing here is attested, published or signed: these candidates exist only to
 # be installed over one another. Public downloads and their upgrade evidence are 4.7c.
 #
 # A rehearsal makes the data with a CLI/MCP the build job publishes from this run's own commit instead of a
@@ -43,6 +44,8 @@ jobs:
             rid: win-x64
           - os: ubuntu-24.04
             rid: linux-x64
+          - os: macos-15
+            rid: osx-arm64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -114,6 +117,9 @@ jobs:
           - os: ubuntu-24.04
             rid: linux-x64
             cli: tar.gz
+          - os: macos-15
+            rid: osx-arm64
+            cli: tar.gz
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     steps:
@@ -178,10 +184,12 @@ jobs:
         run: |
           set -euo pipefail
           [ -z "$CLI_VERSION" ] || { echo "::error::a rehearsal builds its CLI/MCP from this commit and takes no cli_version, not $CLI_VERSION"; exit 1; }
-          mapfile -t found < <(find "$RUNNER_TEMP/cli" -maxdepth 1 -type f \( -name keypaste -o -name keypaste.exe \))
-          [ "${#found[@]}" = 1 ] || { echo "::error::fixture-cli holds ${#found[@]} keypaste programs, not one"; exit 1; }
-          chmod +x "${found[0]}"
-          version="$("${found[0]}" --version | tr -d '[:space:]')"
+          # macOS runs this under its stock bash 3.2, which has no mapfile (D-0398).
+          found="$(find "$RUNNER_TEMP/cli" -maxdepth 1 -type f \( -name keypaste -o -name keypaste.exe \))"
+          count="$(printf '%s' "$found" | grep -c . || true)"
+          [ "$count" = 1 ] || { echo "::error::fixture-cli holds $count keypaste programs, not one"; exit 1; }
+          chmod +x "$found"
+          version="$("$found" --version | tr -d '[:space:]')"
           case "$version" in [0-9]*.[0-9]*.[0-9]*) ;; *) echo "::error::the fixture's CLI/MCP reports '$version', not a version"; exit 1 ;; esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -208,6 +216,13 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/apt-install.sh --no-install-recommends keepassxc
+
+      - name: Install keepassxc-cli (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: brew install --cask keepassxc
 
       - name: Install keepassxc-cli (Windows)
         if: runner.os == 'Windows'
@@ -252,3 +267,4 @@ jobs:
           # take the failing log with it (run 35260785520).
           if-no-files-found: warn
           retention-days: 30
+

@@ -19,13 +19,13 @@ die() { echo "::error::$*" >&2; exit 1; }
 [ $# -ge 3 ] || die 'usage: build-upgrade-candidates.sh <rid> <out-dir> <numeric-version>...'
 rid="$1" out="$2"
 shift 2
-case "$rid" in win-x64 | linux-x64) ;; *) die "$rid has no desktop package to upgrade" ;; esac
+case "$rid" in win-x64 | linux-x64 | osx-arm64) ;; *) die "$rid has no desktop package to upgrade" ;; esac
 
 mkdir -p "$out"
 for prefix in "$@"; do
   case "$prefix" in
     [0-9]*.[0-9]*.[0-9]*) ;;
-    *) die "$prefix is not a numeric version an MSI ProductVersion can carry" ;;
+    *) die "$prefix is not a numeric version, which an MSI ProductVersion and a bundle version need" ;;
   esac
   version="$prefix-$SUFFIX"
   published="$ROOT/artifacts/app/$rid"
@@ -48,6 +48,11 @@ for prefix in "$@"; do
   cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" "$stage"/
   if [ "$rid" = win-x64 ]; then
     "$ROOT/scripts/build-windows-installer.sh" "$stage" "$version" "$reported" "$out"
+  elif [ "$rid" = osx-arm64 ]; then
+    # The DMG is the macOS candidate (release-targets.json); the zip it is made from is not one.
+    zip="$("$ROOT/scripts/build-macos-app.sh" "$stage" "$version" "$reported" "$out")"
+    "$ROOT/scripts/build-macos-dmg.sh" "$zip" "$version" "$reported" "$out"
+    rm -f "$zip"
   else
     image="$("$ROOT/scripts/build-linux-appimage.sh" "$stage" "$version" "$out")"
     "$ROOT/scripts/verify-linux-appimage.sh" "$image" "$version" "$reported" "$stage" >&2

@@ -14,7 +14,12 @@
 # beside the old image: the lower app links keypaste from Settings, a start of the higher image while the lower
 # app runs hands off to it (D-0397) and still re-points the link, the higher app then starts on its own, a later
 # start of the lower one leaves the link, and the person then deletes the lower image. Removing the image
-# leaves the link naming a missing file, which is recorded as a known limit, not checked.
+# leaves the link naming a missing file, which is recorded as a known limit, not checked. On macOS the lower
+# app's Settings links keypaste at /usr/local/bin, made with sudo while Link is offered as a runner has nobody
+# to answer the administrator dialog, and turns on Open at login. The upgrade quits the app, has Finder move the
+# old keypaste.app to the Trash and copies the new one from its DMG to the same path, so the link and the
+# LaunchAgent, which name that path, must come through unchanged with the five files; the upgraded app must
+# then unlock the vault. Uninstalling moves the bundle to the Trash and leaves the link and the LaunchAgent.
 #
 # A rehearsal makes the data with a CLI/MCP built from this commit instead (D-0433). The candidates are never
 # attested either way, so no check changes; the run is never release evidence.
@@ -27,12 +32,14 @@
 # folders, so redirecting LOCALAPPDATA sandboxes nothing (D-0206).
 #
 # The interrupted install fails inside the transaction, from a copy whose cabinet cannot be extracted, and
-# only a log naming the failed action counts: an install that never failed proves no recovery (D-0213).
+# only a log naming the failed action counts: an install that never failed proves no recovery (D-0213). On
+# macOS it is a download that stopped halfway, a half-length DMG that hdiutil must refuse to attach.
 #
 # Checks, in order: install-lower, fixture, upgrade, data-after-upgrade, interrupted, downgrade-refused,
 # uninstall. A check passes only on its evidence, is unreached when its action could not be done or an
 # earlier check failed, and is a contradiction when the action completed and the evidence disagrees.
-# downgrade-refused is not-applicable on Linux, where an AppImage has no installer to refuse one.
+# downgrade-refused is not-applicable on Linux and macOS, where an AppImage or a keypaste.app has no installer to
+# refuse one.
 #
 # Usage:
 #   exercise-desktop-upgrade.sh <rid> <candidates-dir> <cli-version> <cli-dir> <output-dir>
@@ -60,6 +67,7 @@ readonly DOWNGRADE_MESSAGE='A newer keypaste is already installed.'
 readonly INSTALL_FAILED='Action ended.*InstallFinalize. Return value 3|Action ended.*InstallFiles. Return value 3'
 readonly LINK_BUTTON='Link the keypaste command'
 readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
+readonly OPEN_AT_LOGIN='Open keypaste at login'
 readonly CR=$'\r'
 readonly TAB=$'\t'
 
@@ -67,6 +75,8 @@ readonly TAB=$'\t'
 . "$ROOT/scripts/lib/desktop-drive.sh"
 # shellcheck source=scripts/lib/terminal.sh
 . "$ROOT/scripts/lib/terminal.sh"
+# shellcheck source=scripts/lib/macos-install.sh
+. "$ROOT/scripts/lib/macos-install.sh"
 
 usage() {
   echo 'usage: bash scripts/exercise-desktop-upgrade.sh <rid> <candidates-dir> <cli-version> <cli-dir> <output-dir> | --classify <output-dir> | --selftest'
@@ -105,6 +115,9 @@ classify() {
     case "$result" in pass | not-applicable) ;; *) [ -n "$blocked" ] || blocked="$1" ;; esac
   }
 
+  # What the upgraded app's unlock changed besides the two settings files an unlock writes.
+  unlock_wrote_more() { local name; for name in $1; do case "$name" in app.toml | recent.toml) ;; *) printf '%s ' "$name" ;; esac; done; }
+
   # Whether the new terminal started after <when> ran keypaste <version> from where the MSI or the link puts
   # it, with one user Path entry on Windows; when not, the result and why.
   terminal_runs() { # terminal_runs <when> <version>
@@ -131,14 +144,18 @@ classify() {
 
   # On Linux the person links keypaste from the lower app's Settings before the baseline is taken, since the
   # app's unlock writes its settings.
+  # A Settings step that could not be done is named before the baseline it would have completed.
   if judge fixture && judge baseline; then
     made="$detail"
-    if [ "$(fact_of "$dir" baseline)" != complete ]; then result=contradiction; why="the fixture left no complete baseline: $(fact_of "$dir" baseline)"
-    elif [ "$platform" = linux ] && ! { judge window && judge unlocked && judge settings && judge link-cli && judge linked \
+    if [ "$platform" = linux ] && ! { judge window && judge unlocked && judge settings && judge link-cli && judge linked \
       && terminal_runs fixture "$LOWER"; }; then :
+    elif [ "$platform" = macos ] && ! { judge window && judge unlocked && judge settings && judge link-offered && judge link-made \
+      && judge link-cli && judge linked && judge open-at-login && judge login-item && terminal_runs fixture "$LOWER"; }; then :
+    elif [ "$(fact_of "$dir" baseline)" != complete ]; then result=contradiction; why="the fixture left no complete baseline: $(fact_of "$dir" baseline)"
     else
       result=pass; why="$made"
       if [ "$platform" = linux ]; then why="$why; Settings linked keypaste and a new terminal runs $LOWER through it, the login shell reading $(fact_of "$dir" shell_profile)"; fi
+      if [ "$platform" = macos ]; then why="$why; the runner made the link with sudo while Settings offered Link, whose Link then found this copy linked, Open at login was turned on, and a new terminal runs $LOWER through the link"; fi
       if [ "$(fact_of "$dir" rehearsal)" = true ]; then why="$why; the CLI/MCP that made the data is a branch build of this commit, not a published release"; fi
     fi
   fi
@@ -160,6 +177,10 @@ classify() {
     elif [ "$(fact_of "$dir" token_after_upgrade)" != "${VALUES[2]}" ]; then result=contradiction; why="the vault reads $(fact_of "$dir" token_after_upgrade) for $VARIABLE, not ${VALUES[2]}"
     elif [ "$(fact_of "$dir" log_verify_after_upgrade)" != pass ]; then result=contradiction; why="keypaste log verify says $(fact_of "$dir" log_verify_after_upgrade)"
     elif [ "$(fact_of "$dir" keepassxc_after_upgrade)" != "$HISTORY_TITLES" ]; then result=contradiction; why="KeePassXC reads $(fact_of "$dir" keepassxc_after_upgrade) revisions of $PROJECT's $HOME_ENTRY, not $HISTORY_TITLES"
+    elif [ "$platform" = macos ] && ! judge upgraded-unlocked; then :
+    elif [ "$platform" = macos ] && [ -n "$(unlock_wrote_more "$(fact_of "$dir" unlock_changed)")" ]; then
+      result=contradiction; why="the upgraded app's unlock changed $(unlock_wrote_more "$(fact_of "$dir" unlock_changed)"), not only its settings files"
+    elif [ "$platform" = macos ]; then result=pass; why="the vault, its history, the settings, the ceilings, the audit, the link and the LaunchAgent came through the upgrade unchanged, and the upgraded app unlocked the vault"
     else result=pass; why="the vault, its history, the settings, the ceilings and the audit came through the upgrade unchanged"
     fi
   fi
@@ -182,6 +203,8 @@ classify() {
 
   if [ "$platform" = linux ]; then
     result=not-applicable; why='an AppImage has no installer, so nothing can refuse a downgrade'
+  elif [ "$platform" = macos ]; then
+    result=not-applicable; why='a keypaste.app has no installer, so nothing can refuse a downgrade'
   elif judge downgrade; then
     if [ "$(fact_of "$dir" downgrade_exit)" = 0 ]; then result=contradiction; why="the MSI installed $LOWER over $HIGHER"
     elif [ "$(fact_of "$dir" downgrade_message)" != present ]; then result=contradiction; why="the install log does not say '$DOWNGRADE_MESSAGE'"
@@ -205,6 +228,8 @@ classify() {
     elif [ "$platform" = windows ] && [ "$(fact_of "$dir" user_path_after_uninstall)" != "$(fact_of "$dir" user_path_before)" ]; then
       result=contradiction; why="the uninstall left the user Path '$(fact_of "$dir" user_path_after_uninstall)', not '$(fact_of "$dir" user_path_before)' as before the install"
     elif [ "$platform" = windows ]; then result=pass; why='the app, its user Path entry and its terminal keypaste are gone, and the vault, settings, ceilings and audit are untouched'
+    elif [ "$platform" = macos ]; then
+      result=pass; why="Finder moved the app to the Trash and the vault, settings, ceilings and audit are untouched; the link and the LaunchAgent are left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
     else result=pass; why="the app is gone and the vault, settings, ceilings and audit are untouched; the link Settings made is left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
     fi
   fi
@@ -231,6 +256,7 @@ platform() {
   case "$RID" in
     win-x64) echo windows ;;
     linux-x64) echo linux ;;
+    osx-arm64) echo macos ;;
     *) die "no installation candidate for $RID" ;;
   esac
 }
@@ -242,8 +268,8 @@ sha256_of() { if command -v sha256sum >/dev/null; then sha256sum < "$1"; else sh
 powershell_out() { powershell -NoProfile -NonInteractive -Command "$1" | tr -d "$CR"; }
 
 candidate() { # candidate <version>
-  local ext=msi
-  [ "$PLATFORM" = linux ] && ext=AppImage
+  local ext
+  case "$PLATFORM" in windows) ext=msi ;; linux) ext=AppImage ;; macos) ext=dmg ;; esac
   local name="keypaste-app-$1-$RID-internal-unsigned.$ext"
   [ -f "$CANDIDATES/$name" ] || { echo "no candidate at $CANDIDATES/$name" >&2; return 1; }
   printf '%s' "$CANDIDATES/$name"
@@ -251,8 +277,12 @@ candidate() { # candidate <version>
 
 # --- the data whose survival is the point ---------------------------------------------------------
 
-# The five files a user would lose: the vault, the app's two settings files, this computer's ceilings and the audit.
-data_files() { printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/clients.toml" "$HOME_DIR/audit.jsonl"; }
+# The five files a user would lose: the vault, the app's two settings files, this computer's ceilings and the audit;
+# on macOS also Open at login's LaunchAgent.
+data_files() {
+  printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/clients.toml" "$HOME_DIR/audit.jsonl"
+  if [ "$PLATFORM" = macos ]; then printf '%s\n' "$LAUNCH_AGENT"; fi
+}
 
 snapshot() { # snapshot <file>
   local path
@@ -262,6 +292,8 @@ snapshot() { # snapshot <file>
     else printf 'absent  %s\n' "$(basename "$path")" >> "$1"
     fi
   done < <(data_files)
+  # The link names the bundle's fixed path, which an upgrade replaces in place (MacCliLink.KeepCurrent).
+  if [ "$PLATFORM" = macos ]; then printf '%s  link\n' "$(readlink "$MAC_CLI_LINK" || echo absent)" >> "$1"; fi
 }
 
 # Records this transition's before and after, and says identical or what differs.
@@ -368,7 +400,11 @@ read_after() { # read_after <when>
 
 # Where a new terminal should find keypaste: the MSI's install folder, or the link Settings makes.
 terminal_expected() {
-  if [ "$PLATFORM" = windows ]; then printf '%s\\keypaste.exe' "$(windows_folder)"; else printf '%s' "$HOME/.local/bin/keypaste"; fi
+  case "$PLATFORM" in
+    windows) printf '%s\\keypaste.exe' "$(windows_folder)" ;;
+    linux) printf '%s' "$HOME/.local/bin/keypaste" ;;
+    macos) printf '%s' "$MAC_CLI_LINK" ;;
+  esac
 }
 
 # What a new terminal runs after <when>, and on Windows how many user Path entries name the install folder.
@@ -404,35 +440,73 @@ mark_user_path() {
   echo "added $entry to the user Path"
 }
 
-# --- Linux: the app a person starts ---------------------------------------------------------------
+# --- Linux and macOS: the app a person starts -----------------------------------------------------
 
 # Every start stops the running app first, since a second start only asks the running one to show its
-# window (D-0397).
-start_app() { # start_app <appimage> <name>
+# window (D-0397). macOS starts the bundle through LaunchServices.
+start_app() { # start_app <appimage|bundle> <name>
   stop_app
-  "$1" > "$OUT/app-$2.log" 2>&1 &
-  APP_PID=$!
+  if [ "$PLATFORM" = macos ]; then
+    APP_PID="$(mac_start "$1" "$OUT/app-$2.log")" || { echo "$APP_PID"; APP_PID=''; return 1; }
+  else
+    "$1" > "$OUT/app-$2.log" 2>&1 &
+    APP_PID=$!
+  fi
 }
 
 stop_app() {
   [ -n "${APP_PID:-}" ] || return 0
-  pkill -f usr/bin/keypaste-app 2>/dev/null || true
-  kill "$APP_PID" 2>/dev/null || true
-  wait "$APP_PID" 2>/dev/null || true
+  if [ "$PLATFORM" = macos ]; then
+    mac_quit
+  else
+    pkill -f usr/bin/keypaste-app 2>/dev/null || true
+    kill "$APP_PID" 2>/dev/null || true
+    wait "$APP_PID" 2>/dev/null || true
+  fi
   APP_PID=''
   sleep 2
 }
 
 # The lower app, unlocked, links keypaste from Settings as a person does once; a new terminal then runs it.
 link_from_settings() {
-  act accessibility enable_accessibility || return 0
-  start_app "$APP" lower
+  if [ "$PLATFORM" = linux ]; then act accessibility enable_accessibility || return 0; fi
+  start_app "$APP" lower || true
   { act window drive window 120 \
     && act unlocked drive type "$MASTER" && act unlocked-enter drive key Return && act unlocked drive find 'Lock now' \
-    && act settings drive key ctrl+4 && act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX"; } \
-    || true
+    && act settings shortcut 4 && link_cli; } || true
   stop_app
   probe fixture
+}
+
+# Linux's Link writes the link itself. macOS's asks an administrator, so a runner makes the link with sudo while
+# Link is offered and Link then finds this copy linked; Open at login is turned on there too.
+link_cli() {
+  if [ "$PLATFORM" = linux ]; then
+    act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX"
+  else
+    act link-offered drive find "$LINK_BUTTON" && act link-made mac_cli_link "$APP/Contents/MacOS/keypaste" \
+      && act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX" \
+      && act open-at-login drive toggle "$OPEN_AT_LOGIN" && act login-item login_item
+  fi
+}
+
+login_item() {
+  for _ in $(seq 1 40); do [ -f "$LAUNCH_AGENT" ] && break; sleep 0.25; done
+  [ -f "$LAUNCH_AGENT" ] || { echo "Open at login wrote no $LAUNCH_AGENT"; return 1; }
+  grep -qF "<string>$APP/Contents/MacOS/keypaste-app</string>" "$LAUNCH_AGENT" \
+    || { echo "$LAUNCH_AGENT starts another program: $(tr -d '\n' < "$LAUNCH_AGENT")"; return 1; }
+  echo "$LAUNCH_AGENT starts $APP/Contents/MacOS/keypaste-app"
+}
+
+# The upgraded app opens the vault. Its unlock writes the app's settings, so later transitions compare with what
+# it left, and what it changed is recorded.
+unlock_upgraded() {
+  { act upgraded-typed drive type "$MASTER" && act upgraded-unlocked-enter drive key Return \
+    && act upgraded-unlocked drive find 'Lock now'; } || true
+  stop_app
+  mv "$OUT/hashes-baseline.txt" "$OUT/hashes-baseline-before-unlock.txt"
+  snapshot "$OUT/hashes-baseline.txt"
+  fact unlock_changed "$(diff "$OUT/hashes-baseline-before-unlock.txt" "$OUT/hashes-baseline.txt" | sed -n 's/^> [^ ]*  //p' | tr '\n' ' ')"
 }
 
 # A complete download, renamed into place as a browser does.
@@ -485,6 +559,7 @@ msi_log_says() { # msi_log_says <log> <extended-regexp>
 
 app_version() {
   local app="$1"
+  [ "$PLATFORM" != macos ] || app="$app/Contents/MacOS/keypaste-app"
   [ -x "$app" ] || { echo absent; return 0; }
   "$app" --version 2>/dev/null | tr -d "[:space:]$CR" || echo unreadable
 }
@@ -492,7 +567,7 @@ app_version() {
 # --- the run --------------------------------------------------------------------------------------
 
 install_lower() {
-  local msi app code
+  local msi app code dmg
   if [ "$PLATFORM" = windows ]; then
     msi="$(candidate "$LOWER")" || return 1
     mark_user_path || return 1
@@ -506,6 +581,15 @@ install_lower() {
     fact registrations_after_install "$(windows_registrations | tr '\n' ' ')"
     probe install
     echo "msiexec /i exited 0; installed $(cygpath -m "$APP") reporting $(fact_read lower_version), $(fact_read products_after_install) registered"
+  elif [ "$PLATFORM" = macos ]; then
+    dmg="$(candidate "$LOWER")" || return 1
+    APP=/Applications/keypaste.app
+    [ ! -e "$APP" ] || { echo "$APP already exists on this runner"; return 1; }
+    mac_install "$dmg" "$APP" || return 1
+    fact lower_version "$(app_version "$APP")"
+    "$APP/Contents/MacOS/keypaste-app" --selftest > /dev/null || { echo 'the installed app failed --selftest'; return 1; }
+    fact products_after_install "$(mac_bundles)"
+    echo "copied $LOWER's keypaste.app to $APP, which reports $(fact_read lower_version)"
   else
     app="$(candidate "$LOWER")" || return 1
     APP="$APPS/$(basename "$app")"
@@ -520,7 +604,7 @@ install_lower() {
 fact_read() { fact_of "$OUT" "$1"; }
 
 upgrade() {
-  local msi app code higher
+  local msi app code higher dmg
   if [ "$PLATFORM" = windows ]; then
     msi="$(candidate "$HIGHER")" || return 1
     code="$(msiexec_install "$msi" "$OUT/upgrade.log")"
@@ -532,6 +616,20 @@ upgrade() {
     "$APP" --selftest > /dev/null || { echo 'the upgraded app failed --selftest'; return 1; }
     probe upgrade
     echo "MajorUpgrade exited 0; $(cygpath -m "$APP") now reports $(fact_read higher_version)"
+  elif [ "$PLATFORM" = macos ]; then
+    # The upgraded app is left running and locked, so the data is compared with it started, before its unlock.
+    dmg="$(candidate "$HIGHER")" || return 1
+    stop_app
+    mac_quit
+    mac_trash "$APP" || { echo "Finder did not move the $LOWER app to the Trash"; return 1; }
+    mac_install "$dmg" "$APP" || return 1
+    fact higher_version "$(app_version "$APP")"
+    "$APP/Contents/MacOS/keypaste-app" --selftest > /dev/null || { echo 'the upgraded app failed --selftest'; return 1; }
+    fact products_after_upgrade "$(mac_bundles)"
+    start_app "$APP" higher || return 1
+    drive window 120 || { stop_app; echo "the $HIGHER app showed no window"; return 1; }
+    probe upgrade
+    echo "Finder moved the $LOWER app to the Trash and $HIGHER's took its place; $APP reports $(fact_read higher_version) and shows its window"
   else
     # An AppImage has no installer: the new image arrives beside the old one while the old app runs, as after a
     # start at login. The person starts the new image, which hands off to the running app and must still
@@ -567,7 +665,7 @@ upgrade() {
 # a SYSTEM write, deleting the source fails only after InstallFinalize, and the log's own process
 # prefix is no process to end (D-0210, D-0212, D-0213).
 interrupt() {
-  local msi log="$OUT/interrupt.log" source code previous size image partial
+  local msi log="$OUT/interrupt.log" source code previous size image partial said volume
   if [ "$PLATFORM" = windows ]; then
     msi="$(candidate "$THIRD")" || return 1
     source="$OUT/interrupt-source.msi"
@@ -598,6 +696,32 @@ interrupt() {
     fact products_after_interrupt "$(windows_registration_count)"
     fact registrations_after_interrupt "$(windows_registrations | tr '
 ' ' ')"
+  elif [ "$PLATFORM" = macos ]; then
+    # A download that stopped halfway: the image has lost its trailer, so hdiutil must refuse it and nothing is copied.
+    image="$(candidate "$THIRD")" || return 1
+    partial="$OUT/$(basename "$image" .dmg)-partial.dmg"
+    head -c "$(( $(wc -c < "$image") / 2 ))" "$image" > "$partial"
+    code=0
+    volume="$(mac_mountpoint)"
+    mkdir -p "$volume"
+    said="$(mac_bounded 120 hdiutil attach "$partial" -readonly -nobrowse -noautoopen -mountpoint "$volume" 2>&1)" || code=$?
+    fact interrupted_exit "$code"
+    # 142 is the bound expiring, which refuses nothing; only a refusal of the image itself is the truncation's.
+    if [ "$code" != 0 ] && [ "$code" != 142 ] && ! mount | grep -qF " on $volume (" \
+      && printf '%s' "$said" | grep -qiE 'image not recognized|corrupt'; then
+      fact interrupted_failed yes
+      fact interrupted_where "hdiutil attach refused the half-length image: $(printf '%s' "$said" | tail -n 1)"
+    elif [ "$code" != 0 ] && ! mount | grep -qF " on $volume ("; then
+      fact interrupted_failed no
+      fact interrupted_where "hdiutil refused the half-length image for another reason (exit $code): $(printf '%s' "$said" | tail -n 1)"
+    else
+      fact interrupted_failed no
+      fact interrupted_where "hdiutil attached the half-length image (exit $code)"
+      mac_detach "$volume" || true
+    fi
+    fact version_after_interrupt "$(app_version "$APP")"
+    fact products_after_interrupt "$(mac_bundles)"
+    rm -f "$partial"
   else
     # A download that stops halfway: its temporary file is never renamed, so nothing runs it.
     image="$(candidate "$THIRD")" || return 1
@@ -642,6 +766,13 @@ uninstall() {
     fi
     fact user_path_after_uninstall "$(user_path)"
     echo "msiexec /x exited 0"
+  elif [ "$PLATFORM" = macos ]; then
+    stop_app
+    mac_trash "$APP" || { echo "Finder did not move $APP to the Trash"; return 1; }
+    if [ -e "$APP" ]; then fact installed_app_after_uninstall "$APP"; else fact installed_app_after_uninstall absent; fi
+    fact shortcut_after_uninstall absent
+    fact registration_after_uninstall absent
+    echo "Finder moved $APP to the Trash"
   else
     rm -f "$APP"
     if [ -e "$APP" ]; then fact installed_app_after_uninstall "$APP"; else fact installed_app_after_uninstall absent; fi
@@ -659,6 +790,7 @@ environment() {
   case "$PLATFORM" in
     linux) os="$(sed -n 's/^PRETTY_NAME="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/os-release) $(uname -r)" ;;
     windows) os="$(powershell_out '(Get-CimInstance Win32_OperatingSystem | ForEach-Object { "$($_.Caption) $($_.Version)" })')" ;;
+    macos) os="$(sw_vers -productName) $(sw_vers -productVersion) ($(sw_vers -buildVersion))" ;;
   esac
   sha="${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)}"
   jq -n \
@@ -693,9 +825,10 @@ run_all() {
   fi
 
   if act install-lower install_lower && act fixture fixture; then
-    if [ "$PLATFORM" = linux ]; then link_from_settings; fi
+    if [ "$PLATFORM" != windows ]; then link_from_settings; fi
     if act baseline baseline && act upgrade upgrade; then
       act read-after-upgrade read_after upgrade || true
+      if [ "$PLATFORM" = macos ]; then unlock_upgraded; fi
       act interrupt interrupt || true
       if [ "$PLATFORM" = windows ]; then act downgrade downgrade || true; fi
       act uninstall uninstall || true
@@ -723,7 +856,7 @@ selftest() {
   local work cases=0 failures=0
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' RETURN
-  local folder='C:\Users\runner\AppData\Local\Programs\keypaste' link=/home/runner/.local/bin/keypaste
+  local folder='C:\Users\runner\AppData\Local\Programs\keypaste' link=/home/runner/.local/bin/keypaste mac_link=/usr/local/bin/keypaste
   local path_before='%USERPROFILE%\AppData\Local\Microsoft\WindowsApps;C:\work\upgrade-desktop\user-path-entry'
   local bridge='usage: keypaste mcp [--vault <path>]'
 
@@ -798,6 +931,32 @@ selftest() {
     set_fact "$1" terminal_after_older_start "$link"$'\t'"$HIGHER"$'\t'"$bridge"
     set_fact "$1" terminal_after_interrupt "$link"$'\t'"$HIGHER"$'\t'"$bridge"
     set_fact "$1" terminal_after_uninstall $'fails\t/home/runner/.local/bin/keypaste exited 127: not found'
+  }
+  # The passing run on macOS, where the lower app links keypaste and turns on Open at login, and the upgraded app
+  # unlocks the vault.
+  passing_macos() {
+    passing "$1"
+    drop_action "$1" downgrade
+    printf '%s\n' \
+      '{"action":"window","status":"ok","detail":"window keypaste"}' \
+      '{"action":"unlocked","status":"ok","detail":"found Lock now"}' \
+      '{"action":"settings","status":"ok","detail":"sent cmd+4"}' \
+      '{"action":"link-offered","status":"ok","detail":"found Link the keypaste command"}' \
+      '{"action":"link-made","status":"ok","detail":"/usr/local/bin/keypaste -> /Applications/keypaste.app/Contents/MacOS/keypaste"}' \
+      '{"action":"link-cli","status":"ok","detail":"invoked Link the keypaste command"}' \
+      '{"action":"linked","status":"ok","detail":"A terminal runs this app\u0027s keypaste from /usr/local/bin/keypaste."}' \
+      '{"action":"open-at-login","status":"ok","detail":"invoked Open keypaste at login"}' \
+      '{"action":"login-item","status":"ok","detail":"com.keypaste.app.plist starts /Applications/keypaste.app/Contents/MacOS/keypaste-app"}' \
+      '{"action":"upgraded-typed","status":"ok","detail":"typed 21 characters"}' \
+      '{"action":"upgraded-unlocked-enter","status":"ok","detail":"sent Return"}' \
+      '{"action":"upgraded-unlocked","status":"ok","detail":"found Lock now"}' >> "$work/$1/driver.jsonl"
+    set_fact "$1" platform macos
+    set_fact "$1" terminal_expected "$mac_link"
+    set_fact "$1" terminal_after_fixture "$mac_link"$'\t'"$LOWER"$'\t'"$bridge"
+    set_fact "$1" terminal_after_upgrade "$mac_link"$'\t'"$HIGHER"$'\t'"$bridge"
+    set_fact "$1" terminal_after_interrupt "$mac_link"$'\t'"$HIGHER"$'\t'"$bridge"
+    set_fact "$1" terminal_after_uninstall absent
+    set_fact "$1" unlock_changed 'app.toml recent.toml '
   }
   refuse_action() { jq -c --arg a "$2" --arg d "$3" 'if .action == $a then .status = "refused" | .detail = $d else . end' "$work/$1/driver.jsonl" > "$work/t" && mv "$work/t" "$work/$1/driver.jsonl"; }
   drop_action() { jq -c --arg a "$2" 'select(.action != $a)' "$work/$1/driver.jsonl" > "$work/t" && mv "$work/t" "$work/$1/driver.jsonl"; }
@@ -918,6 +1077,30 @@ selftest() {
   passing_linux linux-uninstall-link-gone
   set_fact linux-uninstall-link-gone terminal_after_uninstall absent
 
+  # macOS.
+  passing_macos macos
+  passing_macos macos-not-linked
+  refuse_action macos-not-linked link-made '/usr/local/bin/keypaste already exists'
+  set_fact macos-not-linked baseline 'absent  link'
+  passing_macos macos-no-login-item
+  refuse_action macos-no-login-item login-item 'Open at login wrote no com.keypaste.app.plist'
+  set_fact macos-no-login-item baseline 'absent  com.keypaste.app.plist'
+  passing_macos macos-unlock-wrote-the-vault
+  set_fact macos-unlock-wrote-the-vault unlock_changed 'upgrade-check.kdbx app.toml '
+  passing_macos macos-link-unread
+  set_fact macos-link-unread terminal_after_fixture absent
+  passing_macos macos-upgraded-locked
+  refuse_action macos-upgraded-locked upgraded-unlocked "nothing named 'Lock now' appeared"
+  passing_macos macos-agent-changed
+  set_fact macos-agent-changed data_after_upgrade '< 1f2e  com.keypaste.app.plist > 9a8b  com.keypaste.app.plist'
+  passing_macos macos-link-runs-the-lower
+  set_fact macos-link-runs-the-lower terminal_after_upgrade "$mac_link"$'\t'"$LOWER"$'\t'"$bridge"
+  passing_macos macos-interrupt-attached
+  set_fact macos-interrupt-attached interrupted_failed no
+  set_fact macos-interrupt-attached interrupted_where 'hdiutil attached the half-length image (exit 0)'
+  passing_macos macos-uninstall-left-the-app
+  set_fact macos-uninstall-left-the-app installed_app_after_uninstall /Applications/keypaste.app
+
   local check
   for check in "${CHECKS[@]}"; do expect all-pass "$check" pass; done
   expect lower-not-installed install-lower unreached
@@ -985,6 +1168,21 @@ selftest() {
   expect linux-interrupt-broke-the-link interrupted contradiction
   expect linux-uninstall-link-gone uninstall pass
 
+  for check in "${CHECKS[@]}"; do
+    if [ "$check" = downgrade-refused ]; then expect macos "$check" not-applicable; else expect macos "$check" pass; fi
+  done
+  expect macos-not-linked fixture unreached
+  expect macos-no-login-item fixture unreached
+  expect macos-no-login-item upgrade unreached
+  expect macos-link-unread fixture contradiction
+  expect macos-upgraded-locked upgrade pass
+  expect macos-upgraded-locked data-after-upgrade unreached
+  expect macos-agent-changed data-after-upgrade contradiction
+  expect macos-unlock-wrote-the-vault data-after-upgrade contradiction
+  expect macos-link-runs-the-lower upgrade contradiction
+  expect macos-interrupt-attached interrupted unreached
+  expect macos-uninstall-left-the-app uninstall contradiction
+
   utf16() { local s="$1" i; for ((i = 0; i < ${#s}; i++)); do printf '%s\0' "${s:i:1}"; done; }
   # Two megabytes after the line read for, so a reader that stops at the match leaves its producer writing (F.43).
   utf16 $'MSI (s) (D0:2C) [15:21:46:444]: Note: 1: 2205 2:  3: Error\n' > "$work/filler"
@@ -1027,7 +1225,9 @@ case "${1:-}" in
     CANDIDATES="$2"
     CLI_VERSION="$3"
     CLI_DIR="$4"
-    OUT="$5"
+    mkdir -p "$5"
+    # Absolute, because LaunchServices starts the macOS app from / and mount(8) reports resolved paths.
+    OUT="$(cd "$5" && pwd -P)"
     PLATFORM="$(platform)"
     if [ "$PLATFORM" = windows ]; then
       HOME_DIR="$(cygpath -u "$USERPROFILE")/.keypaste"
@@ -1036,6 +1236,7 @@ case "${1:-}" in
       HOME_DIR="$HOME/.keypaste"
       VAULT="$HOME/keypaste-upgrade/upgrade-check.kdbx"
       APPS="$HOME/Applications"
+      LAUNCH_AGENT="$HOME/Library/LaunchAgents/com.keypaste.app.plist"
     fi
     VAULT_NATIVE="$(native "$VAULT")"
     run_all

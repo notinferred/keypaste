@@ -1,12 +1,19 @@
 # shellcheck shell=bash
 # The macOS steps of the desktop exercises (4.7e): a DMG quarantined as a browser download, attached and its
-# keypaste.app copied to /Applications, what Gatekeeper shows for that copy, and the installed app started and
-# quit through LaunchServices. Sourced after lib/desktop-drive.sh and once the exercise defines ROOT, OUT and fact;
+# keypaste.app copied to /Applications, what Gatekeeper shows for that copy, the installed app started and quit
+# through LaunchServices, and a bundle moved to the Trash by Finder. Sourced after lib/desktop-drive.sh and once the exercise defines ROOT, OUT and fact;
 # written for the stock bash 3.2 (D-0398).
 #
 #   mac_quarantine <file>       stamps a browser download's quarantine through NSURLQuarantinePropertiesKey
-#   mac_attach <dmg> <dir>      attaches it read-only and unbrowsed at <dir>
+#   mac_mountpoint              a fresh mount point in a private temporary folder, outside any records folder, so a
+#                               volume left attached is never uploaded with them: the image links /Applications
+#   mac_attach <dmg> <dir>      attaches it read-only and unbrowsed at <dir>, and detaches it again when it is not
+#                               mounted there
 #   mac_detach <dir>            detaches; a refusal is kept with what holds the volume, never retried (F.64)
+#   mac_install <dmg> <app>     attaches the image at a mount point of its own, copies its keypaste.app to <app> with
+#                               ditto, which keeps the quarantine a Finder drag keeps, and detaches it
+#   mac_trash <app>             has Finder move it to the Trash, as a person deletes an app
+#   mac_bundles                 how many keypaste bundles /Applications holds
 #   mac_quarantined <path>      how many files under <path> carry com.apple.quarantine
 #   mac_gatekeeper <app>        opens it through LaunchServices, records what Gatekeeper shows and cancels it
 #   mac_launcher <app>          opens its Terminal launcher on a planted request; says whether Terminal ran it
@@ -31,10 +38,16 @@ mac_quarantine() {
   xattr -p com.apple.quarantine "$1" || { echo "$1 carries no quarantine after it was stamped"; return 1; }
 }
 
+# Resolved, because mount(8) reports /var/folders under /private.
+mac_mountpoint() { local dir; dir="$(cd "$(mktemp -d)" && pwd -P)" && printf '%s/volume' "$dir"; }
+
 mac_attach() {
   mkdir -p "$2"
   hdiutil attach "$1" -readonly -nobrowse -noautoopen -mountpoint "$2" > /dev/null || return 1
-  mount | grep -qF " on $2 (" || { echo "$1 is not mounted at $2"; return 1; }
+  mount | grep -qF " on $2 (" && return 0
+  echo "$1 is not mounted at $2"
+  hdiutil detach "$2" > /dev/null 2>&1 || true
+  return 1
 }
 
 mac_detach() {
@@ -43,6 +56,26 @@ mac_detach() {
   lsof "$1" 2>&1 | head -n 20
   return 1
 }
+
+mac_install() {
+  local volume
+  volume="$(mac_mountpoint)" || return 1
+  mac_attach "$1" "$volume" || return 1
+  if [ ! -d "$volume/keypaste.app" ] || [ "$(readlink "$volume/Applications")" != /Applications ]; then
+    echo 'the image holds no keypaste.app beside a link to /Applications'
+    mac_detach "$volume"
+    return 1
+  fi
+  ditto "$volume/keypaste.app" "$2" || { mac_detach "$volume"; return 1; }
+  mac_detach "$volume"
+}
+
+mac_trash() {
+  mac_bounded 60 osascript -e "tell application \"Finder\" to delete (POSIX file \"$1\" as alias)" > /dev/null || return 1
+  [ ! -e "$1" ] || { echo "$1 is still there after Finder deleted it"; return 1; }
+}
+
+mac_bundles() { find /Applications -maxdepth 1 -name 'keypaste*.app' | grep -c . || true; }
 
 mac_quarantined() { xattr -lr "$1" 2>/dev/null | grep -c 'com.apple.quarantine' || true; }
 
