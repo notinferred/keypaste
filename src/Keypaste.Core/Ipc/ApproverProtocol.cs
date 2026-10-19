@@ -4,6 +4,7 @@ using System.Text.Json.Serialization.Metadata;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
@@ -28,8 +29,10 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// <b>One transport is not one seam.</b> DECISIONS.md D-0022 forbids fusing the listing path and
 /// the credential path. That still holds: they are different message kinds with different handlers,
-/// and only <see cref="CredentialReply"/> has anywhere to put a secret. Sharing a pipe does not
-/// fuse them; sharing an interface would have.
+/// and among the replies only <see cref="CredentialReply"/> and the env replies have anywhere to put a
+/// secret. Among the requests only <see cref="EditRequest"/> carries one, the new value a terminal
+/// writes, inbound to the holder (D-0464). Sharing a pipe does not fuse them; sharing an interface
+/// would have.
 /// </para>
 /// </remarks>
 public static class ApproverProtocol
@@ -55,6 +58,7 @@ public static class ApproverProtocol
     internal const string WithdrawKind = "withdraw";
     internal const string AccessListKind = "access-list";
     internal const string AccessChangeKind = "access-change";
+    internal const string EditKind = "edit";
 
     /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
     /// <remarks>
@@ -427,6 +431,7 @@ public static class ApproverProtocol
                 WithdrawKind => ApproverMessageKind.Withdraw,
                 AccessListKind => ApproverMessageKind.AccessList,
                 AccessChangeKind => ApproverMessageKind.AccessChange,
+                EditKind => ApproverMessageKind.Edit,
                 _ => ApproverMessageKind.Unknown,
             };
         }
@@ -1333,6 +1338,399 @@ public static class ApproverProtocol
 
             return true;
         }
+    }
+
+    /// <summary>Encodes a terminal's edit.</summary>
+    /// <param name="request">The edit, with every value it writes; a recipe goes as the recipe.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(EditRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return JsonSerializer.SerializeToUtf8Bytes(new EditRequestFrame(request), Wire.EditRequestFrame);
+    }
+
+    /// <summary>Whether an edit fits the one frame a request may take (D-0454), so the CLI can refuse a larger one before sending.</summary>
+    /// <param name="request">The edit.</param>
+    /// <returns><see langword="true"/> when its frame is at most <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    public static bool Fits(EditRequest request) => Encode(request).Length <= MessageFramer.MaximumPayloadBytes;
+
+    /// <summary>Encodes what became of a terminal's edit.</summary>
+    /// <param name="reply">The answer.</param>
+    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>: the variables written are left out first, then the reason.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(EditReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var frame = JsonSerializer.SerializeToUtf8Bytes(new EditReplyFrame(reply, withKeys: true), Wire.EditReplyFrame);
+
+        if (frame.Length <= MessageFramer.MaximumPayloadBytes)
+        {
+            return frame;
+        }
+
+        frame = JsonSerializer.SerializeToUtf8Bytes(new EditReplyFrame(reply, withKeys: false), Wire.EditReplyFrame);
+
+        return frame.Length <= MessageFramer.MaximumPayloadBytes
+            ? frame
+            : JsonSerializer.SerializeToUtf8Bytes(new EditReplyFrame(reply with { Reason = Oversized, Done = null }, withKeys: false), Wire.EditReplyFrame);
+    }
+
+    /// <summary>Decodes a terminal's edit.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded edit, still to be validated and checked by the owner.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed edit of a known action, with a value or a recipe where one is written and never both.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out EditRequest? request)
+    {
+        request = null;
+
+        if (!TryAttached(frame, EditKind, out var vault, out var session, out var root)
+            || !TryString(root, "action", out var word)
+            || !TryAction(word, out var action)
+            || !TryEdit(root, action, out var edit))
+        {
+            return false;
+        }
+
+        request = new EditRequest(edit) { Vault = vault, Session = session };
+        return true;
+    }
+
+    /// <summary>Decodes what became of a terminal's edit.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed edit reply.</returns>
+    /// <remarks>An unrecognised method decodes to <see cref="AuditMethod.Failed"/>, and a grant under one to a refusal: nothing is read as made that the owner did not say was.</remarks>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out EditReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, EditKind)
+                || !TryString(root, "decision", out var decision)
+                || !TryInteger(root, "method", out var method)
+                || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            EditRefusalKind? refusal = null;
+
+            if (root.TryGetProperty("refusal", out _))
+            {
+                if (!TryString(root, "refusal", out var refusalWord) || !TryRefusal(refusalWord, out var kind))
+                {
+                    return false;
+                }
+
+                refusal = kind;
+            }
+
+            EditDone? done = null;
+
+            if (root.TryGetProperty("done", out var doneElement) && !TryDone(doneElement, out done))
+            {
+                return false;
+            }
+
+            var known = Enum.IsDefined((AuditMethod)method);
+
+            reply = new EditReply(
+                known && string.Equals(decision, "granted", StringComparison.Ordinal) ? AuditDecision.Granted : AuditDecision.Denied,
+                known ? (AuditMethod)method : AuditMethod.Failed,
+                reason)
+            {
+                Recorded = TrueOnly(root, "recorded"),
+                Refusal = refusal,
+                Done = done,
+            };
+
+            return true;
+        }
+    }
+
+    /// <summary>The word an edit's action goes on the wire as.</summary>
+    internal static string ActionWord(EditAction action) => action switch
+    {
+        EditAction.Add => "add",
+        EditAction.Set => "set",
+        EditAction.SetFields => "set-fields",
+        EditAction.Remove => "rm",
+        EditAction.Rotate => "rotate",
+        EditAction.RemoveField => "field-rm",
+        EditAction.EnvSet => "env-set",
+        EditAction.EnvRemove => "env-rm",
+        EditAction.EnvPull => "env-pull",
+        EditAction.EnvTag => "env-tag",
+        _ => "env-untag",
+    };
+
+    /// <summary>The word a refused edit's kind goes on the wire as.</summary>
+    internal static string RefusalWord(EditRefusalKind kind) => kind switch
+    {
+        EditRefusalKind.NotFound => "not-found",
+        EditRefusalKind.Conflict => "conflict",
+        _ => "invalid",
+    };
+
+    private static bool TryAction(string word, out EditAction action)
+    {
+        foreach (var candidate in Enum.GetValues<EditAction>())
+        {
+            if (string.Equals(ActionWord(candidate), word, StringComparison.Ordinal))
+            {
+                action = candidate;
+                return true;
+            }
+        }
+
+        action = default;
+        return false;
+    }
+
+    private static bool TryRefusal(string word, out EditRefusalKind kind)
+    {
+        foreach (var candidate in Enum.GetValues<EditRefusalKind>())
+        {
+            if (string.Equals(RefusalWord(candidate), word, StringComparison.Ordinal))
+            {
+                kind = candidate;
+                return true;
+            }
+        }
+
+        kind = default;
+        return false;
+    }
+
+    private static bool TryEdit(JsonElement root, EditAction action, [NotNullWhen(true)] out TerminalEdit? edit)
+    {
+        edit = null;
+
+        switch (action)
+        {
+            case EditAction.Add when TryName(root, out var name) && TrySecret(root, out var secret):
+                edit = new AddItem(name, Optional(root, "username") ?? string.Empty, Optional(root, "url") ?? string.Empty, Optional(root, "notes") ?? string.Empty, secret);
+                return true;
+
+            case EditAction.Set when TryName(root, out var name) && TrySecret(root, out var secret):
+                edit = new SetPassword(name, secret);
+                return true;
+
+            case EditAction.SetFields when TryName(root, out var name) && TryFields(root, out var fields):
+                edit = new SetFields(name, fields);
+                return true;
+
+            case EditAction.Remove when TryString(root, "item", out var item):
+                edit = new RemoveItem(item);
+                return true;
+
+            case EditAction.Rotate when TryName(root, out var name)
+                && root.TryGetProperty("generate", out var generate)
+                && TryRecipe(generate, out var recipe):
+                edit = new RotatePassword(name, recipe);
+                return true;
+
+            case EditAction.RemoveField when TryString(root, "item", out var item) && TryString(root, "field", out var field):
+                edit = new RemoveField(item, field);
+                return true;
+
+            case EditAction.EnvSet when TryVariable(root, out var project, out var environment)
+                && TryString(root, "key", out var key)
+                && TrySecret(root, out var secret):
+                edit = new EnvSetKey(project, environment, key, Optional(root, "entry"), secret);
+                return true;
+
+            case EditAction.EnvRemove when TryVariable(root, out var project, out var environment) && TryString(root, "key", out var key):
+                edit = new EnvRemoveKey(project, environment, key, Optional(root, "entry"));
+                return true;
+
+            case EditAction.EnvPull when TryVariable(root, out var project, out var environment) && TryString(root, "dotenv", out var text):
+                edit = new EnvPullFile(project, environment, Optional(root, "entry"), text);
+                return true;
+
+            case EditAction.EnvTag or EditAction.EnvUntag when TryVariable(root, out var project, out var environment) && TryString(root, "item", out var item):
+                edit = new TagItem(project, environment, item, action == EditAction.EnvTag);
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryName(JsonElement root, [NotNullWhen(true)] out EntryName? name)
+    {
+        name = TryString(root, "group", out var group) && TryString(root, "title", out var title) ? new EntryName(group, title) : null;
+        return name is not null;
+    }
+
+    private static bool TryVariable(JsonElement root, [NotNullWhen(true)] out string? project, [NotNullWhen(true)] out string? environment)
+    {
+        environment = null;
+        return TryString(root, "project", out project) && TryString(root, "environment", out environment);
+    }
+
+    /// <summary>Reads a new secret: a value or a recipe, exactly one of them.</summary>
+    private static bool TrySecret(JsonElement root, [NotNullWhen(true)] out NewSecret? secret)
+    {
+        secret = null;
+
+        var hasValue = root.TryGetProperty("value", out _);
+        var hasRecipe = root.TryGetProperty("generate", out var generate);
+
+        if (hasValue == hasRecipe)
+        {
+            return false;
+        }
+
+        if (hasValue)
+        {
+            secret = TryString(root, "value", out var value) ? NewSecret.Of(value) : null;
+        }
+        else
+        {
+            secret = TryRecipe(generate, out var recipe) ? NewSecret.Generated(recipe) : null;
+        }
+
+        return secret is not null;
+    }
+
+    private static bool TryRecipe(JsonElement element, out SecretRecipe recipe)
+    {
+        recipe = default;
+
+        if (element.ValueKind != JsonValueKind.Object || !TryString(element, "kind", out var kind))
+        {
+            return false;
+        }
+
+        if (string.Equals(kind, "characters", StringComparison.Ordinal)
+            && TryInteger(element, "length", out var length)
+            && TryInteger(element, "alphabet", out var alphabet))
+        {
+            recipe = SecretRecipe.For(new PasswordRecipe
+            {
+                Length = length,
+                Alphabet = (PasswordAlphabet)alphabet,
+                ExcludeLookalikes = TrueOnly(element, "no_lookalikes"),
+            });
+        }
+        else if (string.Equals(kind, "words", StringComparison.Ordinal)
+            && TryInteger(element, "words", out var words)
+            && TryString(element, "separator", out var separator)
+            && separator.Length == 1)
+        {
+            recipe = SecretRecipe.For(new PassphraseRecipe { WordCount = words, Separator = separator[0] });
+        }
+        else
+        {
+            return false;
+        }
+
+        return recipe.TryValidate(out _);
+    }
+
+    private static bool TryFields(JsonElement root, [NotNullWhen(true)] out IReadOnlyList<FieldWrite>? fields)
+    {
+        fields = null;
+
+        if (!root.TryGetProperty("fields", out var array)
+            || array.ValueKind != JsonValueKind.Array
+            || array.GetArrayLength() is 0 or > SetFields.MaximumFields)
+        {
+            return false;
+        }
+
+        bool? protect = TrueOnly(root, "plain") ? false : null;
+        var decoded = new List<FieldWrite>(array.GetArrayLength());
+
+        foreach (var field in array.EnumerateArray())
+        {
+            if (field.ValueKind != JsonValueKind.Object
+                || !TryString(field, "name", out var name)
+                || !TryString(field, "value", out var value))
+            {
+                return false;
+            }
+
+            decoded.Add(new FieldWrite(name, value, protect));
+        }
+
+        fields = decoded;
+        return true;
+    }
+
+    private static bool TryDone(JsonElement element, [NotNullWhen(true)] out EditDone? done)
+    {
+        done = null;
+
+        if (element.ValueKind != JsonValueKind.Object
+            || !TryString(element, "action", out var actionWord)
+            || !TryAction(actionWord, out var action)
+            || !TryInteger(element, "outcome", out var outcome)
+            || !Enum.IsDefined((EditOutcome)outcome)
+            || !TryString(element, "item", out var item)
+            || !TryStrings(element, "names", out var names))
+        {
+            return false;
+        }
+
+        EntryName? entry = null;
+
+        if (element.TryGetProperty("entry", out var entryElement))
+        {
+            if (entryElement.ValueKind != JsonValueKind.Object || !TryName(entryElement, out entry))
+            {
+                return false;
+            }
+        }
+
+        List<EnvKeyWrite> keys = [];
+
+        if (element.TryGetProperty("keys", out var groups))
+        {
+            if (groups.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            foreach (var group in groups.EnumerateArray())
+            {
+                if (group.ValueKind != JsonValueKind.Object
+                    || !TryName(group, out var on)
+                    || !TryStrings(group, "new", out var created)
+                    || !TryStrings(group, "updated", out var updated)
+                    || !TryStrings(group, "unchanged", out var unchanged))
+                {
+                    return false;
+                }
+
+                keys.AddRange(created.Select(key => new EnvKeyWrite(key, EnvWriteChange.New, on, key)));
+                keys.AddRange(updated.Select(key => new EnvKeyWrite(key, EnvWriteChange.Replaces, on, key)));
+                keys.AddRange(unchanged.Select(key => new EnvKeyWrite(key, EnvWriteChange.Unchanged, on, key)));
+            }
+        }
+
+        done = new EditDone(action, (EditOutcome)outcome, item)
+        {
+            Names = names,
+            Keys = keys,
+            Entry = entry,
+            SharesPath = TrueOnly(element, "shares_path"),
+            CreatesHome = TrueOnly(element, "creates_home"),
+        };
+
+        return true;
     }
 
     /// <summary>The word a request carries for where it says it came from.</summary>

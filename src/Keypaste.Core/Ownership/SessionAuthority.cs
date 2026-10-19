@@ -70,6 +70,7 @@ public sealed class SessionAuthority : IApproverHandler
     private readonly ApproverHandler _inner;
     private readonly RequestRecorder _recorder;
     private readonly SessionEnvironments? _environments;
+    private readonly SessionEditor? _editor;
     private readonly Action? _lockNow;
     private readonly TimeProvider _clock;
     private readonly ConcurrentDictionary<string, Attachment> _attached = new(StringComparer.Ordinal);
@@ -88,6 +89,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="environments">What env sets are released with, or null to refuse every one.</param>
     /// <param name="lockNow">What <c>keypaste lock</c> runs, which must end the session for the reply to say locked; null refuses it.</param>
     /// <param name="clock">What attachments and releases are timed on; null is the system clock.</param>
+    /// <param name="editor">What a terminal's edit is put to the person and made with, or null to refuse every one.</param>
     public SessionAuthority(
         VaultIdentity vault,
         Func<SessionLifetime?> lifetime,
@@ -95,7 +97,8 @@ public sealed class SessionAuthority : IApproverHandler
         Func<AuditLog?> audit,
         SessionEnvironments? environments = null,
         Action? lockNow = null,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        SessionEditor? editor = null)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(lifetime);
@@ -107,6 +110,7 @@ public sealed class SessionAuthority : IApproverHandler
         _inner = inner;
         _recorder = new RequestRecorder(audit);
         _environments = environments;
+        _editor = editor;
         _lockNow = lockNow;
         _clock = clock ?? TimeProvider.System;
     }
@@ -510,6 +514,43 @@ public sealed class SessionAuthority : IApproverHandler
             token => _inner.ChangeAccessAsync(request, token),
             lifetime,
             (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
+            withdrawn.Token).ConfigureAwait(false));
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Recorded under the command that asked, <c>keypaste &lt;verb&gt;</c>, naming only what the terminal
+    /// typed (D-0464). The log is asked for before anything is decided, so an edit is never made that its
+    /// line could not follow, and the question is withdrawn by a lock as a credential request's is.
+    /// </remarks>
+    public async ValueTask<EditReply> EditAsync(EditRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        var client = AuditClient.Of($"keypaste {request.Edit.Verb}", CoreInfo.Version, null);
+
+        EditReply Answer(EditReply reply) => _recorder.Recorded(
+            reply,
+            RequestRecords.Edit(client, request.Edit, reply.Decision, reply.Method, request.Session, VaultNamed(request.Vault)));
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
+        {
+            return Answer(new EditReply(AuditDecision.Denied, refusal.Method, refusal.Reason));
+        }
+
+        if (_editor is null)
+        {
+            return Answer(new EditReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not take changes from a terminal"));
+        }
+
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+        Withdrawals.Add(lifetime.Ended);
+
+        return Answer(await Decided(
+            token => _editor.DecideAsync(request, lifetime, token),
+            lifetime,
+            (method, reason) => new EditReply(AuditDecision.Denied, method, reason),
             withdrawn.Token).ConfigureAwait(false));
     }
 

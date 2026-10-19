@@ -311,8 +311,8 @@ public static class TerminalEdits
         var on = ApprovalPrompt.Shown(written.Entry);
         var described = set.Value.Describe("value");
         List<string> changes = [written.Change == EnvWriteChange.New
-            ? $"Adds {set.Key} to {where} on {on} with {described}."
-            : $"Replaces {set.Key} on {on} with {described}; the old value stays in the item's history."];
+            ? $"Adds {Name(set.Key)} to {where} on {on} with {described}."
+            : $"Replaces {Name(set.Key)} on {on} with {described}; the old value stays in the item's history."];
 
         if (plan.CreatesHome)
         {
@@ -360,7 +360,7 @@ public static class TerminalEdits
         return Ready(new EditPreview(
             EditAction.EnvRemove,
             on,
-            [$"Removes {remove.Key} from {on} in {Shown(remove.Project)}/{remove.Environment}; its value stays in the item's history."])
+            [$"Removes {Name(remove.Key)} from {on} in {Shown(remove.Project)}/{remove.Environment}; its value stays in the item's history."])
         {
             Entry = holding[0].Entry,
         });
@@ -402,7 +402,7 @@ public static class TerminalEdits
 
         foreach (var written in plan.Keys.Where(key => key.Change != EnvWriteChange.Unchanged).GroupBy(key => (key.Entry, key.Change)))
         {
-            var keys = Joined(written.Select(key => key.Key).ToList());
+            var keys = Joined(written.Select(key => Name(key.Key)).ToList());
             changes.Add(written.Key.Change == EnvWriteChange.New
                 ? $"New on {ApprovalPrompt.Shown(written.Key.Entry)}: {keys}."
                 : $"Updated on {ApprovalPrompt.Shown(written.Key.Entry)}: {keys}; the previous values stay in the item's history.");
@@ -638,6 +638,8 @@ public static class TerminalEdits
     private static EditResult Done(EditDone done) => new() { Done = done };
 
     private static string Shown(string path) => EntryNameSanitizer.SanitizePath(path).Text;
+
+    private static string Name(string name) => EntryNameSanitizer.Sanitize(name).Text;
 
     private static string Prose(string text) => EntryNameSanitizer.SanitizeProse(text, _proseLength).Text;
 

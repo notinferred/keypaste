@@ -1,4 +1,5 @@
 using Keypaste.Core.Approval;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tokens;
 
@@ -18,6 +19,9 @@ public static class AuditTools
 
     /// <summary>A change to an agent's settings, from whichever surface asked for it.</summary>
     public const string AccessChange = "access_change";
+
+    /// <summary>A terminal's edit to the vault's items, which the vault's holder asked about and saved (D-0464).</summary>
+    public const string Edit = "terminal_edit";
 }
 
 /// <summary>The audit line of each kind of agent request, built here for every process that writes one.</summary>
@@ -233,6 +237,60 @@ public static class RequestRecords
             Vault = vault,
         };
     }
+
+    /// <summary>The line for a terminal's edit.</summary>
+    /// <param name="client">Who asked: the command, as <c>keypaste &lt;verb&gt;</c>.</param>
+    /// <param name="edit">The edit; only the names the terminal typed are kept, never a value or a name read out of the vault.</param>
+    /// <param name="decision">Whether it was made.</param>
+    /// <param name="method">How that was decided.</param>
+    /// <param name="session">The unlocked session that answered, or null.</param>
+    /// <param name="vault">The vault's identity key, or null when none was named.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord Edit(
+        AuditClient client,
+        TerminalEdit edit,
+        AuditDecision decision,
+        AuditMethod method,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(edit);
+
+        var (target, field, summary) = edit switch
+        {
+            AddItem add => (TerminalEdit.PathOf(add.Name), null, "creates the item"),
+            SetPassword set => (TerminalEdit.PathOf(set.Name), "password", "sets the item's password"),
+            SetFields fields => (TerminalEdit.PathOf(fields.Name), null, $"sets {Count(fields.Fields.Count, "field")}: {string.Join(", ", fields.Fields.Select(write => write.Name))}"),
+            RemoveItem remove => (remove.Item, null, "removes the item"),
+            RotatePassword rotate => (TerminalEdit.PathOf(rotate.Name), "password", "replaces the item's password with a generated one"),
+            RemoveField remove => (remove.Item, remove.Field, "removes a field"),
+            EnvSetKey env => ($"{env.Project}/{env.Environment}", env.Key, "sets a variable"),
+            EnvRemoveKey env => ($"{env.Project}/{env.Environment}", env.Key, "removes a variable"),
+            EnvPullFile pull => ($"{pull.Project}/{pull.Environment}", null, "imports a .env file"),
+            TagItem tag => (tag.Item, null, tag.Tagging ? $"tags the item into {tag.Project}/{tag.Environment}" : $"untags the item from {tag.Project}/{tag.Environment}"),
+            _ => (string.Empty, null, "an edit"),
+        };
+
+        return new AuditRecord
+        {
+            Tool = AuditTools.Edit,
+            Client = client,
+            Args = new AuditArgs
+            {
+                Entry = EntryNameSanitizer.SanitizePath(target, maximumLength: AuditArgs.EntryLength).Text,
+                EntryKind = EntryAddressKind.Path,
+                Field = field is null ? null : EntryNameSanitizer.Sanitize(field).Text,
+            },
+            Decision = decision,
+            Method = method,
+            Reason = EntryNameSanitizer.SanitizeProse($"keypaste {edit.Verb} {summary}", AuditArgs.ReasonExcerptLength).Text,
+            Session = session,
+            Vault = vault,
+        };
+    }
+
+    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 
     /// <summary>The line for a <c>keypaste run --session</c> request.</summary>
     /// <param name="project">The project asked for.</param>

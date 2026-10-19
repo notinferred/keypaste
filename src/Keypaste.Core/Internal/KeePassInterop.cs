@@ -968,6 +968,79 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
+    /// <summary>
+    /// What any edit can change, taken before one: every entry, where it sits and a copy of it, every
+    /// group and its times, the tombstones and where the recycle bin is.
+    /// </summary>
+    /// <returns>What <see cref="Restore(VaultSnapshot)"/> puts back.</returns>
+    internal VaultSnapshot Checkpoint()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<PwGroup> groups = [_database.RootGroup, .. _database.RootGroup.GetGroups(true)];
+
+        return new VaultSnapshot(
+            [
+                .. _database.RootGroup.GetEntries(true)
+                    .Select(entry => new EntrySnapshot(entry, entry.ParentGroup, entry.ParentGroup.Entries.IndexOf(entry), entry.CloneDeep())),
+            ],
+            new HashSet<PwGroup>(groups, ReferenceEqualityComparer.Instance),
+            [.. groups.Select(group => new GroupTimes(group, group.LastModificationTime, group.LastAccessTime, group.UsageCount))],
+            [.. _database.DeletedObjects],
+            _database.RecycleBinUuid,
+            _database.RecycleBinChanged);
+    }
+
+    /// <summary>Puts the vault back as <see cref="Checkpoint"/> found it, for an edit no save could keep.</summary>
+    /// <param name="checkpoint">What the vault held before the edit.</param>
+    internal void Restore(VaultSnapshot checkpoint)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        HashSet<PwEntry> known = new(checkpoint.Entries.Select(held => held.Entry), ReferenceEqualityComparer.Instance);
+
+        foreach (PwEntry made in _database.RootGroup.GetEntries(true).Where(entry => !known.Contains(entry)).ToList())
+        {
+            made.ParentGroup?.Entries.Remove(made);
+        }
+
+        foreach (EntrySnapshot held in checkpoint.Entries)
+        {
+            if (!ReferenceEquals(held.Entry.ParentGroup, held.Parent))
+            {
+                held.Entry.ParentGroup?.Entries.Remove(held.Entry);
+                held.Parent.AddEntry(held.Entry, true, false);
+                held.Parent.Entries.Remove(held.Entry);
+                held.Parent.Entries.Insert((uint)Math.Clamp(held.Index, 0, (int)held.Parent.Entries.UCount), held.Entry);
+            }
+
+            held.Entry.AssignProperties(held.Copy, false, true, true);
+        }
+
+        // Deepest first, so a group the edit made inside another it made goes before its parent.
+        foreach (PwGroup made in _database.RootGroup.GetGroups(true).Where(group => !checkpoint.Groups.Contains(group)).Reverse().ToList())
+        {
+            made.ParentGroup?.Groups.Remove(made);
+        }
+
+        foreach (GroupTimes times in checkpoint.Times)
+        {
+            times.Group.LastModificationTime = times.Modified;
+            times.Group.LastAccessTime = times.Accessed;
+            times.Group.UsageCount = times.Used;
+        }
+
+        _database.DeletedObjects.Clear();
+
+        foreach (PwDeletedObject tombstone in checkpoint.Deleted)
+        {
+            _database.DeletedObjects.Add(tombstone);
+        }
+
+        _database.RecycleBinUuid = checkpoint.RecycleBin;
+        _database.RecycleBinChanged = checkpoint.RecycleBinChanged;
+    }
+
     /// <summary>Applies every write to one entry as one edit with one history revision.</summary>
     /// <returns>0 when there is no such entry, otherwise 1.</returns>
     /// <remarks>The caller has checked the names; a write that keeps a value names a field that exists.</remarks>
@@ -2813,6 +2886,21 @@ internal sealed class KeePassInterop : IDisposable
         IReadOnlySet<PwGroup> Groups,
         IReadOnlyList<GroupTimes> Times,
         IReadOnlyList<PwDeletedObject> Deleted);
+
+    /// <summary>What any edit can change, as <see cref="Checkpoint"/> took it before the edit.</summary>
+    /// <param name="Entries">Every entry, the recycled ones included.</param>
+    /// <param name="Groups">Every group then.</param>
+    /// <param name="Times">Every group's times then.</param>
+    /// <param name="Deleted">The vault's tombstones then.</param>
+    /// <param name="RecycleBin">The recycle bin's UUID then, zero when there was none.</param>
+    /// <param name="RecycleBinChanged">When the recycle bin last changed then.</param>
+    internal sealed record VaultSnapshot(
+        IReadOnlyList<EntrySnapshot> Entries,
+        IReadOnlySet<PwGroup> Groups,
+        IReadOnlyList<GroupTimes> Times,
+        IReadOnlyList<PwDeletedObject> Deleted,
+        PwUuid RecycleBin,
+        DateTime RecycleBinChanged);
 
     /// <summary>One entry as it was: where it sat, and a copy of everything in it, its history included.</summary>
     internal sealed record EntrySnapshot(PwEntry Entry, PwGroup Parent, int Index, PwEntry Copy);

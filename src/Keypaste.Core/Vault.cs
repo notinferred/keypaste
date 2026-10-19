@@ -964,6 +964,46 @@ public sealed class Vault : IDisposable
         return true;
     }
 
+    /// <summary>Everything an edit can change, as it is now, so a caller whose save of the edit failed can <see cref="Restore"/> it.</summary>
+    /// <returns>The checkpoint, which only this vault can restore.</returns>
+    public VaultCheckpoint Checkpoint()
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return new VaultCheckpoint(this, _interop.Checkpoint(), _pending, _savedAt);
+        }
+    }
+
+    /// <summary>
+    /// Puts the vault back as <paramref name="checkpoint"/> found it, so no later save writes an edit whose
+    /// own save failed, and says the vault matches its file again when it did then and nothing was saved since.
+    /// </summary>
+    /// <param name="checkpoint">What <see cref="Checkpoint"/> took before the edit.</param>
+    /// <exception cref="ArgumentException">The checkpoint is another vault's.</exception>
+    /// <remarks>Everything changed since the checkpoint goes, so it is taken and restored around one edit and its save.</remarks>
+    public void Restore(VaultCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+
+        if (!ReferenceEquals(checkpoint.Vault, this))
+        {
+            throw new ArgumentException("the checkpoint is another vault's", nameof(checkpoint));
+        }
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            _interop.Restore(checkpoint.Taken);
+            _pending = checkpoint.WasPending || !Nullable.Equals(_savedAt, checkpoint.SavedAt);
+            _changes++;
+        }
+
+        Edited?.Invoke(this, VaultEdit.Everything);
+    }
+
     /// <summary>Puts back what one record write changed, and says the vault matches its file again when nothing else changed or was saved since.</summary>
     private void TakeBack(EntryName name, KeePassInterop.RecordSnapshot before, bool wasPending, long changes)
     {

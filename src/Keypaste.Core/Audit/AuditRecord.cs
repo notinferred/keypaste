@@ -121,6 +121,9 @@ public enum AuditMethod
 
     /// <summary>A change to an agent's settings that gives it nothing more, applied at once without asking.</summary>
     Narrowing = 25,
+
+    /// <summary>A terminal's edit asked for what the vault already held, so nothing was written and nobody was asked.</summary>
+    Unchanged = 26,
 }
 
 /// <summary>Who asked.</summary>

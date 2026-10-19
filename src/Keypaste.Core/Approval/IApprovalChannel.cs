@@ -54,6 +54,14 @@ public interface IApprovalChannel
     ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(ApprovalAnswer.NoChannel);
 
+    /// <summary>Asks a human to allow a terminal's edit to the vault, and waits for their answer.</summary>
+    /// <param name="prompt">What to show. Already sanitized; render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the human said, or why they were not asked.</returns>
+    /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing is written.</remarks>
+    ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ApprovalAnswer.NoChannel);
+
     /// <summary>Tells a human, where they chose Always for, that the change it asked for did not take effect, and why.</summary>
     /// <param name="notice">What to say. Already sanitized; render it as inert text.</param>
     /// <remarks>It asks nothing and must not wait for anything. A channel that cannot show it says nothing.</remarks>

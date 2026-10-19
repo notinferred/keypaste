@@ -207,7 +207,7 @@ public sealed class McpPolicyVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("mcp", "policy", "codex", "--mode", "automatic", "--vault", _harness.VaultPath));
 
         Assert.Contains("not changed: a person refused this change (cursor: run on)", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("not changed: a request for more access from an agent or a terminal was refused or went unanswered a moment ago", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("not changed: a request from an agent or a terminal for more access, or to change the vault, was refused or went unanswered a moment ago", _harness.Err, StringComparison.Ordinal);
         Assert.Contains("try again in ", _harness.Err, StringComparison.Ordinal);
         Assert.Contains("or make it in the app's own agent settings, which do not wait (codex: mode automatic)", _harness.Err, StringComparison.Ordinal);
         Assert.False(owner.Settings.Records["cursor"].Run);

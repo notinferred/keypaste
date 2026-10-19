@@ -42,9 +42,6 @@ namespace Keypaste.Core.Approval;
 /// </remarks>
 public sealed class ApproverHandler
 {
-    /// <summary>The one cooldown every request for more over the pipe shares (THREATS.md T-11).</summary>
-    private const string _askedForMore = "access";
-
     private readonly ICredentialSource _source;
     private readonly IEntryNameLister _lister;
     private readonly ApprovalGate _gate;
@@ -666,7 +663,7 @@ public sealed class ApproverHandler
         // terminal. The app's own settings and Always for come only from the person at the owner, never
         // over the pipe, so their refusals hold nothing back and nothing holds them back.
         var overThePipe = origin is AccessOrigin.Agent or AccessOrigin.Terminal;
-        string[] cooldownKeys = overThePipe ? [_askedForMore] : [];
+        string[] cooldownKeys = overThePipe ? [ApprovalGate.AskedForMore] : [];
         var answer = await _gate.AskAsync(cooldownKeys, prompt, coolUnanswered: overThePipe, kept, cancellationToken).ConfigureAwait(false);
 
         if (!answer.Releases())
@@ -925,6 +922,7 @@ public sealed class ApproverHandler
         new(_gate.Waiting is { } waiting ? [waiting] : [], _grants.InForce())
         {
             WaitingChanges = _gate.WaitingChange is { } change ? [change] : [],
+            WaitingEdits = _gate.WaitingEdit is { } edit ? [edit] : [],
         };
 
     /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
@@ -1027,13 +1025,7 @@ public sealed class ApproverHandler
     private static string CooldownKey(GrantKey key) => ApprovalGate.FieldKey(key.Handle, key.Field);
 
     /// <summary>Why a request for more was not put to the person, and when it can be asked again.</summary>
-    private string CoolingDown()
-    {
-        var seconds = (int)Math.Ceiling(_gate.CooldownLeft(_askedForMore).TotalSeconds);
-
-        return "a request for more access from an agent or a terminal was refused or went unanswered a moment ago, so this one was not put to the person; "
-            + $"try again in {ApprovalLimits.Describe(Math.Max(seconds, 1))}, or make it in the app's own agent settings, which do not wait";
-    }
+    private string CoolingDown() => _gate.CoolingDown("make it in the app's own agent settings, which do not wait");
 
     private static CredentialReply Refused(AuditMethod method, string reason, string? entry = null) => new()
     {

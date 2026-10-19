@@ -137,6 +137,7 @@ public sealed class LaunchEndpointTests : IDisposable
     [InlineData("lock")]
     [InlineData("access-list")]
     [InlineData("access-change")]
+    [InlineData("edit")]
     public async Task Every_other_request_ends_its_connection_unanswered(string kind)
     {
         _channel.Answer = ApprovalAnswer.Approved;
@@ -161,6 +162,9 @@ public sealed class LaunchEndpointTests : IDisposable
             "access-list" => await client.ListAccessAsync(new AccessListRequest { Vault = VaultPath, Session = "session-one" }, Token),
             "access-change" => await client.ChangeAccessAsync(
                 new AccessChangeRequest("claude-code", "so deploys stop asking") { Origin = AccessOrigin.Agent, Mode = "automatic", Vault = VaultPath, Session = "session-one" },
+                Token),
+            "edit" => await client.EditAsync(
+                new EditRequest(new Editing.RemoveItem("env/dev/STRIPE_KEY")) { Vault = VaultPath, Session = "session-one" },
                 Token),
             _ => await client.LockAsync(new LockRequest { Vault = VaultPath, Session = "session-one" }, Token),
         };

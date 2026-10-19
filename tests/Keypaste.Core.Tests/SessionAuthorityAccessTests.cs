@@ -786,7 +786,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
 
         Assert.All(new[] { reworded, another, typed }, reply => Assert.Equal((AuditDecision.Denied, AuditMethod.Cooldown), (reply!.Decision, reply.Method)));
         Assert.StartsWith(
-            "a request for more access from an agent or a terminal was refused or went unanswered a moment ago, so this one was not put to the person; try again in 1 minute, or make it in the app's own agent settings, which do not wait",
+            "a request from an agent or a terminal for more access, or to change the vault, was refused or went unanswered a moment ago, so this one was not put to the person; try again in 1 minute, or make it in the app's own agent settings, which do not wait",
             typed!.Reason,
             StringComparison.Ordinal);
         Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing), (narrowed!.Decision, narrowed.Method));

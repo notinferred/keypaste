@@ -119,6 +119,14 @@ public interface IApproverHandler
     ValueTask<AccessChangeReply> ChangeAccessAsync(AccessChangeRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new AccessChangeReply(Audit.AuditDecision.Denied, Audit.AuditMethod.NoSession, "this keypaste process keeps no agent settings"));
 
+    /// <summary>Makes a terminal's edit to the vault's items, once the person allows it (D-0464).</summary>
+    /// <param name="request">The edit, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>What became of it. A handler that takes no edits refuses.</returns>
+    ValueTask<EditReply> EditAsync(EditRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new EditReply(Audit.AuditDecision.Denied, Audit.AuditMethod.NoSession, "this keypaste process does not take changes from a terminal"));
+
     /// <summary>Tells the handler a connection has gone, so its grants can go with it.</summary>
     /// <param name="connectionId">The connection that ended.</param>
     void Disconnected(string connectionId);

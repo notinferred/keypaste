@@ -92,9 +92,10 @@ public readonly record struct PassphraseRecipe
 /// <c>keypaste add</c> say it generated a six-word passphrase rather than a password.
 /// </para>
 /// <para>
-/// The two payloads are private on purpose. Nothing needs them back: a caller either holds the
-/// concrete recipe it built or wants <see cref="Describe"/>, and keeping them unreachable is what
-/// makes "a words recipe carrying an alphabet" unrepresentable rather than merely unread.
+/// The two payloads are private on purpose, and only the approver protocol reads them back, to carry
+/// a recipe to the vault's holder so a generated value never crosses the pipe (D-0464). Keeping them
+/// out of public reach is what makes "a words recipe carrying an alphabet" unrepresentable rather
+/// than merely unread.
 /// </para>
 /// </remarks>
 public readonly record struct SecretRecipe
@@ -111,6 +112,12 @@ public readonly record struct SecretRecipe
 
     /// <summary>Which kind of secret this recipe makes.</summary>
     public SecretRecipeKind Kind { get; }
+
+    /// <summary>The character recipe, meaningful when <see cref="Kind"/> is <see cref="SecretRecipeKind.Characters"/>.</summary>
+    internal PasswordRecipe Characters => _password;
+
+    /// <summary>The passphrase recipe, meaningful when <see cref="Kind"/> is <see cref="SecretRecipeKind.Words"/>.</summary>
+    internal PassphraseRecipe Words => _passphrase;
 
     /// <summary>Twenty characters from all four classes.</summary>
     public static SecretRecipe Default { get; } = For(PasswordRecipe.Default);

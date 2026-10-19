@@ -19,6 +19,9 @@ public sealed record ApproverActivity(IReadOnlyList<WaitingRequest> Waiting, IRe
 
     /// <summary>The confirmation of a change that gives an agent more in front of a person; at most one.</summary>
     public IReadOnlyList<WaitingChange> WaitingChanges { get; init; } = [];
+
+    /// <summary>The terminal's edit in front of a person; at most one.</summary>
+    public IReadOnlyList<WaitingEdit> WaitingEdits { get; init; } = [];
 }
 
 /// <summary>A timed grant a person gave a repeated <c>keypaste run --session</c> or an agent's run: names only, never a value.</summary>

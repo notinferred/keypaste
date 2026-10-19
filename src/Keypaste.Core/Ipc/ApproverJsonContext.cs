@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Editing;
 
 namespace Keypaste.Core.Ipc;
 
@@ -35,6 +36,8 @@ namespace Keypaste.Core.Ipc;
 [JsonSerializable(typeof(AccessRowFrame))]
 [JsonSerializable(typeof(AccessChangeRequestFrame))]
 [JsonSerializable(typeof(AccessChangeReplyFrame))]
+[JsonSerializable(typeof(EditRequestFrame))]
+[JsonSerializable(typeof(EditReplyFrame))]
 internal sealed partial class ApproverJsonContext : JsonSerializerContext
 {
 }
@@ -339,4 +342,151 @@ internal sealed class AccessChangeReplyFrame(AccessChangeReply reply)
     public int Method => (int)reply.Method;
     public string Reason => reply.Reason;
     public bool Recorded => reply.Recorded;
+}
+
+internal sealed class EditRequestFrame(EditRequest request)
+{
+    private readonly TerminalEdit _edit = request.Edit;
+
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.EditKind;
+    public string Vault => request.Vault;
+    public string Session => request.Session;
+    public string Action => ApproverProtocol.ActionWord(_edit.Action);
+    public string? Group => NameOf(_edit)?.GroupPath;
+    public string? Title => NameOf(_edit)?.Title;
+
+    public string? Item => _edit switch
+    {
+        RemoveItem remove => remove.Item,
+        RemoveField field => field.Item,
+        TagItem tag => tag.Item,
+        _ => null,
+    };
+
+    public string? Field => (_edit as RemoveField)?.Field;
+    public string? Username => (_edit as AddItem)?.Username;
+    public string? Url => (_edit as AddItem)?.Url;
+    public string? Notes => (_edit as AddItem)?.Notes;
+
+    // A secret generated from a recipe goes as the recipe, so the holder generates it and no value crosses.
+    public string? Value => SecretOf(_edit) is { Recipe: null, Text: { } text } ? text : null;
+
+    public RecipeFrame? Generate => _edit is RotatePassword rotate
+        ? new RecipeFrame(rotate.Recipe)
+        : SecretOf(_edit)?.Recipe is { } recipe ? new RecipeFrame(recipe) : null;
+
+    public IEnumerable<FieldFrame>? Fields => (_edit as SetFields)?.Fields.Select(write => new FieldFrame(write.Name, write.Value ?? string.Empty));
+    public bool? Plain => _edit is SetFields fields ? fields.Plain : null;
+
+    public string? Project => _edit switch
+    {
+        EnvSetKey set => set.Project,
+        EnvRemoveKey remove => remove.Project,
+        EnvPullFile pull => pull.Project,
+        TagItem tag => tag.Project,
+        _ => null,
+    };
+
+    public string? Environment => _edit switch
+    {
+        EnvSetKey set => set.Environment,
+        EnvRemoveKey remove => remove.Environment,
+        EnvPullFile pull => pull.Environment,
+        TagItem tag => tag.Environment,
+        _ => null,
+    };
+
+    public string? Key => _edit switch
+    {
+        EnvSetKey set => set.Key,
+        EnvRemoveKey remove => remove.Key,
+        _ => null,
+    };
+
+    public string? Entry => _edit switch
+    {
+        EnvSetKey set => set.Entry,
+        EnvRemoveKey remove => remove.Entry,
+        EnvPullFile pull => pull.Entry,
+        _ => null,
+    };
+
+    public string? Dotenv => (_edit as EnvPullFile)?.Text;
+
+    private static EntryName? NameOf(TerminalEdit edit) => edit switch
+    {
+        AddItem add => add.Name,
+        SetPassword set => set.Name,
+        SetFields fields => fields.Name,
+        RotatePassword rotate => rotate.Name,
+        _ => null,
+    };
+
+    private static NewSecret? SecretOf(TerminalEdit edit) => edit switch
+    {
+        AddItem add => add.Password,
+        SetPassword set => set.Password,
+        EnvSetKey env => env.Value,
+        _ => null,
+    };
+}
+
+internal sealed class RecipeFrame(SecretRecipe recipe)
+{
+    public string Kind => recipe.Kind == SecretRecipeKind.Words ? "words" : "characters";
+    public int? Length => recipe.Kind == SecretRecipeKind.Characters ? recipe.Characters.Length : null;
+    public int? Alphabet => recipe.Kind == SecretRecipeKind.Characters ? (int)recipe.Characters.Alphabet : null;
+    public bool? NoLookalikes => recipe.Kind == SecretRecipeKind.Characters ? recipe.Characters.ExcludeLookalikes : null;
+    public int? Words => recipe.Kind == SecretRecipeKind.Words ? recipe.Words.WordCount : null;
+    public string? Separator => recipe.Kind == SecretRecipeKind.Words ? new string(recipe.Words.Separator, 1) : null;
+}
+
+internal sealed class FieldFrame(string name, string value)
+{
+    public string Name => name;
+    public string Value => value;
+}
+
+internal sealed class EditReplyFrame(EditReply reply, bool withKeys)
+{
+    public int V { get; } = ApproverProtocol.Version;
+    public string Kind { get; } = ApproverProtocol.EditKind;
+    public string Decision => reply.Decision == AuditDecision.Granted ? "granted" : "denied";
+    public int Method => (int)reply.Method;
+    public string Reason => reply.Reason;
+    public bool Recorded => reply.Recorded;
+    public string? Refusal => reply.Refusal is { } kind ? ApproverProtocol.RefusalWord(kind) : null;
+    public EditDoneFrame? Done => reply.Done is { } done ? new EditDoneFrame(done, withKeys) : null;
+}
+
+internal sealed class EditDoneFrame(EditDone done, bool withKeys)
+{
+    public string Action => ApproverProtocol.ActionWord(done.Action);
+    public int Outcome => (int)done.Outcome;
+    public string Item => done.Item;
+    public IReadOnlyList<string> Names => done.Names;
+    public NameFrame? Entry => done.Entry is { } entry ? new NameFrame(entry) : null;
+    public bool SharesPath => done.SharesPath;
+    public bool CreatesHome => done.CreatesHome;
+
+    // Grouped by item, so a reply names each key once and stays near the size of the request that carried them.
+    public IEnumerable<KeysFrame>? Keys => withKeys && done.Keys.Count > 0
+        ? done.Keys.GroupBy(key => key.Entry).Select(group => new KeysFrame(group.Key, [.. group]))
+        : null;
+}
+
+internal sealed class NameFrame(EntryName name)
+{
+    public string Group => name.GroupPath;
+    public string Title => name.Title;
+}
+
+internal sealed class KeysFrame(EntryName entry, IReadOnlyList<EnvKeyWrite> keys)
+{
+    public string Group => entry.GroupPath;
+    public string Title => entry.Title;
+    public IEnumerable<string> New => keys.Where(key => key.Change == EnvWriteChange.New).Select(key => key.Key);
+    public IEnumerable<string> Updated => keys.Where(key => key.Change == EnvWriteChange.Replaces).Select(key => key.Key);
+    public IEnumerable<string> Unchanged => keys.Where(key => key.Change == EnvWriteChange.Unchanged).Select(key => key.Key);
 }

@@ -37,6 +37,9 @@ public enum AccessOrigin
 /// </remarks>
 public sealed record AccessChangePrompt
 {
+    /// <summary>How a prompt says a request came from a terminal, which never proves the person asked.</summary>
+    public const string FromTerminalText = "asked from a terminal; any program you run could have typed it";
+
     /// <summary>Why a change a person allows does not yet give an agent more than the defaults, said after "but".</summary>
     public const string BeneathDefaultsText =
         "keypaste does not wholly understand this agent's saved settings, so the agent gets no more than the defaults until they are fixed";
@@ -129,7 +132,7 @@ public sealed record AccessChangePrompt
         AccessOrigin.Agent => $"asked by {Agent} through its keypaste tool",
         AccessOrigin.Prompt => "asked from the approval prompt's Always for",
         AccessOrigin.Settings => "asked from this app's agent settings",
-        _ => "asked from a terminal; any program you run could have typed it",
+        _ => FromTerminalText,
     };
 
     /// <summary>Builds the prompt for one change, sanitizing everything untrusted on the way in.</summary>

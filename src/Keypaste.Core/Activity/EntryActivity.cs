@@ -90,8 +90,10 @@ public sealed class EntryActivity
 
         foreach (var entry in audit)
         {
+            // A terminal's edit names its item but releases nothing, so it is never a use.
             if (!entry.Granted
                 || entry.At is not { } at
+                || string.Equals(entry.Tool, AuditTools.Edit, StringComparison.Ordinal)
                 || (entry.Vault.Length > 0 && !string.Equals(entry.Vault, vaultKey, StringComparison.Ordinal)))
             {
                 continue;

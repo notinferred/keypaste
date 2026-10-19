@@ -1,6 +1,7 @@
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Editing;
 
 namespace Keypaste.Core.Ipc;
 
@@ -40,6 +41,8 @@ public enum ApproverMessageKind
     AccessList = 12,
     /// <summary>A change to one agent's settings, which the owner applies or puts to the person.</summary>
     AccessChange = 13,
+    /// <summary>A terminal's edit to the vault's items, which the owner puts to the person and saves (D-0464).</summary>
+    Edit = 14,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -509,6 +512,41 @@ public sealed record AccessChangeReply(AuditDecision Decision, AuditMethod Metho
 
     /// <summary>Where a reset set an unreadable <c>clients.toml</c> aside; null for every other change. Never sent.</summary>
     public string? Kept { get; init; }
+}
+
+/// <summary>
+/// Asks the owner to make a terminal's edit to its vault's items, which it checks again itself, puts
+/// to the person and saves under its claim (D-0464).
+/// </summary>
+/// <param name="Edit">The edit, carrying the new values it writes and never a master password.</param>
+/// <remarks><see cref="ToString"/> names the verb only, so no interpolated request can print a value.</remarks>
+public sealed record EditRequest(TerminalEdit Edit)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+
+    /// <inheritdoc/>
+    public override string ToString() => $"edit: {Edit}";
+}
+
+/// <summary>What became of a terminal's edit.</summary>
+/// <param name="Decision">Whether it was made.</param>
+/// <param name="Method">How it was decided: <see cref="AuditMethod.Prompt"/> for the person's answer, <see cref="AuditMethod.Unchanged"/> when nothing needed writing, or a refusal's method.</param>
+/// <param name="Reason">keypaste's own words.</param>
+public sealed record EditReply(AuditDecision Decision, AuditMethod Method, string Reason)
+{
+    /// <summary>Whether the process that answered recorded this request in its audit log before replying.</summary>
+    /// <remarks>A frame without it reads as not recorded, the fail-closed reading.</remarks>
+    public bool Recorded { get; init; }
+
+    /// <summary>Why the edit could not be made as asked, when the vault refused it rather than a person or the session.</summary>
+    public EditRefusalKind? Refusal { get; init; }
+
+    /// <summary>What was changed, or what the vault already held; null when nothing was decided.</summary>
+    public EditDone? Done { get; init; }
 }
 
 /// <summary>

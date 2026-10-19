@@ -1,6 +1,7 @@
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 
 namespace Keypaste.Core.Ownership;
@@ -49,6 +50,18 @@ public sealed record SessionServerOptions
 
     /// <summary>What time it is.</summary>
     public TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>
+    /// Runs a terminal's edit on the vault of the lifetime it was asked under and saves it under the
+    /// owner's claim, or null to refuse every edit (D-0464).
+    /// </summary>
+    public Func<SessionLifetime, Func<Vault, bool>, AgentSave>? WriteEdit { get; init; }
+
+    /// <summary>This computer's <c>clients.toml</c>, which says which agents a tag change would reach unasked.</summary>
+    public string ClientsPath { get; init; } = string.Empty;
+
+    /// <summary>Told of each terminal's edit once it is saved, or null.</summary>
+    public Action<EditDone>? Edited { get; init; }
 }
 
 /// <summary>
@@ -116,6 +129,10 @@ public sealed class SessionServer : IDisposable
                 hourly: options.Hourly,
                 clock: options.Clock);
 
+            var editor = options.WriteEdit is { } write
+                ? new SessionEditor(gate, options.UnlockedFor, write, options.ClientsPath, options.Clock, options.Narrate, options.Edited)
+                : null;
+
             var authority = new SessionAuthority(
                 options.Vault,
                 options.CurrentLifetime,
@@ -123,7 +140,8 @@ public sealed class SessionServer : IDisposable
                 options.Audit,
                 new SessionEnvironments(gate, options.UnlockedFor, options.Clock, envGrants, options.Narrate, launches),
                 options.LockNow,
-                options.Clock);
+                options.Clock,
+                editor);
 
             return new SessionServer(authority, gate, grants, envGrants, options.WatchEdits, options.UnwatchEdits);
         }

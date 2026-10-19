@@ -207,6 +207,18 @@ internal sealed class FakeChannel : IApprovalChannel
     /// <summary>Runs while a confirmation of a change is on screen, before it is answered.</summary>
     internal Action? WhileConfirming { get; set; }
 
+    /// <summary>What a terminal's edit is answered with; a no unless a test says otherwise.</summary>
+    internal ApprovalAnswer EditAnswer { get; set; } = ApprovalAnswer.Denied;
+
+    /// <summary>How many terminal edits were asked about.</summary>
+    internal int EditAsked { get; private set; }
+
+    /// <summary>The last terminal edit asked about.</summary>
+    internal TerminalEditPrompt? LastEditPrompt { get; private set; }
+
+    /// <summary>Runs while a terminal's edit is on screen, before it is answered.</summary>
+    internal Action? WhileEditing { get; set; }
+
     /// <summary>Every notice that the change Always for asked for did not take effect, in order.</summary>
     internal List<AlwaysForNotice> Told { get; } = [];
 
@@ -240,6 +252,14 @@ internal sealed class FakeChannel : IApprovalChannel
         AccessAsked++;
         WhileConfirming?.Invoke();
         return ValueTask.FromResult(AccessAnswer);
+    }
+
+    public ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken)
+    {
+        LastEditPrompt = prompt;
+        EditAsked++;
+        WhileEditing?.Invoke();
+        return ValueTask.FromResult(EditAnswer);
     }
 
     public void Tell(AlwaysForNotice notice) => Told.Add(notice);
