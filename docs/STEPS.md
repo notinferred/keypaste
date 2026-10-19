@@ -69,9 +69,13 @@ Package managers and agent marketplaces carry a version only after it is publish
   - First, a branch preflight with ad-hoc signing settles a bundle layout `codesign` can seal, and the hardened-runtime entitlements. The CoreCLR payload may have to move out of `Contents/MacOS`.
   - Then the app is signed inside-out, notarized and stapled.
   - `spctl` accepts it, and a changed byte is refused.
+  - Terminal must be seen running the launcher of a downloaded bundle macOS opened. On `macos-15` Gatekeeper refuses an unsigned copy's launcher while it is quarantined ([4.7e1](steps/4.7e1.md)).
 - [ ] **4.7e — Install and preserve the macOS desktop candidate.** Needs: 4.7a2, E.1d.
-  - These are the macOS legs of `install-desktop.yml` and `upgrade-desktop.yml`: install, first run, vault acts, a project run, and an upgrade that keeps the vault and settings.
+  - These are the macOS legs of `install-desktop.yml` and `upgrade-desktop.yml`. [4.7e1](steps/4.7e1.md) added the install leg; the parent closes with 4.7e2.
   - Publication moves into 4.7c2, and the Homebrew cask into 3.7a.
+- [ ] **4.7e2 — Upgrade the macOS desktop candidate in place.** Needs: 4.7e1.
+  - The macOS leg of `upgrade-desktop.yml`, with macOS candidates from `build-upgrade-candidates.sh`. An upgrade quits the app, moves the old bundle to the Trash, copies the new one into the same `/Applications` path and opens and unlocks it. An interrupted install is a half-length DMG that `hdiutil attach` refuses, a downgrade is not applicable, and uninstalling moves the bundle to the Trash.
+  - The vault, the settings files, the `/usr/local/bin` link and the LaunchAgent plist, with Open at login turned on in the lower version, must be unchanged after each transition.
 - [ ] **R.1a — Exercise the integrated desktop candidate.** Needs: 9.4, 4.6, F.15, U.2, U.3, 4.4b, 4.3b, 2.6a, E.1b, E.1c, F.2b3a, F.2b3b, V.7a, V.7b, C.2, N.1a, N.1b, N.2, N.3, N.4, N.5, N.6, N.7, N.10, N.12, C.1a, C.1b, C.1c, C.3, C.4, E.1d, C.5a, C.5b, G.1, G.2, G.4a, G.5, G.8, G.9, N.16, V.11, 4.7a2.
   - Install the internal Windows MSI, macOS DMG and Linux AppImage built at a named commit.
   - In each installed app, complete T1–T4 with a disposable vault, a real MCP client and a real child process. The acts:

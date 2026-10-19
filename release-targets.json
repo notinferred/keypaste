@@ -198,7 +198,7 @@
           "os_floor": null,
           "floor_evidence": "none",
           "install_check": null,
-          "install_check_absent": "There is no public desktop release to install. 4.7a packages candidates and 4.7b exercises them."
+          "install_check_absent": "There is no public desktop release to install. 4.7a packages candidates and 4.7e1 exercises the DMG."
         },
         {
           "rid": "win-x64",

@@ -26,6 +26,8 @@ on:
       - 'scripts/verify-run-session.sh'
       - 'scripts/verify-held-saves.sh'
       - 'scripts/verify-clipboard-markers.sh'
+      - 'scripts/exercise-desktop-install.sh'
+      - 'scripts/exercise-desktop-upgrade.sh'
       - 'scripts/lib/**'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
@@ -574,7 +576,7 @@ jobs:
           (cd artifacts/dist && shasum -a 256 -c "$name.sha256")
           echo "zip=$bundle" >> "$GITHUB_OUTPUT"
 
-      # macOS has no install leg yet (4.7e), so the terminal's keypaste is checked on the built bundle (G.5).
+      # Every build's bundle, as install-desktop checks only a dispatched candidate's installed copy (G.5).
       - name: Check a new terminal runs the bundle's keypaste through its link
         if: matrix.bundle
         shell: bash

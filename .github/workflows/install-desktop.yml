@@ -1,10 +1,12 @@
 name: install-desktop
 run-name: ${{ inputs.rehearsal && format('install-desktop rehearsal of app run {0} (not release evidence)', inputs.app_run_id) || format('install-desktop {0}', inputs.tag) }}
 
-# 4.7b: installs a tag's attested desktop candidates on fresh runners and exercises the installed app from
+# 4.7b, 4.7e: installs a tag's attested desktop candidates on fresh runners and exercises the installed app from
 # outside its process (D-0199), then checks that a new terminal runs the keypaste the MSI put on the user PATH
-# or Settings linked (G.5). The candidates are app.yml's workflow artifacts from that tag's run, and the
-# CLI/MCP is the same tag's published release; both are verified before anything is installed.
+# or Settings linked (G.5). On macOS the DMG is quarantined as a browser download, and Gatekeeper must refuse
+# the copy in /Applications before the documented override clears it. The candidates are app.yml's workflow
+# artifacts from that tag's run, and the CLI/MCP is the same tag's published release; both are verified before
+# anything is installed.
 #
 # A rehearsal installs instead the -dryrun packages of a successful app.yml run at this run's own commit, with
 # the CLI/MCP from that run's archive beside them. Nothing in it is attested, so it is never release evidence;
@@ -18,7 +20,7 @@ on:
         required: false
         type: string
       app_run_id:
-        description: "The app.yml run whose app-win-x64 and app-linux-x64 artifacts are the candidates: the tag's, or for a rehearsal a successful run at this branch's commit."
+        description: "The app.yml run whose app-win-x64, app-linux-x64 and app-osx-arm64 artifacts are the candidates: the tag's, or for a rehearsal a successful run at this branch's commit."
         required: true
         type: string
       rehearsal:
@@ -46,6 +48,10 @@ jobs:
           - os: ubuntu-24.04
             rid: linux-x64
             package: AppImage
+            cli: tar.gz
+          - os: macos-15
+            rid: osx-arm64
+            package: dmg
             cli: tar.gz
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -107,9 +113,11 @@ jobs:
           PACKAGE: ${{ matrix.package }}
         run: |
           set -euo pipefail
-          mapfile -t found < <(find "$RUNNER_TEMP/candidate" -maxdepth 1 -type f -name "keypaste-app-*-dryrun-$RID-internal-unsigned.$PACKAGE")
-          [ "${#found[@]}" = 1 ] || { echo "::error::app-$RID holds ${#found[@]} -dryrun $PACKAGE packages, not one"; exit 1; }
-          version="$(basename "${found[0]}")"
+          # macOS runs this under its stock bash 3.2, which has no mapfile (D-0398).
+          found="$(find "$RUNNER_TEMP/candidate" -maxdepth 1 -type f -name "keypaste-app-*-dryrun-$RID-internal-unsigned.$PACKAGE")"
+          count="$(printf '%s' "$found" | grep -c . || true)"
+          [ "$count" = 1 ] || { echo "::error::app-$RID holds $count -dryrun $PACKAGE packages, not one"; exit 1; }
+          version="$(basename "$found")"
           version="${version#keypaste-app-}"
           version="${version%-"$RID"-internal-unsigned."$PACKAGE"}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -143,7 +151,11 @@ jobs:
         run: |
           set -euo pipefail
           name="keypaste-app-$VERSION-$RID.$EXT"
-          (cd "$RUNNER_TEMP/candidate" && sha256sum -c "$name.sha256")
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd "$RUNNER_TEMP/candidate" && sha256sum -c "$name.sha256")
+          else
+            (cd "$RUNNER_TEMP/candidate" && shasum -a 256 -c "$name.sha256")
+          fi
           mkdir -p "$RUNNER_TEMP/cli"
           archive="$RUNNER_TEMP/candidate/$name"
           if [ "$EXT" = zip ]; then
@@ -204,3 +216,4 @@ jobs:
           path: install-desktop/
           if-no-files-found: error
           retention-days: 30
+

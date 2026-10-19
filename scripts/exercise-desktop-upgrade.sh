@@ -61,6 +61,7 @@ readonly INSTALL_FAILED='Action ended.*InstallFinalize. Return value 3|Action en
 readonly LINK_BUTTON='Link the keypaste command'
 readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
 readonly CR=$'\r'
+readonly TAB=$'\t'
 
 # shellcheck source=scripts/lib/desktop-drive.sh
 . "$ROOT/scripts/lib/desktop-drive.sh"
@@ -93,7 +94,7 @@ classify() {
     local action="$1"
     if [ -n "$blocked" ]; then result=unreached; why="$blocked did not pass"; return 1; fi
     record="$(step "$dir" "$action")"
-    status="${record%%$'\t'*}"; detail="${record#*$'\t'}"
+    status="${record%%"$TAB"*}"; detail="${record#*"$TAB"}"
     if [ -z "$record" ]; then result=unreached; why="$action was never attempted"; return 1; fi
     if [ "$status" != ok ]; then result=unreached; why="$action: $detail"; return 1; fi
     return 0
@@ -236,7 +237,7 @@ platform() {
 
 native() { if [ "$PLATFORM" = windows ]; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 
-sha256_of() { sha256sum < "$1" | awk '{print $1}'; }
+sha256_of() { if command -v sha256sum >/dev/null; then sha256sum < "$1"; else shasum -a 256 < "$1"; fi | awk '{print $1}'; }
 
 powershell_out() { powershell -NoProfile -NonInteractive -Command "$1" | tr -d "$CR"; }
 
@@ -474,7 +475,7 @@ upgrade_code() {
   local code
   code="$(sed -n 's/.*UpgradeCode="\([^"]*\)".*/\1/p' "$ROOT/packaging/windows/Package.wxs" | head -n 1)"
   [ -n "$code" ] || die 'packaging/windows/Package.wxs declares no UpgradeCode'
-  printf '{%s}' "${code^^}"
+  printf '{%s}' "$(printf '%s' "$code" | tr '[:lower:]' '[:upper:]')"
 }
 
 # An MSI verbose log is UTF-16 (D-0209); grep reads it to the end, as a grep -q stopping at the match kills tr and pipefail then reads no match (F.43).
@@ -601,7 +602,7 @@ interrupt() {
     # A download that stops halfway: its temporary file is never renamed, so nothing runs it.
     image="$(candidate "$THIRD")" || return 1
     partial="$APPS/$(basename "$image").part"
-    head -c "$(( $(stat -c %s "$image") / 2 ))" "$image" > "$partial"
+    head -c "$(( $(wc -c < "$image") / 2 ))" "$image" > "$partial"
     fact interrupted_exit 1
     fact interrupted_failed yes
     fact interrupted_where 'the partial download was never renamed beside the installed image'
@@ -806,7 +807,7 @@ selftest() {
   expect() { # expect <fixture> <check> <result>
     local actual
     cases=$((cases + 1))
-    actual="$(bash "$SELF" --classify "$work/$1" | jq -rs --arg c "$2" '[.[] | select(.check == $c) | .result] | last // "missing"')"
+    actual="$("$BASH" "$SELF" --classify "$work/$1" | jq -rs --arg c "$2" '[.[] | select(.check == $c) | .result] | last // "missing"')"
     if [ "$actual" != "$3" ]; then
       echo "::error::selftest $1: $2 classified $actual, expected $3" >&2
       failures=$((failures + 1))
@@ -874,7 +875,7 @@ selftest() {
   passing install-other-keypaste
   set_fact install-other-keypaste terminal_after_install $'C:\\tools\\keypaste.exe\t'"$LOWER"$'\t'"$bridge"
   passing install-other-case
-  set_fact install-other-case terminal_after_install "${folder,,}\\keypaste.exe"$'\t'"$LOWER"$'\t'"$bridge"
+  set_fact install-other-case terminal_after_install "$(lower "$folder")\\keypaste.exe"$'\t'"$LOWER"$'\t'"$bridge"
   passing install-not-probed
   drop_fact install-not-probed terminal_after_install
   passing upgrade-runs-the-lower
