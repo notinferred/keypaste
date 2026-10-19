@@ -1006,7 +1006,9 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (EntrySnapshot held in checkpoint.Entries)
         {
-            if (!ReferenceEquals(held.Entry.ParentGroup, held.Parent))
+            // A deleted entry keeps its parent's reference while no longer among its entries, so where it
+            // sits is read from the group, not from the entry.
+            if (!ReferenceEquals(held.Entry.ParentGroup, held.Parent) || held.Parent.Entries.IndexOf(held.Entry) < 0)
             {
                 held.Entry.ParentGroup?.Entries.Remove(held.Entry);
                 held.Parent.AddEntry(held.Entry, true, false);

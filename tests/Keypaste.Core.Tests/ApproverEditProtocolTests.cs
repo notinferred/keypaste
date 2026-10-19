@@ -21,7 +21,7 @@ public sealed class ApproverEditProtocolTests
     {
         "add" => new AddItem(_name, "octo", "https://github.example", "notes", NewSecret.Of(_sentinel)),
         "set" => new SetPassword(_name, NewSecret.Of(_sentinel)),
-        "set-generated" => new SetPassword(_name, NewSecret.Generated(SecretRecipe.For(new PassphraseRecipe { WordCount = 6, Separator = '-' }))),
+        "set-generated" => new SetPassword(_name, NewSecret.Generated(SecretRecipe.For(new PassphraseRecipe { WordCount = 6, Separator = '.' }))),
         "set-fields" => new SetFields(_name, [new FieldWrite("KEY", _sentinel, Protect: false), new FieldWrite("OTHER", "o", Protect: false)]),
         "rm" => new RemoveItem("work/github"),
         "rotate" => new RotatePassword(_name, SecretRecipe.Default),
