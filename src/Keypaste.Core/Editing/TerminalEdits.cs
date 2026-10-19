@@ -641,7 +641,7 @@ public static class TerminalEdits
 
     private static string Prose(string text) => EntryNameSanitizer.SanitizeProse(text, _proseLength).Text;
 
-    private static string Joined(IReadOnlyList<string> names) => names.Count switch
+    private static string Joined(List<string> names) => names.Count switch
     {
         0 => string.Empty,
         1 => names[0],

@@ -124,9 +124,9 @@ public abstract record TerminalEdit
     public abstract bool IsComplete { get; }
 
     /// <summary>The rules that need no vault, as the CLI applies them before it opens one.</summary>
-    /// <param name="error">Why the edit is refused, or empty.</param>
+    /// <param name="reason">Why the edit is refused, or empty.</param>
     /// <returns>Whether the edit may be checked against a vault.</returns>
-    public abstract bool TryValidate(out string error);
+    public abstract bool TryValidate(out string reason);
 
     /// <inheritdoc/>
     public sealed override string ToString() => $"keypaste {Verb}";
@@ -188,19 +188,19 @@ public sealed record AddItem(EntryName Name, string Username, string Url, string
     public override bool IsComplete => Password is not null;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error)
+    public override bool TryValidate(out string reason)
     {
-        if (!TryName(Name, out error))
+        if (!TryName(Name, out reason))
         {
             return false;
         }
 
-        if (!Vault.IsCreatable(Name, out error))
+        if (!Vault.IsCreatable(Name, out reason))
         {
             return false;
         }
 
-        return TrySecret(Password, out error);
+        return TrySecret(Password, out reason);
     }
 }
 
@@ -216,7 +216,7 @@ public sealed record SetPassword(EntryName Name, NewSecret? Password) : Terminal
     public override bool IsComplete => Password is not null;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error) => TryName(Name, out error) && TrySecret(Password, out error);
+    public override bool TryValidate(out string reason) => TryName(Name, out reason) && TrySecret(Password, out reason);
 }
 
 /// <summary><c>keypaste set --field</c>: custom fields of an item that exists, in one revision.</summary>
@@ -231,22 +231,22 @@ public sealed record SetFields(EntryName Name, IReadOnlyList<FieldWrite> Fields)
     public override EditAction Action => EditAction.SetFields;
 
     /// <inheritdoc/>
-    public override bool IsComplete => Fields.All(field => field.Value is not null);
+    public override bool IsComplete => Fields.All(write => write.Value is not null);
 
     /// <summary>Whether new fields are written plain.</summary>
     public bool Plain => Fields.Count > 0 && Fields[0].Protect == false;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error)
+    public override bool TryValidate(out string reason)
     {
-        if (!TryName(Name, out error))
+        if (!TryName(Name, out reason))
         {
             return false;
         }
 
         if (Fields.Count is 0 or > MaximumFields)
         {
-            error = $"give between 1 and {MaximumFields} fields";
+            reason = $"give between 1 and {MaximumFields} fields";
             return false;
         }
 
@@ -254,20 +254,20 @@ public sealed record SetFields(EntryName Name, IReadOnlyList<FieldWrite> Fields)
 
         foreach (var field in Fields)
         {
-            if (!FieldNameRules.IsWritable(field.Name, out error))
+            if (!FieldNameRules.IsWritable(field.Name, out reason))
             {
                 return false;
             }
 
             if (!named.Add(field.Name))
             {
-                error = $"--field '{field.Name}' is given twice";
+                reason = $"--field '{field.Name}' is given twice";
                 return false;
             }
 
             if (field.Protect is true || field.Protect != Fields[0].Protect)
             {
-                error = "a new field is protected unless --plain, which applies to every field given";
+                reason = "a new field is protected unless --plain, which applies to every field given";
                 return false;
             }
         }
@@ -287,10 +287,10 @@ public sealed record RemoveItem(string Item) : TerminalEdit
     public override bool IsComplete => true;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error)
+    public override bool TryValidate(out string reason)
     {
-        error = Item.Length == 0 ? "the item name cannot be empty" : string.Empty;
-        return error.Length == 0;
+        reason = Item.Length == 0 ? "the item name cannot be empty" : string.Empty;
+        return reason.Length == 0;
     }
 }
 
@@ -306,7 +306,7 @@ public sealed record RotatePassword(EntryName Name, SecretRecipe Recipe) : Termi
     public override bool IsComplete => true;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error) => TryName(Name, out error) && Recipe.TryValidate(out error);
+    public override bool TryValidate(out string reason) => TryName(Name, out reason) && Recipe.TryValidate(out reason);
 }
 
 /// <summary><c>keypaste field rm</c>: one custom field, whose value stays in history.</summary>
@@ -321,7 +321,7 @@ public sealed record RemoveField(string Item, string Field) : TerminalEdit
     public override bool IsComplete => true;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error) => FieldNameRules.IsWritable(Field, out error);
+    public override bool TryValidate(out string reason) => FieldNameRules.IsWritable(Field, out reason);
 }
 
 /// <summary><c>keypaste env set</c>: one variable of a project's environment.</summary>
@@ -339,15 +339,15 @@ public sealed record EnvSetKey(string Project, string Environment, string Key, s
     public override bool IsComplete => Value is not null;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error)
+    public override bool TryValidate(out string reason)
     {
         if (Key.Length == 0)
         {
-            error = "the variable name cannot be empty";
+            reason = "the variable name cannot be empty";
             return false;
         }
 
-        return TryProfile(Environment, out error) && TrySecret(Value, out error);
+        return TryProfile(Environment, out reason) && TrySecret(Value, out reason);
     }
 }
 
@@ -365,7 +365,7 @@ public sealed record EnvRemoveKey(string Project, string Environment, string Key
     public override bool IsComplete => true;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error) => TryProfile(Environment, out error);
+    public override bool TryValidate(out string reason) => TryProfile(Environment, out reason);
 }
 
 /// <summary><c>keypaste env pull</c>: a <c>.env</c> file's variables, all or none.</summary>
@@ -382,16 +382,16 @@ public sealed record EnvPullFile(string Project, string Environment, string? Ent
     public override bool IsComplete => true;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error)
+    public override bool TryValidate(out string reason)
     {
-        if (!EnvConvention.IsValidProject(Project, out error) || !TryProfile(Environment, out error))
+        if (!EnvConvention.IsValidProject(Project, out reason) || !TryProfile(Environment, out reason))
         {
             return false;
         }
 
         if (!DotEnv.TryParse(Text, out var document))
         {
-            error = $"the file has {document.Problems.Count} problem(s); nothing was imported";
+            reason = $"the file has {document.Problems.Count} problem(s); nothing was imported";
             return false;
         }
 
@@ -413,5 +413,5 @@ public sealed record TagItem(string Project, string Environment, string Item, bo
     public override bool IsComplete => true;
 
     /// <inheritdoc/>
-    public override bool TryValidate(out string error) => ProjectTag.TryFor(Project, Environment, out _, out error);
+    public override bool TryValidate(out string reason) => ProjectTag.TryFor(Project, Environment, out _, out reason);
 }
