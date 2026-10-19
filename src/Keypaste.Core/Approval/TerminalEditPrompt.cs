@@ -22,8 +22,8 @@ public sealed record TerminalEditPrompt
     /// <summary>What changes, in keypaste's own words, holding no value.</summary>
     public required IReadOnlyList<string> Changes { get; init; }
 
-    /// <summary>Where the request came from, as the prompt says it.</summary>
-    public string OriginText => AccessChangePrompt.FromTerminalText;
+    /// <summary>Where the request came from, as the prompt says it: a terminal, which never proves the person asked.</summary>
+    public string OriginText { get; init; } = AccessChangePrompt.FromTerminalText;
 
     /// <summary>The prompt for one edit, from the preview the holder checked it into.</summary>
     /// <param name="edit">The edit.</param>

@@ -17,26 +17,41 @@ public sealed class ApproverEditProtocolTests
 
     private static readonly EntryName _name = new("work", "github");
 
-    public static TheoryData<TerminalEdit> Edits => new(
-        new AddItem(_name, "octo", "https://github.example", "notes", NewSecret.Of(_sentinel)),
-        new SetPassword(_name, NewSecret.Of(_sentinel)),
-        new SetPassword(_name, NewSecret.Generated(SecretRecipe.For(new PassphraseRecipe { WordCount = 6, Separator = '-' }))),
-        new SetFields(_name, [new FieldWrite("KEY", _sentinel, Protect: false), new FieldWrite("OTHER", "o", Protect: false)]),
-        new RemoveItem("work/github"),
-        new RotatePassword(_name, SecretRecipe.Default),
-        new RemoveField("work/github", "KEY"),
-        new EnvSetKey("billing", "prod", "API_KEY", "work/github", NewSecret.Of(_sentinel)),
-        new EnvRemoveKey("billing", "dev", "API_KEY", null),
-        new EnvPullFile("billing", "dev", null, $"API_KEY={_sentinel}\n"),
-        new TagItem("billing", "dev", "work/github", Tagging: true),
-        new TagItem("billing", "dev", "work/github", Tagging: false));
+    private static TerminalEdit Edit(string action) => action switch
+    {
+        "add" => new AddItem(_name, "octo", "https://github.example", "notes", NewSecret.Of(_sentinel)),
+        "set" => new SetPassword(_name, NewSecret.Of(_sentinel)),
+        "set-generated" => new SetPassword(_name, NewSecret.Generated(SecretRecipe.For(new PassphraseRecipe { WordCount = 6, Separator = '-' }))),
+        "set-fields" => new SetFields(_name, [new FieldWrite("KEY", _sentinel, Protect: false), new FieldWrite("OTHER", "o", Protect: false)]),
+        "rm" => new RemoveItem("work/github"),
+        "rotate" => new RotatePassword(_name, SecretRecipe.Default),
+        "field-rm" => new RemoveField("work/github", "KEY"),
+        "env-set" => new EnvSetKey("billing", "prod", "API_KEY", "work/github", NewSecret.Of(_sentinel)),
+        "env-rm" => new EnvRemoveKey("billing", "dev", "API_KEY", null),
+        "env-pull" => new EnvPullFile("billing", "dev", null, $"API_KEY={_sentinel}\n"),
+        "env-tag" => new TagItem("billing", "dev", "work/github", Tagging: true),
+        _ => new TagItem("billing", "dev", "work/github", Tagging: false),
+    };
 
     private static EditRequest Request(TerminalEdit edit) => new(edit) { Vault = "/vault.kdbx", Session = "session-one" };
 
     [Theory]
-    [MemberData(nameof(Edits))]
-    public void Every_action_round_trips(TerminalEdit edit)
+    [InlineData("add")]
+    [InlineData("set")]
+    [InlineData("set-generated")]
+    [InlineData("set-fields")]
+    [InlineData("rm")]
+    [InlineData("rotate")]
+    [InlineData("field-rm")]
+    [InlineData("env-set")]
+    [InlineData("env-rm")]
+    [InlineData("env-pull")]
+    [InlineData("env-tag")]
+    [InlineData("env-untag")]
+    public void Every_action_round_trips(string action)
     {
+        var edit = Edit(action);
+
         var frame = ApproverProtocol.Encode(Request(edit));
 
         Assert.Equal(ApproverMessageKind.Edit, ApproverProtocol.KindOf(frame));

@@ -359,7 +359,7 @@ internal sealed class EditRequestFrame(EditRequest request)
     public string? Item => _edit switch
     {
         RemoveItem remove => remove.Item,
-        RemoveField field => field.Item,
+        RemoveField removal => removal.Item,
         TagItem tag => tag.Item,
         _ => null,
     };
