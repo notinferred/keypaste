@@ -299,7 +299,15 @@ profile_workflows() {
     scripts/lib/*.sh packaging/macos/keypaste-launch.command
 }
 
-integration_script() { run "$timeout_command" --verbose --kill-after=10s 8m bash "$1"; }
+# A gate writes to a file, so a process it leaves running on Windows cannot hold the step open past its timeout.
+integration_script() {
+  local log code=0
+  log="artifacts/gates/$(basename "$1" .sh).log"
+  mkdir -p artifacts/gates
+  run "$timeout_command" --verbose --kill-after=10s 8m bash "$1" >"$log" 2>&1 || code=$?
+  cat "$log"
+  return "$code"
+}
 
 # dotnet format runs no build and reads only the projects it is given; Core is in both solutions.
 profile_format() {
