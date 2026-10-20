@@ -10,7 +10,7 @@ public enum OwnerAnswer
     /// <summary>No vault is named or chosen, so nothing was asked.</summary>
     NoVault,
 
-    /// <summary><c>KEYPASTE_APPROVER</c> is not a pipe name keypaste accepts, or names a locked app's pipe.</summary>
+    /// <summary><c>KEYPASTE_APPROVER</c> is not a pipe name keypaste accepts.</summary>
     InvalidPipe,
 
     /// <summary>Nothing listens on the vault's pipe.</summary>
@@ -69,11 +69,6 @@ public sealed record OwnerReading(OwnerAnswer Answer, OwnerKind? Kind, string? V
         if (named is { Length: > 0 } && !ApproverEndpoint.IsValidName(named, out var error))
         {
             return Found(OwnerAnswer.InvalidPipe, version: null, HealthStatus.Fix, $"{ApproverEndpoint.EnvironmentVariable} is not a pipe name keypaste accepts: {error}", elsewhere);
-        }
-
-        if (named is { Length: > 0 } && ApproverEndpoint.IsLockedAppName(named))
-        {
-            return Found(OwnerAnswer.InvalidPipe, version: null, HealthStatus.Fix, $"{ApproverEndpoint.EnvironmentVariable} names a locked keypaste app's pipe, which doctor never connects to", elsewhere);
         }
 
         var pipe = ApproverEndpoint.Resolve(null, named, VaultIdentity.Of(home, vault))!;

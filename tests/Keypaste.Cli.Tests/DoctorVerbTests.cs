@@ -259,7 +259,7 @@ public sealed class DoctorVerbTests : IDisposable
                 "owner",
                 "owner",
                 "fix",
-                "KEYPASTE_APPROVER names a locked keypaste app's pipe, which doctor never connects to",
+                "KEYPASTE_APPROVER is not a pipe name keypaste accepts: an approver name cannot start with keypaste-locked-, which names a locked keypaste app's pipe",
                 Where: null,
                 $"unset KEYPASTE_APPROVER, or point it at the process holding {_harness.VaultPath}"),
             Owner(found));

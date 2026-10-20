@@ -47,7 +47,7 @@ public static class ApproverEndpoint
     /// The pipe name: the flag wins, then the environment, then one derived from the vault. Null when
     /// nothing names a pipe or a vault.
     /// </returns>
-    /// <exception cref="ArgumentException">An explicit name is empty, over-long, or has a path separator in it.</exception>
+    /// <exception cref="ArgumentException">An explicit name is not one <see cref="IsValidName"/> accepts.</exception>
     /// <remarks>
     /// Derived per vault, so owners of two vaults never contend for one name (D-0309). An explicit
     /// name can still reach an owner of another vault; the attachment names the vault, and that owner
@@ -71,7 +71,11 @@ public static class ApproverEndpoint
     /// <summary>Whether <paramref name="name"/> is a pipe name <see cref="Resolve"/> accepts.</summary>
     /// <param name="name">The name.</param>
     /// <param name="error">Why not, when it is not.</param>
-    /// <returns>Whether it is 1 to <see cref="MaximumLength"/> characters with no path separator or control character.</returns>
+    /// <returns>
+    /// Whether it is 1 to <see cref="MaximumLength"/> characters with no path separator or control character, and does
+    /// not start with <see cref="LockedAppEndpoint.Prefix"/> in any case, as Windows and macOS match pipe names.
+    /// </returns>
+    /// <remarks>A locked app tells the person an agent asked on a connection alone, so no approver is looked for there (D-0466).</remarks>
     public static bool IsValidName(string name, out string error)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -97,18 +101,14 @@ public static class ApproverEndpoint
             }
         }
 
+        if (name.StartsWith(LockedAppEndpoint.Prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            error = $"an approver name cannot start with {LockedAppEndpoint.Prefix}, which names a locked keypaste app's pipe";
+            return false;
+        }
+
         error = string.Empty;
         return true;
-    }
-
-    /// <summary>Whether <paramref name="name"/> is a pipe a locked app listens on, where a connection alone makes it tell the person an agent asked.</summary>
-    /// <param name="name">The name.</param>
-    /// <returns>Whether it starts with <see cref="LockedAppEndpoint.Prefix"/>, in any case, as Windows and macOS match pipe names.</returns>
-    public static bool IsLockedAppName(string name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-
-        return name.StartsWith(LockedAppEndpoint.Prefix, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Checked(string name, string argument) =>

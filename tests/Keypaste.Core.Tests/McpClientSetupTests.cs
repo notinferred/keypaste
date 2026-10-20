@@ -398,6 +398,9 @@ public sealed class McpClientSetupTests : IDisposable
     [InlineData("pipe/name")]
     [InlineData("pipe:name")]
     [InlineData("pipe\u0001")]
+    [InlineData("keypaste-locked-0123")]
+    [InlineData("KEYPASTE-LOCKED-0123")]
+    [InlineData("Keypaste-Locked-0123")]
     public void An_approver_the_bridge_would_refuse_is_refused_before_anything_is_written(string approver)
     {
         Assert.False(McpServerRegistration.TryCreate(

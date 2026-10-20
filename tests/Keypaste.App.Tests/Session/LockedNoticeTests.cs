@@ -178,6 +178,38 @@ public sealed class LockedNoticeTests
         });
 
     [Fact]
+    public Task A_vault_chosen_while_the_app_stays_locked_is_listened_for_in_place_of_the_one_before() =>
+        HeadlessSession.On(async () =>
+        {
+            using var home = new TempHome();
+            using var shown = new TempVault();
+            using var other = new TempVault();
+            var before = Path.Combine(other.Home, "before.kdbx");
+            var after = Path.Combine(other.Home, "after.kdbx");
+            File.Copy(other.Path_, before);
+            File.Copy(other.Path_, after);
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(home), Claim = claim };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            var notices = Notices(app);
+            using var choice = new Chosen(before);
+            Assert.True(Screen(app).Offer(shown.Path_));
+
+            using var change = new Chosen(after);
+
+            await TellUntilHeardAsync(after);
+            var notice = await NoticeAsync(notices);
+            Assert.Equal("An agent asked for after.kdbx", Text(notice, "HeadText"));
+            Assert.False(await TellAsync(before), "the app still listened for the vault chosen before");
+            Assert.True(await TellAsync(shown.Path_), "the app stopped listening for the vault its unlock screen shows");
+            Assert.False(app.Main!.IsVisible);
+            notice.Close();
+        });
+
+    [Fact]
     public Task Unlocking_takes_a_notice_still_up_down() =>
         HeadlessSession.On(async () =>
         {
@@ -231,6 +263,18 @@ public sealed class LockedNoticeTests
 
     private static Task<bool> TellAsync(string vault) =>
         LockedAppEndpoint.TellAsync(LockedAppEndpoint.NameFor(VaultIdentity.Of(Home, vault)), Token);
+
+    private static async Task TellUntilHeardAsync(string vault)
+    {
+        var deadline = DateTime.UtcNow + _wait;
+
+        while (!await TellAsync(vault))
+        {
+            Assert.True(DateTime.UtcNow < deadline, "the app never listened for that vault");
+            WindowInput.Drain();
+            await Task.Delay(20, Token);
+        }
+    }
 
     private static List<Window> Notices(App app)
     {

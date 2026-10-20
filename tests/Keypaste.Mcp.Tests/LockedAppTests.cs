@@ -56,7 +56,7 @@ public sealed class LockedAppTests
 
     // An approver nobody runs, so every call finds nothing holding the vault, a listing included; in its own home, so a change for less has ceilings to lower.
     private static McpHarness WithNobodyHoldingTheVault() =>
-        new("keypaste-locked-app-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))) { InItsOwnHome = true };
+        new("keypaste-unheld-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))) { InItsOwnHome = true };
 
     // A request for a value, a run, a listing and a change for more, in that order.
     private static async Task<List<CallToolResult>> AskEveryWayAsync(McpClient client, McpHarness harness)

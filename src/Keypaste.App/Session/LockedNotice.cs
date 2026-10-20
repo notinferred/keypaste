@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
 
@@ -14,8 +15,9 @@ namespace Keypaste.App.Session;
 /// </summary>
 /// <remarks>
 /// It listens for the vault the unlock screen shows and for the chosen vault, follows the unlock screen as its
-/// vault changes, and stops when a vault opens. One notice is shown each time the app is locked, whichever vault
-/// was asked for; it names that vault, and only its Open keypaste shows the unlock screen, with that vault on it.
+/// vault changes and the chosen vault as <c>app.toml</c> changes, and stops when a vault opens. One notice is
+/// shown each time the app is locked, whichever vault was asked for; it names that vault, and only its Open
+/// keypaste shows the unlock screen, with that vault on it.
 /// </remarks>
 internal sealed class LockedNotice : IDisposable
 {
@@ -26,6 +28,7 @@ internal sealed class LockedNotice : IDisposable
 
     // Read and written on the UI thread only.
     private readonly Dictionary<string, LockedAppEndpoint> _listening = new(StringComparer.Ordinal);
+    private FileSystemWatcher? _choiceWatcher;
     private UnlockViewModel? _screen;
     private bool _told;
     private bool _disposed;
@@ -102,6 +105,8 @@ internal sealed class LockedNotice : IDisposable
 
     private void OnOpened(object? sender, EventArgs e) => Dispatcher.UIThread.Post(Unlocked);
 
+    private void OnChoiceChanged(object? sender, FileSystemEventArgs e) => Dispatcher.UIThread.Post(Listen);
+
     private void OnScreenChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(UnlockViewModel.SelectedPath))
@@ -123,6 +128,8 @@ internal sealed class LockedNotice : IDisposable
         {
             return;
         }
+
+        WatchChoice();
 
         var wanted = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -146,6 +153,32 @@ internal sealed class LockedNotice : IDisposable
 #pragma warning disable CA2000
             _listening[name] = LockedAppEndpoint.Listen(name, () => Dispatcher.UIThread.Post(() => Tell(name, vault)), _unreachable);
 #pragma warning restore CA2000
+        }
+    }
+
+    // `keypaste use` changes the chosen vault while the app stays locked, with no lock or change of screen to follow.
+    private void WatchChoice()
+    {
+        if (_choiceWatcher is not null)
+        {
+            return;
+        }
+
+        var settings = KeypasteHome.SettingsPath(_session.Home);
+
+        try
+        {
+            _choiceWatcher = new FileSystemWatcher(Path.GetDirectoryName(settings)!, Path.GetFileName(settings));
+            _choiceWatcher.Changed += OnChoiceChanged;
+            _choiceWatcher.Created += OnChoiceChanged;
+            _choiceWatcher.Renamed += OnChoiceChanged;
+            _choiceWatcher.EnableRaisingEvents = true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            // A home that cannot be watched leaves the choice to be read again at the next lock or change of screen.
+            _choiceWatcher?.Dispose();
+            _choiceWatcher = null;
         }
     }
 
@@ -190,6 +223,9 @@ internal sealed class LockedNotice : IDisposable
 
     private void Stop()
     {
+        _choiceWatcher?.Dispose();
+        _choiceWatcher = null;
+
         foreach (var endpoint in _listening.Values)
         {
             endpoint.Dispose();

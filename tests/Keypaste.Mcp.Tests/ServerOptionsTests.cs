@@ -126,6 +126,20 @@ public sealed class ServerOptionsTests
         Assert.Null(help!.LockedAppName);
     }
 
+    /// <summary>D-0466: a bridge never looks for its approver on a locked app's pipe, however the name is cased.</summary>
+    [Theory]
+    [InlineData("keypaste-locked-0123")]
+    [InlineData("KEYPASTE-LOCKED-0123")]
+    [InlineData("Keypaste-Locked-0123")]
+    public void AnApproverNamingALockedAppsPipe_IsRefusedAtStartup_FromTheFlagOrTheEnvironment(string approver)
+    {
+        Assert.False(Parse(out _, out var flagged, "--vault", "v.kdbx", "--approver", approver));
+        Assert.False(ServerOptions.TryParse(["--vault", "v.kdbx"], null, null, approver, null, out _, out var fromEnvironment));
+
+        Assert.StartsWith("--approver: an approver name cannot start with keypaste-locked-", flagged, StringComparison.Ordinal);
+        Assert.StartsWith("--approver: an approver name cannot start with keypaste-locked-", fromEnvironment, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("help")]
     [InlineData("-h")]
