@@ -100,7 +100,7 @@ jobs:
   # mode calls it with linux_only to run its Linux jobs but the KeePassXC ones; that run counts toward nothing (D-0460).
   targets:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 2
     outputs:
       targets: ${{ steps.targets.outputs.targets }}
     steps:
@@ -140,7 +140,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2025","macos-15"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 13
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -163,7 +163,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2025","macos-15"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 17
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -193,7 +193,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 14
     env:
       # KeePassXC's Windows console encoding can alter a non-ASCII master password.
       KP_COMPAT_PASSWORD: ci-master-pw
@@ -240,7 +240,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 6
     env:
       KP_COMPAT_PASSWORD: ci-master-pw
     steps:
@@ -292,7 +292,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","macos-15"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -331,7 +331,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.targets.outputs.targets) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 13
     permissions:
       contents: read
       id-token: write
@@ -652,7 +652,7 @@ jobs:
     if: always()
     needs: [targets, desktop, desktop-gates, compat, first-run, clipboard-markers, package]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
       - name: Fail when any job failed or was cancelled
         shell: bash
