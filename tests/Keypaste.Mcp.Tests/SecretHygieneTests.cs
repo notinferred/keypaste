@@ -408,8 +408,9 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
     /// <summary>
     /// A value keypaste cannot fill in leaves nothing, not even what filled in before the placeholder that
-    /// refused it, whether a person allowed it or Automatic did. The owner's log names the field and the
-    /// placeholder and never a value (D-0465).
+    /// refused it, whether a person allowed it or Automatic did. The agent is told to have the item edited,
+    /// the owner's log names the field and the placeholder and never a value, and asking again is refused
+    /// without asking the person (D-0465).
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -424,14 +425,18 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         await using (harness)
         {
             var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: "DATABASE_URL"), cancellationToken: Token);
+            var again = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: "DATABASE_URL"), cancellationToken: Token);
 
             Assert.True(result.IsError);
+            Assert.Equal(ToolText.Unfillable, TextOf(result));
+            Assert.Equal(ToolText.Cooldown, TextOf(again));
+            Assert.Equal(automatic ? 0 : 1, _human.Asked);
 
-            var line = Assert.Single(_log!.Lines());
-            Assert.Equal("failed", line.GetProperty("method").GetString());
+            var lines = _log!.Lines();
+            Assert.Equal(["unfillable", "cooldown"], lines.Select(line => line.GetProperty("method").GetString()));
             Assert.Equal(
                 "the item's DATABASE_URL holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases",
-                line.GetProperty("reason").GetString());
+                lines[0].GetProperty("reason").GetString());
 
             foreach (var sentinel in _everySentinel)
             {

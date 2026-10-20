@@ -363,7 +363,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Report(filled switch
         {
             null => "That item could not be read. The vault may have locked.",
-            { Refusal: { } refusal } => DisplayTextSanitizer.Sanitize($"{what} {refusal}, so it was not {refused}.").Text,
+            { Refusal: { } refusal } => DisplayTextSanitizer.Sanitize($"{what} {refusal}, so it was not {refused}.").Text + " Edit the item so keypaste can fill it in.",
             _ => $"{what} fills in as empty, so it was not {refused}.",
         });
         return null;

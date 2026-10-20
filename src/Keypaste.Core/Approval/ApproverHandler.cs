@@ -308,7 +308,7 @@ public sealed class ApproverHandler
         // A limit that is spent asks instead: the person is the fallback, never a refusal.
         if (!liveOnly && access.TryAutomatic(item, _hourly))
         {
-            return Automatic(request, name, display, access.Label!, cancellationToken);
+            return Automatic(request, name, display, key, access.Label!, cancellationToken);
         }
 
         // The person chooses once or the timed grant on screen, so its length is the approver's
@@ -377,7 +377,7 @@ public sealed class ApproverHandler
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
         {
-            return Unread(readFailure, request.Field, unfilled, display);
+            return Unread(readFailure, key, unfilled, display, prompt.Client);
         }
 
         using (released)
@@ -436,10 +436,12 @@ public sealed class ApproverHandler
         CredentialRequest request,
         EntryName name,
         string display,
+        GrantKey key,
         string agent,
         CancellationToken cancellationToken)
     {
         var ttl = _gate.Limits.EffectiveTtlSeconds(request.TtlSeconds);
+        var shown = EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text;
 
         if (Withdrawn(display, cancellationToken) is { } withdrawn)
         {
@@ -448,13 +450,11 @@ public sealed class ApproverHandler
 
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
         {
-            return Unread(readFailure, request.Field, unfilled, display);
+            return Unread(readFailure, key, unfilled, display, shown);
         }
 
         using (released)
         {
-            var shown = EntryNameSanitizer.Sanitize(agent, ApprovalPrompt.MaximumClientLength).Text;
-
             // One line on the operator's terminal either way, and the only live signal that this
             // happened at all: no prompt was drawn and nobody was asked (THREATS.md T-12).
             return Deliver(
@@ -958,7 +958,7 @@ public sealed class ApproverHandler
     /// </para>
     /// <para>
     /// The refusal names which authority the release had, so an Automatic release is never written up
-    /// as a person's (THREATS.md T-16). It is the one denial in keypaste that follows a yes.
+    /// as a person's (THREATS.md T-16).
     /// </para>
     /// </remarks>
     private CredentialReply Deliver(CredentialReply granted, string display, string narration)
@@ -976,14 +976,33 @@ public sealed class ApproverHandler
         return granted;
     }
 
-    /// <summary>Refuses a release whose field could not be read, naming a stale vault as that, and a placeholder that cannot be filled in by its field.</summary>
-    private CredentialReply Unread(CredentialFailure failure, string field, string unfilled, string display) =>
-        IsStale(failure)
-            ? Refused(AuditMethod.VaultChanged, Stale(failure, display), display)
-            : Refused(
-                AuditMethod.Failed,
-                failure == CredentialFailure.Unfilled && unfilled.Length > 0 ? $"the item's {field} {unfilled}" : Explain(failure),
-                display);
+    /// <summary>
+    /// Refuses a release whose field could not be read, naming a stale vault as that, and a placeholder that
+    /// cannot be filled in by its field under <see cref="AuditMethod.Unfillable"/>.
+    /// </summary>
+    /// <remarks>
+    /// A placeholder refusal cools the field down as a person's refusal does: asking again ends the same way
+    /// until somebody edits the item, so each retry would otherwise put the same question to a person for nothing.
+    /// </remarks>
+    private CredentialReply Unread(CredentialFailure failure, GrantKey key, string unfilled, string display, string client)
+    {
+        if (IsStale(failure))
+        {
+            return Refused(AuditMethod.VaultChanged, Stale(failure, display), display);
+        }
+
+        if (failure != CredentialFailure.Unfilled)
+        {
+            return Refused(AuditMethod.Failed, Explain(failure), display);
+        }
+
+        var reason = unfilled.Length > 0 ? $"the item's {key.Field} {unfilled}" : Explain(failure);
+
+        _gate.CoolDown(CooldownKey(key));
+        _narrate?.Invoke($"refused {display} for {client}: {reason}; edit the item so keypaste can fill it in");
+
+        return Refused(AuditMethod.Unfillable, reason, display);
+    }
 
     private static bool IsStale(CredentialFailure failure) =>
         failure is CredentialFailure.ChangedOnDisk or CredentialFailure.Unsaved;

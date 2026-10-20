@@ -688,6 +688,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.RunOff => "run-off",
         AuditMethod.Narrowing => "narrowing",
         AuditMethod.Unchanged => "unchanged",
+        AuditMethod.Unfillable => "unfillable",
         _ => "unknown",
     };
 

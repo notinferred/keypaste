@@ -80,7 +80,7 @@ public enum AuditMethod
     /// A word of its own rather than a reuse: <see cref="Failed"/> says asking went wrong and here it
     /// went right, while <see cref="Prompt"/> beside <see cref="AuditDecision.Denied"/> already means
     /// a person said no. The reason names which authority the release had, so an Automatic release is
-    /// never written up as a human act. The only method where a denial follows an authorization.
+    /// never written up as a human act. Like <see cref="Unfillable"/>, a denial that always follows an authorization.
     /// </remarks>
     Undeliverable = 16,
 
@@ -124,6 +124,13 @@ public enum AuditMethod
 
     /// <summary>A terminal's edit asked for what the vault already held, so nothing was written and nobody was asked.</summary>
     Unchanged = 26,
+
+    /// <summary>The request was authorized and the value asked for holds a KeePass placeholder keypaste does not fill in, so nothing was released (D-0465).</summary>
+    /// <remarks>
+    /// Not <see cref="Failed"/>: nothing went wrong, and asking again ends the same way until a person edits the
+    /// item, so the field cools down as a refusal's does. The reason names the placeholder, never a value.
+    /// </remarks>
+    Unfillable = 27,
 }
 
 /// <summary>Who asked.</summary>

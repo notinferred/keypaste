@@ -158,7 +158,7 @@ public sealed class SecretCopyParityTests
 
             Assert.False(screen.Shell.Clipboard.IsCounting);
             Assert.Equal(Hash(_before), await screen.Clipboard.TryReadHashAsync());
-            Assert.Equal($"{subject} {reason}, so it was not copied.", screen.Error);
+            Assert.Equal($"{subject} {reason}, so it was not copied. Edit the item so keypaste can fill it in.", screen.Error);
         });
 
     [Fact]
@@ -181,7 +181,7 @@ public sealed class SecretCopyParityTests
 
         Assert.Empty(screen.Launcher.Opened);
         Assert.Equal(
-            "The web address holds the KeePass placeholder {TOTP}, which keypaste does not fill in, so it was not opened.",
+            "The web address holds the KeePass placeholder {TOTP}, which keypaste does not fill in, so it was not opened. Edit the item so keypaste can fill it in.",
             entries.Error);
     });
 

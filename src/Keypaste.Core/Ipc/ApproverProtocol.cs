@@ -82,9 +82,8 @@ public static class ApproverProtocol
     /// <returns>keypaste's own words, naming which authority allowed it.</returns>
     /// <remarks>
     /// Selected by the authority rather than written once, because a release an Automatic mode allowed
-    /// must never be recorded as a human act (THREATS.md T-16). This is the only path in keypaste
-    /// where a denial follows an authorization, so it is the only place where naming the authority
-    /// on a denied line is meaningful at all.
+    /// must never be recorded as a human act (THREATS.md T-16). Naming the authority on a denied line
+    /// is meaningful only where a denial follows an authorization, as it does here.
     /// </remarks>
     internal static string UndeliverableReason(AuditMethod authority) => authority switch
     {

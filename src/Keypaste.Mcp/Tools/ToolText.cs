@@ -456,6 +456,19 @@ internal static class ToolText
         recorded in the audit log as denied.
         """;
 
+    /// <summary>Why nothing came back for a value holding a KeePass placeholder keypaste does not fill in.</summary>
+    /// <remarks>
+    /// It never says a person allowed it, because an Automatic release reaches this same sentence (T-16).
+    /// "Do not retry": the answer is the same until the item is edited, and the field cools down for a minute.
+    /// </remarks>
+    internal const string Unfillable = """
+        keypaste: DENIED. This item's value holds a KeePass placeholder that keypaste does not fill in,
+        so nothing was released, and asking again will not change that.
+
+        Do not retry. Ask the person you are working with to edit the item so keypaste can fill it in,
+        then ask again after a minute. This call was recorded in the audit log as denied.
+        """;
+
     /// <summary>Why a request was refused before it was even considered.</summary>
     internal const string OutOfScope = """
         keypaste: DENIED. That item is outside what this agent can see, so keypaste will not discuss
@@ -554,6 +567,7 @@ internal static class ToolText
         AuditMethod.Prompt => DeniedByHuman,
         AuditMethod.Cancelled => Cancelled,
         AuditMethod.Undeliverable => Undeliverable,
+        AuditMethod.Unfillable => Unfillable,
         AuditMethod.NoSession => NoSession,
         AuditMethod.VaultChanged => VaultChanged,
         AuditMethod.InjectOnly => InjectOnly,

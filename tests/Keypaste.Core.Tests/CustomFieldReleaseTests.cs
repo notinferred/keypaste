@@ -242,7 +242,8 @@ public sealed class CustomFieldReleaseTests : IDisposable
 
     /// <summary>
     /// A value naming a field that never leaves is refused after the person allowed it, whatever filled in
-    /// before it, and the reason names the field asked for and the placeholder, never a value (D-0465).
+    /// before it, as unfillable, and the reason names the field asked for and the placeholder, never a value;
+    /// asking again is refused without asking the person (D-0465).
     /// </summary>
     [Fact]
     public async Task AValueNamingAFieldThatNeverLeaves_IsRefusedAfterTheAllow_NamingThePlaceholder()
@@ -252,13 +253,15 @@ public sealed class CustomFieldReleaseTests : IDisposable
         approver.Channel.Answer = ApprovalAnswer.Approved;
 
         var reply = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
+        var again = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
 
         Assert.Equal(AuditDecision.Denied, reply.Decision);
-        Assert.Equal(AuditMethod.Failed, reply.Method);
+        Assert.Equal(AuditMethod.Unfillable, reply.Method);
         Assert.Equal(
             "the item's DATABASE_URL holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases",
             reply.Reason);
         Assert.Null(reply.Value);
+        Assert.Equal(AuditMethod.Cooldown, again.Method);
         Assert.Equal(1, approver.Channel.Asked);
         AssertNoSentinel(reply.Reason);
     }

@@ -18,6 +18,8 @@ public sealed class ApproverHandlerTests
 {
     internal const string Sentinel = ApproverFixture.Sentinel;
 
+    private const string _unfilled = "holds the KeePass placeholder {TOTP}, which keypaste does not fill in";
+
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private static CredentialRequest Request(
@@ -737,6 +739,59 @@ public sealed class ApproverHandlerTests
         Assert.Equal(AuditMethod.Cooldown, reconnected.Method);
         Assert.Equal(AuditDecision.Granted, otherField.Decision);
         Assert.Equal(2, fixture.Channel.Asked);
+    }
+
+    /// <summary>
+    /// A value holding a placeholder keypaste cannot fill in is refused after the allow under a method of its
+    /// own, told to the operator's terminal, and cools its field down as a refusal does, so a retry from any
+    /// connection troubles nobody while another field is still asked about (D-0465).
+    /// </summary>
+    [Theory]
+    [InlineData(ApprovalAnswer.Approved)]
+    [InlineData(ApprovalAnswer.ApprovedOnce)]
+    public async Task AnAllowedValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown(ApprovalAnswer answer)
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = answer;
+        fixture.Source.Unfilled = _unfilled;
+
+        var refused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        var again = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Unfillable), (refused.Decision, refused.Method));
+        Assert.Equal($"the item's password {_unfilled}", refused.Reason);
+        Assert.Null(refused.Value);
+        Assert.Equal(0, fixture.Grants.Count);
+        Assert.Equal(AuditMethod.Cooldown, again.Method);
+        Assert.Equal(
+            $"refused env/dev/STRIPE_KEY for claude-code: the item's password {_unfilled}; edit the item so keypaste can fill it in",
+            fixture.Narration[0]);
+
+        fixture.Source.Unfilled = null;
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-2", Token);
+
+        Assert.Equal(AuditDecision.Granted, otherField.Decision);
+        Assert.Equal(2, fixture.Channel.Asked);
+    }
+
+    /// <summary>An Automatic release of a value keypaste cannot fill in is refused, told and cooled down the same way, with nobody asked (D-0465).</summary>
+    [Fact]
+    public async Task AnAutomaticValueThatCannotBeFilledIn_IsRefusedAsUnfillable_AndCoolsItsFieldDown()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Settings.Records[ApproverFixture.Agent] = ApproverFixture.SeesAll with { Mode = AgentMode.Automatic };
+        fixture.Source.Unfilled = _unfilled;
+
+        var refused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Unfillable), (refused.Decision, refused.Method));
+        Assert.Null(refused.Value);
+        Assert.Equal(AuditMethod.Cooldown, again.Method);
+        Assert.Equal(0, fixture.Channel.Asked);
+        Assert.Equal(
+            $"refused env/dev/STRIPE_KEY for claude-code: the item's password {_unfilled}; edit the item so keypaste can fill it in",
+            fixture.Narration[0]);
     }
 
     private static ApproverHandler LiveOnly(ApproverFixture fixture) =>

@@ -88,6 +88,9 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
 
     internal bool FailReads { get; set; }
 
+    /// <summary>When set, a read refuses the value as holding a placeholder keypaste cannot fill in, for this reason.</summary>
+    internal string? Unfilled { get; set; }
+
     internal int Reads { get; private set; }
 
     internal int Resolves { get; private set; }
@@ -146,6 +149,13 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
         if (FailReads)
         {
             failure = CredentialFailure.Failed;
+            return false;
+        }
+
+        if (Unfilled is { } reason)
+        {
+            failure = CredentialFailure.Unfilled;
+            unfilled = reason;
             return false;
         }
 

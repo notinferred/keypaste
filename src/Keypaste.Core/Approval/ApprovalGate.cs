@@ -338,7 +338,7 @@ public sealed class ApprovalGate : IDisposable
             {
                 foreach (var cooldownKey in cooldownKeys)
                 {
-                    _cooldowns[cooldownKey] = Deadline.Starting(_clock, Limits.DenialCooldown);
+                    CoolDown(cooldownKey);
                 }
             }
 
@@ -457,6 +457,10 @@ public sealed class ApprovalGate : IDisposable
 
         return InCooldown(cooldownKey);
     }
+
+    /// <summary>Holds the same request back as a person's refusal does, for one that was authorized and that keypaste then refused because asking again ends the same way.</summary>
+    /// <param name="cooldownKey">What counts as "the same request".</param>
+    internal void CoolDown(string cooldownKey) => _cooldowns[cooldownKey] = Deadline.Starting(_clock, Limits.DenialCooldown);
 
     /// <summary>How long a refusal under this key still holds the same request back, or nothing when none does.</summary>
     /// <param name="cooldownKey">What counts as "the same request".</param>

@@ -857,7 +857,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
 
         _report(fill?.Refusal is { } refusal
-            ? DisplayTextSanitizer.Sanitize($"{row.DisplayKey} {refusal}, so it was not copied.").Text
+            ? DisplayTextSanitizer.Sanitize($"{row.DisplayKey} {refusal}, so it was not copied.").Text + " Edit the item so keypaste can fill it in."
             : "That value could not be read. The vault may have locked.");
         return null;
     }
