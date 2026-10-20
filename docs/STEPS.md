@@ -12,17 +12,6 @@ These rows serve every track: a development machine builds nothing, and CI runs 
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **G.4b — Tell the person when a locked app is asked.** Needs: G.4a.
-  - A bridge that finds no owner has the running app show one notice, with no password field.
-  - Only the person's click opens the unlock screen, and the request itself is still denied.
-  - T-7 is amended.
-- [ ] **G.3 — Add `keypaste doctor`.** Needs: G.1, G.2. Read-only checks, each with a fix line:
-  - the versions match;
-  - the chosen vault exists;
-  - each tool's registration runs and survives upgrades;
-  - the owner answers;
-  - the settings files parse;
-  - `keypaste` is on PATH.
 - [ ] **N.8 — Make `keypaste` alone show where things stand.** Needs: G.1.
   - On a terminal it shows the version, the chosen vault and who holds it, the connected tools and one next step.
   - It asks for no password.
