@@ -1,7 +1,7 @@
 name: dev
 
-# K.6a, K.6c: runs one test class, regenerates the lock files, or runs ci.yml's and app.yml's Linux jobs on a pushed
-# branch so the founder's machine never has to; scripts/dev.sh dispatches it. It is never a release gate or integration
+# K.6a, K.6c, F.66: runs one test class, one verify.sh profile on one runner, regenerates the lock files, or runs ci.yml's
+# and app.yml's Linux jobs on a pushed branch so the founder's machine never has to; scripts/dev.sh dispatches it. It is never a release gate or integration
 # evidence, so no dev run stands in for a full ci or app run (D-0383, D-0460).
 
 on:
@@ -9,6 +9,10 @@ on:
     inputs:
       filter_class:
         description: A fully qualified test class; its namespace selects its project
+        type: string
+        default: ''
+      profile:
+        description: The verify.sh profile that profile mode runs; backend, integration, desktop or desktop-gates
         type: string
         default: ''
       os:
@@ -20,19 +24,19 @@ on:
         type: string
         default: ''
       mode:
-        description: class runs filter_class, linux runs ci.yml's and app.yml's Linux jobs, relock regenerates the lock files
+        description: class runs filter_class, profile runs profile, linux runs ci.yml's and app.yml's Linux jobs, relock regenerates the lock files
         type: choice
-        options: [class, linux, relock]
+        options: [class, profile, linux, relock]
         default: class
 
-run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.filter_class }} ${{ inputs.os }} ${{ inputs.nonce }}
+run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.filter_class }}${{ inputs.profile }} ${{ inputs.os }} ${{ inputs.nonce }}
 
 permissions:
   contents: read
 
-# A new dispatch of the same mode, class and runner on a branch supersedes the run before it.
+# A new dispatch of the same mode, class or profile and runner on a branch supersedes the run before it.
 concurrency:
-  group: dev-${{ github.ref }}-${{ inputs.mode }}-${{ inputs.filter_class }}-${{ inputs.os }}
+  group: dev-${{ github.ref }}-${{ inputs.mode }}-${{ inputs.filter_class }}${{ inputs.profile }}-${{ inputs.os }}
   cancel-in-progress: true
 
 env:
@@ -88,6 +92,43 @@ jobs:
           path: ${{ runner.temp }}/screens
           if-no-files-found: ignore
           retention-days: 7
+
+  # One verify.sh profile on one runner, to retry a failure that only that runner showed (D-0468).
+  profile:
+    name: ${{ inputs.profile }} (${{ matrix.os }})
+    if: inputs.mode == 'profile'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os == 'all' && '["ubuntu-24.04","windows-2025","macos-15"]' || format('["{0}"]', inputs.os)) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: command -v gtimeout >/dev/null || brew install coreutils
+
+      - name: Run the profile
+        shell: bash
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          set -euo pipefail
+          case "$PROFILE" in
+            backend|integration|desktop|desktop-gates) bash scripts/verify.sh "$PROFILE" ;;
+            *) echo "::error::profile must be backend, integration, desktop or desktop-gates"; exit 1 ;;
+          esac
 
   # A development machine has no SDK, so a changed dependency or RuntimeIdentifiers list gets its lock
   # files here: the same SDK as ci.yml and app.yml restores every locked project against what it now declares.

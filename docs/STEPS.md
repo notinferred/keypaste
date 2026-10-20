@@ -6,7 +6,7 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 ## K and B — Build infrastructure
 
-These rows serve every track: a development machine builds nothing, and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
+These rows serve every track: a development machine builds only the compile check (D-0468), and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
 ## T3 — AI requests in the app
 

@@ -113,14 +113,15 @@ counted() {
   printf '%s' "$runs" | jq --arg wf "$1" "[.workflow_runs[]? | select(.name == \$wf and (.event == \"workflow_dispatch\" or .event == \"schedule\" or (.event == \"push\" and .head_branch != \"main\")))] | $2" 2>/dev/null | tr -d "$CR" || true
 }
 
-# How many of the ci runs whose IDs are $1 ran tools jobs and passed every one of them (D-0438).
+# How many of the ci runs whose IDs are $1 ran tools jobs, passed every one of them and skipped no other
+# job, which a tools-only dispatch does (D-0438).
 green_tools_runs() {
   local id jobs count green=0
   for id in $1; do
     case "$id" in *[!0-9]*) die "the API named a ci run that is not a run ID; refusing without a verified answer" ;; esac
     jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=100" 2>/dev/null)" \
       || die "could not ask $GITHUB_REPOSITORY which jobs ci run $id ran"
-    count="$(printf '%s' "$jobs" | jq '[.jobs[] | select(.name | startswith("tools (")) | .conclusion] | if length > 0 and all(. == "success") then length else 0 end' 2>/dev/null | tr -d "$CR" || true)"
+    count="$(printf '%s' "$jobs" | jq '[.jobs[] | select(.name | startswith("tools (")) | .conclusion] as $tools | if ($tools | length) > 0 and ($tools | all(. == "success")) and ([.jobs[] | .conclusion] | all(. != "skipped")) then ($tools | length) else 0 end' 2>/dev/null | tr -d "$CR" || true)"
     case "$count" in
       '' | *[!0-9]*) die "could not count the tools jobs of ci run $id; refusing without a verified answer" ;;
     esac

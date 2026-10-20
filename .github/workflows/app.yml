@@ -83,7 +83,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: app-${{ github.workflow }}-${{ github.ref }}
+  group: app-${{ github.workflow }}-${{ github.ref }}${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && format('-{0}-{1}', github.sha, github.event_name) || '' }}
   # A branch's newer run supersedes its last; main and tags keep every verdict.
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) }}
 

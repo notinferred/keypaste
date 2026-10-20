@@ -28,6 +28,9 @@ compat         Prepare the backend and the app driver, and verify creation, writ
                the site's Worker on loopback, and
                the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
                Never run without being named.
+compile        Locked restore and Release build of both solutions and the consistency project, and dotnet format;
+               no tests, and the build servers stop when it ends. A development machine runs it before each push
+               (D-0468). Never run without being named.
 tools          Prepare the backend, and connect keypaste to the real AI tools installed on this machine, read each
                registration back with the tool's own command where it has one, else at the file level, and remove
                it again. It writes those tools' own configuration, so it runs only on a GitHub runner, after
@@ -81,7 +84,7 @@ while [ "$#" -gt 0 ]; do
       [ "$phase" = all ] || bad_usage 'choose only one phase'
       phase="${1#--}"
       ;;
-    format|backend|desktop|desktop-gates|scripts|workflows|integration|compat|tools)
+    format|backend|desktop|desktop-gates|scripts|workflows|integration|compat|tools|compile)
       [ -z "$profile" ] || bad_usage 'choose one profile'
       profile="$1"
       ;;
@@ -316,6 +319,14 @@ profile_format() {
     run dotnet restore "$target" --locked-mode
     run dotnet format "$target" --no-restore --verify-no-changes --exclude third_party/
   done
+}
+
+# The build servers would otherwise stay resident after a development machine's check, even a failed one.
+profile_compile() {
+  if [ "$list" = false ]; then trap 'dotnet build-server shutdown >/dev/null 2>&1 || true' EXIT; fi
+  prepare_backend
+  prepare_desktop
+  profile_format
 }
 
 check_integration() {

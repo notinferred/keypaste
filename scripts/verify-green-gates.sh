@@ -138,6 +138,7 @@ readonly SCHEDULED_GREEN='[{"name":"ci","conclusion":"success","id":12,"head_bra
 readonly TOOLS_RAN='[{"name":"test (ubuntu-24.04)","conclusion":"success"},{"name":"tools (ubuntu-24.04)","conclusion":"success"},{"name":"tools (windows-2025)","conclusion":"success"},{"name":"tools (macos-15)","conclusion":"success"}]'
 readonly TOOLS_GREEN="{\"11\":$TOOLS_RAN,\"12\":$TOOLS_RAN}"
 readonly TOOLS_SKIPPED='{"11":[{"name":"test (ubuntu-24.04)","conclusion":"success"},{"name":"tools (${{ matrix.os }})","conclusion":"skipped"}]}'
+readonly TOOLS_ONLY='{"11":[{"name":"test (ubuntu-24.04)","conclusion":"skipped"},{"name":"tools (ubuntu-24.04)","conclusion":"success"},{"name":"tools (windows-2025)","conclusion":"success"},{"name":"tools (macos-15)","conclusion":"success"}]}'
 JOBS="$TOOLS_GREEN"
 
 echo "== the shapes a tag can arrive in"
@@ -157,6 +158,8 @@ echo "== ci counts only with its real-tools jobs green (D-0438)"
 run_case "ci-scheduled-with-tools" ok "$SCHEDULED_GREEN" "$SUBJECT" 0 "every required gate is green"
 JOBS="$TOOLS_SKIPPED"
 run_case "ci-tools-skipped" ok "$BOTH_GREEN" "$SUBJECT" 1 "dispatch ci.yml at this commit with -f tools=true"
+JOBS="$TOOLS_ONLY"
+run_case "ci-tools-only" ok "$BOTH_GREEN" "$SUBJECT" 1 "dispatch ci.yml at this commit with -f tools=true"
 JOBS="$TOOLS_GREEN"
 run_case "jobs-empty"   jobs-empty   "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
 run_case "jobs-garbage" jobs-garbage "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
@@ -197,7 +200,7 @@ cat <<EOF
 ok: $cases_run cases. One shape was accepted by the real script - every required gate green in a
     full run, ci's dispatched or scheduled with its tools jobs green - and a missing app run, a red one, a
     commit with neither, a ci run only a pull request or a push to main triggered, a ci run whose tools
-    jobs were skipped, a failed call, and an empty or unparseable reply about the runs or a run's jobs
+    jobs were skipped or that ran only them, a failed call, and an empty or unparseable reply about the runs or a run's jobs
     all refused. Off the same reply it resolves
     which app run built the commit, and refuses when there is none, when the only green run belongs
     to the branch rather than the tag or to a pull request whose branch carries the tag's name, and

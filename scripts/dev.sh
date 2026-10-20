@@ -7,6 +7,7 @@ usage() {
 Usage: bash scripts/dev.sh [--tools] [--wait]
        bash scripts/dev.sh --linux [--wait]
        bash scripts/dev.sh --class FQN [--os O] [--wait]
+       bash scripts/dev.sh --profile P [--os O] [--wait]
        bash scripts/dev.sh --relock
 
 Pushes the current branch and follows GitHub's verdict on it. Needs only git and gh; nothing builds
@@ -21,7 +22,9 @@ The first failure ends the wait with that job's log; the runs carry on until the
 --linux   run every Linux job of ci.yml and app.yml but compat and tools, in parallel in one dev.yml run;
           an intermediate iteration, never integration evidence; not with --class, --os, --relock or --tools
 --class   a fully qualified test class, run through dev.yml in its own project
---os      the runner for --class: linux (default), windows, macos or all
+--profile one verify.sh profile, backend, integration, desktop or desktop-gates, run through dev.yml, to retry a
+          failure only one runner showed
+--os      the runner for --class or --profile: linux (default), windows, macos or all
 --wait    wait for every job and print each failed one's log, rather than stopping at the first
 --relock  regenerate the lock files of the pushed commit with the CI SDK, build nothing, and write
           the ones that changed into this tree to review and commit
@@ -31,7 +34,7 @@ USAGE
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 die() { echo "dev: $1" >&2; exit 1; }
 
-class='' os='' relock=false wait_all=false tools=false linux=false
+class='' profile='' os='' relock=false wait_all=false tools=false linux=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
@@ -39,10 +42,11 @@ while [ "$#" -gt 0 ]; do
     --linux) linux=true ;;
     --tools) tools=true ;;
     --wait) wait_all=true ;;
-    --class|--os)
+    --class|--profile|--os)
       [ "$#" -ge 2 ] || bad_usage "$1 needs a value"
       case "$1" in
         --class) class="$2" ;;
+        --profile) profile="$2" ;;
         --os) os="$2" ;;
       esac
       shift
@@ -53,7 +57,10 @@ while [ "$#" -gt 0 ]; do
 done
 [ "$linux" = false ] || { [ -z "$class" ] && [ -z "$os" ] && [ "$relock" = false ] && [ "$tools" = false ]; } \
   || bad_usage '--linux is a run of its own; it cannot accompany --class, --os, --relock or --tools'
-[ -z "$os" ] || [ -n "$class" ] || bad_usage '--os chooses the runner for --class'
+[ -z "$os" ] || [ -n "$class" ] || [ -n "$profile" ] || bad_usage '--os chooses the runner for --class or --profile'
+[ -z "$profile" ] || { [ -z "$class" ] && [ "$relock" = false ] && [ "$linux" = false ] && [ "$tools" = false ]; } \
+  || bad_usage '--profile is a run of its own; it cannot accompany --class, --linux, --relock or --tools'
+case "$profile" in ''|backend|integration|desktop|desktop-gates) ;; *) bad_usage "unknown --profile $profile" ;; esac
 [ -z "$class" ] || [ "$relock" = false ] || bad_usage '--class and --relock are separate runs'
 [ "$tools" = false ] || { [ -z "$class" ] && [ "$relock" = false ]; } || bad_usage '--tools runs ci.yml in full; it cannot accompany --class or --relock'
 case "${os:-linux}" in
@@ -67,6 +74,7 @@ mode=''
 [ -z "$class" ] || mode=class
 [ "$relock" = false ] || mode=relock
 [ "$linux" = false ] || mode=linux
+[ -z "$profile" ] || mode=profile
 
 branch="$(git symbolic-ref --short -q HEAD)" || die 'HEAD is detached; check out a branch'
 [ "$branch" != main ] || die 'refusing to run on main; work on a branch'
@@ -79,7 +87,7 @@ sha="$(git rev-parse HEAD)"
 runs=()
 if [ -n "$mode" ]; then
   nonce="$(date +%s)-$$"
-  gh workflow run dev.yml --ref "$branch" -f mode="$mode" -f filter_class="$class" -f os="$runner" -f nonce="$nonce"
+  gh workflow run dev.yml --ref "$branch" -f mode="$mode" -f filter_class="$class" -f profile="$profile" -f os="$runner" -f nonce="$nonce"
   found='' tries=0
   while [ -z "$found" ] && [ "$tries" -lt 30 ]; do
     sleep 3
