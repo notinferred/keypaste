@@ -11,6 +11,9 @@ namespace Keypaste.Core.Ownership;
 /// The pipe is bound before the constructor returns. A connection the runtime refuses, which another user's
 /// is (THREATS.md T-10), and a peer gone before it was accepted are not answered, and the next is accepted.
 /// On Windows the pipe admits only this user, so a peer gone before it was accepted can still be told of.
+/// On Unix one instance answers connection after connection: making it anew closes its socket, and with it every
+/// connection queued behind the one answered. Windows makes each anew, since disconnecting discards a reply its peer
+/// has not yet read.
 /// </remarks>
 internal sealed class KnockListener : IDisposable
 {
@@ -70,7 +73,7 @@ internal sealed class KnockListener : IDisposable
         {
             while (true)
             {
-                await AnswerOneAsync(endpoint, answer, goneBeforeAccepted, stop).ConfigureAwait(false);
+                await AnswerOnInstanceAsync(endpoint, answer, goneBeforeAccepted, stop).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -83,7 +86,7 @@ internal sealed class KnockListener : IDisposable
         }
     }
 
-    private static async Task AnswerOneAsync(
+    private static async Task AnswerOnInstanceAsync(
         string endpoint,
         Func<NamedPipeServerStream, CancellationToken, Task> answer,
         Action? goneBeforeAccepted,
@@ -91,21 +94,43 @@ internal sealed class KnockListener : IDisposable
     {
         await using var pipe = Create(endpoint);
 
+        while (true)
+        {
+            try
+            {
+                await pipe.WaitForConnectionAsync(stop).ConfigureAwait(false);
+            }
+            catch (IOException ex) when (goneBeforeAccepted is not null && OperatingSystem.IsWindows() && ex.HResult == _goneBeforeAccepted)
+            {
+                goneBeforeAccepted();
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException)
+            {
+                // Another user's connection, which the runtime refuses, or a peer gone before it was accepted.
+                return;
+            }
+
+            await answer(pipe, stop).ConfigureAwait(false);
+
+            if (OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            HangUp(pipe);
+        }
+    }
+
+    private static void HangUp(NamedPipeServerStream pipe)
+    {
         try
         {
-            await pipe.WaitForConnectionAsync(stop).ConfigureAwait(false);
+            pipe.Disconnect();
         }
-        catch (IOException ex) when (goneBeforeAccepted is not null && OperatingSystem.IsWindows() && ex.HResult == _goneBeforeAccepted)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
-            goneBeforeAccepted();
-            return;
+            // The answer already hung up.
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException)
-        {
-            // Another user's connection, which the runtime refuses, or a peer gone before it was accepted.
-            return;
-        }
-
-        await answer(pipe, stop).ConfigureAwait(false);
     }
 }

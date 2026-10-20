@@ -138,8 +138,7 @@ public sealed class LockedAppEndpoint : IDisposable
         Heard(asked);
 
         // On Windows the bridge hangs up first: ending the connection under it fails its runtime's check of who
-        // made the pipe. Elsewhere the app hangs up at once, since a bridge queued behind a peer that holds on is
-        // dropped when the endpoint is made anew.
+        // made the pipe. Elsewhere the app hangs up at once, so a bridge queued behind it is accepted sooner.
         if (OperatingSystem.IsWindows())
         {
             await AwaitHangUpAsync(pipe, stop).ConfigureAwait(false);
