@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Keypaste.Core;
 
 /// <summary>
