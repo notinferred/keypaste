@@ -65,6 +65,8 @@ public sealed class SecretHygieneTests
     [InlineData("rotate", "secrets/absent")]
     [InlineData("mcp", "policy")]
     [InlineData("mcp", "policy", "--json")]
+    [InlineData("doctor")]
+    [InlineData("doctor", "--json")]
     public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
     {
         using var harness = new CliHarness();

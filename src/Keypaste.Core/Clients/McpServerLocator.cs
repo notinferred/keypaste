@@ -234,13 +234,18 @@ public static class McpServerLocator
         return TryStable(found.Path, platform, out target, out error);
     }
 
+    /// <summary>Whether a copy at <paramref name="canonical"/> is gone once its disk image is ejected or its translocated app quits.</summary>
+    /// <param name="canonical">The copy's path with every link resolved.</param>
+    /// <param name="platform">The platform it runs on; only macOS has either.</param>
+    internal static bool IsTransient(string canonical, McpClientPlatform platform) =>
+        platform == McpClientPlatform.MacOS && (canonical.StartsWith(_volumes, StringComparison.Ordinal) || MacCliLink.IsTranslocated(canonical));
+
     // A macOS path reached through a link, G.5's /usr/local/bin/keypaste among them, is registered as the bundle it names.
-    // A disk image or a translocated copy is gone once it is ejected or quits.
     private static bool TryStable(string path, McpClientPlatform platform, [NotNullWhen(true)] out McpBridgeTarget? target, out string error)
     {
         var stable = platform == McpClientPlatform.MacOS ? PathIdentity.Canonical(path) : Path.GetFullPath(path);
 
-        if (platform == McpClientPlatform.MacOS && (stable.StartsWith(_volumes, StringComparison.Ordinal) || MacCliLink.IsTranslocated(stable)))
+        if (IsTransient(stable, platform))
         {
             target = null;
             error = _moveFirst;

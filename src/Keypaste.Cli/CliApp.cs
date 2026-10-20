@@ -43,6 +43,9 @@ internal static class CliApp
     /// <remarks>Its own code so a script can tell it from finding none, which is <see cref="ExitNotFound"/>.</remarks>
     internal const int ExitClientsRefused = 6;
 
+    /// <summary><c>doctor</c> found something that needs fixing; a note alone does not count.</summary>
+    internal const int ExitNeedsFixing = 7;
+
     /// <summary>
     /// The command <c>run</c> was given exists but could not be executed. The shell convention,
     /// used because scripts already branch on it.
@@ -141,6 +144,9 @@ internal static class CliApp
             case "mcp":
                 return McpCommand.Execute(args, context);
 
+            case "doctor":
+                return DoctorCommand.Execute(args, context);
+
             case "share":
                 return ShareCommand.Execute(args, context);
 
@@ -181,6 +187,7 @@ internal static class CliApp
         ("AGENTS",
         [
             ("mcp", "the MCP server your AI tools start; mcp serve approves here"),
+            ("doctor", "check the vault, the AI tools and the app, and say what to fix"),
             ("grants", "list or revoke time-boxed access"),
             ("token", "create scoped, inject-only tokens"),
             ("log", "show the hash-chained activity log"),
@@ -230,7 +237,7 @@ internal static class CliApp
         writer.WriteLine($"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}");
         writer.WriteLine($"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine("  --json            machine-readable output from ls, search, show, field ls,");
-        writer.WriteLine("                    env ls, log, grants, token ls, share ls and mcp policy");
+        writer.WriteLine("                    env ls, log, grants, doctor, token ls, share ls, mcp policy");
         writer.WriteLine("  -h, --help        help for any command");
         writer.WriteLine();
         writer.WriteLine("  agent is mcp serve, setup is mcp setup, version prints the version.");

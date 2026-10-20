@@ -101,6 +101,16 @@ public static class ApproverEndpoint
         return true;
     }
 
+    /// <summary>Whether <paramref name="name"/> is a pipe a locked app listens on, where a connection alone makes it tell the person an agent asked.</summary>
+    /// <param name="name">The name.</param>
+    /// <returns>Whether it starts with <see cref="LockedAppEndpoint.Prefix"/>, in any case, as Windows and macOS match pipe names.</returns>
+    public static bool IsLockedAppName(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        return name.StartsWith(LockedAppEndpoint.Prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string Checked(string name, string argument) =>
         IsValidName(name, out var error) ? name : throw new ArgumentException(error, argument);
 }

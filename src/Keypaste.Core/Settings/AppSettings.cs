@@ -158,11 +158,20 @@ public sealed record AppSettings
     /// <param name="settings">What <see cref="Load"/> returns.</param>
     /// <returns><see langword="false"/> when the file exists and could not be read or parsed, so a writer knows it would clobber it.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
-    public static bool TryLoad(string path, out AppSettings settings)
+    public static bool TryLoad(string path, out AppSettings settings) => TryLoad(path, out settings, out _);
+
+    /// <summary>Reads the preferences, saying why a file that exists could not be read.</summary>
+    /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
+    /// <param name="settings">What <see cref="Load"/> returns.</param>
+    /// <param name="problem">Why the file could not be read or parsed, such as <c>line 3: …</c>; empty otherwise.</param>
+    /// <returns><see langword="false"/> when the file exists and could not be read or parsed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
+    public static bool TryLoad(string path, out AppSettings settings, out string problem)
     {
         ArgumentNullException.ThrowIfNull(path);
 
         settings = Default;
+        problem = string.Empty;
         byte[] bytes;
 
         try
@@ -175,11 +184,12 @@ public sealed record AppSettings
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            problem = ex.Message;
             return false;
         }
 
-        if (!Toml.TryDecode(bytes, TomlLimits.Paths, out var text, out _)
-            || !Toml.TryParse(text, TomlLimits.Paths, out var document, out _))
+        if (!Toml.TryDecode(bytes, TomlLimits.Paths, out var text, out problem)
+            || !Toml.TryParse(text, TomlLimits.Paths, out var document, out problem))
         {
             return false;
         }

@@ -43,7 +43,8 @@ public sealed record McpToolFinding(McpClient Tool, McpClientDetection Detection
 /// <remarks>
 /// Each tool is looked for on its own thread, because finding one may start its <c>--version</c> for up to
 /// <see cref="McpClientSetup.ProbeTimeout"/>. Nothing is written or kept: a found tool's configuration is read
-/// read-only by <see cref="McpClientConfig.Read"/>, which keeps only whether keypaste is in it.
+/// read-only by <see cref="McpClientConfig.Read"/>, which keeps only whether keypaste is in it and what keypaste's entry
+/// starts.
 /// </remarks>
 public static class McpToolSurvey
 {

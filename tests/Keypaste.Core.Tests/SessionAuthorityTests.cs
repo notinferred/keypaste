@@ -209,6 +209,29 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.True(listing.VaultUnlocked);
     }
 
+    /// <summary>Every attach reply names the owner's version, so <c>keypaste doctor</c> can compare it whatever the answer.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData(AuditMethod.NoSession)]
+    [InlineData(AuditMethod.VaultLocked)]
+    public async Task EveryAttachReply_NamesTheOwnersVersion(AuditMethod? refusal)
+    {
+        if (refusal == AuditMethod.VaultLocked)
+        {
+            _lifetime = null;
+        }
+
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        var vault = refusal == AuditMethod.NoSession ? Path.Combine(_directory, "other.kdbx") : VaultPath;
+        var attached = await client.AttachAsync(new AttachRequest(vault), Token);
+
+        Assert.NotNull(attached);
+        Assert.Equal(refusal, attached.Refusal);
+        Assert.Equal(CoreInfo.Version, attached.OwnerVersion);
+    }
+
     [Fact]
     public async Task TheAuthorityLists_TheRequestWaitingAndThenItsGrant_AndNothingOnceTheLifetimeEnds()
     {

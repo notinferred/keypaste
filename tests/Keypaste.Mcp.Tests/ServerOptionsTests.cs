@@ -137,6 +137,30 @@ public sealed class ServerOptionsTests
         Assert.True(options!.WantsHelp);
     }
 
+    /// <summary>
+    /// D-0467: <c>keypaste doctor</c> starts a registration as <c>mcp --help</c> and then its own flags, so help put first
+    /// is help whatever follows and names no audit log to open, and a flag left without its value fails rather than taking it.
+    /// </summary>
+    [Fact]
+    public void HelpBeforeEveryPinnedFlag_IsHelp_AndNamesNoAuditLog()
+    {
+        Assert.True(Parse(
+            out var options,
+            out _,
+            "--help",
+            "--vault", "v.kdbx",
+            "--audit-log", "audit.jsonl",
+            "--clients", "clients.toml",
+            "--approver", "pinned",
+            "--client-label", "cursor",
+            "--allow-run",
+            "--expose", "**"));
+
+        Assert.True(options!.WantsHelp);
+        Assert.Empty(options.AuditPath);
+        Assert.False(Parse(out _, out _, "--help", "--client-label"));
+    }
+
     [Fact]
     public void AnArgumentOtherThanHelp_IsRefused()
     {

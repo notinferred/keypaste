@@ -172,7 +172,7 @@ public static class McpConfigFile
         return new McpConfigOutcome(McpConfigOutcomeKind.Written, made, Problem: null);
     }
 
-    /// <summary>Whether a configuration file's servers object holds keypaste's member.</summary>
+    /// <summary>Whether a configuration file's servers object holds keypaste's member, leaving what it starts unread.</summary>
     /// <param name="text">The file's bytes.</param>
     /// <param name="serversKey">The top-level member holding the tool's servers.</param>
     /// <param name="problem">
@@ -180,12 +180,28 @@ public static class McpConfigFile
     /// quoting the file.
     /// </param>
     /// <returns>Present, Absent for an empty file or one without the member, or Unknown.</returns>
-    internal static McpEntryPresence Locate(ReadOnlySpan<byte> text, string serversKey, out string? problem)
+    internal static McpEntryPresence Locate(ReadOnlySpan<byte> text, string serversKey, out string? problem) =>
+        Locate(text, serversKey, out problem, out _);
+
+    /// <summary>Whether a configuration file's servers object holds keypaste's member, and what that member starts.</summary>
+    /// <param name="text">The file's bytes.</param>
+    /// <param name="serversKey">The top-level member holding the tool's servers.</param>
+    /// <param name="problem">
+    /// Why it is <see cref="McpEntryPresence.Unknown"/>, completing a sentence that starts with the file's path and never
+    /// quoting the file.
+    /// </param>
+    /// <param name="launch">
+    /// What keypaste's member starts, when it is present, its <c>command</c> is a string and its <c>args</c>, if any, an
+    /// array of strings; otherwise null.
+    /// </param>
+    /// <returns>Present, Absent for an empty file or one without the member, or Unknown.</returns>
+    internal static McpEntryPresence Locate(ReadOnlySpan<byte> text, string serversKey, out string? problem, out McpEntryLaunch? launch)
     {
         ArgumentException.ThrowIfNullOrEmpty(serversKey);
 
         var body = text[MarkLength(text)..];
         problem = null;
+        launch = null;
 
         if (IsBlank(body))
         {
@@ -198,7 +214,75 @@ public static class McpConfigFile
             return McpEntryPresence.Unknown;
         }
 
-        return layout.Keypaste >= 0 ? McpEntryPresence.Present : McpEntryPresence.Absent;
+        if (layout is not { Servers: { } servers, Keypaste: >= 0 })
+        {
+            return McpEntryPresence.Absent;
+        }
+
+        var member = servers.Members[layout.Keypaste];
+        launch = LaunchIn(body[member.ValueStart..member.End]);
+        return McpEntryPresence.Present;
+    }
+
+    // Only the command and the arguments become strings: every other member of the entry, its env among them, is skipped unread.
+    private static McpEntryLaunch? LaunchIn(ReadOnlySpan<byte> entry)
+    {
+        var reader = new Utf8JsonReader(entry, new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        string? command = null;
+        List<string> arguments = [];
+
+        try
+        {
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            {
+                return null;
+            }
+
+            while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+            {
+                if (reader.ValueTextEquals("command"u8))
+                {
+                    if (!reader.Read() || reader.TokenType != JsonTokenType.String)
+                    {
+                        return null;
+                    }
+
+                    command = reader.GetString();
+                }
+                else if (reader.ValueTextEquals("args"u8))
+                {
+                    if (!TryArguments(ref reader, arguments))
+                    {
+                        return null;
+                    }
+                }
+                else
+                {
+                    reader.Skip();
+                }
+            }
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            return null;
+        }
+
+        return command is { Length: > 0 } ? new McpEntryLaunch(command, arguments) : null;
+    }
+
+    private static bool TryArguments(ref Utf8JsonReader reader, List<string> arguments)
+    {
+        if (!reader.Read() || reader.TokenType != JsonTokenType.StartArray)
+        {
+            return false;
+        }
+
+        while (reader.Read() && reader.TokenType == JsonTokenType.String)
+        {
+            arguments.Add(reader.GetString()!);
+        }
+
+        return reader.TokenType == JsonTokenType.EndArray;
     }
 
     /// <summary>The file with keypaste's member set or removed and every other byte kept.</summary>

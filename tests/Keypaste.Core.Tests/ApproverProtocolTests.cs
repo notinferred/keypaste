@@ -932,6 +932,45 @@ public sealed class ApproverProtocolTests
         Assert.Null(reply);
     }
 
+    [Fact]
+    public void AnAttachReply_CarriesTheOwnersVersion_WhetherItAttachesOrRefuses()
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(AttachReply.To("0123abcd") with { OwnerVersion = "0.5.1" }), out AttachReply? attached));
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(AttachReply.Refused(AuditMethod.VaultLocked, "locked") with { OwnerVersion = "0.5.1" }), out AttachReply? refused));
+
+        Assert.True(attached.Attached);
+        Assert.Equal("0.5.1", attached.OwnerVersion);
+        Assert.Equal(AuditMethod.VaultLocked, refused.Refusal);
+        Assert.Equal("0.5.1", refused.OwnerVersion);
+    }
+
+    /// <summary>An owner from before the version was sent still attaches, and a mistyped version reads as none.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData(",\"owner_version\":null")]
+    [InlineData(",\"owner_version\":5")]
+    public void AnAttachReplyWithoutAReadableVersion_StillAttaches(string member)
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            Encoding.UTF8.GetBytes("{\"v\":2,\"kind\":\"attach\",\"session\":\"0123abcd\",\"reason\":\"\"" + member + "}"), out AttachReply? reply));
+
+        Assert.True(reply.Attached);
+        Assert.Null(reply.OwnerVersion);
+    }
+
+    [Fact]
+    public void AnAttachReplyWithAnOverlongVersion_IsRefused()
+    {
+        var longest = new string('9', AttachClient.MaximumLength);
+
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(AttachReply.To("0123abcd") with { OwnerVersion = longest }), out AttachReply? _));
+        Assert.False(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(AttachReply.To("0123abcd") with { OwnerVersion = longest + "9" }), out AttachReply? _));
+    }
+
     private static RunReply Ran(string value = "sk_live_sentinel") =>
         new(EnvResolved.Released("acme-api", [new EnvVariable("DATABASE_URL", value)], "staging"), AuditMethod.Prompt, "a person approved this one run")
         {

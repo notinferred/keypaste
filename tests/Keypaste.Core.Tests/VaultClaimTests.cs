@@ -85,6 +85,26 @@ public sealed class VaultClaimTests : IDisposable
     }
 
     [Fact]
+    public void HolderOf_names_who_holds_a_vault_and_takes_nothing()
+    {
+        Assert.Null(VaultClaim.HolderOf(_home, Vault()));
+        Assert.False(Directory.Exists(Path.Combine(_home, VaultClaim.DirectoryName)));
+
+        Assert.True(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.TerminalAgent, out var held, out _));
+
+        using (held)
+        {
+            Assert.Equal(new VaultOwner(OwnerKind.TerminalAgent, Environment.ProcessId, held.Vault.Path), VaultClaim.HolderOf(_home, Vault()));
+            Assert.Null(VaultClaim.HolderOf(_home, Vault("other.kdbx")));
+            Assert.False(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.DesktopApp, out _, out _));
+        }
+
+        Assert.Null(VaultClaim.HolderOf(_home, Vault()));
+        Assert.True(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.DesktopApp, out var next, out _));
+        next.Dispose();
+    }
+
+    [Fact]
     public void AClaimNeedsNoVaultYet_SoCreatingOneIsCoveredToo()
     {
         Assert.False(File.Exists(Vault("new.kdbx")));

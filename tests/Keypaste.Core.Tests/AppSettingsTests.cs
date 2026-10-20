@@ -121,6 +121,34 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Equal(Broken, File.ReadAllText(SettingsFile));
     }
 
+    [Fact]
+    public void TryLoad_names_the_line_a_malformed_file_goes_wrong_on_and_says_nothing_of_an_absent_or_good_one()
+    {
+        Assert.True(AppSettings.TryLoad(SettingsFile, out _, out var absent));
+        Assert.Empty(absent);
+
+        File.WriteAllText(SettingsFile, "[[settings]]\ntheme = \"dark\"\nthis is not a pair at all\n");
+
+        Assert.False(AppSettings.TryLoad(SettingsFile, out var settings, out var problem));
+        Assert.StartsWith("line 3: ", problem, StringComparison.Ordinal);
+        Assert.Equal(AppSettings.Default, settings);
+
+        AppSettings.Save(SettingsFile, AppSettings.Default with { Theme = AppTheme.Dark });
+
+        Assert.True(AppSettings.TryLoad(SettingsFile, out var read, out var none));
+        Assert.Empty(none);
+        Assert.Equal(AppTheme.Dark, read.Theme);
+    }
+
+    [Fact]
+    public void TryLoad_says_why_a_file_it_cannot_open_could_not_be_read()
+    {
+        Directory.CreateDirectory(SettingsFile);
+
+        Assert.False(AppSettings.TryLoad(SettingsFile, out _, out var problem));
+        Assert.NotEmpty(problem);
+    }
+
     /// <summary>
     /// What a hand edit is most likely to get wrong, and the one case where the whole file has to
     /// go: past a syntax error nothing in it can be trusted to mean what it looks like.

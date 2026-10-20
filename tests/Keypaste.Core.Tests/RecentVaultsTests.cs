@@ -144,6 +144,37 @@ public sealed class RecentVaultsTests : IDisposable
         Assert.Equal(Broken, File.ReadAllText(RecentFile));
     }
 
+    [Fact]
+    public void TryLoad_names_the_line_a_malformed_file_goes_wrong_on_and_says_nothing_of_an_absent_or_good_one()
+    {
+        Assert.True(RecentVaults.TryLoad(RecentFile, out var nothing, out var absent));
+        Assert.Empty(nothing);
+        Assert.Empty(absent);
+
+        File.WriteAllText(RecentFile, "[[vault]]\nthis is not a pair at all\n");
+
+        Assert.False(RecentVaults.TryLoad(RecentFile, out var vaults, out var problem));
+        Assert.StartsWith("line 2: ", problem, StringComparison.Ordinal);
+        Assert.Empty(vaults);
+
+        var vault = Path.Combine(_directory, "personal.kdbx");
+        RecentVaults.Save(RecentFile, RecentVaults.Remember([], vault, DateTimeOffset.UtcNow));
+
+        Assert.True(RecentVaults.TryLoad(RecentFile, out var read, out var none));
+        Assert.Empty(none);
+        Assert.Equal(Path.GetFullPath(vault), Assert.Single(read).Path);
+    }
+
+    [Fact]
+    public void TryLoad_says_why_a_file_it_cannot_open_could_not_be_read()
+    {
+        Directory.CreateDirectory(RecentFile);
+
+        Assert.False(RecentVaults.TryLoad(RecentFile, out var vaults, out var problem));
+        Assert.Empty(vaults);
+        Assert.NotEmpty(problem);
+    }
+
     /// <summary>
     /// One unreadable section is skipped rather than voiding the file. A policy file is used whole
     /// or ignored whole because a rule nobody can read may have been the rule that said no; a

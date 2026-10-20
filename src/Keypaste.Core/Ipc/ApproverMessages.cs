@@ -79,6 +79,9 @@ public sealed record AttachReply(string? Session, AuditMethod? Refusal, string R
     /// <summary>Whether the connection may now make requests.</summary>
     public bool Attached => Session is { Length: > 0 } && Refusal is null;
 
+    /// <summary>The answering keypaste's version, or null from one older than this field; display only, for <c>keypaste doctor</c>.</summary>
+    public string? OwnerVersion { get; init; }
+
     /// <summary>A connection attached to a session.</summary>
     /// <param name="session">The session's identifier.</param>
     /// <returns>The reply.</returns>

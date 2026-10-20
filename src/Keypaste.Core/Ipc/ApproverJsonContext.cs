@@ -93,6 +93,7 @@ internal sealed class AttachReplyFrame(AttachReply reply)
     public string? Session => reply.Session;
     public int? Method => (int?)reply.Refusal;
     public string Reason => reply.Reason;
+    public string? OwnerVersion => reply.OwnerVersion;
 }
 
 internal sealed class CredentialRequestFrame(CredentialRequest request)

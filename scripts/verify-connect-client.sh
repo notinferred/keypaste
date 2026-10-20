@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Connecting an AI tool from the app (2.6a, V-2.6a, G.2, N.3), across real processes: tests/Keypaste.AppDriver
+# Connecting an AI tool from the app (2.6a, V-2.6a, G.2, N.3, G.3), across real processes: tests/Keypaste.AppDriver
 # holds the vault as launch composes the app, with its prompt window drawn on a headless display and clicked,
 # and presses the rows of Agents' AI tools. Everything runs with HOME and USERPROFILE at a home of the gate's
 # own and KEYPASTE_HOME at its .keypaste, the default home, so no real tool's configuration is ever read or
@@ -16,24 +16,30 @@
 # naming no vault and offering run with every item in reach, and the tool's row then says Connected. The check
 # starts that command, which finds the chosen vault, raises the app's prompt for the one item Claude Code's
 # settings let it see, and after Approve the audit file holds a prompted grant naming the app's session and
-# the tool's id. With another vault chosen, Connect again pins this one with --vault and that bridge still
-# reaches the app. Disconnect leaves the tool listing no keypaste and its row offering Connect. For Cursor,
-# which has no settings of its own, the plan is the one edit of keypaste's entry and Cancel writes nothing;
-# Run it changes no byte outside that entry and keeps the seed as the backup, the check is listed only the
-# projects' tagged items, as the defaults give, and asks for the one picked; Disconnect gives back the seed's
-# bytes, leaves the backup alone, and its row offers Connect again. No configuration ever holds the master
-# password, a keyfile, the session or a credential.
+# the tool's id. keypaste doctor --json then exits 0, finding the versions, the vault, the app holding it and
+# Claude Code's registration working and noting Cursor as not connected, and changes no byte under the gate's
+# home, the audit file's included (D-0467). With another vault chosen, Connect again pins this one with
+# --vault and that bridge still reaches the app. Disconnect leaves the tool listing no keypaste and its row
+# offering Connect. For Cursor, which has no settings of its own, the plan is the one edit of keypaste's entry
+# and Cancel writes nothing; Run it changes no byte outside that entry and keeps the seed as the backup, the
+# check is listed only the projects' tagged items, as the defaults give, and asks for the one picked;
+# Disconnect gives back the seed's bytes, leaves the backup alone, and its row offers Connect again. No
+# configuration ever holds the master password, a keyfile, the session or a credential. Once the app has shut
+# down, doctor notes that nothing holds the vault it held and still exits 0.
 #
 # NEGATIVE CONTROL: this fails if the first unlock chooses nothing, if the CLI without --vault does not reach
 # the app, if a tool is not found or its state is wrong before or after Run it or Disconnect, if a cancelled
 # plan writes, if what is registered differs from what was shown, if a registration is not under the tool's
 # id, does not offer run or does not reach every item, if an agent with no settings is listed an untagged
 # item, if the chosen vault is written into the tool or another vault is not, if the check does not reach the
-# app's prompt through the registered bridge, if the audit record names another session or name, if
+# app's prompt through the registered bridge, if the audit record names another session or name, if doctor
+# exits non-zero, finds the versions, the vault, the app or Claude Code's registration anything but working
+# or Cursor anything but a note, or changes a byte under the gate's home or a line of the audit file, if
 # Disconnect leaves keypaste listed, if Cursor's plan or Cancel writes its file, if Run it changes a byte
 # outside keypaste's entry or keeps no backup equal to the seed, if Disconnect does not give back the seed's
-# bytes or touches the backup, or if a secret reaches a tool's configuration or the driver's output. These
-# checks must never be skipped or soft-passed.
+# bytes or touches the backup, if a secret reaches a tool's configuration or the driver's output, or if doctor
+# once the app has shut down does not note that nothing holds the vault or exits non-zero. These checks must
+# never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-connect-master-pw'
@@ -129,6 +135,28 @@ last_audit() { tail -n 1 "$AUDIT" | jq -e "$@" >/dev/null; }
 # What the stand-in client will start, as one line, from its own configuration.
 registered() { jq -r '.mcpServers.keypaste | [.command] + .args | join(" ")' "$CONFIG"; }
 
+# Every file and folder under $1, a line each, a file with its bytes; a lock file its holder keeps open, which
+# Windows lets nothing else read, reads as held.
+tree_of() {
+  local entry
+  find "$1" | LC_ALL=C sort | while IFS= read -r entry; do
+    if [ -f "$entry" ]; then printf '%s %s\n' "$entry" "$(bytes "$entry" 2>/dev/null || echo held)"; else printf '%s\n' "$entry"; fi
+  done
+}
+
+# Runs keypaste doctor --json with no vault named in the environment, holding its findings in DOCTOR and its exit
+# code in DOCTOR_CODE.
+doctor() {
+  DOCTOR_CODE=0
+  DOCTOR="$(env -u KEYPASTE_VAULT PATH="$CLIENT_PATH" "$CLI" doctor --json "$@" | tr -d '\r')" || DOCTOR_CODE=$?
+}
+
+# Whether doctor said something of $1, and everything it said of it reads $2: ok, fix or note.
+doctor_says() {
+  jq -e --arg subject "$1" --arg status "$2" 'map(select(.subject == $subject)) | length > 0 and all(.status == $status)' \
+    <<<"$DOCTOR" >/dev/null
+}
+
 clean_config() {
   local file="$1"
   [ -f "$file" ] || return 0
@@ -215,6 +243,20 @@ last_audit --arg s "$FIRST" --arg l "$CLAUDE" \
   '.tool == "request_credential" and .decision == "granted" and .method == "prompt" and .session == $s and .client.label == $l and .client.name == "keypaste-check"' \
   || die "the audit file does not hold a prompted grant naming the app's session and the tool's id"
 expect_state "$CLAUDE" connected "after Run it"
+
+# -------------------- doctor finds everything working while the app holds the vault, and changes nothing
+LOGGED="$(lines_in "$AUDIT")"
+tree_of "$WORK/user" >"$WORK/home.before"
+doctor
+[ "$DOCTOR_CODE" = 0 ] || die "keypaste doctor exited $DOCTOR_CODE while the app holds the vault: $DOCTOR"
+for subject in versions vault owner "$CLAUDE"; do
+  doctor_says "$subject" ok || die "keypaste doctor does not find $subject working while the app holds the vault: $DOCTOR"
+done
+doctor_says "$CURSOR_ID" note || die "keypaste doctor does not note $CURSOR_ID as not connected: $DOCTOR"
+[ "$(lines_in "$AUDIT")" = "$LOGGED" ] || die "keypaste doctor added a line to the audit file"
+tree_of "$WORK/user" >"$WORK/home.after"
+cmp -s "$WORK/home.before" "$WORK/home.after" \
+  || die "keypaste doctor changed the gate's home: $(diff "$WORK/home.before" "$WORK/home.after" | cut -c1-160 || true)"
 
 # ---------------- with another vault chosen, Connect again pins this one, and that bridge still reaches it
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$OTHER_VAULT" >/dev/null 2>&1 || die "could not create the other vault"
@@ -332,11 +374,18 @@ exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
+# ------------------------------------------- once the app has shut down, doctor notes nothing holds the vault
+doctor --vault "$VAULT"
+[ "$DOCTOR_CODE" = 0 ] || die "keypaste doctor exited $DOCTOR_CODE once the app shut down: $DOCTOR"
+doctor_says owner note || die "keypaste doctor does not note that nothing holds the vault once the app shut down: $DOCTOR"
+
 echo "ok: the first unlock chose the vault and the CLI reached the app without --vault; Agents found both tools,"
 echo "    a cancelled plan wrote nothing, Connect registered exactly the command shown under the tool's id with no"
 echo "    vault in it and the row said Connected, the check raised the app's prompt through that bridge and the"
-echo "    audit file holds its prompted grant under the app's session and the tool's id; with another vault chosen"
-echo "    Connect again pinned this one and its bridge still reached the app, and Disconnect left the tool listing"
-echo "    no keypaste; Cursor's file changed only in keypaste's entry, its first original was kept, its"
-echo "    registration was listed only the tagged items an agent with no settings sees and reached the app's"
-echo "    prompt, and Disconnect gave back its bytes, with no secret or session in any configuration"
+echo "    audit file holds its prompted grant under the app's session and the tool's id; doctor found the versions,"
+echo "    the vault, the app and that registration working, noted Cursor as not connected and changed nothing; with"
+echo "    another vault chosen Connect again pinned this one and its bridge still reached the app, and Disconnect"
+echo "    left the tool listing no keypaste; Cursor's file changed only in keypaste's entry, its first original was"
+echo "    kept, its registration was listed only the tagged items an agent with no settings sees and reached the"
+echo "    app's prompt, and Disconnect gave back its bytes, with no secret or session in any configuration; once the"
+echo "    app shut down, doctor noted that nothing holds the vault and found nothing to fix"

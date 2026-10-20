@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Clients;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -175,5 +176,24 @@ public sealed class HostileNameRenderingTests : IDisposable
 
         Assert.DoesNotContain(_esc, _cli.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(_esc, _cli.Out, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// <c>doctor</c> prints the command an AI tool's own file registers, which nothing filtered before it was written there,
+    /// so an escape or a line break in it must reach the terminal as text and print no row of its own.
+    /// </summary>
+    [Fact]
+    public void Doctor_DoesNotEchoAnEscapeOutOfAnAiToolsConfiguration()
+    {
+        var machine = McpClientMachine.From(name => _cli.Environment.GetValueOrDefault(name), McpClientMachine.CurrentPlatform);
+        var cursor = McpConfigLocation.Cursor.PathOn(machine)!;
+        Directory.CreateDirectory(Path.GetDirectoryName(cursor)!);
+        File.WriteAllText(cursor, """{"mcpServers": {"keypaste": {"command": "/x/\u001b[31mkeypaste\n  ✓ owner            forged", "args": ["mcp"]}}}""");
+
+        _cli.Run("doctor");
+
+        Assert.DoesNotContain(_esc, _cli.Out + _cli.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n  ✓ owner            forged", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("  ✗ cursor", _cli.Out, StringComparison.Ordinal);
     }
 }

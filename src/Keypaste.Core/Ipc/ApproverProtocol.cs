@@ -708,14 +708,17 @@ public static class ApproverProtocol
             var session = Optional(root, "session");
             var refused = TryInteger(root, "method", out var method);
 
-            if (refused == session is { Length: > 0 })
+            // Optional so an older owner still attaches; bounded so a version cannot outgrow a line.
+            var ownerVersion = Optional(root, "owner_version");
+
+            if (refused == session is { Length: > 0 } || ownerVersion?.Length > AttachClient.MaximumLength)
             {
                 return false;
             }
 
-            reply = refused
+            reply = (refused
                 ? AttachReply.Refused(Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed, reason)
-                : AttachReply.To(session!);
+                : AttachReply.To(session!)) with { OwnerVersion = ownerVersion };
 
             return true;
         }

@@ -88,26 +88,45 @@ public static class RecentVaults
     /// </remarks>
     public static IReadOnlyList<RecentVault> Load(string path)
     {
+        TryLoad(path, out var vaults, out _);
+        return vaults;
+    }
+
+    /// <summary>Reads the list, saying why a file that exists could not be read.</summary>
+    /// <param name="path">The file, from <see cref="KeypasteHome.RecentPath"/>.</param>
+    /// <param name="vaults">What <see cref="Load"/> returns.</param>
+    /// <param name="problem">Why the file could not be read or parsed, such as <c>line 3: …</c>; empty otherwise.</param>
+    /// <returns><see langword="false"/> when the file exists and could not be read or parsed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
+    public static bool TryLoad(string path, out IReadOnlyList<RecentVault> vaults, out string problem)
+    {
         ArgumentNullException.ThrowIfNull(path);
 
+        vaults = [];
+        problem = string.Empty;
         byte[] bytes;
 
         try
         {
             bytes = File.ReadAllBytes(path);
         }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return true;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return [];
+            problem = ex.Message;
+            return false;
         }
 
-        if (!Toml.TryDecode(bytes, TomlLimits.Paths, out var text, out _)
-            || !Toml.TryParse(text, TomlLimits.Paths, out var document, out _))
+        if (!Toml.TryDecode(bytes, TomlLimits.Paths, out var text, out problem)
+            || !Toml.TryParse(text, TomlLimits.Paths, out var document, out problem))
         {
-            return [];
+            return false;
         }
 
-        var vaults = new List<RecentVault>(Capacity);
+        var read = new List<RecentVault>(Capacity);
 
         foreach (var table in document.Tables)
         {
@@ -120,10 +139,11 @@ public static class RecentVaults
                 continue;
             }
 
-            vaults.Add(vault);
+            read.Add(vault);
         }
 
-        return Trim(vaults);
+        vaults = Trim(read);
+        return true;
     }
 
     /// <summary>Puts a vault at the front of the list.</summary>

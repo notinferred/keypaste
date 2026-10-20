@@ -100,6 +100,141 @@ public sealed class McpClientConfigTests : IDisposable
         { "[mcp_servers.keypaste]\nnotes = '''\nx\n'''\n", McpEntryPresence.Unknown },
     };
 
+    public static TheoryData<string, string, string, string[]> Launches => new()
+    {
+        {
+            "claude-code",
+            """
+            {
+              "oauthAccount": { "emailAddress": "person@example.com" },
+              "mcpServers": {
+                "keypaste": {
+                  "type": "stdio",
+                  "command": "/opt/keypaste/keypaste",
+                  "args": ["mcp", "--client-label", "claude-code", "--allow-run", "--expose", "**"],
+                  "env": { "KEYPASTE_HOME": "/home/person/.keypaste" }
+                }
+              }
+            }
+            """,
+            "/opt/keypaste/keypaste",
+            ["mcp", "--client-label", "claude-code", "--allow-run", "--expose", "**"]
+        },
+        { "vscode", """{"servers": {"keypaste": {"type": "stdio", "command": "/opt/keypaste/keypaste", "args": ["mcp"]}}}""", "/opt/keypaste/keypaste", ["mcp"] },
+        {
+            "gemini-cli",
+            """{"mcpServers": {"keypaste": {"args": ["mcp", "--vault", "/home/person/vault.kdbx"], "command": "/opt/keypaste/keypaste"}}}""",
+            "/opt/keypaste/keypaste",
+            ["mcp", "--vault", "/home/person/vault.kdbx"]
+        },
+        {
+            "cursor",
+            """
+            // Cursor's servers
+            {
+              "mcpServers": {
+                "keypaste": {
+                  /* keypaste setup wrote this */
+                  "command": "/opt/keypaste/keypaste",
+                  "args": ["mcp", "--allow-run",],
+                },
+              },
+            }
+            """,
+            "/opt/keypaste/keypaste",
+            ["mcp", "--allow-run"]
+        },
+        { "devin", """{"mcpServers": {"keypaste": {"command": "C:\\Program Files\\keypaste\\keypaste.exe"}}}""", @"C:\Program Files\keypaste\keypaste.exe", [] },
+        {
+            "codex",
+            """
+            [mcp_servers.keypaste]
+            command = "/opt/keypaste/keypaste"
+            args = ["mcp", "--client-label", "codex"]
+            """,
+            "/opt/keypaste/keypaste",
+            ["mcp", "--client-label", "codex"]
+        },
+        {
+            "codex",
+            """
+            [mcp_servers.keypaste]
+            command = 'C:\Users\person\AppData\Local\Programs\keypaste\keypaste.exe'
+            args = ['mcp']
+            """,
+            @"C:\Users\person\AppData\Local\Programs\keypaste\keypaste.exe",
+            ["mcp"]
+        },
+        {
+            "codex",
+            """
+            [mcp_servers.keypaste]
+            command = "C:\\Users\\person\\keypaste.exe"
+            args = ["mcp", "--expose", "work/\"shared\"/**"]
+            """,
+            @"C:\Users\person\keypaste.exe",
+            ["mcp", "--expose", "work/\"shared\"/**"]
+        },
+        {
+            "codex",
+            """
+            [mcp_servers.keypaste]
+            command = "/home/zoé/keypaste"
+            args = ["mcp", "--vault", "/home/zo\u00e9/vault.kdbx"]
+            """,
+            "/home/zoé/keypaste",
+            ["mcp", "--vault", "/home/zoé/vault.kdbx"]
+        },
+        {
+            "codex",
+            """
+            [ mcp_servers.keypaste ] # keypaste setup wrote this
+            command = "/opt/keypaste/keypaste" # the bridge
+            args = [ "mcp", "--allow-run", ]
+            """,
+            "/opt/keypaste/keypaste",
+            ["mcp", "--allow-run"]
+        },
+        {
+            "codex",
+            """
+            [mcp_servers.keypaste.env]
+            args = ["not", "these"]
+
+            [mcp_servers.keypaste]
+            command = "/opt/keypaste/keypaste"
+            args = ["mcp"]
+
+            [mcp_servers.keypaste.env]
+            command = "/elsewhere"
+            TOKEN = "kept"
+            """,
+            "/opt/keypaste/keypaste",
+            ["mcp"]
+        },
+    };
+
+    public static TheoryData<string, string> UnreadableLaunches => new()
+    {
+        { "claude-code", """{"mcpServers": {"keypaste": {"command": 7}}}""" },
+        { "claude-code", """{"mcpServers": {"keypaste": {"args": ["mcp"]}}}""" },
+        { "gemini-cli", """{"mcpServers": {"keypaste": {"command": "/k", "args": "mcp"}}}""" },
+        { "cursor", """{"mcpServers": {"keypaste": {"command": "/k", "args": ["mcp", 1]}}}""" },
+        { "cursor", """{"mcpServers": {"keypaste": "/k"}}""" },
+        { "vscode", """{"servers": {"keypaste": {"type": "http", "url": "http://localhost:1"}}}""" },
+        { "devin", """{"mcpServers": {"keypaste": {"command": ""}}}""" },
+        { "codex", "[mcp_servers.keypaste]\ncommand = \"/k\"\nargs = [\n  \"mcp\",\n]\n" },
+        { "codex", "[mcp_servers.keypaste]\ncommand = 7\n" },
+        { "codex", "[mcp_servers.keypaste]\ncommand = \"/k\" \"/j\"\n" },
+        { "codex", "[mcp_servers.keypaste]\ncommand = \"\\q\"\n" },
+        { "codex", "[mcp_servers.keypaste]\ncommand = \"/k\"\ncommand = \"/j\"\n" },
+        { "codex", "[mcp_servers.keypaste]\n\"comm\\u0061nd\" = \"/k\"\n" },
+        { "codex", "[mcp_servers.keypaste]\ncommand.path = \"/k\"\n" },
+        { "codex", "[mcp_servers.keypaste]\ncommand = \"/k\"\nargs = [\"mcp\", 1]\n" },
+        { "codex", "[mcp_servers.keypaste]\ncommand = \"/k\"\n[mcp_servers.keypaste]\nargs = [\"mcp\"]\n" },
+        { "codex", "[mcp_servers.keypaste.env]\nTOKEN = \"t\"\n" },
+    };
+
     public static TheoryData<string, string> Movers => new()
     {
         { "claude-code", "CLAUDE_CONFIG_DIR" },
@@ -259,8 +394,41 @@ public sealed class McpClientConfigTests : IDisposable
     [MemberData(nameof(CodexReadings))]
     public void Codex_reads_present_only_from_the_table_headers_codex_writes(string text, McpEntryPresence expected)
     {
-        Assert.Equal(expected, CodexConfigScan.Scan(Encoding.UTF8.GetBytes(text), "mcp_servers", out var problem));
+        Assert.Equal(expected, CodexConfigScan.Scan(Encoding.UTF8.GetBytes(text), "mcp_servers", out var problem, out _));
         Assert.Equal(expected == McpEntryPresence.Unknown, problem is not null);
+    }
+
+    [Theory]
+    [MemberData(nameof(Launches))]
+    public void Each_tools_entry_is_read_for_the_command_and_arguments_it_starts_and_nothing_else(string id, string text, string command, string[] arguments)
+    {
+        PlantAt(_locations[id].PathOn(Machine())!, text);
+
+        var reading = McpClientConfig.Read(Tool(id, _locations[id]), Machine());
+
+        Assert.Equal(McpEntryPresence.Present, reading.Presence);
+        Assert.Equal(new McpEntryLaunch(command, arguments), reading.Launch);
+    }
+
+    [Theory]
+    [MemberData(nameof(UnreadableLaunches))]
+    public void An_entry_whose_command_or_arguments_are_written_otherwise_is_present_with_nothing_read_from_it(string id, string text)
+    {
+        PlantAt(_locations[id].PathOn(Machine())!, text);
+
+        var reading = McpClientConfig.Read(Tool(id, _locations[id]), Machine());
+
+        Assert.Equal(McpEntryPresence.Present, reading.Presence);
+        Assert.Null(reading.Launch);
+    }
+
+    [Fact]
+    public void An_absent_or_unknown_entry_has_no_launch()
+    {
+        Assert.Equal(McpEntryPresence.Absent, CodexConfigScan.Scan("[mcp_servers.other]\ncommand = \"/k\"\nargs = [\"mcp\"]\n"u8, "mcp_servers", out _, out var absent));
+        Assert.Null(absent);
+        Assert.Equal(McpEntryPresence.Unknown, CodexConfigScan.Scan("[mcp_servers]\nkeypaste = { command = \"/k\" }\n"u8, "mcp_servers", out _, out var unknown));
+        Assert.Null(unknown);
     }
 
     [Fact]
@@ -271,7 +439,7 @@ public sealed class McpClientConfigTests : IDisposable
         var usual = PlantAt(Path.Combine(Home, ".codex", "config.toml"), "[mcp_servers.other]\ncommand = \"o\"\n");
         var codex = McpClientCatalog.Find("codex")!;
 
-        Assert.Equal(new McpEntryReading(McpEntryPresence.Present, moved, Reason: null), McpClientConfig.Read(codex, Machine(("CODEX_HOME", codexHome))));
+        Assert.Equal(new McpEntryReading(McpEntryPresence.Present, moved, Reason: null) { Launch = new McpEntryLaunch("k", []) }, McpClientConfig.Read(codex, Machine(("CODEX_HOME", codexHome))));
         Assert.Equal(new McpEntryReading(McpEntryPresence.Absent, usual, Reason: null), McpClientConfig.Read(codex, Machine()));
     }
 
@@ -283,7 +451,7 @@ public sealed class McpClientConfigTests : IDisposable
         var usual = PlantAt(Path.Combine(Home, ".gemini", "settings.json"), """{"mcpServers": {"other": {"command": "o"}}}""");
         var gemini = Tool("gemini-cli", McpConfigLocation.GeminiCli);
 
-        Assert.Equal(new McpEntryReading(McpEntryPresence.Present, moved, Reason: null), McpClientConfig.Read(gemini, Machine(("GEMINI_CLI_HOME", geminiHome))));
+        Assert.Equal(new McpEntryReading(McpEntryPresence.Present, moved, Reason: null) { Launch = new McpEntryLaunch("k", []) }, McpClientConfig.Read(gemini, Machine(("GEMINI_CLI_HOME", geminiHome))));
         Assert.Equal(new McpEntryReading(McpEntryPresence.Absent, usual, Reason: null), McpClientConfig.Read(gemini, Machine()));
     }
 
@@ -337,7 +505,7 @@ public sealed class McpClientConfigTests : IDisposable
 
         var reading = McpClientConfig.Read(devin, Machine(("XDG_CONFIG_HOME", Path.Combine(Home, ".config") + trailing)));
 
-        Assert.Equal(new McpEntryReading(McpEntryPresence.Present, path, Reason: null), reading);
+        Assert.Equal(new McpEntryReading(McpEntryPresence.Present, path, Reason: null) { Launch = new McpEntryLaunch("k", []) }, reading);
     }
 
     [Theory]

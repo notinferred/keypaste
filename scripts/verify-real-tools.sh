@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# keypaste setup against the real AI tools (G.2, D-0438), as install-real-tools.sh puts them on a runner at their
-# pinned versions: Claude Code, Codex, Gemini CLI, Devin, VS Code and Cursor on every runner, and Claude Desktop on
-# macOS and Windows. It writes those tools' own configuration in the runner account's home, so it refuses to run
-# anywhere but GitHub Actions. keypaste runs with a KEYPASTE_HOME of its own and a vault chosen with keypaste use,
-# so setup pins --vault, --audit-log, --clients and --approver (D-0389), and the bridge is the built keypaste.
+# keypaste setup and doctor against the real AI tools (G.2, G.3, D-0438), as install-real-tools.sh puts them on a
+# runner at their pinned versions: Claude Code, Codex, Gemini CLI, Devin, VS Code and Cursor on every runner, and
+# Claude Desktop on macOS and Windows. It writes those tools' own configuration in the runner account's home, so it
+# refuses to run anywhere but GitHub Actions. keypaste runs with a KEYPASTE_HOME of its own and a vault chosen
+# with keypaste use, so setup pins --vault, --audit-log, --clients and --approver (D-0389), and the bridge is the
+# built keypaste.
 #
 # Seeded first: VS Code's, Cursor's and Claude Desktop's files each hold another server and another top-level key,
 # VS Code's a comment too, in directories created as each app's first run would, since none has run. On Windows the
@@ -18,6 +19,8 @@
 # writes the same entry from the same fields into a throwaway profile, but VS Code never reads the real file back.
 # Every tool's entry starts the bridge with the pinned vault, audit log, ceilings and approver, the tool's id as its label, run
 # offered and every item in reach, which each agent's settings narrow, and each seeded file keeps everything else.
+# Before any tool has started the bridge, keypaste doctor finds every tool's registration working and nothing to
+# fix, and changes no tool's configuration, the pinned audit log or the default home's (D-0467).
 # VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. setup --remove --dry-run then
 # finds every registration, so each of keypaste's readers reads the file its tool wrote on this runner, and on
 # Windows starts Codex and Gemini CLI through node.exe, never cmd.exe. The backups equal the seeds. A second connect
@@ -26,13 +29,14 @@
 # or names a keyfile.
 #
 # NEGATIVE CONTROL: this fails if setup changes a file without --yes, if a removal with nothing to remove runs a
-# tool or changes a byte, if any tool is not configured, if a tool's reader does not find keypaste, if Gemini CLI's
-# bridge does not reach the pinned audit log, if an entry names another program, vault, audit log, ceilings, approver or
-# label or leaves out run or every item's reach, if a seeded file loses another entry, if VS Code would write the
-# entry differently, if keypaste's reader for a tool misses the entry that tool wrote, if Windows starts a tool
-# through cmd.exe, if a backup differs from its seed or changes on a second connect, if removal leaves keypaste
-# anywhere or a seeded file changed, if a second removal is not a no-op, or if a secret reaches a configuration.
-# These checks must never be skipped or soft-passed.
+# tool or changes a byte, if any tool is not configured, if keypaste doctor finds something to fix or a configured
+# tool's registration anything but working, or changes a tool's configuration, the pinned audit log or the default
+# home's, if a tool's reader does not find keypaste, if Gemini CLI's bridge does not reach the pinned audit log, if
+# an entry names another program, vault, audit log, ceilings, approver or label or leaves out run or every item's
+# reach, if a seeded file loses another entry, if VS Code would write the entry differently, if keypaste's reader
+# for a tool misses the entry that tool wrote, if Windows starts a tool through cmd.exe, if a backup differs from
+# its seed or changes on a second connect, if removal leaves keypaste anywhere or a seeded file changed, if a second
+# removal is not a no-op, or if a secret reaches a configuration. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-real-tools-master-pw'
@@ -131,12 +135,13 @@ servers_of() { if [ "$1" = vscode ]; then echo servers; else echo mcpServers; fi
 # VS Code's file is JSON with comments, which jq does not read; the seed's comment is a whole line.
 json() { sed '/^[[:space:]]*\/\//d' "$1"; }
 
+# A file's bytes, or absent.
+contents() { if [ -e "$1" ]; then bytes "$1"; else echo absent; fi; }
+
 # Every tool's own configuration, a line per file: its bytes, or absent.
 snapshot() {
   local file
-  for file in "${CONFIGS[@]}"; do
-    if [ -e "$file" ]; then printf '%s %s\n' "$file" "$(bytes "$file")"; else printf '%s absent\n' "$file"; fi
-  done
+  for file in "${CONFIGS[@]}"; do printf '%s %s\n' "$file" "$(contents "$file")"; done
 }
 
 # Runs keypaste setup with no terminal, holding its output in OUT and ERR and its exit code in CODE.
@@ -294,6 +299,21 @@ for id in $FILE_TOOLS; do
 done
 no_secret "${CONFIGS[@]}"
 
+# -------------------------------------------------------------- keypaste doctor, before any bridge has run
+step 'keypaste doctor finds every registration working and nothing to fix, and changes nothing'
+CONFIGURED="$(snapshot)"
+PINNED_LOG="$(contents "$(unix "$PIN_AUDIT")")"
+CODE=0
+PATH="$(dirname "$CLI"):$PATH" "$CLI" doctor --json < /dev/null 2> "$ERR" | tr -d '\r' > "$OUT" || CODE=$?
+[ "$CODE" = 0 ] || die "keypaste doctor exited $CODE after setup --yes"
+for id in $TOOLS; do
+  jq -e --arg id "$id" 'map(select(.subject == $id)) | length > 0 and all(.status == "ok")' "$OUT" >/dev/null \
+    || die "keypaste doctor does not find $id's registration working"
+done
+[ "$(snapshot)" = "$CONFIGURED" ] || die "keypaste doctor changed a tool's configuration"
+[ "$(contents "$(unix "$PIN_AUDIT")")" = "$PINNED_LOG" ] || die "keypaste doctor changed the pinned audit log $PIN_AUDIT"
+[ "$DEFAULT_AUDIT_EXISTED" = true ] || [ ! -e "$DEFAULT_AUDIT" ] || die "keypaste doctor wrote the default home's audit log $DEFAULT_AUDIT"
+
 # ------------------------------------------------------------------------------- each tool's own reader
 step "Gemini CLI starts the bridge it registered, which takes its home's settings from its arguments"
 rm -f "$(unix "$PIN_AUDIT")"
@@ -404,4 +424,4 @@ no_secret "${CONFIGS[@]}"
 for id in $FILE_TOOLS; do no_secret "$(file_of "$id").keypaste-backup"; done
 
 echo
-echo "ok: keypaste setup connected, read back and removed $(echo "$TOOLS" | wc -w | tr -d ' ') real AI tools on $platform"
+echo "ok: keypaste setup connected, read back and removed $(echo "$TOOLS" | wc -w | tr -d ' ') real AI tools on $platform, and keypaste doctor found each one working"

@@ -263,15 +263,16 @@ public sealed class SessionAuthority : IApproverHandler
 
         _attached.TryRemove(connectionId, out _);
 
+        static ValueTask<AttachReply> Answer(AttachReply reply) => ValueTask.FromResult(reply with { OwnerVersion = CoreInfo.Version });
+
         if (!_vault.Names(request.Vault))
         {
-            return ValueTask.FromResult(
-                AttachReply.Refused(AuditMethod.NoSession, "the keypaste process that answered holds a different vault"));
+            return Answer(AttachReply.Refused(AuditMethod.NoSession, "the keypaste process that answered holds a different vault"));
         }
 
         if (Live() is not { } lifetime)
         {
-            return ValueTask.FromResult(AttachReply.Refused(AuditMethod.VaultLocked, _lockedReason));
+            return Answer(AttachReply.Refused(AuditMethod.VaultLocked, _lockedReason));
         }
 
         var now = _clock.GetUtcNow();
@@ -281,7 +282,7 @@ public sealed class SessionAuthority : IApproverHandler
             Exposure = request.Exposure ?? [],
         };
 
-        return ValueTask.FromResult(AttachReply.To(lifetime.Id));
+        return Answer(AttachReply.To(lifetime.Id));
     }
 
     /// <inheritdoc/>

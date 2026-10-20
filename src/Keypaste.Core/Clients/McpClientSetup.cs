@@ -206,6 +206,21 @@ public static class McpClientSetup
         return cannot is null ? absent with { Found = true, ConfigPath = path } : absent with { Found = true, Problem = cannot };
     }
 
+    /// <summary>Whether <paramref name="client"/> looks installed on <paramref name="machine"/>, starting nothing.</summary>
+    /// <remarks>
+    /// <see cref="Detect"/>'s rule without its <c>--version</c>: the tool's own command is found, whether or not keypaste
+    /// can start it, or the folder of its file, its launcher or its macOS app is there.
+    /// </remarks>
+    internal static bool LooksInstalled(McpClient client, McpClientMachine machine)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(machine);
+
+        return client.Wiring == McpWiring.OwnCli
+            ? McpClientProgram.TryLocate(client, machine, out _, out var problem) || problem is not null
+            : client.Configuration is { } location && IsInstalled(client, location, machine);
+    }
+
     /// <summary>The plan that registers <paramref name="registration"/> with a client <see cref="Detect"/> found.</summary>
     /// <param name="client">The client.</param>
     /// <param name="detection">What <see cref="Detect"/> found.</param>

@@ -133,6 +133,22 @@ public sealed class VaultClaim : IDisposable
         }
     }
 
+    /// <summary>Who holds a vault, as the holder named itself, for display only.</summary>
+    /// <param name="home">keypaste's home directory.</param>
+    /// <param name="vaultPath">The vault.</param>
+    /// <returns>The process its <c>.owner</c> file names, or null when there is none or it cannot be read.</returns>
+    /// <remarks>
+    /// Only the name is read: the claim is never tried and nothing is created, so the answer can name a holder that has
+    /// since died.
+    /// </remarks>
+    public static VaultOwner? HolderOf(string home, string vaultPath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(home);
+        ArgumentException.ThrowIfNullOrEmpty(vaultPath);
+
+        return Holder(Path.Combine(home, DirectoryName, VaultIdentity.Of(home, vaultPath).Key + ".owner"));
+    }
+
     /// <summary>Releases the vault for another process.</summary>
     public void Dispose()
     {

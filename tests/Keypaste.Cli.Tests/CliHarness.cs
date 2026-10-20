@@ -394,6 +394,9 @@ internal sealed class FakeProcessRunner : IProcessRunner
     /// <summary>Programs that exist but fail every call, with this on stderr.</summary>
     internal Dictionary<string, string> Refuses { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>What a program prints on stdout for every call it answers, such as the version a keypaste's <c>--version</c> prints.</summary>
+    internal Dictionary<string, string> Says { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Every invocation, in order, as <c>executable arg arg</c>.</summary>
     internal List<string> Calls { get; } = [];
 
@@ -416,7 +419,7 @@ internal sealed class FakeProcessRunner : IProcessRunner
 
         return Refuses.TryGetValue(fileName, out var complaint)
             ? new ProcessResult(ToolFound: true, ExitCode: 1, string.Empty, complaint)
-            : new ProcessResult(ToolFound: true, ExitCode: 0, string.Empty, string.Empty);
+            : new ProcessResult(ToolFound: true, ExitCode: 0, Says.GetValueOrDefault(fileName, string.Empty), string.Empty);
     }
 
     /// <summary>The calls that were not the "are you installed" probe.</summary>
