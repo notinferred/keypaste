@@ -1,0 +1,50 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.LockedNoticeWindow"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: an agent asked for a locked vault"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    ShowActivated="False"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Said when an agent asks while the app is locked (D-0466). The bridge sends nothing, so the vault is named
+       from this computer's own settings. It has no field and does not take focus, so typing meant for another
+       window reaches nothing here; Close is its default, and Open keypaste is armed only after a moment. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="lock" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Name="HeadText" Classes="prompt-title" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="SubText" Classes="prompt-sub" Text="It's locked, so the request was refused" />
+        </StackPanel>
+      </Grid>
+
+      <TextBlock Name="NoticeText" Classes="prompt-note" Foreground="{DynamicResource KpTextSecondary}"
+                 Text="Agents can use this vault only while it's unlocked. Unlock it in keypaste, then ask the agent to try again. You won't see this again until you've unlocked keypaste." />
+
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Name="Open" Classes="prompt" Content="Open keypaste" AutomationProperties.Name="Open keypaste" IsEnabled="False" />
+        <Button Name="Dismiss" Classes="prompt ghost" Content="Close" IsCancel="True" IsDefault="True" />
+      </StackPanel>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

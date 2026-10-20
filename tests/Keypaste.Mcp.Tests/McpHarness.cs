@@ -67,6 +67,9 @@ internal sealed class McpHarness : IAsyncDisposable
     /// <summary>The ceilings a server in its own home lowers.</summary>
     internal string ClientsPath => KeypasteHome.ClientsPath(_directory);
 
+    /// <summary>Where the started bridge looks for the app open and locked on its vault, or null before it starts.</summary>
+    internal string? LockedAppName => _options?.LockedAppName;
+
     /// <summary>Every byte the server has sent the client, as text.</summary>
     /// <remarks>
     /// The raw frames rather than the parsed results. A claim that a secret did not leak is only

@@ -65,6 +65,9 @@ internal sealed record EntryNameListing(
 
     /// <summary>Whether the owner recorded this listing, so the bridge writes no line.</summary>
     public bool Recorded { get; init; }
+
+    /// <summary>The reason the bridge's line records when it differs from what the agent is told, or null when it does not.</summary>
+    public string? AuditReason { get; init; }
 }
 
 /// <summary>
@@ -145,13 +148,14 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
 
         if (reply is null)
         {
-            return new EntryNameListing(
-                VaultAvailability.Failed,
-                [],
-                outcome == ApproverOutcome.Failed
-                    ? ToolText.ApproverFailed
-                    : ToolText.NoApproverForListing,
-                true);
+            if (outcome == ApproverOutcome.Failed)
+            {
+                return new EntryNameListing(VaultAvailability.Failed, [], ToolText.ApproverFailed, true);
+            }
+
+            return await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false)
+                ? new EntryNameListing(VaultAvailability.Failed, [], ToolText.AppLockedForListing, true) { AuditReason = ToolText.NoApproverForListing }
+                : new EntryNameListing(VaultAvailability.Failed, [], ToolText.NoApproverForListing, true);
         }
 
         // Nothing an unrecorded reply named is shown: entry names are an asset too (law 3.5, T-6).

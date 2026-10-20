@@ -1,10 +1,11 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Xunit;
 
 namespace Keypaste.Mcp.Tests;
 
-/// <summary>What <c>keypaste mcp</c> accepts on its command line for help, the run tool, the client label and the ceilings it may lower.</summary>
+/// <summary>What <c>keypaste mcp</c> accepts on its command line for help, the run tool, the client label, the ceilings it may lower and where it looks for a locked app.</summary>
 public sealed class ServerOptionsTests
 {
     private static bool Parse(out ServerOptions? options, out string error, params string[] argv) =>
@@ -96,6 +97,33 @@ public sealed class ServerOptionsTests
         Assert.Equal(Path.GetFullPath("flag.kdbx"), fromFlag!.VaultPath);
         Assert.Empty(none!.VaultPath);
         Assert.Null(none.VaultKey);
+    }
+
+    /// <summary>D-0466: a bridge looks for the locked app under its vault's own name, whatever <c>--approver</c> or <c>KEYPASTE_APPROVER</c> pins.</summary>
+    [Fact]
+    public void TheLockedApp_IsLookedForUnderItsVaultsName_WhicheverApproverIsPinned()
+    {
+        var home = Path.GetFullPath("bridge-home");
+        var expected = LockedAppEndpoint.NameFor(VaultIdentity.Of(KeypasteHome.Resolve(home), Path.GetFullPath("v.kdbx")));
+
+        Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx"], null, home, null, null, out var plain, out _));
+        Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx", "--approver", "pinned-by-flag"], null, home, null, null, out var flagged, out _));
+        Assert.True(ServerOptions.TryParse(["--vault", "v.kdbx"], null, home, "pinned-by-environment", null, out var fromEnvironment, out _));
+
+        Assert.Equal(expected, plain!.LockedAppName);
+        Assert.Equal(("pinned-by-flag", expected), (flagged!.ApproverName, flagged.LockedAppName));
+        Assert.Equal(("pinned-by-environment", expected), (fromEnvironment!.ApproverName, fromEnvironment.LockedAppName));
+    }
+
+    [Fact]
+    public void WithoutAVault_NoLockedAppIsLookedFor()
+    {
+        Assert.True(ServerOptions.TryParse(["--approver", "pinned-by-flag"], null, null, "pinned-by-environment", null, out var pinned, out _));
+        Assert.True(Parse(out var help, out _, "--help"));
+
+        Assert.Equal("pinned-by-flag", pinned!.ApproverName);
+        Assert.Null(pinned.LockedAppName);
+        Assert.Null(help!.LockedAppName);
     }
 
     [Theory]

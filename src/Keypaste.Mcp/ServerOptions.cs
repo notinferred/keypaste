@@ -116,6 +116,12 @@ internal sealed record ServerOptions
     /// <summary>The configured vault's identity key, for audit lines, or null without a vault.</summary>
     internal string? VaultKey { get; init; }
 
+    /// <summary>
+    /// Where the desktop app listens while it is open and locked on this vault, or null without a vault.
+    /// </summary>
+    /// <remarks>Named from the vault alone, so <c>--approver</c> and <c>KEYPASTE_APPROVER</c> never move it (D-0466).</remarks>
+    internal string? LockedAppName { get; init; }
+
     /// <summary>Parses the command line.</summary>
     /// <param name="argv">The arguments, excluding the program name.</param>
     /// <param name="vaultFromEnvironment">The value of <c>KEYPASTE_VAULT</c>, or null.</param>
@@ -209,6 +215,7 @@ internal sealed record ServerOptions
             ApproverName = pipeName,
             AllowRun = allowRun,
             VaultKey = identity?.Key,
+            LockedAppName = identity is null ? null : LockedAppEndpoint.NameFor(identity),
             AuditPath = log,
             ClientsPath = clientsPath is { Length: > 0 } ? Path.GetFullPath(clientsPath)
                 : PathIdentity.SameFile(log, homeLog) ? KeypasteHome.ClientsPath(homeFromEnvironment)

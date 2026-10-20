@@ -170,6 +170,19 @@ run `keypaste agent --vault <their vault>` in a terminal, and then try again.
 
 That is the source wording; `v0.3.0` says "No keypaste agent is running, so there is nobody to approve this."
 
+In source, when the keypaste app is open with this vault locked, the request is still denied and recorded the same way, and the agent is told where to unlock it:
+
+```
+keypaste: DENIED. Nobody can approve this right now: the keypaste app is open on this computer,
+but this vault is locked in it, and keypaste releases nothing until it is unlocked, whatever
+this agent's settings say.
+
+Ask the person you are working with to unlock this vault in the keypaste app, and then try
+again.
+```
+
+The first such request after the app locks also shows a small notice naming the vault, whether it is the one the unlock screen shows or the one you chose. It has no password field and does not take the keyboard from the window you are typing in. Close is its default, and Open keypaste, which works a second after the notice appears, shows the unlock screen with that vault selected. No other notice appears until you have unlocked and the app has locked again. An agent asking for item names, or for a change to its settings that needs your confirmation, is likewise told that the app is open with the vault locked, and can raise that one notice too.
+
 The MCP client may start its bridge before you start an approver. Calls are refused until an approver is available.
 
 On `0.2.0`, this refusal can also occur under load while the approver is running: the bridge's half-second connection deadline can expire before it tries the pipe. No credential or entry name is released. Retrying is appropriate. This is F.9, repaired in `0.3.0`.

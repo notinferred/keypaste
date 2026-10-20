@@ -207,7 +207,7 @@ internal sealed class RequestAccessChangeTool(
                 new Verdict(AuditDecision.Denied, AuditMethod.NoSession, "this server was started without a vault to ask about" + named, ToolText.NoVault),
             ApproverOutcome.Failed =>
                 new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the approver could not be asked" + named, ToolText.AccessFailed),
-            ApproverOutcome.Unreachable => Lowered(label, edit, named),
+            ApproverOutcome.Unreachable => await LoweredAsync(label, edit, named, cancellationToken).ConfigureAwait(false),
             _ => new Verdict(AuditDecision.Denied, AuditMethod.NoApprover, "no keypaste process holds the vault unlocked" + named, ToolText.AccessNoOwner),
         };
     }
@@ -217,7 +217,7 @@ internal sealed class RequestAccessChangeTool(
     /// <c>keypaste mcp policy</c> does, so an agent's narrowing of itself holds while the vault is locked;
     /// anything that could give more, or that only the vault's settings hold, waits for an owner.
     /// </summary>
-    private Verdict Lowered(string label, AccessEdit edit, string named)
+    private async ValueTask<Verdict> LoweredAsync(string label, AccessEdit edit, string named, CancellationToken cancellationToken)
     {
         const string nobody = "no keypaste process holds the vault unlocked";
 
@@ -247,7 +247,11 @@ internal sealed class RequestAccessChangeTool(
             case CapsChange.Unreadable:
                 return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's ceilings are not usable: {problem}" + named, ToolText.AccessFailed);
             case CapsChange.Declined:
-                return new Verdict(AuditDecision.Denied, AuditMethod.NoApprover, nobody + named, ToolText.AccessNoOwner);
+                return new Verdict(
+                    AuditDecision.Denied,
+                    AuditMethod.NoApprover,
+                    nobody + named,
+                    await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false) ? ToolText.AccessAppLocked : ToolText.AccessNoOwner);
             case CapsChange.Unwritten:
                 return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's ceilings could not be written: {problem}" + named, ToolText.AccessFailed);
         }

@@ -44,6 +44,7 @@ internal sealed partial class App : Application, IDisposable
     private AppTray? _tray;
     private IActivatableLifetime? _activatable;
     private IDisposable? _reopen;
+    private LockedNotice? _lockedNotice;
     private (string Path, string? Keyfile)? _openNext;
     private int _unlockScreens;
     private bool _shuttingDown;
@@ -100,6 +101,13 @@ internal sealed partial class App : Application, IDisposable
             NativeMenu.SetMenu(_window, AppMenu.Build(() => _shell));
         }
 
+        // While locked, the app that holds its home tells the person once that an agent asked for a vault it would open (D-0466).
+        _lockedNotice = Claim is null ? null : new LockedNotice(
+            _session,
+            OpenWindow,
+            TimeProvider.System,
+            reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"));
+
         ShowUnlock(home);
 
         _tray = new AppTray(OpenWindow, () => _session?.Lock(VaultLockReason.Manual), () => _session?.IsUnlocked == true, Quit);
@@ -138,6 +146,9 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>The menu bar or tray icon <see cref="Launch"/> composed.</summary>
     internal AppTray? Tray => _tray;
+
+    /// <summary>What tells the person an agent found the app locked; none unless <see cref="Claim"/> is held, or after quitting.</summary>
+    internal LockedNotice? LockedNotice => _lockedNotice;
 
     /// <summary>The main window <see cref="Launch"/> composed, shown or not.</summary>
     internal MainWindow? Main => _window;
@@ -228,15 +239,17 @@ internal sealed partial class App : Application, IDisposable
     private void Quit()
     {
         _quitting = true;
-        StopAnsweringStarts();
+        StopAnswering();
         _ = _desktop?.TryShutdown();
     }
 
-    // A quitting app no longer tells a second start it showed its window; that start waits to take the home instead.
-    private void StopAnsweringStarts()
+    // A quitting app no longer tells a second start it showed its window, so that start waits to take the home instead, and no longer hears an agent find it locked.
+    private void StopAnswering()
     {
         _reopen?.Dispose();
         _reopen = null;
+        _lockedNotice?.Dispose();
+        _lockedNotice = null;
     }
 
     private void OnPreferencesChanged(object? sender, EventArgs e)
@@ -383,7 +396,7 @@ internal sealed partial class App : Application, IDisposable
     {
         ArgumentNullException.ThrowIfNull(e);
 
-        StopAnsweringStarts();
+        StopAnswering();
 
         if (_shuttingDown || _shell is null)
         {
@@ -465,6 +478,8 @@ internal sealed partial class App : Application, IDisposable
         {
             _unlock.Offer(file.Path, file.Keyfile);
         }
+
+        _lockedNotice?.Watch(_unlock);
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new UnlockView { DataContext = _unlock };
@@ -583,7 +598,7 @@ internal sealed partial class App : Application, IDisposable
             _activatable = null;
         }
 
-        StopAnsweringStarts();
+        StopAnswering();
 
         if (_preferences is not null)
         {

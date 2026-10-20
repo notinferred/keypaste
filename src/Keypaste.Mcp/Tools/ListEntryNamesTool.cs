@@ -94,7 +94,7 @@ internal sealed class ListEntryNamesTool(
         if (listing.Availability != VaultAvailability.Available)
         {
             var refusal = ToolResults.Refuse(listing.Reason);
-            return listing.Recorded ? refusal : Record(Denial(client, Method(listing.Availability), listing.Reason), refusal);
+            return listing.Recorded ? refusal : Record(Denial(client, Method(listing.Availability), listing.AuditReason ?? listing.Reason), refusal);
         }
 
         // The exposure is applied twice on purpose: two things enforcing one rule that cannot

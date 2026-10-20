@@ -718,6 +718,12 @@ public sealed class ScreenRenderer
         notice.Show();
         Save(notice, output, "91g-always-for-notice");
         notice.Close();
+
+        var locked = new LockedNoticeWindow("acme.kdbx", () => { }, new ManualClock(AppClock.Start));
+        locked.Arm();
+        locked.Show();
+        Save(locked, output, "91i-locked-notice");
+        locked.Close();
     }
 
     private static void DrawWindow(PromptWindow window, string output, string name)

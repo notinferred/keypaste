@@ -240,7 +240,13 @@ internal sealed class RequestCredentialTool(
                         Refusal: ToolText.NoVault),
                 ApproverOutcome.Failed =>
                     new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the approver could not be asked"),
-                _ => new Verdict(AuditDecision.Denied, AuditMethod.NoApprover, "no keypaste process holds the vault unlocked"),
+                _ => new Verdict(
+                    AuditDecision.Denied,
+                    AuditMethod.NoApprover,
+                    "no keypaste process holds the vault unlocked",
+                    Refusal: outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false)
+                        ? ToolText.AppLocked
+                        : null),
             };
         }
 

@@ -104,7 +104,8 @@ internal static class Program
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
         "       launch [--background]\n" +
-        "            (runs the app as keypaste-app does, on a headless display, until standard input closes)\n" +
+        "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
+        "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password, entry password or field value.";
 

@@ -175,6 +175,14 @@ internal static class ToolText
         then try again. This call was recorded in the audit log as denied.
         """;
 
+    /// <summary>Why a change was not made when nothing holds the vault and the app is open and locked on it (D-0466).</summary>
+    internal const string AccessAppLocked = """
+        keypaste: NOT CHANGED. The keypaste app is open on this computer, but this vault is locked in
+        it, so there is nobody to confirm this change, and it cannot be made without them. Ask the
+        person you are working with to unlock the vault in the keypaste app, and then try again. This
+        call was recorded in the audit log as denied.
+        """;
+
     /// <summary>Why a change was not made when nothing holds the vault and the bridge cannot tell which ceilings to lower.</summary>
     /// <remarks>Names the fix, because only the person's configuration can give the bridge the file.</remarks>
     internal const string AccessCeilingsUnknown = """
@@ -326,6 +334,17 @@ internal static class ToolText
         every request will be refused. This call was recorded in the audit log as denied.
         """;
 
+    /// <summary>Why a call was refused when no approver is running and the app is open and locked on the vault (D-0466).</summary>
+    internal const string AppLocked = """
+        keypaste: DENIED. Nobody can approve this right now: the keypaste app is open on this computer,
+        but this vault is locked in it, and keypaste releases nothing until it is unlocked, whatever
+        this agent's settings say.
+
+        Ask the person you are working with to unlock this vault in the keypaste app, and then try
+        again. Until then, every request will be refused. This call was recorded in the audit log as
+        denied.
+        """;
+
     /// <summary>Why a listing was refused when nothing holds the vault.</summary>
     internal const string NoApproverForListing = """
         keypaste: nothing holds this vault unlocked, so there are no item names to read. No item
@@ -334,6 +353,15 @@ internal static class ToolText
         Ask the person you are working with to unlock it in the keypaste desktop app, or to run
         `keypaste agent --vault <their vault>` in a terminal, and then try again. This call was
         recorded in the audit log as denied.
+        """;
+
+    /// <summary>Why a listing was refused when nothing holds the vault and the app is open and locked on it (D-0466).</summary>
+    internal const string AppLockedForListing = """
+        keypaste: the keypaste app is open on this computer, but this vault is locked in it, so there
+        are no item names to read. No item names were read.
+
+        Ask the person you are working with to unlock it in the keypaste app, and then try again. This
+        call was recorded in the audit log as denied.
         """;
 
     /// <summary>Why a call was refused when the vault's owner answered locked.</summary>

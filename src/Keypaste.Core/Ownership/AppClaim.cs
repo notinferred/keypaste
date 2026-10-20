@@ -30,6 +30,8 @@ public sealed class AppClaim : IDisposable
     public const string Prefix = "keypaste-app-";
 
     private static readonly TimeSpan _attempt = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan _deliveryBound = TimeSpan.FromSeconds(1);
+    private static readonly byte[] _shown = [1];
 
     private readonly FileStream? _held;
     private int _requests;
@@ -118,7 +120,7 @@ public sealed class AppClaim : IDisposable
         ArgumentNullException.ThrowIfNull(show);
         ArgumentNullException.ThrowIfNull(unreachable);
 
-        return new Listener(this, show, unreachable);
+        return new KnockListener(Endpoint, (pipe, stop) => ShowThenSayAsync(pipe, show, stop), unreachable);
     }
 
     /// <summary>
@@ -158,9 +160,24 @@ public sealed class AppClaim : IDisposable
     /// <summary>Releases the home for another process.</summary>
     public void Dispose() => _held?.Dispose();
 
-    // One instance at a time, which on Windows makes each the pipe's first, so a pipe somebody else made under this name is refused rather than joined.
-    private static NamedPipeServerStream Create(string endpoint) =>
-        new(endpoint, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+    private async Task ShowThenSayAsync(NamedPipeServerStream pipe, Func<Task> show, CancellationToken stop)
+    {
+        Interlocked.Increment(ref _requests);
+        await show().WaitAsync(stop).ConfigureAwait(false);
+
+        // A Windows pipe write waits for its reader, so a peer that never reads is given a second, not the listener.
+        using var delivery = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        delivery.CancelAfter(_deliveryBound);
+
+        try
+        {
+            await pipe.WriteAsync(_shown, delivery.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or SocketException || (ex is OperationCanceledException && !stop.IsCancellationRequested))
+        {
+            // The start stopped waiting, or never read.
+        }
+    }
 
     private static Reply Ask(string endpoint, TimeSpan budget)
     {
@@ -207,84 +224,5 @@ public sealed class AppClaim : IDisposable
         Shown,
         NotYet,
         Refused,
-    }
-
-    private sealed class Listener : IDisposable
-    {
-        private static readonly TimeSpan _stopGrace = TimeSpan.FromSeconds(2);
-        private static readonly TimeSpan _deliveryBound = TimeSpan.FromSeconds(1);
-        private static readonly byte[] _shown = [1];
-
-        private readonly CancellationTokenSource _stop = new();
-        private readonly Task _accepting;
-
-        internal Listener(AppClaim claim, Func<Task> show, Action<string> unreachable) =>
-            _accepting = AcceptAsync(claim, show, unreachable, _stop.Token);
-
-        public void Dispose()
-        {
-            _stop.Cancel();
-
-            try
-            {
-                _accepting.Wait(_stopGrace);
-            }
-            catch (AggregateException)
-            {
-                // Stopping is the answer either way.
-            }
-
-            _stop.Dispose();
-        }
-
-        private static async Task AcceptAsync(AppClaim claim, Func<Task> show, Action<string> unreachable, CancellationToken stop)
-        {
-            try
-            {
-                while (true)
-                {
-                    await AnswerOneAsync(claim, show, stop).ConfigureAwait(false);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                // Stopping, or the app's dispatcher ending, is how this ends.
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException)
-            {
-                unreachable(ex.Message);
-            }
-        }
-
-        private static async Task AnswerOneAsync(AppClaim claim, Func<Task> show, CancellationToken stop)
-        {
-            await using var pipe = Create(claim.Endpoint);
-
-            try
-            {
-                await pipe.WaitForConnectionAsync(stop).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException)
-            {
-                // Another user's connection, which the runtime refuses, or a peer gone before it was accepted.
-                return;
-            }
-
-            Interlocked.Increment(ref claim._requests);
-            await show().WaitAsync(stop).ConfigureAwait(false);
-
-            // A Windows pipe write waits for its reader, so a peer that never reads is given a second, not the listener.
-            using var delivery = CancellationTokenSource.CreateLinkedTokenSource(stop);
-            delivery.CancelAfter(_deliveryBound);
-
-            try
-            {
-                await pipe.WriteAsync(_shown, delivery.Token).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is IOException or SocketException || (ex is OperationCanceledException && !stop.IsCancellationRequested))
-            {
-                // The start stopped waiting, or never read.
-            }
-        }
     }
 }

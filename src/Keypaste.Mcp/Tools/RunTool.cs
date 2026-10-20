@@ -207,7 +207,12 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
                 ApproverOutcome.Refused when refusal?.Refusal is { } method => Verdict.Denied(method, refusal.Reason),
                 ApproverOutcome.NoVault => Verdict.Denied(AuditMethod.NoSession, "this server was started without a vault to ask about", ToolText.NoVault),
                 ApproverOutcome.Failed => Verdict.Denied(AuditMethod.Failed, "the owner did not answer a run request", ToolText.RunUnanswered),
-                _ => Verdict.Denied(AuditMethod.NoApprover, "no keypaste process holds the vault unlocked"),
+                _ => Verdict.Denied(
+                    AuditMethod.NoApprover,
+                    "no keypaste process holds the vault unlocked",
+                    outcome == ApproverOutcome.Unreachable && await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false)
+                        ? ToolText.AppLocked
+                        : null),
             }, null);
         }
 

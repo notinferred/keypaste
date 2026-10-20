@@ -197,6 +197,7 @@ public sealed partial class PlainWordsTests
             Changes = ["Adds STRIPE_KEY to billing/dev on env/billing/.env with the value the terminal sent."],
         })));
         yield return ("the Always for notice", new NoticeWindow(new AlwaysForNotice("work laptop", "billing:dev", "another request was already in front of a person"), _ => { }));
+        yield return ("the locked notice", new LockedNoticeWindow("billing.kdbx", () => { }, TimeProvider.System));
     }
 
     private static IEnumerable<(string Where, string Text)> Shown(Control root, string where)

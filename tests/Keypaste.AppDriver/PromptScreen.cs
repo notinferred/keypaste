@@ -200,7 +200,8 @@ internal sealed class PromptScreen : IDisposable
     private static Button Button(Window window, string name) =>
         window.FindControl<Button>(name) ?? throw new DriverException($"the prompt has no {name} button");
 
-    private static void Click(Window window, Button button)
+    // Touches none of this type's static fields, so a launch that presses with it never starts this screen's display.
+    internal static void Click(Window window, Button button)
     {
         window.CaptureRenderedFrame();
 

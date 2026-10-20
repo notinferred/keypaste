@@ -16,10 +16,21 @@
 # shown its window, and the first is still running. A killed app leaves the home, and on Linux its socket
 # file, to the next start at login, which a second start then reaches.
 #
+# While that app is locked, its unlock screen on the vault it opened there and keypaste use having chosen
+# another, an agent asking for either is refused and recorded as before and told the app is open and
+# locked on it; one asking for a third vault is told nothing holds it, as before (G.4b). The first such
+# request shows one notice naming the vault asked about and no window, and later ones show none. Only
+# the notice's Open keypaste shows the window, with that vault on the unlock screen, after which the app
+# listens for that vault alone; a quit app listens for none.
+#
 # NEGATIVE CONTROL: this fails if a request is answered by a locked, quit or killed app, if a status
 # says serving without the session that answers, if anything still holds the vault after a lock or a
 # quit, if the app displaces keypaste agent, or if a second start runs beside the first, shows its
-# window at login or not for a person. These checks must never be skipped or soft-passed.
+# window at login or not for a person. It fails if an agent asking a locked app is answered or recorded
+# otherwise than as no-approver, is told the app is locked on a vault it neither shows nor chose or not
+# told so of one it does, if a request shows the window or a second notice, or if Open keypaste does not
+# show the window with the vault asked about on its unlock screen. These checks must never be skipped
+# or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-lifecycle-master-pw'
@@ -102,7 +113,7 @@ ask() {
       printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}"
       await_replies "${WAIT_SECONDS:-30}" "$OUT" 3 || true
     fi
-  } | "$CLI" mcp --vault "$VAULT" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" 7>&- 9>&- \
+  } | "$CLI" mcp --vault "${ASK_VAULT:-$VAULT}" --expose 'env/**' --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" 7>&- 9>&- \
     || die "keypaste mcp exited non-zero"
 }
 
@@ -341,8 +352,77 @@ exec 6>&-
 wait_for '^shut down' "$APP_OUT"
 APP_PID=""
 
+# ------------------------------------ an agent asking the locked app is told so, and the person once
+OTHER="$(native "$WORK/other.kdbx")"
+CHOSEN="$(native "$WORK/chosen.kdbx")"
+for vault in "$OTHER" "$CHOSEN"; do
+  printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$vault" >/dev/null || die "could not create $vault"
+done
+# The unlock screen keeps the vault it opened, and agents and the CLI use the one keypaste use chose.
+said="$(KEYPASTE_HOME="$APP_HOME_NATIVE" KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" open "$VAULT" 2>&1 </dev/null)" \
+  || die "the app's unlock screen did not open the vault: $said"
+said="$(KEYPASTE_HOME="$APP_HOME_NATIVE" "$CLI" use "$CHOSEN" 2>&1)" || die "keypaste use did not choose another vault in the app's home: $said"
+
+readonly BEFORE='nothing holds this vault unlocked'
+readonly LOCKED='keypaste app is open on this computer'
+
+# One bridge in the app's home asking for vault $1, as ask does.
+ask_app() {
+  local vault="$1"
+  shift
+  KEYPASTE_HOME="$APP_HOME_NATIVE" ASK_VAULT="$vault" ask "$@"
+}
+
+# Both calls of the last ask were refused by nobody and recorded as no-approver, each saying $2.
+refused_saying() {
+  local what="$1" text="$2"
+  refused_by_nobody "$what"
+  tail -n 2 "$AUDIT" | jq -e -s 'all(.method == "no-approver")' >/dev/null \
+    || die "$what: the refusals were not recorded as no-approver"
+  jq -e -s --arg t "$text" \
+    '[.[] | select(.id == 2 or .id == 3) | .result.content[0].text | split("\n") | join(" ") | contains($t)] | length == 2 and all' \
+    <"$OUT" >/dev/null || die "$what: the refusals did not say '$text'"
+}
+
+start_app "$WORK/app-3.txt" --background
+wait_for '^window hidden' "$APP_OUT"
+
+ask_app "$OTHER" "$WORK/notice-other-stdout.txt" "$WORK/notice-other-stderr.txt"
+refused_saying "a vault the locked app neither shows nor chose" "$BEFORE"
+
+ask_app "$CHOSEN" "$WORK/notice-chosen-stdout.txt" "$WORK/notice-chosen-stderr.txt"
+refused_saying "the vault the locked app chose" "$LOCKED"
+wait_for '^locked-notice shown .*chosen\.kdbx' "$APP_OUT"
+
+ask_app "$VAULT" "$WORK/notice-shown-stdout.txt" "$WORK/notice-shown-stderr.txt"
+refused_saying "the vault on the locked app's unlock screen" "$LOCKED"
+ask_app "$CHOSEN" "$WORK/notice-again-stdout.txt" "$WORK/notice-again-stderr.txt"
+refused_saying "the chosen vault asked again" "$LOCKED"
+grep -q '^window shown' "$APP_OUT" && die "an agent asking the locked app showed its window"
+
+echo 'notice open' >&6
+wait_for '^locked-notice closed' "$APP_OUT"
+wait_for '^window shown' "$APP_OUT"
+
+ask_app "$CHOSEN" "$WORK/notice-opened-stdout.txt" "$WORK/notice-opened-stderr.txt"
+refused_saying "the vault Open keypaste put on the unlock screen" "$LOCKED"
+ask_app "$VAULT" "$WORK/notice-moved-stdout.txt" "$WORK/notice-moved-stderr.txt"
+refused_saying "the vault Open keypaste took off the unlock screen" "$BEFORE"
+
+exec 6>&-
+wait_for '^shut down' "$APP_OUT"
+APP_PID=""
+NOTICES="$(grep -c '^locked-notice shown' "$APP_OUT" || true)"
+[ "$NOTICES" -eq 1 ] || die "agents asking the locked app showed $NOTICES notices before an unlock, not one"
+
+ask_app "$CHOSEN" "$WORK/notice-quit-stdout.txt" "$WORK/notice-quit-stderr.txt"
+refused_saying "the chosen vault once the app quit" "$BEFORE"
+
 echo "ok: launched locked and refusing, the app served a real keypaste mcp once unlocked; lock and quit each left"
 echo "    nobody answering or holding the vault; a killed app answered nothing and a relaunch refused until it"
 echo "    unlocked a new session on the same endpoint; keypaste agent holding the vault was named and kept answering;"
 echo "    and in one home a second keypaste-app at login showed nothing, a second one exited once the running app showed"
-echo "    its window, and a killed app left the home and its endpoint to the next start, which a second start reached"
+echo "    its window, and a killed app left the home and its endpoint to the next start, which a second start reached;"
+echo "    and agents asking the locked app for the vault on its unlock screen or the chosen one were refused as before"
+echo "    and told it was locked there, one notice named the vault asked about with no window, and only its Open keypaste"
+echo "    showed the window, with that vault on the unlock screen"
