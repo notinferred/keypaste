@@ -36,7 +36,8 @@ public sealed class LockedAppEndpoint : IDisposable
     private LockedAppEndpoint(string name, Action asked, Action<string> unreachable)
     {
         Name = name;
-        _listener = new KnockListener(name, (pipe, stop) => HearAsync(pipe, asked, stop), unreachable);
+        // A bridge hangs up as soon as it connects, so one that lands before the app waits again is still a knock (F.66).
+        _listener = new KnockListener(name, (pipe, stop) => HearAsync(pipe, asked, stop), unreachable, () => Heard(asked));
     }
 
     /// <summary>The pipe this listens on.</summary>
@@ -126,10 +127,15 @@ public sealed class LockedAppEndpoint : IDisposable
         return true;
     }
 
-    private async Task HearAsync(NamedPipeServerStream pipe, Action asked, CancellationToken stop)
+    private void Heard(Action asked)
     {
         Interlocked.Increment(ref _requests);
         asked();
+    }
+
+    private async Task HearAsync(NamedPipeServerStream pipe, Action asked, CancellationToken stop)
+    {
+        Heard(asked);
 
         // On Windows the bridge hangs up first: ending the connection under it fails its runtime's check of who
         // made the pipe. Elsewhere the app hangs up at once, since a bridge queued behind a peer that holds on is

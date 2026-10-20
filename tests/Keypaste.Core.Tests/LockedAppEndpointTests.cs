@@ -89,6 +89,30 @@ public sealed class LockedAppEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task BridgesInQuickSuccession_AreEachHeard()
+    {
+        // Each bridge hangs up as soon as it connects, which can be before the app waits again; on Windows that
+        // connection reaches the app already gone, 1 in 200 times in F.66's probe.
+        const int bridges = 300;
+        var heard = 0;
+        using var endpoint = LockedAppEndpoint.Listen(_name, () => Interlocked.Increment(ref heard), _ => { });
+
+        for (var i = 0; i < bridges; i++)
+        {
+            Assert.True(await LockedAppEndpoint.TellAsync(_name, Token), $"bridge {i} did not reach the app");
+        }
+
+        var started = Stopwatch.GetTimestamp();
+        while (Volatile.Read(ref heard) < bridges && Stopwatch.GetElapsedTime(started) < _wait)
+        {
+            await Task.Delay(20, Token);
+        }
+
+        Assert.Equal(bridges, Volatile.Read(ref heard));
+        Assert.Equal(bridges, endpoint.Requests);
+    }
+
+    [Fact]
     public async Task APeerThatNeverHangsUp_HoldsNothingUp()
     {
         using var heard = new SemaphoreSlim(0);

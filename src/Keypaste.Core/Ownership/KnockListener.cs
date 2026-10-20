@@ -10,10 +10,14 @@ namespace Keypaste.Core.Ownership;
 /// <remarks>
 /// The pipe is bound before the constructor returns. A connection the runtime refuses, which another user's
 /// is (THREATS.md T-10), and a peer gone before it was accepted are not answered, and the next is accepted.
+/// On Windows the pipe admits only this user, so a peer gone before it was accepted can still be told of.
 /// </remarks>
 internal sealed class KnockListener : IDisposable
 {
     private static readonly TimeSpan _stopGrace = TimeSpan.FromSeconds(2);
+
+    // ERROR_NO_DATA: the peer connected and closed before the pipe waited for it.
+    private const int _goneBeforeAccepted = unchecked((int)0x800700E8);
 
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _accepting;
@@ -22,8 +26,13 @@ internal sealed class KnockListener : IDisposable
     /// <param name="endpoint">The pipe's name.</param>
     /// <param name="answer">Answers one accepted connection, which is hung up once the answer completes; given the token that stops listening.</param>
     /// <param name="unreachable">Told why, when the endpoint cannot be bound.</param>
-    internal KnockListener(string endpoint, Func<NamedPipeServerStream, CancellationToken, Task> answer, Action<string> unreachable) =>
-        _accepting = AcceptAsync(endpoint, answer, unreachable, _stop.Token);
+    /// <param name="goneBeforeAccepted">On Windows, told of a peer of this user that hung up before it was accepted; null leaves it unanswered.</param>
+    internal KnockListener(
+        string endpoint,
+        Func<NamedPipeServerStream, CancellationToken, Task> answer,
+        Action<string> unreachable,
+        Action? goneBeforeAccepted = null) =>
+        _accepting = AcceptAsync(endpoint, answer, unreachable, goneBeforeAccepted, _stop.Token);
 
     public void Dispose()
     {
@@ -54,13 +63,14 @@ internal sealed class KnockListener : IDisposable
         string endpoint,
         Func<NamedPipeServerStream, CancellationToken, Task> answer,
         Action<string> unreachable,
+        Action? goneBeforeAccepted,
         CancellationToken stop)
     {
         try
         {
             while (true)
             {
-                await AnswerOneAsync(endpoint, answer, stop).ConfigureAwait(false);
+                await AnswerOneAsync(endpoint, answer, goneBeforeAccepted, stop).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -73,13 +83,22 @@ internal sealed class KnockListener : IDisposable
         }
     }
 
-    private static async Task AnswerOneAsync(string endpoint, Func<NamedPipeServerStream, CancellationToken, Task> answer, CancellationToken stop)
+    private static async Task AnswerOneAsync(
+        string endpoint,
+        Func<NamedPipeServerStream, CancellationToken, Task> answer,
+        Action? goneBeforeAccepted,
+        CancellationToken stop)
     {
         await using var pipe = Create(endpoint);
 
         try
         {
             await pipe.WaitForConnectionAsync(stop).ConfigureAwait(false);
+        }
+        catch (IOException ex) when (goneBeforeAccepted is not null && OperatingSystem.IsWindows() && ex.HResult == _goneBeforeAccepted)
+        {
+            goneBeforeAccepted();
+            return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SocketException)
         {
