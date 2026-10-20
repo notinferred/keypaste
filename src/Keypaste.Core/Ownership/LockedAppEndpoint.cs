@@ -12,8 +12,9 @@ namespace Keypaste.Core.Ownership;
 /// <para>
 /// A pipe restricted to the current user, as the approver's is, named from the vault's identity alone, so
 /// <c>KEYPASTE_APPROVER</c> and <c>--approver</c> never move it. A connection is the whole request: nothing
-/// is read from it or written to it, and the app hangs up once it has heard, so a process that reaches it
-/// can at most make the app say that an agent asked (THREATS.md T-11).
+/// is written to it, and nothing sent on it is used, so a process that reaches it can at most make the app
+/// say that an agent asked (THREATS.md T-11). The bridge hangs up as soon as it has connected, and the app
+/// ends a connection still open after 100 ms.
 /// </para>
 /// <para>
 /// Each side refuses a peer running as another user, as on the approver's endpoint (T-10). Another user who
@@ -26,7 +27,7 @@ public sealed class LockedAppEndpoint : IDisposable
     /// <summary>What every locked app endpoint's name starts with.</summary>
     public const string Prefix = "keypaste-locked-";
 
-    private static readonly TimeSpan _connectBound = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan _connectBound = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan _hangUpBound = TimeSpan.FromMilliseconds(100);
 
     private readonly KnockListener _listener;
@@ -35,7 +36,7 @@ public sealed class LockedAppEndpoint : IDisposable
     private LockedAppEndpoint(string name, Action asked, Action<string> unreachable)
     {
         Name = name;
-        _listener = new KnockListener(name, (pipe, _) => Hear(pipe, asked), unreachable);
+        _listener = new KnockListener(name, (pipe, stop) => HearAsync(pipe, asked, stop), unreachable);
     }
 
     /// <summary>The pipe this listens on.</summary>
@@ -81,8 +82,7 @@ public sealed class LockedAppEndpoint : IDisposable
     /// </returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <remarks>
-    /// Connecting is given 100 ms and the app's hang-up 100 ms more; an app slower to hang up was still
-    /// reached. The connection is made on a thread of its own, never the pool, for the reason
+    /// Connecting is given 200 ms, and the bridge hangs up as soon as it has connected. The connection is made on a thread of its own, never the pool, for the reason
     /// <see cref="Ipc.ApproverClient.TryConnectAsync"/> gives (F.9). The pipe is opened at the identification
     /// level, so whoever made it cannot act as this user.
     /// </remarks>
@@ -123,36 +123,38 @@ public sealed class LockedAppEndpoint : IDisposable
             return false;
         }
 
-        using var hungUp = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        hungUp.CancelAfter(_hangUpBound);
-
-        try
-        {
-            _ = pipe.ReadAsync(new byte[1], hungUp.Token).AsTask().GetAwaiter().GetResult();
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or SocketException)
-        {
-            // The app was reached; its hang-up only says that it has heard.
-        }
-
         return true;
     }
 
-    private Task Hear(NamedPipeServerStream pipe, Action asked)
+    private async Task HearAsync(NamedPipeServerStream pipe, Action asked, CancellationToken stop)
     {
         Interlocked.Increment(ref _requests);
         asked();
 
-        // Windows keeps an instance alive while the bridge still holds it, which would refuse the next one as the pipe's first.
+        // The bridge hangs up first: on Windows, ending the connection under it fails the check its runtime
+        // makes after connecting of who made the pipe, and holding it past the bound keeps the next bridge out.
+        using var bound = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        bound.CancelAfter(_hangUpBound);
+        var discarded = new byte[256];
+
+        try
+        {
+            while (await pipe.ReadAsync(discarded, bound.Token).ConfigureAwait(false) > 0)
+            {
+            }
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException or SocketException)
+        {
+            // Still connected at the bound, stopping, or gone.
+        }
+
         try
         {
             pipe.Disconnect();
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
             // The bridge already hung up.
         }
-
-        return Task.CompletedTask;
     }
 }

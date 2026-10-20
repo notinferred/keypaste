@@ -62,7 +62,7 @@ public sealed class LockedAppEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task WhatAPeerSends_IsNeverRead_AndTheNextIsStillHeard()
+    public async Task WhatAPeerSends_IsNeverUsed_AndTheNextIsStillHeard()
     {
         using var heard = new SemaphoreSlim(0);
         using var endpoint = LockedAppEndpoint.Listen(_name, () => heard.Release(), _ => { });
@@ -77,7 +77,7 @@ public sealed class LockedAppEndpointTests : IDisposable
             }
             catch (IOException)
             {
-                // The app hangs up without reading, which can end the write.
+                // The app ends a connection still open at its bound, which can end the write.
             }
         }
 

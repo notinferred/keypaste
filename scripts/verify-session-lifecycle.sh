@@ -38,7 +38,7 @@ readonly SECRET='SENTINEL-LIFECYCLE-PASSWORD-5c20d4'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
-DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR APP_OUT START_OUT'
+DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR APP_OUT START_OUT AUDIT APP_AUDIT'
 require jq
 
 CLI="$(keypaste_bin)"
@@ -286,6 +286,7 @@ listed_by "$AGENT_SESSION" "keypaste agent after the app's refusal"
 APP_HOME="$WORK/app-home"
 mkdir -p "$APP_HOME"
 APP_HOME_NATIVE="$(native "$APP_HOME")"
+APP_AUDIT="$APP_HOME/audit.jsonl"
 printf '[[settings]]\nstay_in_tray = 1\n' >"$APP_HOME/app.toml"
 
 # Starts the app as keypaste-app does, through the driver, with its input held open; sets APP_PID.
