@@ -13,8 +13,8 @@ namespace Keypaste.Core.Ownership;
 /// A pipe restricted to the current user, as the approver's is, named from the vault's identity alone, so
 /// <c>KEYPASTE_APPROVER</c> and <c>--approver</c> never move it. A connection is the whole request: nothing
 /// is written to it, and nothing sent on it is used, so a process that reaches it can at most make the app
-/// say that an agent asked (THREATS.md T-11). The bridge hangs up as soon as it has connected, and the app
-/// ends a connection still open after 100 ms.
+/// say that an agent asked (THREATS.md T-11). The bridge hangs up as soon as it has connected; the app hangs
+/// up at once, or on Windows once the bridge has, ending a connection still open after 100 ms.
 /// </para>
 /// <para>
 /// Each side refuses a peer running as another user, as on the approver's endpoint (T-10). Another user who
@@ -131,8 +131,26 @@ public sealed class LockedAppEndpoint : IDisposable
         Interlocked.Increment(ref _requests);
         asked();
 
-        // The bridge hangs up first: on Windows, ending the connection under it fails the check its runtime
-        // makes after connecting of who made the pipe, and holding it past the bound keeps the next bridge out.
+        // On Windows the bridge hangs up first: ending the connection under it fails its runtime's check of who
+        // made the pipe. Elsewhere the app hangs up at once, since a bridge queued behind a peer that holds on is
+        // dropped when the endpoint is made anew.
+        if (OperatingSystem.IsWindows())
+        {
+            await AwaitHangUpAsync(pipe, stop).ConfigureAwait(false);
+        }
+
+        try
+        {
+            pipe.Disconnect();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            // The bridge already hung up.
+        }
+    }
+
+    private static async Task AwaitHangUpAsync(NamedPipeServerStream pipe, CancellationToken stop)
+    {
         using var bound = CancellationTokenSource.CreateLinkedTokenSource(stop);
         bound.CancelAfter(_hangUpBound);
         var discarded = new byte[256];
@@ -143,18 +161,9 @@ public sealed class LockedAppEndpoint : IDisposable
             {
             }
         }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or SocketException)
+        catch (Exception ex) when (ex is OperationCanceledException or IOException)
         {
             // Still connected at the bound, stopping, or gone.
-        }
-
-        try
-        {
-            pipe.Disconnect();
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
-        {
-            // The bridge already hung up.
         }
     }
 }
