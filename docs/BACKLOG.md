@@ -7,7 +7,7 @@ These are retained feature ideas, not discarded features or promises for the fir
 | Option | Why it is outside the current product tracks / what would justify it | Previous work IDs |
 |---|---|---|
 | Browser save, update and passkeys | Filling a login (8.1, 8.3a) is committed to T6. Saving or updating from a page and passkeys each need their own origin-verification and interoperable design. | 8.2a/b, 8.3b–e, 8.4a/b, 8.5a/b |
-| Desktop Auto-Type and cross-entry references | Adds window matching, platform input and placeholder semantics; choose a demonstrated app workflow first. Same-entry placeholders are P.3b1 in STEPS; `{REF:}` references to another entry (P.3b2) need their own exposure and audit rules. | P.3b2, P.4a/b |
+| Desktop Auto-Type and cross-entry references | Adds window matching, platform input and placeholder semantics; choose a demonstrated app workflow first. Same-entry placeholders fill in since P.3b1; `{REF:}` references to another entry (P.3b2) need their own exposure and audit rules. | P.3b2, P.4a/b |
 | Attachment editing | Preserving attachments does not require an editor; select one for a demonstrated workflow, with size limits and no plaintext temporary files. Custom fields (V.7) and TOTP (9.2a/b) are committed in STEPS. | V.8a/b |
 | Multiple simultaneous vaults and auto-open | Recent-vault selection already exists. Add concurrent sessions only when needed, with separate locks and exposure scopes. | P.2 |
 | Privacy-preserving breach checks | Local password health (V.9) is committed to T6. A remote check is a separate capability with its own privacy design. | P.8 |

@@ -8,16 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 These rows serve every track: a development machine builds nothing, and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-## T4 — Project environments
-
-A variable becomes an env-named custom field on an ordinary entry. The entry's own tag, `env:<project>` or `env:<project>:<environment>`, puts it in that environment (D-0367). Every set still leaves only through `EnvResolution`, whole or not at all (D-0337), and every child starts through `EnvLaunch`.
-
-keypaste keeps no compatibility with its own releases before 0.5.0 (D-0416): an untagged entry under `env/<project>`, the layout 0.3.0 wrote, is an ordinary entry and no variable. The syntax of `-p`, of `kp://<project>/<environment>/<KEY>` and of token scopes is kept.
-
-- [ ] **P.3b1 — Resolve same-entry placeholders in released values.** Needs: C.1b.
-  - `{TITLE}`, `{USERNAME}`, `{PASSWORD}`, `{URL}`, `{NOTES}` and `{S:<field>}` resolve within the entry the person approved, to KeePassXC's depth of 10. So `OPENAI_API_KEY={PASSWORD}` needs no copy.
-  - `{REF:…}` stays refused; it is P.3b2 in BACKLOG.
-
 ## T3 — AI requests in the app
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
