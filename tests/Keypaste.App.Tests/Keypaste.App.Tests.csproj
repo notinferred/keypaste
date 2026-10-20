@@ -23,6 +23,8 @@
   -->
   <ItemGroup>
     <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
+    <!-- Every vault these tests create takes a token Argon2 cost (D-0469). -->
+    <Compile Include="../Keypaste.Core.Tests/CheapKeyDerivation.cs" Link="CheapKeyDerivation.cs" />
     <!-- A project's variables written as env set writes them, for fixtures. -->
     <Compile Include="../Keypaste.Core.Tests/ProjectVariables.cs" Link="ProjectVariables.cs" />
     <!-- The same software YubiKey the core's hardware-key tests prove against KeePassXC's vectors. -->

@@ -8,9 +8,9 @@ namespace Keypaste.Cli.Tests;
 /// The <c>env</c> verb group end to end, through the real dispatch and the real vault.
 /// </summary>
 /// <remarks>
-/// Each vault-touching test pays for Argon2 at 64 MiB twice over — once to create the vault and
-/// once per command that opens it — so assertions are grouped by behaviour rather than split one
-/// per fact. If this class gets slow, cut the number of vault-touching tests, never the KDF.
+/// Each vault-touching test derives a key to create the vault and again per command that opens it, so
+/// assertions are grouped by behaviour rather than split one per fact. The vaults take the token cost of
+/// D-0469; <c>KeyDerivationCostTests</c> holds the production one.
 /// </remarks>
 public sealed class EnvVerbTests
 {

@@ -442,8 +442,14 @@ public sealed class VaultBackupTests : IDisposable
     public void ASaveKilledAtTheBackupBoundary_LeavesTheVaultAndACompleteBackup()
     {
         // The boundary needs no product knob to find: the backup file appearing beside the vault is
-        // the instant between "the bytes are preserved" and "the vault is replaced".
-        var path = SeededVault("before");
+        // the instant between "the bytes are preserved" and "the vault is replaced". That instant lasts
+        // one key derivation, so this vault keeps the production cost.
+        string path;
+        using (TestKeyDerivation.Production())
+        {
+            path = SeededVault("before");
+        }
+
         var bytes = File.ReadAllBytes(path);
 
         var info = new ProcessStartInfo

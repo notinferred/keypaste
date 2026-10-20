@@ -162,6 +162,8 @@ public sealed class SaveTimingTests : IDisposable
     [Fact]
     public void ASaveDoingRealWorkAlone_IsReportedAsWork_NotGateWait()
     {
+        // The work this weighs against the gate is mostly the save's key derivation, so the vault keeps the production cost.
+        using var production = TestKeyDerivation.Production();
         using var vault = SavedVault("work").Vault;
         vault.AddEntry(new VaultEntry { Title = "T", Password = "p" });
 

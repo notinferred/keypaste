@@ -24,6 +24,8 @@
     <Compile Include="../Keypaste.App.Tests/ViewModels/NewItemForm.cs" Link="NewItemForm.cs" />
     <!-- The app suite's throwaway home, named after whichever assembly compiles it. -->
     <Compile Include="../Keypaste.App.Tests/IsolatedHome.cs" Link="IsolatedHome.cs" />
+    <!-- Every vault these tests create takes a token Argon2 cost (D-0469). -->
+    <Compile Include="../Keypaste.Core.Tests/CheapKeyDerivation.cs" Link="CheapKeyDerivation.cs" />
   </ItemGroup>
 
   <!--

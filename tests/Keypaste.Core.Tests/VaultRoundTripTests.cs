@@ -9,9 +9,8 @@ namespace Keypaste.Core.Tests;
 /// test enforces.
 /// </summary>
 /// <remarks>
-/// Argon2 at 64 MiB costs real time per derivation, so these tests create and open vaults
-/// sparingly. If this file ever needs to run faster, reduce the number of open/save cycles —
-/// never the KDF parameters, which are the thing under test.
+/// Each open and save derives a key, so these tests create and open vaults sparingly. The vaults take the
+/// token cost of D-0469; <see cref="KeyDerivationCostTests"/> holds the production parameters.
 /// </remarks>
 public sealed class VaultRoundTripTests : IDisposable
 {

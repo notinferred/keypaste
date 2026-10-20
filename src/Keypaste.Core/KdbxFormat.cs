@@ -7,8 +7,8 @@ namespace Keypaste.Core;
 /// <para>
 /// The Argon2 values here are stated explicitly rather than inherited from the underlying
 /// library's defaults. They happen to agree with KeePass 2.61 today; pinning them means that
-/// if an upstream default ever changes, it surfaces as a failing test rather than as a silent
-/// change to how every vault keypaste writes is protected.
+/// if an upstream default ever changes, it surfaces as a failing test (<c>KeyDerivationCostTests</c>)
+/// rather than as a silent change to how every vault keypaste writes is protected.
 /// </para>
 /// <para>
 /// keypaste implements no cryptography (docs/PRODUCT.md law 3.6). These are configuration, not

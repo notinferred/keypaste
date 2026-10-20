@@ -2396,8 +2396,9 @@ internal sealed class KeePassInterop : IDisposable
         KdfParameters parameters = kdf.GetDefaultParameters();
         kdf.Randomize(parameters);
 
-        parameters.SetUInt64(Argon2Kdf.ParamIterations, KdbxFormat.Argon2Iterations);
-        parameters.SetUInt64(Argon2Kdf.ParamMemory, KdbxFormat.Argon2Memory);
+        bool token = TestKeyDerivation.Applies;
+        parameters.SetUInt64(Argon2Kdf.ParamIterations, token ? TestKeyDerivation.Iterations : KdbxFormat.Argon2Iterations);
+        parameters.SetUInt64(Argon2Kdf.ParamMemory, token ? TestKeyDerivation.Memory : KdbxFormat.Argon2Memory);
         parameters.SetUInt32(Argon2Kdf.ParamParallelism, KdbxFormat.Argon2Parallelism);
         parameters.SetUInt32(Argon2Kdf.ParamVersion, KdbxFormat.Argon2Version);
 

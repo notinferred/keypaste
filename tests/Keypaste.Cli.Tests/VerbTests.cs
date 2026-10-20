@@ -8,9 +8,8 @@ namespace Keypaste.Cli.Tests;
 /// End-to-end coverage of the five verbs, in-process against fakes.
 /// </summary>
 /// <remarks>
-/// Each vault operation costs an Argon2 derivation (~100ms), so these lean on a handful of
-/// seeded vaults rather than one per assertion. If this file ever gets slow, cut the number of
-/// vault-touching cases — never the KDF parameters, which are the thing under test elsewhere.
+/// Each vault operation derives a key, so these lean on a handful of seeded vaults rather than one per
+/// assertion. The vaults take the token cost of D-0469; <c>KeyDerivationCostTests</c> holds the production one.
 /// </remarks>
 public sealed class VerbTests
 {

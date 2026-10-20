@@ -8,8 +8,8 @@ namespace Keypaste.Core.Tests;
 /// 4.5 applies with full force. What it refuses matters at least as much as what it releases.
 /// </summary>
 /// <remarks>
-/// One vault, created once: Argon2 at KDBX4 defaults is deliberately expensive, and a fixture per
-/// test would make this the slowest file in the suite for no extra coverage.
+/// One vault, created once: each creation derives a key, and a fixture per test would add that time for
+/// no extra coverage.
 /// </remarks>
 public sealed class VaultCredentialSourceTests : IDisposable
 {
