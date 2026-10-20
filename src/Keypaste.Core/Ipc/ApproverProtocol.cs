@@ -716,9 +716,10 @@ public static class ApproverProtocol
                 return false;
             }
 
-            reply = (refused
+            var answered = refused
                 ? AttachReply.Refused(Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed, reason)
-                : AttachReply.To(session!)) with { OwnerVersion = ownerVersion };
+                : AttachReply.To(session!);
+            reply = answered with { OwnerVersion = ownerVersion };
 
             return true;
         }
