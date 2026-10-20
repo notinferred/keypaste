@@ -205,6 +205,12 @@ lines_after() { tail -n +"$(($2 + 1))" "$1"; }
 kill_process() {
   if command -v taskkill >/dev/null 2>&1; then
     taskkill //F //PID "$1" >/dev/null 2>&1 || true
+    # Windows frees a killed process's files only once it has exited, so a cleanup's removal waits for that.
+    local _
+    for _ in $(seq 1 50); do
+      tasklist //FI "PID eq $1" //NH 2>/dev/null | grep -qw "$1" || return 0
+      sleep 0.1
+    done
   else
     kill -9 "$1" 2>/dev/null || true
   fi
