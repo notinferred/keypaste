@@ -138,9 +138,10 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
         return false;
     }
 
-    public bool TryRead(EntryName name, string field, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+    public bool TryRead(EntryName name, string field, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure, out string unfilled)
     {
         value = null;
+        unfilled = string.Empty;
 
         if (FailReads)
         {

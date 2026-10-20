@@ -788,6 +788,32 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal("[d] deny  [y] allow  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
     }
 
+    /// <summary>A placeholder a new value plants is named on its own line under the change it follows, by keyword only.</summary>
+    [Fact]
+    public async Task ATerminalsEdit_NamesThePlaceholderItsValuePlants()
+    {
+        var rig = Build("d");
+        var planting = Edit() with
+        {
+            Changes =
+            [
+                Edit().Changes[0],
+                "Its new password holds {REF:…}, which keypaste does not fill in, so it is refused wherever it would leave.",
+            ],
+        };
+
+        await rig.Channel.AskAsync(planting, Token);
+
+        Assert.Contains(
+            string.Join(
+                Environment.NewLine,
+                "  changes  Replaces the password of work/github with the password the terminal sent; the old one stays in its history.",
+                "           Its new password holds {REF:…}, which keypaste does not fill in, so it is refused wherever it would leave.",
+                string.Empty),
+            rig.Stderr.ToString(),
+            StringComparison.Ordinal);
+    }
+
     /// <summary>Enter, a deny key, the credential prompt's allow keys and end of input all write nothing.</summary>
     [Theory]
     [InlineData("")]

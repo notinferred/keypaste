@@ -10,8 +10,8 @@ namespace Keypaste.Core;
 /// <remarks>
 /// Each profile is judged on the keys the file references from it, as the session path judges
 /// them, so an unusable key the file never names refuses nothing. An entry reference is read from the vault as its file
-/// holds it (D-0317), never from a reserved group, and its field must hold something. A refusal
-/// names each variable and its reference, never a value.
+/// holds it (D-0317), never from a reserved group, with its own item's placeholders filled in (D-0465), and its field
+/// must hold something. A literal is never filled in. A refusal names each variable and its reference, never a value.
 /// </remarks>
 public static class EnvReferenceResolution
 {
@@ -68,6 +68,7 @@ public static class EnvReferenceResolution
             group => (IReadOnlyList<string>)[.. group.Select(env => env.Key).Distinct(StringComparer.Ordinal)]);
         List<EnvVariable> variables = [];
         List<EnvSource> sources = [];
+        List<EnvVariable> fills = [];
         List<EnvProblem> problems = [];
         var withheld = false;
         var live = false;
@@ -77,6 +78,7 @@ public static class EnvReferenceResolution
             string? value;
             string? why;
             EnvSource? source = null;
+            IReadOnlyList<string> parts = [];
 
             switch (line.Reference)
             {
@@ -88,6 +90,7 @@ public static class EnvReferenceResolution
                     }
 
                     (value, why) = Pick(set, env);
+                    parts = [.. PartsOf(set, env.Key)];
                     live |= set.RequiresLiveApproval;
 
                     if (set.Sources.FirstOrDefault(candidate => string.Equals(candidate.Key, env.Key, StringComparison.Ordinal)) is { } origin)
@@ -98,7 +101,7 @@ public static class EnvReferenceResolution
                     break;
 
                 case EntryReference entry:
-                    (value, why, var named) = Read(vault, snapshot!.Entries, entry, now);
+                    (value, why, var named, parts) = Read(vault, snapshot!.Entries, entry, now);
 
                     if (named is not null)
                     {
@@ -124,6 +127,7 @@ public static class EnvReferenceResolution
             else
             {
                 variables.Add(new EnvVariable(line.Name, value!));
+                fills.AddRange(parts.Select(part => new EnvVariable(line.Name, part)));
 
                 if (source is not null)
                 {
@@ -144,7 +148,7 @@ public static class EnvReferenceResolution
 
         return problems.Count > 0
             ? EnvResolved.Refused(project, EnvOutcome.Unusable, problems, profile)
-            : EnvResolved.Released(project, variables, profile, sources, live);
+            : EnvResolved.Released(project, variables, profile, sources, live, fills);
     }
 
     /// <summary>What a file makes of a set released for its references: each value under the file's name for it, and each literal.</summary>
@@ -163,6 +167,7 @@ public static class EnvReferenceResolution
         }
 
         List<EnvVariable> variables = [];
+        List<EnvVariable> fills = [];
         List<EnvProblem> problems = [];
 
         foreach (var line in document.Lines)
@@ -177,6 +182,7 @@ public static class EnvReferenceResolution
                 && released.Variables.FirstOrDefault(variable => string.Equals(variable.Key, env.Key, StringComparison.Ordinal)) is { } found)
             {
                 variables.Add(new EnvVariable(line.Name, found.Value));
+                fills.AddRange(PartsOf(released, env.Key).Select(part => new EnvVariable(line.Name, part)));
             }
             else
             {
@@ -191,10 +197,16 @@ public static class EnvReferenceResolution
 
         return problems.Count > 0
             ? EnvResolved.Refused(released.Project, EnvOutcome.Unusable, problems, released.Profile)
-            : EnvResolved.Released(released.Project, variables, released.Profile);
+            : EnvResolved.Released(released.Project, variables, released.Profile, fills: fills);
     }
 
     private const string _missing = "is not in this environment's set";
+
+    private const string _stale = "cannot be read: the vault no longer matches its file";
+
+    /// <summary>Each text a placeholder filled into one variable of a set.</summary>
+    private static IEnumerable<string> PartsOf(EnvResolved set, string key) =>
+        set.Fills.Where(fill => string.Equals(fill.Key, key, StringComparison.Ordinal)).Select(fill => fill.Value);
 
     /// <summary>A value, a reason, or neither when the line is withheld because another line of its profile is refused.</summary>
     private static (string? Value, string? Why) Pick(EnvResolved set, EnvReference env)
@@ -226,25 +238,27 @@ public static class EnvReferenceResolution
             : (null, $"{env.Key} {_missing}");
     }
 
-    private static (string? Value, string? Why, EnvEntry? Entry) Read(Vault vault, IReadOnlyList<EnvEntry> entries, EntryReference reference, DateTimeOffset now)
+    /// <summary>An entry reference's value with its item's placeholders filled in, its entry and each text filled in; or why it cannot be released.</summary>
+    private static (string? Value, string? Why, EnvEntry? Entry, IReadOnlyList<string> Parts) Read(
+        Vault vault, IReadOnlyList<EnvEntry> entries, EntryReference reference, DateTimeOffset now)
     {
         if (ReservedGroups.IsReserved(reference.Entry.GroupPath))
         {
-            return (null, "is in a group keypaste keeps for itself", null);
+            return (null, "is in a group keypaste keeps for itself", null, []);
         }
 
         var matches = entries.Where(entry => entry.Name == reference.Entry).ToList();
 
         if (matches.Count != 1)
         {
-            return (null, matches.Count == 0 ? "names no item" : "names more than one item", null);
+            return (null, matches.Count == 0 ? "names no item" : "names more than one item", null, []);
         }
 
         var found = matches[0].Entry;
 
         if (found.Expires is { } expires && expires <= now)
         {
-            return (null, "expired " + expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture), null);
+            return (null, "expired " + expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture), null, []);
         }
 
         string value;
@@ -256,7 +270,7 @@ public static class EnvReferenceResolution
 
             if (state != SavedRead.Current)
             {
-                return (null, "cannot be read: the vault no longer matches its file", null);
+                return (null, _stale, null, []);
             }
 
             value = custom ?? string.Empty;
@@ -272,6 +286,24 @@ public static class EnvReferenceResolution
             };
         }
 
-        return value.Length == 0 ? (null, $"has an empty {reference.Field}", null) : (value, null, matches[0]);
+        IReadOnlyList<string> parts = [];
+
+        if (KeePassPlaceholders.Holds(value))
+        {
+            if (vault.ReadSavedFill(reference.Entry, value, out var fill) != SavedRead.Current || fill is null)
+            {
+                return (null, _stale, null, []);
+            }
+
+            if (fill.Value is not { } filled)
+            {
+                return (null, fill.Refusal, null, []);
+            }
+
+            value = filled;
+            parts = fill.Parts;
+        }
+
+        return value.Length == 0 ? (null, $"has an empty {reference.Field}", null, []) : (value, null, matches[0], parts);
     }
 }

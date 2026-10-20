@@ -168,6 +168,10 @@ internal sealed class VariableRow(EnvVariable variable)
     /// <summary>The set's values, or null for a set that was not released, so a refusal has no member to carry one in.</summary>
     public static IEnumerable<VariableRow>? Of(EnvResolved set) =>
         set.Outcome == EnvOutcome.Resolved ? set.Variables.Select(variable => new VariableRow(variable)) : null;
+
+    /// <summary>The texts filled into a released set's values (D-0465), or null when none were or the set was not released, so a frame without one is written as before.</summary>
+    public static IEnumerable<VariableRow>? FillsOf(EnvResolved set) =>
+        set.Outcome == EnvOutcome.Resolved && set.Fills.Count > 0 ? set.Fills.Select(fill => new VariableRow(fill)) : null;
 }
 
 internal sealed class AttachedFrame(string kind, string vault, string session)
@@ -286,6 +290,7 @@ internal sealed class RunReplyFrame(RunReply reply)
     public bool Recorded => reply.Recorded;
     public IEnumerable<ProblemRow> Problems => ProblemRow.Of(reply.Set);
     public IEnumerable<VariableRow>? Variables => VariableRow.Of(reply.Set);
+    public IEnumerable<VariableRow>? Fills => VariableRow.FillsOf(reply.Set);
 }
 
 internal sealed class AccessListRequestFrame(AccessListRequest request)

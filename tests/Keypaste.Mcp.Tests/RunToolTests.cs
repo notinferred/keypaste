@@ -95,6 +95,26 @@ public sealed class RunToolTests : IDisposable
         Assert.True(Structured(result).GetProperty("replacements").GetInt32() >= 10);
     }
 
+    /// <summary>A text a placeholder filled into a value is scrubbed wherever it is printed on its own, under that value's name (D-0465).</summary>
+    [Fact]
+    public async Task ATextFilledIntoAValue_ComesBackAsThatValuesMarker()
+    {
+        const string part = "deploy-" + _core;
+        await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce, variables: [("DATABASE_URL", "pre-{S:DEPLOY_KEY}-post"), ("DEPLOY_KEY", part)]);
+        await using var harness = new McpHarness(owner.PipeName, VaultPath);
+        var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
+        var run = Run("--print", part, "--stderr", part);
+        run["keys"] = new[] { "DATABASE_URL" };
+
+        var result = await client.CallToolAsync(ToolText.RunToolName, run, cancellationToken: Token);
+
+        Assert.False(result.IsError, TextOf(result));
+        Assert.Equal(["DATABASE_URL"], Structured(result).GetProperty("injected").EnumerateArray().Select(name => name.GetString()));
+        Assert.Equal("[keypaste:DATABASE_URL]", Structured(result).GetProperty("stdout").GetString()!.Trim());
+        Assert.Equal("[keypaste:DATABASE_URL]", Structured(result).GetProperty("stderr").GetString()!.Trim());
+        AssertNoValue(TextOf(result));
+    }
+
     [Fact]
     public async Task ExitCodeAndBothStreams_ComeBack()
     {
@@ -543,12 +563,18 @@ public sealed class RunToolTests : IDisposable
         private int _asked;
         private int _runs;
 
-        private Owner(RunToolTests test, ApprovalAnswer answer, string? clients)
+        private Owner(RunToolTests test, ApprovalAnswer answer, string? clients, IReadOnlyList<(string Key, string Value)> variables)
         {
             _answer = answer;
             Log = new OwnerLog(Path.Combine(test._directory, "home"));
             _vault = Vault.Create(test.VaultPath, "correct horse battery staple");
             ProjectVariables.Set(_vault, "acme-api", "DATABASE_URL", _value);
+
+            foreach (var (key, value) in variables)
+            {
+                ProjectVariables.Set(_vault, "acme-api", key, value);
+            }
+
             var token = new EntryName("env/acme-api", "TOKEN");
             _vault.AddEntry(new VaultEntry { GroupPath = token.GroupPath, Title = token.Title, Password = "tok-" + _core });
             _vault.SetFields(token, [new FieldWrite("TOKEN", "tok-" + _core)]);
@@ -597,7 +623,9 @@ public sealed class RunToolTests : IDisposable
 
         internal int Runs => Volatile.Read(ref _runs);
 
-        internal static Owner Start(RunToolTests test, ApprovalAnswer answer, string? clients = null) => new(test, answer, clients);
+        /// <summary>Starts an owner of the test's vault, whose <c>acme-api</c> also holds <paramref name="variables"/> as <c>env set</c> writes them.</summary>
+        internal static Owner Start(RunToolTests test, ApprovalAnswer answer, string? clients = null, IReadOnlyList<(string Key, string Value)>? variables = null) =>
+            new(test, answer, clients, variables ?? []);
 
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
         {

@@ -523,6 +523,46 @@ public sealed class EnvExportTests
     }
 
     [Fact]
+    public void Dotenv_WritesEachValueWithItsOwnItemsPlaceholdersFilledIn()
+    {
+        using var harness = Seeded(("API_KEY", "sk_live_secret"), ("DATABASE_URL", "postgres://app:{S:API_KEY}@db/{TITLE}"));
+        var path = Target(harness);
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "export", "billing", path, "--dotenv", "--yes", "--vault", harness.VaultPath));
+
+        Assert.True(DotEnv.TryDecode(File.ReadAllBytes(path), out var text, out var decodeError), decodeError);
+        Assert.True(DotEnv.TryParse(text, out var document));
+        Assert.Equal(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["API_KEY"] = "sk_live_secret",
+                ["DATABASE_URL"] = "postgres://app:sk_live_secret@db/.env",
+            },
+            document.Variables.ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Dotenv_RefusesAValueHoldingAPlaceholderItCannotFillIn_AndWritesNothing()
+    {
+        using var harness = Seeded(("API_KEY", "sk_live_secret"), ("OTP_URL", "otpauth://{TOTP}"));
+        var path = Target(harness);
+        const string said = "keypaste env export: OTP_URL holds the KeePass placeholder {TOTP}, which keypaste does not fill in (env/billing/.env); nothing was written.";
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitInternalError, harness.Run("env", "export", "billing", "--dotenv", "--stdout", "--vault", harness.VaultPath));
+        Assert.Contains(said, harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Out);
+        Assert.Empty(harness.ConsoleStyle.Alarms);
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitInternalError, harness.Run("env", "export", "billing", path, "--dotenv", "--yes", "--vault", harness.VaultPath));
+        Assert.Contains(said, harness.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(path));
+        Assert.DoesNotContain("sk_live_secret", harness.Out + harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Dotenv_WithProfile()
     {
         using var harness = SeededWithTwo();

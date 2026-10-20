@@ -85,7 +85,7 @@ public sealed class TaggedProjectRunTests : IDisposable
     {
         { "two-entries", ["STRIPE_SECRET_KEY is on more than one item (services/Database, services/Stripe)"] },
         { "expired", ["DATABASE_URL expired 2020-01-02 03:04:05Z (services/Database)"] },
-        { "placeholder", ["DATABASE_URL holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Database)"] },
+        { "placeholder", ["DATABASE_URL holds the KeePass placeholder {TOTP}, which keypaste does not fill in (services/Database)"] },
     };
 
     [Theory]
@@ -103,7 +103,7 @@ public sealed class TaggedProjectRunTests : IDisposable
                     vault.SetExpiryUnchecked(new EntryName("services", "Database"), new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
                     break;
                 default:
-                    vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("DATABASE_URL", "postgres://u:{PASSWORD}@db-c1b")]);
+                    vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("DATABASE_URL", "postgres://u:{TOTP}@db-c1b")]);
                     break;
             }
         });
@@ -118,6 +118,18 @@ public sealed class TaggedProjectRunTests : IDisposable
             Assert.Contains(text, _harness.Err, StringComparison.Ordinal);
         }
 
+        Assert.DoesNotContain("-c1b", _harness.Out + _harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_gives_the_child_a_value_with_its_own_entrys_placeholders_filled_in()
+    {
+        Edit(vault => vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("DATABASE_URL", "postgres://u:{PASSWORD}@db-c1b")]));
+
+        _harness.AssertExit(CliApp.ExitSuccess, Run("run", "billing", "--", "node"));
+
+        Assert.Equal("postgres://u:database-login-c1b@db-c1b", _harness.ProcessLauncher.Environment["DATABASE_URL"]);
+        Assert.Equal("stripe-value-c1b", _harness.ProcessLauncher.Environment["STRIPE_SECRET_KEY"]);
         Assert.DoesNotContain("-c1b", _harness.Out + _harness.Err, StringComparison.Ordinal);
     }
 

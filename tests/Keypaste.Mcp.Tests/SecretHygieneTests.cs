@@ -275,6 +275,13 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
+    /// <summary>Writes one more custom field to the entry every sentinel lives in, and saves it.</summary>
+    private void Plant(string field, string value)
+    {
+        Assert.True(_vault!.SetFields(new EntryName("env/dev", "STRIPE_KEY"), [new FieldWrite(field, value)]));
+        _vault.Save();
+    }
+
     /// <summary>
     /// Sweeps every channel that leaves the process for a sentinel, and says which one it found it
     /// in. Both audit logs and the raw transcript are searched as text, because that is what is
@@ -360,6 +367,75 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             foreach (var other in _everySentinel.Where(s => !string.Equals(s, expected, StringComparison.Ordinal)))
             {
                 Assert.DoesNotContain(other, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A value naming its own item's fields brings exactly those, filled in, and no other field of the
+    /// item or the vault, whether a person allowed it or Automatic did; neither log records any of it (D-0465).
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AValueNamingItsOwnFields_BringsThoseFilledIn_AndNoOtherField(bool automatic)
+    {
+        Plant("DATABASE_URL", "postgres://{USERNAME}:{S:OPENAI_API_KEY}@db");
+        _human.Answer = ApprovalAnswer.Approved;
+
+        var (harness, client) = automatic ? await StartAutomaticAsync() : await StartAsync();
+
+        await using (harness)
+        {
+            var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: "DATABASE_URL"), cancellationToken: Token);
+            var text = TextOf(result);
+
+            Assert.False(result.IsError, text);
+            Assert.Contains($"postgres://{SentinelUsername}:{SentinelApiKey}@db", text, StringComparison.Ordinal);
+            Assert.Equal(automatic ? 0 : 1, _human.Asked);
+
+            foreach (var other in _everySentinel.Where(each => each is not (SentinelUsername or SentinelApiKey)))
+            {
+                AssertNowhere(harness, other, text, "a value naming two fields");
+            }
+
+            foreach (var named in new[] { SentinelUsername, SentinelApiKey })
+            {
+                Assert.DoesNotContain(named, _log!.Text() + harness.AuditText, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A value keypaste cannot fill in leaves nothing, not even what filled in before the placeholder that
+    /// refused it, whether a person allowed it or Automatic did. The owner's log names the field and the
+    /// placeholder and never a value (D-0465).
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AValueThatCannotBeFilledIn_LeavesNoValueAnywhere(bool automatic)
+    {
+        Plant("DATABASE_URL", "postgres://{USERNAME}:{PASSWORD}@db/{S:Recovery codes}");
+        _human.Answer = ApprovalAnswer.Approved;
+
+        var (harness, client) = automatic ? await StartAutomaticAsync() : await StartAsync();
+
+        await using (harness)
+        {
+            var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: "DATABASE_URL"), cancellationToken: Token);
+
+            Assert.True(result.IsError);
+
+            var line = Assert.Single(_log!.Lines());
+            Assert.Equal("failed", line.GetProperty("method").GetString());
+            Assert.Equal(
+                "the item's DATABASE_URL holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases",
+                line.GetProperty("reason").GetString());
+
+            foreach (var sentinel in _everySentinel)
+            {
+                AssertNowhere(harness, sentinel, TextOf(result), "a value that cannot be filled in");
             }
         }
     }

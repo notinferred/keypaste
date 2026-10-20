@@ -33,8 +33,9 @@ public sealed record EnvMatrixRow(string Key, IReadOnlyList<EnvCell> Cells);
 /// A project's keys against its profiles, for the Env profiles screen and <c>keypaste env diff</c>.
 /// </summary>
 /// <remarks>
-/// Values are compared while it is built and then dropped: no record here has a member that could
-/// hold one, so a matrix can be bound, logged or printed without that question arising.
+/// Values are compared as they leave keypaste, their placeholders filled in (D-0465), while it is built and
+/// then dropped: no record here has a member that could hold one, so a matrix can be bound, logged or
+/// printed without that question arising.
 /// </remarks>
 /// <param name="Project">The project.</param>
 /// <param name="Profiles">Its environments, as <see cref="ProjectCatalog"/> orders them.</param>
@@ -70,7 +71,7 @@ public sealed record EnvMatrix(string Project, IReadOnlyList<EnvProfileInfo> Pro
 
             foreach (var member in EnvResolution.Members(snapshot, project, profile.Name, out _))
             {
-                values[member.Key] = member.Value;
+                values[member.Key] = EnvResolution.Filled(member) ?? member.Value;
 
                 if (!holders.TryGetValue((profile.Name, member.Key), out var entries))
                 {

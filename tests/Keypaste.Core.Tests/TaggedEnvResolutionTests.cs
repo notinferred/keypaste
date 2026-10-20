@@ -61,7 +61,7 @@ public sealed class TaggedEnvResolutionTests : IDisposable
             Tagged(v, "services", "Twin", ["env:billing"], ("SHARED", "shared-two-value"));
             Tagged(v, "services", "Old", ["env:billing"], ("OLD_KEY", "old-value"));
             v.SetExpiryUnchecked(new EntryName("services", "Old"), _now.AddDays(-1));
-            Tagged(v, "services", "Ref", ["env:billing"], ("REF_KEY", "prefix-{PASSWORD}-suffix"));
+            Tagged(v, "services", "Ref", ["env:billing"], ("REF_KEY", "prefix-{TOTP}-suffix"));
             Tagged(v, "services", "Json", ["env:billing"], ("JSON_KEY", "{\"json\":\"value\"}"));
         });
 
@@ -73,7 +73,7 @@ public sealed class TaggedEnvResolutionTests : IDisposable
         Assert.Equal(
             [
                 ("OLD_KEY", "expired 2026-09-23 12:00:00Z (services/Old)"),
-                ("REF_KEY", "holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Ref)"),
+                ("REF_KEY", "holds the KeePass placeholder {TOTP}, which keypaste does not fill in (services/Ref)"),
                 ("SHARED", "is on more than one item (services/Stripe, services/Twin)"),
             ],
             resolved.Problems.Select(problem => (problem.Key, problem.Reason)));
@@ -124,8 +124,59 @@ public sealed class TaggedEnvResolutionTests : IDisposable
         Assert.Equal([new EnvVariable("STRIPE_KEY", "stripe-value")], subset.Variables);
         Assert.Equal([new EnvSource("STRIPE_KEY", new EntryName("services", "Stripe"), "STRIPE_KEY")], subset.Sources);
         Assert.Equal(
-            "holds the KeePass placeholder {S:…}, which keypaste does not resolve (services/Ref)",
+            "holds the KeePass placeholder {S:…}, which names no field of its item (services/Ref)",
             Assert.Single(EnvResolution.Resolve(vault, "billing", "dev", ["REF_KEY"], _clock).Problems).Reason);
+    }
+
+    [Fact]
+    public void A_value_fills_in_its_own_entrys_fields_and_the_set_carries_each_text_filled_in()
+    {
+        using var vault = Saved(v =>
+        {
+            Tagged(v, "services", "Database", ["env:billing"], ("DATABASE_URL", "postgres://u:{PASSWORD}@{S:DB_HOST}/{title}"), ("DB_HOST", "db-host"));
+            Tagged(v, "services", "Stripe", ["env:billing"], ("STRIPE_KEY", "stripe-value"));
+        });
+
+        var resolved = EnvResolution.Resolve(vault, "billing", _clock);
+
+        Assert.Equal(EnvOutcome.Resolved, resolved.Outcome);
+        Assert.Equal(
+            [
+                new EnvVariable("DATABASE_URL", "postgres://u:password-of-Database@db-host/Database"),
+                new EnvVariable("DB_HOST", "db-host"),
+                new EnvVariable("STRIPE_KEY", "stripe-value"),
+            ],
+            resolved.Variables);
+        Assert.Equal(
+            [
+                new EnvVariable("DATABASE_URL", "password-of-Database"),
+                new EnvVariable("DATABASE_URL", "db-host"),
+                new EnvVariable("DATABASE_URL", "Database"),
+            ],
+            resolved.Fills);
+        Assert.Equal(
+            "postgres://u:{PASSWORD}@{S:DB_HOST}/{title}",
+            Assert.Single(EnvResolution.List(vault, "billing", "dev").Variables, variable => variable.Key == "DATABASE_URL").Value);
+    }
+
+    [Fact]
+    public void A_value_never_fills_in_another_entrys_field()
+    {
+        using var vault = Saved(v =>
+        {
+            Tagged(v, "services", "Stripe", ["env:billing"], ("STRIPE_KEY", "stripe-value"));
+            Tagged(v, "services", "Database", ["env:billing"], ("DATABASE_URL", "{S:STRIPE_KEY}"));
+        });
+
+        var resolved = EnvResolution.Resolve(vault, "billing", _clock);
+
+        Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
+        Assert.Equal(
+            ("DATABASE_URL", "holds the KeePass placeholder {S:…}, which names no field of its item (services/Database)"),
+            (Assert.Single(resolved.Problems).Key, resolved.Problems[0].Reason));
+        Assert.Empty(resolved.Variables);
+        Assert.Empty(resolved.Fills);
+        Assert.DoesNotContain("stripe-value", resolved.Refusal, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -265,22 +316,6 @@ public sealed class TaggedEnvResolutionTests : IDisposable
         Assert.Equal([new EnvSource("STRIPE", new EntryName("services", "Stripe"), "STRIPE_KEY")], resolved.Sources);
         Assert.True(resolved.RequiresLiveApproval);
     }
-
-    [Theory]
-    [InlineData("{PASSWORD}", "{PASSWORD}")]
-    [InlineData("a{password}b", "{PASSWORD}")]
-    [InlineData("{USERNAME}:{URL}", "{USERNAME}")]
-    [InlineData("{S:API Key}", "{S:…}")]
-    [InlineData("{REF:P@I:0123}", "{REF:…}")]
-    [InlineData("{DT_SIMPLE}", "{DT_SIMPLE}")]
-    [InlineData("{t-conv:/x/upper/}", "{T-CONV:…}")]
-    [InlineData("{\"a\":{\"b\":1}}", null)]
-    [InlineData("{}", null)]
-    [InlineData("{PASSWORDS}", null)]
-    [InlineData("${HOME}", null)]
-    [InlineData("{PASSWORD", null)]
-    public void A_placeholder_is_found_by_name_and_other_braces_are_not(string value, string? found) =>
-        Assert.Equal(found, KeePassPlaceholders.Find(value));
 
     private Vault Saved(Action<Vault> build)
     {

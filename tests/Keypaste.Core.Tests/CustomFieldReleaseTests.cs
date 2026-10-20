@@ -16,6 +16,9 @@ public sealed class CustomFieldReleaseTests : IDisposable
     private const string _apiKey = "SENTINEL-C5A-OPENAI-3c4d";
     private const string _recovery = "SENTINEL-C5A-RECOVERY-5e6f";
 
+    private const string _databaseUrl = "postgres://u:{PASSWORD}@db/{S:OPENAI_API_KEY}";
+    private const string _databaseUrlFilled = "postgres://u:" + _password + "@db/" + _apiKey;
+
     private static readonly EntryName _openAi = new("api", "OpenAI");
     private static readonly string[] _everySentinel = [_password, _apiKey, _recovery];
 
@@ -164,16 +167,16 @@ public sealed class CustomFieldReleaseTests : IDisposable
     {
         var source = new VaultCredentialSource(() => _vault);
 
-        Assert.True(source.TryRead(_openAi, "OPENAI_API_KEY", out var released, out var failure), failure.ToString());
+        Assert.True(source.TryRead(_openAi, "OPENAI_API_KEY", out var released, out var failure, out _), failure.ToString());
         using (released)
         {
             Assert.Equal(_apiKey, released.Value.ToString());
         }
 
-        Assert.False(source.TryRead(_openAi, "Recovery codes", out _, out failure));
+        Assert.False(source.TryRead(_openAi, "Recovery codes", out _, out failure, out _));
         Assert.Equal(CredentialFailure.NoSuchField, failure);
 
-        Assert.False(source.TryRead(_openAi, "MISSING_KEY", out _, out failure));
+        Assert.False(source.TryRead(_openAi, "MISSING_KEY", out _, out failure, out _));
         Assert.Equal(CredentialFailure.Empty, failure);
     }
 
@@ -194,7 +197,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
             return _vault;
         });
 
-        var read = source.TryRead(_openAi, "OPENAI_API_KEY", out var released, out var failure);
+        var read = source.TryRead(_openAi, "OPENAI_API_KEY", out var released, out var failure, out _);
         using (released)
         {
             Assert.False(read);
@@ -203,6 +206,92 @@ public sealed class CustomFieldReleaseTests : IDisposable
 
         Assert.Equal(expected, failure);
         Assert.Equal(2, calls);
+    }
+
+    /// <summary>A value naming its own item's fields is released filled in, and a timed grant serves the filled value (D-0465).</summary>
+    [Fact]
+    public async Task AnApprovedRequest_ReleasesTheValueFilledIn_AndItsGrantServesThatValue()
+    {
+        Plant("DATABASE_URL", _databaseUrl);
+        using var approver = new Approver(_vault);
+        approver.Channel.Answer = ApprovalAnswer.Approved;
+
+        var first = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
+        var again = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.Prompt, first.Method);
+        Assert.Equal(_databaseUrlFilled, first.Value);
+        Assert.Equal(AuditMethod.GrantCache, again.Method);
+        Assert.Equal(_databaseUrlFilled, again.Value);
+        Assert.Equal(1, approver.Channel.Asked);
+        Assert.Equal("DATABASE_URL", approver.Channel.LastPrompt!.Field);
+    }
+
+    [Fact]
+    public async Task AnAutomaticRelease_IsFilledIn()
+    {
+        Plant("DATABASE_URL", _databaseUrl);
+        using var approver = new Approver(_vault, ApproverFixture.SeesAll with { Mode = AgentMode.Automatic });
+
+        var released = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.Automatic, released.Method);
+        Assert.Equal(_databaseUrlFilled, released.Value);
+        Assert.Equal(0, approver.Channel.Asked);
+    }
+
+    /// <summary>
+    /// A value naming a field that never leaves is refused after the person allowed it, whatever filled in
+    /// before it, and the reason names the field asked for and the placeholder, never a value (D-0465).
+    /// </summary>
+    [Fact]
+    public async Task AValueNamingAFieldThatNeverLeaves_IsRefusedAfterTheAllow_NamingThePlaceholder()
+    {
+        Plant("DATABASE_URL", "postgres://u:{PASSWORD}@db/{S:Recovery codes}");
+        using var approver = new Approver(_vault);
+        approver.Channel.Answer = ApprovalAnswer.Approved;
+
+        var reply = await approver.Handler.RequestAsync(Request("DATABASE_URL"), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.Failed, reply.Method);
+        Assert.Equal(
+            "the item's DATABASE_URL holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases",
+            reply.Reason);
+        Assert.Null(reply.Value);
+        Assert.Equal(1, approver.Channel.Asked);
+        AssertNoSentinel(reply.Reason);
+    }
+
+    [Theory]
+    [InlineData(false, CredentialFailure.Unsaved)]
+    [InlineData(true, CredentialFailure.ChangedOnDisk)]
+    public void AChangeAfterTheFieldIsReadAndBeforeItIsFilledIn_ReleasesNothing(bool onDisk, CredentialFailure expected)
+    {
+        Plant("DATABASE_URL", _databaseUrl);
+
+        // The source asks for the vault to read the entries, then the custom field, then the fields it names.
+        var calls = 0;
+        var source = new VaultCredentialSource(() =>
+        {
+            if (++calls == 3)
+            {
+                Change(onDisk);
+            }
+
+            return _vault;
+        });
+
+        var read = source.TryRead(_openAi, "DATABASE_URL", out var released, out var failure, out var unfilled);
+        using (released)
+        {
+            Assert.False(read);
+            Assert.Null(released);
+        }
+
+        Assert.Equal(expected, failure);
+        Assert.Empty(unfilled);
+        Assert.Equal(3, calls);
     }
 
     [Fact]
@@ -250,10 +339,36 @@ public sealed class CustomFieldReleaseTests : IDisposable
         }
     }
 
+    /// <summary>A shared custom field is sealed with its own item's placeholders filled in (D-0465).</summary>
+    [Fact]
+    public async Task AShare_SealsTheCustomFieldFilledIn()
+    {
+        using var fixture = new ShareFixture();
+        using var vault = fixture.Open();
+        Assert.True(vault.SetFields(ShareFixture.Stripe, [new FieldWrite("OPENAI_API_KEY", _apiKey), new FieldWrite("DATABASE_URL", _databaseUrl)]));
+        vault.Save();
+
+        var outcome = await fixture.Service().CreateAsync(vault, ShareFixture.Request(field: "DATABASE_URL"), CancellationToken.None);
+
+        Assert.True(outcome.Ok, outcome.Message);
+        Assert.True(ShareLink.TryParse(outcome.Link!, out var id, out var key));
+        Assert.True(ShareCrypto.TryOpen(fixture.Server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out var error), error);
+        var field = Assert.Single(payload.Fields);
+        Assert.Equal(("DATABASE_URL", "postgres://u:" + ShareFixture.StripeValue + "@db/" + _apiKey), (field.Name, field.Value));
+        Assert.DoesNotContain(ShareFixture.StripeValue, fixture.AuditText(), StringComparison.Ordinal);
+        AssertNoSentinel(fixture.AuditText());
+    }
+
     private EnvResolved Resolve(string text)
     {
         _ = EnvReferenceFile.TryParse(Encoding.UTF8.GetBytes(text), out var document);
         return EnvReferenceResolution.Resolve(_vault, document, TimeProvider.System);
+    }
+
+    private void Plant(string field, string value)
+    {
+        Assert.True(_vault.SetFields(_openAi, [new FieldWrite(field, value)]));
+        _vault.Save();
     }
 
     private void Change(bool onDisk)

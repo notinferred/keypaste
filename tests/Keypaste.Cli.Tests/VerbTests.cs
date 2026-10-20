@@ -394,6 +394,55 @@ public sealed class VerbTests
         Assert.DoesNotContain("slashed-secret", harness.Err, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The value leaves with its own item's placeholders filled in, on stdout and on the clipboard alike,
+    /// for the password and for a custom field (D-0465).
+    /// </summary>
+    [Fact]
+    public void Get_FillsInTheItemsOwnPlaceholders_OnStdoutAndTheClipboard()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master);
+        PlantDatabase(harness, "db-{USERNAME}-{s:DB_SUFFIX}");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("get", "web/db", "--vault", harness.VaultPath, "--show"));
+        Assert.Equal("db-dbuser-5d1e-9f2c", harness.Out.TrimEnd(), StringComparer.Ordinal);
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(
+            CliApp.ExitSuccess,
+            harness.Run("get", "web/db", "--field", "DATABASE_URL", "--vault", harness.VaultPath, "--timeout", "0"));
+        Assert.Equal("postgres://dbuser-5d1e:db-dbuser-5d1e-9f2c@db", harness.Clipboard.Content, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// A value keypaste cannot fill in leaves by neither way, after whatever filled in before it; the
+    /// refusal names the field and the placeholder, never a value, and points to what shows it as stored.
+    /// </summary>
+    [Fact]
+    public void Get_AValueThatCannotBeFilledIn_IsRefused_AndPointsToShowReveal()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master);
+        PlantDatabase(harness, "{USERNAME}-{S:Recovery codes}");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitInternalError, harness.Run("get", "web/db", "--vault", harness.VaultPath, "--show"));
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitInternalError, harness.Run("get", "web/db", "--vault", harness.VaultPath));
+
+        Assert.Empty(harness.Out);
+        Assert.Equal(0, harness.Clipboard.SetCount);
+        Assert.Contains(
+            "keypaste get: the password of 'web/db' holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases; keypaste show 'web/db' --reveal shows it as the vault holds it",
+            harness.Err,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("dbuser-5d1e", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("recovery-7b3a", harness.Err, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Get_WrongMasterPassword_ExitsAuthFailed()
     {
@@ -708,6 +757,22 @@ public sealed class VerbTests
     {
         using var vault = Vault.Open(harness.VaultPath, Master);
         vault.AddEntry(new VaultEntry { Title = title, Password = password, GroupPath = groupPath });
+        vault.Save();
+    }
+
+    /// <summary>Adds <c>web/db</c>, whose <c>DATABASE_URL</c> names its username and password.</summary>
+    private static void PlantDatabase(CliHarness harness, string password)
+    {
+        var name = new EntryName("web", "db");
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Username = "dbuser-5d1e", Password = password });
+        Assert.True(vault.SetFields(
+            name,
+            [
+                new FieldWrite("DB_SUFFIX", "9f2c"),
+                new FieldWrite("DATABASE_URL", "postgres://{USERNAME}:{PASSWORD}@db"),
+                new FieldWrite("Recovery codes", "recovery-7b3a"),
+            ]));
         vault.Save();
     }
 

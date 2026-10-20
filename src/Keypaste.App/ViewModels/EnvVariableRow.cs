@@ -66,12 +66,9 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 
     private async Task CopyAsync()
     {
-        if (_owner.Read(this) is not { } value)
+        if (_owner.ReadFilled(this) is { } value)
         {
-            _owner.Report("That value could not be read. The vault may have locked.");
-            return;
+            await _owner.Clipboard.CopyAsync(value, Key).ConfigureAwait(true);
         }
-
-        await _owner.Clipboard.CopyAsync(value, Key).ConfigureAwait(true);
     }
 }

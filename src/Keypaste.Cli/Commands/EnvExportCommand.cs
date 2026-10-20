@@ -21,6 +21,10 @@ namespace Keypaste.Cli.Commands;
 /// beside a clipboard that is otherwise the only way out. It is an escape hatch, and a vault you
 /// cannot leave is a vault nobody should adopt — but it is loud, and it says what it just did.
 /// </para>
+/// <para>
+/// Each value is written as it leaves keypaste, its own item's placeholders filled in, and one keypaste
+/// cannot fill in refuses the whole export (D-0465).
+/// </para>
 /// </remarks>
 internal static class EnvExportCommand
 {
@@ -232,6 +236,18 @@ internal static class EnvExportCommand
         return CliApp.ExitInternalError;
     }
 
+    /// <summary>Refuses a value holding a placeholder keypaste cannot fill in, naming it and its entry, or null when every value fills in (D-0465).</summary>
+    private static int? Unfilled(IReadOnlyList<EnvProblem> unfilled, CliContext context)
+    {
+        if (unfilled.Count == 0)
+        {
+            return null;
+        }
+
+        context.Stderr.WriteLine($"keypaste env export: {EntryNameSanitizer.Sanitize(unfilled[0].Key).Text} {unfilled[0].Reason}; nothing was written.");
+        return CliApp.ExitInternalError;
+    }
+
     private static bool TryRefuseTheVault(string vaultPath, string targetPath, CliContext context, out int exit) =>
         VaultOverwriteGuard.TryRefuse("keypaste env export", vaultPath, targetPath, "a .env", context, out exit);
 
@@ -268,10 +284,13 @@ internal static class EnvExportCommand
         bool assumeYes,
         CliContext context)
     {
-        var listing = EnvResolution.List(vault, project, profile);
+        var listing = EnvResolution.ListFilled(vault, project, profile, out var unfilled);
         var setName = EnvProfileNames.SetName(project, profile);
 
-        if ((Missing(listing.Outcome, project, profile, context) ?? Repeated(listing, context) ?? NamedLikeStandard(listing, context)) is { } refused)
+        if ((Missing(listing.Outcome, project, profile, context)
+            ?? Repeated(listing, context)
+            ?? NamedLikeStandard(listing, context)
+            ?? Unfilled(unfilled, context)) is { } refused)
         {
             return refused;
         }

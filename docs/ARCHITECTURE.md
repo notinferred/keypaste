@@ -44,6 +44,7 @@ On macOS a Run confirmed in the app runs: `App/ViewModels/ProjectLaunchViewModel
 | Project tags: which tags keypaste writes, the `env:<project>[:<environment>]` grammar, the projects a vault holds and what a tag change reaches | `TagRules.cs`, `ProjectTag.cs`, `ProjectCatalog.cs`, `ProjectTagChange.cs` |
 | Profiles, the profile matrix and diffs | `EnvProfileNames.cs` (which profile names resolve and which are protected), `EnvMatrix.cs`, `EnvDiff.cs` |
 | `kp://` references and reference files | `KpReference.cs`, `EnvReferenceFile.cs`, `EnvReferenceResolution.cs` |
+| KeePass placeholders such as `{PASSWORD}`, filled in from a value's own item wherever the value leaves keypaste, and what refuses it (D-0465) | `KeePassPlaceholders.cs`, `PlaceholderFill.cs`; the item's fields are read through `Vault.FillPlaceholders` and `KeePassInterop.ReadPlaceholderFields` |
 | keypaste's own groups in the vault, hidden from every listing | `ReservedGroups.cs` |
 | Scoped tokens and token bundles | `Tokens/` |
 | Share links: sealing, the keypaste.com client and the vault's records | `Sharing/` |

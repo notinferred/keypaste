@@ -77,6 +77,24 @@ public sealed class EnvMatrixTests : IDisposable
     }
 
     [Fact]
+    public void Values_AreComparedAsTheyLeave_WithTheirPlaceholdersFilledIn()
+    {
+        ProjectVariables.Set(_vault, "acme-api", "API_HOST", "api.example");
+        ProjectVariables.Set(_vault, "acme-api", "API_URL", "https://{S:API_HOST}");
+        ProjectVariables.Set(_vault, "acme-api", "staging", "API_URL", "https://api.example");
+        ProjectVariables.Set(_vault, "acme-api", "prod", "API_URL", "https://{S:API_HOST}");
+
+        var matrix = EnvMatrix.Build(_vault, "acme-api", _clock);
+        var api = matrix.Row("API_URL")!;
+
+        Assert.Equal(["staging"], api.Cells[0].SameValueAs);
+        Assert.Equal(["dev"], api.Cells[1].SameValueAs);
+        Assert.Equal(EnvCellState.Unusable, api.Cells[2].State);
+        Assert.Equal("holds the KeePass placeholder {S:…}, which names no field of its item (env/acme-api/.env.prod)", api.Cells[2].Problem);
+        Assert.Contains(new EnvDiffLine("API_URL", EnvDiffKind.SameValue, "dev", "staging"), EnvDiff.Compare(matrix, "dev", "staging"));
+    }
+
+    [Fact]
     public void NoRecordHasAValueMember()
     {
         foreach (var type in new[] { typeof(EnvMatrix), typeof(EnvMatrixRow), typeof(EnvCell), typeof(EnvProfileInfo), typeof(EnvDiffLine) })

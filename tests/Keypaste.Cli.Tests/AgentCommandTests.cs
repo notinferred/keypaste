@@ -379,10 +379,11 @@ public sealed class AgentCommandTests : IDisposable
             return true;
         }
 
-        public bool TryRead(EntryName name, string field, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+        public bool TryRead(EntryName name, string field, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure, out string unfilled)
         {
             value = new ReleasedField(field, "prod-sentinel");
             failure = CredentialFailure.None;
+            unfilled = string.Empty;
             return true;
         }
 

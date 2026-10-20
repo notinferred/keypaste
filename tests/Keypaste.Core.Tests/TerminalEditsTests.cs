@@ -226,6 +226,111 @@ public sealed class TerminalEditsTests : IDisposable
     }
 
     [Fact]
+    public void Add_names_the_placeholders_each_value_plants_right_after_what_it_creates()
+    {
+        var edit = new AddItem(new EntryName("work", "github"), "octo", string.Empty, "{url}", NewSecret.Of(_sentinel + "{USERNAME}{S:Title}"));
+
+        var preview = Check(edit).Preview!;
+
+        AssertNoValue(preview);
+        Assert.Equal(
+            [
+                "Creates work/github with the password the terminal sent, and the username and notes the terminal sent.",
+                "Its new password fills in {USERNAME} and {S:Title} from this item when it leaves.",
+                "Its new notes fill in {URL} from this item when they leave.",
+            ],
+            preview.Changes);
+    }
+
+    [Theory]
+    [InlineData("{REF:P@I:0}", "{REF:…}, which keypaste does not fill in")]
+    [InlineData("{Totp}", "{TOTP}, which keypaste does not fill in")]
+    [InlineData("{password}", "{PASSWORD}, which leads back to itself")]
+    [InlineData("{S:Region}", "{S:Region}, which names a field keypaste never releases")]
+    [InlineData("{S:" + _sentinel + "}", "{S:…}, which names no field of its item")]
+    public void Set_names_the_placeholder_that_refuses_its_new_password_wherever_it_leaves(string planted, string named)
+    {
+        _vault.SetFields(_stripe, [new FieldWrite("Region", "eu")]);
+
+        var preview = Check(new SetPassword(_stripe, NewSecret.Of(_sentinel + planted))).Preview!;
+
+        AssertNoValue(preview);
+        Assert.Equal(
+            [
+                "Replaces the password of api/Stripe with the password the terminal sent; the old one stays in its history.",
+                $"Its new password holds {named}, so it is refused wherever it would leave.",
+            ],
+            preview.Changes);
+    }
+
+    [Fact]
+    public void Set_fields_name_a_field_only_when_the_item_has_it_or_the_edit_writes_it()
+    {
+        _vault.SetFields(_stripe, [new FieldWrite("DEPLOY_KEY", _sentinel)]);
+        var edit = new SetFields(
+            _stripe,
+            [
+                new FieldWrite("API_KEY", "{S:DEPLOY_KEY}"),
+                new FieldWrite("DATABASE_URL", "postgres://u:{S:DB_PASSWORD}@db"),
+                new FieldWrite("DB_PASSWORD", "db"),
+                new FieldWrite("OTHER", "{S:" + _sentinel + "}"),
+            ]);
+
+        var preview = Check(edit).Preview!;
+
+        AssertNoValue(preview);
+        Assert.Equal(
+            [
+                "Sets API_KEY, DATABASE_URL, DB_PASSWORD and OTHER on api/Stripe to values the terminal sent; the item's earlier state stays in its history.",
+                "The new value of API_KEY fills in {S:DEPLOY_KEY} from this item when it leaves.",
+                "The new value of DATABASE_URL fills in {S:DB_PASSWORD} from this item when it leaves.",
+                "The new value of OTHER holds {S:…}, which names no field of its item, so it is refused wherever it would leave.",
+            ],
+            preview.Changes);
+
+        Assert.NotNull(Apply(edit, preview).Done);
+        Assert.Equal("{S:DEPLOY_KEY}", _vault.ReadField(_stripe, "API_KEY"));
+    }
+
+    [Fact]
+    public void Env_set_names_what_its_value_plants_from_the_item_it_is_written_to()
+    {
+        Apply(new TagItem("billing", "dev", "api/Stripe", Tagging: true));
+        var edit = new EnvSetKey("billing", "dev", "DATABASE_URL", "api/Stripe", NewSecret.Of("postgres://u:{PASSWORD}@db-" + _sentinel));
+
+        var preview = Check(edit).Preview!;
+
+        AssertNoValue(preview);
+        Assert.DoesNotContain(preview.Changes, sentence => sentence.Contains("login-password", StringComparison.Ordinal));
+        Assert.Equal(
+            [
+                "Adds DATABASE_URL to billing/dev on api/Stripe with the value the terminal sent.",
+                "The new value of DATABASE_URL fills in {PASSWORD} from this item when it leaves.",
+            ],
+            preview.Changes);
+    }
+
+    [Fact]
+    public void Env_pull_names_what_each_variable_plants_on_its_item()
+    {
+        var text = $"API_URL=https://{{URL}}/{_sentinel}\nDATABASE_URL=postgres://u:{{PASSWORD}}@db\nLINK={{REF:P@I:0}}\nREGION=eu\n";
+
+        var preview = Check(new EnvPullFile("billing", "dev", null, text)).Preview!;
+
+        AssertNoValue(preview);
+        Assert.Equal(
+            [
+                "Imports 4 variables into billing/dev: 4 new, 0 updated, 0 unchanged.",
+                "On env/billing/.env, API_URL fills in {URL} from that item when it leaves.",
+                "On env/billing/.env, DATABASE_URL fills in {PASSWORD} from that item when it leaves.",
+                "On env/billing/.env, LINK holds {REF:…}, which keypaste does not fill in, so it is refused wherever it would leave.",
+                "New on env/billing/.env: API_URL, DATABASE_URL, LINK and REGION.",
+                "Creates env/billing/.env and tags it into billing/dev.",
+            ],
+            preview.Changes);
+    }
+
+    [Fact]
     public void Tagging_twice_is_unchanged_and_untagging_removes_the_tag()
     {
         var tag = new TagItem("billing", "dev", "api/Stripe", Tagging: true);

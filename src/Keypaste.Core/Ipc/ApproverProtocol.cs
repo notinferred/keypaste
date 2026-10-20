@@ -1999,7 +1999,8 @@ public static class ApproverProtocol
     /// <returns><see langword="true"/> when the frame was a well-formed run reply.</returns>
     /// <remarks>
     /// Values are accepted only on a released set, and an undefined method is refused rather than
-    /// guessed at, so a reply that says no never delivers a value alongside.
+    /// guessed at, so a reply that says no never delivers a value alongside. The texts filled into a
+    /// released set's values are optional, and each must be under one of its variables (D-0465).
     /// </remarks>
     public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RunReply? reply)
     {
@@ -2035,16 +2036,22 @@ public static class ApproverProtocol
 
             if (outcome == EnvOutcome.Resolved)
             {
-                if (problems.Count > 0 || !TryPairs(root, "variables", "value", out var variables))
+                if (problems.Count > 0
+                    || !TryPairs(root, "variables", "value", out var variables)
+                    || !TryFills(root, variables, out var fills))
                 {
                     return false;
                 }
 
-                set = EnvResolved.Released(project, [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))], profile);
+                set = EnvResolved.Released(
+                    project,
+                    [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))],
+                    profile,
+                    fills: [.. fills.Select(pair => new EnvVariable(pair.Key, pair.Value))]);
             }
             else
             {
-                if (root.TryGetProperty("variables", out _))
+                if (root.TryGetProperty("variables", out _) || root.TryGetProperty("fills", out _))
                 {
                     return false;
                 }
@@ -2062,6 +2069,22 @@ public static class ApproverProtocol
 
             return true;
         }
+    }
+
+    /// <summary>A released run set's optional <c>fills</c>, none when absent; false when they are malformed or one is under no variable of the set.</summary>
+    private static bool TryFills(
+        JsonElement root,
+        List<KeyValuePair<string, string>> variables,
+        [NotNullWhen(true)] out List<KeyValuePair<string, string>>? fills)
+    {
+        if (!root.TryGetProperty("fills", out _))
+        {
+            fills = [];
+            return true;
+        }
+
+        return TryPairs(root, "fills", "value", out fills)
+            && fills.TrueForAll(fill => variables.Exists(variable => string.Equals(variable.Key, fill.Key, StringComparison.Ordinal)));
     }
 
     private static bool TryPairs(

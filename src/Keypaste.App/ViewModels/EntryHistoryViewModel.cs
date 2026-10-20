@@ -197,7 +197,8 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <remarks>
     /// Re-read and re-checked like a hold, so a list read before an edit elsewhere cannot put a
-    /// different revision's password on the clipboard.
+    /// different revision's password on the clipboard. Its placeholders fill in from that revision's
+    /// own fields, not the item's current ones (D-0465).
     /// </remarks>
     internal async Task Copy(EntryRevisionRow row)
     {
@@ -209,14 +210,17 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (Read(row) is not { Length: > 0 } password)
+        if (Read(row) is not { Length: > 0 } stored)
         {
             _owner.Report(_stale);
             Load();
             return;
         }
 
-        await _clipboard.CopyAsync(password, $"Password from {row.When}").ConfigureAwait(true);
+        if (_owner.Filled(vault => vault.FillPlaceholders(_owner.Name, row.Index, stored), $"The password from {row.When}", "copied") is { } password)
+        {
+            await _clipboard.CopyAsync(password, $"Password from {row.When}").ConfigureAwait(true);
+        }
     }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>

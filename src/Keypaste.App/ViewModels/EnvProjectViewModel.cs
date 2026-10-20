@@ -806,7 +806,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Reads one value out of the open vault, from the entry and field holding it, for a copy or a hold.</summary>
+    /// <summary>Reads one value out of the open vault as it holds it, from the entry and field holding it, for a hold.</summary>
     internal string? Read(EnvVariableRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -827,8 +827,40 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Passes a message up to the screen, which draws the banner.</summary>
-    internal void Report(string? message) => _report(message);
+    /// <summary>
+    /// Reads one value out of the open vault as it leaves keypaste, for a copy: its placeholders filled in
+    /// from its entry's own fields, or why it cannot leave reported (D-0465).
+    /// </summary>
+    /// <returns>The value, or null once what went wrong was reported.</returns>
+    internal string? ReadFilled(EnvVariableRow row)
+    {
+        if (Read(row) is not { } value)
+        {
+            _report("That value could not be read. The vault may have locked.");
+            return null;
+        }
+
+        PlaceholderFill? fill;
+        try
+        {
+            fill = _session.Unlocked?.FillPlaceholders(row.Source.Entry, value);
+        }
+        catch (VaultException e)
+        {
+            _report(e.Message);
+            return null;
+        }
+
+        if (fill?.Value is { } filled)
+        {
+            return filled;
+        }
+
+        _report(fill?.Refusal is { } refusal
+            ? DisplayTextSanitizer.Sanitize($"{row.DisplayKey} {refusal}, so it was not copied.").Text
+            : "That value could not be read. The vault may have locked.");
+        return null;
+    }
 
     /// <summary>Asks to remove a variable.</summary>
     internal void BeginRemove(EnvVariableRow row)

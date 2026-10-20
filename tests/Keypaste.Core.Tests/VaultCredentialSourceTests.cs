@@ -26,6 +26,13 @@ public sealed class VaultCredentialSourceTests : IDisposable
     internal const string SentinelUrl = "https://sentinel-url-c8e2.example";
     internal const string SentinelNotes = "SENTINEL-NOTES-d5f0";
 
+    private const string _databaseUser = "SENTINEL-DB-USER-61c3";
+    private const string _databasePassword = "SENTINEL-DB-PASSWORD-7e21";
+    private const string _databaseRecovery = "SENTINEL-DB-RECOVERY-9a40";
+    private const string _filled = "postgres://" + _databaseUser + ":" + _databasePassword + "@db";
+
+    private static readonly EntryName _database = new("env/dev", "DATABASE");
+
     private readonly string _directory;
     private readonly Vault _vault;
 
@@ -85,9 +92,32 @@ public sealed class VaultCredentialSourceTests : IDisposable
 
     private ReleasedField ReadField(string entryArgument, string field)
     {
-        Assert.True(Source().TryRead(Resolve(entryArgument), field, out var value, out var failure), failure.ToString());
+        Assert.True(Source().TryRead(Resolve(entryArgument), field, out var value, out var failure, out _), failure.ToString());
         Assert.NotNull(value);
         return value;
+    }
+
+    /// <summary>An item whose notes and <c>DB_URL</c> name its password, which names its username and a custom field.</summary>
+    private void PlantDatabase(string password)
+    {
+        _vault.AddEntry(new VaultEntry
+        {
+            GroupPath = _database.GroupPath,
+            Title = _database.Title,
+            Username = _databaseUser,
+            Password = password,
+            Notes = "{Password}",
+        });
+
+        Assert.True(_vault.SetFields(
+            _database,
+            [
+                new FieldWrite("DB_PASSWORD", _databasePassword),
+                new FieldWrite("DB_URL", "{PASSWORD}"),
+                new FieldWrite("Recovery codes", _databaseRecovery),
+            ]));
+
+        _vault.Save();
     }
 
     /// <summary>
@@ -111,10 +141,10 @@ public sealed class VaultCredentialSourceTests : IDisposable
     /// <summary>
     /// Stated as an invariant rather than as four equality checks, because it is the claim
     /// THREATS.md T-8 makes: the other three fields are not merely unselected, they are not
-    /// present in the released object at all.
+    /// present in the released object at all, when the value names none of them (D-0465).
     /// </summary>
     [Fact]
-    public void TheOtherThreeFields_AreNowhereInTheReleasedValue()
+    public void TheOtherThreeFields_AreNowhereInAValueThatNamesNone()
     {
         using var released = ReadField("env/dev/STRIPE_KEY", "password");
 
@@ -177,7 +207,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
         Assert.Null(name);
         Assert.Equal(CredentialFailure.VaultLocked, resolveFailure);
 
-        var released = Locked().TryRead(new EntryName("env/dev", "STRIPE_KEY"), "password", out var value, out var readFailure);
+        var released = Locked().TryRead(new EntryName("env/dev", "STRIPE_KEY"), "password", out var value, out var readFailure, out _);
 
         // The using is what satisfies CA2000. It is also the honest shape: the assertion is that
         // nothing came back, and if that ever fails, whatever did come back still has to be zeroed.
@@ -220,7 +250,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     [InlineData("totp")]
     public void AFieldKeypasteDoesNotRelease_IsRefused(string field)
     {
-        var released = Source().TryRead(new EntryName("env/dev", "STRIPE_KEY"), field, out var value, out var failure);
+        var released = Source().TryRead(new EntryName("env/dev", "STRIPE_KEY"), field, out var value, out var failure, out _);
 
         using (value)
         {
@@ -237,7 +267,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     [Fact]
     public void AnEmptyField_IsRefusedRatherThanReleased()
     {
-        var released = Source().TryRead(new EntryName("env/dev", "BLANK"), "password", out var value, out var failure);
+        var released = Source().TryRead(new EntryName("env/dev", "BLANK"), "password", out var value, out var failure, out _);
 
         using (value)
         {
@@ -258,14 +288,110 @@ public sealed class VaultCredentialSourceTests : IDisposable
         _vault.Save();
 
         Assert.Equal("https://only.example", Read("env/dev/ONLY_URL", "url"), StringComparer.Ordinal);
-        Assert.False(Source().TryRead(new EntryName("env/dev", "ONLY_URL"), "password", out _, out var failure));
+        Assert.False(Source().TryRead(new EntryName("env/dev", "ONLY_URL"), "password", out _, out var failure, out _));
         Assert.Equal(CredentialFailure.Empty, failure);
+    }
+
+    /// <summary>
+    /// A value naming its own item's fields leaves with them filled in, from a standard field, through
+    /// one that names another, and from a custom field, in any case; a field it does not name stays out (D-0465).
+    /// </summary>
+    [Theory]
+    [InlineData("password")]
+    [InlineData("notes")]
+    [InlineData("DB_URL")]
+    public void AValueNamingItsOwnItemsFields_IsReleasedFilledIn(string field)
+    {
+        PlantDatabase("postgres://{username}:{s:DB_PASSWORD}@db");
+
+        Assert.True(Source().TryRead(_database, field, out var released, out var failure, out var unfilled), failure.ToString());
+
+        using (released)
+        {
+            Assert.Equal(_filled, released.Value.ToString(), StringComparer.Ordinal);
+            Assert.Equal(field, released.Field, StringComparer.Ordinal);
+            Assert.Empty(unfilled);
+        }
+    }
+
+    /// <summary>
+    /// Anything keypaste cannot fill in refuses the value whole, after whatever filled in before it, and
+    /// the refusal names the placeholder and never a value (D-0465).
+    /// </summary>
+    [Theory]
+    [InlineData("{USERNAME}:{REF:P@I:0123}", "holds the KeePass placeholder {REF:…}, which keypaste does not fill in")]
+    [InlineData("{S:DB_PASSWORD}{totp}", "holds the KeePass placeholder {TOTP}, which keypaste does not fill in")]
+    [InlineData("{S:Recovery codes}", "holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases")]
+    [InlineData("{S:DB_HOST}", "holds the KeePass placeholder {S:…}, which names no field of its item")]
+    [InlineData("x{PASSWORD}", "holds the KeePass placeholder {PASSWORD}, which leads back to itself")]
+    public void AValueKeypasteCannotFillIn_IsUnfilled_NamingThePlaceholderAndNoValue(string password, string expected)
+    {
+        PlantDatabase(password);
+
+        var released = Source().TryRead(_database, "password", out var value, out var failure, out var unfilled);
+
+        using (value)
+        {
+            Assert.False(released);
+            Assert.Null(value);
+            Assert.Equal(CredentialFailure.Unfilled, failure);
+            Assert.Equal(expected, unfilled, StringComparer.Ordinal);
+        }
+
+        foreach (var sentinel in new[] { _databaseUser, _databasePassword, _databaseRecovery })
+        {
+            Assert.DoesNotContain(sentinel, unfilled, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>A field that is empty fills in as empty, and a value that fills in as empty is refused like any empty field.</summary>
+    [Fact]
+    public void AValueThatFillsInAsEmpty_IsRefusedAsEmpty()
+    {
+        PlantDatabase("{URL}");
+
+        var released = Source().TryRead(_database, "password", out var value, out var failure, out var unfilled);
+
+        using (value)
+        {
+            Assert.False(released);
+            Assert.Equal(CredentialFailure.Empty, failure);
+            Assert.Empty(unfilled);
+        }
+    }
+
+    /// <summary>The saved file is read again only for a value holding a placeholder, and nothing is read with no vault unlocked.</summary>
+    [Fact]
+    public void AVaultLockedBeforeTheFillIsRead_ReleasesNothing()
+    {
+        PlantDatabase("{S:DB_PASSWORD}");
+        var calls = 0;
+        var source = new VaultCredentialSource(() => ++calls == 1 ? _vault : null);
+
+        var released = source.TryRead(_database, "password", out var value, out var failure, out _);
+
+        using (value)
+        {
+            Assert.False(released);
+            Assert.Null(value);
+            Assert.Equal(CredentialFailure.VaultLocked, failure);
+            Assert.Equal(2, calls);
+        }
+
+        calls = 0;
+        Assert.True(source.TryRead(new EntryName("env/dev", "STRIPE_KEY"), "password", out value, out failure, out _), failure.ToString());
+
+        using (value)
+        {
+            Assert.Equal(SentinelPassword, value.Value.ToString(), StringComparer.Ordinal);
+            Assert.Equal(1, calls);
+        }
     }
 
     [Fact]
     public void ReadingAnEntryThatIsNoLongerThere_IsNotFound()
     {
-        var released = Source().TryRead(new EntryName("env/dev", "VANISHED"), "password", out var value, out var failure);
+        var released = Source().TryRead(new EntryName("env/dev", "VANISHED"), "password", out var value, out var failure, out _);
 
         using (value)
         {
@@ -296,7 +422,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     {
         Assert.Throws<ArgumentNullException>(() => new VaultCredentialSource(null!));
         Assert.Throws<ArgumentNullException>(() => Source().TryResolve(null!, out _, out _));
-        Assert.Throws<ArgumentNullException>(() => Source().TryRead(null!, "password", out _, out _));
-        Assert.Throws<ArgumentNullException>(() => Source().TryRead(new EntryName("a", "b"), null!, out _, out _));
+        Assert.Throws<ArgumentNullException>(() => Source().TryRead(null!, "password", out _, out _, out _));
+        Assert.Throws<ArgumentNullException>(() => Source().TryRead(new EntryName("a", "b"), null!, out _, out _, out _));
     }
 }

@@ -494,6 +494,50 @@ public sealed class Vault : IDisposable
         return _interop.ReadCustomField(name, field);
     }
 
+    /// <summary>Fills in the KeePass placeholders a value of one item holds from that item's own fields, as this vault holds it now, saved or not (D-0465).</summary>
+    /// <param name="name">The item the value belongs to.</param>
+    /// <param name="value">The value as the vault holds it.</param>
+    /// <returns>
+    /// The value as it leaves keypaste, or why it cannot leave; null when it holds a placeholder and no item
+    /// answers to that name. A value holding none comes back as it is, and nothing is read.
+    /// </returns>
+    /// <remarks>What is shown or edited stays the stored text; only what leaves is filled in.</remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public PlaceholderFill? FillPlaceholders(EntryName name, string value)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(value);
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return Filled(value, () => _interop.ReadPlaceholderFields(name));
+        }
+    }
+
+    /// <summary><see cref="FillPlaceholders(EntryName, string)"/> for a value of one of the item's revisions, from that revision's own fields.</summary>
+    /// <param name="name">The item the revision belongs to.</param>
+    /// <param name="revision">The revision's position in <see cref="ReadHistory"/>'s order.</param>
+    /// <param name="value">The value as the revision holds it.</param>
+    /// <returns>
+    /// The value as it leaves keypaste, or why it cannot leave; null when it holds a placeholder and the item has
+    /// no revision at that position. A value holding none comes back as it is, and nothing is read.
+    /// </returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public PlaceholderFill? FillPlaceholders(EntryName name, int revision, string value)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(value);
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return Filled(value, () => _interop.ReadPlaceholderFields(name, revision));
+        }
+    }
+
     /// <summary>Sets one or several custom fields of one entry as a single edit. Call <see cref="Save"/> to persist it.</summary>
     /// <param name="name">The entry.</param>
     /// <param name="writes">The fields to write, each named once.</param>
@@ -845,6 +889,47 @@ public sealed class Vault : IDisposable
             value = _interop.ReadCustomField(name, field);
             return SavedRead.Current;
         }
+    }
+
+    /// <summary><see cref="FillPlaceholders(EntryName, string)"/>, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="name">The item the value belongs to.</param>
+    /// <param name="value">The value as the vault holds it.</param>
+    /// <param name="fill">
+    /// When the answer is <see cref="SavedRead.Current"/>, the value as it leaves keypaste or why it cannot leave,
+    /// or null when it holds a placeholder and no item answers to that name; otherwise null.
+    /// </param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal SavedRead ReadSavedFill(EntryName name, string value, out PlaceholderFill? fill)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(value);
+
+        fill = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            fill = Filled(value, () => _interop.ReadPlaceholderFields(name));
+            return SavedRead.Current;
+        }
+    }
+
+    private static PlaceholderFill? Filled(string value, Func<PlaceholderFields?> read)
+    {
+        if (!KeePassPlaceholders.Holds(value))
+        {
+            return PlaceholderFill.Filled(value, []);
+        }
+
+        return read() is { } fields ? KeePassPlaceholders.Fill(value, () => fields) : null;
     }
 
     /// <summary>Each entry directly in one of keypaste's own groups, with one of its string fields, but only while this vault holds exactly what its file holds.</summary>

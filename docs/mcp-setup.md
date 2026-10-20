@@ -326,7 +326,7 @@ For protocol errors, inspect wrappers and shell profiles for text written to std
 
 Can the agent see my passwords? Each successful request returns one field of one entry under a human approval, its still-live cached grant, or, in source, the agent's Automatic mode, which you confirmed. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste mcp` holds no vault, but it does receive and forward the released value.
 
-Can it see my entry names? Only the ones it can see, the least of its settings and `--expose`, which both default to `tag:env:*`, the entries tagged into a project, and only while the app or `keypaste agent` holds its vault unlocked. Through a tag it reaches only an entry's project variables, never its password; a pattern naming a group, such as `--expose 'services/**'`, reaches whole entries.
+Can it see my entry names? Only the ones it can see, the least of its settings and `--expose`, which both default to `tag:env:*`, the entries tagged into a project, and only while the app or `keypaste agent` holds its vault unlocked. Through a tag it reaches only an entry's project variables, never its password field, though a variable whose value holds a placeholder such as `{PASSWORD}` carries that field filled in (D-0465); a pattern naming a group, such as `--expose 'services/**'`, reaches whole entries.
 
 Can it change my vault? The current MCP surface only lists names and requests values; it cannot add, edit or delete entries. Desktop and CLI editing are separate workflows.
 

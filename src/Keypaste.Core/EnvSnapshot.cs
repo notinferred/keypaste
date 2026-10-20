@@ -12,6 +12,12 @@ internal sealed record EnvEntry(VaultEntry Entry, IReadOnlyList<string> Tags, IR
     /// <summary>The entry's name.</summary>
     public EntryName Name => EntryName.Of(Entry);
 
+    /// <summary>The name of each of its custom fields in ordinal order, read only when a project tag names the entry; no value.</summary>
+    public IReadOnlyList<string> FieldNames { get; init; } = [];
+
+    /// <summary>What a placeholder in one of its values may fill in from.</summary>
+    internal PlaceholderFields Placeholders => PlaceholderFields.Of(Entry, Fields, FieldNames);
+
     /// <summary>Whether one of its own tags puts it in a project's environment.</summary>
     /// <param name="project">The project.</param>
     /// <param name="environment">The environment.</param>

@@ -38,12 +38,17 @@ public interface ICredentialSource
         [NotNullWhen(true)] out EntryName? name,
         out CredentialFailure failure);
 
-    /// <summary>Reads one field of one entry.</summary>
+    /// <summary>Reads one field of one entry, with the entry's own placeholders filled in (D-0465).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
     /// <param name="field">Which field, lower-case and exactly as the tool schema spells it.</param>
     /// <param name="value">The released field, when one could be read.</param>
     /// <param name="failure">Why not, when none could.</param>
-    /// <returns><see langword="true"/> when the field was read and is not empty.</returns>
+    /// <param name="unfilled">
+    /// On <see cref="CredentialFailure.Unfilled"/>, why the value cannot leave, naming the placeholder and
+    /// never a value, such as <c>holds the KeePass placeholder {REF:…}, which keypaste does not fill in</c>;
+    /// otherwise empty.
+    /// </param>
+    /// <returns><see langword="true"/> when the field was read and filled in, and is not empty.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="field"/> is null.</exception>
     /// <remarks>
     /// Call this only after a human has approved the request, or after a live grant has been found.
@@ -53,7 +58,8 @@ public interface ICredentialSource
         EntryName name,
         string field,
         [NotNullWhen(true)] out ReleasedField? value,
-        out CredentialFailure failure);
+        out CredentialFailure failure,
+        out string unfilled);
 
     /// <summary>Whether a release of this entry is asked about live every time, with no grant and no rule (D-0348).</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>

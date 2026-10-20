@@ -45,6 +45,23 @@ public sealed class TerminalEditWindowTests
         });
 
     [Fact]
+    public Task TheWindow_NamesThePlaceholderAValuePlants_UnderTheChange() =>
+        HeadlessSession.On(async () =>
+        {
+            const string sets = "Sets DATABASE_URL on work/github to values the terminal sent; the item's earlier state stays in its history.";
+            const string fills = "The new value of DATABASE_URL fills in {PASSWORD} from this item when it leaves.";
+
+            var screen = new Screen();
+            var asking = screen.Ask(Prompt("work/github", [sets, fills]));
+            var window = await screen.ShownAsync();
+
+            Assert.Equal([sets, fills], Changes(window));
+
+            Click(window, "Deny");
+            Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
+        });
+
+    [Fact]
     public Task Allow_AllowsOnlyOnceTheWindowHasBeenUpAMoment() =>
         HeadlessSession.On(async () =>
         {

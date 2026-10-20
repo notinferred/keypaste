@@ -122,7 +122,12 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return Refused(matches.Count == 0 ? $"no item '{what}'" : $"more than one item is called '{what}'");
         }
 
-        var fields = Select(vault, matches[0], request.Field);
+        var fields = Select(vault, matches[0], request.Field, out var unfilled);
+        if (unfilled is { } refusal)
+        {
+            return Refused($"the {refusal.Field} of '{what}' {refusal.Reason}");
+        }
+
         if (fields is null)
         {
             return Refused("the vault changed on disk since it was opened; open it again first");
@@ -316,29 +321,66 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             : $"a recipient label has at most {MaximumRecipientLength} characters";
     }
 
-    /// <summary>The fields to seal, each under its name, or null when a custom field's saved read found the vault changed.</summary>
-    private static List<ShareField>? Select(Vault vault, VaultEntry entry, string field)
+    /// <summary>
+    /// The fields to seal, each under its name with its own entry's placeholders filled in (D-0465), or null
+    /// when a saved read found the vault changed or a field could not be filled in, which <paramref name="unfilled"/> then names.
+    /// </summary>
+    private static List<ShareField>? Select(Vault vault, VaultEntry entry, string field, out (string Field, string Reason)? unfilled)
     {
+        unfilled = null;
+        var name = EntryName.Of(entry);
+        (string Name, string Value)[] chosen;
+
         if (CredentialFields.IsCustom(field))
         {
-            if (vault.ReadSavedField(EntryName.Of(entry), field, out var custom) != SavedRead.Current)
+            if (vault.ReadSavedField(name, field, out var custom) != SavedRead.Current)
             {
                 return null;
             }
 
-            return custom is { Length: > 0 } ? [new ShareField(field, custom)] : [];
+            chosen = [(field, custom ?? string.Empty)];
+        }
+        else
+        {
+            chosen = field switch
+            {
+                "login" => [("username", entry.Username), ("password", entry.Password), ("url", entry.Url)],
+                "username" => [("username", entry.Username)],
+                "url" => [("url", entry.Url)],
+                "notes" => [("notes", entry.Notes)],
+                _ => [("password", entry.Password)],
+            };
         }
 
-        (string Name, string Value)[] chosen = field switch
-        {
-            "login" => [("username", entry.Username), ("password", entry.Password), ("url", entry.Url)],
-            "username" => [("username", entry.Username)],
-            "url" => [("url", entry.Url)],
-            "notes" => [("notes", entry.Notes)],
-            _ => [("password", entry.Password)],
-        };
+        List<ShareField> fields = [];
 
-        return [.. chosen.Where(pair => pair.Value.Length > 0).Select(pair => new ShareField(pair.Name, pair.Value))];
+        foreach (var (shown, stored) in chosen)
+        {
+            var value = stored;
+
+            if (KeePassPlaceholders.Holds(stored))
+            {
+                if (vault.ReadSavedFill(name, stored, out var fill) != SavedRead.Current || fill is null)
+                {
+                    return null;
+                }
+
+                if (fill.Value is not { } filled)
+                {
+                    unfilled = (shown, fill.Refusal ?? string.Empty);
+                    return null;
+                }
+
+                value = filled;
+            }
+
+            if (value.Length > 0)
+            {
+                fields.Add(new ShareField(shown, value));
+            }
+        }
+
+        return fields;
     }
 
     private static string Path(EntryName name) => name.GroupPath.Length == 0 ? name.Title : name.GroupPath + "/" + name.Title;

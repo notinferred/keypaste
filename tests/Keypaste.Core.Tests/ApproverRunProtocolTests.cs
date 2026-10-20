@@ -72,12 +72,30 @@ public sealed class ApproverRunProtocolTests
             Session = "session-one",
         };
 
-        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out RunReply? decoded));
+        var frame = ApproverProtocol.Encode(reply);
+
+        Assert.True(ApproverProtocol.TryDecode(frame, out RunReply? decoded));
         Assert.Equal(EnvOutcome.Resolved, decoded.Set.Outcome);
         Assert.Equal(_sentinel, Assert.Single(decoded.Set.Variables).Value);
         Assert.Equal(900, decoded.GrantedSeconds);
         Assert.Equal(reply.Entries, decoded.Entries);
         Assert.Equal(AuditMethod.Prompt, decoded.Method);
+        Assert.Empty(decoded.Set.Fills);
+        Assert.DoesNotContain("\"fills\"", Encoding.UTF8.GetString(frame), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AReleasedReply_CarriesWhatWasFilledIntoItsValues()
+    {
+        var set = EnvResolved.Released(
+            "acme-api",
+            [new EnvVariable("DATABASE_URL", "postgres://u:" + _sentinel + "@db"), new EnvVariable("PORT", "5432")],
+            "staging",
+            fills: [new EnvVariable("DATABASE_URL", _sentinel)]);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(new RunReply(set, AuditMethod.Prompt, "ok")), out RunReply? decoded));
+        Assert.Equal([new EnvVariable("DATABASE_URL", _sentinel)], decoded.Set.Fills);
+        Assert.DoesNotContain(_sentinel, decoded.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -86,6 +104,22 @@ public sealed class ApproverRunProtocolTests
         const string frame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"granted_seconds":0,"entries":[],"problems":[],"variables":[{"key":"A","value":"leaked"}]}""";
 
         Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out RunReply? _));
+    }
+
+    [Fact]
+    public void FillsOnARefusalOrUnderAnotherVariable_AreRejected()
+    {
+        const string released = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":0,"reason":"ok","method":5,"granted_seconds":0,"entries":[],"problems":[],"variables":[{"key":"A","value":"pre-x-post"}]""";
+        const string refused = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"granted_seconds":0,"entries":[],"problems":[]""";
+
+        Assert.True(Decodes(released + "}"));
+        Assert.True(Decodes(released + ""","fills":[{"key":"A","value":"x"}]}"""));
+        Assert.False(Decodes(released + ""","fills":[{"key":"B","value":"x"}]}"""));
+        Assert.False(Decodes(released + ""","fills":{"key":"A","value":"x"}}"""));
+        Assert.True(Decodes(refused + "}"));
+        Assert.False(Decodes(refused + ""","fills":[{"key":"A","value":"leaked"}]}"""));
+
+        static bool Decodes(string frame) => ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out RunReply? _);
     }
 
     [Fact]

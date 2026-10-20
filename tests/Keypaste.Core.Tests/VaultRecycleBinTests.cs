@@ -297,7 +297,7 @@ public sealed class VaultRecycleBinTests : IDisposable
         Assert.False(source.TryResolve("env/billing/TOKEN", out _, out var resolveFailure));
         Assert.Equal(CredentialFailure.NotFound, resolveFailure);
 
-        Assert.False(source.TryRead(_token, "password", out _, out var readFailure));
+        Assert.False(source.TryRead(_token, "password", out _, out var readFailure, out _));
         Assert.Equal(CredentialFailure.NotFound, readFailure);
     }
 

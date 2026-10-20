@@ -10,6 +10,8 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 public sealed class ShareServiceTests : IDisposable
 {
+    private const string _branch = "branch-0427-a5c1";
+
     private readonly ShareFixture _fixture = new();
 
     public void Dispose() => _fixture.Dispose();
@@ -18,6 +20,23 @@ public sealed class ShareServiceTests : IDisposable
     {
         using var vault = _fixture.Open();
         return new ShareStore(vault).List().Count;
+    }
+
+    /// <summary>A saved login whose username names its title, whose password names its username and a custom field, and whose URL is given.</summary>
+    private static EntryName PlantJoint(Vault vault, string url)
+    {
+        var joint = new EntryName("Banking", "Joint");
+        vault.AddEntry(new VaultEntry
+        {
+            GroupPath = joint.GroupPath,
+            Title = joint.Title,
+            Username = "{TITLE}-owner",
+            Password = "pw-{USERNAME}-{S:BRANCH}",
+            Url = url,
+        });
+        Assert.True(vault.SetFields(joint, [new FieldWrite("BRANCH", _branch)]));
+        vault.Save();
+        return joint;
     }
 
     /// <summary>The rules a front end checks its flags against are the ones a request is refused by (F.55).</summary>
@@ -242,6 +261,44 @@ public sealed class ShareServiceTests : IDisposable
         Assert.False(outcome.Ok);
         Assert.Contains("has no notes", outcome.Message, StringComparison.Ordinal);
         Assert.Empty(_fixture.Server.Requests);
+    }
+
+    /// <summary>Each field of a login is sealed with its own item's placeholders filled in, and the audit line carries none of them (D-0465).</summary>
+    [Fact]
+    public async Task Create_FillsInEachFieldsPlaceholders()
+    {
+        using var vault = _fixture.Open();
+        var joint = PlantJoint(vault, "https://bank.example/{S:BRANCH}");
+
+        var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(joint, "login"), CancellationToken.None);
+
+        Assert.True(outcome.Ok, outcome.Message);
+        Assert.True(ShareLink.TryParse(outcome.Link!, out var id, out var key));
+        Assert.True(ShareCrypto.TryOpen(_fixture.Server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out var error), error);
+        Assert.Equal(
+            [("username", "Joint-owner"), ("password", "pw-Joint-owner-" + _branch), ("url", "https://bank.example/" + _branch)],
+            payload.Fields.Select(field => (field.Name, field.Value)));
+        Assert.DoesNotContain(_branch, _fixture.AuditText(), StringComparison.Ordinal);
+    }
+
+    /// <summary>One field that cannot be filled in refuses the whole share before anything is sent, naming the field and the placeholder and no value.</summary>
+    [Fact]
+    public async Task Create_AFieldThatCannotBeFilledIn_RefusesTheWholeShare()
+    {
+        using var vault = _fixture.Open();
+        var joint = PlantJoint(vault, "https://bank.example/{REF:A@I:0123}");
+
+        var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(joint, "login"), CancellationToken.None);
+
+        Assert.False(outcome.Ok);
+        Assert.Equal(ShareFailure.Refused, outcome.Failure);
+        Assert.Equal(
+            "the url of 'Banking/Joint' holds the KeePass placeholder {REF:…}, which keypaste does not fill in",
+            outcome.Message);
+        Assert.Null(outcome.Link);
+        Assert.Empty(_fixture.Server.Requests);
+        Assert.Equal(0, ShareRecordsOnDisk());
+        Assert.Equal(string.Empty, _fixture.AuditText());
     }
 
     [Fact]

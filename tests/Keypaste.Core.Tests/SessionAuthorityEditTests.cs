@@ -112,6 +112,28 @@ public sealed class SessionAuthorityEditTests : IDisposable
     }
 
     [Fact]
+    public async Task APlaceholderTheValuePlants_IsNamedInThePrompt_AndNoValueIsShownOrRecorded()
+    {
+        _fixture.Channel.EditAnswer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+        var stored = "postgres://u:{PASSWORD}@db-" + _sentinel;
+
+        var reply = await client.EditAsync(Edit(new SetFields(_github, [new FieldWrite("DATABASE_URL", stored)])), Token);
+
+        Assert.Equal(EditOutcome.FieldsSet, reply!.Done!.Outcome);
+        Assert.Equal(stored, _vault.ReadField(_github, "DATABASE_URL"));
+
+        var prompt = _fixture.Channel.LastEditPrompt!;
+        Assert.Equal("The new value of DATABASE_URL fills in {PASSWORD} from this item when it leaves.", prompt.Changes[1]);
+        Assert.DoesNotContain(prompt.Changes, sentence => sentence.Contains(_sentinel, StringComparison.Ordinal) || sentence.Contains("old-password", StringComparison.Ordinal));
+
+        Assert.Equal(AuditTools.Edit, Assert.Single(_log.Lines()).GetProperty("tool").GetString());
+        Assert.DoesNotContain(_sentinel, _log.Text(), StringComparison.Ordinal);
+        Assert.DoesNotContain("old-password", _log.Text(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ADeniedEdit_WritesNothing_AndHoldsBackEveryRequestForMore()
     {
         await using var owner = Owner.Start(this);

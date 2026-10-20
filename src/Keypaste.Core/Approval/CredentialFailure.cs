@@ -47,4 +47,10 @@ public enum CredentialFailure
 
     /// <summary>The open vault holds a change no save has written yet, or is being written.</summary>
     Unsaved = 8,
+
+    /// <summary>
+    /// The field holds a KeePass placeholder keypaste does not fill in, or one naming a field it cannot
+    /// read, so the value cannot leave whole (D-0465).
+    /// </summary>
+    Unfilled = 9,
 }

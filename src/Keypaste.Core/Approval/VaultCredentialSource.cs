@@ -130,12 +130,14 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         EntryName name,
         string field,
         [NotNullWhen(true)] out ReleasedField? value,
-        out CredentialFailure failure)
+        out CredentialFailure failure,
+        out string unfilled)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(field);
 
         value = null;
+        unfilled = string.Empty;
 
         if (!CredentialFields.IsReleasable(field))
         {
@@ -162,7 +164,8 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
             return false;
         }
 
-        if (!TrySelect(entry, name, field, out var text, out failure))
+        if (!TrySelect(entry, name, field, out var stored, out failure)
+            || !TryFill(name, stored, out var text, out failure, out unfilled))
         {
             return false;
         }
@@ -224,6 +227,52 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         }
 
         return failure == CredentialFailure.None;
+    }
+
+    /// <summary>The field's text with its own entry's placeholders filled in from the saved file, read only when it holds one (D-0465).</summary>
+    private bool TryFill(EntryName name, string stored, out string text, out CredentialFailure failure, out string unfilled)
+    {
+        text = stored;
+        failure = CredentialFailure.None;
+        unfilled = string.Empty;
+
+        if (!KeePassPlaceholders.Holds(stored))
+        {
+            return true;
+        }
+
+        if (_unlockedVault() is not { } vault)
+        {
+            failure = CredentialFailure.VaultLocked;
+            return false;
+        }
+
+        PlaceholderFill? fill = null;
+
+        try
+        {
+            failure = Failure(vault.ReadSavedFill(name, stored, out fill));
+        }
+        catch (Exception)
+        {
+            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 3.7).
+            failure = CredentialFailure.Failed;
+        }
+
+        if (failure != CredentialFailure.None)
+        {
+            return false;
+        }
+
+        if (fill?.Value is not { } filled)
+        {
+            failure = fill is null ? CredentialFailure.NotFound : CredentialFailure.Unfilled;
+            unfilled = fill?.Refusal ?? string.Empty;
+            return false;
+        }
+
+        text = filled;
+        return true;
     }
 
     /// <summary>The one entry matching a predicate, or null with the reason there is not exactly one.</summary>

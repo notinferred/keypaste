@@ -97,7 +97,8 @@ public sealed class EnvResolved
         IReadOnlyList<EnvVariable> variables,
         IReadOnlyList<EnvProblem> problems,
         IReadOnlyList<EnvSource> sources,
-        bool requiresLiveApproval)
+        bool requiresLiveApproval,
+        IReadOnlyList<EnvVariable> fills)
     {
         Project = project;
         Profile = profile;
@@ -106,6 +107,7 @@ public sealed class EnvResolved
         Problems = problems;
         Sources = sources;
         RequiresLiveApproval = requiresLiveApproval;
+        Fills = fills;
     }
 
     /// <summary>The project resolved.</summary>
@@ -128,6 +130,12 @@ public sealed class EnvResolved
 
     /// <summary>Whether a source entry belongs to a protected environment by any of its own tags (D-0348, D-0371).</summary>
     public bool RequiresLiveApproval { get; }
+
+    /// <summary>
+    /// Each text a placeholder filled into a value of <see cref="Variables"/>, under that variable's name, so what a
+    /// run prints can be scrubbed of it (D-0465); empty when nothing was filled in or the set was not released.
+    /// </summary>
+    public IReadOnlyList<EnvVariable> Fills { get; }
 
     /// <summary>The source entries, each once, in the order their first variable comes out.</summary>
     public IReadOnlyList<EntryName> Entries => [.. Sources.Select(source => source.Entry).Distinct()];
@@ -165,12 +173,13 @@ public sealed class EnvResolved
         IReadOnlyList<EnvVariable> variables,
         string profile = EnvProfileNames.Default,
         IReadOnlyList<EnvSource>? sources = null,
-        bool requiresLiveApproval = false) =>
-        new(project, profile, EnvOutcome.Resolved, variables, [], sources ?? [], requiresLiveApproval);
+        bool requiresLiveApproval = false,
+        IReadOnlyList<EnvVariable>? fills = null) =>
+        new(project, profile, EnvOutcome.Resolved, variables, [], sources ?? [], requiresLiveApproval, fills ?? []);
 
     internal static EnvResolved Refused(
         string project, EnvOutcome outcome, IReadOnlyList<EnvProblem>? problems = null, string profile = EnvProfileNames.Default) =>
-        new(project, profile, outcome, [], problems ?? [], [], false);
+        new(project, profile, outcome, [], problems ?? [], [], false, []);
 }
 
 /// <summary>One environment's variables as a listing reads them, unjudged.</summary>
@@ -207,10 +216,12 @@ internal sealed record EnvMember(string Key, string Value, EnvEntry Entry, strin
 /// the recycle bin is outside every traversal (D-0248), and keypaste's own groups hold no project.
 /// </para>
 /// <para>
-/// A refusal names each variable, why and the entries concerned, never a value: a key on two
-/// entries, an expired entry, a custom field named like a standard one in another case, and a value
-/// holding a KeePass placeholder (<see cref="KeePassPlaceholders"/>). Two keys cannot differ only in
-/// case, since a variable's field is named in capitals (<see cref="EnvConvention.IsEnvNamedField"/>).
+/// Each value leaves with the KeePass placeholders naming its own entry's fields filled in
+/// (<see cref="KeePassPlaceholders"/>, D-0465). A refusal names each variable, why and the entries
+/// concerned, never a value: a key on two entries, an expired entry, a custom field named like a
+/// standard one in another case, and a value holding a placeholder keypaste cannot fill in. Two keys
+/// cannot differ only in case, since a variable's field is named in capitals
+/// (<see cref="EnvConvention.IsEnvNamedField"/>).
 /// </para>
 /// </remarks>
 public static class EnvResolution
@@ -289,6 +300,25 @@ public static class EnvResolution
             }
         }
 
+        // A released set holds each key once, so its filled-in texts are kept by key.
+        var parts = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            var member = members[i];
+            var fill = Fill(member);
+
+            if (fill.Value is { } value)
+            {
+                members[i] = member with { Value = value };
+                parts[member.Key] = fill.Parts;
+            }
+            else
+            {
+                problems.Add(Unfilled(member, fill));
+            }
+        }
+
         foreach (var problem in Judge(members, now))
         {
             problems.Add(problem);
@@ -314,7 +344,8 @@ public static class EnvResolution
             [.. members.Select(member => new EnvVariable(member.Key, member.Value))],
             profile,
             [.. members.Select(member => member.Source)],
-            EnvProfileNames.IsProtected(profile) || members.Any(member => RequiresLiveApproval(member.Entry)));
+            EnvProfileNames.IsProtected(profile) || members.Any(member => RequiresLiveApproval(member.Entry)),
+            [.. members.SelectMany(member => parts[member.Key].Select(part => new EnvVariable(member.Key, part)))]);
     }
 
     /// <summary>One environment's variables as the vault holds them now, saved or not, unjudged: what a listing or an export shows, KeePassXC's view never hidden.</summary>
@@ -322,29 +353,55 @@ public static class EnvResolution
     /// <param name="project">The project name.</param>
     /// <param name="profile">The environment's name.</param>
     /// <returns>Its variables ordinal by key, then by entry, each with its source; or why there are none.</returns>
+    /// <remarks>Each value is the stored text, its placeholders as written.</remarks>
     public static EnvListing List(Vault vault, string project, string profile)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(profile);
 
-        var snapshot = vault.ReadEnvSnapshot();
-        var members = Members(snapshot, project, profile, out var exists);
+        return Listing(Listed(vault.ReadEnvSnapshot(), project, profile, out var outcome), outcome);
+    }
 
-        if (!exists)
+    /// <summary>
+    /// <see cref="List"/> with each value as it leaves keypaste, its own entry's placeholders filled in
+    /// (D-0465): what a plaintext export writes.
+    /// </summary>
+    /// <param name="vault">The open vault.</param>
+    /// <param name="project">The project name.</param>
+    /// <param name="profile">The environment's name.</param>
+    /// <param name="unfilled">Each variable whose value cannot be filled in and why, naming its entry; it is left out of the listing.</param>
+    /// <returns>Its variables ordinal by key, then by entry, each with its source; or why there are none.</returns>
+    public static EnvListing ListFilled(Vault vault, string project, string profile, out IReadOnlyList<EnvProblem> unfilled)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(profile);
+
+        var members = Listed(vault.ReadEnvSnapshot(), project, profile, out var outcome);
+        List<EnvMember> filled = [];
+        List<EnvProblem> refused = [];
+
+        foreach (var member in members)
         {
-            return new EnvListing(ProjectExists(snapshot, project) ? EnvOutcome.NoProfile : EnvOutcome.NoProject, [], []);
+            var fill = Fill(member);
+
+            if (fill.Value is { } value)
+            {
+                filled.Add(member with { Value = value });
+            }
+            else
+            {
+                refused.Add(Unfilled(member, fill));
+            }
         }
 
-        members = [.. members
-            .OrderBy(member => member.Key, StringComparer.Ordinal)
-            .ThenBy(member => ApprovalPrompt.Shown(member.Entry.Name), StringComparer.Ordinal)];
-
-        return new EnvListing(
-            EnvOutcome.Resolved,
-            [.. members.Select(member => new EnvVariable(member.Key, member.Value))],
-            [.. members.Select(member => member.Source)]);
+        unfilled = refused;
+        return Listing(filled, outcome);
     }
+
+    /// <summary>A member's value as it leaves keypaste, or null when it holds a placeholder keypaste cannot fill in (D-0465).</summary>
+    internal static string? Filled(EnvMember member) => Fill(member).Value;
 
     /// <summary>Every variable one environment holds, unjudged, and whether the environment exists at all.</summary>
     /// <param name="snapshot">The vault's entries, tags and group paths.</param>
@@ -395,11 +452,6 @@ public static class EnvResolution
                     member.Key,
                     $"expired {expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture)} ({at})");
             }
-
-            if (KeePassPlaceholders.Find(member.Value) is { } placeholder)
-            {
-                yield return new EnvProblem(member.Key, $"holds the KeePass placeholder {placeholder}, which keypaste does not resolve ({at})");
-            }
         }
 
         foreach (var same in members.GroupBy(member => member.Key, StringComparer.Ordinal).Where(group => group.Count() > 1))
@@ -410,6 +462,26 @@ public static class EnvResolution
 
     /// <summary>Whether releasing a member's value must be asked about live, by any of its entry's own tags.</summary>
     internal static bool RequiresLiveApproval(EnvEntry entry) => EnvProfileNames.RequiresLiveApproval(entry.Tags);
+
+    /// <summary>A member's value with its own entry's placeholders filled in, or why it cannot leave.</summary>
+    private static PlaceholderFill Fill(EnvMember member) => KeePassPlaceholders.Fill(member.Value, () => member.Entry.Placeholders);
+
+    /// <summary>Why a member's value cannot leave, naming its entry and never a value.</summary>
+    private static EnvProblem Unfilled(EnvMember member, PlaceholderFill fill) => new(member.Key, $"{fill.Refusal} ({Where([member])})");
+
+    /// <summary>Every variable one environment holds, ordinal by key and then by entry, and whether the environment is there.</summary>
+    private static List<EnvMember> Listed(EnvSnapshot snapshot, string project, string profile, out EnvOutcome outcome)
+    {
+        var members = Members(snapshot, project, profile, out var exists);
+        outcome = exists ? EnvOutcome.Resolved : ProjectExists(snapshot, project) ? EnvOutcome.NoProfile : EnvOutcome.NoProject;
+
+        return [.. members
+            .OrderBy(member => member.Key, StringComparer.Ordinal)
+            .ThenBy(member => ApprovalPrompt.Shown(member.Entry.Name), StringComparer.Ordinal)];
+    }
+
+    private static EnvListing Listing(List<EnvMember> members, EnvOutcome outcome) =>
+        new(outcome, [.. members.Select(member => new EnvVariable(member.Key, member.Value))], [.. members.Select(member => member.Source)]);
 
     /// <summary>The entries holding some members, as a prompt shows them, in ordinal order; two entries sharing a path are both named.</summary>
     private static string Where(IReadOnlyList<EnvMember> members) =>

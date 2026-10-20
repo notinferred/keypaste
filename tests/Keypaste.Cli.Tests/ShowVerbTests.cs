@@ -160,6 +160,33 @@ public sealed class ShowVerbTests : IDisposable
         Assert.Equal(_secret, values["STRIPE_SECRET_KEY"]);
     }
 
+    /// <summary>What is revealed is the stored text: a placeholder is shown as written, never filled in (D-0463, D-0465).</summary>
+    [Fact]
+    public void A_placeholder_is_revealed_as_the_vault_holds_it()
+    {
+        const string stored = "postgres://u:{PASSWORD}@db/{S:STRIPE_SECRET_KEY}";
+        const string filled = "postgres://u:" + _password + "@db/" + _secret;
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            Assert.True(vault.SetFields(new EntryName("api", "Stripe"), [new FieldWrite("DATABASE_URL", stored)]));
+            vault.Save();
+        }
+
+        _harness.AssertExit(CliApp.ExitSuccess, Run("show", "api/Stripe", "--json", "--reveal"));
+        using (var document = JsonDocument.Parse(_harness.Out))
+        {
+            var url = Assert.Single(document.RootElement[0].GetProperty("fields").EnumerateArray(), each => each.GetProperty("name").GetString() == "DATABASE_URL");
+            Assert.Equal(stored, url.GetProperty("value").GetString());
+        }
+
+        Assert.DoesNotContain(filled, _harness.Out, StringComparison.Ordinal);
+
+        _harness.Stdout.GetStringBuilder().Clear();
+        _harness.AssertExit(CliApp.ExitSuccess, Run("show", "api/Stripe", "--reveal"));
+        Assert.Contains(Row("DATABASE_URL", stored, "protected"), _harness.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain(filled, _harness.Out, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_revealed_value_that_could_misrepresent_itself_is_cleaned_and_told()
     {

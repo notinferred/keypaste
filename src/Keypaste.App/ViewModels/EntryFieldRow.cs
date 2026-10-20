@@ -87,12 +87,9 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
 
     private async Task CopyAsync()
     {
-        if (_owner.ReadField(Name) is not { Length: > 0 } value)
+        if (_owner.ReadFilledField(this) is { } value)
         {
-            _owner.Report($"{DisplayName} is empty, or could not be read. The vault may have locked.");
-            return;
+            await _owner.Clipboard.CopyAsync(value, DisplayName).ConfigureAwait(true);
         }
-
-        await _owner.Clipboard.CopyAsync(value, DisplayName).ConfigureAwait(true);
     }
 }

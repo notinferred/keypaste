@@ -23,6 +23,11 @@ namespace Keypaste.App.ViewModels;
 /// the same way as the password (V.7b). Every change to a field or a tag is one core call and one
 /// save, so it is one revision in the entry's history.
 /// </para>
+/// <para>
+/// A copy or an open hands on a value as it leaves keypaste, its KeePass placeholders filled in from
+/// the item's own fields, and refuses one it cannot fill (D-0465); a hold, a mask and the edit form
+/// keep the stored text.
+/// </para>
 /// </remarks>
 internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
 {
@@ -301,7 +306,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <summary>Drops the pending tag change, writing nothing.</summary>
     internal RelayCommand CancelTagChangeCommand { get; }
 
-    /// <summary>Reads one custom field out of the open vault, for a hold or a copy.</summary>
+    /// <summary>Reads one custom field out of the open vault as it holds it, for a hold.</summary>
     internal string? ReadField(string field)
     {
         try
@@ -313,6 +318,55 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             Report(e.Message);
             return null;
         }
+    }
+
+    /// <summary>Reads one custom field out of the open vault as it leaves keypaste, for a copy: its placeholders filled in, or why it cannot leave reported.</summary>
+    /// <returns>The value, or null once what went wrong was reported.</returns>
+    internal string? ReadFilledField(EntryFieldRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        if (ReadField(row.Name) is not { Length: > 0 } value)
+        {
+            Report($"{row.DisplayName} is empty, or could not be read. The vault may have locked.");
+            return null;
+        }
+
+        return Filled(vault => vault.FillPlaceholders(Name, value), row.DisplayName, "copied");
+    }
+
+    /// <summary>A value of this item as it leaves keypaste, its placeholders filled in from the item's own fields (D-0465).</summary>
+    /// <param name="fill">Fills the value in from the open vault.</param>
+    /// <param name="what">What the value is, as a sentence about it starts, such as <c>The password</c>.</param>
+    /// <param name="refused">What does not happen to it when it cannot leave, such as <c>copied</c>.</param>
+    /// <returns>The filled value, never empty, or null once why it cannot leave was reported.</returns>
+    internal string? Filled(Func<Vault, PlaceholderFill?> fill, string what, string refused)
+    {
+        ArgumentNullException.ThrowIfNull(fill);
+
+        PlaceholderFill? filled;
+        try
+        {
+            filled = _session.Unlocked is { } vault ? fill(vault) : null;
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return null;
+        }
+
+        if (filled?.Value is { Length: > 0 } value)
+        {
+            return value;
+        }
+
+        Report(filled switch
+        {
+            null => "That item could not be read. The vault may have locked.",
+            { Refusal: { } refusal } => DisplayTextSanitizer.Sanitize($"{what} {refusal}, so it was not {refused}.").Text,
+            _ => $"{what} fills in as empty, so it was not {refused}.",
+        });
+        return null;
     }
 
     /// <summary>Opens the form that writes a new value over one field's.</summary>
@@ -481,10 +535,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <summary>Whether the URL is shown as text, with a line saying why it opens nothing.</summary>
     internal bool ShowsUrlNote => Url.Length > 0 && !OpensUrl;
 
-    /// <summary>Opens the URL in the default browser.</summary>
+    /// <summary>Opens the URL in the default browser, its placeholders filled in.</summary>
     internal AsyncRelayCommand OpenUrlCommand { get; }
 
-    /// <summary>Copies the URL as it is stored, which is not a secret.</summary>
+    /// <summary>Copies the URL, which is not a secret, with the countdown only once it filled in another field.</summary>
     internal AsyncRelayCommand CopyUrlCommand { get; }
 
     internal bool ShowsNotes => Notes.Length > 0;
@@ -637,7 +691,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <summary>Copies the password, with the auto-clearing countdown.</summary>
     internal AsyncRelayCommand CopyPasswordCommand { get; }
 
-    /// <summary>Copies the username, which is not a secret and gets no countdown.</summary>
+    /// <summary>Copies the username, which is not a secret, with the countdown only once it filled in another field.</summary>
     internal AsyncRelayCommand CopyUsernameCommand { get; }
 
     internal RelayCommand EditCommand { get; }
@@ -777,22 +831,31 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             return;
         }
 
-        if (found is not { Length: > 0 } password)
+        if (found is not { Length: > 0 } stored)
         {
             Report("That item could not be read. The vault may have locked.");
             return;
         }
 
-        await _clipboard.CopyAsync(password, "Password").ConfigureAwait(true);
+        if (Filled(vault => vault.FillPlaceholders(Name, stored), "The password", "copied") is { } password)
+        {
+            await _clipboard.CopyAsync(password, "Password").ConfigureAwait(true);
+        }
     }
 
     private async Task CopyUsernameAsync() =>
-        await _clipboard.CopyPlainAsync(Username, "Username").ConfigureAwait(true);
+        await CopyFilledAsync(Username, "The username", "Username").ConfigureAwait(true);
 
     private async Task OpenUrlAsync()
     {
-        if (!WebAddress.TryOpenable(Url, out var address))
+        if (Filled(vault => vault.FillPlaceholders(Name, Url), "The web address", "opened") is not { } url)
         {
+            return;
+        }
+
+        if (!WebAddress.TryOpenable(url, out var address))
+        {
+            Report("Filled in, the web address is not one keypaste opens, so it was not opened. Copy it to use it.");
             return;
         }
 
@@ -803,7 +866,20 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     }
 
     private async Task CopyUrlAsync() =>
-        await _clipboard.CopyPlainAsync(Url, "Web address").ConfigureAwait(true);
+        await CopyFilledAsync(Url, "The web address", "Web address").ConfigureAwait(true);
+
+    /// <summary>Copies a field that is not a secret as it leaves keypaste; once it filled in another field it may carry one, so it gets the countdown.</summary>
+    private async Task CopyFilledAsync(string stored, string what, string label)
+    {
+        if (Filled(vault => vault.FillPlaceholders(Name, stored), what, "copied") is not { } value)
+        {
+            return;
+        }
+
+        await (string.Equals(value, stored, StringComparison.Ordinal)
+            ? _clipboard.CopyPlainAsync(value, label)
+            : _clipboard.CopyAsync(value, label)).ConfigureAwait(true);
+    }
 
     private async Task CopyReferenceAsync()
     {

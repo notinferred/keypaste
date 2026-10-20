@@ -38,7 +38,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         {
             ProjectVariables.Set(created, "dev", "TOKEN", _token1);
             ProjectVariables.Set(created, "dev", "DATABASE_URL", _token2);
-            ProjectVariables.Set(created, "broken", "REF", "{PASSWORD}");
+            ProjectVariables.Set(created, "broken", "REF", "{REF:T@I:0123}");
             created.Save();
         }
 

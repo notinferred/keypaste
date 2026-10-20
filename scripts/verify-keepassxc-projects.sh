@@ -23,12 +23,14 @@
 # env:billing:prod, and the same untagged entries. `keypaste run` gives a child exactly the tagged
 # fields of the environment it names, never OLD_KEY or DB, `keypaste get` still reads OLD_KEY as an
 # ordinary entry, `env export` writes a reference for each tagged key and `env diff` compares the
-# environments' key names. A key on two entries, an expired member, {PASSWORD} in a value and a
-# custom PASSWORD field each start nothing and name their entries. `run --session` through a real
-# `keypaste agent`, and through the app's own prompt window held by tests/Keypaste.AppDriver on an
-# untouched copy, gets the same set after a prompt naming the source entries, and the staging set is
-# asked once only. A scoped token's run of the dev set is audited with its source entries, and its
-# staging set is refused because a member is also tagged env:billing:prod.
+# environments' key names. A key on two entries, an expired member, {REF:…} in a value and a
+# custom PASSWORD field each start nothing and name their entries, and a value holding {PASSWORD}
+# reaches the child filled in from its own entry, exactly as KeePassXC shows it (P.3b1).
+# `run --session` through a real `keypaste agent`, and through the app's own prompt window held by
+# tests/Keypaste.AppDriver on an untouched copy, gets the same set after a prompt naming the source
+# entries, and the staging set is asked once only. A scoped token's run of the dev set is audited
+# with its source entries, and its staging set is refused because a member is also tagged
+# env:billing:prod.
 #
 # A copy of the third vault, held by its own `keypaste agent`, is asked through a `keypaste mcp` on the
 # default exposure (C.5b): the listing names the three tagged entries with their variables and project
@@ -414,11 +416,20 @@ twin="<Entry><UUID>$(uuid ftwin)</UUID><Tags>env:billing</Tags><String><Key>Titl
 refused two-entries 'DATABASE_URL is on more than one item (services/Database, services/Twin)' "$twin" 'db-c1b' ''
 refused expired 'DATABASE_URL expired 2020-01-02 03:04:05Z (services/Database)' '' 'db-c1b' \
   '<Times><Expires>True</Expires><ExpiryTime>2020-01-02T03:04:05Z</ExpiryTime></Times>'
-refused placeholder 'DATABASE_URL holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Database)' \
-  '' 'postgres://u:{PASSWORD}@db-c1b' ''
+refused placeholder 'DATABASE_URL holds the KeePass placeholder {REF:…}, which keypaste does not fill in (services/Database)' \
+  '' 'postgres://u:{REF:P@T:Stripe}@db-c1b' ''
 custom="<Entry><UUID>$(uuid fcustom)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Custom</Value></String><String><Key>Password</Key><Value ProtectInMemory=\"True\">custom-login-c1b</Value></String><String><Key>PASSWORD</Key><Value ProtectInMemory=\"True\">custom-field-c1b</Value></String></Entry>"
 refused standard-name 'PASSWORD is a custom field named like a standard one, which keypaste never releases (services/Custom)' \
   "$custom" 'db-c1b' ''
+
+step "P.3b1: a value holding {PASSWORD} reaches the child filled in from its own entry, as KeePassXC shows it"
+make_fields filled '' 'postgres://u:{PASSWORD}@db-c1b' ''
+shown=$(kx show "$dir/filled.kdbx" services/Database -a DATABASE_URL) || die "keepassxc-cli could not show the filled DATABASE_URL"
+[ "$shown" = 'postgres://u:database-login-c1b@db-c1b' ] || die "KeePassXC shows DATABASE_URL as: ${shown}"
+out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/filled.kdbx" -- "$child" -c 'printf %s "${DATABASE_URL-unset}"' 2>"$dir/filled.err" | tr -d '\r') \
+  || die "keypaste run failed on a value holding {PASSWORD}: $(cat "$dir/filled.err")"
+[ "$out" = "$shown" ] || die "the child got DATABASE_URL as ${out}, and KeePassXC shows ${shown}"
+grep -qF -- '-c1b' "$dir/filled.err" && die "keypaste run printed a value: $(cat "$dir/filled.err")"
 
 step "C.5b: under the default exposure an agent lists the tagged entries with their variables and tags, gets a variable, never a password, and runs billing from services/"
 exposed="$dir/exposed.kdbx"
@@ -1237,4 +1248,4 @@ out=$(printf '%s\n' "$pw" | OLD_KEY=old-c1b "$kp" run billing --vault "$fields" 
   || die "keypaste run with OLD_KEY inherited failed: $(cat "$dir/run.err")"
 [ "$out" = "$dev_set" ] && die "a child holding OLD_KEY still matched the dev set — the run comparisons cannot see OLD_KEY"
 
-printf '\n%s\n' "PROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, a tag KeePassXC dropped with another change is flagged and restored, and agents' settings survive KeePassXC's saves and merge into one entry per agent, the newer record whole."
+printf '\n%s\n' "PROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, a value's {PASSWORD} reaches a child as KeePassXC fills it in, a tag KeePassXC dropped with another change is flagged and restored, and agents' settings survive KeePassXC's saves and merge into one entry per agent, the newer record whole."

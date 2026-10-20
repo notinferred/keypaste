@@ -8,7 +8,8 @@ namespace Keypaste.Core.Editing;
 /// </summary>
 /// <remarks>
 /// Nothing here saves: the caller saves, or the holder saves under its claim. A refusal carries
-/// keypaste's words without the verb, and a preview names items, fields and variables, never a value.
+/// keypaste's words without the verb, and a preview names items, fields, variables and the KeePass
+/// placeholders a value plants, never a value.
 /// </remarks>
 public static class TerminalEdits
 {
@@ -148,7 +149,19 @@ public static class TerminalEdits
         var alsoSent = given.Count == 0 ? string.Empty : $", and the {Joined(given)} the terminal sent";
         var password = add.Password?.Describe("password") ?? "a password";
 
-        List<string> changes = [$"Creates {Shown(path)} with {password}{alsoSent}."];
+        List<string> changes =
+        [
+            $"Creates {Shown(path)} with {password}{alsoSent}.",
+            .. Planting(
+                [
+                    new("Its new password", add.Password?.Text, "Password"),
+                    new("Its new username", add.Username, "UserName"),
+                    new("Its new URL", add.Url, "URL"),
+                    new("Its new notes", add.Notes, "Notes") { Plural = true },
+                ],
+                () => []),
+        ];
+
         if (sharesPath)
         {
             changes.Add($"{Shown(path)} then names two items, and keypaste get refuses that path until one is renamed.");
@@ -172,9 +185,12 @@ public static class TerminalEdits
         return Ready(new EditPreview(
             EditAction.Set,
             Shown(path),
-            [existing is null
-                ? $"Creates {Shown(path)} with {password}."
-                : $"Replaces the password of {Shown(path)} with {password}; the old one stays in its history."])
+            [
+                existing is null
+                    ? $"Creates {Shown(path)} with {password}."
+                    : $"Replaces the password of {Shown(path)} with {password}; the old one stays in its history.",
+                .. Planting([new("Its new password", set.Password?.Text, "Password")], () => Held(vault, set.Name, [])),
+            ])
         {
             Creates = existing is null,
         });
@@ -203,7 +219,13 @@ public static class TerminalEdits
         }
 
         var names = Joined(set.Fields.Select(field => Shown(field.Name)).ToList());
-        List<string> changes = [$"Sets {names} on {Shown(path)} to values the terminal sent; the item's earlier state stays in its history."];
+        List<string> changes =
+        [
+            $"Sets {names} on {Shown(path)} to values the terminal sent; the item's earlier state stays in its history.",
+            .. Planting(
+                [.. set.Fields.Select(field => new Written($"The new value of {Shown(field.Name)}", field.Value, field.Name))],
+                () => [.. current.Select(field => field.Name), .. set.Fields.Select(field => field.Name)]),
+        ];
 
         if (set.Plain)
         {
@@ -310,9 +332,13 @@ public static class TerminalEdits
 
         var on = ApprovalPrompt.Shown(written.Entry);
         var described = set.Value.Describe("value");
-        List<string> changes = [written.Change == EnvWriteChange.New
-            ? $"Adds {Name(set.Key)} to {where} on {on} with {described}."
-            : $"Replaces {Name(set.Key)} on {on} with {described}; the old value stays in the item's history."];
+        List<string> changes =
+        [
+            written.Change == EnvWriteChange.New
+                ? $"Adds {Name(set.Key)} to {where} on {on} with {described}."
+                : $"Replaces {Name(set.Key)} on {on} with {described}; the old value stays in the item's history.",
+            .. Planting([new($"The new value of {Name(set.Key)}", value, written.Field)], () => Held(vault, written.Entry, [written.Field])),
+        ];
 
         if (plan.CreatesHome)
         {
@@ -398,6 +424,9 @@ public static class TerminalEdits
         List<string> changes =
         [
             $"Imports {Count(plan.Created.Count + plan.Updated.Count, "variable")} into {Shown(where)}: {plan.Created.Count} new, {plan.Updated.Count} updated, {plan.Unchanged} unchanged.",
+            .. plan.ToWrite.SelectMany(writes => Planting(
+                [.. writes.Select(key => new Written($"On {ApprovalPrompt.Shown(writes.Key)}, {Name(key.Key)}", plan.Value(key.Key), key.Field) { Item = "that item" })],
+                () => Held(vault, writes.Key, plan.Keys.Where(key => key.Entry == writes.Key).Select(key => key.Field)))),
         ];
 
         foreach (var written in plan.Keys.Where(key => key.Change != EnvWriteChange.Unchanged).GroupBy(key => (key.Entry, key.Change)))
@@ -629,6 +658,35 @@ public static class TerminalEdits
         return true;
     }
 
+    /// <summary>
+    /// A sentence for each value written to one item that holds a KeePass placeholder: what it fills in where it
+    /// leaves keypaste, or what refuses it there, by keyword and never by value (D-0465).
+    /// </summary>
+    /// <param name="written">Each value the edit writes to the item; one not yet read plants nothing.</param>
+    /// <param name="held">Reads the name of each custom field the item has once the edit is written; called only when a value holds a placeholder.</param>
+    private static List<string> Planting(List<Written> written, Func<List<string>> held)
+    {
+        List<string> sentences = [];
+        List<string>? names = null;
+
+        foreach (var value in written)
+        {
+            if (value.Text is not { } text || !KeePassPlaceholders.Holds(text))
+            {
+                continue;
+            }
+
+            var planted = KeePassPlaceholders.Planted(text, names ??= held(), value.Field);
+            sentences.Add(planted.Refused is { } refused ? value.RefusedBy(refused) : value.Fills([.. planted.Fills]));
+        }
+
+        return sentences;
+    }
+
+    /// <summary>The name of each custom field an item has once an edit writes these to it.</summary>
+    private static List<string> Held(Vault vault, EntryName item, IEnumerable<string> written) =>
+        [.. (vault.Fields(item) ?? []).Select(field => field.Name), .. written];
+
     private static EditCheck Ready(EditPreview preview) => new() { Preview = preview };
 
     private static EditCheck Refused(EditRefusalKind kind, string reason) => new() { Refusal = new EditRefusal(kind, reason) };
@@ -651,4 +709,33 @@ public static class TerminalEdits
     };
 
     private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
+
+    /// <summary>A value an edit writes to one item, and how a sentence about what it plants names it.</summary>
+    /// <param name="Subject">How the sentence names the value, such as <c>Its new password</c>.</param>
+    /// <param name="Text">The value, or null before it is read.</param>
+    /// <param name="Field">The field it is written to, so a value naming that field leads back to itself.</param>
+    private sealed record Written(string Subject, string? Text, string Field)
+    {
+        /// <summary>Whether the subject takes a plural verb, as <c>Its new notes</c> does.</summary>
+        internal bool Plural { get; init; }
+
+        /// <summary>How the sentence names the item, such as <c>this item</c> when the prompt's item is the one written.</summary>
+        internal string Item { get; init; } = "this item";
+
+        /// <summary>The sentence for a value that fills in these placeholders from its item where it leaves.</summary>
+        internal string Fills(List<string> placeholders) =>
+            Plural
+                ? $"{Subject} fill in {Joined(placeholders)} from {Item} when they leave."
+                : $"{Subject} fills in {Joined(placeholders)} from {Item} when it leaves.";
+
+        /// <summary>The sentence for a value this placeholder refuses wherever it would leave.</summary>
+        internal string RefusedBy(PlaceholderRefusal refusal) =>
+            Plural
+                ? $"{Subject} hold {refusal.Placeholder}, which {refusal.Ending}, so they are refused wherever they would leave."
+                : $"{Subject} holds {refusal.Placeholder}, which {refusal.Ending}, so it is refused wherever it would leave.";
+
+        /// <summary>The subject only, so a debugger never shows the value.</summary>
+        /// <returns>The subject.</returns>
+        public override string ToString() => Subject;
+    }
 }

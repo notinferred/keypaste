@@ -150,6 +150,53 @@ public sealed class EnvReferenceResolutionTests : IDisposable
         Assert.Equal(EnvOutcome.Unusable, EnvReferenceResolution.Apply(document, otherProfile).Outcome);
     }
 
+    [Fact]
+    public void A_reference_fills_in_its_own_items_placeholders_and_carries_each_text_filled_in_under_the_files_name()
+    {
+        ProjectVariables.Set(_vault, "acme-api", "staging", "API_URL", "https://{S:STRIPE_KEY}@api");
+        _vault.AddEntry(new VaultEntry { GroupPath = "work", Title = "db", Username = "db-user", Password = "db-password-sentinel", Url = "postgres://{USERNAME}:{PASSWORD}@db" });
+        _vault.Save();
+
+        var resolved = Resolve("URL=kp://acme-api/staging/API_URL\nDB=kp:///work/db#url\nPROXY=http://{PASSWORD}@proxy\n");
+
+        Assert.Equal(EnvOutcome.Resolved, resolved.Outcome);
+        Assert.Equal(
+            [
+                new EnvVariable("URL", "https://sk_staging_sentinel@api"),
+                new EnvVariable("DB", "postgres://db-user:db-password-sentinel@db"),
+                new EnvVariable("PROXY", "http://{PASSWORD}@proxy"),
+            ],
+            resolved.Variables);
+        Assert.Equal(
+            [new EnvVariable("URL", "sk_staging_sentinel"), new EnvVariable("DB", "db-user"), new EnvVariable("DB", "db-password-sentinel")],
+            resolved.Fills);
+
+        var applied = EnvReferenceResolution.Apply(
+            Document("URL=kp://acme-api/staging/API_URL\n"),
+            EnvResolution.Resolve(_vault, "acme-api", "staging", ["API_URL"], _clock));
+
+        Assert.Equal([new EnvVariable("URL", "https://sk_staging_sentinel@api")], applied.Variables);
+        Assert.Equal([new EnvVariable("URL", "sk_staging_sentinel")], applied.Fills);
+    }
+
+    [Fact]
+    public void An_entry_reference_keypaste_cannot_fill_in_refuses_the_file_naming_the_placeholder()
+    {
+        _vault.AddEntry(new VaultEntry { GroupPath = "work", Title = "db", Password = "db-password-sentinel", Url = "postgres://{S:DB_USER}:{PASSWORD}@db" });
+        _vault.Save();
+
+        var resolved = Resolve("DB=kp:///work/db#url\nAWS_USER=kp:///work/aws#username\n");
+
+        Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
+        Assert.Equal(
+            ("DB", "(kp:///work/db#url) holds the KeePass placeholder {S:…}, which names no field of its item"),
+            (Assert.Single(resolved.Problems).Key, resolved.Problems[0].Reason));
+        Assert.Empty(resolved.Variables);
+        Assert.Empty(resolved.Fills);
+        AssertNoValue(resolved);
+        Assert.DoesNotContain("db-password-sentinel", resolved.Refusal, StringComparison.Ordinal);
+    }
+
     /// <summary>Adds staging's <c>OLD_KEY</c> on an entry of its own that expired yesterday, and saves.</summary>
     private void AddExpiredStagingKey()
     {

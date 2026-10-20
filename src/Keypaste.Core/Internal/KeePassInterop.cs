@@ -770,6 +770,36 @@ internal sealed class KeePassInterop : IDisposable
             : null;
     }
 
+    /// <summary>What a placeholder in a value of the one entry with this name may fill in from, or null when there is no such entry.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal PlaceholderFields? ReadPlaceholderFields(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found ? PlaceholderFieldsOf(found.Entry, name.GroupPath) : null;
+    }
+
+    /// <summary>
+    /// What a placeholder in a value of the revision at this position in <see cref="ReadHistory"/>'s order
+    /// may fill in from, or null when there is no such entry or revision.
+    /// </summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal PlaceholderFields? ReadPlaceholderFields(EntryName name, int revision)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return null;
+        }
+
+        uint[] order = HistoryNewestFirst(found.Entry);
+
+        return revision >= 0 && revision < order.Length
+            ? PlaceholderFieldsOf(found.Entry.History.GetAt(order[revision]), name.GroupPath)
+            : null;
+    }
+
     /// <summary>Each live entry directly in each group at this path by its groups' own names, by UUID and title, with one of its string fields, in traversal order.</summary>
     internal IReadOnlyList<ReservedRecord> ReadRecords(string groupPath, string field)
     {
@@ -2557,6 +2587,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             List<string> tags = [.. entry.Tags];
             List<KeyValuePair<string, string>> fields = [];
+            List<string> names = [];
 
             // A value is read only from an entry a project tag names, so no other entry's fields are held.
             if (tags.Any(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member))
@@ -2565,9 +2596,13 @@ internal sealed class KeePassInterop : IDisposable
                     .Where(field => !PwDefs.IsStandardField(field.Key) && EnvConvention.IsEnvNamedField(field.Key))
                     .OrderBy(field => field.Key, StringComparer.Ordinal)
                     .Select(field => new KeyValuePair<string, string>(field.Key, field.Value.ReadString())));
+                names.AddRange(entry.Strings
+                    .Select(field => field.Key)
+                    .Where(key => !PwDefs.IsStandardField(key))
+                    .Order(StringComparer.Ordinal));
             }
 
-            found.Add(new EnvEntry(Read(entry, groupPath), tags, fields));
+            found.Add(new EnvEntry(Read(entry, groupPath), tags, fields) { FieldNames = names });
         }
 
         foreach (PwGroup child in group.Groups)
@@ -2684,6 +2719,17 @@ internal sealed class KeePassInterop : IDisposable
     private static string ReadField(PwEntry entry, string field)
     {
         return entry.Strings.ReadSafe(field);
+    }
+
+    // A field keypaste never releases is named, never read.
+    private static PlaceholderFields PlaceholderFieldsOf(PwEntry entry, string groupPath)
+    {
+        List<string> names = [.. entry.Strings.Select(field => field.Key).Where(key => !PwDefs.IsStandardField(key))];
+
+        return PlaceholderFields.Of(
+            Read(entry, groupPath),
+            names.Where(Approval.CredentialFields.IsCustom).Select(name => new KeyValuePair<string, string>(name, ReadField(entry, name))),
+            names);
     }
 
     private static PwUuid ToPwUuid(Guid id) => new(id.ToByteArray(bigEndian: true));

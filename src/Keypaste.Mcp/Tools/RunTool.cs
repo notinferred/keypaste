@@ -30,9 +30,10 @@ namespace Keypaste.Mcp.Tools;
 /// (THREATS.md T-8).
 /// </para>
 /// <para>
-/// <b>What comes back holds no value this tool knows how to find</b>: each literal and escaped form is
-/// scrubbed from the output. The command itself can still reveal one in another form, to a file or
-/// over the network, which the result and T-35 say.
+/// <b>What comes back holds no value this tool knows how to find</b>: each literal and escaped form of
+/// every value, and of every text a placeholder filled into one (D-0465), is scrubbed from the output.
+/// The command itself can still reveal one in another form, to a file or over the network, which the
+/// result and T-35 say.
 /// </para>
 /// </remarks>
 internal sealed class RunTool(ServerOptions options, ApproverConnection approver, AuditLog audit) : McpServerTool
@@ -242,7 +243,7 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
             return ToolResults.Refuse(ToolText.RunNotStarted(program, result.Error));
         }
 
-        var scrubber = OutputScrubber.For(reply.Set.Variables);
+        var scrubber = OutputScrubber.For([.. reply.Set.Variables, .. reply.Set.Fills]);
 
         return ToolResults.Ran(
             names,

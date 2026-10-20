@@ -375,9 +375,9 @@ public sealed class ApproverHandler
         }
 
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
-        if (!_source.TryRead(name, request.Field, out var released, out var readFailure))
+        if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
         {
-            return Unread(readFailure, display);
+            return Unread(readFailure, request.Field, unfilled, display);
         }
 
         using (released)
@@ -446,9 +446,9 @@ public sealed class ApproverHandler
             return withdrawn;
         }
 
-        if (!_source.TryRead(name, request.Field, out var released, out var readFailure))
+        if (!_source.TryRead(name, request.Field, out var released, out var readFailure, out var unfilled))
         {
-            return Unread(readFailure, display);
+            return Unread(readFailure, request.Field, unfilled, display);
         }
 
         using (released)
@@ -976,11 +976,14 @@ public sealed class ApproverHandler
         return granted;
     }
 
-    /// <summary>Refuses a release whose field could not be read, naming a stale vault as that.</summary>
-    private CredentialReply Unread(CredentialFailure failure, string display) =>
+    /// <summary>Refuses a release whose field could not be read, naming a stale vault as that, and a placeholder that cannot be filled in by its field.</summary>
+    private CredentialReply Unread(CredentialFailure failure, string field, string unfilled, string display) =>
         IsStale(failure)
             ? Refused(AuditMethod.VaultChanged, Stale(failure, display), display)
-            : Refused(AuditMethod.Failed, Explain(failure), display);
+            : Refused(
+                AuditMethod.Failed,
+                failure == CredentialFailure.Unfilled && unfilled.Length > 0 ? $"the item's {field} {unfilled}" : Explain(failure),
+                display);
 
     private static bool IsStale(CredentialFailure failure) =>
         failure is CredentialFailure.ChangedOnDisk or CredentialFailure.Unsaved;
@@ -1057,6 +1060,7 @@ public sealed class ApproverHandler
         CredentialFailure.ChangedOnDisk =>
             "another program changed the vault file since keypaste read it; nothing is released until a person reloads the vault",
         CredentialFailure.Unsaved => "the vault has a change that is not saved yet",
+        CredentialFailure.Unfilled => "the item's field holds a KeePass placeholder keypaste does not fill in",
         _ => "the vault could not be read",
     };
 }

@@ -132,7 +132,7 @@ withdrawn() { wait_for '^prompt withdrawn' "$HOLD_OUT" "$PROMPTS"; }
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
 project_var "$CLI" "$VAULT" "$MASTER" ci DEPLOY_KEY "$DEPLOY" || die "could not store the ci set"
 project_var "$CLI" "$VAULT" "$MASTER" ci DB_URL "$DATABASE" || die "could not store the ci set"
-project_var "$CLI" "$VAULT" "$MASTER" broken DB_URL 'postgres://ci:{PASSWORD}@db' || die "could not store a value keypaste does not resolve"
+project_var "$CLI" "$VAULT" "$MASTER" broken DB_URL 'postgres://ci:{REF:P@I:0}@db' || die "could not store a value keypaste does not fill in"
 # The tagged project: DB_URL on its home entry beside DEPLOY_KEY on an entry tagged into dev and prod (C.1b).
 project_var "$CLI" "$VAULT" "$MASTER" tagged DB_URL "$DATABASE" || die "could not store the tagged set's home entry"
 printf '%s\n' "deploy-login" | KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" raw-add "$VAULT" services Deploy >/dev/null \

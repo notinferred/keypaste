@@ -249,6 +249,87 @@ public sealed class VaultSavedStateTests : IDisposable
     }
 
     [Fact]
+    public void A_value_fills_in_from_its_item_only_while_the_vault_matches_its_file()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "saved")]));
+        vault.Save();
+
+        Assert.Equal(SavedRead.Current, vault.ReadSavedFill(_token, "{PASSWORD}:{S:API_KEY}", out var fill));
+        Assert.NotNull(fill);
+        Assert.Equal("v1:saved", fill.Value);
+        Assert.Equal(["v1", "saved"], fill.Parts);
+
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "unsaved")]));
+
+        Assert.Equal(SavedRead.Unsaved, vault.ReadSavedFill(_token, "{S:API_KEY}", out fill));
+        Assert.Null(fill);
+    }
+
+    [Fact]
+    public void A_value_whose_vault_another_writer_saved_is_not_filled_in()
+    {
+        using var vault = Seeded();
+        ExternalSave(_token, "external");
+
+        Assert.Equal(SavedRead.ChangedOnDisk, vault.ReadSavedFill(_token, "{PASSWORD}", out var fill));
+        Assert.Null(fill);
+    }
+
+    [Fact]
+    public void A_value_holding_no_placeholder_comes_back_as_it_is_without_its_item_being_read()
+    {
+        using var vault = Seeded();
+        var missing = new EntryName("env/billing", "MISSING");
+
+        Assert.Equal(SavedRead.Current, vault.ReadSavedFill(missing, "plain {text}", out var fill));
+        Assert.NotNull(fill);
+        Assert.Equal("plain {text}", fill.Value);
+        Assert.Empty(fill.Parts);
+        Assert.Equal("plain {text}", vault.FillPlaceholders(missing, "plain {text}")!.Value);
+
+        Assert.Equal(SavedRead.Current, vault.ReadSavedFill(missing, "{PASSWORD}", out fill));
+        Assert.Null(fill);
+        Assert.Null(vault.FillPlaceholders(missing, "{PASSWORD}"));
+    }
+
+    [Fact]
+    public void A_revision_fills_in_from_its_own_fields()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "k1")]));
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "k2")]));
+
+        Assert.Equal("k2", vault.FillPlaceholders(_token, "{S:API_KEY}")!.Value);
+        Assert.Equal("k1", vault.FillPlaceholders(_token, 0, "{S:API_KEY}")!.Value);
+        Assert.Equal(
+            "holds the KeePass placeholder {S:…}, which names no field of its item",
+            vault.FillPlaceholders(_token, 1, "{S:API_KEY}")!.Refusal);
+        Assert.Null(vault.FillPlaceholders(_token, 2, "{S:API_KEY}"));
+    }
+
+    [Fact]
+    public void A_tagged_item_names_every_custom_field_and_reads_only_those_keypaste_releases()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "key"), new FieldWrite("Recovery codes", "codes")]));
+        Assert.True(vault.SetFields(_other, [new FieldWrite("API_KEY", "other")]));
+        Assert.True(vault.AddTag(_token, "env:billing"));
+        vault.Save();
+
+        Assert.Equal(SavedRead.Current, vault.ReadSavedEnv(out var snapshot));
+        var entries = snapshot!.Entries;
+        var tagged = entries.Single(entry => entry.Name == _token);
+
+        Assert.Equal(["API_KEY", "Recovery codes"], tagged.FieldNames);
+        Assert.Empty(entries.Single(entry => entry.Name == _other).FieldNames);
+        Assert.Equal("v1/key", KeePassPlaceholders.Fill("{PASSWORD}/{S:API_KEY}", () => tagged.Placeholders).Value);
+        Assert.Equal(
+            "holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases",
+            KeePassPlaceholders.Fill("{S:Recovery codes}", () => tagged.Placeholders).Refusal);
+    }
+
+    [Fact]
     public void A_file_that_cannot_be_read_is_not_taken_as_unchanged()
     {
         using var vault = Seeded();

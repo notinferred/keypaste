@@ -9,6 +9,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// Without <c>--reveal</c> (or its older spelling <c>--show</c>) the secret goes to the clipboard and never to stdout. That is the whole
 /// point of the verb: a password on stdout ends up in shell history, scrollback, and CI logs.
+/// Either way the value leaves with its own item's placeholders filled in, or not at all (D-0465).
 /// </remarks>
 internal static class GetCommand
 {
@@ -97,11 +98,26 @@ internal static class GetCommand
                 return CliApp.ExitNotFound;
             }
 
-            var secret = field is null ? entry.Password : vault.ReadField(EntryName.Of(entry), field);
-            if (secret is null)
+            var name = EntryName.Of(entry);
+            var stored = field is null ? entry.Password : vault.ReadField(name, field);
+            if (stored is null)
             {
                 context.Stderr.WriteLine($"keypaste get: '{entryPath}' has no field '{field}'");
                 return CliApp.ExitNotFound;
+            }
+
+            var fill = vault.FillPlaceholders(name, stored);
+            if (fill is null)
+            {
+                context.Stderr.WriteLine($"keypaste get: no item '{entryPath}'");
+                return CliApp.ExitNotFound;
+            }
+
+            if (fill.Value is not { } secret)
+            {
+                context.Stderr.WriteLine(
+                    $"keypaste get: the {field ?? "password"} of '{entryPath}' {fill.Refusal}; keypaste show '{entryPath}' --reveal shows it as the vault holds it");
+                return CliApp.ExitInternalError;
             }
 
             if (show)
