@@ -15,9 +15,6 @@ Every release still needs a person's answer or a rule they set, and the bridge s
 - [ ] **N.8 — Make `keypaste` alone show where things stand.** Needs: G.1.
   - On a terminal it shows the version, the chosen vault and who holds it, the connected tools and one next step.
   - It asks for no password.
-- [ ] **N.9 — Give each CLI concept one name.** Needs: none.
-  - `approve` for the terminal approver, and `clients` for per-client choices.
-  - The old spellings are removed, with no aliases (D-0416).
 
 ## T5 — Desktop delivery
 
