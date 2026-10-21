@@ -56,12 +56,19 @@ internal static class StatusCommand
         return CliApp.ExitSuccess;
     }
 
-    /// <summary>The first of: choose a vault, connect an AI tool, hold the vault unlocked, see doctor, or the help.</summary>
+    /// <summary>The first of: choose a vault, see doctor for an unreadable app.toml, connect an AI tool, hold the vault unlocked, see doctor, or the help.</summary>
     private static string NextStep(VaultReading vault, OwnerReading owner, IReadOnlyList<ToolReading> tools)
     {
+        const string Doctor = "run `keypaste doctor` to see what to fix";
+
         if (vault.State is VaultState.None or VaultState.Missing or VaultState.NotKeePass)
         {
             return "run `keypaste use <path>` to choose your vault";
+        }
+
+        if (vault.State == VaultState.AppTomlUnreadable)
+        {
+            return Doctor;
         }
 
         if (!tools.Any(tool => tool.Reading.Presence == McpEntryPresence.Present))
@@ -82,7 +89,7 @@ internal static class StatusCommand
         var findings = vault.Findings.Concat(tools.Select(tool => tool.Finding)).Append(owner.Finding);
 
         return findings.Any(finding => finding.Status == HealthStatus.Fix)
-            ? "run `keypaste doctor` to see what to fix"
+            ? Doctor
             : "`keypaste --help` lists every command";
     }
 

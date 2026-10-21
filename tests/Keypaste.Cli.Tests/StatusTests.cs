@@ -85,6 +85,19 @@ public sealed class StatusTests : IDisposable
     }
 
     [Fact]
+    public void An_unreadable_app_toml_with_no_tool_connected_says_to_see_doctor()
+    {
+        var settings = KeypasteHome.SettingsPath(Home);
+        Directory.CreateDirectory(Path.GetDirectoryName(settings)!);
+        File.WriteAllText(settings, "[[settings]]\nnot a pair\n");
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run());
+
+        Assert.Equal("none chosen; app.toml could not be read", Said("vault"));
+        Assert.Equal("› run `keypaste doctor` to see what to fix", Step());
+    }
+
+    [Fact]
     public void Each_tool_is_connected_not_connected_or_unknown_and_none_connected_says_to_run_setup()
     {
         Healthy();
