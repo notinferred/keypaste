@@ -36,6 +36,6 @@ D-0472 and D-0473. T-40 names the links' path and what a link reveals.
 ## Limits and follow-ups
 
 - No test opens a link in the real Cursor or VS Code: `verify-real-tools.sh` and `verify-connect-client.sh` still check only the file path, so whether each tool accepts these links, and what it shows before adding keypaste, is unverified. Extending `verify-real-tools.sh` is the follow-up once a runner can drive either tool's URL handler.
-- The tests hold the link to its `Uri.AbsoluteUri`; that Avalonia's launcher hands it to the platform unchanged is unverified.
+- On macOS and Linux `OpenerProcess` hands the link's `Uri.AbsoluteUri` to `open` or `xdg-open` as its only argument with no shell between, because Avalonia's Linux launcher runs it through `/bin/sh`, which adds a backslash before each `&` and `~` and expands `$NAME`, and on both platforms reports success before the opener exits; `OpenerProcessTests` holds the argument byte for byte and a non-zero exit as not opened against a stub opener. On Windows Avalonia's launcher still hands it over, which no test observes.
 - The row ships after 4.7c2. The CLI and app parts reach people with the first release that includes them; whether that is 0.5.0 is decided at release.
 - The site part is G.7's.
