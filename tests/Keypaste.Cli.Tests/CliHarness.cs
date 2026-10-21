@@ -68,6 +68,9 @@ internal sealed class CliHarness : IDisposable
     /// <summary>The AppImage <c>setup</c> runs from; by default none.</summary>
     internal McpAppImage? AppImage { get; set; }
 
+    /// <summary>Whether stdout is to be taken for a terminal; by default it is redirected.</summary>
+    internal bool StdoutIsTerminal { get; set; }
+
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
@@ -87,6 +90,7 @@ internal sealed class CliHarness : IDisposable
         WorkingDirectory = WorkingDirectory,
         ProcessPath = ProcessPath ?? Path.Combine(Directory, McpServerLocator.ExecutableName),
         AppImage = () => AppImage,
+        StdoutIsTerminal = StdoutIsTerminal,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>

@@ -70,6 +70,11 @@ internal static class CliApp
 
         if (args.Length == 0)
         {
+            if (context.StdoutIsTerminal)
+            {
+                return StatusCommand.Execute(context);
+            }
+
             WriteUsage(context.Stderr, context.ConsoleStyle);
             return ExitUsageError;
         }

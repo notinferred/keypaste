@@ -196,4 +196,21 @@ public sealed class HostileNameRenderingTests : IDisposable
         Assert.DoesNotContain("\n  ✓ owner            forged", _cli.Out, StringComparison.Ordinal);
         Assert.Contains("  ✗ cursor", _cli.Out, StringComparison.Ordinal);
     }
+
+    /// <summary><c>keypaste</c> alone on a terminal reads the same file and prints only that the tool is connected.</summary>
+    [Fact]
+    public void BareKeypaste_PrintsNothingOfAnAiToolsConfiguration()
+    {
+        var machine = McpClientMachine.From(name => _cli.Environment.GetValueOrDefault(name), McpClientMachine.CurrentPlatform);
+        var cursor = McpConfigLocation.Cursor.PathOn(machine)!;
+        Directory.CreateDirectory(Path.GetDirectoryName(cursor)!);
+        File.WriteAllText(cursor, """{"mcpServers": {"keypaste": {"command": "/x/\u001b[31mkeypaste\n› forged", "args": ["mcp"]}}}""");
+        _cli.StdoutIsTerminal = true;
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run());
+
+        Assert.DoesNotContain(_esc, _cli.Out + _cli.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("forged", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("  AI tools  Cursor connected", _cli.Out, StringComparison.Ordinal);
+    }
 }

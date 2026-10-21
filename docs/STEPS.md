@@ -12,9 +12,6 @@ These rows serve every track: a development machine builds only the compile chec
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **N.8 — Make `keypaste` alone show where things stand.** Needs: G.1.
-  - On a terminal it shows the version, the chosen vault and who holds it, the connected tools and one next step.
-  - It asks for no password.
 
 ## T5 — Desktop delivery
 

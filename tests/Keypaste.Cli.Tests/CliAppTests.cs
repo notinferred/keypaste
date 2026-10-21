@@ -8,13 +8,24 @@ namespace Keypaste.Cli.Tests;
 public sealed class CliAppTests
 {
     [Fact]
-    public void NoArguments_PrintsHelpToStderr_Exit1()
+    public void NoArguments_WithStdoutRedirected_PrintsHelpToStderr_Exit1()
     {
         using var harness = new CliHarness();
 
         Assert.Equal(CliApp.ExitUsageError, harness.Run());
         Assert.Empty(harness.Out);
         Assert.Equal(GroupedHelp, harness.Err);
+    }
+
+    [Fact]
+    public void NoArguments_OnATerminal_PrintsWhereThingsStand_Exit0()
+    {
+        using var harness = new CliHarness { StdoutIsTerminal = true };
+
+        Assert.Equal(CliApp.ExitSuccess, harness.Run());
+        Assert.StartsWith($"keypaste {CoreInfo.Version}{Environment.NewLine}  vault     ", harness.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("USAGE", harness.Out, StringComparison.Ordinal);
+        Assert.Empty(harness.Err);
     }
 
     [Theory]

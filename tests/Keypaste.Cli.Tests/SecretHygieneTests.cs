@@ -83,6 +83,23 @@ public sealed class SecretHygieneTests
         }
     }
 
+    /// <summary><c>keypaste</c> alone on a terminal reads only the vault's header, so no field value reaches what it prints.</summary>
+    [Fact]
+    public void BareKeypaste_OnATerminal_LeaksNoFieldValue()
+    {
+        using var harness = new CliHarness { StdoutIsTerminal = true };
+        Seed(harness);
+        harness.Environment[VaultLocation.EnvironmentVariable] = harness.VaultPath;
+
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run());
+
+        foreach (var sentinel in _everySentinel)
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>
     /// <c>env set</c> is swept separately because it is the one verb that is handed a value
     /// rather than reading one, and both of its input forms have to stay silent about it. The

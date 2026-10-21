@@ -138,7 +138,7 @@ internal static class DoctorCommand
     };
 
     // Not EntryNameSanitizer, which would blank a fix's backticks and a Windows path's backslashes: only what repaints or breaks the line goes.
-    private static string Shown(string text) => DisplayTextSanitizer.Sanitize(text).Text.Replace('\n', ' ').Replace('\t', ' ');
+    internal static string Shown(string text) => DisplayTextSanitizer.Sanitize(text).Text.Replace('\n', ' ').Replace('\t', ' ');
 
     private static void WriteUsage(TextWriter writer)
     {

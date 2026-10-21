@@ -114,7 +114,10 @@ public sealed record OwnerReading(OwnerAnswer Answer, OwnerKind? Kind, string? V
         _ => "quit the keypaste app or stop `keypaste approve`, and start it again",
     };
 
-    private static string Holder(OwnerKind? kind) => kind switch
+    /// <summary>Who holds the vault, as a short name: the keypaste app, keypaste approve or a keypaste process.</summary>
+    /// <param name="kind">Who holds it, as its claim names it, or null when none is named.</param>
+    /// <returns>The name.</returns>
+    public static string Holder(OwnerKind? kind) => kind switch
     {
         OwnerKind.TerminalAgent => "keypaste approve",
         OwnerKind.DesktopApp => "the keypaste app",

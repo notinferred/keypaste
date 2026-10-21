@@ -4,13 +4,13 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// D-0467's read-only rule: <c>keypaste doctor</c> and the checks it runs open no vault, read no password, take no claim,
-/// ask the vault's holder nothing but to connect and attach, never reach the locked app's notice, write no file and set
-/// up no AI tool.
+/// D-0467's read-only rule: <c>keypaste doctor</c>, <c>keypaste</c> alone on a terminal and the checks they run open no
+/// vault, read no password, take no claim, ask the vault's holder nothing but to connect and attach, never reach the locked
+/// app's notice, write no file and set up no AI tool.
 /// </summary>
 /// <remarks>
-/// A text scan of <c>DoctorCommand.cs</c> and every file of the core's <c>Health</c> folder, in which a name in a comment
-/// counts too. The holder's requests are read from <c>ApproverClient</c> itself, so a request added there is forbidden here
+/// A text scan of <c>DoctorCommand.cs</c>, <c>StatusCommand.cs</c> and every file of the core's <c>Health</c> folder, in
+/// which a name in a comment counts too. The holder's requests are read from <c>ApproverClient</c> itself, so a request added there is forbidden here
 /// without this list changing.
 /// </remarks>
 public sealed partial class DoctorSourceRulesTests
@@ -42,8 +42,9 @@ public sealed partial class DoctorSourceRulesTests
         var names = Sources().Select(source => source.Name).ToList();
 
         Assert.Contains("DoctorCommand.cs", names);
+        Assert.Contains("StatusCommand.cs", names);
         Assert.Contains("HealthCheck.cs", names);
-        Assert.True(names.Count >= 7, $"only {names.Count} files were scanned");
+        Assert.True(names.Count >= 8, $"only {names.Count} files were scanned");
         Assert.True(Requests().Count >= 11, $"only {Requests().Count} of the holder's requests were found");
         Assert.DoesNotContain(".AttachAsync(", Requests());
     }
@@ -78,6 +79,7 @@ public sealed partial class DoctorSourceRulesTests
 
         return health
             .Append(Path.Combine(root, "src", "Keypaste.Cli", "Commands", "DoctorCommand.cs"))
+            .Append(Path.Combine(root, "src", "Keypaste.Cli", "Commands", "StatusCommand.cs"))
             .Select(path => (Path.GetFileName(path), File.ReadAllText(path)));
     }
 

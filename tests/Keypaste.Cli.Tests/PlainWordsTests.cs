@@ -4,8 +4,9 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// The CLI's help says item, environment, allowance, what an agent can see, KeePass database and
-/// AI tool, never the words those replaced (D-0457).
+/// The CLI's help, and what <c>keypaste</c> alone prints on a terminal, say item, environment,
+/// allowance, what an agent can see, KeePass database and AI tool, never the words those replaced
+/// (D-0457).
 /// </summary>
 /// <remarks>
 /// Command and subcommand names, flags, file names, environment variables, <c>kp://</c> references
@@ -33,7 +34,7 @@ public sealed partial class PlainWordsTests
     [Fact]
     public void EveryHelp_HoldsNoneOfTheRetiredWords()
     {
-        var said = new List<(string Where, string Text)> { ("keypaste --help", Help("--help")) };
+        var said = new List<(string Where, string Text)> { ("keypaste --help", Help("--help")), ("keypaste on a terminal", Status()) };
 
         foreach (var verb in Verbs().Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
@@ -54,6 +55,15 @@ public sealed partial class PlainWordsTests
         using var harness = new CliHarness();
 
         harness.Run(args);
+
+        return harness.Out + harness.Err;
+    }
+
+    private static string Status()
+    {
+        using var harness = new CliHarness { StdoutIsTerminal = true };
+
+        harness.Run();
 
         return harness.Out + harness.Err;
     }

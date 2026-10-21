@@ -52,6 +52,9 @@ internal sealed class CliContext
     /// <summary>How output is coloured and marked on a terminal, and left plain everywhere else.</summary>
     internal required IConsoleStyle ConsoleStyle { get; init; }
 
+    /// <summary>Whether stdout reaches a terminal rather than a pipe or a file, whether or not it is coloured.</summary>
+    internal bool StdoutIsTerminal { get; init; }
+
     /// <summary>What time it is, for the commands that take a relative span.</summary>
     internal TimeProvider Clock { get; init; } = TimeProvider.System;
 
@@ -86,6 +89,7 @@ internal sealed class CliContext
             ProcessLauncher = new SystemProcessLauncher(),
             ProcessRunner = processRunner,
             ConsoleStyle = new SystemConsoleStyle(environment, stdout, stderr),
+            StdoutIsTerminal = !Console.IsOutputRedirected,
             AppImage = McpAppImage.ForThisProcess,
         };
     }
