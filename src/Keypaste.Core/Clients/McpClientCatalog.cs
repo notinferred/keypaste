@@ -102,6 +102,9 @@ public sealed record McpClient(
     /// <summary>Whether the client reads its configuration only when it starts.</summary>
     public bool ReadsAtLaunch { get; init; }
 
+    /// <summary>The link the client opens to add keypaste itself, which <see cref="McpInstallLink"/> composes.</summary>
+    public McpInstallLinkFormat InstallLink { get; init; }
+
     /// <summary>Whether the client runs on <paramref name="platform"/>.</summary>
     public bool RunsOn(McpClientPlatform platform) => (Platforms & Flag(platform)) != 0;
 
@@ -373,6 +376,7 @@ public static class McpClientCatalog
             Launcher = "code",
             MacApp = "Visual Studio Code.app",
             Expands = ["${"],
+            InstallLink = McpInstallLinkFormat.VsCode,
         },
         new("cursor", "Cursor", McpWiring.ConfigFile, Executable: null)
         {
@@ -381,6 +385,7 @@ public static class McpClientCatalog
             MacApp = "Cursor.app",
             Expands = ["${"],
             ReadsAtLaunch = true,
+            InstallLink = McpInstallLinkFormat.Cursor,
         },
         new("claude-desktop", "Claude Desktop", McpWiring.ConfigFile, Executable: null)
         {

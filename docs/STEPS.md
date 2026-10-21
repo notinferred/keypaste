@@ -83,12 +83,10 @@ Package managers and agent marketplaces carry a version only after it is publish
   - H-0022 decides the namespace, and whether a verified GitHub Release copy is acceptable.
 - [ ] **G.6d — Offer a Gemini CLI extension.** Needs: G.1. Ships after: 4.7c2.
   - It registers the same bridge, with the same rules for agents.
-- [ ] **G.6e — Publish Cursor and VS Code install links.** Needs: G.1. Ships after: 4.7c2.
-  - The links are composed from the same registration `setup` writes.
-  - They are used in the app, in `setup` output and on the site.
 - [ ] **G.7 — Publish a one-prompt setup page.** Needs: G.3, G.6e. Ships after: 4.7c2.
   - A keypaste.com page with one prompt an agent can follow: install through a verified channel, run `keypaste setup` and `keypaste doctor`, and never ask for a pasted secret.
   - `verify-demo.sh` checks its commands.
+  - The page also offers G.6e's Cursor and VS Code install links. A link there cannot name one computer's paths as `setup`'s do, so the page decides what its links start, or points to `keypaste setup --link`.
 - [ ] **L.2b — Move the guides onto keypaste.com.** Needs: L.1.
   - The guides L.1 rewrites move into `site/web` as their only home, and the repository keeps links to them; the checks that read `docs/demo.md` and the other transcript pages follow them.
   - The content pages gain a content security policy, checked in a browser against search and the diagrams.

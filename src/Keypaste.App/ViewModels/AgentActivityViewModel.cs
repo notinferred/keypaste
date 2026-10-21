@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
@@ -45,6 +46,8 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     private readonly AppAuthority? _authority;
     private readonly ClientConnector? _connector;
+    private readonly ClipboardCountdown? _clipboard;
+    private readonly IWebLauncher? _web;
     private readonly string _auditPath;
     private readonly string _clientsPath;
     private readonly TimeProvider _clock;
@@ -84,6 +87,8 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     /// <param name="connector">What finding and connecting AI tools reaches, or null to look for none.</param>
     /// <param name="toast">Says what a press did.</param>
     /// <param name="openHistory">Opens Agents › History.</param>
+    /// <param name="clipboard">Where a Connect pane copies a tool's install link.</param>
+    /// <param name="web">What opens a tool's install link.</param>
     internal AgentActivityViewModel(
         AppAuthority? authority,
         string? home,
@@ -91,10 +96,14 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         Action<Action>? post = null,
         ClientConnector? connector = null,
         Action<string>? toast = null,
-        Action? openHistory = null)
+        Action? openHistory = null,
+        ClipboardCountdown? clipboard = null,
+        IWebLauncher? web = null)
     {
         _authority = authority;
         _connector = authority is null ? null : connector;
+        _clipboard = clipboard;
+        _web = web;
         OpenHistoryCommand = new RelayCommand(() => openHistory?.Invoke(), () => openHistory is not null);
         _toast = toast ?? (_ => { });
         OffersHistory = openHistory is not null;
@@ -662,7 +671,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         CloseConnection();
 
-        var pane = new ConnectClientViewModel(_authority.Session, _connector, tool, removes, ran: Look, cancelled: Cancelled);
+        var pane = new ConnectClientViewModel(_authority.Session, _connector, tool, removes, ran: Look, cancelled: Cancelled, clipboard: _clipboard, web: _web);
         pane.PropertyChanged += OnConnectionChanged;
         _connecting = row;
         row.Connection = pane;

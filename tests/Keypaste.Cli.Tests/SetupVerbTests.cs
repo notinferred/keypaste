@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -93,6 +95,17 @@ public sealed class SetupVerbTests
 
     private static int RunSetup(CliHarness harness, params string[] extra) =>
         harness.Run(["setup", "--yes", "--vault", harness.VaultPath, .. extra]);
+
+    /// <summary>The lines of output that are a link starting with <paramref name="prefix"/>, each whole on its own line.</summary>
+    private static List<string> Printed(CliHarness harness, string prefix) =>
+        [.. harness.Out.Split('\n').Select(line => line.TrimEnd('\r')).Where(line => line.StartsWith(prefix, StringComparison.Ordinal))];
+
+    private static JsonNode? CursorEntry(string link)
+    {
+        const string Config = "&config=";
+        var encoded = link[(link.IndexOf(Config, StringComparison.Ordinal) + Config.Length)..];
+        return JsonNode.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(Uri.UnescapeDataString(encoded))));
+    }
 
     [Fact]
     public void Claude_code_is_told_the_scope_and_the_transport()
@@ -568,6 +581,92 @@ public sealed class SetupVerbTests
         Assert.Contains($"-- {ServerPath(harness)} mcp --approver keypaste-test-pipe --client-label claude-code", call, StringComparison.Ordinal);
         Assert.DoesNotContain("--audit-log", call, StringComparison.Ordinal);
         Assert.DoesNotContain("--vault", call, StringComparison.Ordinal);
+    }
+
+    /// <summary>On request each link is printed alone on its line, holding the entry a run writes, and printing it changes nothing.</summary>
+    [Fact]
+    public void Link_prints_the_entry_a_run_writes_as_each_tools_install_link_and_changes_nothing()
+    {
+        using var harness = Wired();
+        var cursor = McpClientCatalog.Find("cursor")!.Configuration!.PathOn(Machine(harness))!;
+
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("setup", "--link", "--vault", harness.VaultPath));
+
+        Assert.Contains("  vscode           open this link to have VS Code add keypaste:", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("  cursor           open this link to have Cursor add keypaste:", harness.Out, StringComparison.Ordinal);
+        Assert.Single(Printed(harness, McpInstallLink.VsCodePrefix));
+        var link = Assert.Single(Printed(harness, McpInstallLink.CursorPrefix));
+        Assert.Empty(harness.ProcessRunner.Calls);
+        Assert.False(File.Exists(cursor));
+
+        Seed(harness, "cursor", "{}");
+        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "cursor"));
+
+        var written = JsonNode.Parse(File.ReadAllText(cursor))!["mcpServers"]!["keypaste"];
+        Assert.True(JsonNode.DeepEquals(written, CursorEntry(link)), link);
+    }
+
+    [Fact]
+    public void Link_for_a_tool_that_takes_none_is_a_usage_error()
+    {
+        using var harness = Wired("codex");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("setup", "--link", "--client", "cursor,codex"));
+
+        Assert.Contains("keypaste: codex takes no install link; vscode and cursor do", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Out);
+    }
+
+    [Fact]
+    public void Link_with_remove_is_a_usage_error()
+    {
+        using var harness = Wired();
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("setup", "--link", "--remove"));
+
+        Assert.Empty(harness.Out);
+    }
+
+    /// <summary>A moved configuration keypaste does not follow is still the tool's own to write, so it is offered the link.</summary>
+    [Fact]
+    public void A_tool_whose_file_keypaste_cannot_find_is_offered_its_link()
+    {
+        using var harness = Wired();
+        Seed(harness, "vscode", "{}");
+        harness.Environment["VSCODE_PORTABLE"] = Path.Combine(harness.Directory, "portable");
+
+        harness.AssertExit(CliApp.ExitClientsRefused, RunSetup(harness, "--client", "vscode"));
+
+        Assert.Contains("  vscode           skipped", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("keypaste: VSCODE_PORTABLE is set", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("  vscode           or open this link to have VS Code add keypaste:", harness.Out, StringComparison.Ordinal);
+        Assert.Single(Printed(harness, McpInstallLink.VsCodePrefix));
+    }
+
+    [Fact]
+    public void A_tool_whose_file_keypaste_leaves_alone_is_offered_its_link()
+    {
+        using var harness = Wired();
+        const string Unreadable = """{ "mcpServers": [] }""";
+        var cursor = Seed(harness, "cursor", Unreadable);
+
+        harness.AssertExit(CliApp.ExitClientsRefused, RunSetup(harness, "--client", "cursor"));
+
+        Assert.Contains("  cursor           Cursor refused", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("  cursor           or open this link to have Cursor add keypaste:", harness.Out, StringComparison.Ordinal);
+        Assert.Single(Printed(harness, McpInstallLink.CursorPrefix));
+        Assert.Equal(Unreadable, File.ReadAllText(cursor));
+    }
+
+    [Fact]
+    public void A_tool_that_is_configured_is_offered_no_link()
+    {
+        using var harness = Wired();
+        Seed(harness, "cursor", "{}");
+
+        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "cursor"));
+
+        Assert.Empty(Printed(harness, McpInstallLink.CursorPrefix));
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Settings;
@@ -25,6 +26,11 @@ namespace Keypaste.App.ViewModels;
 /// command line and asks as the tool would, so the request meets this app's session, its prompt
 /// window and its audit log. The value it is released is discarded unread.
 /// </para>
+/// <para>
+/// <b>Cursor and VS Code can add keypaste themselves.</b> Their install link carries the entry Run it would write
+/// (<see cref="McpInstallLink"/>), so it is offered beside the plan, and stays offered when keypaste cannot write the
+/// tool's file, until Run it has connected the tool.
+/// </para>
 /// </remarks>
 internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 {
@@ -32,11 +38,14 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     private readonly ClientConnector _connector;
     private readonly Action? _ran;
     private readonly Action? _cancelled;
+    private readonly ClipboardCountdown? _clipboard;
+    private readonly IWebLauncher? _web;
     private readonly CancellationTokenSource _closing = new();
 
     private McpSetupPlan? _pending;
     private McpServerRegistration? _pendingRegistration;
     private McpServerRegistration? _registered;
+    private string? _installLink;
     private string _preview = string.Empty;
     private string _previewNote = string.Empty;
     private string _message = string.Empty;
@@ -53,7 +62,17 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     /// <param name="removes">Whether the pane disconnects the tool rather than connecting it.</param>
     /// <param name="ran">Called once Run it has run a plan, whatever came of it.</param>
     /// <param name="cancelled">Called once Cancel has dropped the plan.</param>
-    internal ConnectClientViewModel(AppVaultSession session, ClientConnector connector, McpClient client, bool removes, Action? ran = null, Action? cancelled = null)
+    /// <param name="clipboard">Where Copy link puts the tool's install link, or null to offer no copy.</param>
+    /// <param name="web">What opens the tool's install link, or null to offer no opening.</param>
+    internal ConnectClientViewModel(
+        AppVaultSession session,
+        ClientConnector connector,
+        McpClient client,
+        bool removes,
+        Action? ran = null,
+        Action? cancelled = null,
+        ClipboardCountdown? clipboard = null,
+        IWebLauncher? web = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(connector);
@@ -63,6 +82,8 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         _connector = connector;
         _ran = ran;
         _cancelled = cancelled;
+        _clipboard = clipboard;
+        _web = web;
         Client = client;
         Removes = removes;
 
@@ -70,6 +91,8 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         CancelCommand = new RelayCommand(Cancel, () => _pending is not null && !_isRunning);
         CheckCommand = new AsyncRelayCommand(CheckAsync, () => _registered is not null && !IsChecking);
         AskCommand = new AsyncRelayCommand(AskAsync, () => _check is not null && _checkEntry is not null && _checkEntries.Count > 0);
+        OpenInstallLinkCommand = new AsyncRelayCommand(OpenInstallLinkAsync, () => OffersInstallLink && _web is not null);
+        CopyInstallLinkCommand = new AsyncRelayCommand(CopyInstallLinkAsync, () => OffersInstallLink && _clipboard is not null);
 
         DependsOn(nameof(HasPreview), nameof(Preview));
         DependsOn(nameof(HasMessage), nameof(Message));
@@ -81,6 +104,9 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         DependsOn(CancelCommand, nameof(Pending), nameof(IsRunning));
         DependsOn(CheckCommand, nameof(Registered), nameof(IsChecking));
         DependsOn(AskCommand, nameof(IsChecking), nameof(SelectedCheckEntry), nameof(CheckEntries));
+        DependsOn(nameof(OffersInstallLink), nameof(InstallLink), nameof(Registered));
+        DependsOn(OpenInstallLinkCommand, nameof(InstallLink), nameof(Registered));
+        DependsOn(CopyInstallLinkCommand, nameof(InstallLink), nameof(Registered));
     }
 
     /// <summary>The tool this pane connects or disconnects.</summary>
@@ -161,6 +187,26 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     /// <summary>Asks for the entry picked from the check's listing.</summary>
     internal AsyncRelayCommand AskCommand { get; }
 
+    /// <summary>The link that has the tool add keypaste itself, holding the entry Run it would write; null for a tool that takes none.</summary>
+    internal string? InstallLink
+    {
+        get => _installLink;
+        private set => Set(ref _installLink, value);
+    }
+
+    /// <summary>Whether the link is offered: until Run it has connected the tool.</summary>
+    internal bool OffersInstallLink => _installLink is not null && _registered is null;
+
+    internal string OpenInstallLinkLabel => $"Open in {Client.DisplayName}";
+
+    /// <summary>What the link does, beside the plan or after keypaste could not write the tool's file.</summary>
+    internal string InstallLinkNote => $"Or let {Client.DisplayName} add keypaste itself: this link holds the same command.";
+
+    /// <summary>Hands the link to the system, which opens it in the tool.</summary>
+    internal AsyncRelayCommand OpenInstallLinkCommand { get; }
+
+    internal AsyncRelayCommand CopyInstallLinkCommand { get; }
+
     private McpSetupPlan? Pending
     {
         get => _pending;
@@ -173,6 +219,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     private async Task PreviewConnectAsync()
     {
         Forget();
+        InstallLink = null;
 
         // A tool may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both (D-0389).
         if (_session.VaultPath is not { } vault
@@ -204,6 +251,12 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         {
             Message = NotInstalled(client);
             return;
+        }
+
+        // Inside an AppImage the registration starts a link only Run it makes, so the tool's own link would start nothing.
+        if (target.Link is null && McpInstallLink.TryCreate(client, machine.Platform, registration, out var installLink, out _))
+        {
+            InstallLink = installLink;
         }
 
         if (!McpClientSetup.TryConnect(client, detection, registration, target.Link, out var plan, out var refusal))
@@ -298,6 +351,27 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         Forget();
         Message = "Cancelled. Nothing was changed.";
         _cancelled?.Invoke();
+    }
+
+    private async Task OpenInstallLinkAsync()
+    {
+        if (_installLink is not { } link || _web is null)
+        {
+            return;
+        }
+
+        if (!await _web.OpenAsync(new Uri(link)).ConfigureAwait(true))
+        {
+            Message = $"Your system didn't open the link. Copy it and paste it into your browser, which hands it to {Client.DisplayName}.";
+        }
+    }
+
+    private async Task CopyInstallLinkAsync()
+    {
+        if (_installLink is { } link && _clipboard is not null)
+        {
+            await _clipboard.CopyPlainAsync(link, $"{Client.DisplayName} install link").ConfigureAwait(true);
+        }
     }
 
     private async Task CheckAsync()

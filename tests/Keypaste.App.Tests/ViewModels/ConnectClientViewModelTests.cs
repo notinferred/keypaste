@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Linking;
@@ -75,6 +77,8 @@ public sealed class ConnectClientViewModelTests : IDisposable
         string? approver = null,
         Action? ran = null,
         Action? cancelled = null,
+        ClipboardCountdown? clipboard = null,
+        IWebLauncher? web = null,
         params string[] listed) =>
         new(
             Unlocked(home ?? DefaultHome),
@@ -92,7 +96,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
             McpClientCatalog.Find(tool)!,
             removes,
             ran,
-            cancelled);
+            cancelled,
+            clipboard,
+            web);
 
     private static Func<McpBridgeTargetResult> Serving(McpServerCommand server) =>
         () => new McpBridgeTargetResult(new McpBridgeTarget(server, Link: null, Note: null), Error: null);
@@ -387,6 +393,105 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Cursor_is_offered_the_link_holding_the_entry_run_it_writes_until_run_it_connects_it()
+    {
+        var file = Seed(Path.Combine(".cursor", "mcp.json"), "{}");
+        var clipboard = new FakeClipboard();
+        using var countdown = new ClipboardCountdown(clipboard, new ManualClock(AppClock.Start));
+        var launcher = new RecordingLauncher();
+        using var model = Model("cursor", clipboard: countdown, web: launcher);
+
+        await model.PreviewAsync();
+
+        Assert.True(McpInstallLink.TryCreate(model.Client, Machine.Platform, Expected("cursor"), out var expected, out var error), error);
+        Assert.Equal(expected, model.InstallLink);
+        Assert.True(model.OffersInstallLink);
+        Assert.Equal("Open in Cursor", model.OpenInstallLinkLabel);
+
+        await model.OpenInstallLinkCommand.ExecuteAsync();
+        await model.CopyInstallLinkCommand.ExecuteAsync();
+
+        Assert.Equal(expected, Assert.Single(launcher.Opened).AbsoluteUri);
+        Assert.Equal(expected, clipboard.Content);
+        Assert.False(clipboard.ContentWasSetAsASecret);
+        Assert.Equal("{}", File.ReadAllText(file));
+        Assert.Empty(_runner.Calls);
+
+        await model.ConfirmCommand.ExecuteAsync();
+
+        Assert.StartsWith("Connected.", model.Message, StringComparison.Ordinal);
+        Assert.False(model.OffersInstallLink);
+        Assert.False(model.OpenInstallLinkCommand.CanExecute(null));
+        Assert.False(model.CopyInstallLinkCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task A_file_keypaste_leaves_alone_keeps_the_link_offered()
+    {
+        const string Unreadable = """{ "mcpServers": [] }""";
+        var file = Seed(Path.Combine(".cursor", "mcp.json"), Unreadable);
+        using var model = Model("cursor", web: new RecordingLauncher());
+
+        await model.PreviewAsync();
+        await model.ConfirmCommand.ExecuteAsync();
+
+        Assert.EndsWith("nothing was written.", model.Message, StringComparison.Ordinal);
+        Assert.Null(model.Registered);
+        Assert.True(model.OffersInstallLink);
+        Assert.True(model.OpenInstallLinkCommand.CanExecute(null));
+        Assert.Equal(Unreadable, File.ReadAllText(file));
+    }
+
+    [Fact]
+    public async Task A_link_the_system_does_not_open_says_what_to_do_next()
+    {
+        Seed(Path.Combine(".cursor", "mcp.json"), "{}");
+        using var model = Model("cursor", web: new RecordingLauncher(opens: false));
+
+        await model.PreviewAsync();
+        await model.OpenInstallLinkCommand.ExecuteAsync();
+
+        Assert.Equal("Your system didn't open the link. Copy it and paste it into your browser, which hands it to Cursor.", model.Message);
+    }
+
+    [Fact]
+    public async Task A_tool_that_takes_no_link_is_offered_none()
+    {
+        using var model = Model(web: new RecordingLauncher());
+
+        await model.PreviewAsync();
+
+        Assert.True(model.HasPreview);
+        Assert.Null(model.InstallLink);
+        Assert.False(model.OpenInstallLinkCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task A_removal_is_offered_no_link()
+    {
+        Seed(Path.Combine(".cursor", "mcp.json"), _holdingKeypaste);
+        using var model = Model("cursor", removes: true, web: new RecordingLauncher());
+
+        await model.PreviewAsync();
+
+        Assert.True(model.HasPreview);
+        Assert.Null(model.InstallLink);
+    }
+
+    /// <summary>Inside an AppImage the registration starts a link only Run it makes, so a link opened first would start nothing.</summary>
+    [Fact]
+    public async Task Inside_an_appimage_no_link_is_offered_before_run_it_makes_the_one_it_starts()
+    {
+        Seed(Path.Combine(".cursor", "mcp.json"), "{}");
+        using var model = Model("cursor", findServer: Through(FakeCliLink.At(CliLinkState.Absent)), web: new RecordingLauncher());
+
+        await model.PreviewAsync();
+
+        Assert.True(model.HasPreview);
+        Assert.Null(model.InstallLink);
+    }
+
+    [Fact]
     public async Task A_refusal_is_reported_in_the_clients_words_and_leaves_nothing_to_check()
     {
         _runner.Refusal = "that scope is not writable here";
@@ -585,6 +690,18 @@ public sealed class ConnectClientViewModelTests : IDisposable
         }
 
         _fixture.Dispose();
+    }
+
+    /// <summary>Records each address the pane asks the platform to open, and answers as the platform would.</summary>
+    private sealed class RecordingLauncher(bool opens = true) : IWebLauncher
+    {
+        internal List<Uri> Opened { get; } = [];
+
+        public Task<bool> OpenAsync(Uri address)
+        {
+            Opened.Add(address);
+            return Task.FromResult(opens);
+        }
     }
 
     /// <summary>Records every client command except the installed probe, each by its bare command as the preview shows it.</summary>

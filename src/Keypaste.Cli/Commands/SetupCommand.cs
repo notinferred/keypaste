@@ -41,6 +41,7 @@ internal static class SetupCommand
         new("dry-run", TakesValue: false),
         new("remove", TakesValue: false),
         new("yes", TakesValue: false),
+        new("link", TakesValue: false),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -67,6 +68,11 @@ internal static class SetupCommand
             return CliApp.ExitUsageError;
         }
 
+        if (line.HasFlag("link"))
+        {
+            return WriteLinks(line, context, clients, platform);
+        }
+
         var removing = line.HasFlag("remove");
         var dryRun = line.HasFlag("dry-run");
         var assumeYes = line.HasFlag("yes");
@@ -91,7 +97,7 @@ internal static class SetupCommand
 
         if (!tools.Any(tool => tool.Installed))
         {
-            WriteSteps(context, tools, link: null, dryRun);
+            WriteSteps(context, tools, link: null, dryRun, offersLinks: false);
             context.Stderr.WriteLine("keypaste: no AI tool keypaste connects is installed here. Nothing was changed.");
             return CliApp.ExitNotFound;
         }
@@ -103,7 +109,7 @@ internal static class SetupCommand
 
         var acting = tools.Where(tool => tool.Plan is { IsNotConnected: false }).ToList();
         var link = acting.Count > 0 ? target?.Link : null;
-        WriteSteps(context, tools, link, dryRun);
+        WriteSteps(context, tools, link, dryRun, offersLinks: target is { Link: null });
 
         if (dryRun)
         {
@@ -133,6 +139,12 @@ internal static class SetupCommand
         {
             var result = McpClientSetup.Apply(tool.Plan!, context.ProcessRunner);
             Report(context, tool.Client, result, removing);
+
+            // Any link this run needed was made before the first tool step, so the tool's own link now starts this copy.
+            if (result.Status == McpSetupStatus.Refused && tool.InstallLink is { } offered)
+            {
+                Offer(context, tool.Client, offered, alternative: true);
+            }
 
             if (result.Status is McpSetupStatus.Done or McpSetupStatus.NotConnected)
             {
@@ -209,22 +221,97 @@ internal static class SetupCommand
             return new Tool(client, Installed: false, Plan: null, Skipped: null);
         }
 
-        if (detection.Problem is { } problem)
-        {
-            return new Tool(client, Installed: true, Plan: null, problem);
-        }
-
         if (registration is null)
         {
-            return new Tool(client, Installed: true, McpClientSetup.Remove(client, detection, McpClientConfig.Read(client, machine)), Skipped: null);
+            return detection.Problem is { } removalProblem
+                ? new Tool(client, Installed: true, Plan: null, removalProblem)
+                : new Tool(client, Installed: true, McpClientSetup.Remove(client, detection, McpClientConfig.Read(client, machine)), Skipped: null);
+        }
+
+        var offered = McpInstallLink.TryCreate(client, machine.Platform, registration, out var installLink, out _) ? installLink : null;
+
+        if (detection.Problem is { } problem)
+        {
+            return new Tool(client, Installed: true, Plan: null, problem, offered);
         }
 
         return McpClientSetup.TryConnect(client, detection, registration, link: null, out var plan, out var refusal)
-            ? new Tool(client, Installed: true, plan, Skipped: null)
-            : new Tool(client, Installed: true, Plan: null, refusal);
+            ? new Tool(client, Installed: true, plan, Skipped: null, offered)
+            : new Tool(client, Installed: true, Plan: null, refusal, offered);
     }
 
-    private static void WriteSteps(CliContext context, IReadOnlyList<Tool> tools, McpBridgeLink? link, bool dryRun)
+    /// <summary>Prints each selected tool's install link, composed from the registration a run would write, and changes nothing.</summary>
+    private static int WriteLinks(CommandLine line, CliContext context, IReadOnlyList<McpClient> clients, McpClientPlatform platform)
+    {
+        if (line.HasFlag("remove"))
+        {
+            context.Stderr.WriteLine("keypaste: --link prints links that add keypaste; it does not go with --remove");
+            return CliApp.ExitUsageError;
+        }
+
+        if (line.Value("client") is { Length: > 0 } && clients.FirstOrDefault(client => !TakesLink(client)) is { } unlinked)
+        {
+            context.Stderr.WriteLine($"keypaste: {unlinked.Id} takes no install link; {LinkedClientIds(platform)} do");
+            return CliApp.ExitUsageError;
+        }
+
+        var linked = clients.Where(TakesLink).ToList();
+        var machine = McpClientMachine.From(context.Environment.Get, platform);
+        Dictionary<string, McpServerRegistration> registrations = new(StringComparer.Ordinal);
+
+        if (!TryRegister(line, context, machine, linked, out var target, registrations))
+        {
+            return CliApp.ExitUsageError;
+        }
+
+        // Inside an AppImage the registration starts a link that only a run of setup makes.
+        if (target!.Link is { } bridge)
+        {
+            context.Stderr.WriteLine($"keypaste: {bridge.Link.LinkPath} does not start this copy yet, so a link would start nothing.");
+            context.Stderr.WriteLine("keypaste: run keypaste setup, which makes it. Nothing was changed.");
+            return CliApp.ExitUsageError;
+        }
+
+        WriteHeader(context, registrations[linked[0].Id], target.Note, ChosenVault.Read(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+
+        var offered = 0;
+
+        foreach (var client in linked)
+        {
+            if (McpInstallLink.TryCreate(client, platform, registrations[client.Id], out var link, out var error))
+            {
+                Offer(context, client, link, alternative: false);
+                offered++;
+            }
+            else
+            {
+                Line(context, client.Id, "no link");
+                context.Stderr.WriteLine($"keypaste: {error}");
+            }
+        }
+
+        if (offered == 0)
+        {
+            return CliApp.ExitClientsRefused;
+        }
+
+        WriteNextStep(context, registrations[linked[0].Id]);
+        return CliApp.ExitSuccess;
+    }
+
+    /// <summary>Prints the link that has the tool add keypaste itself, alone on its line so it is copied whole.</summary>
+    private static void Offer(CliContext context, McpClient client, string link, bool alternative)
+    {
+        Line(context, client.Id, (alternative ? "or open" : "open") + $" this link to have {client.DisplayName} add keypaste:");
+        context.Stdout.WriteLine(link);
+    }
+
+    private static bool TakesLink(McpClient client) => client.InstallLink != McpInstallLinkFormat.None;
+
+    private static string LinkedClientIds(McpClientPlatform platform) =>
+        string.Join(" and ", McpClientCatalog.For(platform).Where(TakesLink).Select(client => client.Id));
+
+    private static void WriteSteps(CliContext context, IReadOnlyList<Tool> tools, McpBridgeLink? link, bool dryRun, bool offersLinks)
     {
         if (link is not null)
         {
@@ -243,6 +330,12 @@ internal static class SetupCommand
             {
                 Line(context, tool.Client.Id, "skipped");
                 context.Stderr.WriteLine($"keypaste: {why}");
+
+                if (offersLinks && tool.InstallLink is { } offered)
+                {
+                    Offer(context, tool.Client, offered, alternative: true);
+                }
+
                 continue;
             }
 
@@ -425,7 +518,7 @@ internal static class SetupCommand
     private static void WriteUsage(TextWriter writer)
     {
         writer.WriteLine("usage: keypaste setup [--vault <path>] [--client <a,b>] [--label <name>]");
-        writer.WriteLine("                      [--expose <glob,glob>] [--dry-run] [--remove] [--yes]");
+        writer.WriteLine("                      [--expose <globs>] [--dry-run] [--remove] [--yes] [--link]");
         writer.WriteLine();
         writer.WriteLine("Finds the AI tools on this machine and points them at your vault.");
         writer.WriteLine();
@@ -436,12 +529,13 @@ internal static class SetupCommand
         writer.WriteLine("  --dry-run           print every step and change nothing");
         writer.WriteLine("  --remove            take keypaste out again, leaving everything else alone");
         writer.WriteLine("  --yes               change without asking; required when stdin is not a terminal");
+        writer.WriteLine("  --link              print links that have Cursor and VS Code add keypaste");
         writer.WriteLine();
         writer.WriteLine("An AI tool that ships its own command is configured with it. For one that does not,");
         writer.WriteLine("keypaste changes only its own part of the tool's configuration file and keeps");
         writer.WriteLine("the first original beside it.");
     }
 
-    /// <summary>One selected client: whether it is installed, and the plan for it or why it is skipped.</summary>
-    private sealed record Tool(McpClient Client, bool Installed, McpSetupPlan? Plan, string? Skipped);
+    /// <summary>One selected client: whether it is installed, the plan for it or why it is skipped, and the link that has it add keypaste itself.</summary>
+    private sealed record Tool(McpClient Client, bool Installed, McpSetupPlan? Plan, string? Skipped, string? InstallLink = null);
 }

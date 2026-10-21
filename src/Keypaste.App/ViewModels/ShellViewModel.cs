@@ -769,7 +769,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     private AgentActivityViewModel Activity() =>
-        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.AgentHistory));
+        new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.AgentHistory), Clipboard, _web);
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {

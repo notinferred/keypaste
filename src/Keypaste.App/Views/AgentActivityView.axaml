@@ -195,6 +195,25 @@
                             </StackPanel>
                           </StackPanel>
                           <TextBlock Classes="body" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                          <!-- Cursor and VS Code add keypaste themselves from a link holding the same entry (G.6e). -->
+                          <StackPanel Spacing="10" IsVisible="{Binding OffersInstallLink}">
+                            <TextBlock Classes="caption" Text="{Binding InstallLinkNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                            <Border Classes="terminal">
+                              <ScrollViewer HorizontalScrollBarVisibility="Auto">
+                                <SelectableTextBlock Name="InstallLink"
+                                                     Text="{Binding InstallLink}"
+                                                     Margin="14,12"
+                                                     FontFamily="{DynamicResource KpMono}"
+                                                     FontSize="12"
+                                                     Foreground="{DynamicResource KpGrey3}"
+                                                     AutomationProperties.Name="Install link" />
+                              </ScrollViewer>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <Button Name="OpenInstallLink" Content="{Binding OpenInstallLinkLabel}" Command="{Binding OpenInstallLinkCommand}" />
+                              <Button Name="CopyInstallLink" Classes="ghost" Content="Copy link" Command="{Binding CopyInstallLinkCommand}" />
+                            </StackPanel>
+                          </StackPanel>
                           <StackPanel Spacing="10" IsVisible="{Binding OffersCheck}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <Button Name="CheckConnection" Content="Check the connection" Command="{Binding CheckCommand}" />

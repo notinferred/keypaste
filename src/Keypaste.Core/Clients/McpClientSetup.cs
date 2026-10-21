@@ -249,13 +249,10 @@ public static class McpClientSetup
             return false;
         }
 
-        foreach (var marker in client.ExpansionMarkers(detection.Platform))
+        if (Rewritten(client, detection.Platform, registration) is { } rewritten)
         {
-            if (registration.CommandLine().FirstOrDefault(word => word.Contains(marker, StringComparison.Ordinal)) is { } rewritten)
-            {
-                error = $"{client.DisplayName} would rewrite {marker} in {rewritten}, so it would not start what keypaste registers";
-                return false;
-            }
+            error = rewritten;
+            return false;
         }
 
         List<McpSetupStep> steps = link is null ? [] : [link];
@@ -379,6 +376,20 @@ public static class McpClientSetup
         }
 
         return new McpSetupResult(McpSetupStatus.LinkFailed, LinkFailure(link.Link, result), Backup: null);
+    }
+
+    /// <summary>Why <paramref name="client"/> would not start what <paramref name="registration"/> says on <paramref name="platform"/>, or null when it would.</summary>
+    internal static string? Rewritten(McpClient client, McpClientPlatform platform, McpServerRegistration registration)
+    {
+        foreach (var marker in client.ExpansionMarkers(platform))
+        {
+            if (registration.CommandLine().FirstOrDefault(word => word.Contains(marker, StringComparison.Ordinal)) is { } rewritten)
+            {
+                return $"{client.DisplayName} would rewrite {marker} in {rewritten}, so it would not start what keypaste registers";
+            }
+        }
+
+        return null;
     }
 
     private static string? Unreachable(McpClient client, McpClientDetection detection) => detection switch

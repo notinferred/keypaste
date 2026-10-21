@@ -236,10 +236,10 @@ public sealed partial class PlainWordsTests
         }
     }
 
-    /// <summary>A plan is the commands a tool runs, and history's rows keep the words the log records, so only its column heads are prose.</summary>
+    /// <summary>A plan is the commands a tool runs, an install link encodes them, and history's rows keep the words the log records, so only its column heads are prose.</summary>
     private static string Prose(TextBlock block) => block.Name switch
     {
-        "ConnectPlan" => string.Empty,
+        "ConnectPlan" or "InstallLink" => string.Empty,
         "SessionHistory" => (block.Text ?? string.Empty).Split(Environment.NewLine)[0],
         _ => block.Text ?? string.Empty,
     };
