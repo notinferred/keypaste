@@ -65,5 +65,6 @@ D-0466 in [DECISIONS](../../DECISIONS.md). T-7, T-10, T-11 and T-29 in [THREATS]
 - The notice may sit over the unlock form.
 - Deleting `app.toml` while the app is locked is not followed until the next lock. Where the system refuses the file watch, such as at Linux's limit on watches, the chosen vault is read again only at the next lock or change of the unlock screen.
 - With no app running, each refusal for want of an owner spends up to 200 ms on the knock.
+- Knocks in quick succession could go unheard. On Windows, a bridge that hung up before the app waited again was lost. On Unix, making the endpoint anew dropped a bridge queued behind the one being answered. [F.66](F.66.md) found both and fixed them.
 - The listing's audit line keeps today's reason while its agent reads the locked text.
 - Source only.
