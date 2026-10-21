@@ -1,6 +1,6 @@
 # N.8 — `keypaste` alone shows where things stand
 
-Completed 2026-10-21, source only; runs RUN_IDS.
+Completed 2026-10-21 on `main` at `c208ad6`, source only: ci 39633992142 and app 39633992293, every job green, and ci 39634014306 ran the `tools` jobs.
 
 ## Amendments
 
@@ -34,3 +34,9 @@ D-0471.
 - Width is counted in UTF-16 code units, so a path with wide or combining characters can pass 80 columns on screen.
 - `keypaste --vault <path>` with no verb is still an unknown command; the status always shows the vault keypaste finds without a flag.
 - The pseudo-terminal check does not run on Windows.
+
+
+## What failed on the way
+
+- **The new gate failed on macOS** in app 39628706366 and 39630638040. The status was right, but macOS's `script` writes `^D` and two backspaces, from its empty input, before the output, so the version line did not match.
+- **The fix.** The gate strips that echo. Dev run 39631007950 passed `desktop-gates` on macOS before `c208ad6` integrated the fix.

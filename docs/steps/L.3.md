@@ -1,6 +1,6 @@
 # L.3 — Write the safe-agent guide
 
-Completed 2026-10-21 on `task/L.3` above `e68a366`, source only; runs RUN_IDS.
+Completed 2026-10-21 on `main` at `c208ad6`, source only: ci 39633992142 and app 39633992293, every job green, and ci 39634014306 ran the `tools` jobs.
 
 ## Amendments
 
@@ -24,7 +24,7 @@ Nothing was built or run on this machine beyond `bash -n` over the two changed s
 
 - **Documentation read on 2026-10-21**, as the guide's Sources list it: Claude Code's sandboxing, settings reference, sandbox environments, permissions and permission modes; Codex's sandbox, agent approvals and security, permissions, Windows sandbox, configuration reference, developer commands and MCP pages; Cursor's run modes, `sandbox.json` reference, agent security, MCP, CLI parameters and CLI configuration pages.
 - **Source, where the documentation is silent.** Codex `rust-v0.162.1`: `cli/src/main.rs` and `lib.rs` give `codex sandbox` the host's options directly (`--permission-profile`, `-C`, `--allow-unix-socket` on macOS) and take `-c` overrides before `sandbox`; `debug_sandbox.rs` takes the policy from the loaded configuration; `seatbelt_base_policy.sbpl` allows `process-info*` only for `(target same-sandbox)`; `linux-sandbox/src/bwrap.rs` passes `--unshare-pid` and `--proc /proc`. `@anthropic-ai/sandbox-runtime` 0.0.79 from npm: `macos-sandbox-utils.js` has the same `process-info*` rule and `linux-sandbox-utils.js` passes `--unshare-pid`.
-- **Gate.** [verify-real-tools.sh](../../scripts/verify-real-tools.sh), after setup and each tool's reader, on Linux and macOS: from the project folder, `codex -c 'sandbox_mode="workspace-write"' sandbox -- /bin/sh -c …` appends to a file in that folder, which must land; the same append to `$HOME/.keypaste/clients.toml` and to Codex's `config.toml` must exit non-zero with the system's refusal (not permitted, read-only file system or permission denied), so a timeout does not pass, and leave each file's bytes as they were; then Gemini CLI's bridge must start again, open the pinned audit log and leave the default home's alone. [install-real-tools.sh](../../scripts/install-real-tools.sh) adds Ubuntu's `bubblewrap` and lifts the user-namespace restriction on Linux. Runs RUN_IDS.
+- **Gate.** [verify-real-tools.sh](../../scripts/verify-real-tools.sh), after setup and each tool's reader, on Linux and macOS: from the project folder, `codex -c 'sandbox_mode="workspace-write"' sandbox -- /bin/sh -c …` appends to a file in that folder, which must land; the same append to `$HOME/.keypaste/clients.toml` and to Codex's `config.toml` must exit non-zero with the system's refusal (not permitted, read-only file system or permission denied), so a timeout does not pass, and leave each file's bytes as they were; then Gemini CLI's bridge must start again, open the pinned audit log and leave the default home's alone. [install-real-tools.sh](../../scripts/install-real-tools.sh) adds Ubuntu's `bubblewrap` and lifts the user-namespace restriction on Linux. Runs ci 39633992142 and app 39633992293.
 
 ## Decisions
 

@@ -1,6 +1,6 @@
 # G.6e — Install Cursor and VS Code from a link
 
-Completed 2026-10-21 in `<sha>`, source only; runs RUN_IDS.
+Completed 2026-10-21 on `main` at `c208ad6`, source only: ci 39633992142 and app 39633992293, every job green, and ci 39634014306 ran the `tools` jobs.
 
 ## Amendments
 
@@ -21,7 +21,7 @@ The row asked for Cursor and VS Code install links composed from the registratio
 
 ## Evidence
 
-Source only: no build or test ran on the founder's machine, and the integrator's compile check and RUN_IDS are the evidence.
+Source only: no build or test ran on the founder's machine, and the integrator's compile check and ci 39633992142 and app 39633992293 are the evidence.
 
 - `McpInstallLinkTests`: Cursor's link decodes to exactly `FileEntry(typed: false)`, its only members `command` and `args` and its argv the registration's `CommandLine()`; VS Code's decodes to `name`, `type`, `command` and `args`, the rest exactly `FileEntry(typed: true)`; each over three pairs of server and vault paths, plain, with spaces, `&`, `+`, `#`, `%` and double quotes, and in Japanese, each link pure ASCII with no space, quote or `#`, one `&` in Cursor's and none in VS Code's, and equal to its own `Uri.AbsoluteUri`; an unpinned registration's link names no `--vault`; a `${` in the vault gives no link with `TryConnect`'s own refusal; only Cursor and VS Code take one.
 - `SetupVerbTests`: `--link` prints both links in a harness with no tool installed, starts nothing and creates no file, and Cursor's decodes to the entry a following run writes; `--client cursor,codex --link` and `--link --remove` are usage errors; VS Code skipped under `VSCODE_PORTABLE` and Cursor refused over `{ "mcpServers": [] }` each print their link, the refused file unchanged; a configured Cursor prints none.

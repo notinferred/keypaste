@@ -1,6 +1,6 @@
 # G.6b — A Claude Desktop extension that starts the installed keypaste
 
-Completed 2026-10-21 on `task/G.6b`, source only; runs RUN_IDS. The bundle is packed and checked in CI and published nowhere: the row ships after 4.7c2.
+Completed 2026-10-21 on `main` at `c208ad6`, source only: ci 39633992142 and app 39633992293, every job green, and ci 39634014306 ran the `tools` jobs. The bundle is packed and checked in CI and published nowhere: the row ships after 4.7c2.
 
 ## Amendments
 
@@ -29,7 +29,7 @@ The founder delegated the row's open choices on 2026-10-21: where the row leaves
 - `verify.sh workflows` shellchecks the script.
 - Nothing was run on the founder's machine except `bash -n`, `node --check`, and `npm install --package-lock-only --ignore-scripts`, which resolved the lock and installed nothing.
 - The lock's integrity for `@anthropic-ai/mcpb` 2.1.2 matches the registry's `dist.integrity`.
-- Runs: RUN_IDS.
+- Runs: ci 39633992142 and app 39633992293.
 
 ## Decisions
 
@@ -41,5 +41,5 @@ D-0474 (the bundle and its launcher) and D-0475 (packing and checking it in CI).
 - **Only the Linux path is checked.** The check runs only the launcher's Linux branch, `~/.local/bin` and PATH. Its macOS and Windows places, and Claude Desktop installing and starting the bundle, run in no check until the bundle's installation is verified.
 - **Claude Desktop can hold keypaste twice.** If setup or Connect has already written keypaste's entry into `claude_desktop_config.json`, installing the extension gives Claude Desktop two keypaste servers under one label. Setup does not yet detect the extension.
 - **No custom home.** A `KEYPASTE_HOME` other than the default, which setup pins with flags (D-0389), is not supported by the extension.
-- **Time limits are estimates.** The step's 2-minute limit and the job's 5 minutes are estimates until RUN_IDS show the step's time.
+- **Time limits are estimates.** The step's 2-minute limit and the job's 5 minutes are estimates until ci 39633992142 and app 39633992293 show the step's time.
 - **The CLI calls version 0.3 unfinished.** The CLI's own 0.3 schema file is marked work in progress, while the specification calls 0.3 current.
