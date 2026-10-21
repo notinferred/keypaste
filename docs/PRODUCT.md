@@ -1,6 +1,6 @@
 # Product rules
 
-Last ratified: 2026-10-10 (v1.12, D-0430): an agent receives a value on a person's answer or a rule they set; every bridge keypaste connects offers run, off until the person turns it on for that agent; an agent may ask only about its own settings, and a change that gives it more takes effect only once the person confirms it; the Agent Credential Access Format is keypaste's storage format for agent access; and T7 adds an agent that organizes the vault without seeing its values. v1.11's break with keypaste's own releases before 0.5.0 (D-0416), v1.10's cloud vault and server access (D-0408), v1.9's end state (D-0400) and v1.8's KeePass-first product and track order (D-0367) otherwise stand. Earlier versions remain in Git. Scope changes update this document, ROADMAP, STEPS and the decision record together. The security laws in §3 remain fixed.
+Last ratified: 2026-10-21 (v1.13, D-0482): keypaste may create a key file the person asks for, written once where they choose (§3.4), and the security laws change only by a dated re-ratification. v1.12 (D-0430) stands: an agent receives a value on a person's answer or a rule they set; every bridge keypaste connects offers run, off until the person turns it on for that agent; an agent may ask only about its own settings, and a change that gives it more takes effect only once the person confirms it; the Agent Credential Access Format is keypaste's storage format for agent access; and T7 adds an agent that organizes the vault without seeing its values. v1.11's break with keypaste's own releases before 0.5.0 (D-0416), v1.10's cloud vault and server access (D-0408), v1.9's end state (D-0400) and v1.8's KeePass-first product and track order (D-0367) otherwise stand. Earlier versions remain in Git. Scope changes update this document, ROADMAP, STEPS and the decision record together. The security laws in §3 change only by a dated re-ratification.
 
 ## 1. Product
 
@@ -63,7 +63,7 @@ Under v1.8, share links, scoped tokens and `--allow-run` remain in scope as adva
 1. The vault master key never leaves the local process, including through telemetry or an encrypted server backup. There are no exceptions.
 2. Agents never get the vault. Each release contains one credential with one scope and TTL, following explicit human approval or a pre-approved policy the human wrote. Default is deny.
 3. Every agent access has an immutable, local, human-readable log recording who or what requested which entry, when, and whether access was granted or denied.
-4. Keypaste never writes secrets to disk unencrypted. Injection uses process environment memory only.
+4. Keypaste never writes secrets to disk unencrypted, except a key file the person asks keypaste to create, written once where they choose. Injection uses process environment memory only.
 5. Analytics and telemetry never include secret content or entry names. Only opt-in anonymous usage counts are permitted.
 6. Use the KDBX4 specification (Argon2, AES-256/ChaCha20) through mature audited libraries. Never write custom cryptography or modify the format.
 7. Fail closed: every error path in the agent bridge denies access.
