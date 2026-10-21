@@ -443,6 +443,13 @@ internal static class SetupCommand
             chosen.Add(client);
         }
 
+        if (chosen.Count == 0)
+        {
+            unknown = requested;
+            clients = [];
+            return false;
+        }
+
         clients = chosen;
         return true;
     }

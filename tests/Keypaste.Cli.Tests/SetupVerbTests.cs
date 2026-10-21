@@ -617,6 +617,20 @@ public sealed class SetupVerbTests
         Assert.Empty(harness.Out);
     }
 
+    [Theory]
+    [InlineData(",")]
+    [InlineData(" ")]
+    public void A_client_list_that_names_no_tool_is_a_usage_error(string requested)
+    {
+        using var harness = Wired();
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("setup", "--link", "--client", requested));
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("setup", "--client", requested));
+
+        Assert.Contains($"keypaste: no AI tool called '{requested}'.", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Out);
+    }
+
     [Fact]
     public void Link_with_remove_is_a_usage_error()
     {
