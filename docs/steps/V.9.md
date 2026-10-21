@@ -55,7 +55,7 @@ Nothing was built or run on this machine; every test runs on GitHub.
 - keypaste loads no common-password list into the estimator, so a password built on a common word is rated by its characters alone and can pass where a list of common passwords would mark it weak. Vendoring one is a new dependency on the secret path (PRODUCT §3.9) and is held for the founder.
 - A dismissed weak or reused password stays dismissed after it changes (D-0479).
 - An expiry that passes while the vault is unlocked is listed at the next save or unlock.
-- The check rates every password on the UI thread, under the vault's lock, after each save; the estimator bounds itself at half a second for one password, and a vault of many thousands of items has not been measured.
+- The check rates every password on the UI thread, under the vault's lock, after each save; the estimator rates a password of at most 256 characters, so a longer one is never reported weak though its reuse is, and a vault of many thousands of items has not been measured.
 - Custom fields are not rated or compared, so an API key reused across items is not found.
 - Which of `QualityCheck` and `KnownBad` KeePassXC 2.7 writes when an entry is excluded from its reports was not observed here; both are read, and only KeePassLib wrote them in the tests.
 - No row opens its item; the caption points to Items. A button that opens Items on the item would need Items to select an item when another screen asks, which nothing does yet.

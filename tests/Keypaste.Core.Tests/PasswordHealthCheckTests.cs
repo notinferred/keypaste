@@ -64,6 +64,25 @@ public sealed class PasswordHealthCheckTests : IDisposable
     }
 
     [Fact]
+    public void A_password_too_long_to_rate_is_not_weak_and_its_reuse_is_still_found()
+    {
+        var repeated = new string('a', 8 * 1024);
+
+        Seed(created =>
+        {
+            Add(created, _forum, repeated);
+            Add(created, _shop, repeated);
+            Add(created, _mail, new string('b', 257));
+        });
+
+        using var vault = Vault.Open(VaultPath, _master);
+
+        Assert.Equal(
+            [(_forum, PasswordProblem.Reused), (_shop, PasswordProblem.Reused)],
+            PasswordHealthCheck.Scan(vault, _now).Select(finding => (finding.Entry, finding.Problem)));
+    }
+
+    [Fact]
     public void An_expiry_at_the_moment_of_the_check_has_passed_and_one_a_second_later_has_not()
     {
         Seed(created =>

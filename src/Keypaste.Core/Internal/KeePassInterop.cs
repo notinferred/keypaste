@@ -38,6 +38,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The entry custom data KeePassXC reads, besides KDBX 4.1's <c>QualityCheck</c>, as leaving an entry out of its reports.</summary>
     private const string _excludedFromReports = "KnownBad";
 
+    /// <summary>The longest password, in characters, the estimator rates: its repetition pass grows with the cube of the length and runs under the vault's lock, and KeePassXC stops at the same length.</summary>
+    private const int _longestRated = 256;
+
     private readonly PwDatabase _database;
     private bool _disposed;
     private bool _readOnly;
@@ -2535,7 +2538,7 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
-    /// <summary>KeePass's estimate of a password and its HMAC under <paramref name="key"/>, or nulls when it is empty or holds a placeholder.</summary>
+    /// <summary>KeePass's estimate of a password and its HMAC under <paramref name="key"/>, or nulls when it is empty or holds a placeholder; one longer than <see cref="_longestRated"/> has a digest and no estimate.</summary>
     /// <remarks>The UTF-8 copy is zeroed before this returns, and the estimator zeroes its own.</remarks>
     private static (uint? Bits, string? Digest) Rate(ProtectedString password, byte[] key)
     {
@@ -2553,7 +2556,9 @@ internal sealed class KeePassInterop : IDisposable
                 return (null, null);
             }
 
-            return (QualityEstimation.EstimatePasswordBits(utf8), Convert.ToHexString(HMACSHA256.HashData(key, utf8)));
+            uint? bits = Encoding.UTF8.GetCharCount(utf8) <= _longestRated ? QualityEstimation.EstimatePasswordBits(utf8) : null;
+
+            return (bits, Convert.ToHexString(HMACSHA256.HashData(key, utf8)));
         }
         finally
         {
