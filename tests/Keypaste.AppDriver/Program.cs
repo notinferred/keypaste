@@ -825,7 +825,7 @@ internal sealed class Driver(string home)
             : Refused(settings.Message);
     }
 
-    /// <summary>Lists Settings › Recommendations as the app checked it on unlock: entry, key, kind and state, never a value.</summary>
+    /// <summary>Lists the keys Settings › Recommendations found in notes on unlock, and how many need review: entry, key, kind and state, never a value.</summary>
     internal Task<int> ReviewNotesAsync(string vault) =>
         WithRecommendationsAsync(vault, list =>
         {
@@ -836,7 +836,7 @@ internal sealed class Driver(string home)
                 Console.Out.WriteLine($"finding entry={row.Entry} key={row.Key} kind={kind} state={state}");
             }
 
-            Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.NeedsReview}"));
+            Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.Rows.Count(row => row.NeedsReview)}"));
             return 0;
         });
 
@@ -882,7 +882,7 @@ internal sealed class Driver(string home)
             return list.Message.Length == 0 ? Did("restored") : Refused(list.Message);
         });
 
-    /// <summary>Lists the project tags Settings › Recommendations found dropped: entry, tag and state, never a value (V.11).</summary>
+    /// <summary>Lists the project tags Settings › Recommendations found dropped, and how many need review: entry, tag and state, never a value (V.11).</summary>
     internal Task<int> ReviewLostTagsAsync(string vault) =>
         WithRecommendationsAsync(vault, list =>
         {
@@ -892,7 +892,7 @@ internal sealed class Driver(string home)
                 Console.Out.WriteLine($"lost entry={row.Entry} tag={row.Tag} state={state}");
             }
 
-            Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.NeedsReview}"));
+            Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.LostTags.Count(row => row.NeedsReview)}"));
             return 0;
         });
 

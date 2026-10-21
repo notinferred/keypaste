@@ -15,6 +15,9 @@ internal sealed class TempVault : IDisposable
 {
     internal const string Password = "correct-horse-battery-staple";
 
+    /// <summary>The password of the vault's one item, strong and used once, so Settings › Recommendations has nothing to say about it (V.9).</summary>
+    internal const string ExamplePassword = "entry-secret-7Kq2Vx9mZ4";
+
     private readonly string _directory;
 
     internal TempVault()
@@ -25,7 +28,7 @@ internal sealed class TempVault : IDisposable
         Path_ = Path.Combine(_directory, "test.kdbx");
 
         using var vault = Vault.Create(Path_, Password);
-        vault.AddEntry(new VaultEntry { Title = "example", Password = "entry-secret" });
+        vault.AddEntry(new VaultEntry { Title = "example", Password = ExamplePassword });
         vault.Save();
     }
 

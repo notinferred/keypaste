@@ -142,7 +142,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         };
     }
 
-    /// <summary>Keys left in notes, owned by the shell for the unlock; null where no shell built this screen.</summary>
+    /// <summary>Recommendations, owned by the shell for the unlock; null where no shell built this screen.</summary>
     internal RecommendationsViewModel? Recommendations { get; }
 
     internal bool HasRecommendations => Recommendations is not null;

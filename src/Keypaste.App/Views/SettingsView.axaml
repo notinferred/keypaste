@@ -78,8 +78,8 @@
           <TextBlock Classes="subtitle" Text="Saved on this machine, and in force as soon as you change them." />
         </StackPanel>
 
-        <!-- Recommendations (C.2, V.11): keys left in notes, named by entry and key, never by value, and project
-             tags another app dropped. No amber here. -->
+        <!-- Recommendations (C.2, V.11, V.9): keys left in notes, named by entry and key, never by value, project
+             tags another app dropped, and weak, reused or expired passwords, named by item and problem. No amber here. -->
         <Panel IsVisible="{Binding HasRecommendations}">
         <Border Name="RecommendationsCard"
                 Classes="card filled settings"
@@ -95,10 +95,10 @@
             <Border Classes="settings-row">
               <TextBlock Classes="caption"
                          TextWrapping="Wrap"
-                         Text="Keys left in notes and project tags another app dropped, checked on this machine when you unlock and after each save. Nothing changes until you choose." />
+                         Text="Keys left in notes, passwords that are weak, reused or past their expiry date, and project tags another app dropped, checked on this machine when you unlock and after each save. Nothing changes until you choose." />
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding IsEmpty}">
-              <TextBlock Name="RecommendationsEmpty" Classes="caption" Text="No keys found in notes, and no project tags dropped." />
+              <TextBlock Name="RecommendationsEmpty" Classes="caption" Text="No keys found in notes, no weak, reused or expired passwords, and no project tags dropped." />
             </Border>
             <ItemsControl Name="RecommendationRows" ItemsSource="{Binding Rows}" IsVisible="{Binding HasNoteKeys}">
               <ItemsControl.ItemTemplate>
@@ -202,6 +202,41 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- V.9: an item whose password is weak or reused, or that has expired, named by item and problem and never by value. -->
+            <ItemsControl Name="PasswordRows" ItemsSource="{Binding Passwords}" IsVisible="{Binding HasPasswords}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PasswordRow">
+                  <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="20,12">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
+                          AutomationProperties.Name="{Binding Description}">
+                      <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Name="PasswordProblem"
+                                     Text="{Binding Problem}"
+                                     FontSize="13.5"
+                                     FontWeight="Medium"
+                                     Foreground="{DynamicResource KpTextPrimary}"
+                                     VerticalAlignment="Center" />
+                          <Border Classes="chip outline state" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding StateLabel}" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Classes="caption" Text="{Binding Where}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Classes="sm ghost" Content="Dismiss" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border Classes="settings-row" IsVisible="{Binding HasPasswords}">
+              <TextBlock Classes="caption"
+                         TextWrapping="Wrap"
+                         Text="Replace a weak or reused password on its item in Items; a generated one is strong and used nowhere else. An expiry date is changed in KeePassXC or the app that set it." />
+            </Border>
             <Border Classes="settings-row" IsVisible="{Binding HasMessage}">
               <TextBlock Name="RecommendationsMessage"
                          Classes="caption"

@@ -235,7 +235,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Stops waiting for the YubiKey, so the save fails and writes nothing.</summary>
     internal RelayCommand CancelTouchCommand { get; }
 
-    /// <summary>Keys left in notes, checked on unlock and after each save, and listed only in Settings.</summary>
+    /// <summary>Recommendations, checked on unlock and after each save, and listed only in Settings.</summary>
     internal RecommendationsViewModel Recommendations { get; }
 
     /// <summary>The auto-clearing clipboard, and the toast that counts it down.</summary>

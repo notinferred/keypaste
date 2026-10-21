@@ -112,9 +112,6 @@ Each row keeps its historical meaning and is expanded when selected.
   - One import contract, with preview, collision decisions and atomic commit, so nothing is dropped silently.
   - Its adapters, each Needs 9.1a: 9.1b (Bitwarden JSON), 9.1c (LastPass CSV), 9.1d1 (1Password 1PUX), 9.1d2 (1Password CSV) and 9.1e (KeePassXC CSV).
   - 9.1f guides import in the desktop.
-- [ ] **V.9 — Report local password health.** Needs: C.2.
-  - Find weak, reused and expired credentials locally, with no network request.
-  - Report them in the same Recommendations list.
 - [ ] **P.1 — Hardware-key vault unlocking.** Needs: V.1b, U.2. Ships after: R.1.
   - The desktop already unlocks a vault that needs a YubiKey slot and changes the key in Settings (D-0366), but this has not been tried with a physical key.
   - What remains:

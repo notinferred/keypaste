@@ -2303,6 +2303,17 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>Every live entry's password rating and expiry outside keypaste's own groups, for <see cref="PasswordHealthCheck"/>.</summary>
+    internal IReadOnlyList<EntryPasswordHealth> ReadPasswordHealth()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        lock (_state)
+        {
+            return _interop.ReadPasswordHealth();
+        }
+    }
+
     /// <summary>What one entry's move writes, or null with its refusals added.</summary>
     private (List<FieldWrite> Writes, string Notes)? PlanNoteMove(
         NoteKeyCheck check,

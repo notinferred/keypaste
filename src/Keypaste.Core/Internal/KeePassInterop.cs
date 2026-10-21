@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.ComponentModel;
 using KeePassLib;
+using KeePassLib.Cryptography;
 using KeePassLib.Cryptography.Cipher;
 using KeePassLib.Cryptography.KeyDerivation;
 using KeePassLib.Keys;
@@ -33,6 +34,9 @@ internal sealed class KeePassInterop : IDisposable
 {
     /// <summary>What KeePass and KeePassXC call the recycle bin, and so does keypaste.</summary>
     internal const string RecycleBinName = "Recycle Bin";
+
+    /// <summary>The entry custom data KeePassXC reads, besides KDBX 4.1's <c>QualityCheck</c>, as leaving an entry out of its reports.</summary>
+    private const string _excludedFromReports = "KnownBad";
 
     private readonly PwDatabase _database;
     private bool _disposed;
@@ -1202,6 +1206,29 @@ internal sealed class KeePassInterop : IDisposable
         List<LostProjectTag> lost = [];
         CollectLostProjectTags(_database.RootGroup, string.Empty, lost, Bin());
         return lost;
+    }
+
+    /// <summary>Every live entry's password rating and expiry outside keypaste's own groups, by the traversal <see cref="Collect"/> uses (V.9).</summary>
+    /// <remarks>
+    /// No password in <see cref="ReservedGroups"/> is decrypted. The digests are HMACs under a key drawn for this read and
+    /// zeroed after it, so they compare passwords within it and confirm nothing outside it.
+    /// </remarks>
+    internal IReadOnlyList<EntryPasswordHealth> ReadPasswordHealth()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+
+        try
+        {
+            List<EntryPasswordHealth> found = [];
+            CollectPasswordHealth(_database.RootGroup, string.Empty, found, Bin(), key);
+            return found;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
     }
 
     /// <summary>Every live entry carrying a tag of its own, by the traversal <see cref="Collect"/> uses.</summary>
@@ -2479,6 +2506,58 @@ internal sealed class KeePassInterop : IDisposable
             {
                 CollectNotes(child, ChildPath(groupPath, child.Name), found, bin);
             }
+        }
+    }
+
+    private static void CollectPasswordHealth(PwGroup group, string groupPath, List<EntryPasswordHealth> found, PwGroup? bin, byte[] key)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            var (bits, digest) = Rate(entry.Strings.GetSafe(PwDefs.PasswordField), key);
+
+            found.Add(new EntryPasswordHealth(
+                new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)),
+                entry.Uuid.ToHexString(),
+                bits,
+                digest,
+                entry.Expires ? new DateTimeOffset(TimeUtil.ToUtc(entry.ExpiryTime, true)) : null,
+                !entry.QualityCheck || entry.CustomData.Get(_excludedFromReports) == "true"));
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            var childPath = ChildPath(groupPath, child.Name);
+
+            if (!ReferenceEquals(child, bin) && !ReservedGroups.IsReserved(childPath))
+            {
+                CollectPasswordHealth(child, childPath, found, bin, key);
+            }
+        }
+    }
+
+    /// <summary>KeePass's estimate of a password and its HMAC under <paramref name="key"/>, or nulls when it is empty or holds a placeholder.</summary>
+    /// <remarks>The UTF-8 copy is zeroed before this returns, and the estimator zeroes its own.</remarks>
+    private static (uint? Bits, string? Digest) Rate(ProtectedString password, byte[] key)
+    {
+        if (password.IsEmpty)
+        {
+            return (null, null);
+        }
+
+        byte[] utf8 = password.ReadUtf8();
+
+        try
+        {
+            if (utf8.AsSpan().Contains((byte)'{') && KeePassPlaceholders.Holds(Encoding.UTF8.GetString(utf8)))
+            {
+                return (null, null);
+            }
+
+            return (QualityEstimation.EstimatePasswordBits(utf8), Convert.ToHexString(HMACSHA256.HashData(key, utf8)));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(utf8);
         }
     }
 

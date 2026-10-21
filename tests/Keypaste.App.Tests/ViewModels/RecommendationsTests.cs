@@ -14,6 +14,10 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </summary>
 public sealed class RecommendationsTests : IDisposable
 {
+    // Strong and used once each, so the keys in notes are all the list holds (V.9).
+    private const string _stripeLogin = "stripe-login-Q7v2Lm9X";
+    private const string _plainLogin = "plain-login-W4k8Rz3N";
+
     private static readonly string _gitHubToken = "ghp_" + string.Concat(Enumerable.Repeat("kp2c", 9));
     private static readonly EntryName _stripe = new("services", "Stripe");
     private static readonly EntryName _plain = new("services", "Plain");
@@ -36,8 +40,8 @@ public sealed class RecommendationsTests : IDisposable
     {
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            vault.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "p", Notes = _notes });
-            vault.AddEntry(new VaultEntry { GroupPath = _plain.GroupPath, Title = _plain.Title, Password = "p", Notes = "Recovery codes are in the safe." });
+            vault.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = _stripeLogin, Notes = _notes });
+            vault.AddEntry(new VaultEntry { GroupPath = _plain.GroupPath, Title = _plain.Title, Password = _plainLogin, Notes = "Recovery codes are in the safe." });
             vault.Save();
         }
 

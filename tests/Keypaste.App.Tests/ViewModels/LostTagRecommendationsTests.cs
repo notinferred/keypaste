@@ -20,6 +20,9 @@ public sealed class LostTagRecommendationsTests : IDisposable
     private const string _oldValue = "sk_live_APP_LOST_TAG_old";
     private const string _newValue = "sk_live_APP_LOST_TAG_new";
 
+    // Strong and used once, so the dropped tag is all the list holds (V.9).
+    private const string _webLogin = "web-login-H3t8Kw6Q";
+
     private static readonly EntryName _billing = new("services", "Billing");
     private static readonly EntryName _web = new("services", "Web");
     private static readonly DateTime _dropped = new(2030, 1, 1, 9, 0, 0, DateTimeKind.Utc);
@@ -35,7 +38,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
             vault.AddEntry(new VaultEntry { GroupPath = _billing.GroupPath, Title = _billing.Title, Password = _oldValue });
             Assert.True(vault.SetFields(_billing, [new FieldWrite("STRIPE_SECRET_KEY", _oldValue)]));
             Assert.True(vault.AddTag(_billing, "env:billing:prod"));
-            vault.AddEntry(new VaultEntry { GroupPath = _web.GroupPath, Title = _web.Title, Password = "p" });
+            vault.AddEntry(new VaultEntry { GroupPath = _web.GroupPath, Title = _web.Title, Password = _webLogin });
             Assert.True(vault.AddTag(_web, "env:web"));
             Assert.True(vault.RemoveTags(_web, ["env:web"]));
             vault.Save();
