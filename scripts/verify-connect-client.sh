@@ -20,7 +20,7 @@
 # registration working and noting Cursor as not connected, and changes no byte under the gate's home, the audit
 # file's included (D-0467). On Linux and macOS, keypaste alone, under a pseudo-terminal from `script` with no
 # colour, exits 0 and prints its version, the chosen vault, the app holding it unlocked, Claude Code
-# connected and the help as its next step, changing no byte under that home (D-NEW-1). With another vault
+# connected and the help as its next step, changing no byte under that home (D-0471). With another vault
 # chosen, Connect again pins this one with --vault and that bridge still reaches the app. Disconnect leaves the
 # tool listing no keypaste and its row offering Connect. For Cursor, which has no settings of its own, the plan
 # is the one edit of keypaste's entry and Cancel writes nothing; Run it changes no byte outside that entry and

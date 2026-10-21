@@ -14,7 +14,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste</c> alone on a terminal: each row, each next step, and that it asks for nothing, starts nothing and
-/// changes nothing (D-0467, D-NEW-1).
+/// changes nothing (D-0467, D-0471).
 /// </summary>
 /// <remarks>
 /// Each case builds its machine under the harness's directory as <c>DoctorVerbTests</c> does: a vault that is only the

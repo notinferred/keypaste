@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>
 /// <c>keypaste</c> alone on a terminal: this keypaste's version, the vault it would use and who holds it, the AI tools
-/// connected, and one next step (D-NEW-1).
+/// connected, and one next step (D-0471).
 /// </summary>
 /// <remarks>
 /// It reads what <c>doctor</c> reads and starts no process (D-0467): the vault's header, each AI tool's file, and the
