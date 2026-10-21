@@ -30,7 +30,7 @@ public sealed class ChosenVaultVerbTests
         ChosenVault.Choose(Home(harness), harness.VaultPath, onlyIfNone: false);
 
         harness.Prompt.Enqueue(_master);
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("get", "solo", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("get", "solo", "--reveal"));
 
         Assert.Equal("solo-secret", harness.Out.TrimEnd());
     }
@@ -54,7 +54,7 @@ public sealed class ChosenVaultVerbTests
         harness.Environment[VaultLocator.EnvironmentVariable] = Missing(harness, "from-env.kdbx");
 
         harness.Prompt.Enqueue(_master);
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("get", "solo", "--show", "--vault", harness.VaultPath));
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("get", "solo", "--reveal", "--vault", harness.VaultPath));
 
         Assert.Equal("solo-secret", harness.Out.TrimEnd());
     }

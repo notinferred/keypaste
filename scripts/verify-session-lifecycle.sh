@@ -7,7 +7,7 @@
 # unlocking lets a real keypaste mcp request reach the app's session. Locking and quitting each leave
 # the next request refused and nobody holding the vault. An app killed with a request waiting leaves no
 # endpoint answering, and a relaunch reports the vault locked, refuses until unlocked, and then serves
-# a new session on the same endpoint. With keypaste agent holding the vault first, the app's unlock is
+# a new session on the same endpoint. With keypaste approve holding the vault first, the app's unlock is
 # refused naming it, the status names it as the owner, and the agent keeps answering.
 #
 # One app runs per user and home (F.38): with the tray on and the app started at login through the
@@ -25,7 +25,7 @@
 #
 # NEGATIVE CONTROL: this fails if a request is answered by a locked, quit or killed app, if a status
 # says serving without the session that answers, if anything still holds the vault after a lock or a
-# quit, if the app displaces keypaste agent, or if a second start runs beside the first, shows its
+# quit, if the app displaces keypaste approve, or if a second start runs beside the first, shows its
 # window at login or not for a person. It fails if an agent asking a locked app is answered or recorded
 # otherwise than as no-approver, is told the app is locked on a vault it neither shows nor chose or not
 # told so of one it does, if a request shows the window or a second notice, or if Open keypaste does not
@@ -58,7 +58,7 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 HOLD_PID=""
 AGENT_PID=""
 APP_PID=""
-# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 6 is the started app's input, 7 the held app's, 8 the open bridge's and 9 keypaste agent's.
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 6 is the started app's input, 7 the held app's, 8 the open bridge's and 9 keypaste approve's.
 exec 6>/dev/null
 exec 7>/dev/null
 exec 8>/dev/null
@@ -176,7 +176,7 @@ printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "
 printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
 # The entry is not tagged into a project, so the agent sees it only once a person lets it see env/**,
-# confirmed at keypaste agent's terminal before the app holds the vault.
+# confirmed at keypaste approve's terminal before the app holds the vault.
 agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-probe --see env/**' || die "could not save ci-probe's settings in the vault"
 
 # -------------------------------------------- launched with no terminal, unlocking serves agents
@@ -258,9 +258,9 @@ exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-# ----------------------------------------- keypaste agent holding the vault is named, not displaced
+# ----------------------------------------- keypaste approve holding the vault is named, not displaced
 exec 9>&-
-exec 9> >(exec 7>&- 8>&-; exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
+exec 9> >(exec 7>&- 8>&-; exec "$CLI" approve --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
 printf '%s\n' "$MASTER" >&9
 wait_for 'listening on' "$AGENT_ERR"
 AGENT_SESSION="$(grep 'listening on' "$AGENT_ERR" | sed -E 's/.* for unlock ([0-9a-f]+),.*/\1/')"
@@ -270,17 +270,17 @@ set +e
 KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1 </dev/null
 refused_exit=$?
 set -e
-[ "$refused_exit" -eq 1 ] || die "the app did not refuse a vault keypaste agent holds (exit $refused_exit)"
-AGENT_PID="$(sed -nE 's/^refused: .*keypaste agent \(process ([0-9]+)\).*/\1/p' "$HOLD_OUT" | head -1)"
-[ -n "$AGENT_PID" ] || die "the app's refusal does not name keypaste agent"
-grep -q "^owner: Keypaste agent (process $AGENT_PID) holds this vault" "$HOLD_OUT" \
-  || die "the unlock screen does not name keypaste agent as the owner"
-[ "$(last_status)" = "status held by keypaste agent (process $AGENT_PID)" ] \
-  || die "the app's status is '$(last_status)', not the agent as owner"
-grep -q '^status serving' "$HOLD_OUT" && die "the app served a vault keypaste agent holds"
+[ "$refused_exit" -eq 1 ] || die "the app did not refuse a vault keypaste approve holds (exit $refused_exit)"
+AGENT_PID="$(sed -nE 's/^refused: .*keypaste approve \(process ([0-9]+)\).*/\1/p' "$HOLD_OUT" | head -1)"
+[ -n "$AGENT_PID" ] || die "the app's refusal does not name keypaste approve"
+grep -q "^owner: Keypaste approve (process $AGENT_PID) holds this vault" "$HOLD_OUT" \
+  || die "the unlock screen does not name keypaste approve as the owner"
+[ "$(last_status)" = "status held by keypaste approve (process $AGENT_PID)" ] \
+  || die "the app's status is '$(last_status)', not keypaste approve as owner"
+grep -q '^status serving' "$HOLD_OUT" && die "the app served a vault keypaste approve holds"
 
 ask "$WORK/agent-stdout.txt" "$WORK/agent-mcp-stderr.txt" --list-only
-listed_by "$AGENT_SESSION" "keypaste agent after the app's refusal"
+listed_by "$AGENT_SESSION" "keypaste approve after the app's refusal"
 
 # ------------------------------------------- one app per user and home, which a second start shows
 APP_HOME="$WORK/app-home"
@@ -421,7 +421,7 @@ refused_saying "the chosen vault once the app quit" "$BEFORE"
 
 echo "ok: launched locked and refusing, the app served a real keypaste mcp once unlocked; lock and quit each left"
 echo "    nobody answering or holding the vault; a killed app answered nothing and a relaunch refused until it"
-echo "    unlocked a new session on the same endpoint; keypaste agent holding the vault was named and kept answering;"
+echo "    unlocked a new session on the same endpoint; keypaste approve holding the vault was named and kept answering;"
 echo "    and in one home a second keypaste-app at login showed nothing, a second one exited once the running app showed"
 echo "    its window, and a killed app left the home and its endpoint to the next start, which a second start reached;"
 echo "    and agents asking the locked app for the vault on its unlock screen or the chosen one were refused as before"

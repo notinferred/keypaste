@@ -2,7 +2,7 @@
 """Records the demo GIF's session from the real binaries, as a tape for render-gif.py.
 
 It plays docs/demo.md's scenario with a scripted MCP client in place of Claude, sending the calls
-verify-demo.sh sends: `keypaste agent` runs on a real pseudo-terminal, so what it prints, colours
+verify-demo.sh sends: `keypaste approve` runs on a real pseudo-terminal, so what it prints, colours
 included, is what a person's terminal receives; the client asks for the fixture credential twice on
 one connection, the person answers o and then d, and `keypaste log` closes it. The waits below are
 the recording's pacing, and every timestamp in the tape is real. `--home /home/you` gives the paths
@@ -200,8 +200,8 @@ def main():
     tape = Tape()
     tape.add("top", "prompt")
     time.sleep(0.6)
-    tape.typed("top", "keypaste agent --vault ~/keypaste-demo.kdbx")
-    agent = Terminal(tape, keypaste + ["agent", "--vault", vault], env)
+    tape.typed("top", "keypaste approve --vault ~/keypaste-demo.kdbx")
+    agent = Terminal(tape, keypaste + ["approve", "--vault", vault], env)
     agent.wait_for("Master password:")
     time.sleep(0.9)
     agent.press(MASTER + "\r", secret=True)
@@ -234,7 +234,7 @@ def main():
     time.sleep(0.6)
     agent.press("\x03")
     if agent.finish() != 0:
-        sys.exit("capture: keypaste agent did not stop cleanly")
+        sys.exit("capture: keypaste approve did not stop cleanly")
 
     time.sleep(0.5)
     tape.add("top", "prompt")

@@ -226,7 +226,7 @@ public sealed class HealthCheckTests : IDisposable
 
     [Theory]
     [InlineData(OwnerKind.DesktopApp, "0.5.0", "0.5.1", "0.5.1", "the keypaste app holding the vault is 0.5.0, this is 0.5.1", "quit the keypaste app and open it again")]
-    [InlineData(OwnerKind.TerminalAgent, "0.5.0", "0.5.1", "0.5.1", "keypaste agent holding the vault is 0.5.0, this is 0.5.1", "stop keypaste agent and start it again")]
+    [InlineData(OwnerKind.TerminalAgent, "0.5.0", "0.5.1", "0.5.1", "keypaste approve holding the vault is 0.5.0, this is 0.5.1", "stop keypaste approve and start it again")]
     [InlineData(OwnerKind.DesktopApp, null, "0.5.1", "0.5.1", "the keypaste app holding the vault is older than this keypaste", "quit the keypaste app and open it again")]
     [InlineData(OwnerKind.DesktopApp, "zero", "0.5.1", "0.5.1", "the keypaste app holding the vault gives a version keypaste cannot read", "quit the keypaste app and open it again")]
     [InlineData(OwnerKind.DesktopApp, "0.5.2", "0.5.1", "0.5.1", "the keypaste app holding the vault is 0.5.2, this is 0.5.1", "update this keypaste, or run the one the app installed")]
@@ -260,10 +260,10 @@ public sealed class HealthCheckTests : IDisposable
             Owner(OwnerKind.DesktopApp, version: null, OwnerAnswer.NothingListening),
             [Registered("cursor", version: null)],
             OnPath(_here, thisCopy: true));
-        var agent = HealthCheck.Versions(_here, Owner(OwnerKind.TerminalAgent, _here, OwnerAnswer.Locked), [], OnPath(version: null));
+        var approver = HealthCheck.Versions(_here, Owner(OwnerKind.TerminalAgent, _here, OwnerAnswer.Locked), [], OnPath(version: null));
 
         Assert.Equal("0.5.1 here", Assert.Single(nothing).Says);
-        Assert.Equal("0.5.1 here and in keypaste agent", Assert.Single(agent).Says);
+        Assert.Equal("0.5.1 here and in keypaste approve", Assert.Single(approver).Says);
     }
 
     [Fact]

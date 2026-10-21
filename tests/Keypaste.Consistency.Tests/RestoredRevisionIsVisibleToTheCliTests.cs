@@ -16,7 +16,7 @@ namespace Keypaste.Consistency.Tests;
 /// V.2b's claim is not that <c>RestoreRevision</c> works — <c>VaultHistoryTests</c> establishes
 /// that — but that the button on the pane reaches it, saves, and leaves a vault the shipped reader
 /// agrees about. Only a test holding both front ends can ask that: the restore is a GUI action and
-/// <c>keypaste get --show</c> is the reader.
+/// <c>keypaste get --reveal</c> is the reader.
 /// </para>
 /// <para>
 /// <b>The mutations that must make this file fail:</b> a restore that never saves, which every
@@ -41,13 +41,13 @@ public sealed class RestoredRevisionIsVisibleToTheCliTests
         Replace(detail, _middle);
         Replace(detail, _current);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.Equal(_current, fixture.Cli.Out.Trim());
 
         Restore(detail, oldest: true);
 
         Assert.Null(screen.Model.Error);
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.Equal(_oldest, fixture.Cli.Out.Trim());
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("ls"));
@@ -85,7 +85,7 @@ public sealed class RestoredRevisionIsVisibleToTheCliTests
         Restore(detail, oldest: true);
 
         Assert.Null(screen.Model.Error);
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/billing/.env", "--field", "ROTATED", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/billing/.env", "--field", "ROTATED", "--reveal"));
         Assert.Equal("v1-first", fixture.Cli.Out.Trim());
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));

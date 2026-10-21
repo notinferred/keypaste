@@ -13,7 +13,7 @@ using Keypaste.Core.Settings;
 namespace Keypaste.Cli.Commands;
 
 /// <summary>
-/// <c>keypaste agent</c> — holds the unlocked vault and asks you about every credential request.
+/// <c>keypaste approve</c> — holds the unlocked vault and asks you about every credential request.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -29,9 +29,9 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// <b>It holds the vault's claim for as long as it runs</b>, taken before the password is asked
-/// for, so a vault the desktop app or another agent already holds is refused by name and never
-/// opened (D-0309). Under that claim it applies each agent's settings from the vault and saves a
-/// change to them that the person confirms in this terminal.
+/// for, so a vault the desktop app or another <c>keypaste approve</c> already holds is refused by
+/// name and never opened (D-0309). Under that claim it applies each agent's settings from the vault
+/// and saves a change to them that the person confirms in this terminal.
 /// </para>
 /// <para>
 /// <b>It writes the audit line of every request it answers</b>, in its own home's log, before it
@@ -49,7 +49,7 @@ namespace Keypaste.Cli.Commands;
 /// (D-0313).
 /// </para>
 /// </remarks>
-internal static class AgentCommand
+internal static class ApproveCommand
 {
     internal const string ApproverOption = "approver";
     internal const string TimeoutOption = "approval-timeout";
@@ -146,7 +146,7 @@ internal static class AgentCommand
     }
 
     /// <summary>
-    /// What <c>keypaste mcp policy</c> must be told to reach this agent: its vault when that is not the
+    /// What <c>keypaste clients</c> must be told to reach this approver: its vault when that is not the
     /// chosen one, and its pipe when that is not the one its vault's owner listens on unasked.
     /// </summary>
     private static (string? Vault, string? Approver) Reach(string vaultPath, string pipeName, string home, CliContext context)
@@ -176,7 +176,7 @@ internal static class AgentCommand
         using var lifetime = new SessionLifetime();
         using var stop = new CancellationTokenSource();
 
-        // The agent saves only what a person confirmed, or a narrowing, under the claim it holds, so no
+        // The approver saves only what a person confirmed, or a narrowing, under the claim it holds, so no
         // save here can land under another owner (D-0317).
         AgentSave Save(Func<Vault, bool> edit)
         {
@@ -199,7 +199,7 @@ internal static class AgentCommand
             {
                 return new AgentSave(
                     AgentSaveOutcome.ChangedOnDisk,
-                    "another program changed the vault file since keypaste agent opened it; restart keypaste agent to read it again");
+                    "another program changed the vault file since keypaste approve opened it; restart keypaste approve to read it again");
             }
             catch (VaultException ex)
             {
@@ -278,11 +278,11 @@ internal static class AgentCommand
             }
         }
 
-        console.WriteLine("keypaste: the agent has stopped. The vault is locked and every allowance has ended.");
+        console.WriteLine("keypaste: keypaste approve has stopped. The vault is locked and every allowance has ended.");
         return CliApp.ExitSuccess;
     }
 
-    /// <summary>Ends the lifetime, then stops the listener; a stop that arrives after the agent has gone does nothing.</summary>
+    /// <summary>Ends the lifetime, then stops the listener; a stop that arrives after the approver has gone does nothing.</summary>
     private static void Stop(SessionLifetime lifetime, CancellationTokenSource stop)
     {
         lifetime.End();
@@ -354,7 +354,7 @@ internal static class AgentCommand
         if (retiredPolicy is not null)
         {
             console.WriteLine(
-                $"keypaste: {retiredPolicy} is no longer read: each agent's settings are kept in the vault. `keypaste mcp policy` shows them.");
+                $"keypaste: {retiredPolicy} is no longer read: each agent's settings are kept in the vault. `keypaste clients` shows them.");
         }
 
         if (automatic.Count > 0)
@@ -437,8 +437,8 @@ internal static class AgentCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste agent [--vault <path>] [--keyfile <path>] [--approver <name>]");
-        writer.WriteLine("                      [--approval-timeout <seconds>] [--max-ttl <seconds>]");
+        writer.WriteLine("usage: keypaste approve [--vault <path>] [--keyfile <path>] [--approver <name>]");
+        writer.WriteLine("                        [--approval-timeout <seconds>] [--max-ttl <seconds>]");
         writer.WriteLine();
         writer.WriteLine("Unlocks your vault and waits. When an AI agent asks keypaste mcp for a");
         writer.WriteLine("credential, the request appears here and nothing is released until you say yes.");
@@ -452,7 +452,7 @@ internal static class AgentCommand
         writer.WriteLine();
         writer.WriteLine("Each agent's settings, kept in the vault, decide what it can see and how it is");
         writer.WriteLine("asked; an agent you set to Automatic is answered without asking you, and every");
-        writer.WriteLine("release is recorded. `keypaste mcp policy` shows and changes them.");
+        writer.WriteLine("release is recorded. `keypaste clients` shows and changes them.");
         writer.WriteLine();
         writer.WriteLine("Your master password is typed here, never in a window an agent caused to appear.");
     }

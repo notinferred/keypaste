@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # `keypaste run --session` takes a project's set from the process holding the vault (E.1c, V-E.1c), across
 # real processes: the shipped keypaste, tests/Keypaste.AppDriver holding the vault as launch composes the
-# app with its prompt window drawn on a headless display and clicked, and `keypaste agent` answering in
+# app with its prompt window drawn on a headless display and clicked, and `keypaste approve` answering in
 # its terminal. The child is a real process that prints the set from its own environment.
 #
 # With the app holding the vault, the run raises the app's prompt naming the project, its variable names,
@@ -9,7 +9,7 @@
 # asks for no password. A set of a tagged entry's field and a field of the project's home entry names each
 # source entry, and because that entry is also tagged into prod it offers Allow once only (C.1b). Deny, a lock while the prompt waits and the timeout each exit non-zero with no
 # child, and a set E.1a refuses is refused before any prompt. With nothing holding the vault the run says
-# so. With `keypaste agent` holding it, o releases once and n refuses.
+# so. With `keypaste approve` holding it, o releases once and n refuses.
 #
 # On macOS the app's own Run opens Terminal (E.1d): an assembled keypaste.app carries the real launcher and a
 # keypaste that starts the built CLI, the held app presses Run in a terminal and Start, real Terminal runs the
@@ -57,7 +57,7 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 HOLD_PID=""
 AGENT_PID=""
 TERMINAL_OPENED=false
-# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input and 9 keypaste agent's.
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input and 9 keypaste approve's.
 exec 7>/dev/null
 exec 9>/dev/null
 cleanup() {
@@ -347,9 +347,9 @@ if [ "$(uname -s)" = Darwin ]; then
   HOLD_PID=""
 fi
 
-# ------------------------------------------------------------- keypaste agent holds it: o and n
+# ------------------------------------------------------------- keypaste approve holds it: o and n
 exec 9>&-
-exec 9> >(exec 7>&-; exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
+exec 9> >(exec 7>&-; exec "$CLI" approve --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
 AGENT_SHELL=$!
 if [ -r "/proc/$AGENT_SHELL/winpid" ]; then AGENT_PID="$(cat "/proc/$AGENT_SHELL/winpid")"; else AGENT_PID="$AGENT_SHELL"; fi
 printf '%s\n' "$MASTER" >&9
@@ -357,18 +357,18 @@ wait_for 'listening on' "$AGENT_ERR"
 
 start_run ci agent-yes
 wait_for "is asking for a project's variables" "$AGENT_ERR" 1
-grep -q 'variables    DB_URL DEPLOY_KEY' "$AGENT_ERR" || die "keypaste agent did not show the variable names"
-grep -q 'command      .* agent-yes' "$AGENT_ERR" || die "keypaste agent did not show the command"
+grep -q 'variables    DB_URL DEPLOY_KEY' "$AGENT_ERR" || die "keypaste approve did not show the variable names"
+grep -q 'command      .* agent-yes' "$AGENT_ERR" || die "keypaste approve did not show the command"
 printf 'o\n' >&9
-released "o at keypaste agent"
+released "o at keypaste approve"
 
 start_run ci agent-no
 wait_for "is asking for a project's variables" "$AGENT_ERR" 2
 printf 'n\n' >&9
-refused "n at keypaste agent" "said no"
-grep -qE "$DEPLOY|$DATABASE" "$AGENT_ERR" && die "a value reached keypaste agent's terminal"
+refused "n at keypaste approve" "said no"
+grep -qE "$DEPLOY|$DATABASE" "$AGENT_ERR" && die "a value reached keypaste approve's terminal"
 
-echo "ok: keypaste run --session took the set from the app only on Approve and from keypaste agent only on o,"
+echo "ok: keypaste run --session took the set from the app only on Approve and from keypaste approve only on o,"
 echo "    showing the project, names, command and directory and never a value or a password prompt; Deny, n,"
 echo "    a lock, the timeout, an unusable set and no owner each started nothing"
 if [ "$(uname -s)" = Darwin ]; then

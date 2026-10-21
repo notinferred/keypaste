@@ -117,8 +117,14 @@ internal static class CliApp
             case "token":
                 return TokenCommand.Execute(args, context);
 
+            case "approve":
+                return ApproveCommand.Execute(args, context);
+
+            case "clients":
+                return ClientsCommand.Execute(args, context);
+
             case "agent":
-                return AgentCommand.Execute(args, context);
+                return Renamed(context, "keypaste agent", "keypaste approve");
 
             case "setup":
                 return SetupCommand.Execute(args, context);
@@ -171,6 +177,13 @@ internal static class CliApp
         }
     }
 
+    /// <summary>Refuses a removed spelling, naming the one that replaced it, and runs nothing (D-0470).</summary>
+    internal static int Renamed(CliContext context, string removed, string replacement)
+    {
+        context.Stderr.WriteLine($"keypaste: {removed} is now {replacement}");
+        return ExitUsageError;
+    }
+
     /// <summary>The verbs, grouped as a person looks for them, in the order they are printed.</summary>
     private static readonly (string Heading, (string Verb, string Summary)[] Verbs)[] _groups =
     [
@@ -186,7 +199,10 @@ internal static class CliApp
         ]),
         ("AGENTS",
         [
-            ("mcp", "the MCP server your AI tools start; mcp serve approves here"),
+            ("setup", "connect this computer's AI tools to your vault"),
+            ("mcp", "the MCP server your AI tools start"),
+            ("approve", "approve agents' requests in this terminal"),
+            ("clients", "show or change what each agent can see and do"),
             ("doctor", "check the vault, the AI tools and the app, and say what to fix"),
             ("grants", "list or revoke time-boxed access"),
             ("token", "create scoped, inject-only tokens"),
@@ -237,10 +253,10 @@ internal static class CliApp
         writer.WriteLine($"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}");
         writer.WriteLine($"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine("  --json            machine-readable output from ls, search, show, field ls,");
-        writer.WriteLine("                    env ls, log, grants, doctor, token ls, share ls, mcp policy");
+        writer.WriteLine("                    env ls, log, grants, doctor, token ls, share ls, clients");
         writer.WriteLine("  -h, --help        help for any command");
         writer.WriteLine();
-        writer.WriteLine("  agent is mcp serve, setup is mcp setup, version prints the version.");
+        writer.WriteLine("  version prints the version.");
         writer.WriteLine();
         writer.WriteLine(Muted("EXIT CODES"));
         writer.WriteLine("  0 ok  1 usage  2 error  3 not found  4 wrong password  5 audit log tampered");

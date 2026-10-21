@@ -162,7 +162,7 @@ diff -u <(printf '%s
 # ---------------------------------------------------------------------------------------
 step "keypaste reads its own backup back, with no special reader"
 read_back=$(printf '%s
-' "$pw" | "$kp" get "$entry" --vault "$backups/$first" --show | tr -d '\r')
+' "$pw" | "$kp" get "$entry" --vault "$backups/$first" --reveal | tr -d '\r')
 grep -qF 'v1-first' <<<"$read_back"   || die "keypaste cannot read the previous value out of its own backup. Got: ${read_back}"
 
 # ---------------------------------------------------------------------------------------

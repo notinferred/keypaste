@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.Core;
+using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -63,28 +64,49 @@ public sealed class CliAppTests
         Assert.Contains("  \u001b[38;5;214mgrants" + Styling.SystemConsoleStyle.Reset + "    list or revoke", terminal.ToString(), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void McpServe_IsAgent()
+    [Theory]
+    [InlineData("approve", "usage: keypaste approve ")]
+    [InlineData("clients", "usage: keypaste clients ")]
+    public void ApproveAndClients_AreVerbsOfTheirOwn(string verb, string usage)
     {
-        using var alias = new CliHarness();
-        using var verb = new CliHarness();
+        using var harness = new CliHarness();
 
-        Assert.Equal(CliApp.ExitSuccess, alias.Run("mcp", "serve", "--help"));
-        Assert.Equal(CliApp.ExitSuccess, verb.Run("agent", "--help"));
-        Assert.Equal(verb.Out, alias.Out);
-        Assert.Contains("usage: keypaste agent", alias.Out, StringComparison.Ordinal);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run(verb, "--help"));
+        Assert.StartsWith(usage, harness.Out, StringComparison.Ordinal);
+        Assert.Empty(harness.Err);
     }
 
-    [Fact]
-    public void McpSetup_IsSetup()
+    /// <summary>
+    /// A removed spelling is refused on one line naming the one that replaced it, and runs nothing, its help
+    /// included: no password is asked for, nothing is printed, copied, started or written (D-0470).
+    /// </summary>
+    [Theory]
+    [InlineData("keypaste: keypaste agent is now keypaste approve", "agent")]
+    [InlineData("keypaste: keypaste agent is now keypaste approve", "agent", "--help")]
+    [InlineData("keypaste: keypaste mcp serve is now keypaste approve", "mcp", "serve")]
+    [InlineData("keypaste: keypaste mcp serve is now keypaste approve", "mcp", "serve", "--help")]
+    [InlineData("keypaste: keypaste mcp setup is now keypaste setup", "mcp", "setup", "--client", "claude-code")]
+    [InlineData("keypaste: keypaste mcp setup is now keypaste setup", "mcp", "setup", "--help")]
+    [InlineData("keypaste: keypaste mcp policy is now keypaste clients", "mcp", "policy", "cursor", "--mode", "ask")]
+    [InlineData("keypaste: keypaste mcp policy is now keypaste clients", "mcp", "policy", "--help")]
+    [InlineData("keypaste get: --show is now --reveal", "get", "solo", "--show")]
+    [InlineData("keypaste get: --show is now --reveal", "get", "solo", "--reveal", "--show")]
+    [InlineData("keypaste get: --show is now --reveal", "get", "--show", "--help")]
+    public void ARemovedSpelling_IsRefused_NamingItsReplacement_AndRunsNothing(string refusal, params string[] args)
     {
-        using var alias = new CliHarness();
-        using var verb = new CliHarness();
+        using var harness = new CliHarness();
+        harness.SeedVault("removed-spelling-master", ("solo", "solo-secret"));
+        var asked = harness.Prompt.PromptsSeen.Count;
 
-        Assert.Equal(CliApp.ExitSuccess, alias.Run("mcp", "setup", "--help"));
-        Assert.Equal(CliApp.ExitSuccess, verb.Run("setup", "--help"));
-        Assert.Equal(verb.Out, alias.Out);
-        Assert.NotEmpty(alias.Out);
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run([.. args, "--vault", harness.VaultPath]));
+
+        Assert.Equal(refusal + Environment.NewLine, harness.Err);
+        Assert.Empty(harness.Out);
+        Assert.Equal(asked, harness.Prompt.PromptsSeen.Count);
+        Assert.Equal(0, harness.Clipboard.SetCount);
+        Assert.Empty(harness.ProcessRunner.Calls);
+        Assert.Empty(harness.ProcessLauncher.Started);
+        Assert.False(File.Exists(KeypasteHome.ClientsPath(harness.Environment[KeypasteHome.EnvironmentVariable])));
     }
 
     [Fact]
@@ -98,7 +120,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(23, verbs.Count);
+        Assert.Equal(26, verbs.Count);
 
         foreach (var verb in verbs.Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
@@ -128,7 +150,10 @@ public sealed class CliAppTests
             "  env       import, export and diff .env environments",
             "",
             "AGENTS",
-            "  mcp       the MCP server your AI tools start; mcp serve approves here",
+            "  setup     connect this computer's AI tools to your vault",
+            "  mcp       the MCP server your AI tools start",
+            "  approve   approve agents' requests in this terminal",
+            "  clients   show or change what each agent can see and do",
             "  doctor    check the vault, the AI tools and the app, and say what to fix",
             "  grants    list or revoke time-boxed access",
             "  token     create scoped, inject-only tokens",
@@ -151,10 +176,10 @@ public sealed class CliAppTests
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",
             $"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
             "  --json            machine-readable output from ls, search, show, field ls,",
-            "                    env ls, log, grants, doctor, token ls, share ls, mcp policy",
+            "                    env ls, log, grants, doctor, token ls, share ls, clients",
             "  -h, --help        help for any command",
             "",
-            "  agent is mcp serve, setup is mcp setup, version prints the version.",
+            "  version prints the version.",
             "",
             "EXIT CODES",
             "  0 ok  1 usage  2 error  3 not found  4 wrong password  5 audit log tampered",

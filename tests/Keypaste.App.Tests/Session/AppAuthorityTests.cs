@@ -125,11 +125,11 @@ public sealed class AppAuthorityTests
     }
 
     [Fact]
-    public async Task A_vault_keypaste_agent_holds_is_refused_and_the_status_names_the_agent()
+    public async Task A_vault_keypaste_approve_holds_is_refused_and_the_status_names_it()
     {
         using var fixture = new TempVault();
         using var authority = Launch(fixture);
-        var agent = $"keypaste agent (process {Environment.ProcessId})";
+        var approver = $"keypaste approve (process {Environment.ProcessId})";
         var unlocked = 0;
         using var model = new UnlockViewModel(authority.Session, fixture.Home, new FakeVaultFilePicker(), () => unlocked++);
         Assert.True(model.Offer(fixture.Path_));
@@ -142,12 +142,12 @@ public sealed class AppAuthorityTests
             await model.UnlockAsync();
 
             Assert.Equal(0, unlocked);
-            Assert.Contains(agent, model.Message, StringComparison.Ordinal);
-            Assert.Equal($"Keypaste agent (process {Environment.ProcessId}) holds this vault.", model.Owner);
+            Assert.Contains(approver, model.Message, StringComparison.Ordinal);
+            Assert.Equal($"Keypaste approve (process {Environment.ProcessId}) holds this vault.", model.Owner);
 
             var held = Assert.IsType<AuthorityStatus.HeldBy>(authority.Status);
             Assert.Equal(OwnerKind.TerminalAgent, held.Owner.Kind);
-            Assert.Equal($"Keypaste agent (process {Environment.ProcessId}) holds this vault, and agents reach it there.", AgentActivityViewModel.Describe(held));
+            Assert.Equal($"Keypaste approve (process {Environment.ProcessId}) holds this vault, and agents reach it there.", AgentActivityViewModel.Describe(held));
 
             Type(model, "x");
             Assert.False(model.HasMessage);

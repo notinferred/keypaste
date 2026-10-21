@@ -316,7 +316,7 @@ internal static class GrantsCommand
         writer.WriteLine("usage: keypaste grants [--json] [--vault <path>] [--approver <name>]");
         writer.WriteLine("       keypaste grants revoke (<id> | <agent> | --all) [--vault <path>] [--approver <name>]");
         writer.WriteLine();
-        writer.WriteLine("lists the time-boxed access the keypaste app or `keypaste agent` holding the vault");
+        writer.WriteLine("lists the time-boxed access the keypaste app or `keypaste approve` holding the vault");
         writer.WriteLine("has given, names only, and ends it: one allowance by its id, every allowance an agent");
         writer.WriteLine("holds by its name, or all of them.");
     }

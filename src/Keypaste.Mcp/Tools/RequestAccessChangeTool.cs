@@ -24,7 +24,7 @@ namespace Keypaste.Mcp.Tools;
 /// <b>Bounds, never their removal.</b> An agent may ask for Automatic until a time or at most so many an
 /// hour, and the person sees the limit before confirming; it cannot ask for a limit to be removed or for
 /// its settings to be reset. A time it gives is read on this computer's clock unless it names its
-/// offset, and sent in UTC, as <c>keypaste mcp policy</c> sends one.
+/// offset, and sent in UTC, as <c>keypaste clients</c> sends one.
 /// </para>
 /// <para>
 /// <b>The owner decides.</b> It classifies the change: one that gives the agent nothing more applies
@@ -214,7 +214,7 @@ internal sealed class RequestAccessChangeTool(
 
     /// <summary>
     /// With nothing holding the vault, makes a change that only lowers this computer's ceilings, as
-    /// <c>keypaste mcp policy</c> does, so an agent's narrowing of itself holds while the vault is locked;
+    /// <c>keypaste clients</c> does, so an agent's narrowing of itself holds while the vault is locked;
     /// anything that could give more, or that only the vault's settings hold, waits for an owner.
     /// </summary>
     private async ValueTask<Verdict> LoweredAsync(string label, AccessEdit edit, string named, CancellationToken cancellationToken)

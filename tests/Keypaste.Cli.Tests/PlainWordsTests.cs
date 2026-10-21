@@ -21,14 +21,13 @@ public sealed partial class PlainWordsTests
         ["field", "ls"], ["field", "rm"],
         ["grants", "revoke"],
         ["log", "verify"],
-        ["mcp", "serve"], ["mcp", "setup"], ["mcp", "policy"],
         ["share", "ls"], ["share", "revoke"],
     ];
 
     [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?)", RegexOptions.IgnoreCase)]
     private static partial Regex Retired();
 
-    [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify|policy|serve|setup))?|\bgrants(?=,| revoke| {2,})|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
+    [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\bgrants(?=,| revoke| {2,})|\bclients(?= {2,})|(?<=share ls, )clients(?=\r?\n)|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
     private static partial Regex Interface();
 
     [Fact]

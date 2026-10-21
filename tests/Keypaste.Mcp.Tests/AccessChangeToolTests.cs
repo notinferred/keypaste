@@ -237,7 +237,7 @@ public sealed class AccessChangeToolTests : IDisposable
 
     /// <summary>
     /// With nothing holding the vault, an agent's request for less, an end to Automatic included, lowers
-    /// this computer's ceilings, as <c>keypaste mcp policy</c> would, and the bridge records it; one for
+    /// this computer's ceilings, as <c>keypaste clients</c> would, and the bridge records it; one for
     /// more is still refused and lowers nothing.
     /// </summary>
     [Fact]

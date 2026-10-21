@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// <para>
 /// Names only, never values — exactly like <c>keypaste ls</c>. Reading a value is already a verb:
-/// <c>keypaste get &lt;entry&gt; --field &lt;KEY&gt; --show</c>. Adding a second way to print a
+/// <c>keypaste get &lt;entry&gt; --field &lt;KEY&gt; --reveal</c>. Adding a second way to print a
 /// secret would widen the surface that has to stay honest for no new capability.
 /// </para>
 /// <para>

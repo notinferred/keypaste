@@ -156,10 +156,10 @@ project_var() {
 # A path as a Windows program must be given it from Git Bash; unchanged elsewhere.
 native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 
-# Saves agents' settings in a vault as a person confirms them at `keypaste agent`'s terminal, before
+# Saves agents' settings in a vault as a person confirms them at `keypaste approve`'s terminal, before
 # anything else holds the vault: a short-lived agent with a home of its own answers yes to each change
 # and stops, so the gate's log and ceilings hold only what the gate itself does.
-#   agent_settings <keypaste> <vault> <master> '<keypaste mcp policy words>'...
+#   agent_settings <keypaste> <vault> <master> '<keypaste clients words>'...
 # Each change's words are split on spaces and never globbed, so `--see **` reaches keypaste as written.
 agent_settings() {
   local cli=$1 vault=$2 master=$3 home pipe err pid change status=0 answers=''
@@ -170,7 +170,7 @@ agent_settings() {
   err="$home/agent-stderr.txt"
   for change in "$@"; do answers="${answers}y"$'\n'; done
   printf '%s\n%s' "$master" "$answers" \
-    | KEYPASTE_HOME="$(native "$home")" "$cli" agent --vault "$vault" --approver "$pipe" >/dev/null 2>"$err" &
+    | KEYPASTE_HOME="$(native "$home")" "$cli" approve --vault "$vault" --approver "$pipe" >/dev/null 2>"$err" &
   pid=$!
   for _ in $(seq 1 100); do
     grep -q 'listening on' "$err" 2>/dev/null && break
@@ -180,7 +180,7 @@ agent_settings() {
   if grep -q 'listening on' "$err" 2>/dev/null; then
     for change in "$@"; do
       read -r -a words <<<"$change"
-      KEYPASTE_HOME="$(native "$home")" "$cli" mcp policy "${words[@]}" --vault "$vault" --approver "$pipe" >/dev/null 2>>"$err" \
+      KEYPASTE_HOME="$(native "$home")" "$cli" clients "${words[@]}" --vault "$vault" --approver "$pipe" >/dev/null 2>>"$err" \
         || { status=1; break; }
     done
   else

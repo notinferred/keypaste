@@ -124,7 +124,7 @@ public sealed class LaunchEndpointTests : IDisposable
     /// <summary>
     /// An agent that finds the endpoint gets nothing: a bridge's attachment is answered but not shown
     /// as connected, and every request an agent, <c>keypaste grants</c>, <c>keypaste lock</c>,
-    /// <c>keypaste mcp policy</c> or a token run makes ends the connection unanswered, asking nobody and
+    /// <c>keypaste clients</c> or a token run makes ends the connection unanswered, asking nobody and
     /// recording nothing.
     /// </summary>
     [Theory]

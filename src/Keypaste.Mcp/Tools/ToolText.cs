@@ -171,8 +171,8 @@ internal static class ToolText
     internal const string AccessNoOwner = """
         keypaste: NOT CHANGED. Nothing holds this vault unlocked, so there is nobody to confirm this
         change, and it cannot be made without them. Ask the person you are working with to unlock it
-        in the keypaste desktop app, or to run `keypaste agent --vault <their vault>` in a terminal, and
-        then try again. This call was recorded in the audit log as denied.
+        in the keypaste desktop app, or to run `keypaste approve --vault <their vault>` in a terminal,
+        and then try again. This call was recorded in the audit log as denied.
         """;
 
     /// <summary>Why a change was not made when nothing holds the vault and the app is open and locked on it (D-0466).</summary>
@@ -326,11 +326,11 @@ internal static class ToolText
     /// </remarks>
     internal const string NoApprover = """
         keypaste: DENIED. Nobody can approve this right now: nothing holds this vault unlocked, neither
-        the keypaste desktop app nor a keypaste agent, and keypaste releases nothing until one does,
+        the keypaste desktop app nor keypaste approve, and keypaste releases nothing until one does,
         whatever this agent's settings say.
 
         Ask the person you are working with to unlock this vault in the keypaste desktop app, or to
-        run `keypaste agent --vault <their vault>` in a terminal, and then try again. Until then,
+        run `keypaste approve --vault <their vault>` in a terminal, and then try again. Until then,
         every request will be refused. This call was recorded in the audit log as denied.
         """;
 
@@ -351,7 +351,7 @@ internal static class ToolText
         names were read.
 
         Ask the person you are working with to unlock it in the keypaste desktop app, or to run
-        `keypaste agent --vault <their vault>` in a terminal, and then try again. This call was
+        `keypaste approve --vault <their vault>` in a terminal, and then try again. This call was
         recorded in the audit log as denied.
         """;
 
@@ -390,7 +390,7 @@ internal static class ToolText
         saved. Nothing was read or released.
 
         If a change was being saved, try once more. Otherwise ask the person you are working with to
-        reload the vault, with Reload in the keypaste desktop app or by restarting `keypaste agent`,
+        reload the vault, with Reload in the keypaste desktop app or by restarting `keypaste approve`,
         and then try again. This call was recorded in the audit log as denied.
         """;
 

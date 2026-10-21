@@ -163,7 +163,7 @@ printf '%s\n' "$MASTER" | "$CLI" env tag ci "$STAGING_ENTRY" -p staging --yes --
 printf '%s\n' "$MASTER" | "$CLI" env tag ci "$RELEASE_ENTRY" --yes --vault "$VAULT" >/dev/null \
   || die "could not put $RELEASE_ENTRY in ci/dev"
 # The first two entries are tagged into no project, so the agent sees them only once a person lets it see env/**
-# and api/**, confirmed at keypaste agent's terminal before the app holds the vault.
+# and api/**, confirmed at keypaste approve's terminal before the app holds the vault.
 agent_settings "$CLI" "$VAULT" "$MASTER" "$LABEL --see env/** --see api/**" || die "could not save the probe's settings in the vault"
 
 exec 7>&-

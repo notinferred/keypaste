@@ -335,7 +335,7 @@ public sealed class GenerateFlagTests
         string[] named = field is null ? [] : ["--field", field];
         Assert.Equal(
             CliApp.ExitSuccess,
-            harness.Run([.. new[] { "get", entryPath }, .. named, .. new[] { "--show", "--vault", harness.VaultPath }]));
+            harness.Run([.. new[] { "get", entryPath }, .. named, .. new[] { "--reveal", "--vault", harness.VaultPath }]));
 
         return harness.Out.Trim();
     }

@@ -83,7 +83,7 @@ internal sealed class McpHarness : IAsyncDisposable
     internal FakeEntryNameSource Source { get; } = new();
 
     /// <summary>
-    /// A real <c>keypaste agent</c>, in this process, answering over a real named pipe.
+    /// A real <c>keypaste approve</c> listener, in this process, answering over a real named pipe.
     /// </summary>
     /// <remarks>
     /// A fake handler rather than a fake connection, so the bridge under test builds a genuine

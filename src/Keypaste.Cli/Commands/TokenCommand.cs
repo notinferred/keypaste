@@ -21,7 +21,7 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// <c>create</c> and <c>revoke</c> save, so they take the vault's claim first and are refused while
-/// the app or <c>keypaste agent</c> holds it: a token written under a running owner would be
+/// the app or <c>keypaste approve</c> holds it: a token written under a running owner would be
 /// invisible to it and leave its copy changed on disk (D-0317). <c>ls</c> and <c>bundle</c> only read.
 /// </para>
 /// </remarks>
@@ -584,7 +584,7 @@ internal static class TokenCommand
         writer.WriteLine("a token only feeds `keypaste run --token` or `--bundle`: it injects a set into a");
         writer.WriteLine($"command and never prints a value. --ttl defaults to 30d. pass the token in {RunWithToken.EnvironmentVariable}.");
         writer.WriteLine();
-        writer.WriteLine("create and revoke change the vault, so lock it in the app or `keypaste agent` first.");
+        writer.WriteLine("create and revoke change the vault, so lock it in the app or `keypaste approve` first.");
         writer.WriteLine("a protected environment (prod) needs --allow-prod, then asks you live every time,");
         writer.WriteLine("and is never put in a bundle.");
     }

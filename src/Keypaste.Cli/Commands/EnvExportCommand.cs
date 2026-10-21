@@ -17,7 +17,7 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// <b><c>--dotenv</c> is the one command that puts plaintext on disk.</b> docs/PRODUCT.md law 3.4 forbids a secret touching
 /// disk unencrypted <em>by keypaste's doing</em>; here the user names the format, names the
-/// destination, and answers for it, which is the same distinction that lets <c>get --show</c> exist
+/// destination, and answers for it, which is the same distinction that lets <c>get --reveal</c> exist
 /// beside a clipboard that is otherwise the only way out. It is an escape hatch, and a vault you
 /// cannot leave is a vault nobody should adopt — but it is loud, and it says what it just did.
 /// </para>
@@ -88,7 +88,7 @@ internal static class EnvExportCommand
         var assumeYes = line.HasFlag("yes");
 
         // Same rule as `rm` and `env pull`. --stdout is exempt: naming that flag is the consent,
-        // exactly as `get --show` is, and there is nothing left behind to answer for.
+        // exactly as `get --reveal` is, and there is nothing left behind to answer for.
         if (dotenv && !toStdout && !assumeYes && !context.Prompt.IsInteractive)
         {
             return Fail(context, "--yes is required when stdin is not a terminal");

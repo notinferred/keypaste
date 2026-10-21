@@ -13,7 +13,7 @@
 # version before it, and after KeePassXC merges in a newer copy of the entry, keypaste reads KeePassXC's
 # value and the entry's history holds both values keypaste saved (D-0387).
 # On a second vault KeePassXC made, `api/OpenAI` holds a password, a protected `OPENAI_API_KEY`,
-# `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste agent` and `keypaste mcp` release
+# `Recovery codes`, `otp` and `KP2A_URL_1` (C.5a). A real `keypaste approve` and `keypaste mcp` release
 # `OPENAI_API_KEY` alone and refuse the other names without asking anyone, and the `run` tool naming
 # its reference is asked about as the entry and the field. With the agent made Automatic, the field
 # is released unprompted and `Recovery codes` is still refused by name, before anyone is asked.
@@ -266,13 +266,13 @@ printf "    KeePassXC's version at Unix second %s, keypaste's saves at %s and %s
 history=$(history_xml)
 grep -qF "$saved" <<<"$history" && die "the value about to be merged over is already in history"
 merge_copy "$saved" fields-after-merge 2037-01-01T00:00:00Z newer
-got=$(kp_with '' get "$entry" --field MERGED --show 2>/dev/null) || die "keypaste cannot read the merged field"
+got=$(kp_with '' get "$entry" --field MERGED --reveal 2>/dev/null) || die "keypaste cannot read the merged field"
 [ "$(tr -d '\r' <<<"$got")" = fields-after-merge ] || die "after the merge keypaste reads '${got}', not KeePassXC's value"
 history=$(history_xml)
 grep -qF "$first" <<<"$history" || die "after the merge the history lost the first of keypaste's two saves"
 grep -qF "$saved" <<<"$history" || die "after the merge the history lost the second of keypaste's two saves"
 
-step "a real keypaste agent and keypaste mcp release the env-named field KeePassXC wrote, and no other"
+step "a real keypaste approve and keypaste mcp release the env-named field KeePassXC wrote, and no other"
 openai="$dir/openai.kdbx"
 cat >"$dir/openai.xml" <<EOF
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
@@ -302,7 +302,7 @@ printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/openai.xml")
   || die "keepassxc-cli could not import the OpenAI entry"
 [ "$(kx show "$openai" api/OpenAI -a OPENAI_API_KEY)" = fields-openai-api-key ] || die "KeePassXC does not read the OPENAI_API_KEY it wrote"
 # fields-probe sees api/** and may run commands, each still asked about, as a person confirmed at
-# keypaste agent's terminal; without them it would see only what is tagged into a project.
+# keypaste approve's terminal; without them it would see only what is tagged into a project.
 agent_settings "$kp" "$(native "$openai")" "$pw" 'fields-probe --see api/** --run on' \
   || die "could not save fields-probe's settings in the KeePassXC vault"
 # The app's half runs on this copy, which keypaste has written nothing into but those settings.
@@ -313,7 +313,7 @@ others=(fields-openai-password fields-openai-recovery KRSXG5CTMVRXEZLU fields-op
 denial='keypaste: DENIED. The "field" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.'
 
 agents=0
-# Starts keypaste agent on the OpenAI vault: $1 is what it reads after the master password, the rest its options.
+# Starts keypaste approve on the OpenAI vault: $1 is what it reads after the master password, the rest its options.
 start_agent() {
   local answers=$1
   shift
@@ -321,15 +321,15 @@ start_agent() {
   agents=$((agents + 1))
   pipe="keypaste-fields-$$-$(date +%s)-$agents"
   agent_err="$dir/agent-$agents.err"
-  printf '%s\n%b' "$pw" "$answers" | "$kp" agent --vault "$(native "$openai")" --approver "$pipe" "$@" \
+  printf '%s\n%b' "$pw" "$answers" | "$kp" approve --vault "$(native "$openai")" --approver "$pipe" "$@" \
     >/dev/null 2>"$agent_err" &
   agent_pid=$!
   for _ in $(seq 1 100); do
     grep -q 'listening on' "$agent_err" && break
-    kill -0 "$agent_pid" 2>/dev/null || die "keypaste agent exited before it listened: $(cat "$agent_err")"
+    kill -0 "$agent_pid" 2>/dev/null || die "keypaste approve exited before it listened: $(cat "$agent_err")"
     sleep 0.2
   done
-  grep -q 'listening on' "$agent_err" || die "keypaste agent never started listening"
+  grep -q 'listening on' "$agent_err" || die "keypaste approve never started listening"
 }
 # The prompts the current agent drew.
 asked() { tr -d '\r' <"$agent_err" | grep -c 'an agent is asking for a credential' || true; }
@@ -361,7 +361,7 @@ for field in 'Recovery codes' otp KP2A_URL_1 URL; do
     || die "a request for '$field' was not refused with the fixed denial: $(cat "$dir/field-$id.out")"
   id=$((id + 1))
 done
-[ "$(asked)" = 1 ] || die "keypaste agent was not asked exactly once: a field that never leaves reached a person"
+[ "$(asked)" = 1 ] || die "keypaste approve was not asked exactly once: a field that never leaves reached a person"
 lines_after "$audit" "$logged" | jq -e -s 'length == 5 and .[0].args.field == "OPENAI_API_KEY" and .[0].decision == "granted"
                                            and (.[1:] | all(.args.field == "invalid" and .method == "invalid-request"))' >/dev/null \
   || die "the audit log does not show the release and four invalid fields: $(lines_after "$audit" "$logged")"

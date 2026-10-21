@@ -4,16 +4,16 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste agent</c> records every request it answers, so a log it cannot write stops it before the
+/// <c>keypaste approve</c> records every request it answers, so a log it cannot write stops it before the
 /// master password is asked for, rather than leaving a person to unlock an owner that can only refuse.
 /// </summary>
-public sealed class AgentAuditLogTests : IDisposable
+public sealed class ApproveAuditLogTests : IDisposable
 {
-    private const string _master = "agent-audit-master";
+    private const string _master = "approve-audit-master";
 
     private readonly CliHarness _harness = new();
 
-    public AgentAuditLogTests() => _harness.SeedVault(_master, ("env/dev/TOKEN", "agent-audit-value"));
+    public ApproveAuditLogTests() => _harness.SeedVault(_master, ("env/dev/TOKEN", "approve-audit-value"));
 
     public void Dispose() => _harness.Dispose();
 
@@ -25,7 +25,7 @@ public sealed class AgentAuditLogTests : IDisposable
         var asked = _harness.Prompt.PromptsSeen.Count;
         _harness.Prompt.Enqueue(_master);
 
-        var exit = _harness.Run("agent", "--vault", _harness.VaultPath);
+        var exit = _harness.Run("approve", "--vault", _harness.VaultPath);
 
         Assert.Equal(CliApp.ExitInternalError, exit);
         Assert.StartsWith($"keypaste: the audit log at '{log}' could not be opened: ", _harness.Err, StringComparison.Ordinal);

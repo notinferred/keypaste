@@ -18,7 +18,7 @@ namespace Keypaste.Consistency.Tests;
 /// that — but that a person can delete something by mistake in the app and get it back, and that
 /// what they get back is the credential every other keypaste surface then uses. Only a test holding
 /// both front ends can ask that: the deletion and the restore are GUI actions, and
-/// <c>keypaste get --show</c> and <c>keypaste run</c> are the readers.
+/// <c>keypaste get --reveal</c> and <c>keypaste run</c> are the readers.
 /// </para>
 /// <para>
 /// <b>The mutations that must make this file fail:</b> a restore that never saves; one that
@@ -42,7 +42,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
 
         // The deletion is real from the CLI's side, which is what makes the recovery below worth
         // anything: a trash that listed a live entry would pass every assertion after this one.
-        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
 
         using var trash = Trash(fixture);
         var row = Assert.Single(trash.Model.Rows);
@@ -52,7 +52,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
         trash.Model.RestoreCommand.Execute(null);
 
         Assert.Null(trash.Model.Error);
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.Equal(_password, fixture.Cli.Out.Trim());
     }
 
@@ -94,7 +94,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
             Assert.Single(HistoryOf(fixture, "ROTATED")).Fields.Password,
             StringComparer.Ordinal);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/billing/ROTATED", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/billing/ROTATED", "--reveal"));
         Assert.Equal("v2-current", fixture.Cli.Out.Trim());
     }
 
@@ -142,7 +142,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
         screen.Model.UndoDeleteCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.Equal(_password, fixture.Cli.Out.Trim());
     }
 

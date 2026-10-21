@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Renders a tape from capture-demo.py as the demo GIF: two terminal windows in the brand's terminal style.
 
-The top window replays keypaste agent's pseudo-terminal byte for byte, colour escapes included; the
+The top window replays keypaste approve's pseudo-terminal byte for byte, colour escapes included; the
 commands typed at its shell are animated at the tape's typing speed, and nothing a program did not
 print is drawn into a terminal body. The bottom window shows the scripted MCP client's calls and the
 text keypaste mcp returned to it, verbatim. Keys the person pressed, which the approver does not
@@ -355,7 +355,7 @@ def apply(windows, action):
 def render(tape, output):
     painter = Painter(tape["columns"])
     windows = {
-        "top": Window(painter, TOP_ROWS, "keypaste agent", cursor=True),
+        "top": Window(painter, TOP_ROWS, "keypaste approve", cursor=True),
         "bottom": Window(painter, BOTTOM_ROWS, "agent: a scripted MCP client, over stdio to keypaste mcp", cursor=False),
     }
     height = MARGIN * 2 + GAP + windows["top"].height() + windows["bottom"].height()

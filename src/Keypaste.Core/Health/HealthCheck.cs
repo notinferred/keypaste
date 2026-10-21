@@ -32,7 +32,7 @@ public enum HealthArea
     /// <summary>Whether an AI tool's registration starts keypaste and survives upgrades.</summary>
     Tool,
 
-    /// <summary>Whether the keypaste app or <c>keypaste agent</c> holds the vault and answers.</summary>
+    /// <summary>Whether the keypaste app or <c>keypaste approve</c> holds the vault and answers.</summary>
     Owner,
 
     /// <summary>Whether keypaste's settings files parse.</summary>
@@ -164,7 +164,7 @@ public static class HealthCheck
                 case 0:
                     matched.Add(owner.Kind switch
                     {
-                        OwnerKind.TerminalAgent => "in keypaste agent",
+                        OwnerKind.TerminalAgent => "in keypaste approve",
                         OwnerKind.DesktopApp => "in the keypaste app",
                         _ => "in the keypaste process holding the vault",
                     });

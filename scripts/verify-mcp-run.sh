@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves the shipped run tool end to end, across two real processes: a real `keypaste agent` holds a
+# Proves the shipped run tool end to end, across two real processes: a real `keypaste approve` holds a
 # real vault and asks a person, and a real `keypaste mcp --allow-run` starts the command with the
 # approved value in its environment and returns its output scrubbed (D-0358, D-0359). An agent's
 # commands are off until the person turns them on, which they confirm in the agent's terminal. The
@@ -72,17 +72,17 @@ printf '%s\n' "$MASTER" | "$CLI" env set ci 'DATABASE_URL=pre-{S:DEPLOY_KEY}-pos
 # first run, o for the third and d for the fourth. The second is served from the grant the h gave, so
 # nothing reads an answer for it.
 printf '%s\ny\nh\no\nd\n' "$MASTER" \
-  | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
+  | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
 for _ in $(seq 1 100); do
   grep -q 'listening on' "$AGENT_ERR" && break
-  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste agent exited before it started listening"
+  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste approve exited before it started listening"
   sleep 0.2
 done
-grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listening"
+grep -q 'listening on' "$AGENT_ERR" || die "keypaste approve never started listening"
 SESSION="$(grep 'listening on' "$AGENT_ERR" | head -1 | sed -E 's/.* for unlock ([^,]+),.*/\1/')"
-[ -n "$SESSION" ] || die "keypaste agent named no unlock on its listening line"
+[ -n "$SESSION" ] || die "keypaste approve named no unlock on its listening line"
 
 # A run of ci's whole set, or only of the keys given as a JSON array.
 call() {
@@ -126,7 +126,7 @@ jq -se 'any(.[]; .id == 2 and .result.isError == true)' <"$OUT" >/dev/null || di
 [ -e "$OFF_MARKER" ] && die "a run started while the agent's commands are off"
 [ "$(prompts_drawn)" -eq 0 ] || die "a run was asked about while the agent's commands are off"
 
-"$CLI" mcp policy ci-probe --run on --vault "$VAULT" --approver "$PIPE" 2>"$ERR" \
+"$CLI" clients ci-probe --run on --vault "$VAULT" --approver "$PIPE" 2>"$ERR" \
   || die "turning ci-probe's commands on, confirmed in the agent's terminal, was not applied"
 grep -q 'a change would give an agent more' "$AGENT_ERR" || die "turning commands on did not wait for the person"
 

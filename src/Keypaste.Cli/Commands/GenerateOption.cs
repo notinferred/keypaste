@@ -10,7 +10,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// <para>
 /// <b>These flags generate <i>into the vault</i>, and print only a count.</b>
-/// <c>keypaste get</c> requires <c>--show</c> before it will put a password on stdout, because
+/// <c>keypaste get</c> requires <c>--reveal</c> before it will put a password on stdout, because
 /// stdout is shell history, scrollback and CI logs, and generating where the value is already
 /// being stored needs no such exception: the password goes into the vault and the only thing
 /// printed is what kind and how much of it there was.
@@ -19,9 +19,9 @@ namespace Keypaste.Cli.Commands;
 /// <b>This file used to say there could be no <c>keypaste generate</c> verb at all, and V.6
 /// overturned that for exactly one case (DECISIONS.md D-0237).</b> A passphrase for a share
 /// (5.4a) exists to leave by a second channel, and no vault holds it, so there is no store for it
-/// to go into and <c>get --show</c>'s discipline has nothing to protect. That verb generates
+/// to go into and <c>get --reveal</c>'s discipline has nothing to protect. That verb generates
 /// passphrases only; a character password on stdout still has no argument, because
-/// <c>add --generate</c> already stores one and <c>get --show</c> already prints it.
+/// <c>add --generate</c> already stores one and <c>get --reveal</c> already prints it.
 /// </para>
 /// <para>
 /// One flag set, parsed once, so <c>add</c> and <c>env set</c> cannot drift into two spellings of

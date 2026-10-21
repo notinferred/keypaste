@@ -15,7 +15,7 @@ namespace Keypaste.Cli;
 internal sealed record OwnerRoute(string Verb, Func<CliContext, TerminalEdit?> Read, Func<EditDone, CliContext, int> Done);
 
 /// <summary>
-/// Sends a verb's edit to the app or <c>keypaste agent</c> holding the vault, which asks the person and
+/// Sends a verb's edit to the app or <c>keypaste approve</c> holding the vault, which asks the person and
 /// saves it under its own claim, instead of refusing it (D-0464).
 /// </summary>
 /// <remarks>
@@ -43,7 +43,7 @@ internal static class OwnerEdit
     /// <param name="vaultPath">The vault.</param>
     /// <param name="line">The command line, for <c>--approver</c>.</param>
     /// <param name="context">Where prompts and output go.</param>
-    /// <param name="holder">The app or <c>keypaste agent</c> holding the vault.</param>
+    /// <param name="holder">The app or <c>keypaste approve</c> holding the vault.</param>
     /// <param name="route">How the verb reads its values and says what was done.</param>
     /// <param name="refusal">What the verb says when nothing answers on the pipe.</param>
     /// <returns>The verb's exit code.</returns>

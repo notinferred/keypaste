@@ -6,7 +6,7 @@ namespace Keypaste.Core.Approval;
 /// <summary>Where a request to change an agent's settings says it came from.</summary>
 public enum AccessOrigin
 {
-    /// <summary><c>keypaste mcp policy</c> in a terminal, which any program the person runs could have typed.</summary>
+    /// <summary><c>keypaste clients</c> in a terminal, which any program the person runs could have typed.</summary>
     Terminal = 0,
 
     /// <summary>The agent itself, through its keypaste tool.</summary>

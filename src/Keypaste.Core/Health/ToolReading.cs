@@ -25,7 +25,7 @@ public sealed record ToolReading(McpClient Tool, McpEntryReading Reading, string
     /// <returns>One reading per such tool, in the catalog's order; a tool neither installed nor registered is left out.</returns>
     /// <remarks>
     /// Only a registered command that is a full path to an existing file named <c>keypaste</c>, whose arguments start
-    /// with <c>mcp</c> and are not <c>mcp serve</c>, <c>mcp setup</c> or <c>mcp policy</c>, is started; never the AI tool.
+    /// with <c>mcp</c> and are not the retired <c>mcp serve</c>, <c>mcp setup</c> or <c>mcp policy</c>, is started; never the AI tool.
     /// <c>--help</c> follows <c>mcp</c> at once, so no option of the registration can take it as its value.
     /// </remarks>
     public static IReadOnlyList<ToolReading> ReadAll(HealthScope scope, IProcessRunner? runner)

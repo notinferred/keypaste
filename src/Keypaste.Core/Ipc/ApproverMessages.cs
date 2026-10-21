@@ -37,7 +37,7 @@ public enum ApproverMessageKind
     Run = 10,
     /// <summary>Withdraws the request a connection is waiting on: the owner still sends its reply, then ends the connection.</summary>
     Withdraw = 11,
-    /// <summary>Every agent's settings the vault holds, for <c>keypaste mcp policy</c>.</summary>
+    /// <summary>Every agent's settings the vault holds, for <c>keypaste clients</c>.</summary>
     AccessList = 12,
     /// <summary>A change to one agent's settings, which the owner applies or puts to the person.</summary>
     AccessChange = 13,

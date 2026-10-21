@@ -11,14 +11,14 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// <b>This is the one verb whose output is a fresh secret on stdout, and the exception is
 /// argued rather than assumed (DECISIONS.md D-0237).</b> Everywhere else keypaste refuses to
-/// print a secret without <c>--show</c>, because stdout is shell history, scrollback and CI logs.
+/// print a secret without <c>--reveal</c>, because stdout is shell history, scrollback and CI logs.
 /// A share passphrase (STEPS 5.4a) is the case that rule does not fit: it exists to travel to
 /// another person by a second channel, and no vault holds it, so there is nothing for the
 /// discipline to protect and no other way to obtain it.
 /// </para>
 /// <para>
 /// <b>It generates passphrases only.</b> A character password on stdout has no such argument —
-/// <c>add --generate</c> stores one and <c>get --show</c> prints one, both already — so
+/// <c>add --generate</c> stores one and <c>get --reveal</c> prints one, both already — so
 /// <c>--words</c> is required rather than defaulted. A bare <c>keypaste generate</c>, or a
 /// truncated argument list, prints usage and exits 1: no typo can make this verb emit a secret.
 /// </para>

@@ -134,6 +134,6 @@ internal static class EnvCommand
         writer.WriteLine("a variable is a field of an item tagged env:<project> (the dev environment) or");
         writer.WriteLine("env:<project>:<environment>, editable in KeePassXC. set and pull write a new one on");
         writer.WriteLine("--entry, or on the environment's home item env/<project>/.env, created tagged.");
-        writer.WriteLine("to read a value: keypaste get <item> --field <KEY> --show");
+        writer.WriteLine("to read a value: keypaste get <item> --field <KEY> --reveal");
     }
 }

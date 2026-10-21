@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste agent</c>'s one stderr writer: a line written while a person is choosing never
+/// <c>keypaste approve</c>'s one stderr writer: a line written while a person is choosing never
 /// splices into the choice line of the dialog they are reading (THREATS.md T-2).
 /// </summary>
 public sealed class AgentConsoleTests

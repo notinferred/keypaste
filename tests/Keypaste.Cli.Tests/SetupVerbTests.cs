@@ -451,7 +451,7 @@ public sealed class SetupVerbTests
         Assert.DoesNotContain("--vault", call, StringComparison.Ordinal);
         Assert.DoesNotContain(harness.VaultPath, call, StringComparison.Ordinal);
         Assert.Contains($"vault          {harness.VaultPath} (the chosen vault; the tool's configuration names none)", harness.Out, StringComparison.Ordinal);
-        Assert.EndsWith("  keypaste agent", harness.Out.TrimEnd(), StringComparison.Ordinal);
+        Assert.EndsWith("  keypaste approve", harness.Out.TrimEnd(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -475,7 +475,7 @@ public sealed class SetupVerbTests
         harness.AssertExit(CliApp.ExitSuccess, harness.Run("setup", "--yes", "--client", "claude-code"));
 
         Assert.Contains($"--vault {harness.VaultPath}", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
-        Assert.EndsWith($"  keypaste agent --vault {harness.VaultPath}", harness.Out.TrimEnd(), StringComparison.Ordinal);
+        Assert.EndsWith($"  keypaste approve --vault {harness.VaultPath}", harness.Out.TrimEnd(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -488,7 +488,7 @@ public sealed class SetupVerbTests
         harness.AssertExit(CliApp.ExitSuccess, harness.Run("setup", "--yes", "--client", "claude-code"));
 
         Assert.DoesNotContain("--vault", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
-        Assert.EndsWith("  keypaste agent", harness.Out.TrimEnd(), StringComparison.Ordinal);
+        Assert.EndsWith("  keypaste approve", harness.Out.TrimEnd(), StringComparison.Ordinal);
     }
 
     [Fact]

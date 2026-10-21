@@ -47,7 +47,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--reveal"));
         Assert.Equal(_typed, fixture.Cli.Out.Trim());
     }
 
@@ -66,7 +66,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--reveal"));
         Assert.Equal(_pasted, fixture.Cli.Out.Trim());
     }
 
@@ -91,7 +91,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.Equal(_typed, fixture.Cli.Out.Trim());
 
         Assert.Equal(1, HistoryOf(fixture, string.Empty, "github"));

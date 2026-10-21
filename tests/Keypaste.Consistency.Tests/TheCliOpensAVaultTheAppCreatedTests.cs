@@ -78,7 +78,7 @@ public sealed class TheCliOpensAVaultTheAppCreatedTests : IDisposable
         _cli.Prompt.Enqueue(_master);
         _cli.AssertExit(
             CliApp.ExitSuccess,
-            _cli.Run("get", "work/github", "--show", "--vault", _cli.VaultPath));
+            _cli.Run("get", "work/github", "--reveal", "--vault", _cli.VaultPath));
 
         Assert.Contains("s3cret", _cli.Out, StringComparison.Ordinal);
     }

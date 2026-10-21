@@ -14,7 +14,7 @@ namespace Keypaste.Mcp.Tests;
 /// <summary>
 /// Every call is recorded once: by the owner that answered it, in its own home's log, or by the bridge
 /// when nothing did, in the log its <c>--audit-log</c> names (THREATS.md T-6, T-14). The shipped bridge
-/// against an owner composed as the app and <c>keypaste agent</c> compose it, each with its own log.
+/// against an owner composed as the app and <c>keypaste approve</c> compose it, each with its own log.
 /// </summary>
 public sealed class OneLinePerRequestTests : IAsyncLifetime
 {

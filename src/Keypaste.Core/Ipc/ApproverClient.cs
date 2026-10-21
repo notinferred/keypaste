@@ -66,7 +66,7 @@ public sealed class ApproverClient : IAsyncDisposable
     /// <remarks>
     /// <para>
     /// <b>The connect runs on a thread of its own, and must not be moved back onto the pool.</b> A null
-    /// here becomes a refusal telling a person to start <c>keypaste agent</c>, so it may only mean that
+    /// here becomes a refusal telling a person to start <c>keypaste approve</c>, so it may only mean that
     /// nothing answered. <c>NamedPipeClientStream.ConnectAsync</c> queues its whole connect loop as a pool
     /// work item and a <c>CancelAfter</c> budget is a pool timer; with no worker free, the expired timer
     /// is taken before the queued connect, which then never tries the pipe at all (F.9, runtime

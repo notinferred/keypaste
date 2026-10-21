@@ -22,9 +22,9 @@
 #
 # NEGATIVE CONTROL: this script fails if scripts/demo/deploy.sh exits zero with no STRIPE_KEY set,
 # if it exits non-zero with one, if any of the key beyond its masked prefix and suffix reaches its
-# output, if the approval dialog the shipped agent draws differs by one character from the block in
+# output, if the approval dialog the shipped approver draws differs by one character from the block in
 # EITHER page, if the `[d] deny  [o] once  [h] 1 hour  [a] always for demo:dev` choice line or the two
-# lines the agent draws to say what `[a]` does are missing from either, if either stops carrying the
+# lines the approver draws to say what `[a]` does are missing from either, if either stops carrying the
 # dialog at all, if a request allowed for an hour or once does not return the
 # credential with the lifetime the person chose, if a refused one does, if
 # the credential reaches the audit log, if the rendered `keypaste log` table header differs from
@@ -146,15 +146,15 @@ project_var "$CLI" "$VAULT" "$MASTER" "$PROJECT" "$KEY" "$SECRET" || die "could 
 # One answer per request on stdin: h, then o, then d. ConsoleSecretPrompt reads redirected input a
 # byte at a time precisely so this works.
 printf '%s\nh\no\nd\n' "$MASTER" \
-  | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
+  | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
 for _ in $(seq 1 100); do
   grep -q 'listening on' "$AGENT_ERR" && break
-  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste agent exited before it started listening"
+  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste approve exited before it started listening"
   sleep 0.2
 done
-grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listening"
+grep -q 'listening on' "$AGENT_ERR" || die "keypaste approve never started listening"
 
 ask() {
   local id="$1" out="$2" err="$3"
@@ -188,7 +188,7 @@ ERR="$WORK/approve-stderr.txt"
 ask 2 "$OUT" "$ERR"
 
 # The block both sides must agree on, from "an agent is asking" to the disclaimer that closes it.
-# Carriage returns are stripped: the agent writes native line endings and the document is stored
+# Carriage returns are stripped: the approver writes native line endings and the document is stored
 # with LF, and a diff over that difference would be noise rather than drift.
 block() {
   sed -n '/^keypaste: an agent is asking for a credential\.$/,/^  That sentence was written by the agent/p' "$1" \
@@ -203,7 +203,7 @@ for page in $TRANSCRIPT_PAGES; do
   block "$page" >"$WORK/dialog-doc.txt"
   [ -s "$WORK/dialog-doc.txt" ] || die "$page has no approval dialog block"
   if ! diff -u "$WORK/dialog-doc.txt" "$WORK/dialog-actual.txt" >"$DIFF" 2>&1; then
-    die "the approval dialog in $page is not what the shipped agent draws"
+    die "the approval dialog in $page is not what the shipped approver draws"
   fi
 done
 
@@ -332,12 +332,12 @@ grep -q "$SECRET" "$OUT" && die "keypaste log printed the credential"
   || die "keypaste log verify did not find its own log intact"
 
 # ------------------------------------------------------- F. the options the page tells you to type
-"$CLI" agent --help >"$WORK/agent-help.txt" 2>&1 || true
-"$CLI" log --help   >"$WORK/log-help.txt"   2>&1 || true
-"$CLI" mcp --help   >"$WORK/mcp-help.txt"   2>&1 || true
+"$CLI" approve --help >"$WORK/approve-help.txt" 2>&1 || true
+"$CLI" log --help     >"$WORK/log-help.txt"     2>&1 || true
+"$CLI" mcp --help     >"$WORK/mcp-help.txt"     2>&1 || true
 
 for opt in --vault --approver --approval-timeout --max-ttl; do
-  grep -q -- "$opt" "$WORK/agent-help.txt" || die "keypaste agent no longer offers $opt, which $DOC tells you to type"
+  grep -q -- "$opt" "$WORK/approve-help.txt" || die "keypaste approve no longer offers $opt, which $DOC tells you to type"
 done
 for opt in --since --denied --client; do
   grep -q -- "$opt" "$WORK/log-help.txt" || die "keypaste log no longer offers $opt, which $DOC mentions"
@@ -365,6 +365,6 @@ wait "$AGENT_PID" 2>/dev/null || true
 AGENT_PID=""
 
 echo "ok: the demo's fixture behaves as docs/demo.md prints it, the approval dialog the shipped"
-echo "ok: agent draws matches the page character for character, an approved request released the"
+echo "ok: approver draws matches the page character for character, an approved request released the"
 echo "ok: credential and a refused one released nothing. Claude's half of the demo is not checked"
 echo "ok: here and cannot be: what a model chooses to do is not a thing a gate can hold."

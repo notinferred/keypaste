@@ -41,12 +41,12 @@ public sealed class CliDispatchSourceRulesTests
     public void A_verb_that_names_the_bridge_is_found()
     {
         var app = Read("CliApp.cs");
-        var agent = Read(Path.Combine("Commands", "AgentCommand.cs"));
+        var approve = Read(Path.Combine("Commands", "ApproveCommand.cs"));
 
         Assert.Empty(Offenders("CliApp.cs", app));
         Assert.NotEmpty(Offenders("CliApp.cs", "using Keypaste.Mcp;\n" + app));
-        Assert.Empty(Offenders("AgentCommand.cs", agent));
-        Assert.NotEmpty(Offenders("AgentCommand.cs", "using ModelContextProtocol.Server;\n" + agent));
+        Assert.Empty(Offenders("ApproveCommand.cs", approve));
+        Assert.NotEmpty(Offenders("ApproveCommand.cs", "using ModelContextProtocol.Server;\n" + approve));
     }
 
     private static IEnumerable<string> Offenders(string name, string text) =>

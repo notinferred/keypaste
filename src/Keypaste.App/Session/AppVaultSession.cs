@@ -11,7 +11,7 @@ namespace Keypaste.App.Session;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This is what Stage 4.1 is for.</b> <c>keypaste agent</c> says in its own remarks that "there
+/// <b>This is what Stage 4.1 is for.</b> <c>keypaste approve</c> says in its own remarks that "there
 /// is no idle auto-lock in this version — closing the terminal is the lock", and that Stage 4.1
 /// owns idle locking. This is that.
 /// </para>

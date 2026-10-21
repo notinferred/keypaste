@@ -29,15 +29,20 @@ public sealed class VaultClaimTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// <c>keypaste approve</c> names itself on disk by the kind every keypaste reads, which D-0470 left as it was, and a
+    /// refusal names it by its command.
+    /// </summary>
     [Fact]
-    public void AnAgentHoldingTheVault_IsNamedAsTheAgent()
+    public void KeypasteApproveHoldingTheVault_KeepsItsKindOnDisk_AndIsNamedByItsCommand()
     {
         Assert.True(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.TerminalAgent, out var first, out _));
 
         using (first)
         {
+            Assert.Contains("kind=TerminalAgent", File.ReadAllLines(Path.Combine(_home, VaultClaim.DirectoryName, first.Vault.Key + ".owner")));
             Assert.False(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.DesktopApp, out _, out var refusal, out var holder));
-            Assert.Contains("keypaste agent (process", refusal, StringComparison.Ordinal);
+            Assert.Contains("keypaste approve (process", refusal, StringComparison.Ordinal);
             Assert.Equal(new VaultOwner(OwnerKind.TerminalAgent, Environment.ProcessId, first.Vault.Path), holder);
         }
     }

@@ -2,7 +2,7 @@
 
 This demo uses two terminals to show a failed deploy, a credential request, approval and a successful retry, followed by its audit record. The recorded flow takes about sixty seconds.
 
-`keypaste agent` holds the vault and asks for approval. Your MCP client starts `keypaste mcp`, which forwards requests without holding a vault. You start the approver yourself. Its unlock is independent of the desktop app, and locking that app does not stop this approver. The planned shared desktop session and native approval dialog are not part of this demo. [Approvals](approvals.md) explains what you authorize.
+`keypaste approve` holds the vault and asks for approval. Your MCP client starts `keypaste mcp`, which forwards requests without holding a vault. You start the approver yourself. Its unlock is independent of the desktop app, and locking that app does not stop this approver. The planned shared desktop session and native approval dialog are not part of this demo. [Approvals](approvals.md) explains what you authorize.
 
 The terminal output below was captured from real keypaste processes. Claude's actions and wording can vary between runs.
 
@@ -76,7 +76,7 @@ Work in a small scratch project rather than a real one. Copy `scripts/demo/deplo
 Left terminal:
 
 ```sh
-keypaste agent --vault ~/keypaste-demo.kdbx
+keypaste approve --vault ~/keypaste-demo.kdbx
 ```
 
 ```
@@ -232,7 +232,7 @@ Repeat the credential request on the same MCP connection while its approval rema
 
 | What you see | What it is |
 |---|---|
-| `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste agent` from starting on it; lock the vault in the app first. |
+| `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste approve` from starting on it; lock the vault in the app first. |
 | Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read STRIPE_KEY from env/demo/.env`. |
 | `DENIED. That item is outside what this agent can see` (`v0.3.0`: `outside what this server was configured to expose`) | The request named something other than `STRIPE_KEY` on `env/demo/.env`, the key was stored some other way than `env set`, or an `--expose` was added to the bridge. Approval cannot widen it. |
 | The dialog never appears | Your MCP client is running somewhere you are not looking. The approval prompt is that terminal: `v0.3.0` has no native dialog. |

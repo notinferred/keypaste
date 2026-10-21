@@ -7,7 +7,7 @@
 # denial, and its audit line names the session it reached. Unlocking again starts a session where the
 # same request waits again rather than being answered from anything before the lock. Quitting the app
 # with a request waiting answers it the same way. Where a signal can reach a native process, a request
-# waiting at `keypaste agent`'s prompt is answered the same way when the agent is sent SIGTERM. Idle
+# waiting at `keypaste approve`'s prompt is answered the same way when the agent is sent SIGTERM. Idle
 # and an expired sleep take the same transition; they run over a real pipe with a manual clock in
 # LockBoundaryTests, because this gate cannot wait out an idle timeout or suspend the machine.
 #
@@ -40,7 +40,7 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
 HOLD_PID=""
 AGENT_PID=""
-# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste agent's.
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste approve's.
 exec 7>/dev/null
 exec 8>/dev/null
 cleanup() {
@@ -89,7 +89,7 @@ printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "
 printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
 # The entry is not tagged into a project, so the agent sees it only once a person lets it see env/**,
-# confirmed at keypaste agent's terminal before the app holds the vault.
+# confirmed at keypaste approve's terminal before the app holds the vault.
 agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-probe --see env/**' || die "could not save ci-probe's settings in the vault"
 
 # ---------------------------------------------------- a manual lock denies the waiting request
@@ -123,12 +123,12 @@ wait_for '^withdrawn' "$HOLD_OUT" 2
 denied_as_locked "$SECOND" "quitting"
 HOLD_PID=""
 
-# ------------------------------------------- stopping keypaste agent denies what is waiting
+# ------------------------------------------- stopping keypaste approve denies what is waiting
 if command -v taskkill >/dev/null 2>&1; then
-  echo "skip: keypaste agent's SIGTERM step, because Git Bash cannot deliver a signal to a native Windows process; CI runs it on Linux"
+  echo "skip: keypaste approve's SIGTERM step, because Git Bash cannot deliver a signal to a native Windows process; CI runs it on Linux"
 else
   mkfifo "$WORK/agent.in"
-  "$CLI" agent --vault "$VAULT" <"$WORK/agent.in" >/dev/null 2>"$AGENT_ERR" &
+  "$CLI" approve --vault "$VAULT" <"$WORK/agent.in" >/dev/null 2>"$AGENT_ERR" &
   AGENT_PID=$!
   exec 9>"$WORK/agent.in"
   printf '%s\n' "$MASTER" >&9
@@ -145,11 +145,11 @@ else
   AGENT_PID=""
   exec 9>&-
   finish_request
-  [ "$agent_exit" -eq 0 ] || die "keypaste agent did not stop cleanly on SIGTERM (exit $agent_exit)"
+  [ "$agent_exit" -eq 0 ] || die "keypaste approve did not stop cleanly on SIGTERM (exit $agent_exit)"
   grep -q 'withdrawn before you answered' "$AGENT_ERR" || die "SIGTERM did not withdraw the agent's prompt"
-  grep -q 'every allowance has ended' "$AGENT_ERR" || die "keypaste agent did not report that it locked"
-  denied_as_locked "$AGENT_SESSION" "stopping keypaste agent"
-  echo "ok: SIGTERM withdrew the request waiting at keypaste agent's prompt and it was audited as vault-locked"
+  grep -q 'every allowance has ended' "$AGENT_ERR" || die "keypaste approve did not report that it locked"
+  denied_as_locked "$AGENT_SESSION" "stopping keypaste approve"
+  echo "ok: SIGTERM withdrew the request waiting at keypaste approve's prompt and it was audited as vault-locked"
 fi
 
 echo "ok: a request waiting at the app's session was denied as vault-locked by a manual lock and by quitting,"

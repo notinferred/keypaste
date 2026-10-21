@@ -184,7 +184,7 @@ for project in alpha beta; do
   printf '%s\n' "$MASTER" | "$CLI" env set "$project" "$(printf '%s' "$project" | tr a-z A-Z)_KEY=$OTHER_SECRET" --vault "$VAULT" >/dev/null 2>&1 \
     || die "could not store project ${project}'s variable"
 done
-# Claude Code sees the one untagged item once a person lets it see env/ci/**, confirmed at keypaste agent's
+# Claude Code sees the one untagged item once a person lets it see env/ci/**, confirmed at keypaste approve's
 # terminal before the app holds the vault; Cursor, with no settings of its own, sees only the tagged ones,
 # however wide its connection is registered.
 agent_settings "$CLI" "$VAULT" "$MASTER" "$CLAUDE --see env/ci/**" || die "could not save $CLAUDE's settings in the vault"

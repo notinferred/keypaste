@@ -27,14 +27,10 @@ internal sealed record ServerOptions
     internal const string Usage = """
         usage: keypaste mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
                             [--allow-run] [--audit-log <path>] [--clients <path>] [--approver <name>]
-               keypaste mcp serve | setup | policy [options]
 
         An MCP server that lets an AI agent ask for one credential, with your approval and a full
-        audit trail. An AI tool starts it; you do not run it yourself. See docs/mcp-setup.md.
-
-          serve    approve agents' requests in this terminal (same as keypaste agent)
-          setup    connect this computer's AI tools to your vault (same as keypaste setup)
-          policy   show or change each agent's settings: what it can see, values, run and mode
+        audit trail. An AI tool starts it; you do not run it yourself. `keypaste setup` connects this
+        computer's AI tools to your vault. See docs/mcp-setup.md.
 
           --vault <path>        which vault to ask, or set KEYPASTE_VAULT. Without either,
                                 the vault chosen in the keypaste app or with `keypaste use`
@@ -47,7 +43,7 @@ internal sealed record ServerOptions
                                 A command can still reveal them.
           --audit-log <path>    where this bridge records a call it refuses itself or that
                                 nothing holding the vault answered, or set KEYPASTE_HOME; the
-                                app or keypaste agent records the calls it answers in its own log
+                                app or keypaste approve records the calls it answers in its own log
           --clients <path>      this computer's ceilings, clients.toml, which an agent's change that
                                 gives it less lowers while nothing holds the vault; or set KEYPASTE_HOME
           --approver <name>     which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER
@@ -55,9 +51,9 @@ internal sealed record ServerOptions
 
         Nothing is released unless a person says yes to that specific request, or set this agent to
         Automatic for it. Requests go to whichever keypaste process holds the vault unlocked: the
-        desktop app or a `keypaste agent` the person started in their own terminal - so no agent can
-        cause a master password prompt to appear. With nothing holding the vault, every request is
-        denied but an agent's change that gives it less. `keypaste mcp policy` shows each agent's
+        desktop app or `keypaste approve` in the person's own terminal - so no agent can cause a
+        master password prompt to appear. With nothing holding the vault, every request is denied
+        but an agent's change that gives it less. `keypaste clients` shows or changes each agent's
         settings. An agent may ask for a change to its own; one that gives it more waits for the
         person to confirm it, and one that gives it less applies at once on this computer.
         """;

@@ -148,7 +148,7 @@ printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "
 printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
 # The entry is not tagged into a project, so the agent sees it only once a person lets it see env/**,
-# confirmed at keypaste agent's terminal before the app holds the vault.
+# confirmed at keypaste approve's terminal before the app holds the vault.
 agent_settings "$CLI" "$VAULT" "$MASTER" "$LABEL --see env/**" || die "could not save the probe's settings in the vault"
 
 exec 7>&-

@@ -251,24 +251,25 @@ public sealed class VerbTests
     }
 
     [Fact]
-    public void Get_WithShow_WritesOnlyThePasswordToStdout()
+    public void Get_WithReveal_WritesOnlyThePasswordToStdout_AndNothingToTheClipboard()
     {
         using var harness = new CliHarness();
         harness.SeedVault(Master, ("solo", "solo-secret"));
 
         harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--show");
+        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal");
 
         Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Equal("solo-secret", harness.Out.TrimEnd(), StringComparer.Ordinal);
+        Assert.Equal("solo-secret" + Environment.NewLine, harness.Out);
+        Assert.Equal(0, harness.Clipboard.SetCount);
     }
 
     /// <summary>
-    /// The core promise of <c>get</c>: without <c>--show</c> the secret reaches the clipboard and
+    /// The core promise of <c>get</c>: without <c>--reveal</c> the secret reaches the clipboard and
     /// never stdout, because stdout ends up in shell history, scrollback and CI logs.
     /// </summary>
     [Fact]
-    public void Get_WithoutShow_CopiesToTheClipboard_AndNeverToStdout()
+    public void Get_WithoutReveal_CopiesToTheClipboard_AndNeverToStdout()
     {
         using var harness = new CliHarness();
         harness.SeedVault(Master, ("solo", "solo-secret"));
@@ -336,7 +337,7 @@ public sealed class VerbTests
     /// (docs/PRODUCT.md law 3.7).
     /// </summary>
     [Fact]
-    public void Get_NoClipboardTool_FailsAndSuggestsShow_WithoutLeakingTheSecret()
+    public void Get_NoClipboardTool_FailsAndSuggestsReveal_WithoutLeakingTheSecret()
     {
         using var harness = new CliHarness();
         harness.SeedVault(Master, ("solo", "solo-secret"));
@@ -346,7 +347,7 @@ public sealed class VerbTests
         var exit = harness.Run("get", "solo", "--vault", harness.VaultPath);
 
         Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("--show", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("--reveal", harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("solo-secret", harness.Out, StringComparison.Ordinal);
         Assert.DoesNotContain("solo-secret", harness.Err, StringComparison.Ordinal);
     }
@@ -358,7 +359,7 @@ public sealed class VerbTests
         harness.SeedVault(Master, ("solo", "solo-secret"));
 
         harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "nope", "--vault", harness.VaultPath, "--show");
+        var exit = harness.Run("get", "nope", "--vault", harness.VaultPath, "--reveal");
 
         Assert.Equal(CliApp.ExitNotFound, exit);
         Assert.Empty(harness.Out);
@@ -367,7 +368,7 @@ public sealed class VerbTests
     /// <summary>
     /// The read half of D-0091. Two entries answer to <c>a/b/c</c>, so serving either would be a
     /// guess — and unlike a guessed removal, a guessed read hands the wrong secret over and says
-    /// nothing about having done it. Both ways out of the verb are checked: <c>--show</c> must
+    /// nothing about having done it. Both ways out of the verb are checked: <c>--reveal</c> must
     /// print no password, and the default must put none on the clipboard.
     /// </summary>
     [Fact]
@@ -380,7 +381,7 @@ public sealed class VerbTests
         harness.Prompt.Enqueue(Master);
         harness.AssertExit(
             CliApp.ExitInternalError,
-            harness.Run("get", "a/b/c", "--vault", harness.VaultPath, "--show"));
+            harness.Run("get", "a/b/c", "--vault", harness.VaultPath, "--reveal"));
 
         harness.Prompt.Enqueue(Master);
         harness.AssertExit(
@@ -405,7 +406,7 @@ public sealed class VerbTests
         PlantDatabase(harness, "db-{USERNAME}-{s:DB_SUFFIX}");
 
         harness.Prompt.Enqueue(Master);
-        harness.AssertExit(CliApp.ExitSuccess, harness.Run("get", "web/db", "--vault", harness.VaultPath, "--show"));
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("get", "web/db", "--vault", harness.VaultPath, "--reveal"));
         Assert.Equal("db-dbuser-5d1e-9f2c", harness.Out.TrimEnd(), StringComparer.Ordinal);
 
         harness.Prompt.Enqueue(Master);
@@ -427,7 +428,7 @@ public sealed class VerbTests
         PlantDatabase(harness, "{USERNAME}-{S:Recovery codes}");
 
         harness.Prompt.Enqueue(Master);
-        harness.AssertExit(CliApp.ExitInternalError, harness.Run("get", "web/db", "--vault", harness.VaultPath, "--show"));
+        harness.AssertExit(CliApp.ExitInternalError, harness.Run("get", "web/db", "--vault", harness.VaultPath, "--reveal"));
 
         harness.Prompt.Enqueue(Master);
         harness.AssertExit(CliApp.ExitInternalError, harness.Run("get", "web/db", "--vault", harness.VaultPath));
@@ -449,7 +450,7 @@ public sealed class VerbTests
         harness.SeedVault(Master, ("solo", "solo-secret"));
 
         harness.Prompt.Enqueue("not the password");
-        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--show");
+        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal");
 
         Assert.Equal(CliApp.ExitAuthFailed, exit);
         Assert.Empty(harness.Out);
@@ -649,7 +650,7 @@ public sealed class VerbTests
             Path.Combine(harness.Directory, "does-not-exist.kdbx");
 
         harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--show");
+        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal");
 
         Assert.Equal(CliApp.ExitSuccess, exit);
     }
@@ -662,7 +663,7 @@ public sealed class VerbTests
         harness.Environment[VaultLocator.EnvironmentVariable] = harness.VaultPath;
 
         harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "solo", "--show");
+        var exit = harness.Run("get", "solo", "--reveal");
 
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Equal("solo-secret", harness.Out.TrimEnd(), StringComparer.Ordinal);
@@ -722,30 +723,6 @@ public sealed class VerbTests
         harness.AssertExit(CliApp.ExitSuccess, harness.Run("ls", "--flat", "--vault", harness.VaultPath));
 
         Assert.Equal(["Banking/", "Banking/Chase"], harness.Out.ReplaceLineEndings("\n").TrimEnd().Split('\n'));
-    }
-
-    [Fact]
-    public void Get_Reveal_IsShow()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("solo", "solo-secret"));
-
-        harness.Prompt.Enqueue(Master);
-        harness.AssertExit(CliApp.ExitSuccess, harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal"));
-
-        Assert.Equal("solo-secret" + Environment.NewLine, harness.Out);
-        Assert.Equal(0, harness.Clipboard.SetCount);
-    }
-
-    [Fact]
-    public void Get_RevealAndShow_IsUsage()
-    {
-        using var harness = new CliHarness();
-
-        harness.AssertExit(CliApp.ExitUsageError, harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal", "--show"));
-
-        Assert.Empty(harness.Out);
-        Assert.Empty(harness.Prompt.PromptsSeen);
     }
 
     /// <summary>

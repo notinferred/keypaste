@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace Keypaste.Core.Agents;
 
-/// <summary>A change to one agent's settings, as <c>keypaste mcp policy</c> names it; what it leaves out stays as it is.</summary>
+/// <summary>A change to one agent's settings, as <c>keypaste clients</c> names it; what it leaves out stays as it is.</summary>
 /// <remarks>
 /// <para>
 /// A mode and a limit apply to <see cref="Project"/>'s row, or with no project to the agent's default.

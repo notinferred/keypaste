@@ -112,10 +112,10 @@ expected=$(kpxc show -a Password "$db" "$home") || die "keepassxc-cli show faile
 [ "${#expected}" -ge 16 ] || die "generated password is ${#expected} chars — -g/-L was not honoured"
 [ "$expected" != 'v2-rewritten-by-keypaste' ] || die "edit -g did not actually change the value"
 
-actual=$(kp_run get "$home" --show --vault "$db") || die "keypaste get failed"
+actual=$(kp_run get "$home" --reveal --vault "$db") || die "keypaste get failed"
 diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") \
   || die "keypaste does not read the value KeePassXC wrote (left = KeePassXC, right = keypaste)"
-kept=$(kp_run get "$home" --field "$key" --show --vault "$db") || die "keypaste get --field failed"
+kept=$(kp_run get "$home" --field "$key" --reveal --vault "$db") || die "keypaste get --field failed"
 [ "$kept" = 'v2-rewritten-by-keypaste' ] || die "KeePassXC's save did not keep the variable keypaste wrote: '${kept}'"
 echo "keypaste reads the value KeePassXC generated, and its own variable beside it."
 
@@ -132,7 +132,7 @@ printf '%s\n' "$pw" | "$cli" add -g -L 20 -l -U -n "$db" "env/${project}/ADDED_B
 
 added=$(kpxc show -a Password "$db" "env/${project}/ADDED_BY_KPXC") || die "keepassxc-cli show failed for the added entry"
 [ -n "$added" ] || die "the added entry has an EMPTY password - nothing would be compared"
-[ "$(kp_run get "env/${project}/ADDED_BY_KPXC" --show --vault "$db")" = "$added" ] \
+[ "$(kp_run get "env/${project}/ADDED_BY_KPXC" --reveal --vault "$db")" = "$added" ] \
   || die "keypaste does not read the entry KeePassXC added"
 
 keys=$(kp_run env ls "$project" --vault "$db") || die "keypaste env ls failed"
@@ -194,7 +194,7 @@ kp_run ls --json --vault "$db" | jq -e --arg group "env/${project}" '
 before_ambiguous=$(bytes "$db")
 
 set +e
-collide_out=$(printf '%s\n' "$pw" | "$kp" get "env/${project}/nested/NESTED_KEY" --show --vault "$db" 2>/dev/null | tr -d '\r')
+collide_out=$(printf '%s\n' "$pw" | "$kp" get "env/${project}/nested/NESTED_KEY" --reveal --vault "$db" 2>/dev/null | tr -d '\r')
 collide_rc=$?
 set -e
 [ "$collide_rc" -ne 0 ] || die "keypaste get exited 0 on a path TWO entries answer to"
@@ -228,7 +228,7 @@ if diff -q <(printf '%s\n' "${expected}-CORRUPTED") <(printf '%s\n' "$actual") >
 fi
 
 set +e
-missing_out=$(printf '%s\n' "$pw" | "$kp" get "env/${project}/NO_SUCH_KEY" --show --vault "$db" 2>/dev/null | tr -d '\r')
+missing_out=$(printf '%s\n' "$pw" | "$kp" get "env/${project}/NO_SUCH_KEY" --reveal --vault "$db" 2>/dev/null | tr -d '\r')
 missing_rc=$?
 set -e
 [ "$missing_rc" -eq 3 ] \

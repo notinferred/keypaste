@@ -267,7 +267,7 @@ public sealed class EnvExportTests
     }
 
     /// <summary>
-    /// Naming <c>--stdout</c> is the consent, exactly as <c>get --show</c> is, so a piped run is
+    /// Naming <c>--stdout</c> is the consent, exactly as <c>get --reveal</c> is, so a piped run is
     /// not a usage error the way it is for the file form.
     /// </summary>
     [Fact]

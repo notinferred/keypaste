@@ -3,7 +3,7 @@ using Keypaste.Cli.Styling;
 namespace Keypaste.Cli.Approval;
 
 /// <summary>
-/// The one writer for <c>keypaste agent</c>'s stderr, so a line written while a person is choosing
+/// The one writer for <c>keypaste approve</c>'s stderr, so a line written while a person is choosing
 /// cannot splice into the choice line of the dialog they are reading (THREATS.md T-2).
 /// </summary>
 /// <remarks>

@@ -40,7 +40,7 @@ readonly ENTRY_GROUP='web'
 readonly ENTRY_TITLE='install-check'
 readonly PROJECT='install'
 readonly VARIABLE='APP_ADDED'
-readonly AGENT_STATUS='Keypaste agent (process '
+readonly AGENT_STATUS='Keypaste approve (process '
 readonly LINK_BUTTON='Link the keypaste command'
 readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
 readonly CR=$'\r'
@@ -454,14 +454,14 @@ env_run() {
   local child="${BASH:-/bin/bash}"
   fact env_list "$(cli env ls "$PROJECT" 2>&1 || true)"
   # The app adds a new key as a field of the project's home entry (D-0413).
-  fact get_output "$(cli get "env/$PROJECT/.env" --field "$VARIABLE" --show 2>/dev/null || true)"
+  fact get_output "$(cli get "env/$PROJECT/.env" --field "$VARIABLE" --reveal 2>/dev/null || true)"
   fact run_output "$(printf '%s\n' "$MASTER" | "$KP" run "$PROJECT" --vault "$VAULT_NATIVE" -- "$child" -c "printf %s \"\$$VARIABLE\"" 2>/dev/null | tr -d '\r' || true)"
 }
 
 approval() {
   local pipe="keypaste-install-check-$$-$RANDOM" agent_pid response audit="$HOME_DIR/audit.jsonl"
   # y lets install-check see the group the app saved into, which is in no project; h then allows the request for the hour.
-  printf '%s\ny\nh\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  printf '%s\ny\nh\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do
@@ -470,7 +470,7 @@ approval() {
     sleep 0.2
   done
   act agent-listening grep 'listening on' "$OUT/agent-stderr.txt" || { kill "$agent_pid" 2>/dev/null || true; return 0; }
-  act agent-settings "$KP" mcp policy install-check --see "$ENTRY_GROUP/**" --vault "$VAULT_NATIVE" --approver "$pipe" || true
+  act agent-settings "$KP" clients install-check --see "$ENTRY_GROUP/**" --vault "$VAULT_NATIVE" --approver "$pipe" || true
 
   launch second "$pipe" > /dev/null
   if act second-window drive window 120 && act second-unlock drive type "$MASTER" && act second-unlock-enter drive key Return \
@@ -596,7 +596,7 @@ selftest() {
       '{"action":"entry-listed","status":"ok","detail":"found install-check"}' \
       '{"action":"save-entry","status":"ok","detail":"invoked Save"}' \
       '{"action":"add-variable","status":"ok","detail":"invoked Add"}' \
-      '{"action":"agent-activity","status":"ok","detail":"Keypaste agent (process 4242) holds this vault, and agents reach it there."}' \
+      '{"action":"agent-activity","status":"ok","detail":"Keypaste approve (process 4242) holds this vault, and agents reach it there."}' \
       '{"action":"request","status":"ok","detail":"{}"}' \
       '{"action":"terminal-shell","status":"ok","detail":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe"}' > "$dir/driver.jsonl"
     printf '%s\n' \
@@ -609,7 +609,7 @@ selftest() {
       '{"fact":"vault_changed_by_variable","value":"true"}' \
       '{"fact":"get_output","value":"generated"}' \
       '{"fact":"run_output","value":"generated"}' \
-      '{"fact":"agent_activity","value":"Keypaste agent (process 4242) holds this vault, and agents reach it there."}' \
+      '{"fact":"agent_activity","value":"Keypaste approve (process 4242) holds this vault, and agents reach it there."}' \
       '{"fact":"mcp_error","value":"false"}' \
       '{"fact":"username_readback","value":"edited-in-app-1"}' \
       '{"fact":"audit_decision","value":"granted"}' \
@@ -703,7 +703,7 @@ selftest() {
   set_fact denied audit_decision denied
   set_fact denied mcp_error true
   passing no-agent-screen
-  refuse_action no-agent-screen agent-activity "nothing starting 'Keypaste agent (process ' appeared"
+  refuse_action no-agent-screen agent-activity "nothing starting 'Keypaste approve (process ' appeared"
   passing unfinished
   jq -c 'select(.fact != "finished")' "$work/unfinished/facts.jsonl" > "$work/t" && mv "$work/t" "$work/unfinished/facts.jsonl"
   passing terminal-other-version

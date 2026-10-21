@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# A CLI verb that saves while the app or keypaste agent holds the vault (N.10, N.11), across real
+# A CLI verb that saves while the app or keypaste approve holds the vault (N.10, N.11), across real
 # processes: the shipped keypaste and keypaste mcp, tests/Keypaste.AppDriver holding the vault as launch
-# composes the app, and `keypaste agent` answering in its terminal.
+# composes the app, and `keypaste approve` answering in its terminal.
 #
 # While each holds the vault, access and import are refused naming the holder's process and the next
 # step, with the vault's bytes and backups unchanged. Every verb that edits items sends its edit to the
 # holder instead (D-0464): piped only its values it is asked about there and saved; given no value it
 # needs, it sends nothing; piped a master password before its values, as a script written for a verb
-# that opened the vault itself does, it sends nothing either. Under keypaste agent each is answered `y`
+# that opened the vault itself does, it sends nothing either. Under keypaste approve each is answered `y`
 # at its terminal, and the last is answered `d` and changes nothing. The holder then still answers an
 # agent's request instead of refusing it as vault-changed. Once `keypaste lock` ends the hold, each verb
 # saves itself.
@@ -48,7 +48,7 @@ readonly ERR="$WORK/mcp-stderr.txt"
 
 HOLD_PID=""
 AGENT_PID=""
-# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste agent's.
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste approve's.
 exec 7>/dev/null
 exec 9>/dev/null
 exec 8>/dev/null
@@ -66,7 +66,7 @@ digest() { sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1; }
 backups() { find "$WORK/vault.kdbx.backups" -type f 2>/dev/null | wc -l | tr -d ' '; }
 
 # Verb $1's arguments in phase $2, one per line; each phase adds and pulls what the one before did not,
-# and the last untags the item keypaste agent tagged.
+# and the last untags the item keypaste approve tagged.
 arguments() {
   case "$1" in
     add) printf '%s\n' add "ci/NEW_$2" ;;
@@ -194,7 +194,7 @@ printf '%s\n%s\n' "$MASTER" "$V1" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/n
 printf '%s\n%s\n' "$SOURCE_PW" "$SOURCE_PW" | "$CLI" init "$SOURCE" >/dev/null || die "could not create the import source"
 printf '%s\n%s\n' "$SOURCE_PW" 'old-held' | "$CLI" add Imported/old --vault "$SOURCE" >/dev/null || die "could not fill the import source"
 # The entry is not tagged into a project, so each probe sees it only once a person lets it see env/**,
-# confirmed at keypaste agent's terminal before anything holds the vault.
+# confirmed at keypaste approve's terminal before anything holds the vault.
 agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-held-app --see env/**' 'ci-held-agent --see env/**' || die "could not save the two probes' settings in the vault"
 
 # ------------------------------------------------------------------------------- the app holds it
@@ -229,18 +229,18 @@ exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-# ----------------------------------------------------------------------------- keypaste agent holds it
+# ----------------------------------------------------------------------------- keypaste approve holds it
 exec 9>&-
-exec 9> >(exec 7>&- 8>&-; exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
+exec 9> >(exec 7>&- 8>&-; exec "$CLI" approve --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
 AGENT_SHELL=$!
 if [ -r "/proc/$AGENT_SHELL/winpid" ]; then AGENT_PID="$(cat "/proc/$AGENT_SHELL/winpid")"; else AGENT_PID="$AGENT_SHELL"; fi
 printf '%s\n' "$MASTER" >&9
 wait_for 'listening on' "$AGENT_ERR"
 
-refuse_all "$AGENT_PID" 'Run `keypaste lock` and try again.' "keypaste agent"
-old_style_refused set "keypaste agent" agent
+refuse_all "$AGENT_PID" 'Run `keypaste lock` and try again.' "keypaste approve"
+old_style_refused set "keypaste approve" agent
 
-# Each edit waits in the background for the person at keypaste agent's terminal: every one is allowed
+# Each edit waits in the background for the person at keypaste approve's terminal: every one is allowed
 # but the last, which is denied, since a denial holds every later edit back for a minute.
 asked=0
 last="${EDITS[${#EDITS[@]}-1]}"
@@ -255,18 +255,18 @@ for verb in "${EDITS[@]}"; do
   verb_pid=$!
   asked=$((asked + 1))
   wait_for 'keypaste: a terminal asks to change this vault' "$AGENT_ERR" "$asked"
-  grep -q "  command  keypaste " "$AGENT_ERR" || die "$verb under keypaste agent: the prompt did not name the command"
+  grep -q "  command  keypaste " "$AGENT_ERR" || die "$verb under keypaste approve: the prompt did not name the command"
 
   if [ "$verb" = "$last" ]; then
     printf 'd\n' >&9
     set +e; wait "$verb_pid"; VERB_EXIT=$?; set -e
-    [ "$VERB_EXIT" -ne 0 ] || die "$verb under keypaste agent: exited 0 when denied"
-    [ "$(digest)" = "$before" ] || die "$verb under keypaste agent: denied, and the vault's bytes changed"
+    [ "$VERB_EXIT" -ne 0 ] || die "$verb under keypaste approve: exited 0 when denied"
+    [ "$(digest)" = "$before" ] || die "$verb under keypaste approve: denied, and the vault's bytes changed"
   else
     printf 'y\n' >&9
     set +e; wait "$verb_pid"; VERB_EXIT=$?; set -e
-    [ "$VERB_EXIT" -eq 0 ] || die "$verb under keypaste agent: exited $VERB_EXIT: $(cat "$VERB_ERR")"
-    [ "$(digest)" != "$before" ] || die "$verb under keypaste agent: allowed, and nothing was saved"
+    [ "$VERB_EXIT" -eq 0 ] || die "$verb under keypaste approve: exited $VERB_EXIT: $(cat "$VERB_ERR")"
+    [ "$(digest)" != "$before" ] || die "$verb under keypaste approve: allowed, and nothing was saved"
   fi
 done
 
@@ -274,16 +274,16 @@ bridge ci-held-agent
 request 3
 wait_for 'an agent is asking for a credential' "$AGENT_ERR"
 printf 'o\n' >&9
-answered 3 "keypaste agent"
+answered 3 "keypaste approve"
 
-"$CLI" lock --vault "$VAULT" >"$WORK/lock.txt" 2>&1 7>&- 9>&- 8>&-   || die "keypaste lock did not stop keypaste agent: $(cat "$WORK/lock.txt")"
-wait_for 'the agent has stopped' "$AGENT_ERR"
+"$CLI" lock --vault "$VAULT" >"$WORK/lock.txt" 2>&1 7>&- 9>&- 8>&-   || die "keypaste lock did not stop keypaste approve: $(cat "$WORK/lock.txt")"
+wait_for 'keypaste approve has stopped' "$AGENT_ERR"
 exec 9>&-
 AGENT_PID=""
 exec 8>&-
 
 # ------------------------------------------------------------------------ nothing holds it: each saves
-# keypaste agent's denied rm left Work/github in place; access goes last, since it changes the master password the others are given.
+# keypaste approve's denied rm left Work/github in place; access goes last, since it changes the master password the others are given.
 for verb in "${EDITS[@]}" import access; do
   before="$(digest)"
   answers "$verb" free >"$WORK/answers.txt"
@@ -292,9 +292,9 @@ for verb in "${EDITS[@]}" import access; do
   [ "$(digest)" != "$before" ] || die "$verb with nothing holding the vault: nothing was saved"
 done
 
-echo "ok: while the app and then keypaste agent held the vault, access and import were refused naming the"
+echo "ok: while the app and then keypaste approve held the vault, access and import were refused naming the"
 echo "    holder's process and the next step, with the vault's bytes and backups unchanged; add, set, set"
 echo "    --field, rotate, field rm, env set, env tag, env rm, env pull and rm were each asked about there and"
 echo "    saved by the holder, none sent anything without its value or with a master password piped first,"
-echo "    and the one keypaste agent denied changed nothing; each holder then released to an agent, and once"
+echo "    and the one keypaste approve denied changed nothing; each holder then released to an agent, and once"
 echo "    keypaste lock ended the hold each verb saved"

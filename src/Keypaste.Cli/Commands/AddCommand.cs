@@ -144,7 +144,7 @@ internal static class AddCommand
     internal static int Done(EditDone done, SecretRecipe? recipe, CliContext context)
     {
         // Somebody who wants the value runs `keypaste get`, which already has the clipboard, the
-        // --show discipline and the auto-clear.
+        // --reveal discipline and the auto-clear.
         context.Stderr.WriteLine(recipe is { } generated
             ? $"Added {done.Item} ({generated.Describe("password")} generated)"
             : $"Added {done.Item}");

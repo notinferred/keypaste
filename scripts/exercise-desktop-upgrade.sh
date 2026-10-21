@@ -339,9 +339,9 @@ fixture() {
   done
 
   # A ceiling this computer keeps for the agent, made before any recent vault names one to hold it.
-  "$KP" mcp policy upgrade-check --run off >/dev/null 2>&1 || { echo 'keypaste mcp policy did not write a ceiling'; return 1; }
-  "$KP" mcp policy --json 2>/dev/null | jq -e '. == [{"kind":"ceiling","label":"upgrade-check","run":"off"}]' >/dev/null \
-    || { echo 'keypaste mcp policy --json does not read the ceiling back'; return 1; }
+  "$KP" clients upgrade-check --run off >/dev/null 2>&1 || { echo 'keypaste clients did not write a ceiling'; return 1; }
+  "$KP" clients --json 2>/dev/null | jq -e '. == [{"kind":"ceiling","label":"upgrade-check","run":"off"}]' >/dev/null \
+    || { echo 'keypaste clients --json does not read the ceiling back'; return 1; }
   printf '[[vault]]\npath = "%s"\nopened_at = "%s"\n' "$VAULT_NATIVE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME_DIR/recent.toml"
   printf '[[settings]]\nidle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
   echo "vault $VAULT_NATIVE with $ENTRY and env/$PROJECT, made by $("$KP" --version | tr -d "$CR")"
@@ -361,7 +361,7 @@ baseline() {
 
 audit_record() {
   local pipe="keypaste-upgrade-check-$$-$RANDOM" agent_pid
-  printf '%s\nh\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  printf '%s\nh\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do
@@ -386,14 +386,14 @@ audit_record() {
 
 read_after() { # read_after <when>
   compare "$1"
-  fact "token_after_$1" "$(cli get "env/$PROJECT/$HOME_ENTRY" --field "$VARIABLE" --show || true)"
+  fact "token_after_$1" "$(cli get "env/$PROJECT/$HOME_ENTRY" --field "$VARIABLE" --reveal || true)"
   if printf '%s\n' "$MASTER" | "$KP" log verify > "$OUT/log-verify-$1.txt" 2>&1; then
     fact "log_verify_after_$1" pass
   else
     fact "log_verify_after_$1" "exit $?"
   fi
   fact "keepassxc_after_$1" "$(keepassxc)"
-  "$KP" mcp policy --json > "$OUT/ceilings-$1.json" 2>&1 || true
+  "$KP" clients --json > "$OUT/ceilings-$1.json" 2>&1 || true
 }
 
 # --- a new terminal -------------------------------------------------------------------------------

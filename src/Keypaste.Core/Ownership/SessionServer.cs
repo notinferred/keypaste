@@ -6,7 +6,7 @@ using Keypaste.Core.Ipc;
 
 namespace Keypaste.Core.Ownership;
 
-/// <summary>How one owner answers agents for one unlock: everything that differs between the desktop and <c>keypaste agent</c>.</summary>
+/// <summary>How one owner answers agents for one unlock: everything that differs between the desktop and <c>keypaste approve</c>.</summary>
 public sealed record SessionServerOptions
 {
     /// <summary>The vault served.</summary>
@@ -66,7 +66,7 @@ public sealed record SessionServerOptions
 
 /// <summary>
 /// The grants, the gate, the handler, the authority and the listener one owner answers agents with for
-/// one unlock, built once so the desktop and <c>keypaste agent</c> cannot assemble them differently.
+/// one unlock, built once so the desktop and <c>keypaste approve</c> cannot assemble them differently.
 /// </summary>
 /// <remarks>
 /// The authority is built before the vault's endpoint is bound, so the app answers its own Runs on its

@@ -403,7 +403,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         Assert.Equal(["narrowing", "prompt", "prompt", "automatic"], Lines("method"));
         Assert.All(_log.Lines().Take(3), line =>
         {
-            Assert.Equal("keypaste mcp policy", line.GetProperty("client").GetProperty("name").GetString());
+            Assert.Equal("keypaste clients", line.GetProperty("client").GetProperty("name").GetString());
             Assert.Equal(_agent, line.GetProperty("client").GetProperty("label").GetString());
             Assert.Contains("mode ", line.GetProperty("reason").GetString()!, StringComparison.Ordinal);
         });

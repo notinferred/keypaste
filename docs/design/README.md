@@ -127,7 +127,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 ## CLI (`keypaste CLI.dc.html`)
 Rules: 80 columns; amber = needs you (prompt `›`, commands in help, pending boxes, cursor); green ✓ = done; red = refused or missing; grey = everything else. `--json` for piping. Values are never printed without `--reveal`. See the file for exact output of:
 - `run`
-- `mcp serve` (boxed approval with the key hints [d] deny · [o] once · [h] 1 hour, plus a countdown)
+- `approve` (boxed approval with the key hints [d] deny · [o] once · [h] 1 hour, plus a countdown)
 - `grants`, `grants revoke`
 - `env export` / `env diff`
 - `share`, `import`, `token create`

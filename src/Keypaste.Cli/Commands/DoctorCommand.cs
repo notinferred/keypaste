@@ -145,7 +145,7 @@ internal static class DoctorCommand
         writer.WriteLine("usage: keypaste doctor [--vault <path>] [--json]");
         writer.WriteLine();
         writer.WriteLine("Checks, reading only, that this keypaste, your vault, the keypaste app or");
-        writer.WriteLine("`keypaste agent` holding it, your AI tools' connections, keypaste's settings");
+        writer.WriteLine("`keypaste approve` holding it, your AI tools' connections, keypaste's settings");
         writer.WriteLine("files and PATH work together, and says what to fix. It opens no vault, asks");
         writer.WriteLine("for no password and changes nothing.");
         writer.WriteLine();

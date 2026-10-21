@@ -4,8 +4,8 @@
 # The 2.2 gate proves a person's yes and no cross a process boundary. This is the opposite claim and
 # it is harder: that a setting the person confirmed in advance releases something without anybody
 # being asked, and that the very same agent still draws a prompt for anything the setting does not
-# cover. The setting is made the way a person makes it, with `keypaste mcp policy` confirmed in
-# `keypaste agent`'s terminal, and a change the person refuses changes nothing. An agent can ask for a
+# cover. The setting is made the way a person makes it, with `keypaste clients` confirmed in
+# `keypaste approve`'s terminal, and a change the person refuses changes nothing. An agent can ask for a
 # change to its own settings through its keypaste tool, and the same confirmation stands between it
 # and anything more.
 #
@@ -64,7 +64,7 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
 AGENT_PID=""
 cleanup() {
-  # `keypaste agent` blocks on its pipe until it is stopped, and one that outlives the script keeps
+  # `keypaste approve` blocks on its pipe until it is stopped, and one that outlives the script keeps
   # the CI step's handles open until the job times out; Windows also keeps $WORK while it runs.
   if [ -n "$AGENT_PID" ]; then
     kill "$AGENT_PID" 2>/dev/null || true
@@ -99,17 +99,17 @@ EOF
 # which ConsoleSecretPrompt reports as no answer and the gate turns into a denial — the second,
 # independent guard described at the top.
 printf '%s\nd\ny\ny\nd\n' "$MASTER" \
-  | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --approval-timeout 10 --max-ttl 30 >/dev/null 2>"$AGENT_ERR" &
+  | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 10 --max-ttl 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
 for _ in $(seq 1 100); do
   grep -q 'listening on' "$AGENT_ERR" && break
-  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste agent exited before it started listening"
+  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste approve exited before it started listening"
   sleep 0.2
 done
-grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listening"
+grep -q 'listening on' "$AGENT_ERR" || die "keypaste approve never started listening"
 
-grep -q "policy.toml is no longer read" "$AGENT_ERR" || die "keypaste agent did not say the old policy.toml is no longer read"
+grep -q "policy.toml is no longer read" "$AGENT_ERR" || die "keypaste approve did not say the old policy.toml is no longer read"
 
 # A request a person refuses, or that reads the end of the input, cools its field down for every bridge
 # for a minute (T-11), so each phase that ends in a refusal asks for a field no later phase asks for;
@@ -173,7 +173,7 @@ change() {
 says() { jq -se --argjson id "$1" --arg text "$3" 'any(.[]; .id == $id and (.result.content[0].text | contains($text)))' <"$2" >/dev/null; }
 refused() { jq -se --argjson id "$1" 'any(.[]; .id == $id and .result.isError == true)' <"$2" >/dev/null; }
 
-policy() { "$CLI" mcp policy "$@" --vault "$VAULT" --approver "$PIPE"; }
+clients() { "$CLI" clients "$@" --vault "$VAULT" --approver "$PIPE"; }
 
 # ================================================= A: an agent with no settings is asked about
 before="$(prompts_drawn)"
@@ -186,7 +186,7 @@ grep -q "$OTHER" "$OUT" && die "the answer d still released the credential, or t
 # ======================================= B: a change that gives more waits for the person's answer
 ERR="$WORK/confirmed-change.txt"
 before="$(changes_drawn)"
-policy "$LABEL" --project ci --mode automatic 2>"$ERR" || die "a change the person confirmed was not made"
+clients "$LABEL" --project ci --mode automatic 2>"$ERR" || die "a change the person confirmed was not made"
 [ "$(changes_drawn)" -eq $((before + 1)) ] || die "a change that gives more did not reach the person"
 grep -q 'a person confirmed it' "$ERR" || die "the confirmed change did not say a person confirmed it"
 
@@ -223,7 +223,7 @@ change 26 "$OUT" '{"mode":"automatic","reason":"under another name"}' --label ci
 says 26 "$OUT" 'was refused or went unanswered' || die "the request under another agent's name was not refused as cooling down"
 
 ERR="$WORK/terminal-cooled.txt"
-if policy "$LABEL" --mode automatic 2>"$ERR"; then die "a terminal's request for more, right after a refusal, was reported as made"; fi
+if clients "$LABEL" --mode automatic 2>"$ERR"; then die "a terminal's request for more, right after a refusal, was reported as made"; fi
 [ "$(changes_drawn)" -eq $((before + 2)) ] || die "a terminal's request for more, right after a refusal, was put to the person"
 grep -q 'try again in' "$ERR" || die "the terminal's request held back did not say when to try again"
 grep -q 'which do not wait' "$ERR" || die "the terminal's request held back did not say the app's settings do not wait"
@@ -234,7 +234,7 @@ change 24 "$OUT" '{"run":"off","reason":"ci is done running things"}'
 says 24 "$OUT" 'applied at once on this computer' || die "the agent's narrowing did not say it applied at once"
 
 OUT="$WORK/agent-settings.json"
-policy --json >"$OUT" || die "keypaste mcp policy --json failed through the agent"
+clients --json >"$OUT" || die "keypaste clients --json failed through the agent"
 jq -e --arg l "$LABEL" \
   '([.[] | select(.kind == "agent" and .name == $l)][0].record | .run == true and .mode != "automatic" and (.see // [] | index("**") | not) and ([.projects[] | select(.project == "ci" and .mode == "automatic")] | length == 1) and ([.projects[]? | select(.project == "web")] | length == 0))
    and ([.[] | select(.kind == "ceiling" and .label == $l and .run == "off")] | length == 1)' \
@@ -301,7 +301,7 @@ grep -q "$SPARE" "$OUT" && die "a bridge the operator never labelled was release
 # ================================================================= H: `*` is never made Automatic
 before="$(changes_drawn)"
 ERR="$WORK/any-automatic.txt"
-if policy '*' --project ci --mode automatic 2>"$ERR"; then die "every agent was made Automatic"; fi
+if clients '*' --project ci --mode automatic 2>"$ERR"; then die "every agent was made Automatic"; fi
 [ "$(changes_drawn)" -eq "$before" ] || die "making every agent Automatic was put to the person instead of refused"
 
 # ============================================== I: this computer's ceiling narrows the vault's settings
@@ -335,7 +335,7 @@ released 10 "$SECRET" "$OUT" || die "with the ceiling removed, the Automatic req
 # ======================================================= J: a spent hourly limit asks instead
 # A lower limit gives the agent nothing more, so it applies at once with nobody asked.
 before="$(changes_drawn)"
-policy "$LABEL" --project ci --per-hour 1 2>"$WORK/limit.txt" || die "a lower hourly limit was not applied"
+clients "$LABEL" --project ci --per-hour 1 2>"$WORK/limit.txt" || die "a lower hourly limit was not applied"
 [ "$(changes_drawn)" -eq "$before" ] || die "a lower hourly limit was put to the person"
 grep -q 'applied at once, since it gives the agent nothing more' "$WORK/limit.txt" || die "the lower limit did not say it applied at once"
 
@@ -355,7 +355,7 @@ grep -q "$SECRET" "$OUT" && die "a release went past the hourly limit unasked"
 
 [ "$(grep -c '"method":"automatic"' "$AUDIT" || true)" -eq 3 ] || die "the log does not hold exactly the three Automatic releases"
 jq -e -s --arg l "$LABEL" \
-  '[.[] | select(.tool == "access_change" and .client.name == "keypaste mcp policy" and .client.label == $l)] | length == 3
+  '[.[] | select(.tool == "access_change" and .client.name == "keypaste clients" and .client.label == $l)] | length == 3
    and .[0].decision == "granted" and .[1].method == "cooldown" and .[2].method == "narrowing"' \
   <"$AUDIT" >/dev/null || die "the log does not hold the confirmed change, the one held back and the narrowing, in that order"
 jq -e -s --arg l "$LABEL" \
@@ -377,12 +377,12 @@ done
 # AI tool may not pass KEYPASTE_HOME on. With the owner stopped, such a bridge lowers the ceilings the owner reads
 # for the agent's own request for less; one given the log alone cannot tell which apply, lowers nothing and says
 # to run setup again. Last, so its lines are not among those counted above.
-"$CLI" lock --vault "$VAULT" --approver "$PIPE" >"$WORK/lock.txt" 2>&1 || die "keypaste lock did not stop keypaste agent: $(cat "$WORK/lock.txt")"
+"$CLI" lock --vault "$VAULT" --approver "$PIPE" >"$WORK/lock.txt" 2>&1 || die "keypaste lock did not stop keypaste approve: $(cat "$WORK/lock.txt")"
 for _ in $(seq 1 50); do
-  grep -q 'the agent has stopped' "$AGENT_ERR" && break
+  grep -q 'keypaste approve has stopped' "$AGENT_ERR" && break
   sleep 0.2
 done
-grep -q 'the agent has stopped' "$AGENT_ERR" || die "keypaste agent did not stop on keypaste lock"
+grep -q 'keypaste approve has stopped' "$AGENT_ERR" || die "keypaste approve did not stop on keypaste lock"
 wait "$AGENT_PID" 2>/dev/null || true
 AGENT_PID=""
 rm -f "$CLIENTS"
@@ -397,7 +397,7 @@ change 32 "$OUT" '{"run":"off","reason":"ci is done running things"}' --no-home 
 says 32 "$OUT" 'applied at once on this computer' || die "a bridge pinned to its home's ceilings did not apply the agent's narrowing"
 
 OUT="$WORK/pinned-settings.json"
-policy --json >"$OUT" 2>/dev/null || die "keypaste mcp policy --json failed with nothing holding the vault"
+clients --json >"$OUT" 2>/dev/null || die "keypaste clients --json failed with nothing holding the vault"
 jq -e --arg l "$LABEL" '[.[] | select(.kind == "ceiling" and .label == $l and .run == "off")] | length == 1' <"$OUT" >/dev/null \
   || die "the pinned bridge did not lower the ceilings the owner reads"
 

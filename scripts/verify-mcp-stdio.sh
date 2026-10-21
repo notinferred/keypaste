@@ -160,14 +160,14 @@ printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destr
 printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
   || die "a tool other than run lost its false hints"
 
-# 9. keypaste hands `keypaste mcp` to the bridge and `mcp serve`, `setup` and `policy` to its verbs
-#    (D-0418). Every help form prints the bridge's one usage on stdout, naming those verbs, and each
-#    verb answers as the command it is. A dispatch that sent every `mcp` to the bridge fails here; one
-#    that sent none fails every step above.
+# 9. keypaste hands `keypaste mcp` to the bridge and refuses the removed `mcp serve`, `setup` and `policy`,
+#    naming what replaced each, without starting the bridge (D-0418, D-0470). Every help form prints the
+#    bridge's one usage on stdout. A dispatch that sent every `mcp` to the bridge fails here; one that sent
+#    none fails every step above.
 readonly HOME_DIR="$WORK/home"
 mkdir -p "$HOME_DIR"
 help="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp --help)" || die "keypaste mcp --help exited non-zero"
-for word in --client-label --expose serve setup policy; do
+for word in --client-label --expose; do
   case "$help" in *"$word"*) ;; *) die "keypaste mcp --help does not name $word: $help" ;; esac
 done
 for form in help -h; do
@@ -175,25 +175,32 @@ for form in help -h; do
   [ "$other" = "$help" ] || die "keypaste mcp $form and keypaste mcp --help print different help"
 done
 
-for verb in agent setup; do
-  alias=serve
-  [ "$verb" = setup ] && alias=setup
-  aliased="$("$BIN_PATH" mcp "$alias" --help)" || die "keypaste mcp $alias --help exited non-zero"
-  direct="$("$BIN_PATH" "$verb" --help)" || die "keypaste $verb --help exited non-zero"
-  [ "$aliased" = "$direct" ] || die "keypaste mcp $alias --help did not reach keypaste $verb: $aliased"
+for renamed in serve=approve setup=setup policy=clients; do
+  word="${renamed%%=*}"
+  for extra in '' --help; do
+    set +e
+    # shellcheck disable=SC2086 # an empty $extra adds no argument
+    KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp "$word" $extra >"$WORK/renamed-out.txt" 2>"$WORK/renamed-err.txt" </dev/null
+    status=$?
+    set -e
+    [ "$status" -eq 1 ] || die "keypaste mcp $word $extra exited $status, not 1"
+    [ ! -s "$WORK/renamed-out.txt" ] || die "keypaste mcp $word $extra wrote to stdout: $(cat "$WORK/renamed-out.txt")"
+    [ "$(tr -d '\r' <"$WORK/renamed-err.txt")" = "keypaste: keypaste mcp $word is now keypaste ${renamed#*=}" ] \
+      || die "keypaste mcp $word $extra did not name keypaste ${renamed#*=}: $(cat "$WORK/renamed-err.txt")"
+  done
 done
 
-policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp policy --json)" || die "keypaste mcp policy --json exited non-zero"
+policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients --json)" || die "keypaste clients --json exited non-zero"
 printf '%s' "$policies" | jq -e '. == []' >/dev/null \
-  || die "keypaste mcp policy --json printed '$policies' for a home with no clients.toml, not []"
+  || die "keypaste clients --json printed '$policies' for a home with no clients.toml, not []"
 
 # With nothing holding a vault, a lower ceiling is the one change that can be made, and the list shows it as a row.
-KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp policy cursor --mode ask 2>/dev/null \
-  || die "keypaste mcp policy did not lower cursor's ceiling with nothing holding a vault"
-policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" mcp policy --json)" || die "keypaste mcp policy --json exited non-zero"
+KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients cursor --mode ask 2>/dev/null \
+  || die "keypaste clients did not lower cursor's ceiling with nothing holding a vault"
+policies="$(KEYPASTE_HOME="$HOME_DIR" "$BIN_PATH" clients --json)" || die "keypaste clients --json exited non-zero"
 printf '%s' "$policies" | jq -e '. == [{"kind":"ceiling","label":"cursor","mode":"ask"}]' >/dev/null \
-  || die "keypaste mcp policy --json printed '$policies', not cursor's one ceiling"
+  || die "keypaste clients --json printed '$policies', not cursor's one ceiling"
 
 echo "ok: keypaste mcp speaks MCP over stdio, exposes three tools, denies every call, audits them,"
 echo "    refuses a tool call that arrives before the initialize handshake, adds run only with --allow-run,"
-echo "    prints one help for every help form, and hands serve, setup and policy to the CLI's verbs"
+echo "    prints one help for every help form, and refuses mcp serve, setup and policy naming their replacements"

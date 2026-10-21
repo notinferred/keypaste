@@ -45,7 +45,7 @@ If any line is malformed, the vault remains unchanged. The error report lists up
 
 ```sh
 keypaste env ls dev
-keypaste get env/dev/.env --field DATABASE_URL --show
+keypaste get env/dev/.env --field DATABASE_URL --reveal
 ```
 
 The import above used `--keep` so you can inspect the result before deletion. Once satisfied, run `keypaste env pull dev` again; unchanged values are left alone, and you can answer its deletion prompt. keypaste tells you what deleting does and does not do:
@@ -75,7 +75,7 @@ See [SECURITY.md](../SECURITY.md) for the deletion and exposure limits.
 keypaste run dev -- npm start
 ```
 
-This command asks for the vault password on each invocation. In source, `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste agent` instead: it asks for no password, the app or agent shows the project, the variable names, the command and this directory, and the command starts only when you allow it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Projects screen can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#what-the-screens-show)).
+This command asks for the vault password on each invocation. In source, `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste approve` instead: it asks for no password, either one shows the project, the variable names, the command and this directory, and the command starts only when you allow it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Projects screen can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#what-the-screens-show)).
 
 keypaste places variables in the child environment without writing a plaintext env file. CI points temporary directories at an empty folder and checks that the injection fixture leaves it empty. The child can still write or forward values; review its logging and behavior.
 

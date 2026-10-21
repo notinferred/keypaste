@@ -9,7 +9,7 @@ using Keypaste.Core.Ownership;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// The harness's vault held unlocked and served on a pipe of its own, as <c>keypaste agent</c> composes
+/// The harness's vault held unlocked and served on a pipe of its own, as <c>keypaste approve</c> composes
 /// it, answering every env prompt and terminal edit the same way, saving each edit it allows, and issuing
 /// the passes the app's Run confirmation issues.
 /// </summary>
@@ -89,7 +89,7 @@ internal sealed class UnlockedOwner : IAsyncDisposable
             ?? throw new InvalidOperationException("the owner issued no pass");
     }
 
-    /// <summary>Saves a terminal's edit the person allowed, as <c>keypaste agent</c> does under its claim.</summary>
+    /// <summary>Saves a terminal's edit the person allowed, as <c>keypaste approve</c> does under its claim.</summary>
     private AgentSave Write(SessionLifetime asked, Func<Vault, bool> apply)
     {
         if (!ReferenceEquals(asked, Lifetime) || !asked.IsLive)

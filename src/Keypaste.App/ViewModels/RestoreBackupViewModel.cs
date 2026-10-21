@@ -43,7 +43,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         "Nothing recovers a password nobody remembers.";
 
     internal const string OtherPrograms =
-        "Close anything else that has this vault open first, KeePassXC and a running keypaste agent " +
+        "Close anything else that has this vault open first, KeePassXC and keypaste approve in a terminal " +
         "included: they keep their own copy and will not notice the change.";
 
     private const string _refused = "That password doesn't open this backup, or the backup is damaged. Try another copy.";

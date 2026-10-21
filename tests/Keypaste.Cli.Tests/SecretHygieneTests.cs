@@ -25,7 +25,7 @@ public sealed class SecretHygieneTests
     internal const string EnvPath = "env/hygiene/.env";
 
     /// <summary>
-    /// Sweeps every verb in every shape that is not <c>--show</c> and asserts no field value
+    /// Sweeps every verb in every shape that is not <c>--reveal</c> and asserts no field value
     /// appears anywhere in the output. This is what catches the change that helpfully echoes an
     /// entry back for confirmation, or logs the record it just wrote.
     /// </summary>
@@ -63,8 +63,8 @@ public sealed class SecretHygieneTests
     [InlineData("rotate", "secrets/target")]
     [InlineData("rotate", "secrets/target", "--words", "6")]
     [InlineData("rotate", "secrets/absent")]
-    [InlineData("mcp", "policy")]
-    [InlineData("mcp", "policy", "--json")]
+    [InlineData("clients")]
+    [InlineData("clients", "--json")]
     [InlineData("doctor")]
     [InlineData("doctor", "--json")]
     public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
@@ -154,7 +154,7 @@ public sealed class SecretHygieneTests
     /// <remarks>
     /// A dedicated fact rather than a row in the theory above, for two reasons. The theory appends
     /// <c>--vault</c> and cannot carry a per-harness output path; and <c>--stdout</c> is the second
-    /// documented exception after <c>get --show</c> — there the secret on stdout <em>is</em> the
+    /// documented exception after <c>get --reveal</c> — there the secret on stdout <em>is</em> the
     /// command, so sweeping it would assert the opposite of what it promises. What is asserted for
     /// that form instead, in <c>EnvExportTests</c>, is that nothing leaks onto stderr, which is
     /// what keeps the pipe usable.
@@ -185,7 +185,7 @@ public sealed class SecretHygieneTests
     /// </summary>
     /// <remarks>
     /// The only sweep here that cannot use a sentinel: nothing knows the value until it is read
-    /// back. So the value is learned afterwards, from <c>get --show</c>, and the assertion is made
+    /// back. So the value is learned afterwards, from <c>get --reveal</c>, and the assertion is made
     /// against what the generating command had already written. The positive half — that a value of
     /// the right length exists at all — comes first, because a sweep for a string that was never
     /// produced passes for a <c>--generate</c> that silently did nothing.
@@ -215,7 +215,7 @@ public sealed class SecretHygieneTests
 
         harness.Prompt.Enqueue(Master);
         string[] field = entry ? [] : ["--field", "GENERATED"];
-        Assert.Equal(CliApp.ExitSuccess, harness.Run([.. new[] { "get", target }, .. field, .. new[] { "--show", "--vault", harness.VaultPath }]));
+        Assert.Equal(CliApp.ExitSuccess, harness.Run([.. new[] { "get", target }, .. field, .. new[] { "--reveal", "--vault", harness.VaultPath }]));
 
         var value = harness.Out.Trim();
 

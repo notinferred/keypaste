@@ -13,7 +13,7 @@ namespace Keypaste.App;
 /// <remarks>
 /// <para>
 /// <b>This process owns the vault it unlocks</b> and serves it to <c>keypaste mcp</c> on that
-/// vault's endpoint while it is unlocked; a <c>keypaste agent</c> on the same vault is refused by
+/// vault's endpoint while it is unlocked; <c>keypaste approve</c> on the same vault is refused by
 /// name (D-0309).
 /// </para>
 /// </remarks>

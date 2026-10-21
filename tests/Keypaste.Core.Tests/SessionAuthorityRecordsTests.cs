@@ -98,7 +98,7 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
 
     /// <summary>
     /// A program that speaks the owner's pipe itself, with no bridge in front of it to write a line, is
-    /// recorded by the owner composed as the app and <c>keypaste agent</c> compose it, under the client
+    /// recorded by the owner composed as the app and <c>keypaste approve</c> compose it, under the client
     /// it claims (T-14).
     /// </summary>
     [Fact]

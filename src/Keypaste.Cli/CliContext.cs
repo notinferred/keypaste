@@ -67,7 +67,7 @@ internal sealed class CliContext
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the
-    /// whole reason <c>keypaste get x --show | tr -d '\n'</c> is safe to write, and a test asserts
+    /// whole reason <c>keypaste get x --reveal | tr -d '\n'</c> is safe to write, and a test asserts
     /// this wiring rather than trusting the convention.
     /// </remarks>
     internal static CliContext CreateDefault(TextWriter stdout, TextWriter stderr)

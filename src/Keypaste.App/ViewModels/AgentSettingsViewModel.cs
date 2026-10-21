@@ -13,7 +13,7 @@ namespace Keypaste.App.ViewModels;
 /// What it sets: <c>mode</c>, <c>values</c>, <c>run</c>, <c>see</c> (all projects or only those picked),
 /// or <c>pick</c>, one project or environment among those picked.
 /// </param>
-/// <param name="Word">Its word as <c>keypaste mcp policy</c> spells it; <c>all</c> or <c>only</c> for <c>see</c>; for <c>pick</c>, a selector.</param>
+/// <param name="Word">Its word as <c>keypaste clients</c> spells it; <c>all</c> or <c>only</c> for <c>see</c>; for <c>pick</c>, a selector.</param>
 /// <param name="Words">What the panel says.</param>
 /// <param name="IsChosen">Whether it holds now.</param>
 /// <param name="Project">The project row a mode is for, or null for the agent's default.</param>
@@ -35,7 +35,7 @@ internal sealed record SettingRow(ProjectScope Scope, IReadOnlyList<SettingChoic
 /// <remarks>
 /// <para>
 /// Each choice is one change, made through the session authority that answers agents, as
-/// <c>keypaste mcp policy</c> makes one. A change that gives the agent nothing more applies at once,
+/// <c>keypaste clients</c> makes one. A change that gives the agent nothing more applies at once,
 /// here and in the vault; any other waits for the person to confirm it in the prompt window, and
 /// nothing changes until they do. Either way it is recorded in the audit log, and the panel then reads
 /// what the vault and this computer hold, so a refused change leaves every control as it was.
@@ -492,7 +492,7 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
 
     private void Start(Func<Task> change) => Changing = change();
 
-    /// <summary>Asks the authority for one change in <c>keypaste mcp policy</c>'s words, then reads the settings again.</summary>
+    /// <summary>Asks the authority for one change in <c>keypaste clients</c>'s words, then reads the settings again.</summary>
     private Task ApplyAsync(
         string? project = null,
         string? mode = null,

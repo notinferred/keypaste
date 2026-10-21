@@ -39,7 +39,7 @@ public sealed record AgentSave(AgentSaveOutcome Outcome, string Reason)
     public bool Holds => Outcome is AgentSaveOutcome.Saved or AgentSaveOutcome.Unchanged;
 }
 
-/// <summary>The records the vault holds, read as one list for <c>keypaste mcp policy</c>.</summary>
+/// <summary>The records the vault holds, read as one list for <c>keypaste clients</c>.</summary>
 /// <param name="State">Whether the open vault matches its file; the records are read from the open vault either way.</param>
 /// <param name="Records">Every record, by name.</param>
 public sealed record AgentRecordList(SavedRead State, IReadOnlyList<AgentRecord> Records)

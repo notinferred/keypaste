@@ -173,7 +173,7 @@ keypaste run dev -- npm start
 
 ## Connecting it to Claude
 
-`keypaste-mcp` is started by your MCP client and forwards requests without holding a vault. You start `keypaste agent` in your terminal to unlock the vault and approve requests:
+`keypaste-mcp` is started by your MCP client and forwards requests without holding a vault. You start `keypaste agent`, which 0.5.0 renames `keypaste approve`, in your terminal to unlock the vault and approve requests:
 
 ```sh
 keypaste agent --vault ~/vault.kdbx
@@ -206,7 +206,7 @@ keypaste rm github --yes
 
 `ls` prints a names-only group tree. `get` copies the password to the clipboard and clears it after twenty seconds; `--show` writes it to stdout instead. Password prompts never echo input. Command data goes to stdout and diagnostics to stderr, so `keypaste get x --show` can be piped. Set `KEYPASTE_VAULT` or pass `--vault` to each command.
 
-In `v0.3.0`, `rm` permanently deletes the entry and its history. In 0.5.0, which is not yet published, it moves the entry to the vault's recycle bin, where KeePassXC can see and restore it, unless the vault's recycle bin is switched off. `get --show` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
+In `v0.3.0`, `rm` permanently deletes the entry and its history. In 0.5.0, which is not yet published, it moves the entry to the vault's recycle bin, where KeePassXC can see and restore it, unless the vault's recycle bin is switched off, and `get --reveal` replaces `get --show`, which is refused. Printing a value with `get` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
 
 ### Generating one
 
@@ -238,11 +238,11 @@ keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
 | 4 | wrong master password |
 | 5 | the audit log is not the file keypaste wrote |
 
-When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. While the desktop app or `keypaste agent` holds the vault they take the value alone, and the holder asks you to allow the change; a line more is refused. In 0.5.0, `access --password` takes the current master password and then the new one twice; `access` refuses with 1 before changing anything it would not change safely and with 4 for a wrong current password. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
+When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. While the desktop app or `keypaste approve` holds the vault they take the value alone, and the holder asks you to allow the change; a line more is refused. In 0.5.0, `access --password` takes the current master password and then the new one twice; `access` refuses with 1 before changing anything it would not change safely and with 4 for a wrong current password. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
 
 ## Environment variables
 
-In `v0.3.0` each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password; [D-0014](docs/decisions-archive.md) explains the convention. In 0.5.0, which is not yet published, a variable is a protected field of an entry tagged `env:<project>`, and `env set` and `env pull` put a new one on the project's entry `env/<project>/.env`, so the value below is read with `keypaste get env/billing/.env --field DATABASE_URL --show`; an entry of the earlier layout stays an ordinary entry and is no longer a variable. KeePassXC can edit both directly. CI checks interoperability on all three operating systems.
+In `v0.3.0` each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password; [D-0014](docs/decisions-archive.md) explains the convention. In 0.5.0, which is not yet published, a variable is a protected field of an entry tagged `env:<project>`, and `env set` and `env pull` put a new one on the project's entry `env/<project>/.env`, so the value below is read with `keypaste get env/billing/.env --field DATABASE_URL --reveal`; an entry of the earlier layout stays an ordinary entry and is no longer a variable. KeePassXC can edit both directly. CI checks interoperability on all three operating systems.
 
 ```sh
 keypaste env pull billing
@@ -271,7 +271,7 @@ keypaste run prod -- ./deploy.sh
 
 The `--` is required. Without it, `keypaste run dev npm start` cannot be told apart from a project called `npm`; everything after it belongs to the command, including flags keypaste also understands.
 
-The child inherits your environment with project variables overlaid, and receives the terminal's stdin, stdout and stderr. `run` opens the vault itself, asking for its password, and closes it before starting the child. In source, `keypaste run --session` opens nothing and asks for no password: the desktop app or `keypaste agent` holding the vault unlocked shows the project, its variable names, the command and the directory, and the child starts only if you allow it there. A refusal, a lock, 45 seconds without an answer or nothing holding the vault each end the run with a reason and no child. The child receives a snapshot: later edits or locks do not update or erase its environment.
+The child inherits your environment with project variables overlaid, and receives the terminal's stdin, stdout and stderr. `run` opens the vault itself, asking for its password, and closes it before starting the child. In source, `keypaste run --session` opens nothing and asks for no password: the desktop app or `keypaste approve` holding the vault unlocked shows the project, its variable names, the command and the directory, and the child starts only if you allow it there. A refusal, a lock, 45 seconds without an answer or nothing holding the vault each end the run with a reason and no child. The child receives a snapshot: later edits or locks do not update or erase its environment.
 
 After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit.
 
@@ -296,7 +296,7 @@ Export uses single quotes where possible for consistent reading by `motdotla/dot
 
 In `v0.3.0` two tools appear in the client: `list_entry_names`, which returns group paths and entry names and never a value, and `request_credential`, which asks you to release one field of one entry. In 0.5.0, which is not yet published, a third, `request_access_change`, asks for a change to that agent's own settings and waits for you to confirm one that gives it more, and every bridge `keypaste setup` connects also offers `run`, which runs nothing until you turn it on for that agent.
 
-A credential request requires your approval, a matching rule you wrote in `v0.3.0`, or in 0.5.0 a setting you confirmed that makes that agent Automatic for the entry. Enter your master password only in `keypaste agent`, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
+A credential request requires your approval, a matching rule you wrote in `v0.3.0`, or in 0.5.0 a setting you confirmed that makes that agent Automatic for the entry. Enter your master password only in `keypaste agent`, `keypaste approve` in 0.5.0, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
 
 An explicit refusal tells the agent not to retry. Silence for 45 seconds denies the request. Matching requests can reuse a live approval. Every call, including denied and malformed calls, is appended to `~/.keypaste/audit.jsonl` without the returned value.
 
@@ -308,11 +308,11 @@ In `v0.3.0` exposure defaults to the `env/` subtree, and only explicit `--expose
 
 In `v0.3.0`, a narrow rule in `~/.keypaste/policy.toml` releases matching requests without asking you; `keypaste policy ls` displays its parsed patterns, and [the `v0.3.0` policy guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) explains them.
 
-In 0.5.0 `policy.toml` is no longer read. Each agent has settings kept in the vault, under the `--client-label` its bridge was given: what it can see, whether it is given values, whether it may run commands, and a mode for the agent and for each project or environment you add a row for. Ask every time offers Allow once only; Ask, allow for a while, the default, also offers an hour; Automatic releases what the agent can see without asking you and records each release, optionally at most so many an hour or until a date, after which it asks again. Commands and protected environments are always asked. A change that gives an agent more waits for your confirmation where the vault is unlocked, in the app or in `keypaste agent`'s terminal; one that gives it less applies at once:
+In 0.5.0 `policy.toml` is no longer read. Each agent has settings kept in the vault, under the `--client-label` its bridge was given: what it can see, whether it is given values, whether it may run commands, and a mode for the agent and for each project or environment you add a row for. Ask every time offers Allow once only; Ask, allow for a while, the default, also offers an hour; Automatic releases what the agent can see without asking you and records each release, optionally at most so many an hour or until a date, after which it asks again. Commands and protected environments are always asked. A change that gives an agent more waits for your confirmation where the vault is unlocked, in the app or in `keypaste approve`'s terminal; one that gives it less applies at once:
 
 ```sh
-keypaste mcp policy
-keypaste mcp policy claude-code --project billing:dev --mode automatic --per-hour 20
+keypaste clients
+keypaste clients claude-code --project billing:dev --mode automatic --per-hour 20
 ```
 
 The app's Agents screen sets the same things, and its prompt's Always for button makes an item's environment Automatic after the same confirmation. [Agent settings and modes](docs/policy.md) explains them. The settings are stored in the vault as [ACAF v1](https://keypaste.com/acaf/v1/), a published format other KeePass apps can read.

@@ -582,13 +582,13 @@ public sealed class TerminalApprovalChannelTests
 
         Assert.Equal(
             "keypaste: allowed once. billing:dev was not made Automatic for claude-code: nobody answered inside the window. "
-                + "To ask for it again: keypaste mcp policy claude-code --project billing:dev --mode automatic" + Environment.NewLine,
+                + "To ask for it again: keypaste clients claude-code --project billing:dev --mode automatic" + Environment.NewLine,
             rig.Stderr.ToString());
         Assert.Empty(rig.Prompt.PromptsSeen);
     }
 
     /// <summary>
-    /// The command names this owner's vault and pipe when <c>keypaste mcp policy</c> would not find them
+    /// The command names this owner's vault and pipe when <c>keypaste clients</c> would not find them
     /// unasked, and is not printed when a name in it is one a shell would act on or read as an option.
     /// </summary>
     [Theory]
@@ -611,8 +611,8 @@ public sealed class TerminalApprovalChannelTests
 
         Assert.EndsWith(
             reach is null
-                ? "`keypaste mcp policy` can ask for it again." + Environment.NewLine
-                : $"To ask for it again: keypaste mcp policy {agent} --project {scope} --mode automatic{reach}" + Environment.NewLine,
+                ? "`keypaste clients` can ask for it again." + Environment.NewLine
+                : $"To ask for it again: keypaste clients {agent} --project {scope} --mode automatic{reach}" + Environment.NewLine,
             stderr.ToString(),
             StringComparison.Ordinal);
     }

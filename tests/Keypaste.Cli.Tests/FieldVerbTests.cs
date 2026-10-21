@@ -180,7 +180,7 @@ public sealed class FieldVerbTests : IDisposable
         Assert.DoesNotContain(_secret, _harness.Out, StringComparison.Ordinal);
 
         _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitSuccess, Run("get", "api/Stripe", "--field", "STRIPE_SECRET_KEY", "--show"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("get", "api/Stripe", "--field", "STRIPE_SECRET_KEY", "--reveal"));
         Assert.Equal(_secret + Environment.NewLine, _harness.Out);
     }
 
@@ -191,7 +191,7 @@ public sealed class FieldVerbTests : IDisposable
         Keypaste.Core.Internal.KeePassInterop.WriteForeignUnchecked(path, System.Text.Encoding.UTF8.GetBytes(_master), null, "AES-KDF", "AES-256");
 
         _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("get", "Banking/Checking", "--field", "otp", "--show", "--vault", path));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("get", "Banking/Checking", "--field", "otp", "--reveal", "--vault", path));
 
         Assert.StartsWith("otpauth://", _harness.Out, StringComparison.Ordinal);
     }

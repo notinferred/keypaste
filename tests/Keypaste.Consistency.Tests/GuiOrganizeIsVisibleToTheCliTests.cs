@@ -89,7 +89,7 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
         }
 
         // 4. The CLI reads the moved entry at its new path.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/invoicing/DEPLOY_TOKEN", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/invoicing/DEPLOY_TOKEN", "--reveal"));
         Assert.Equal("second", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
 
         // 5. The project is still billing, its tag's name, and holds only its tagged field.
@@ -130,10 +130,10 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
             Assert.Null(entries.Error);
         }
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "archive/database-old", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "archive/database-old", "--reveal"));
         Assert.Equal("pg-secret", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
 
-        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "servers/database", "--show"));
+        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "servers/database", "--reveal"));
     }
 
     /// <summary>

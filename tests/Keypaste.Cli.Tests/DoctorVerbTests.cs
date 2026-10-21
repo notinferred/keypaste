@@ -28,7 +28,7 @@ public sealed class DoctorVerbTests : IDisposable
 {
     private const string _signIn = "SENTINEL-CLAUDE-SIGN-IN-3f1e";
 
-    private const string _restart = "quit the keypaste app or stop `keypaste agent`, and start it again";
+    private const string _restart = "quit the keypaste app or stop `keypaste approve`, and start it again";
 
     private static readonly TimeSpan _ownerWait = TimeSpan.FromSeconds(30);
 
@@ -103,7 +103,7 @@ public sealed class DoctorVerbTests : IDisposable
                 $"  ✓ cursor           starts keypaste {CoreInfo.Version} from a place upgrades keep",
                 $"                     {This}",
                 "  · owner            nothing holds the vault unlocked; agents are refused",
-                "                     › unlock it in the keypaste app, or run `keypaste agent`",
+                "                     › unlock it in the keypaste app, or run `keypaste approve`",
                 "  ✓ settings         app.toml parses",
                 "  ✓ PATH             a terminal runs this keypaste",
                 $"                     {This}",
@@ -133,7 +133,7 @@ public sealed class DoctorVerbTests : IDisposable
         Assert.Equal(new Finding("vault", "vault", "ok", "the chosen vault is a KeePass database", _harness.VaultPath, Fix: null), found[1]);
         Assert.Equal(new Finding("tool", "AI tools", "note", "no AI tool keypaste connects is installed here", Where: null, Fix: null), found[2]);
         Assert.Equal(
-            new Finding("owner", "owner", "note", "nothing holds the vault unlocked; agents are refused", Where: null, "unlock it in the keypaste app, or run `keypaste agent`"),
+            new Finding("owner", "owner", "note", "nothing holds the vault unlocked; agents are refused", Where: null, "unlock it in the keypaste app, or run `keypaste approve`"),
             found[3]);
     }
 

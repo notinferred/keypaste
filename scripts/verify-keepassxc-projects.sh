@@ -14,7 +14,7 @@
 # the 4.0 vault stays 4.0, the 4.1 vault keeps its version and its group tag, and a refused tag leaves
 # the file byte-identical.
 #
-# Then a real `keypaste agent` holds the 4.1 vault and a real `keypaste mcp`, exposed to the entries,
+# Then a real `keypaste approve` holds the 4.1 vault and a real `keypaste mcp`, exposed to the entries,
 # asks for passwords. An untagged-for-prod entry answered with the hour gets it, and so does
 # env/billing/prod/DB. The entry tagged env:billing:prod, and one KeePassXC tagged env:billing:Prod
 # through `keepassxc-cli merge`, are offered Allow once only: the hour is refused and once is honoured.
@@ -26,13 +26,13 @@
 # environments' key names. A key on two entries, an expired member, {REF:…} in a value and a
 # custom PASSWORD field each start nothing and name their entries, and a value holding {PASSWORD}
 # reaches the child filled in from its own entry, exactly as KeePassXC shows it (P.3b1).
-# `run --session` through a real `keypaste agent`, and through the app's own prompt window held by
+# `run --session` through a real `keypaste approve`, and through the app's own prompt window held by
 # tests/Keypaste.AppDriver on an untouched copy, gets the same set after a prompt naming the source
 # entries, and the staging set is asked once only. A scoped token's run of the dev set is audited
 # with its source entries, and its staging set is refused because a member is also tagged
 # env:billing:prod.
 #
-# A copy of the third vault, held by its own `keypaste agent`, is asked through a `keypaste mcp` on the
+# A copy of the third vault, held by its own `keypaste approve`, is asked through a `keypaste mcp` on the
 # default exposure (C.5b): the listing names the three tagged entries with their variables and project
 # tags and no untagged one, STRIPE_SECRET_KEY is released, Stripe's password is refused before anyone
 # is asked, and billing's dev set runs from entries under services/.
@@ -63,14 +63,14 @@
 # revision.
 #
 # A seventh vault KeePassXC makes from the first document holds agents' settings as ACAF records (G.8),
-# which keypaste writes through `keypaste agent` and confirmed `keypaste mcp policy` changes: one entry
+# which keypaste writes through `keypaste approve` and confirmed `keypaste clients` changes: one entry
 # per agent in .keypaste/agents, each entry and both groups under the UUID their names derive (AcafIds),
 # the vault staying KDBX 4.0. KeePassXC edits an entry, adds one and saves, keeping every record and tag
 # byte for byte, and keypaste applies what it reads. Two copies then change apart: keypaste changes one
 # agent in each and the same agent in both, creates the same agent in both, the second later each time,
 # and tags an entry in the first; KeePassXC edits an entry in the second. `keepassxc-cli merge` either
 # way leaves every change and tag and one entry per agent, the newer record of each agent changed or
-# created in both whole with the older in its history, and a real `keypaste agent` applies the newer.
+# created in both whole with the older in its history, and a real `keypaste approve` applies the newer.
 # keypaste then narrows both agents in one merged copy; merged either way again, each narrowing holds,
 # with the record before it in the history. Two copies of the vault before keypaste wrote anything each
 # create the same agent, and merged either way they hold one .keypaste group, one agents group and one
@@ -261,28 +261,28 @@ printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$grouped")" "$(native "$dir/
   || die "keepassxc-cli could not merge the newer copy"
 grep -qx 'env:billing:Prod' <<<"$(tags "$grouped" services/Other)" || die "the merge did not bring env:billing:Prod"
 
-step "a real keypaste agent and keypaste mcp: the hour is refused for a protected tag and honoured otherwise, under a prod path too"
+step "a real keypaste approve and keypaste mcp: the hour is refused for a protected tag and honoured otherwise, under a prod path too"
 pipe="keypaste-projects-$$-$(date +%s)"
 # The home's log, which every owner and bridge here writes; each phase reads the lines it gained.
 audit="$KEYPASTE_HOME/audit.jsonl"
 logged=$(lines_in "$audit")
 agent_err="$dir/agent.err"
-# projects-probe sees services/** and env/** by path, as a person confirmed at keypaste agent's
+# projects-probe sees services/** and env/** by path, as a person confirmed at keypaste approve's
 # terminal; with no settings it would see only project variables, never a password.
 agent_settings "$kp" "$(native "$grouped")" "$pw" 'projects-probe --see services/** --see env/**' \
   || die "could not save projects-probe's settings in the KeePassXC vault"
 # One answer per request, in order: the hour for the dev entry, once then the hour for the prod entry
 # (once first, because refusing the hour cools that field down for every bridge, D-0425), the hour for
 # the entry KeePassXC tagged through the merge, and the hour for env/billing/prod/DB.
-printf '%s\nh\no\nh\nh\nh\n' "$pw" | "$kp" agent --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
+printf '%s\nh\no\nh\nh\nh\n' "$pw" | "$kp" approve --vault "$(native "$grouped")" --approver "$pipe" --approval-timeout 30 \
   >/dev/null 2>"$agent_err" &
 agent_pid=$!
 for _ in $(seq 1 100); do
   grep -q 'listening on' "$agent_err" && break
-  kill -0 "$agent_pid" 2>/dev/null || die "keypaste agent exited before it listened: $(cat "$agent_err")"
+  kill -0 "$agent_pid" 2>/dev/null || die "keypaste approve exited before it listened: $(cat "$agent_err")"
   sleep 0.2
 done
-grep -q 'listening on' "$agent_err" || die "keypaste agent never started listening"
+grep -q 'listening on' "$agent_err" || die "keypaste approve never started listening"
 
 ask() {
   local id=$1 entry=$2 out="$dir/ask-$1.out"
@@ -305,7 +305,7 @@ ask 5 services/Other | granted 5 && die "the entry KeePassXC tagged env:billing:
 ask 6 env/billing/prod/DB | granted 6 || die "the untagged env/billing/prod/DB answered with the hour was not released: a path protected it"
 
 [ "$(tr -d '\r' <"$agent_err" | grep -c 'it is asked about every time')" = 3 ] \
-  || die "keypaste agent did not say three times that the entry is asked about every time: $(cat "$agent_err")"
+  || die "keypaste approve did not say three times that the entry is asked about every time: $(cat "$agent_err")"
 lines_after "$audit" "$logged" | jq -e -s 'map(select(.method == "prompt")) | length == 5
                                            and .[0].decision == "granted" and .[1].decision == "granted"
                                            and .[2].decision == "denied" and .[3].decision == "denied" and .[4].decision == "granted"' >/dev/null \
@@ -381,7 +381,7 @@ for environment in staging prod; do
     || die "keypaste run -p ${environment} failed: $(cat "$dir/run.err")"
   [ "$out" = "$shared_set" ] || die "the ${environment} child's environment was: ${out}"
 done
-[ "$(kp_on "$fields" get env/billing/OLD_KEY --show 2>/dev/null)" = old-c1b ] || die "keypaste get does not read env/billing/OLD_KEY as an ordinary entry"
+[ "$(kp_on "$fields" get env/billing/OLD_KEY --reveal 2>/dev/null)" = old-c1b ] || die "keypaste get does not read env/billing/OLD_KEY as an ordinary entry"
 
 step "C.1b: env export writes a reference for each variable, and env diff compares the tagged environments"
 exported=$(kp_on "$fields" env export billing --stdout 2>/dev/null) || die "keypaste env export failed"
@@ -440,19 +440,19 @@ logged=$(lines_in "$audit")
 expose_out="$dir/exposed.out"
 trap 'cleanup; kill "${expose_pid:-}" 2>/dev/null || true' EXIT
 # exposed-probe keeps the default view and may run commands, each still asked about, as a person
-# confirmed at keypaste agent's terminal; with no settings its run would be refused unasked.
+# confirmed at keypaste approve's terminal; with no settings its run would be refused unasked.
 agent_settings "$kp" "$(native "$exposed")" "$pw" 'exposed-probe --run on' \
   || die "could not turn exposed-probe's commands on in the KeePassXC vault"
 # The hour for STRIPE_SECRET_KEY, then once for the run; the password is refused before anyone is asked.
-printf '%s\nh\no\n' "$pw" | "$kp" agent --vault "$(native "$exposed")" --approver "$expose_pipe" --approval-timeout 30 \
+printf '%s\nh\no\n' "$pw" | "$kp" approve --vault "$(native "$exposed")" --approver "$expose_pipe" --approval-timeout 30 \
   >/dev/null 2>"$expose_err" &
 expose_pid=$!
 for _ in $(seq 1 100); do
   grep -q 'listening on' "$expose_err" && break
-  kill -0 "$expose_pid" 2>/dev/null || die "keypaste agent exited before it listened: $(cat "$expose_err")"
+  kill -0 "$expose_pid" 2>/dev/null || die "keypaste approve exited before it listened: $(cat "$expose_err")"
   sleep 0.2
 done
-grep -q 'listening on' "$expose_err" || die "keypaste agent never started listening on the exposed vault"
+grep -q 'listening on' "$expose_err" || die "keypaste approve never started listening on the exposed vault"
 
 replied() { # waits for the answer to one id
   for _ in $(seq 1 300); do
@@ -502,9 +502,9 @@ lines_after "$audit" "$logged" | jq -e -s '[.[] | select(.tool == "request_crede
 lines_after "$audit" "$logged" | jq -e -s 'any(.[]; .tool == "run" and .decision == "granted" and (.entries | sort) == ["services/Database", "services/Stripe"])' >/dev/null \
   || die "the run's audit line does not name the two services entries: $(lines_after "$audit" "$logged")"
 [ "$(tr -d '\r' <"$expose_err" | grep -c 'an agent is asking for a credential')" = 1 ] \
-  || die "keypaste agent was not asked exactly once for a credential: $(cat "$expose_err")"
+  || die "keypaste approve was not asked exactly once for a credential: $(cat "$expose_err")"
 [ "$(tr -d '\r' <"$expose_err" | grep -c 'an agent wants to run a command')" = 1 ] \
-  || die "keypaste agent was not asked exactly once to run: $(cat "$expose_err")"
+  || die "keypaste approve was not asked exactly once to run: $(cat "$expose_err")"
 kill "$expose_pid" 2>/dev/null || true
 wait "$expose_pid" 2>/dev/null || true
 trap cleanup EXIT
@@ -514,7 +514,7 @@ token=$(printf '%s\n' "$pw" | "$kp" token create gate-ci --scope 'read:billing/d
   || die "keypaste token create failed: $(cat "$dir/token.err")"
 [ -n "$token" ] || die "keypaste token create printed no token: $(cat "$dir/token.err")"
 
-step "C.1b: run --session through a real keypaste agent names the source entries, and a set holding a prod-tagged member is asked once only"
+step "C.1b: run --session through a real keypaste approve names the source entries, and a set holding a prod-tagged member is asked once only"
 fields_pipe="keypaste-fields-$$-$(date +%s)"
 fields_err="$dir/fields-agent.err"
 cleanup_fields() {
@@ -524,15 +524,15 @@ cleanup_fields() {
 }
 trap cleanup_fields EXIT
 # The hour for the dev run, then once for the staging run, whose Shared entry is also tagged env:billing:prod.
-printf '%s\nh\no\n' "$pw" | "$kp" agent --vault "$(native "$fields")" --approver "$fields_pipe" --approval-timeout 30 \
+printf '%s\nh\no\n' "$pw" | "$kp" approve --vault "$(native "$fields")" --approver "$fields_pipe" --approval-timeout 30 \
   >/dev/null 2>"$fields_err" &
 fields_pid=$!
 for _ in $(seq 1 100); do
   grep -q 'listening on' "$fields_err" && break
-  kill -0 "$fields_pid" 2>/dev/null || die "keypaste agent exited before it listened: $(cat "$fields_err")"
+  kill -0 "$fields_pid" 2>/dev/null || die "keypaste approve exited before it listened: $(cat "$fields_err")"
   sleep 0.2
 done
-grep -q 'listening on' "$fields_err" || die "keypaste agent never started listening on the fields vault"
+grep -q 'listening on' "$fields_err" || die "keypaste approve never started listening on the fields vault"
 
 out=$("$kp" run --session billing --vault "$(native "$fields")" --approver "$fields_pipe" -- "$child" -c "$probe" 2>"$dir/session-dev.err" | tr -d '\r') \
   || die "run --session failed: $(cat "$dir/session-dev.err") / $(cat "$fields_err")"
@@ -1036,22 +1036,22 @@ held_pid=
 holds=0
 asks=0
 trap 'cleanup_fields; kill "${held_pid:-}" 2>/dev/null || true' EXIT
-# Holds the vault $1 with a real keypaste agent of the gate's home, answering its prompts with the keys in $2.
+# Holds the vault $1 with a real keypaste approve of the gate's home, answering its prompts with the keys in $2.
 hold() {
   release
   holds=$((holds + 1))
   held=$1
   held_pipe="keypaste-acaf-$$-$(date +%s)-$holds"
   held_err="$dir/acaf-agent-$holds.err"
-  printf '%s\n%b' "$pw" "$2" | "$kp" agent --vault "$(native "$held")" --approver "$held_pipe" --approval-timeout 30 \
+  printf '%s\n%b' "$pw" "$2" | "$kp" approve --vault "$(native "$held")" --approver "$held_pipe" --approval-timeout 30 \
     >/dev/null 2>"$held_err" &
   held_pid=$!
   for _ in $(seq 1 100); do
     grep -q 'listening on' "$held_err" && break
-    kill -0 "$held_pid" 2>/dev/null || die "keypaste agent exited before it listened on ${held}: $(cat "$held_err")"
+    kill -0 "$held_pid" 2>/dev/null || die "keypaste approve exited before it listened on ${held}: $(cat "$held_err")"
     sleep 0.2
   done
-  grep -q 'listening on' "$held_err" || die "keypaste agent never started listening on ${held}"
+  grep -q 'listening on' "$held_err" || die "keypaste approve never started listening on ${held}"
 }
 release() {
   [ -n "$held_pid" ] || return 0
@@ -1089,7 +1089,7 @@ answered() {
 }
 # Every agent's record keypaste reads through the owner holding the vault, as name and record.
 read_held() {
-  "$kp" mcp policy --json --vault "$(native "$held")" --approver "$held_pipe" 2>"$dir/acaf-policy.err" | tr -d '\r' \
+  "$kp" clients --json --vault "$(native "$held")" --approver "$held_pipe" 2>"$dir/acaf-policy.err" | tr -d '\r' \
     | jq -c '[.[] | select(.kind == "agent") | {name, record}] | sort'
 }
 # The same list from a name and a record's text for each.
@@ -1180,7 +1180,7 @@ for merged in "$into_first" "$into_second"; do
   released || die "${name}: acaf-twin, Automatic for billing in the newer copy, was not released STRIPE_SECRET_KEY: ${reply}"
   [ "$(answered "$logged")" = '[["acaf-first","request_credential","denied","inject-only"],["acaf-second","request_credential","granted","prompt"],["acaf-both","request_credential","granted","automatic"],["acaf-twin","request_credential","granted","automatic"]]' ] \
     || die "${name}: the owner did not record what each record says: $(answered "$logged")"
-  [ "$(said_held 'an agent is asking for a credential')" = 1 ] || die "${name}: keypaste agent was not asked exactly once: $(cat "$held_err")"
+  [ "$(said_held 'an agent is asking for a credential')" = 1 ] || die "${name}: keypaste approve was not asked exactly once: $(cat "$held_err")"
   [ "$(said_held 'this agent is set to Ask every time')" = 1 ] || die "${name}: acaf-second's prompt did not say it is asked every time: $(cat "$held_err")"
   release
 done

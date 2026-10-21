@@ -16,7 +16,10 @@ internal static class Program
         return CliApp.Run(args, StandardStreams.Output(), StandardStreams.Error());
     }
 
-    /// <summary>Whether <paramref name="args"/> start the MCP bridge, decided from the arguments alone so no vault code runs first (D-0418).</summary>
+    /// <summary>
+    /// Whether <paramref name="args"/> start the MCP bridge, decided from the arguments alone so no vault code runs first
+    /// (D-0418). The removed <c>mcp serve</c>, <c>setup</c> and <c>policy</c> never do, so the CLI refuses them (D-0470).
+    /// </summary>
     internal static bool StartsBridge(string[] args) =>
         args is [McpServerLocator.BridgeArgument, ..] && args is not [_, "serve" or "setup" or "policy", ..];
 }

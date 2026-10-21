@@ -147,7 +147,7 @@ step "the shipped binary reads the entry at the new path, and lists no project f
 listed=$(printf '%s\n' "$pw" | "$kp" env ls --vault "$db") || die "keypaste env ls failed"
 grep -qE "invoicing|${project}" <<<"$listed" && die "keypaste lists an untagged group under env as a project. It said: ${listed}"
 
-got=$(printf '%s\n' "$pw" | "$kp" get env/invoicing/TOKEN --show --vault "$db") \
+got=$(printf '%s\n' "$pw" | "$kp" get env/invoicing/TOKEN --reveal --vault "$db") \
   || die "keypaste get failed at the renamed path"
 grep -qF 'v4-current' <<<"$got" || die "keypaste does not read the value at the renamed path. It said: ${got}"
 

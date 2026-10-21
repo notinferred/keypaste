@@ -433,7 +433,7 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(1, _fixture.Channel.Asked);
         Assert.Equal(0, _fixture.Grants.Count);
         Assert.Equal(external, File.ReadAllBytes(VaultPath));
-        Assert.Contains(_fixture.Narration, line => line.Contains("restart keypaste agent", StringComparison.Ordinal));
+        Assert.Contains(_fixture.Narration, line => line.Contains("restart keypaste approve", StringComparison.Ordinal));
     }
 
     /// <summary>

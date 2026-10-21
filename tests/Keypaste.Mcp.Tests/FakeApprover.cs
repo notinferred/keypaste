@@ -7,7 +7,7 @@ using Keypaste.Core.Ipc;
 namespace Keypaste.Mcp.Tests;
 
 /// <summary>
-/// A <c>keypaste agent</c> that answers however a test tells it to, over a real named pipe.
+/// A stand-in for <c>keypaste approve</c> that answers however a test tells it to, over a real named pipe.
 /// </summary>
 /// <remarks>
 /// <para>

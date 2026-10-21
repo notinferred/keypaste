@@ -133,7 +133,7 @@ public sealed class RunSessionTests : IDisposable
         Assert.Empty(_harness.ProcessLauncher.Started);
         Assert.Empty(_harness.Prompt.PromptsSeen);
         Assert.Contains(
-            $"nothing holds {_harness.VaultPath} unlocked; unlock it in the keypaste app or start `keypaste agent`, so nothing was started",
+            $"nothing holds {_harness.VaultPath} unlocked; unlock it in the keypaste app or start `keypaste approve`, so nothing was started",
             _harness.Err,
             StringComparison.Ordinal);
     }
@@ -473,7 +473,7 @@ public sealed class RunSessionTests : IDisposable
     /// <summary>
     /// A run from the app that finds nothing answering, the app having locked or quit after Start, says so and to press
     /// Run again, since its pass belonged to that unlock and only the app listens where it asks; unlocking alone or
-    /// starting <c>keypaste agent</c> could not serve it.
+    /// starting <c>keypaste approve</c> could not serve it.
     /// </summary>
     [Fact]
     public async Task A_run_from_the_app_finding_nothing_answering_says_to_press_Run_in_the_app_again()
@@ -491,7 +491,7 @@ public sealed class RunSessionTests : IDisposable
             "keypaste run: the keypaste app locked or quit before this window could start, so nothing was started. Press Run in the app again.",
             _harness.Err,
             StringComparison.Ordinal);
-        Assert.DoesNotContain("keypaste agent", _harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("keypaste approve", _harness.Err, StringComparison.Ordinal);
         Assert.Equal(["Press Return to finish."], _harness.Prompt.PromptsSeen);
         Assert.Empty(_harness.ProcessLauncher.Started);
     }

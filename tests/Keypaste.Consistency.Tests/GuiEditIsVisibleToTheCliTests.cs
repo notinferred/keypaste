@@ -58,7 +58,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--reveal"));
 
         var value = fixture.Cli.Out.Trim();
         Assert.Equal(PasswordGenerator.DefaultLength, value.Length);
@@ -68,7 +68,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
     }
 
     /// <summary>
-    /// A passphrase generated in the app is the value <c>keypaste get --show</c> returns.
+    /// A passphrase generated in the app is the value <c>keypaste get --reveal</c> returns.
     /// </summary>
     /// <remarks>
     /// V-V.6's last clause, and the same argument as the test above: the generator is the only
@@ -89,7 +89,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--reveal"));
 
         var value = fixture.Cli.Out.Trim();
         Assert.NotEmpty(value);
@@ -120,7 +120,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
         Assert.Null(screen.Model.Error);
 
         // The password the GUI did not touch is the one the CLI still hands back.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.Equal("gh-password", fixture.Cli.Out.Trim());
     }
 
@@ -131,17 +131,17 @@ public sealed class GuiEditIsVisibleToTheCliTests
         using var screen = Entries(fixture);
 
         // The positive control first: it is there before it is not.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
 
         screen.Model.Selected = screen.Model.Rows.Single(row => row.Title == "github");
         screen.Model.DeleteCommand.Execute(null);
         screen.Model.ConfirmDeleteCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
-        Assert.Equal(CliApp.ExitNotFound, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitNotFound, fixture.Run("get", "github", "--reveal"));
 
         // And nothing else went with it.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "keep", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "keep", "--reveal"));
     }
 
     /// <summary>
@@ -299,7 +299,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
         Assert.NotNull(screen.Model.Error);
 
         // The terminal's write is still there, which is the whole point.
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "from-the-terminal", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "from-the-terminal", "--reveal"));
         Assert.Equal("from-the-terminal", fixture.Cli.Out.Trim());
     }
 
@@ -332,7 +332,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--field", "API_TOKEN", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--field", "API_TOKEN", "--reveal"));
         Assert.Equal("token-from-the-app", fixture.Cli.Out.Trim());
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("env", "ls"));

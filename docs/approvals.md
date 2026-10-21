@@ -1,29 +1,29 @@
 # Approving an agent's request
 
-A person approves credential requests unless a live approval covers them or, in source, the agent's settings make it Automatic for the entry. This guide describes the terminal workflow in source, for the next release, and, in source, [approving in the desktop app](#approving-in-the-desktop-app); notes give `v0.3.0`'s differences, where policy rules allow matching requests without a prompt at `keypaste agent`. [Agent settings and modes](policy.md) explains what each agent can see, receive and run, and how its requests are answered.
+A person approves credential requests unless a live approval covers them or, in source, the agent's settings make it Automatic for the entry. This guide describes the terminal workflow in source, for the next release, and, in source, [approving in the desktop app](#approving-in-the-desktop-app); notes give `v0.3.0`'s differences: its approver is `keypaste agent`, where policy rules allow matching requests without a prompt. [Agent settings and modes](policy.md) explains what each agent can see, receive and run, and how its requests are answered.
 
-In source, one vault has one owner: while the app has a vault unlocked, `keypaste agent` on that vault is refused with a message naming the app, and the app asks about that vault's credential requests itself. The desktop and a terminal approver on another vault still unlock independently, and the app launches a project's terminal through its own session; [ROADMAP](../ROADMAP.md) has the work ahead.
+In source, one vault has one owner: while the app has a vault unlocked, `keypaste approve` on that vault is refused with a message naming the app, and the app asks about that vault's credential requests itself. The desktop and a terminal approver on another vault still unlock independently, and the app launches a project's terminal through its own session; [ROADMAP](../ROADMAP.md) has the work ahead.
 
 <a id="the-short-version"></a>
 
 ```
   your terminal                     your MCP client
        │                                   │
-  keypaste agent  ◄──── local pipe ────  keypaste mcp
+  keypaste approve ◄─── local pipe ────  keypaste mcp
    • unlocked vault                       • validates the request
    • asks you                             • refuses anything out of scope
    • holds live grants                    • returns one field
    • writes the audit line
 ```
 
-`keypaste mcp` is started by the MCP client and forwards requests without holding the vault. You start `keypaste agent`, which holds the vault and decides, under each agent's settings, whether to prompt, reuse an approval or release without asking.
+`keypaste mcp` is started by the MCP client and forwards requests without holding the vault. You start `keypaste approve`, which holds the vault and decides, under each agent's settings, whether to prompt, reuse an approval or release without asking.
 
-An agent cannot trigger a master-password prompt. You enter the password only in a terminal you opened, after running `keypaste agent`. This avoids teaching you to trust password windows that another program could imitate.
+An agent cannot trigger a master-password prompt. You enter the password only in a terminal you opened, after running `keypaste approve`. This avoids teaching you to trust password windows that another program could imitate.
 
 ## Starting the approver
 
 ```sh
-keypaste agent --vault ~/vaults/personal.kdbx
+keypaste approve --vault ~/vaults/personal.kdbx
 ```
 
 It asks for your master password, then waits:
@@ -92,7 +92,7 @@ Reused approvals do not show the new reason in the terminal. The audit log recor
 
 ## Automatic releases
 
-In source, a request from an agent whose settings make it Automatic for the entry is released without a prompt, within what the agent can see, and `keypaste agent` prints a line for it:
+In source, a request from an agent whose settings make it Automatic for the entry is released without a prompt, within what the agent can see, and `keypaste approve` prints a line for it:
 
 ```
 keypaste: released env/billing/.env to claude-code without asking (Automatic)
@@ -102,7 +102,7 @@ The audit line records it as `automatic`, never as a person's approval, and it k
 
 ## Confirming a change to an agent's settings
 
-In source, a change that would give an agent more, whether you asked for it with `keypaste mcp policy`, the agent asked through its keypaste tool or `a` asked for it, waits for you where the vault is unlocked:
+In source, a change that would give an agent more, whether you asked for it with `keypaste clients`, the agent asked through its keypaste tool or `a` asked for it, waits for you where the vault is unlocked:
 
 ```
 ────────────────────────────────────────────────────────────
@@ -119,13 +119,13 @@ keypaste: a change would give an agent more.
 
 `asked` is where the request says it came from, which keypaste cannot check, and an agent's own request adds its reason as its own words. When the agent's saved settings hold something keypaste does not wholly understand, such as another program's setting or a typo from a hand edit, the `[y]` line says instead that the agent gets no more than the defaults until they are fixed, and so does the app's confirmation. `y` allows; every other key, Enter included, denies, and so does silence. Once you refuse a request for more from a terminal or an agent, or leave it unanswered, the next request for more from any terminal or any agent, under any agent name, is refused for a minute without asking you, and is told when to try again; the one `a` asked for is not held back, since only you can ask for it, and neither are the app's own agent settings. A change that gives an agent less applies at once and asks nobody, even while its saved settings hold something keypaste does not understand, and a change that leaves them wholly understood asks for everything they then give.
 
-When the change `a` asked for does not take effect, for any reason but your `d`, a line after the release says so and why, and gives the command that asks for it again, naming this terminal's vault and pipe when `keypaste mcp policy` would not find them by itself:
+When the change `a` asked for does not take effect, for any reason but your `d`, a line after the release says so and why, and gives the command that asks for it again, naming this terminal's vault and pipe when `keypaste clients` would not find them by itself:
 
 ```
-keypaste: allowed once. billing:dev was not made Automatic for claude-code: another request was already in front of a person. To ask for it again: keypaste mcp policy claude-code --project billing:dev --mode automatic
+keypaste: allowed once. billing:dev was not made Automatic for claude-code: another request was already in front of a person. To ask for it again: keypaste clients claude-code --project billing:dev --mode automatic
 ```
 
-When a name in that command is one a shell would act on, or would read as an option, the line says only that `keypaste mcp policy` can ask for it again.
+When a name in that command is one a shell would act on, or would read as an option, the line says only that `keypaste clients` can ask for it again.
 
 ## When you say no
 
@@ -139,7 +139,7 @@ In source, a request whose client gives up, or whose `keypaste mcp` goes away, i
 
 In source, when the desktop app has a vault unlocked, a credential request for that vault opens a keypaste prompt window over whatever you are doing. It shows who is asking (the name the client gave itself, which is not verified), the client label from its configuration, the entry, the field, what you can allow, a countdown, and the agent's reason, under a line saying the agent wrote it.
 
-Allow once releases that one field and keeps nothing. Allow for 1 hour also lets the same connection ask for the same field again for an hour without asking you, and is not offered for an entry tagged into a protected environment. Both work a second after the prompt appears, so a click meant for another window cannot approve. Deny, Escape and closing the window refuse, and focus starts on Deny, so Enter refuses too. Nobody answering for 45 seconds refuses. Locking the app, quitting it and the client giving up each refuse the request and take the prompt down. The one-prompt-at-a-time rule, the one-minute refusal cooldown and connection-scoped grants apply as they do at `keypaste agent`.
+Allow once releases that one field and keeps nothing. Allow for 1 hour also lets the same connection ask for the same field again for an hour without asking you, and is not offered for an entry tagged into a protected environment. Both work a second after the prompt appears, so a click meant for another window cannot approve. Deny, Escape and closing the window refuse, and focus starts on Deny, so Enter refuses too. Nobody answering for 45 seconds refuses. Locking the app, quitting it and the client giving up each refuse the request and take the prompt down. The one-prompt-at-a-time rule, the one-minute refusal cooldown and connection-scoped grants apply as they do at `keypaste approve`.
 
 In source, a prompt the terminal would offer `a` for also has an Always for button, labelled with the entry's environment and captioned "Allows once, then asks to make it Automatic", in a place of its own above the other buttons, so none of them moves whether it shows or not; it works when the allows do, releases the request once and then opens the confirmation of the change. That confirmation is a window of its own, with the same fixed layout: it names the agent, what it would gain and where the request came from, and in the reason's box says that you chose it with Always for, focus starts on Deny, Allow works a second after it appears, and Deny, Escape, closing it, a lock and 45 seconds without an answer change nothing. When the change does not take effect for any reason but your Deny, a notice window says, after the release, which environment was not made Automatic and why; Close is its default, and its button that names the agent's settings brings the main window forward with that agent's settings open on Agents, where any change still asks you to confirm it.
 
@@ -149,23 +149,23 @@ The Agents screen lists the request in front of you under Waiting for you, with 
 
 ## Runs that ask for a project's variables
 
-In source, `keypaste run --session <project> -- <command>` asks the process holding the vault for the project's whole set instead of opening the vault itself ([replace-dotenv](replace-dotenv.md#run-your-app)). The app shows it in a prompt window of its own and `keypaste agent` in its terminal, naming the project, the variable names, the entry each value comes from, the command and the directory the run was started in, never a value. Allow once, or `o` at the agent, starts the command with the set. Allow this command for 15 minutes, or `h`, also lets any program of yours run exactly that command in that directory again for 15 minutes without asking, reading the latest values each time while the variable names stay the same; it is never offered for a protected profile or a set holding an entry tagged into one, such as `env:billing:prod`, and it ends on a lock or a revoke ([THREATS.md](../THREATS.md) T-34). `keypaste agent` prints a line for each run such a grant lets through, naming the project, profile and command and the seconds left. The same rules as a credential request apply otherwise: both allows work after a second, Deny, Escape, closing, `d`, `n`, Enter, a lock and 45 seconds without an answer refuse, one prompt is shown at a time, and refusing a run refuses the same project, command and directory for a minute. The command shown is what the run says it will start, and a program running as you could claim one and start another, so approve only a run you started ([THREATS.md](../THREATS.md) T-30). No agent setting releases a set. The process holding the vault writes each release and each refusal of a valid run to the audit log, and refuses a run whose line it cannot write.
+In source, `keypaste run --session <project> -- <command>` asks the process holding the vault for the project's whole set instead of opening the vault itself ([replace-dotenv](replace-dotenv.md#run-your-app)). The app shows it in a prompt window of its own and `keypaste approve` in its terminal, naming the project, the variable names, the entry each value comes from, the command and the directory the run was started in, never a value. Allow once, or `o` at the terminal, starts the command with the set. Allow this command for 15 minutes, or `h`, also lets any program of yours run exactly that command in that directory again for 15 minutes without asking, reading the latest values each time while the variable names stay the same; it is never offered for a protected profile or a set holding an entry tagged into one, such as `env:billing:prod`, and it ends on a lock or a revoke ([THREATS.md](../THREATS.md) T-34). `keypaste approve` prints a line for each run such a grant lets through, naming the project, profile and command and the seconds left. The same rules as a credential request apply otherwise: both allows work after a second, Deny, Escape, closing, `d`, `n`, Enter, a lock and 45 seconds without an answer refuse, one prompt is shown at a time, and refusing a run refuses the same project, command and directory for a minute. The command shown is what the run says it will start, and a program running as you could claim one and start another, so approve only a run you started ([THREATS.md](../THREATS.md) T-30). No agent setting releases a set. The process holding the vault writes each release and each refusal of a valid run to the audit log, and refuses a run whose line it cannot write.
 
 ## Commands an agent asks to run
 
-In source, a bridge started with `--allow-run` lets an agent ask to run a command with secrets in its environment ([mcp-setup](mcp-setup.md#running-a-command-with-secrets---allow-run)). The prompt, in the app's window or the agent's terminal, shows `tool keypaste.run`, the client and its label, the exact program and command line, the resolved directory, the project and profile, each variable with the entry it comes from and `inject only`, and the agent's reason, and a loader such as `NODE_OPTIONS` is tagged as changing how programs start. Allow once, or `o`, starts that command once. The timed choice, or `h`, lets that client run the same command line in the same directory on the same connection again for up to 15 minutes without asking, and the prompt says it can change the files that command runs in that time; it is never offered for a protected entry or an agent set to Ask every time, and it ends when the bridge disconnects, on a lock, a revoke or an edit of an entry it names. `keypaste agent` prints a line for each run such a grant lets through. The app or `keypaste agent` writes every run to the audit log before it answers, and the bridge starts nothing the owner did not record. An agent runs nothing until its settings let it, which is off by default, and no mode releases a run without asking. The output the agent gets back has each literal or escaped occurrence of a value replaced, but a command can reveal a value in another form, so approve only a command whose behaviour you know ([THREATS.md](../THREATS.md) T-35).
+In source, a bridge started with `--allow-run` lets an agent ask to run a command with secrets in its environment ([mcp-setup](mcp-setup.md#running-a-command-with-secrets---allow-run)). The prompt, in the app's window or `keypaste approve`'s terminal, shows `tool keypaste.run`, the client and its label, the exact program and command line, the resolved directory, the project and profile, each variable with the entry it comes from and `inject only`, and the agent's reason, and a loader such as `NODE_OPTIONS` is tagged as changing how programs start. Allow once, or `o`, starts that command once. The timed choice, or `h`, lets that client run the same command line in the same directory on the same connection again for up to 15 minutes without asking, and the prompt says it can change the files that command runs in that time; it is never offered for a protected entry or an agent set to Ask every time, and it ends when the bridge disconnects, on a lock, a revoke or an edit of an entry it names. `keypaste approve` prints a line for each run such a grant lets through. The app or `keypaste approve` writes every run to the audit log before it answers, and the bridge starts nothing the owner did not record. An agent runs nothing until its settings let it, which is off by default, and no mode releases a run without asking. The output the agent gets back has each literal or escaped occurrence of a value replaced, but a command can reveal a value in another form, so approve only a command whose behaviour you know ([THREATS.md](../THREATS.md) T-35).
 
-## When no agent is running
+## When no approver is running
 
 Everything is denied, and the agent is told exactly how to fix it:
 
 ```
 keypaste: DENIED. Nobody can approve this right now: nothing holds this vault unlocked, neither
-the keypaste desktop app nor a keypaste agent, and keypaste releases nothing until one does,
+the keypaste desktop app nor keypaste approve, and keypaste releases nothing until one does,
 whatever this agent's settings say.
 
 Ask the person you are working with to unlock this vault in the keypaste desktop app, or to
-run `keypaste agent --vault <their vault>` in a terminal, and then try again.
+run `keypaste approve --vault <their vault>` in a terminal, and then try again.
 ```
 
 That is the source wording; `v0.3.0` says "No keypaste agent is running, so there is nobody to approve this."
@@ -189,7 +189,7 @@ On `0.2.0`, this refusal can also occur under load while the approver is running
 
 ## What is written down
 
-The app or `keypaste agent` appends one line to `~/.keypaste/audit.jsonl` for every call it answers, granted, denied or abandoned, and `keypaste mcp` one for every call it refuses itself, a malformed one included, or that nothing answered. Each line records the entry, field, client, stated reason and decision.
+The app or `keypaste approve` appends one line to `~/.keypaste/audit.jsonl` for every call it answers, granted, denied or abandoned, and `keypaste mcp` one for every call it refuses itself, a malformed one included, or that nothing answered. Each line records the entry, field, client, stated reason and decision.
 
 It does not add the returned field value to the log. Names and reason excerpts are logged metadata, so do not put secret values in them. See [docs/mcp-setup.md](mcp-setup.md) for the format.
 
@@ -197,7 +197,7 @@ It does not add the returned field value to the log. Names and reason excerpts a
 
 ## Limits
 
-The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Stop that process to lock it. The desktop app holds a separate session, so locking the desktop does not lock the approver; in source the two cannot hold the same vault at once. In `v0.3.0` approval prompts appear only in the approver terminal; in source the desktop asks in its own window for the vault it has unlocked. An already-open approver also retains its in-memory vault snapshot: reopen it after a desktop or external edit to use the updated values. In source, once another program changes the file it refuses every request as `vault-changed` instead, until you restart it.
+The vault stays unlocked while `keypaste approve` runs; it has no idle auto-lock. Stop that process to lock it. The desktop app holds a separate session, so locking the desktop does not lock the approver; in source the two cannot hold the same vault at once. In `v0.3.0` approval prompts appear only in the approver terminal; in source the desktop asks in its own window for the vault it has unlocked. An already-open approver also retains its in-memory vault snapshot: reopen it after a desktop or external edit to use the updated values. In source, once another program changes the file it refuses every request as `vault-changed` instead, until you restart it.
 
 TTL limits cached approval reuse. Expiry clears the cache buffer but cannot erase strings or copies retained by clients, transcripts or session files. Stopping the approver cannot revoke these copies; rotate the credential at its provider when needed. [SECURITY.md](../SECURITY.md) describes the memory limits.
 

@@ -468,7 +468,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>
     /// <para>
     /// Recorded under the surface that asked, with the agent the change is for as its label: a bridge's
-    /// client when one attached, otherwise <c>keypaste mcp policy</c>, or no name for one that says an
+    /// client when one attached, otherwise <c>keypaste clients</c>, or no name for one that says an
     /// agent asked. Beyond that, the origin the request claims only chooses where a narrowing is kept
     /// and what the person is told it came from.
     /// </para>
@@ -490,7 +490,7 @@ public sealed class SessionAuthority : IApproverHandler
         var attached = _attached.TryGetValue(connectionId, out var attachment) ? attachment.Client : null;
         var client = attached is not null ? AuditClient.Of(attached.Name, attached.Version, request.Agent)
             : request.Origin == AccessOrigin.Agent ? AuditClient.Of(null, null, request.Agent)
-            : AuditClient.Of("keypaste mcp policy", CoreInfo.Version, request.Agent);
+            : AuditClient.Of("keypaste clients", CoreInfo.Version, request.Agent);
 
         AccessChangeReply Answer(AccessChangeReply reply) => _recorder.Recorded(
             reply,

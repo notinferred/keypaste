@@ -26,7 +26,7 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// Nothing here touches a vault or a secret. <c>setup</c> writes a path into a configuration file, with run offered
 /// and every item in reach unless <c>--expose</c> narrows it, because what that path can release is decided by each
-/// agent's settings, which the app or <c>keypaste agent</c> holding the vault applies, and a person's answer or a mode
+/// agent's settings, which the app or <c>keypaste approve</c> holding the vault applies, and a person's answer or a mode
 /// they set.
 /// </para>
 /// </remarks>
@@ -408,7 +408,7 @@ internal static class SetupCommand
         context.Stdout.WriteLine("Nothing is allowed yet. keypaste mcp holds no vault and decides nothing.");
         context.Stdout.WriteLine("Unlock the vault in the keypaste app, or start the process that decides in a terminal:");
         context.Stdout.WriteLine();
-        context.Stdout.WriteLine(registration.VaultPath is { } pinned ? $"  keypaste agent --vault {pinned}" : "  keypaste agent");
+        context.Stdout.WriteLine(registration.VaultPath is { } pinned ? $"  keypaste approve --vault {pinned}" : "  keypaste approve");
     }
 
     private static void Line(CliContext context, string id, string text) => context.Stdout.WriteLine(Formatted(id, text));

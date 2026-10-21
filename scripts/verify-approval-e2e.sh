@@ -2,7 +2,7 @@
 # Proves the shipped approval flow works end to end, across two real processes.
 #
 # Everything else in the suite runs the approver and the bridge inside one test host. This is the
-# only place a real `keypaste agent` unlocks a real vault in one process, a real `keypaste mcp`
+# only place a real `keypaste approve` unlocks a real vault in one process, a real `keypaste mcp`
 # asks it over a real named pipe from another, and a person's yes or no decides what comes back.
 # "The credential crosses a process boundary" is the premise of the entire architecture, and a
 # premise nothing exercises is a premise nobody is checking.
@@ -65,7 +65,7 @@ printf '%s\n%s\n%s\n' "$MASTER" "$API_KEY" "$RECOVERY" \
   || die "could not set the entry's custom fields"
 
 # ci-probe sees every entry and may run commands, each still asked about, as a person confirmed at
-# keypaste agent's terminal; without them it would see only what is tagged into a project and run nothing.
+# keypaste approve's terminal; without them it would see only what is tagged into a project and run nothing.
 agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-probe --see ** --run on' || die "could not save ci-probe's settings in the vault"
 
 # ------------------------------------------------------------- a reference names one custom field
@@ -101,7 +101,7 @@ ERR="$WORK/no-agent-stderr.txt"
 jq -e 'select(.id == 2) | .result.isError == true' <"$OUT" >/dev/null \
   || die "with no agent running, the request was not refused"
 
-grep -q 'keypaste agent' "$OUT" || die "the no-agent refusal does not name the command that fixes it"
+grep -q 'keypaste approve' "$OUT" || die "the no-agent refusal does not name the command that fixes it"
 grep -q "$SECRET" "$OUT" && die "a credential was returned with no agent running"
 
 # --------------------------------------------------------------------------- start the approver
@@ -109,17 +109,17 @@ grep -q "$SECRET" "$OUT" && die "a credential was returned with no agent running
 # a new bridge, so a new connection, and is asked again. ConsoleSecretPrompt reads redirected input
 # one byte at a time precisely so this works.
 printf '%s\nh\nd\no\nd\n' "$MASTER" \
-  | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
+  | "$CLI" approve --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
 for _ in $(seq 1 100); do
   grep -q 'listening on' "$AGENT_ERR" && break
-  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste agent exited before it started listening"
+  kill -0 "$AGENT_PID" 2>/dev/null || die "keypaste approve exited before it started listening"
   sleep 0.2
 done
-grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listening"
+grep -q 'listening on' "$AGENT_ERR" || die "keypaste approve never started listening"
 SESSION="$(grep 'listening on' "$AGENT_ERR" | head -1 | sed -E 's/.* for unlock ([^,]+),.*/\1/')"
-[ -n "$SESSION" ] || die "keypaste agent named no unlock on its listening line"
+[ -n "$SESSION" ] || die "keypaste approve named no unlock on its listening line"
 
 ask() {
   local id="$1" out="$2" err="$3"
@@ -243,7 +243,7 @@ jq -e -s --arg s "$SESSION" \
    and (.[4:8] | all(.args.field == "invalid" and .method == "invalid-request" and .decision == "denied"))
    and .[8].tool == "run" and .[8].decision == "denied" and .[8].method == "prompt"' \
   <"$AUDIT" >/dev/null \
-  || die "the audit lines do not show a sessionless denial, the prompts of keypaste agent's session $SESSION, the custom field, four invalid fields and a denied run"
+  || die "the audit lines do not show a sessionless denial, the prompts of keypaste approve's session $SESSION, the custom field, four invalid fields and a denied run"
 
 # The one thing the log must never contain, on the one path where a credential existed to leak.
 grep -q "$SECRET" "$AUDIT" && die "the audit log contains the released credential"

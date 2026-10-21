@@ -29,7 +29,7 @@ public enum OwnerAnswer
     NoAnswer,
 }
 
-/// <summary>Whether the keypaste app or <c>keypaste agent</c> holds the vault and answers, and its version.</summary>
+/// <summary>Whether the keypaste app or <c>keypaste approve</c> holds the vault and answers, and its version.</summary>
 /// <param name="Answer">What the pipe found.</param>
 /// <param name="Kind">Who holds the vault, as its claim names it, for display only; null when none is named.</param>
 /// <param name="Version">The version the owner gave, or null when it gave none or nothing answered.</param>
@@ -77,7 +77,7 @@ public sealed record OwnerReading(OwnerAnswer Answer, OwnerKind? Kind, string? V
         if (client is null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Found(OwnerAnswer.NothingListening, version: null, HealthStatus.Note, "nothing holds the vault unlocked; agents are refused", "unlock it in the keypaste app, or run `keypaste agent`");
+            return Found(OwnerAnswer.NothingListening, version: null, HealthStatus.Note, "nothing holds the vault unlocked; agents are refused", "unlock it in the keypaste app, or run `keypaste approve`");
         }
 
         using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -102,7 +102,7 @@ public sealed record OwnerReading(OwnerAnswer Answer, OwnerKind? Kind, string? V
     internal static string Holding(OwnerKind? kind) => kind switch
     {
         OwnerKind.DesktopApp => "the keypaste app holding the vault",
-        OwnerKind.TerminalAgent => "keypaste agent holding the vault",
+        OwnerKind.TerminalAgent => "keypaste approve holding the vault",
         _ => "the keypaste process holding the vault",
     };
 
@@ -110,13 +110,13 @@ public sealed record OwnerReading(OwnerAnswer Answer, OwnerKind? Kind, string? V
     internal static string Restart(OwnerKind? kind) => kind switch
     {
         OwnerKind.DesktopApp => "quit the keypaste app and open it again",
-        OwnerKind.TerminalAgent => "stop keypaste agent and start it again",
-        _ => "quit the keypaste app or stop `keypaste agent`, and start it again",
+        OwnerKind.TerminalAgent => "stop keypaste approve and start it again",
+        _ => "quit the keypaste app or stop `keypaste approve`, and start it again",
     };
 
     private static string Holder(OwnerKind? kind) => kind switch
     {
-        OwnerKind.TerminalAgent => "keypaste agent",
+        OwnerKind.TerminalAgent => "keypaste approve",
         OwnerKind.DesktopApp => "the keypaste app",
         _ => "a keypaste process",
     };

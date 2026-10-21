@@ -14,18 +14,18 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste agent</c> as a full owner: what it tells the person leaving it running, that it applies
+/// <c>keypaste approve</c> as a full owner: what it tells the person leaving it running, that it applies
 /// each agent's settings, and that it saves a change a person confirms in its terminal, under its claim,
 /// or says why it could not.
 /// </summary>
-public sealed class AgentCommandTests : IDisposable
+public sealed class ApproveCommandTests : IDisposable
 {
-    private const string _master = "agent-command-master";
+    private const string _master = "approve-command-master";
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(20);
 
     private readonly CliHarness _harness = new();
 
-    public AgentCommandTests() => _harness.SeedVault(_master, ("env/dev/TOKEN", "agent-command-value"));
+    public ApproveCommandTests() => _harness.SeedVault(_master, ("env/dev/TOKEN", "approve-command-value"));
 
     public void Dispose() => _harness.Dispose();
 
@@ -37,7 +37,7 @@ public sealed class AgentCommandTests : IDisposable
     {
         using var stderr = new StringWriter();
 
-        AgentCommand.Announce(
+        ApproveCommand.Announce(
             "/vaults/v.kdbx",
             "keypaste-agent-test",
             "test-session",
@@ -80,18 +80,18 @@ public sealed class AgentCommandTests : IDisposable
         var text = Announced("/home/you/.keypaste/policy.toml");
 
         Assert.Single(text.Split(Environment.NewLine), line => line.Contains("policy.toml", StringComparison.Ordinal));
-        Assert.Contains("keypaste: /home/you/.keypaste/policy.toml is no longer read: each agent's settings are kept in the vault. `keypaste mcp policy` shows them.", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: /home/you/.keypaste/policy.toml is no longer read: each agent's settings are kept in the vault. `keypaste clients` shows them.", text, StringComparison.Ordinal);
     }
 
     [Fact]
     public void ThePolicyFlagIsGone()
     {
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("agent", "--policy", "rules.toml", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("approve", "--policy", "rules.toml", "--vault", _harness.VaultPath));
 
         using var usage = new StringWriter();
-        AgentCommand.WriteUsage(usage);
+        ApproveCommand.WriteUsage(usage);
         Assert.DoesNotContain("--policy", usage.ToString(), StringComparison.Ordinal);
-        Assert.Contains("keypaste mcp policy", usage.ToString(), StringComparison.Ordinal);
+        Assert.Contains("keypaste clients", usage.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>No mode releases an entry in a protected profile: the person at the terminal is shown it, with no timed choice.</summary>
@@ -133,24 +133,24 @@ public sealed class AgentCommandTests : IDisposable
     }
 
     /// <summary>
-    /// A change from a terminal that gives an agent more is confirmed in the agent's own terminal, then
+    /// A change from a terminal that gives an agent more is confirmed in the approver's own terminal, then
     /// saved in the vault under its claim, where the next owner reads it; its line names the change.
     /// </summary>
     [Fact]
     public async Task AChangeConfirmedInItsTerminal_IsSavedInTheVault()
     {
-        await using var agent = await RunningAgent.StartAsync(_harness, _master, "y");
-        using var terminal = Terminal(agent);
+        await using var approver = await RunningApprover.StartAsync(_harness, _master, "y");
+        using var terminal = Terminal(approver);
 
-        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("mcp", "policy", "claude-code", "--mode", "automatic", "--run", "on", "--vault", _harness.VaultPath));
+        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("clients", "claude-code", "--mode", "automatic", "--run", "on", "--vault", _harness.VaultPath));
 
         Assert.Contains("a person confirmed it (claude-code: mode automatic, run on)", terminal.Err, StringComparison.Ordinal);
-        Assert.Contains("keypaste: a change would give an agent more.", agent.Text, StringComparison.Ordinal);
-        Assert.Contains("by default: Automatic: released without asking, recorded in history", agent.Text, StringComparison.Ordinal);
-        Assert.Contains("may run commands, each still asked about", agent.Text, StringComparison.Ordinal);
-        Assert.Contains("  asked    asked from a terminal; any program you run could have typed it", agent.Text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: a change would give an agent more.", approver.Text, StringComparison.Ordinal);
+        Assert.Contains("by default: Automatic: released without asking, recorded in history", approver.Text, StringComparison.Ordinal);
+        Assert.Contains("may run commands, each still asked about", approver.Text, StringComparison.Ordinal);
+        Assert.Contains("  asked    asked from a terminal; any program you run could have typed it", approver.Text, StringComparison.Ordinal);
 
-        await agent.StopAsync(terminal);
+        await approver.StopAsync(terminal);
 
         using (var vault = Vault.Open(_harness.VaultPath, _master))
         {
@@ -167,8 +167,8 @@ public sealed class AgentCommandTests : IDisposable
     [Fact]
     public async Task AConfirmedChangeItCannotSave_IsRefusedAndSaid()
     {
-        await using var agent = await RunningAgent.StartAsync(_harness, _master, "y");
-        using var terminal = Terminal(agent);
+        await using var approver = await RunningApprover.StartAsync(_harness, _master, "y");
+        using var terminal = Terminal(approver);
 
         using (var other = Vault.Open(_harness.VaultPath, _master))
         {
@@ -176,12 +176,12 @@ public sealed class AgentCommandTests : IDisposable
             other.Save();
         }
 
-        terminal.AssertExit(CliApp.ExitInternalError, terminal.Run("mcp", "policy", "claude-code", "--mode", "automatic", "--vault", _harness.VaultPath));
+        terminal.AssertExit(CliApp.ExitInternalError, terminal.Run("clients", "claude-code", "--mode", "automatic", "--vault", _harness.VaultPath));
 
         Assert.Contains("not changed: a person confirmed it, and the vault was not saved: another program changed the vault file", terminal.Err, StringComparison.Ordinal);
-        Assert.Contains("restart keypaste agent", terminal.Err, StringComparison.Ordinal);
+        Assert.Contains("restart keypaste approve", terminal.Err, StringComparison.Ordinal);
 
-        await agent.StopAsync(terminal);
+        await approver.StopAsync(terminal);
 
         using var vault = Vault.Open(_harness.VaultPath, _master);
         Assert.Empty(new AgentAccessStore(vault).Read("claude-code").Own);
@@ -191,77 +191,77 @@ public sealed class AgentCommandTests : IDisposable
     [Fact]
     public async Task ANarrowing_AppliesAtOnce_WithNobodyAsked()
     {
-        await using var agent = await RunningAgent.StartAsync(_harness, _master);
-        using var terminal = Terminal(agent);
+        await using var approver = await RunningApprover.StartAsync(_harness, _master);
+        using var terminal = Terminal(approver);
 
-        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("mcp", "policy", "claude-code", "--mode", "ask", "--vault", _harness.VaultPath));
+        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("clients", "claude-code", "--mode", "ask", "--vault", _harness.VaultPath));
 
         Assert.Contains("applied at once, since it gives the agent nothing more", terminal.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("a change would give an agent more", agent.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("a change would give an agent more", approver.Text, StringComparison.Ordinal);
         Assert.True(AccessCaps.TryLoad(KeypasteHome.ClientsPath(Home), out var caps, out var problem), problem);
         Assert.Equal(AgentMode.Ask, Assert.Single(caps.Rows).Mode);
 
-        await agent.StopAsync(terminal);
+        await approver.StopAsync(terminal);
 
         using var vault = Vault.Open(_harness.VaultPath, _master);
         Assert.Equal(AgentMode.Ask, Assert.Single(new AgentAccessStore(vault).Read("claude-code").Own).Access.Mode);
     }
 
     /// <summary>
-    /// A terminal's edit to the vault <c>keypaste agent</c> holds is asked about in the agent's own terminal
+    /// A terminal's edit to the vault <c>keypaste approve</c> holds is asked about in the approver's own terminal
     /// by name only, saved there under its claim once allowed, and recorded on its own line (D-0464).
     /// </summary>
     [Fact]
     public async Task ATerminalEditConfirmedInItsTerminal_IsSavedInTheVault()
     {
-        await using var agent = await RunningAgent.StartAsync(_harness, _master, "y");
-        using var terminal = Terminal(agent);
+        await using var approver = await RunningApprover.StartAsync(_harness, _master, "y");
+        using var terminal = Terminal(approver);
 
-        terminal.Prompt.Enqueue("agent-command-new-value");
+        terminal.Prompt.Enqueue("approve-command-new-value");
         terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("set", "env/dev/TOKEN", "--vault", _harness.VaultPath));
 
         Assert.Contains("updated env/dev/TOKEN", terminal.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("Master password: ", terminal.Prompt.PromptsSeen);
-        Assert.Contains("keypaste: a terminal asks to change this vault.", agent.Text, StringComparison.Ordinal);
-        Assert.Contains("  command  keypaste set", agent.Text, StringComparison.Ordinal);
-        Assert.Contains("  asked    asked from a terminal; any program you run could have typed it", agent.Text, StringComparison.Ordinal);
-        Assert.DoesNotContain("agent-command-new-value", agent.Text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: a terminal asks to change this vault.", approver.Text, StringComparison.Ordinal);
+        Assert.Contains("  command  keypaste set", approver.Text, StringComparison.Ordinal);
+        Assert.Contains("  asked    asked from a terminal; any program you run could have typed it", approver.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("approve-command-new-value", approver.Text, StringComparison.Ordinal);
 
-        await agent.StopAsync(terminal);
+        await approver.StopAsync(terminal);
 
         using (var vault = Vault.Open(_harness.VaultPath, _master))
         {
-            Assert.Equal("agent-command-new-value", vault.Find(new EntryName("env/dev", "TOKEN"))!.Password);
+            Assert.Equal("approve-command-new-value", vault.Find(new EntryName("env/dev", "TOKEN"))!.Password);
         }
 
         var line = Assert.Single(Lines(), line => line.GetProperty("tool").GetString() == AuditTools.Edit);
         Assert.Equal(("granted", "prompt"), (line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
-        Assert.DoesNotContain("agent-command-new-value", File.ReadAllText(KeypasteHome.AuditPath(Home)), StringComparison.Ordinal);
+        Assert.DoesNotContain("approve-command-new-value", File.ReadAllText(KeypasteHome.AuditPath(Home)), StringComparison.Ordinal);
     }
 
-    /// <summary>A terminal's edit the person denies at the agent's terminal writes nothing, and the terminal is told.</summary>
+    /// <summary>A terminal's edit the person denies at the approver's terminal writes nothing, and the terminal is told.</summary>
     [Fact]
     public async Task ATerminalEditDeniedInItsTerminal_ChangesNothing()
     {
-        await using var agent = await RunningAgent.StartAsync(_harness, _master, "d");
-        using var terminal = Terminal(agent);
+        await using var approver = await RunningApprover.StartAsync(_harness, _master, "d");
+        using var terminal = Terminal(approver);
 
         terminal.AssertExit(CliApp.ExitUsageError, terminal.Run("rm", "env/dev/TOKEN", "--yes", "--vault", _harness.VaultPath));
 
         Assert.Contains("keypaste rm: not saved: a person refused this change", terminal.Err, StringComparison.Ordinal);
-        Assert.Contains("keypaste: denied. Nothing was written.", agent.Text, StringComparison.Ordinal);
+        Assert.Contains("keypaste: denied. Nothing was written.", approver.Text, StringComparison.Ordinal);
 
-        await agent.StopAsync(terminal);
+        await approver.StopAsync(terminal);
 
         using var vault = Vault.Open(_harness.VaultPath, _master);
         Assert.NotNull(vault.Find(new EntryName("env/dev", "TOKEN")));
     }
 
-    private CliHarness Terminal(RunningAgent agent)
+    private CliHarness Terminal(RunningApprover approver)
     {
         var terminal = new CliHarness();
         terminal.Environment[KeypasteHome.EnvironmentVariable] = Home;
-        terminal.Environment[ApproverEndpoint.EnvironmentVariable] = agent.Pipe;
+        terminal.Environment[ApproverEndpoint.EnvironmentVariable] = approver.Pipe;
         return terminal;
     }
 
@@ -282,8 +282,8 @@ public sealed class AgentCommandTests : IDisposable
         return exposure;
     }
 
-    /// <summary>A <c>keypaste agent</c> of the harness's vault, run in this process on its own thread and pipe.</summary>
-    private sealed class RunningAgent : IAsyncDisposable
+    /// <summary><c>keypaste approve</c> on the harness's vault, run in this process on its own thread and pipe.</summary>
+    private sealed class RunningApprover : IAsyncDisposable
     {
         private readonly StringWriter _stderr;
         private readonly TextWriter _synchronized;
@@ -291,7 +291,7 @@ public sealed class AgentCommandTests : IDisposable
         private readonly string _vault;
         private bool _stopped;
 
-        private RunningAgent(string pipe, string vault, StringWriter stderr, TextWriter synchronized, Task<int> running)
+        private RunningApprover(string pipe, string vault, StringWriter stderr, TextWriter synchronized, Task<int> running)
         {
             Pipe = pipe;
             _vault = vault;
@@ -315,7 +315,7 @@ public sealed class AgentCommandTests : IDisposable
         }
 
         /// <summary>Starts it with the master password and then each answer a person would type, and waits until it listens.</summary>
-        internal static async Task<RunningAgent> StartAsync(CliHarness harness, string master, params string[] answers)
+        internal static async Task<RunningApprover> StartAsync(CliHarness harness, string master, params string[] answers)
         {
             var pipe = "keypaste-agent-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
             harness.Environment[ApproverEndpoint.EnvironmentVariable] = pipe;
@@ -325,16 +325,16 @@ public sealed class AgentCommandTests : IDisposable
             var stderr = new StringWriter();
             var synchronized = TextWriter.Synchronized(stderr);
             var context = harness.NewContext(synchronized);
-            var agent = new RunningAgent(pipe, harness.VaultPath, stderr, synchronized, Task.Run(() => CliApp.Run(["agent", "--vault", harness.VaultPath], context)));
+            var approver = new RunningApprover(pipe, harness.VaultPath, stderr, synchronized, Task.Run(() => CliApp.Run(["approve", "--vault", harness.VaultPath], context)));
 
-            for (var waited = TimeSpan.Zero; waited < _wait && !agent.Text.Contains("listening on", StringComparison.Ordinal); waited += TimeSpan.FromMilliseconds(100))
+            for (var waited = TimeSpan.Zero; waited < _wait && !approver.Text.Contains("listening on", StringComparison.Ordinal); waited += TimeSpan.FromMilliseconds(100))
             {
-                Assert.False(agent._running.IsCompleted, $"keypaste agent stopped before it listened:{Environment.NewLine}{agent.Text}");
+                Assert.False(approver._running.IsCompleted, $"keypaste approve stopped before it listened:{Environment.NewLine}{approver.Text}");
                 await Task.Delay(TimeSpan.FromMilliseconds(100), Token);
             }
 
-            Assert.Contains("listening on", agent.Text, StringComparison.Ordinal);
-            return agent;
+            Assert.Contains("listening on", approver.Text, StringComparison.Ordinal);
+            return approver;
         }
 
         /// <summary>Locks it from a terminal, as a person would, and waits for it to stop.</summary>

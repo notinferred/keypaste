@@ -7,7 +7,7 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>Retrieves a password, or one custom field: <c>keypaste get &lt;entry&gt; [--field &lt;name&gt;]</c>.</summary>
 /// <remarks>
-/// Without <c>--reveal</c> (or its older spelling <c>--show</c>) the secret goes to the clipboard and never to stdout. That is the whole
+/// Without <c>--reveal</c> the secret goes to the clipboard and never to stdout. That is the whole
 /// point of the verb: a password on stdout ends up in shell history, scrollback, and CI logs.
 /// Either way the value leaves with its own item's placeholders filled in, or not at all (D-0465).
 /// </remarks>
@@ -39,16 +39,16 @@ internal static class GetCommand
             return CliApp.ExitUsageError;
         }
 
-        if (line.WantsHelp)
+        if (line.HasFlag("show"))
         {
-            context.Stdout.WriteLine("usage: keypaste get <item> [--field <name>] [--reveal | --show] [--timeout <seconds>]");
-            return CliApp.ExitSuccess;
+            context.Stderr.WriteLine("keypaste get: --show is now --reveal");
+            return CliApp.ExitUsageError;
         }
 
-        if (line.HasFlag("show") && line.HasFlag("reveal"))
+        if (line.WantsHelp)
         {
-            context.Stderr.WriteLine("keypaste get: --reveal and --show are the same option; give one");
-            return CliApp.ExitUsageError;
+            context.Stdout.WriteLine("usage: keypaste get <item> [--field <name>] [--reveal] [--timeout <seconds>]");
+            return CliApp.ExitSuccess;
         }
 
         if (line.Operands.Count != 1)
@@ -87,7 +87,7 @@ internal static class GetCommand
         }
 
         var entryPath = line.Operands[0];
-        var show = line.HasFlag("show") || line.HasFlag("reveal");
+        var reveal = line.HasFlag("reveal");
 
         return VaultSession.Open(path, line, context, vault =>
         {
@@ -120,7 +120,7 @@ internal static class GetCommand
                 return CliApp.ExitInternalError;
             }
 
-            if (show)
+            if (reveal)
             {
                 context.Stdout.WriteLine(secret);
                 return CliApp.ExitSuccess;
@@ -137,8 +137,8 @@ internal static class GetCommand
         {
             // Never fall back to printing the secret. A user who wants it on stdout says so.
             context.Stderr.WriteLine(status == ClipboardStatus.NoDisplay
-                ? $"keypaste get: {error}. Use --show to print it instead."
-                : $"keypaste get: could not use the clipboard: {error}. Use --show instead.");
+                ? $"keypaste get: {error}. Use --reveal to print it instead."
+                : $"keypaste get: could not use the clipboard: {error}. Use --reveal instead.");
             return CliApp.ExitInternalError;
         }
 

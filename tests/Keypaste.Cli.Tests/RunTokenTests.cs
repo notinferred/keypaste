@@ -276,7 +276,7 @@ public sealed class RunTokenTests : IDisposable
         _harness.AssertExit(CliApp.ExitInternalError, Run("-p", "staging", "acme-api"));
 
         Assert.Contains(
-            $"nothing holds {_harness.VaultPath} unlocked; unlock it in the keypaste app or start `keypaste agent`, so nothing was started",
+            $"nothing holds {_harness.VaultPath} unlocked; unlock it in the keypaste app or start `keypaste approve`, so nothing was started",
             _harness.Err,
             StringComparison.Ordinal);
         Assert.Empty(_harness.Prompt.PromptsSeen);

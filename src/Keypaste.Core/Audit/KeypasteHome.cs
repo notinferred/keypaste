@@ -47,7 +47,7 @@ public static class KeypasteHome
     public static string AuditPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), AuditFileName);
 
-    /// <summary>Resolves where the retired policy file was kept, so <c>keypaste agent</c> can say it no longer reads one there.</summary>
+    /// <summary>Resolves where the retired policy file was kept, so <c>keypaste approve</c> can say it no longer reads one there.</summary>
     /// <remarks>Agents' settings are kept in the vault now, and this computer's ceilings in <see cref="ClientsPath"/>.</remarks>
     public static string PolicyPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), PolicyFileName);
@@ -88,7 +88,7 @@ public static class KeypasteHome
     /// <remarks>
     /// Every setting in it only takes away from what the vault's settings give, so a hand or a script
     /// that edits it can only narrow, and a narrowing kept here outlives a restore or a merge of the
-    /// vault. Not <c>app.toml</c>, which holds preferences: <c>keypaste agent</c> enforces the same file.
+    /// vault. Not <c>app.toml</c>, which holds preferences: <c>keypaste approve</c> enforces the same file.
     /// </remarks>
     public static string ClientsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), ClientsFileName);

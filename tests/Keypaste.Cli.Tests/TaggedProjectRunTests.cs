@@ -76,7 +76,7 @@ public sealed class TaggedProjectRunTests : IDisposable
     [Fact]
     public void Get_reads_the_untagged_env_entry_as_an_ordinary_entry()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("get", "env/billing/OLD_KEY", "--show"));
+        _harness.AssertExit(CliApp.ExitSuccess, Run("get", "env/billing/OLD_KEY", "--reveal"));
 
         Assert.Equal("old-value-c1b", _harness.Out.Trim());
     }

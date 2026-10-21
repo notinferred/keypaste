@@ -182,12 +182,15 @@ public sealed class ServerOptionsTests
         Assert.Contains("'serve'", error, StringComparison.Ordinal);
     }
 
+    /// <summary>D-0470: the usage names the verbs that replaced <c>mcp serve</c>, <c>setup</c> and <c>policy</c>, and none of the three.</summary>
     [Fact]
-    public void TheUsage_KeepsTheOptionNamesTheDemoChecks_AndNamesTheVerbs()
+    public void TheUsage_KeepsTheOptionNamesTheDemoChecks_AndNamesTheVerbsThatReplacedItsOwn()
     {
-        foreach (var name in new[] { "--vault", "--client-label", "--expose", "--allow-run", "serve", "setup", "policy" })
+        foreach (var name in new[] { "--vault", "--client-label", "--expose", "--allow-run", "`keypaste setup`", "`keypaste approve`", "`keypaste clients`" })
         {
             Assert.Contains(name, ServerOptions.Usage, StringComparison.Ordinal);
         }
+
+        Assert.DoesNotMatch(@"\b(?:serve|policy)\b|mcp setup", ServerOptions.Usage);
     }
 }

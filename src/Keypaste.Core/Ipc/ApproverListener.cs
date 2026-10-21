@@ -67,7 +67,7 @@ public sealed class ApproverListener : IDisposable
     /// <exception cref="IOException">The name is already taken.</exception>
     /// <remarks>
     /// Binding in the constructor rather than in <see cref="RunAsync"/> is deliberate twice over:
-    /// <c>keypaste agent</c> fails at startup on a name somebody else holds, rather than appearing
+    /// <c>keypaste approve</c> fails at startup on a name somebody else holds, rather than appearing
     /// to work and never accepting anything; and a bridge started in the same breath cannot lose a
     /// race against a pipe that does not exist yet.
     /// </remarks>

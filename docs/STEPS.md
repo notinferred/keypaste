@@ -133,7 +133,7 @@ Each row keeps its historical meaning and is expanded when selected.
   - The desktop already unlocks a vault that needs a YubiKey slot and changes the key in Settings (D-0366), but this has not been tried with a physical key.
   - What remains:
     - creating such a vault;
-    - opening it from the CLI and `keypaste agent`;
+    - opening it from the CLI and `keypaste approve`;
     - real-device unlock, save and reopen with KeePassXC interoperability;
     - missing-key and wrong-key refusal;
     - documented spare-key and lost-key limits.

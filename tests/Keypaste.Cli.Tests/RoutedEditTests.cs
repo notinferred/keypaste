@@ -10,7 +10,7 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// While the app or <c>keypaste agent</c> holds the vault, a verb that edits items sends its change to
+/// While the app or <c>keypaste approve</c> holds the vault, a verb that edits items sends its change to
 /// the holder, which asks the person and saves it (D-0464): no master password is asked for or sent, a
 /// refusal keeps the verb's exit code, an old script's leading master password sends nothing, and
 /// <c>access</c> and <c>import</c> stay refused.

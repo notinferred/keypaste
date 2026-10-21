@@ -32,7 +32,7 @@ public sealed class RestoredBackupIsVisibleToTheCliTests
 
         EditThroughTheApp(fixture, _after);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.Equal(_after, fixture.Cli.Out.Trim());
 
         var home = Directory.CreateDirectory(
@@ -59,7 +59,7 @@ public sealed class RestoredBackupIsVisibleToTheCliTests
 
         fixture.Session.Lock(VaultLockReason.Manual);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
         Assert.NotEmpty(fixture.Cli.Out.Trim());
         Assert.Equal(_before, fixture.Cli.Out.Trim());
 
@@ -69,7 +69,7 @@ public sealed class RestoredBackupIsVisibleToTheCliTests
         fixture.Cli.Stdout.GetStringBuilder().Clear();
         fixture.Cli.Prompt.Enqueue(VaultFixture.Master);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Cli.Run(["get", "github", "--show", "--vault", replaced.Path]));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Cli.Run(["get", "github", "--reveal", "--vault", replaced.Path]));
         Assert.Equal(_after, fixture.Cli.Out.Trim());
     }
 

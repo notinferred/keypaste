@@ -73,7 +73,7 @@ internal sealed class SessionOwner : IAsyncDisposable
         /// <summary>Refuses it, as an owner composed without a lock action does.</summary>
         None,
 
-        /// <summary>Ends the lifetime and stops listening, as <c>keypaste agent</c> does.</summary>
+        /// <summary>Ends the lifetime and stops listening, as <c>keypaste approve</c> does.</summary>
         StopsListening,
 
         /// <summary>Ends the lifetime and keeps listening, as the desktop does until its host stops.</summary>

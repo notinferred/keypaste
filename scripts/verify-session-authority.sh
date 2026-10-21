@@ -6,9 +6,9 @@
 # A real keypaste mcp request reaches the app's session, is put to the person in the app's prompt, and
 # the app records the listing and the refusal in its own home's log, naming that session, while the
 # bridge, logging elsewhere, records nothing. With the app locked the requests are refused and the bridge
-# records them, the app nothing. `keypaste agent` and a second app on the same vault are each refused with
+# records them, the app nothing. `keypaste approve` and a second app on the same vault are each refused with
 # a message naming the app, before any password is asked for. Unlocking again starts a new session, in
-# which the app applies the vault's agent settings as `keypaste agent` does: what the agent is Automatic
+# which the app applies the vault's agent settings as `keypaste approve` does: what the agent is Automatic
 # for is released unasked and recorded as such. A killed app leaves nothing holding the vault. The
 # stale-session and unattached cases run over a real pipe in SessionAuthorityTests, because the shipped
 # bridge always attaches.
@@ -96,7 +96,7 @@ printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "
 printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" add "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
 project_var "$CLI" "$VAULT" "$MASTER" ci AUTO_KEY "$AUTO" || die "could not store ci's AUTO_KEY"
-# ci-probe sees env/**, and ci is Automatic for it, as a person confirmed both at keypaste agent's terminal.
+# ci-probe sees env/**, and ci is Automatic for it, as a person confirmed both at keypaste approve's terminal.
 agent_settings "$CLI" "$VAULT" "$MASTER" 'ci-probe --see env/**' 'ci-probe --project ci --mode automatic' \
   || die "could not save ci-probe's settings in the vault"
 
@@ -129,14 +129,14 @@ app_lines | jq -e -s --arg s "$FIRST" 'length == 2
 # ------------------------------------------------------------------- a second owner is refused
 set +e
 # Bounded, so an agent that wrongly starts is stopped and reported rather than listening forever.
-printf '%s\n' "$MASTER" | timeout 30 "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR"
+printf '%s\n' "$MASTER" | timeout 30 "$CLI" approve --vault "$VAULT" >/dev/null 2>"$AGENT_ERR"
 agent_exit=$?
 set -e
-[ "$agent_exit" -ne 0 ] || die "keypaste agent started on a vault the app holds"
+[ "$agent_exit" -ne 0 ] || die "keypaste approve started on a vault the app holds"
 grep -q "already unlocked in the keypaste desktop app (process $HOLD_PID)" "$AGENT_ERR" \
-  || die "keypaste agent's refusal does not name the app holding the vault"
-grep -q 'Master password' "$AGENT_ERR" && die "keypaste agent asked for the password of a vault the app holds"
-grep -q 'listening on' "$AGENT_ERR" && die "keypaste agent listened on a vault the app holds"
+  || die "keypaste approve's refusal does not name the app holding the vault"
+grep -q 'Master password' "$AGENT_ERR" && die "keypaste approve asked for the password of a vault the app holds"
+grep -q 'listening on' "$AGENT_ERR" && die "keypaste approve listened on a vault the app holds"
 
 set +e
 second="$(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" open "$VAULT" 2>&1)"
@@ -198,4 +198,4 @@ set -e
 [ "$after_exit" -eq 0 ] || die "the vault stayed held after the app holding it was killed: $after"
 
 echo "ok: the app served its vault to a real keypaste mcp under a named session, refused while locked,"
-echo "    refused keypaste agent and a second app by name before any password, and held nothing once killed"
+echo "    refused keypaste approve and a second app by name before any password, and held nothing once killed"

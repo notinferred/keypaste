@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Tests;
 /// <para>
 /// The point of the reach tests is not that twelve verbs each parse a flag. It is that adding a
 /// keyfile to a vault must not silently take that vault away from <c>keypaste run</c> and
-/// <c>keypaste agent</c> — the env and MCP journeys — while leaving it open in the app. A verb that
+/// <c>keypaste approve</c> — the env and MCP journeys — while leaving it open in the app. A verb that
 /// quietly lost the option would fail nothing else in this suite.
 /// </para>
 /// <para>
@@ -58,7 +58,7 @@ public sealed class KeyfileOptionTests
             verbs.Add(["env", "rm", "demo", "TOKEN", "--yes", _vault, _keyfile]);
             verbs.Add(["env", "export", "demo", "--dotenv", "--stdout", "--yes", _vault, _keyfile]);
             verbs.Add(["run", "demo", _vault, _keyfile, "--", "true"]);
-            verbs.Add(["agent", _vault, _keyfile]);
+            verbs.Add(["approve", _vault, _keyfile]);
             verbs.Add(["access", "--password", _vault, _keyfile]);
             return verbs;
         }
@@ -282,11 +282,11 @@ public sealed class KeyfileOptionTests
     // ---------------------------------------------------------------------------------------
 
     [Fact]
-    public void The_agent_usage_names_the_keyfile_option()
+    public void The_approve_usage_names_the_keyfile_option()
     {
         using var harness = new CliHarness();
 
-        harness.Run("agent", "--help");
+        harness.Run("approve", "--help");
 
         Assert.Contains("--keyfile <path>", harness.Out, StringComparison.Ordinal);
     }

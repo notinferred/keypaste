@@ -493,7 +493,7 @@ internal static class RunCommand
     /// <returns>The reply, or null with the reason and what follows from it ready to print.</returns>
     /// <remarks>
     /// Only the app listens where a run carrying a pass asks, and that pass belongs to the unlock that issued it, so a run
-    /// finding nothing there is told to press Run again rather than to unlock or start <c>keypaste agent</c>.
+    /// finding nothing there is told to press Run again rather than to unlock or start <c>keypaste approve</c>.
     /// </remarks>
     private static async Task<(EnvReply? Reply, string Refusal)> AskAsync(
         string pipe,
@@ -508,7 +508,7 @@ internal static class RunCommand
         if (client is null)
         {
             return (null, request.Launch is null
-                ? NotStarted($"nothing holds {OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste agent`")
+                ? NotStarted($"nothing holds {OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste approve`")
                 : "the keypaste app locked or quit before this window could start, so nothing was started. Press Run in the app again.");
         }
 
@@ -752,7 +752,7 @@ internal static class RunCommand
         writer.WriteLine("--project <name> names the project as the operand does, and takes a name that");
         writer.WriteLine("starts with -.");
         writer.WriteLine();
-        writer.WriteLine("with --session, no password is asked for here: the keypaste app or `keypaste agent`");
+        writer.WriteLine("with --session, no password is asked for here: the keypaste app or `keypaste approve`");
         writer.WriteLine("holding the vault unlocked shows you the project, its variable names, the command");
         writer.WriteLine("and this directory, and the command starts only if you allow it there.");
         writer.WriteLine();

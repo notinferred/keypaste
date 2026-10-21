@@ -30,7 +30,7 @@ public sealed class PoolShortageTests
     /// </summary>
     /// <remarks>
     /// Asserts the classification rather than a duration. The refusal for <c>Unreachable</c> tells a
-    /// person to start <c>keypaste agent</c>, and here one is running; a longer connect budget changes
+    /// person to start <c>keypaste approve</c>, and here one is running; a longer connect budget changes
     /// nothing about that, because the scenario holds both workers for three budgets whatever the
     /// budget is.
     /// </remarks>

@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>One owner's server for one unlock, built the same way for the desktop and <c>keypaste agent</c> (F.55).</summary>
+/// <summary>One owner's server for one unlock, built the same way for the desktop and <c>keypaste approve</c> (F.55).</summary>
 public sealed class SessionServerTests : IDisposable
 {
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-session-server-tests-").FullName;

@@ -7,7 +7,7 @@ using Keypaste.Core.Approval;
 namespace Keypaste.Cli.Approval;
 
 /// <summary>
-/// Asks the human in the terminal they started <c>keypaste agent</c> in.
+/// Asks the human in the terminal they started <c>keypaste approve</c> in.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -160,10 +160,10 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return AnswerAsync(request.GrantSeconds, started, cancellationToken);
     }
 
-    /// <summary>The vault <c>keypaste mcp policy</c> must be pointed at to reach this owner, or null when it finds this one unasked.</summary>
+    /// <summary>The vault <c>keypaste clients</c> must be pointed at to reach this owner, or null when it finds this one unasked.</summary>
     internal string? Vault { get; init; }
 
-    /// <summary>The pipe <c>keypaste mcp policy</c> must be pointed at to reach this owner, or null when it finds this one unasked.</summary>
+    /// <summary>The pipe <c>keypaste clients</c> must be pointed at to reach this owner, or null when it finds this one unasked.</summary>
     internal string? Approver { get; init; }
 
     public void Tell(AlwaysForNotice notice)
@@ -172,7 +172,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         var again = RetryCommand(notice) is { } command
             ? $"To ask for it again: {command}"
-            : "`keypaste mcp policy` can ask for it again.";
+            : "`keypaste clients` can ask for it again.";
 
         _console.WriteLine(_console.Paint(Tone.Danger, $"keypaste: allowed once. {notice.Unmade} {again}"));
     }
@@ -190,7 +190,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             return null;
         }
 
-        return $"keypaste mcp policy {notice.Agent} --project {notice.Scope} --mode automatic"
+        return $"keypaste clients {notice.Agent} --project {notice.Scope} --mode automatic"
             + (Vault is { } vault ? $" --vault {vault}" : string.Empty)
             + (Approver is { } approver ? $" --approver {approver}" : string.Empty);
     }

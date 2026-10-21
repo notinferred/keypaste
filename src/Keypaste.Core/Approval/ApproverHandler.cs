@@ -1023,7 +1023,7 @@ public sealed class ApproverHandler
         }
 
         _narrate?.Invoke(failure == CredentialFailure.ChangedOnDisk
-            ? $"refused {what}: another program changed the vault file, so nothing is served from the copy unlocked here; restart keypaste agent to serve what the file holds now"
+            ? $"refused {what}: another program changed the vault file, so nothing is served from the copy unlocked here; restart keypaste approve to serve what the file holds now"
             : $"refused {what}: {Explain(failure)}");
 
         return Explain(failure);

@@ -1222,7 +1222,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(0, _fixture.Channel.Asked);
     }
 
-    /// <summary><c>keypaste agent</c> builds the same server as the app, whose pass store nothing issues to: a pass presented to it is refused unasked.</summary>
+    /// <summary><c>keypaste approve</c> builds the same server as the app, whose pass store nothing issues to: a pass presented to it is refused unasked.</summary>
     [Fact]
     public async Task An_owner_that_issued_no_pass_refuses_one_unasked()
     {

@@ -51,7 +51,7 @@ public sealed class EnvVerbTests
         harness.Run("env", "set", "billing", "TOKEN", "--vault", harness.VaultPath);
 
         harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "env/billing/.env", "--field", "TOKEN", "--show", "--vault", harness.VaultPath);
+        var exit = harness.Run("get", "env/billing/.env", "--field", "TOKEN", "--reveal", "--vault", harness.VaultPath);
 
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Equal("s3cret-value", harness.Out.ReplaceLineEndings("\n").Trim(), StringComparer.Ordinal);

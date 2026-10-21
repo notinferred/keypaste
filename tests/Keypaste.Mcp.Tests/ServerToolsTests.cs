@@ -322,7 +322,7 @@ public sealed class ServerToolsTests
 
         Assert.True(result.IsError);
         Assert.Contains("DENIED", text, StringComparison.Ordinal);
-        Assert.Contains("keypaste agent", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste approve", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Do not retry", text, StringComparison.Ordinal);
     }
 

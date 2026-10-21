@@ -8,11 +8,11 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste mcp policy</c>, the one place to read and change agents' settings: through the process
+/// <c>keypaste clients</c>, the one place to read and change agents' settings: through the process
 /// holding the vault, where a change that gives more waits for the person, and with nothing holding
 /// it, only a lowering of this computer's ceilings.
 /// </summary>
-public sealed class McpPolicyVerbTests : IDisposable
+public sealed class ClientsVerbTests : IDisposable
 {
     private readonly CliHarness _harness = new();
 
@@ -31,7 +31,7 @@ public sealed class McpPolicyVerbTests : IDisposable
     [Fact]
     public void WithNoOwner_TheListShowsTheDefaults_AndSaysTheVaultsSettingsAreNotShown()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy"));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients"));
 
         Assert.Contains("  AGENT", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("*   (default)", _harness.Out, StringComparison.Ordinal);
@@ -39,11 +39,14 @@ public sealed class McpPolicyVerbTests : IDisposable
         Assert.Contains("so only this computer's ceilings are shown", _harness.Err, StringComparison.Ordinal);
     }
 
-    /// <summary>With nothing holding the vault, a change that only lowers this computer's ceilings is made, and recorded.</summary>
+    /// <summary>
+    /// With nothing holding the vault, a change that only lowers this computer's ceilings is made, and recorded
+    /// under the verb's own name (D-0470).
+    /// </summary>
     [Fact]
     public void WithNoOwner_ALowering_IsWrittenAsACeiling()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "cursor", "--mode", "ask", "--values", "no"));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--mode", "ask", "--values", "no"));
 
         Assert.Contains("applied on this computer, since it gives the agent nothing more (mode ask, values no)", _harness.Err, StringComparison.Ordinal);
         var row = Assert.Single(Caps().Rows);
@@ -53,6 +56,7 @@ public sealed class McpPolicyVerbTests : IDisposable
         using var parsed = JsonDocument.Parse(line);
         Assert.Equal("access_change", parsed.RootElement.GetProperty("tool").GetString());
         Assert.Equal("narrowing", parsed.RootElement.GetProperty("method").GetString());
+        Assert.Equal("keypaste clients", parsed.RootElement.GetProperty("client").GetProperty("name").GetString());
         Assert.Equal("cursor", parsed.RootElement.GetProperty("client").GetProperty("label").GetString());
     }
 
@@ -65,11 +69,11 @@ public sealed class McpPolicyVerbTests : IDisposable
     [InlineData("--reset", null)]
     public void WithNoOwner_AWidening_IsRefused(string option, string? value)
     {
-        string[] args = value is null ? ["mcp", "policy", "cursor", option] : ["mcp", "policy", "cursor", option, value];
+        string[] args = value is null ? ["clients", "cursor", option] : ["clients", "cursor", option, value];
 
         _harness.AssertExit(CliApp.ExitInternalError, _harness.Run(args));
 
-        Assert.Contains("Unlock the vault in the app or run `keypaste agent`, then run this again.", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Unlock the vault in the app or run `keypaste approve`, then run this again.", _harness.Err, StringComparison.Ordinal);
         Assert.False(File.Exists(ClientsPath));
     }
 
@@ -77,10 +81,10 @@ public sealed class McpPolicyVerbTests : IDisposable
     [Fact]
     public void WithNoOwner_ALimit_IsKeptAsACeiling()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "cursor", "--per-hour", "5"));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--per-hour", "5"));
         _harness.Stdout.GetStringBuilder().Clear();
 
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "--json"));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--json"));
 
         Assert.Equal("""[{"kind":"ceiling","label":"cursor","per_hour":5}]""" + Environment.NewLine, _harness.Out);
     }
@@ -88,10 +92,10 @@ public sealed class McpPolicyVerbTests : IDisposable
     [Fact]
     public void Json_ListsEachCeilingAsARow()
     {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "*", "--values", "no"));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "*", "--values", "no"));
         _harness.Stdout.GetStringBuilder().Clear();
 
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "--json"));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--json"));
 
         Assert.Equal("""[{"kind":"ceiling","label":"*","values":"no"}]""" + Environment.NewLine, _harness.Out);
     }
@@ -105,7 +109,7 @@ public sealed class McpPolicyVerbTests : IDisposable
     [InlineData("cursor", null, null)]
     public void BadWords_AreUsage(string agent, string? option, string? value)
     {
-        string[] args = option is null ? ["mcp", "policy", agent] : ["mcp", "policy", agent, option, value!];
+        string[] args = option is null ? ["clients", agent] : ["clients", agent, option, value!];
 
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run(args));
 
@@ -120,11 +124,11 @@ public sealed class McpPolicyVerbTests : IDisposable
         File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"cursor\"\npolicy = \"ask\"\n");
         var before = File.ReadAllBytes(ClientsPath);
 
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("mcp", "policy"));
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients"));
         Assert.Contains("line 3", _harness.Err, StringComparison.Ordinal);
         Assert.Contains("fix it or delete it", _harness.Err, StringComparison.Ordinal);
 
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("mcp", "policy", "cursor", "--mode", "ask"));
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "cursor", "--mode", "ask"));
         Assert.Equal(before, File.ReadAllBytes(ClientsPath));
     }
 
@@ -135,7 +139,7 @@ public sealed class McpPolicyVerbTests : IDisposable
         await using var owner = SessionOwner.Start(_harness);
         owner.Settings.Records["cursor"] = AgentAccess.Defaults with { Mode = AgentMode.Ask, Projects = [Row("billing:dev")] };
 
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--vault", _harness.VaultPath));
 
         Assert.Contains("  cursor ", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("billing:dev", _harness.Out, StringComparison.Ordinal);
@@ -161,7 +165,7 @@ public sealed class McpPolicyVerbTests : IDisposable
         };
         owner.Settings.Records["c-agent"] = AgentAccess.Defaults with { Run = true };
 
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--vault", _harness.VaultPath));
 
         Assert.Contains("  a-agent ", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("  b-huge ", _harness.Out, StringComparison.Ordinal);
@@ -173,7 +177,7 @@ public sealed class McpPolicyVerbTests : IDisposable
         Assert.DoesNotContain("than one reply holds", _harness.Err, StringComparison.Ordinal);
 
         var before = _harness.Out.Length;
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "--json", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--json", "--vault", _harness.VaultPath));
 
         using var listed = JsonDocument.Parse(_harness.Out[before..]);
         var agents = listed.RootElement.EnumerateArray().Where(row => row.GetProperty("kind").GetString() == "agent").ToList();
@@ -193,8 +197,8 @@ public sealed class McpPolicyVerbTests : IDisposable
         await using var owner = SessionOwner.Start(_harness, records: true);
 
         owner.Asked.Change = ApprovalAnswer.ApprovedOnce;
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "cursor", "--values", "no", "--vault", _harness.VaultPath));
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "cursor", "--project", "billing", "--mode", "automatic", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--values", "no", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--project", "billing", "--mode", "automatic", "--vault", _harness.VaultPath));
 
         Assert.Contains("applied at once, since it gives the agent nothing more (cursor: values no)", _harness.Err, StringComparison.Ordinal);
         Assert.Contains("a person confirmed it (cursor: project billing, mode automatic)", _harness.Err, StringComparison.Ordinal);
@@ -203,8 +207,8 @@ public sealed class McpPolicyVerbTests : IDisposable
         Assert.Equal(AgentMode.Automatic, Assert.Single(saved.Projects).Mode);
 
         owner.Asked.Change = ApprovalAnswer.Denied;
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("mcp", "policy", "cursor", "--run", "on", "--vault", _harness.VaultPath));
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("mcp", "policy", "codex", "--mode", "automatic", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "cursor", "--run", "on", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "codex", "--mode", "automatic", "--vault", _harness.VaultPath));
 
         Assert.Contains("not changed: a person refused this change (cursor: run on)", _harness.Err, StringComparison.Ordinal);
         Assert.Contains("not changed: a request from an agent or a terminal for more access, or to change the vault, was refused or went unanswered a moment ago", _harness.Err, StringComparison.Ordinal);
@@ -229,7 +233,7 @@ public sealed class McpPolicyVerbTests : IDisposable
 
         _harness.AssertExit(
             CliApp.ExitSuccess,
-            _harness.Run("mcp", "policy", "cursor", "--mode", "automatic", "--until", "2026-12-31", "--per-hour", "20", "--vault", _harness.VaultPath));
+            _harness.Run("clients", "cursor", "--mode", "automatic", "--until", "2026-12-31", "--per-hour", "20", "--vault", _harness.VaultPath));
 
         Assert.Equal(
             new AccessLimit { PerHour = 20, Until = new DateTimeOffset(2026, 12, 31, 21, 59, 59, TimeSpan.Zero) },
@@ -238,7 +242,7 @@ public sealed class McpPolicyVerbTests : IDisposable
         Assert.True(AuditReader.TryRead(KeypasteHome.AuditPath(Home), out var entries, out _, out var error), error);
         Assert.EndsWith("(cursor: mode automatic, per-hour 20, until 2026-12-31T21:59:59Z)", entries[^1].Reason, StringComparison.Ordinal);
 
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("mcp", "policy", "--vault", _harness.VaultPath));
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--vault", _harness.VaultPath));
 
         Assert.Contains("automatic, until 2026-12-31 23:59 +02:00, at most 20 an hour", _harness.Out, StringComparison.Ordinal);
     }
@@ -249,7 +253,7 @@ public sealed class McpPolicyVerbTests : IDisposable
     {
         _harness.Clock.Zone = TestZones.PlusTwo;
 
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("mcp", "policy", "cursor", "--until", "2026-07-26 17:00"));
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("clients", "cursor", "--until", "2026-07-26 17:00"));
 
         Assert.Contains("until 2026-07-26 17:00 +02:00 has already passed on this computer's clock", _harness.Err, StringComparison.Ordinal);
         Assert.False(File.Exists(ClientsPath));

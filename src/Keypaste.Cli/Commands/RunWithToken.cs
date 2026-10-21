@@ -273,7 +273,7 @@ internal static class RunWithToken
 
         if (client is null)
         {
-            return (null, $"nothing holds {RunCommand.OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste agent`");
+            return (null, $"nothing holds {RunCommand.OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste approve`");
         }
 
         var attached = await client.AttachAsync(new AttachRequest(vaultPath), bound.Token);
