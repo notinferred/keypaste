@@ -8,7 +8,8 @@
 # manifest's for Cursor, Cursor's Agent CLI and Claude Desktop, and for Cursor's Linux package, which neither
 # carries, the digest of the file at its versioned URL when it was pinned. Codex and Gemini CLI come from npm
 # through scripts/real-tools, whose lock pins every package by integrity and whose install scripts never run.
-# No vendor's moving install script runs, and no tool's own setup step.
+# No vendor's moving install script runs, and no tool's own setup step. On Linux, Ubuntu's bubblewrap is added for
+# Codex's sandbox, which verify-real-tools.sh drives as the safe-agent guide sets it (L.3).
 #
 # Logs go to stderr; each directory to put on PATH is a line on stdout, in the runner's own form.
 #
@@ -96,7 +97,12 @@ case "$runner" in
   linux)
     fetch vscode "$dest/code.deb"
     fetch cursor "$dest/cursor.deb"
-    bash "$ROOT/scripts/apt-install.sh" --no-install-recommends "$dest/code.deb" "$dest/cursor.deb" >&2
+    bash "$ROOT/scripts/apt-install.sh" --no-install-recommends "$dest/code.deb" "$dest/cursor.deb" bubblewrap >&2
+    # Codex's sandbox runs commands through bubblewrap, whose user namespace the image's AppArmor default refuses;
+    # Codex's Linux prerequisites give lifting that restriction as the fallback to loading a profile.
+    if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" != 0 ]; then
+      sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 >&2
+    fi
     ;;
   macos)
     fetch vscode "$dest/vscode.zip"

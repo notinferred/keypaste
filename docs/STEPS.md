@@ -46,8 +46,6 @@ Package managers and agent marketplaces carry a version only after it is publish
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 0.5.0. This renames CHANGELOG's Unreleased section and sets the version.
   - Verify from anonymous downloads: public hashes, provenance, signatures and notarization, and an upgrade that keeps the vault, `~/.keypaste` and the recent list.
   - Rehearsal certificates, unpublished artifacts and source builds do not pass.
-- [ ] **L.3 — Write the safe-agent guide.** Needs: none.
-  - How to run Claude Code, Codex and Cursor so the agent cannot write `~/.keypaste` or its own MCP configuration and cannot read other processes, on each system, and what keypaste still cannot stop (T-14, T-35, T-36).
 - [ ] **R.1b — Round-trip a tagged entry through the phone apps (H-0024).** Human. Needs: none.
   - Tag an entry and give it a protected env field in keypaste, edit that entry in KeePassium, Strongbox and KeePassDX, and confirm keypaste still reads the tag, the field and its protection; record each app's version.
 - [ ] **L.1 — Make the released app understandable and reachable.** Needs: 4.7c2, L.3.

@@ -31,6 +31,7 @@ on:
       - 'docs/policy.md'
       - 'docs/approvals.md'
       - 'docs/desktop.md'
+      - 'docs/safe-agents.md'
       - '.claude/**'
       - 'site/README.md'
       - 'site/schema.sql'
@@ -392,7 +393,7 @@ jobs:
 
   # The AI tools keypaste connects, at the versions install-real-tools.sh pins, connected by keypaste setup, read back
   # with each tool's own command where it has one (VS Code's, Claude Desktop's and Windows Cursor's at the file level)
-  # and removed again.
+  # and removed again; on Linux and macOS, Codex's sandbox refuses an agent's write to keypaste's home (L.3).
   tools:
     name: tools (${{ matrix.os }})
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.tools || inputs.only_tools))

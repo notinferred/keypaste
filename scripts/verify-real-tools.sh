@@ -21,22 +21,26 @@
 # offered and every item in reach, which each agent's settings narrow, and each seeded file keeps everything else.
 # Before any tool has started the bridge, keypaste doctor finds every tool's registration working and nothing to
 # fix, and changes no tool's configuration, the pinned audit log or the default home's (D-0467).
-# VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. setup --remove --dry-run then
-# finds every registration, so each of keypaste's readers reads the file its tool wrote on this runner, and on
-# Windows starts Codex and Gemini CLI through node.exe, never cmd.exe. The backups equal the seeds. A second connect
-# changes no entry and no backup. Removing leaves no tool listing keypaste and gives each seeded file back byte for
-# byte, and a second removal calls every tool not connected. No configuration or backup holds the master password
-# or names a keyfile.
+# VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. On Linux and macOS, codex
+# sandbox runs a shell from the project folder as docs/safe-agents.md sets Codex: its write inside that folder lands,
+# its appends to ~/.keypaste/clients.toml and to Codex's config.toml are refused and change neither, and Gemini CLI's
+# bridge still starts with the pinned home afterwards (L.3). setup --remove --dry-run then finds every registration,
+# so each of keypaste's readers reads the file its tool wrote on this runner, and on Windows starts Codex and Gemini
+# CLI through node.exe, never cmd.exe. The backups equal the seeds. A second connect changes no entry and no backup.
+# Removing leaves no tool listing keypaste and gives each seeded file back byte for byte, and a second removal calls
+# every tool not connected. No configuration or backup holds the master password or names a keyfile.
 #
 # NEGATIVE CONTROL: this fails if setup changes a file without --yes, if a removal with nothing to remove runs a
 # tool or changes a byte, if any tool is not configured, if keypaste doctor finds something to fix or a configured
 # tool's registration anything but working, or changes a tool's configuration, the pinned audit log or the default
 # home's, if a tool's reader does not find keypaste, if Gemini CLI's bridge does not reach the pinned audit log, if
 # an entry names another program, vault, audit log, ceilings, approver or label or leaves out run or every item's
-# reach, if a seeded file loses another entry, if VS Code would write the entry differently, if keypaste's reader
-# for a tool misses the entry that tool wrote, if Windows starts a tool through cmd.exe, if a backup differs from
-# its seed or changes on a second connect, if removal leaves keypaste anywhere or a seeded file changed, if a second
-# removal is not a no-op, or if a secret reaches a configuration. These checks must never be skipped or soft-passed.
+# reach, if a seeded file loses another entry, if VS Code would write the entry differently, if Codex's sandbox
+# refuses a write inside its workspace or lets one change keypaste's home or Codex's configuration, if the bridge no
+# longer starts after it, if keypaste's reader for a tool misses the entry that tool wrote, if Windows starts a tool
+# through cmd.exe, if a backup differs from its seed or changes on a second connect, if removal leaves keypaste
+# anywhere or a seeded file changed, if a second removal is not a no-op, or if a secret reaches a configuration.
+# These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-real-tools-master-pw'
@@ -355,6 +359,42 @@ MSYS2_ARG_CONV_EXCL='*' "$TIMEOUT" 120 code --user-data-dir "$(native "$WORK/vsc
   || die "code --add-mcp failed"
 [ "$(json "$WORK/vscode/User/mcp.json" | jq -S '.servers.keypaste')" = "$(json "$VSCODE_FILE" | jq -S '.servers.keypaste')" ] \
   || die "VS Code writes $(json "$WORK/vscode/User/mcp.json" | jq -c '.servers.keypaste'), not keypaste's $(json "$VSCODE_FILE" | jq -c '.servers.keypaste')"
+
+# ------------------------------------------------------------------ an agent's command under Codex's sandbox
+# Codex's Windows sandbox needs a setup this runner has not had, so it is not driven here (L.3).
+if [ "$platform" != windows ]; then
+  step "Codex's sandbox, set as docs/safe-agents.md sets it, refuses writes to keypaste's home and Codex's configuration"
+  KEYPASTE_DIR="$H/.keypaste"
+  MADE_KEYPASTE_DIR=false
+  if [ ! -d "$KEYPASTE_DIR" ]; then
+    mkdir "$KEYPASTE_DIR"
+    MADE_KEYPASTE_DIR=true
+  fi
+  # Appends a line to a file from a shell Codex sandboxes as it would the agent's, from the project folder.
+  sandboxed_append() {
+    # shellcheck disable=SC2016 # the sandboxed sh expands $1, not this shell.
+    "$TIMEOUT" 60 codex -c 'sandbox_mode="workspace-write"' sandbox -- /bin/sh -c 'printf "%s\n" "# an agent was here" >> "$1"' sh "$1"
+  }
+  sandboxed_append "$WORK/project/sandbox-probe" > "$OUT" 2>&1 \
+    || die "Codex's sandbox refused a write inside its workspace, so it did not run as configured: $(cat "$OUT")"
+  [ -s "$WORK/project/sandbox-probe" ] || die "Codex's sandbox reported a write inside its workspace that did not land"
+  for target in "$KEYPASTE_DIR/clients.toml" "$CODEX_FILE"; do
+    before="$(contents "$target")"
+    if sandboxed_append "$target" > "$OUT" 2>&1; then die "Codex's sandbox let a command write $target"; fi
+    grep -Eiq 'not permitted|read-only file system|permission denied' "$OUT" \
+      || die "the sandboxed write to $target failed without the system refusing it: $(cat "$OUT")"
+    [ "$(contents "$target")" = "$before" ] || die "Codex's sandbox let a command change $target"
+    echo "refused: $target"
+  done
+  if [ "$MADE_KEYPASTE_DIR" = true ]; then rmdir "$KEYPASTE_DIR"; fi
+
+  step 'the keypaste mcp a tool registered still starts with its own home'
+  rm -f "$(unix "$PIN_AUDIT")"
+  gemini_list > "$OUT" 2>&1 || die "gemini mcp list failed"
+  grep -Eq 'keypaste: .* - Connected' "$OUT" || die "after the sandboxed writes, gemini mcp list does not show keypaste connected"
+  [ -e "$(unix "$PIN_AUDIT")" ] || die "after the sandboxed writes, the bridge did not open the pinned audit log $PIN_AUDIT"
+  [ "$DEFAULT_AUDIT_EXISTED" = true ] || [ ! -e "$DEFAULT_AUDIT" ] || die "a bridge wrote the default home's audit log $DEFAULT_AUDIT"
+fi
 
 # ---------------------------------------------------------------------------------- keypaste's own readers
 step "keypaste's reader for every tool finds the entry that tool wrote"
