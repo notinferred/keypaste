@@ -31,7 +31,7 @@ D-0471.
 
 ## Limits and follow-ups
 
-- Status does not compare versions; a holder or registration older than this keypaste reaches the person through `keypaste doctor`.
+- Status compares only the holder's version, which the attach reply already gives, and points at `keypaste doctor` when it differs; a registration or PATH copy on another version reaches the person only through doctor, which starts them to learn it.
 - Width is counted in UTF-16 code units, so a path with wide or combining characters can pass 80 columns on screen.
 - `keypaste --vault <path>` with no verb is still an unknown command; the status always shows the vault keypaste finds without a flag.
 - The pseudo-terminal check does not run on Windows.

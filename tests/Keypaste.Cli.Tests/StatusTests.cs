@@ -1,11 +1,14 @@
 using System.Buffers.Binary;
 using System.Globalization;
+using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Keypaste.Cli.Commands;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Infrastructure;
+using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
 using Xunit;
@@ -82,6 +85,23 @@ public sealed class StatusTests : IDisposable
         AssertShows(missing, vault[0]);
         Assert.Equal(["from KEYPASTE_VAULT", "missing"], vault.Skip(1));
         Assert.Equal("› run `keypaste use <path>` to choose your vault", Step());
+    }
+
+    [Fact]
+    public async Task An_owner_on_another_version_says_to_see_doctor()
+    {
+        Healthy();
+        Register(McpConfigLocation.Cursor, This, "mcp");
+        var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        _harness.Environment[ApproverEndpoint.EnvironmentVariable] = pipe;
+        using var done = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        done.CancelAfter(TimeSpan.FromSeconds(30));
+        var owner = AnswerOnceAsync(pipe, AttachReply.To("status-session") with { OwnerVersion = "0.0.1" }, done.Token);
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run());
+        await owner;
+
+        Assert.Equal("› run `keypaste doctor` to see what to fix", Step());
     }
 
     [Fact]
@@ -302,6 +322,20 @@ public sealed class StatusTests : IDisposable
     }
 
     /// <summary>The path as printed: itself, or its start and end around an ellipsis.</summary>
+    /// <summary>Listens on <paramref name="pipe"/> for one attach naming no AI tool and answers it with <paramref name="reply"/>.</summary>
+    private static async Task AnswerOnceAsync(string pipe, AttachReply reply, CancellationToken cancellationToken)
+    {
+        await using var server = new NamedPipeServerStream(
+            pipe, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await server.WaitForConnectionAsync(cancellationToken);
+        using var framer = new MessageFramer(server, ownsStream: false);
+
+        var frame = await framer.ReadAsync(cancellationToken);
+        Assert.True(ApproverProtocol.TryDecode(frame, out AttachRequest? attach));
+        Assert.Null(attach!.Client);
+        await framer.WriteAsync(ApproverProtocol.Encode(reply), cancellationToken);
+    }
+
     private static void AssertShows(string path, string shown)
     {
         var cut = shown.IndexOf('…', StringComparison.Ordinal);

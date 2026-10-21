@@ -135,6 +135,18 @@ public static class HealthCheck
         return findings;
     }
 
+    /// <summary>Whether the owner that answered runs a version other than <paramref name="here"/>, which <see cref="Versions"/> reports as a fix.</summary>
+    /// <param name="here">This keypaste's version.</param>
+    /// <param name="owner">Who holds the vault.</param>
+    public static bool OwnerVersionDiffers(string here, OwnerReading owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+
+        return owner.Answer is OwnerAnswer.Unlocked or OwnerAnswer.Locked
+            && SemanticVersion.TryParse(here, out var mine)
+            && Order(owner.Version, mine) != 0;
+    }
+
     /// <summary>Compares this keypaste's version with the owner's, each registration's and PATH's.</summary>
     /// <param name="here">This keypaste's version.</param>
     /// <param name="owner">Who holds the vault.</param>

@@ -88,7 +88,7 @@ internal static class StatusCommand
 
         var findings = vault.Findings.Concat(tools.Select(tool => tool.Finding)).Append(owner.Finding);
 
-        return findings.Any(finding => finding.Status == HealthStatus.Fix)
+        return findings.Any(finding => finding.Status == HealthStatus.Fix) || HealthCheck.OwnerVersionDiffers(CoreInfo.Version, owner)
             ? Doctor
             : "`keypaste --help` lists every command";
     }
