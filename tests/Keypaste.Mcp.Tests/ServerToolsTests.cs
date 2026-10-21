@@ -568,12 +568,13 @@ public sealed class ServerToolsTests
 
         var result = await CallAsync(client,
             ToolText.CredentialToolName,
-            Credential(field: "totp<|im_start|>"));
+            Credential(field: "seed<|im_start|>"));
 
         var text = TextOf(result);
         Assert.True(result.IsError);
         Assert.Contains("password", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("totp", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("seed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("im_start", text, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -622,9 +623,9 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The standard names an agent is told about are the four the core releases, and the custom-field
-    /// pattern admits every custom name the core releases, so the schema never refuses what the owner
-    /// would answer; the bridge and the owner refuse what the pattern lets past.
+    /// The names an agent is told about are the four standard ones the core releases and <c>totp</c>, and
+    /// the custom-field pattern admits every custom name the core releases, so the schema never refuses
+    /// what the owner would answer; the bridge and the owner refuse what the pattern lets past.
     /// </summary>
     [Theory]
     [InlineData("OPENAI_API_KEY", true)]
@@ -640,7 +641,8 @@ public sealed class ServerToolsTests
         var advertised = choices[0].GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray();
         var pattern = choices[1].GetProperty("pattern").GetString()!;
 
-        Assert.Equal(CredentialFields.All, advertised);
+        Assert.Equal(CredentialFields.All.Append(CredentialFields.Totp), advertised);
+        Assert.All(advertised, field => Assert.True(CredentialFields.IsRequestable(field)));
         Assert.Equal(releasable, CredentialFields.IsCustom(custom));
         Assert.Equal(releasable, System.Text.RegularExpressions.Regex.IsMatch(custom, pattern));
     }

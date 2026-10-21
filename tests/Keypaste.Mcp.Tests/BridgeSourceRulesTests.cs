@@ -3,8 +3,9 @@ using Xunit;
 namespace Keypaste.Mcp.Tests;
 
 /// <summary>
-/// The bridge holds no vault: it cannot open, create or unlock one, and has nowhere to take a master
-/// password or keyfile from (PRODUCT §2, THREATS.md T-8). Its path starts in the CLI's <c>Program.cs</c>,
+/// The bridge holds no vault: it cannot open, create or unlock one, has nowhere to take a master
+/// password or keyfile from, and never reads a TOTP seed, whose code only the owner computes
+/// (PRODUCT §2, THREATS.md T-8, D-0480). Its path starts in the CLI's <c>Program.cs</c>,
 /// which hands <c>keypaste mcp</c> to it before any other CLI code runs (D-0418).
 /// </summary>
 /// <remarks>
@@ -28,6 +29,9 @@ public sealed class BridgeSourceRulesTests
         "VaultSession",
         "SecretInput",
         "KeePassInterop",
+        "TotpSpec",
+        "ReadTotp",
+        "ReadSavedTotp",
     ];
 
     [Fact]

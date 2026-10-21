@@ -53,4 +53,7 @@ public enum CredentialFailure
     /// read, so the value cannot leave whole (D-0465).
     /// </summary>
     Unfilled = 9,
+
+    /// <summary>The item has no TOTP keypaste can compute, so there is no code to release (D-0480).</summary>
+    NoCode = 10,
 }

@@ -118,7 +118,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
         var reply = await approver.Handler.RequestAsync(Request(field), "conn-1", Token);
 
         Assert.Equal(AuditMethod.InvalidRequest, reply.Method);
-        Assert.Equal($"the request's field must be {CredentialFields.Rule}", reply.Reason);
+        Assert.Equal($"the request's field must be {CredentialFields.RequestRule}", reply.Reason);
         Assert.Null(reply.Value);
         Assert.Equal(0, approver.Channel.Asked);
     }

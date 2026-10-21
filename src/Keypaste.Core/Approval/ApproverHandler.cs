@@ -39,6 +39,11 @@ namespace Keypaste.Core.Approval;
 /// every time, skips the grant cache and Automatic and is offered no timed grant, so it is asked about
 /// every time; a protected entry is so whatever any setting says.
 /// </para>
+/// <para>
+/// A TOTP code is offered no timed grant either: a grant holds the value it released, and a code is
+/// stale once its period ends. It is released once or under an Automatic mode, and the lifetime the
+/// reply carries is the code's time left in its period (D-0480).
+/// </para>
 /// </remarks>
 public sealed class ApproverHandler
 {
@@ -268,6 +273,7 @@ public sealed class ApproverHandler
             ? OnceOnly.ProtectedProfile
             : item.Mode == AgentMode.Ask ? OnceOnly.AskEveryTime : OnceOnly.None;
         var liveOnly = onceOnly != OnceOnly.None;
+        var isCode = string.Equals(request.Field, CredentialFields.Totp, StringComparison.Ordinal);
 
         // Declared before the try so the copy the cache hands out is zeroed on every path — the
         // repo's idiom for a disposable that only exists on one branch.
@@ -313,10 +319,10 @@ public sealed class ApproverHandler
 
         // The person chooses once or the timed grant on screen, so its length is the approver's
         // ceiling and never the agent's ttl_seconds.
-        var grantSeconds = liveOnly ? 0 : _gate.Limits.MaximumTtlSeconds;
+        var grantSeconds = liveOnly || isCode ? 0 : _gate.Limits.MaximumTtlSeconds;
         var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, grantSeconds, request.ClientLabel) with
         {
-            OnceOnly = onceOnly,
+            OnceOnly = onceOnly == OnceOnly.None && isCode ? OnceOnly.TotpCode : onceOnly,
             AlwaysFor = isProtected || item.Mode == AgentMode.Automatic ? null : AlwaysFor(access, tags),
         };
 
@@ -403,7 +409,7 @@ public sealed class ApproverHandler
                         ? $"a person approved this request for {ApprovalLimits.Describe(grantSeconds)}"
                         : "a person approved this one request",
                     Entry = display,
-                    TtlSeconds = timed ? grantSeconds : 0,
+                    TtlSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : timed ? grantSeconds : 0,
                     Value = released.Value.ToString(),
                     AlwaysFor = alwaysFor,
                 },
@@ -464,7 +470,7 @@ public sealed class ApproverHandler
                     Method = AuditMethod.Automatic,
                     Reason = $"released without asking: {shown}'s mode for this item is Automatic",
                     Entry = display,
-                    TtlSeconds = ttl,
+                    TtlSeconds = released.CurrentFor is { } current ? WholeSeconds(current) : ttl,
                     Value = released.Value.ToString(),
                 },
                 display,
@@ -1049,6 +1055,9 @@ public sealed class ApproverHandler
     /// <summary>Why a request for more was not put to the person, and when it can be asked again.</summary>
     private string CoolingDown() => _gate.CoolingDown("make it in the app's own agent settings, which do not wait");
 
+    /// <summary>A value's lifetime as a reply carries it, rounded up so a code with part of a second left is not told it has none.</summary>
+    private static int WholeSeconds(TimeSpan lifetime) => (int)Math.Ceiling(lifetime.TotalSeconds);
+
     private static CredentialReply Refused(AuditMethod method, string reason, string? entry = null) => new()
     {
         Decision = AuditDecision.Denied,
@@ -1080,6 +1089,7 @@ public sealed class ApproverHandler
             "another program changed the vault file since keypaste read it; nothing is released until a person reloads the vault",
         CredentialFailure.Unsaved => "the vault has a change that is not saved yet",
         CredentialFailure.Unfilled => "the item's field holds a KeePass placeholder keypaste does not fill in",
+        CredentialFailure.NoCode => "the item has no TOTP keypaste can compute",
         _ => "the vault could not be read",
     };
 }

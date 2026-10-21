@@ -310,7 +310,7 @@ app_openai="$dir/openai-app.kdbx"
 cp "$openai" "$app_openai"
 api_key=fields-openai-api-key
 others=(fields-openai-password fields-openai-recovery KRSXG5CTMVRXEZLU fields-openai-kp2a)
-denial='keypaste: DENIED. The "field" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.'
+denial='keypaste: DENIED. The "field" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.'
 
 agents=0
 # Starts keypaste approve on the OpenAI vault: $1 is what it reads after the master password, the rest its options.

@@ -535,6 +535,7 @@ public sealed class TerminalApprovalChannelTests
     [Theory]
     [InlineData(OnceOnly.ProtectedProfile, "  this item is in a protected environment: it is asked about every time.")]
     [InlineData(OnceOnly.AskEveryTime, "  this agent is set to Ask every time: no timed allowance is offered.")]
+    [InlineData(OnceOnly.TotpCode, "  a TOTP code changes every period: no timed allowance is offered.")]
     public async Task TheCredentialDialog_SaysWhyItIsOnceOnly(OnceOnly onceOnly, string why)
     {
         var rig = Build("d");

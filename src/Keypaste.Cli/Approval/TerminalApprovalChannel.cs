@@ -401,9 +401,12 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         if (request.TtlSeconds == 0)
         {
-            lines.Add(request.OnceOnly == OnceOnly.AskEveryTime
-                ? _askEveryTimeLine
-                : "  this item is in a protected environment: it is asked about every time.");
+            lines.Add(request.OnceOnly switch
+            {
+                OnceOnly.AskEveryTime => _askEveryTimeLine,
+                OnceOnly.TotpCode => "  a TOTP code changes every period: no timed allowance is offered.",
+                _ => "  this item is in a protected environment: it is asked about every time.",
+            });
         }
 
         if (request.AlwaysFor is { } scope)

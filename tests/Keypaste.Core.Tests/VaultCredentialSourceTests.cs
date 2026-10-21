@@ -247,7 +247,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     [InlineData("Password")]
     [InlineData("secret")]
     [InlineData("")]
-    [InlineData("totp")]
+    [InlineData("otp")]
     public void AFieldKeypasteDoesNotRelease_IsRefused(string field)
     {
         var released = Source().TryRead(new EntryName("env/dev", "STRIPE_KEY"), field, out var value, out var failure, out _);

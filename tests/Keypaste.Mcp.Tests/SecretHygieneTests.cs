@@ -4,6 +4,7 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
+using Keypaste.Core.Totp;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -52,6 +53,12 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
     /// <summary>A custom field of the same entry that is not env-named, so it never leaves.</summary>
     internal const string SentinelRecovery = "SENTINEL-RECOVERY-CODES-b04e2f";
+
+    /// <summary>RFC 6238's SHA-1 seed in base32, which the entry's <c>otp</c> holds when a test plants it, and which never leaves.</summary>
+    internal const string SentinelTotpSeed = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+
+    /// <summary>KeePassXC's <c>otp</c> for <see cref="SentinelTotpSeed"/>, with 8 digits so a code is not mistaken for digits a log line already holds.</summary>
+    internal const string SentinelTotpUri = "otpauth://totp/Stripe?secret=" + SentinelTotpSeed + "&digits=8";
 
     /// <summary>A secret in a part of the vault this server was never allowed to name.</summary>
     internal const string SentinelOutOfScope = "SENTINEL-OUT-OF-SCOPE-e51b70";
@@ -343,6 +350,80 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// <c>totp</c> brings the item's current code, computed by the owner after a person allowed it, for
+    /// the seconds it has left; the seed, the <c>otp</c> URI holding it and every other field appear
+    /// nowhere, the code reaches neither log, and the owner's line records a <c>totp</c> release (D-0480).
+    /// </summary>
+    [Fact]
+    public async Task OnApproval_TheCurrentTotpCodeComesBack_AndNeverItsSeed()
+    {
+        _vault!.SetFieldsUnchecked(new EntryName("env/dev", "STRIPE_KEY"), [new FieldWrite(TotpSpec.OtpField, SentinelTotpUri)]);
+        _vault.Save();
+        _human.Answer = ApprovalAnswer.Approved;
+
+        using var spec = TotpSpec.FromUri(SentinelTotpUri, out _)!;
+        var (harness, client) = await StartAsync();
+
+        await using (harness)
+        {
+            var before = spec.Code(TimeProvider.System).Value;
+            var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: CredentialFields.Totp), cancellationToken: Token);
+            var after = spec.Code(TimeProvider.System).Value;
+
+            Assert.False(result.IsError);
+            var released = Assert.IsType<System.Text.Json.JsonElement>(result.StructuredContent);
+            var code = released.GetProperty("value").GetString()!;
+            Assert.True(
+                string.Equals(code, before, StringComparison.Ordinal) || string.Equals(code, after, StringComparison.Ordinal),
+                "the code released was current neither before the call nor after it");
+            Assert.Equal(CredentialFields.Totp, released.GetProperty("field").GetString());
+            Assert.InRange(released.GetProperty("expires_in_seconds").GetInt32(), 1, 30);
+            Assert.Equal(1, _human.Asked);
+
+            var line = Assert.Single(_log!.Lines());
+            Assert.Equal(CredentialFields.Totp, line.GetProperty("args").GetProperty("field").GetString());
+            Assert.Equal("granted", line.GetProperty("decision").GetString());
+            Assert.Equal("prompt", line.GetProperty("method").GetString());
+
+            Assert.DoesNotContain(code, _log.Text() + harness.AuditText, StringComparison.Ordinal);
+
+            foreach (var sentinel in _everySentinel.Append(SentinelTotpSeed).Append(SentinelTotpUri))
+            {
+                AssertNowhere(harness, sentinel, TextOf(result), "a TOTP code");
+            }
+        }
+    }
+
+    /// <summary>A person's yes to a code keeps nothing, so the next code is asked about again, and a no releases none.</summary>
+    [Fact]
+    public async Task ATotpCode_IsAskedAboutEveryTime_AndADenialReleasesNothing()
+    {
+        _vault!.SetFieldsUnchecked(new EntryName("env/dev", "STRIPE_KEY"), [new FieldWrite(TotpSpec.OtpField, SentinelTotpUri)]);
+        _vault.Save();
+        _human.Answer = ApprovalAnswer.Approved;
+
+        var (harness, client) = await StartAsync();
+
+        await using (harness)
+        {
+            var first = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: CredentialFields.Totp), cancellationToken: Token);
+            _human.Answer = ApprovalAnswer.Denied;
+            var second = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: CredentialFields.Totp), cancellationToken: Token);
+
+            Assert.False(first.IsError);
+            Assert.True(second.IsError);
+            Assert.Equal(2, _human.Asked);
+            Assert.Equal(0, _grants!.Count);
+            Assert.Equal(["granted", "denied"], _log!.Lines().Select(line => line.GetProperty("decision").GetString()));
+
+            foreach (var sentinel in _everySentinel.Append(SentinelTotpSeed).Append(SentinelTotpUri))
+            {
+                AssertNowhere(harness, sentinel, TextOf(second), "a denied TOTP code");
+            }
+        }
+    }
+
+    /// <summary>
     /// Each field in turn, so "only the requested one" is proved four times rather than once for
     /// whichever field happens to be first.
     /// </summary>
@@ -453,6 +534,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     [Theory]
     [InlineData("Recovery codes")]
     [InlineData("otp")]
+    [InlineData("TimeOtp-Secret")]
+    [InlineData("TimeOtp-Secret-Base32")]
     [InlineData("KP2A_URL_1")]
     [InlineData("URL")]
     public async Task AFieldThatNeverLeaves_IsRefusedUnasked_AndAuditedAsInvalid(string field)
@@ -467,7 +550,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
             Assert.True(result.IsError);
             Assert.Equal(
-                "keypaste: DENIED. The \"field\" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.",
+                "keypaste: DENIED. The \"field\" argument must be password, username, url, notes, totp or a custom field named like an environment variable. This call was recorded in the audit log.",
                 TextOf(result));
             Assert.Equal(0, _human.Asked);
 

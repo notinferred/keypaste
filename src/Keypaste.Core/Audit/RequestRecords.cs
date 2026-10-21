@@ -89,7 +89,7 @@ public static class RequestRecords
     /// <summary>The line for a request for one field of one entry.</summary>
     /// <param name="client">Who asked.</param>
     /// <param name="entry">The <c>entry</c> argument as the agent wrote it.</param>
-    /// <param name="field">The <c>field</c> argument as the agent wrote it; one keypaste does not release is recorded as <c>invalid</c>.</param>
+    /// <param name="field">The <c>field</c> argument as the agent wrote it, <c>totp</c> for a TOTP code; one a request may not name is recorded as <c>invalid</c>.</param>
     /// <param name="ttlSeconds">The lifetime the agent asked for, or <c>-1</c> when it was missing or unusable.</param>
     /// <param name="statedReason">The agent's stated reason, verbatim.</param>
     /// <param name="decision">Whether the field was released.</param>
@@ -121,7 +121,7 @@ public static class RequestRecords
         ArgumentNullException.ThrowIfNull(reason);
         ArgumentNullException.ThrowIfNull(exposure);
 
-        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsReleasable(field) ? field : null, ttlSeconds, statedReason);
+        var args = AuditArgs.ForCredentialRequest(entry, CredentialFields.IsRequestable(field) ? field : null, ttlSeconds, statedReason);
 
         // The agent is told to prefer a handle, so the argument is usually an opaque k1_… that
         // answers nothing a reader of the log asks; the name it resolved to does.

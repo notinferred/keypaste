@@ -33,9 +33,9 @@ public static class CredentialRequestRules
             return new("entry", Length(MaximumEntryLength));
         }
 
-        if (!CredentialFields.IsReleasable(field))
+        if (!CredentialFields.IsRequestable(field))
         {
-            return new("field", $"must be {CredentialFields.Rule}");
+            return new("field", $"must be {CredentialFields.RequestRule}");
         }
 
         if (reason.Length is 0 or > MaximumReasonLength)

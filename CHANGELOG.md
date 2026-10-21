@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+An item with a TOTP now shows its code in the app, masked until you hold Reveal, with the seconds until the next code beside it, and Copy puts the code on the clipboard with the usual clearing countdown. An agent can ask for an item's current code with `request_credential` and `field` `totp`, which `list_entry_names` offers for items that have one: you allow each code once, with no timed allowance since the code changes, or the agent's Automatic mode releases it, and the log records a `totp` release. No agent, `kp://` reference or share is ever given the seed ([9.2b](docs/steps/9.2b.md)).
+
 `keypaste` on its own in a terminal now shows where things stand: its version, the vault it uses and what chose it, whether the keypaste app or `keypaste approve` holds it unlocked, which AI tools are connected, and one next step, such as `keypaste setup` or opening the app. It asks for no password, starts nothing and changes nothing. In a script or a pipe, `keypaste` alone still prints the help on stderr and exits 1 ([N.8](docs/steps/N.8.md)).
 `keypaste setup --link` prints a link for Cursor and one for VS Code that has the tool add keypaste itself, holding the same command and flags `setup` would write to its file, and changes nothing. `keypaste setup` also prints a tool's link when it cannot write that tool's file, and the app's Connect pane for Cursor and VS Code shows the link beside its plan, with Open in Cursor or Open in VS Code and Copy link. A link names the paths `setup` would write, your vault's among them, but never a value ([G.6e](docs/steps/G.6e.md)).
 

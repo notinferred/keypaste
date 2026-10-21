@@ -95,9 +95,6 @@ Each row keeps its historical meaning and is expanded when selected.
   - Resume a locked session with Windows Hello, keeping the full unlock path intact.
 - [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b. Ships after: 4.7c2.
   - Touch ID, under the same session policy, using the signed app's entitlements.
-- [ ] **9.2b — Use TOTP in the app and approval bridge.** Needs: 9.2a.
-  - Show the code and its countdown.
-  - Let an agent be approved for a code, but never for the seed.
 - [ ] **8.1 — Install and pair the native messaging host.** Needs: none.
   - Start with a discovery: can keypaste serve the existing KeePassXC-Browser extension's protocol, as KeePassNatMsg does for KeePass 2?
   - Either way, pair only to specific extension identities, under the approval rules of §3.

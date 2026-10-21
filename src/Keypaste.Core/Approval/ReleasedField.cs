@@ -7,9 +7,10 @@ namespace Keypaste.Core.Approval;
 /// <para>
 /// This is the credential path's answer to <see cref="EntryName"/>, and it exists for the same
 /// reason. It carries the name of the field that was asked for and the characters of that field,
-/// and it has no other member — so "return ONLY the requested field value" is a property of the
-/// type system rather than of a code path somebody could later widen. It is deliberately
-/// <em>not</em> a <see cref="VaultEntry"/> with the other fields blanked (THREATS.md T-8).
+/// and, for a TOTP code, how long it stays current; it has no other member — so "return ONLY the
+/// requested field value" is a property of the type system rather than of a code path somebody could
+/// later widen. It is deliberately <em>not</em> a <see cref="VaultEntry"/> with the other fields
+/// blanked (THREATS.md T-8).
 /// </para>
 /// <para>
 /// The value is held in a <see cref="SecretBuffer"/> so it can be zeroed when the grant expires.
@@ -36,6 +37,9 @@ public sealed class ReleasedField : IDisposable
 
     /// <summary>The field name that was asked for.</summary>
     public string Field { get; }
+
+    /// <summary>How long the value stays current: a TOTP code's time left in its period, or null for a field, which does not change with time.</summary>
+    public TimeSpan? CurrentFor { get; init; }
 
     /// <summary>The released characters, or empty once this has been disposed.</summary>
     public ReadOnlySpan<char> Value => _value.Value;

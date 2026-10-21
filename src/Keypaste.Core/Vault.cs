@@ -912,6 +912,39 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary><see cref="ReadTotp"/>, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="spec">
+    /// When the answer is <see cref="SavedRead.Current"/>, the item's TOTP, which the caller disposes; null when there is no
+    /// such entry, it has none, or <paramref name="refusal"/> says why it cannot be computed, and whenever the answer is not.
+    /// </param>
+    /// <param name="refusal">Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal SavedRead ReadSavedTotp(EntryName name, out TotpSpec? spec, out string? refusal)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        spec = null;
+        refusal = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            spec = _interop.ReadCustomFields(name, TotpSpec.IsSourceField) is { } fields
+                ? TotpSpec.Read(fields, out refusal)
+                : null;
+            return SavedRead.Current;
+        }
+    }
+
     /// <summary><see cref="FillPlaceholders(EntryName, string)"/>, but only while this vault holds exactly what its file holds.</summary>
     /// <param name="name">The item the value belongs to.</param>
     /// <param name="value">The value as the vault holds it.</param>

@@ -271,6 +271,34 @@ public sealed class TotpSpecTests
         Assert.False(CredentialFields.IsReleasable(name));
 
     [Theory]
+    [InlineData(30, 59L, 1)]
+    [InlineData(30, 60L, 30)]
+    [InlineData(30, 1111111111L, 29)]
+    [InlineData(60, 1111111111L, 29)]
+    [InlineData(1, 1234567890L, 1)]
+    public void The_time_left_comes_from_the_period_alone(int period, long seconds, int left) =>
+        Assert.Equal(TimeSpan.FromSeconds(left), TotpSpec.Remaining(TimeSpan.FromSeconds(period), DateTimeOffset.FromUnixTimeSeconds(seconds)));
+
+    [Fact]
+    public void The_time_left_and_a_code_agree()
+    {
+        using var spec = Parsed($"otpauth://totp/x?secret={_seed}&period=45");
+        var at = DateTimeOffset.FromUnixTimeSeconds(1111111111).AddMilliseconds(250);
+
+        Assert.Equal(TotpSpec.Remaining(spec.Period, at), spec.Code(at).Remaining);
+        Assert.Throws<ArgumentOutOfRangeException>(() => TotpSpec.Remaining(TimeSpan.Zero, at));
+    }
+
+    [Fact]
+    public void An_item_may_hold_a_TOTP_only_by_otp_or_a_KeePass_2_secret()
+    {
+        Assert.True(TotpSpec.MayHold(name => name == "otp"));
+        Assert.True(TotpSpec.MayHold(name => name == "TimeOtp-Secret-Base32"));
+        Assert.False(TotpSpec.MayHold(name => name == "TimeOtp-Length"));
+        Assert.False(TotpSpec.MayHold(name => name == "TOTP Seed"));
+    }
+
+    [Theory]
     [InlineData("MY", new byte[] { 0x66 })]
     [InlineData("MZXQ", new byte[] { 0x66, 0x6F })]
     [InlineData("MZXW6", new byte[] { 0x66, 0x6F, 0x6F })]

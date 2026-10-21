@@ -120,7 +120,7 @@ public sealed class SessionServer : IDisposable
         try
         {
             var handler = new ApproverHandler(
-                new VaultCredentialSource(() => options.UnlockedFor(lifetime)),
+                new VaultCredentialSource(() => options.UnlockedFor(lifetime), options.Clock),
                 new VaultEntryNameLister(() => options.UnlockedFor(lifetime)),
                 gate,
                 grants,

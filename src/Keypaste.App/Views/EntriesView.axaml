@@ -998,6 +998,64 @@
                       </Border>
                     </Grid>
 
+                    <!-- The TOTP code is masked and computed at the hold or the copy, as the password is read;
+                         only the seconds until the next code are bound (D-0481). -->
+                    <Grid ColumnDefinitions="96,*" IsVisible="{Binding ShowsTotp}">
+                      <TextBlock Grid.Column="0" Classes="label" Text="TOTP" VerticalAlignment="Center" />
+                      <Border Grid.Column="1" Classes="value">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                          <ctl:RevealedValue Grid.Column="0"
+                                             x:Name="CurrentTotp"
+                                             Source="{Binding Totp}"
+                                             MaskedLength="{Binding Totp.MaskedLength}"
+                                             AutomationProperties.Name="Hold to reveal the TOTP code"
+                                             FontFamily="{DynamicResource KpMono}"
+                                             FontSize="14"
+                                             HorizontalAlignment="Left"
+                                             VerticalAlignment="Center"
+                                             ClipToBounds="True"
+                                             Foreground="{DynamicResource KpTextPrimary}" />
+                          <TextBlock Grid.Column="1"
+                                     x:Name="TotpCountdown"
+                                     Classes="mono secondary"
+                                     Text="{Binding Totp.Countdown}"
+                                     ToolTip.Tip="Seconds until the next code"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,8,0" />
+                          <ctl:RevealButton Grid.Column="2"
+                                            Classes="ghost in-field"
+                                            Target="{Binding #CurrentTotp}"
+                                            ToolTip.Tip="Hold to reveal"
+                                            AutomationProperties.Name="Reveal the TOTP code">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <ctl:KpIcon Icon="eye" Size="14" />
+                              <TextBlock Text="Reveal" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </ctl:RevealButton>
+                          <Button Grid.Column="3"
+                                  x:Name="CopyTotp"
+                                  Classes="ghost in-field"
+                                  Command="{Binding Totp.CopyCommand}"
+                                  ToolTip.Tip="Copy the code; the clipboard clears itself"
+                                  AutomationProperties.Name="Copy the TOTP code">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <ctl:KpIcon Icon="copy" Size="13" />
+                              <TextBlock Text="Copy" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
+                        </Grid>
+                      </Border>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="96,*" IsVisible="{Binding ShowsTotpProblem}">
+                      <TextBlock Grid.Column="0" Classes="label" Text="TOTP" VerticalAlignment="Top" />
+                      <TextBlock Grid.Column="1"
+                                 x:Name="TotpRefusal"
+                                 Classes="caption"
+                                 TextWrapping="Wrap"
+                                 Text="{Binding TotpProblem}" />
+                    </Grid>
+
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
                       <TextBlock Grid.Column="0" Classes="label" Text="URL" VerticalAlignment="Top" Margin="0,11,0,0" />
                       <!-- A web address opens in the browser; anything else is text and says why (N.5, D-0378). -->

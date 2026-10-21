@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Keypaste.Core.Totp;
 
 namespace Keypaste.Core.Approval;
 
@@ -24,10 +25,13 @@ namespace Keypaste.Core.Approval;
 /// <param name="unlockedVault">
 /// The vault currently unlocked in this process, or <see langword="null"/> when none is.
 /// </param>
-public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredentialSource
+/// <param name="clock">What a TOTP code is computed for; null is the system clock.</param>
+public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvider? clock = null) : ICredentialSource
 {
     private readonly Func<Vault?> _unlockedVault =
         unlockedVault ?? throw new ArgumentNullException(nameof(unlockedVault));
+
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -139,7 +143,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         value = null;
         unfilled = string.Empty;
 
-        if (!CredentialFields.IsReleasable(field))
+        if (!CredentialFields.IsRequestable(field))
         {
             failure = CredentialFailure.NoSuchField;
             return false;
@@ -162,6 +166,11 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         if (entry is null)
         {
             return false;
+        }
+
+        if (string.Equals(field, CredentialFields.Totp, StringComparison.Ordinal))
+        {
+            return TryCompute(name, out value, out failure);
         }
 
         if (!TrySelect(entry, name, field, out var stored, out failure)
@@ -189,6 +198,47 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         SavedRead.Unsaved => CredentialFailure.Unsaved,
         _ => CredentialFailure.Failed,
     };
+
+    /// <summary>The item's current TOTP code, computed from the saved file only now; the seed goes no further than the spec, which is zeroed here (D-0480).</summary>
+    private bool TryCompute(EntryName name, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+    {
+        value = null;
+
+        if (_unlockedVault() is not { } vault)
+        {
+            failure = CredentialFailure.VaultLocked;
+            return false;
+        }
+
+        TotpSpec? spec = null;
+        TotpCode code;
+
+        try
+        {
+            failure = Failure(vault.ReadSavedTotp(name, out spec, out _));
+
+            if (failure != CredentialFailure.None || spec is null)
+            {
+                failure = failure == CredentialFailure.None ? CredentialFailure.NoCode : failure;
+                return false;
+            }
+
+            code = spec.Code(_clock);
+        }
+        catch (Exception)
+        {
+            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 3.7).
+            failure = CredentialFailure.Failed;
+            return false;
+        }
+        finally
+        {
+            spec?.Dispose();
+        }
+
+        value = new ReleasedField(CredentialFields.Totp, code.Value) { CurrentFor = code.Remaining };
+        return true;
+    }
 
     /// <summary>The field's text: a standard one from the entry read, a custom one from the saved file, read only now.</summary>
     private bool TrySelect(VaultEntry entry, EntryName name, string field, out string text, out CredentialFailure failure)

@@ -28,6 +28,10 @@ namespace Keypaste.App.ViewModels;
 /// the item's own fields, and refuses one it cannot fill (D-0465); a hold, a mask and the edit form
 /// keep the stored text.
 /// </para>
+/// <para>
+/// An item with a TOTP gets <see cref="Totp"/>, whose code is computed the same way, at the press
+/// (D-0481); one keypaste cannot compute says why in <see cref="TotpProblem"/> instead.
+/// </para>
 /// </remarks>
 internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
 {
@@ -35,6 +39,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private readonly ClipboardCountdown _clipboard;
     private readonly Action<EntryName> _restored;
     private readonly IWebLauncher? _web;
+    private readonly Action<Action> _post;
+    private EntryTotpRow? _totp;
+    private string? _totpProblem;
     private string _entryPath;
     private string _title;
     private string _groupPath;
@@ -73,7 +80,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         VaultEntry entry,
         Action<string?> report,
         Action<EntryName> restored,
-        IWebLauncher? web = null)
+        IWebLauncher? web = null,
+        Action<Action>? post = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -85,6 +93,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         _clipboard = clipboard;
         _entryPath = entry.Path;
         _web = web;
+        _post = post ?? (run => run());
         Report = report;
 
         _title = entry.Title;
@@ -134,6 +143,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         CancelTagChangeCommand = new RelayCommand(() => PendingTagChange = null, () => PendingTagChange is not null);
 
         DependsOn(nameof(HasFields), nameof(Fields));
+        DependsOn(nameof(ShowsTotp), nameof(Totp), nameof(IsEditing));
+        DependsOn(nameof(ShowsTotpProblem), nameof(TotpProblem), nameof(IsEditing));
         DependsOn(nameof(HasTags), nameof(Tags));
         DependsOn(nameof(IsReplacingField), nameof(ReplacingField));
         DependsOn(nameof(ReplaceFieldPrompt), nameof(ReplacingField));
@@ -193,6 +204,32 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     }
 
     internal bool HasFields => _fields.Count > 0;
+
+    /// <summary>The item's TOTP, when keypaste can compute one; null otherwise.</summary>
+    internal EntryTotpRow? Totp
+    {
+        get => _totp;
+        private set
+        {
+            var previous = _totp;
+
+            if (Set(ref _totp, value))
+            {
+                previous?.Dispose();
+            }
+        }
+    }
+
+    internal bool ShowsTotp => !IsEditing && _totp is not null;
+
+    /// <summary>Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</summary>
+    internal string? TotpProblem
+    {
+        get => _totpProblem;
+        private set => Set(ref _totpProblem, value);
+    }
+
+    internal bool ShowsTotpProblem => !IsEditing && _totpProblem is not null;
 
     /// <summary>The entry's own tags, never its group's.</summary>
     internal IReadOnlyList<EntryTagChip> Tags
@@ -312,6 +349,32 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         try
         {
             return _session.Unlocked?.ReadField(Name, field);
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return null;
+        }
+    }
+
+    /// <summary>The item's current TOTP code, computed from the open vault for a hold or a copy; the seed is zeroed before this returns.</summary>
+    /// <returns>The code, or null once what went wrong was reported.</returns>
+    internal string? ReadTotpCode()
+    {
+        try
+        {
+            string? refusal = null;
+            using var spec = _session.Unlocked?.ReadTotp(Name, out refusal);
+
+            if (spec is null)
+            {
+                Report(refusal is null
+                    ? "This item's TOTP could not be read. The vault may have locked."
+                    : TotpRefusal(refusal));
+                return null;
+            }
+
+            return spec.Code(_session.Clock).Value;
         }
         catch (VaultException e)
         {
@@ -780,6 +843,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Reference = null;
         AgentLines = [];
         Fields = [];
+        Totp = null;
+        TotpProblem = null;
         Tags = [];
         ReplacingField = null;
         RemovingField = null;
@@ -942,12 +1007,26 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         {
             Fields = [.. (vault.Fields(Name) ?? []).Select(field => new EntryFieldRow(this, field))];
             Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(tag, RemoveTag))];
+            ReadTotp(vault);
         }
         catch (VaultException e)
         {
             Report(e.Message);
         }
     }
+
+    /// <summary>Takes the TOTP's shape, never its seed: the spec is zeroed here, and each code is computed again at its press.</summary>
+    private void ReadTotp(Vault vault)
+    {
+        using var spec = vault.ReadTotp(Name, out var refusal);
+
+        Totp = spec is null ? null : new EntryTotpRow(this, _session.Clock, _post, spec.Digits, spec.Period);
+        TotpProblem = refusal is null ? null : TotpRefusal(refusal);
+    }
+
+    /// <summary>What the pane says of a TOTP keypaste refuses, from the refusal, which names a field and never a value.</summary>
+    private static string TotpRefusal(string refusal) =>
+        DisplayTextSanitizer.Sanitize($"keypaste can't show this item's TOTP code. {refusal} Correct that field to see the code here.").Text;
 
     /// <summary>Makes one change to this entry through core and saves it, as one revision.</summary>
     /// <param name="change">The change; false when it found nothing to change.</param>

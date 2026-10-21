@@ -5,7 +5,7 @@ namespace Keypaste.Core;
 /// Every member is a name, so like <see cref="EntryName"/> it has nowhere to put a value (D-0022).
 /// </remarks>
 /// <param name="Name">The entry, unsanitized.</param>
-/// <param name="Fields">The fields that hold something and may be asked for: the standard ones first, in <see cref="Approval.CredentialFields.All"/> order, then custom ones, ordinally.</param>
+/// <param name="Fields">The fields that hold something and may be asked for: the standard ones first, in <see cref="Approval.CredentialFields.All"/> order, then <c>totp</c> when a field a TOTP is read from holds anything, then custom ones, ordinally.</param>
 /// <param name="Tags">Its own project tags as written, each one <see cref="ProjectTag"/> reads as a member.</param>
 public sealed record ListedEntry(EntryName Name, IReadOnlyList<string> Fields, IReadOnlyList<string> Tags)
 {

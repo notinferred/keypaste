@@ -2674,6 +2674,7 @@ internal sealed class KeePassInterop : IDisposable
             List<string> fields =
             [
                 .. _standardFields.Where(field => entry.Strings.Get(field.Value) is { IsEmpty: false }).Select(field => field.Key),
+                .. Totp.TotpSpec.MayHold(name => entry.Strings.Get(name) is { IsEmpty: false }) ? [Approval.CredentialFields.Totp] : Array.Empty<string>(),
                 .. entry.Strings.Select(field => field.Key)
                     .Where(key => !PwDefs.IsStandardField(key) && Approval.CredentialFields.IsCustom(key))
                     .Order(StringComparer.Ordinal),

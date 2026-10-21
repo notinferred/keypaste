@@ -316,6 +316,9 @@ internal static class ToolText
         Pass the `handle` from list_entry_names as `entry` where you have one, and a `field` it lists
         for that item; a full item path also works but is ambiguous if any title contains a slash. Write `reason` for the person reading
         it, not for the model: it is shown to them verbatim.
+
+        Where an item lists `totp`, that field is its current TOTP code, never the seed behind it. A code
+        is released once, for the seconds it has left; ask again for the next one.
         """;
 
     /// <summary>Why a call was refused when no approver is running.</summary>

@@ -51,10 +51,10 @@ internal static class ToolSchemas
             "field": {
               "type": "string",
               "anyOf": [
-                { "enum": ["password", "username", "url", "notes"] },
+                { "enum": ["password", "username", "url", "notes", "totp"] },
                 { "pattern": "^[A-Z][A-Z0-9_]{0,127}$" }
               ],
-              "description": "Which single field to release: password, username, url or notes, or one custom field of the item named like an environment variable, such as OPENAI_API_KEY. Never more than one."
+              "description": "Which single field to release: password, username, url or notes; totp for the item's current TOTP code, never its seed; or one custom field of the item named like an environment variable, such as OPENAI_API_KEY. Never more than one."
             },
             "reason": {
               "type": "string",
@@ -66,7 +66,7 @@ internal static class ToolSchemas
               "type": "integer",
               "minimum": 1,
               "maximum": 3600,
-              "description": "How long you would like it for. The person chooses once or an allowance for a set time; a release under an Automatic mode honours this number."
+              "description": "How long you would like it for. The person chooses once or an allowance for a set time; a release under an Automatic mode honours this number. A TOTP code lasts only until it changes, whatever you ask."
             }
           },
           "required": ["entry", "field", "reason", "ttl_seconds"],

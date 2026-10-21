@@ -118,12 +118,27 @@ public sealed class TotpSpec : IDisposable
             var offset = mac[length - 1] & 0x0F;
             var truncated = BinaryPrimitives.ReadInt32BigEndian(mac.Slice(offset, sizeof(int))) & 0x7FFF_FFFF;
 
-            return new TotpCode(Encode(truncated), TimeSpan.FromTicks(step - (elapsed % step)));
+            return new TotpCode(Encode(truncated), Remaining(Period, at));
         }
         finally
         {
             CryptographicOperations.ZeroMemory(mac);
         }
+    }
+
+    /// <summary>How long the code current at a moment stays current, from the period alone, so a countdown reads no seed.</summary>
+    /// <param name="period">How long each code is current, as <see cref="Period"/> gives it.</param>
+    /// <param name="at">The moment, no earlier than 1970-01-01 UTC.</param>
+    /// <returns>The time until the next period starts: more than zero and at most <paramref name="period"/>.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="period"/> is not positive, or <paramref name="at"/> is before the Unix epoch.</exception>
+    public static TimeSpan Remaining(TimeSpan period, DateTimeOffset at)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(period, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(at, DateTimeOffset.UnixEpoch);
+
+        var step = period.Ticks;
+
+        return TimeSpan.FromTicks(step - ((at.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) % step));
     }
 
     /// <summary>How codes are computed, never the seed.</summary>
@@ -149,6 +164,16 @@ public sealed class TotpSpec : IDisposable
     /// <returns><see langword="true"/> when <see cref="Read"/> reads it.</returns>
     internal static bool IsSourceField(string name) =>
         string.Equals(name, OtpField, StringComparison.Ordinal) || name.StartsWith(_keePass2Prefix, StringComparison.Ordinal);
+
+    /// <summary>Whether an item may have a TOTP, judged by which of its seed fields hold anything, so no value is read.</summary>
+    /// <param name="holds">Whether the item's custom field of this name holds anything.</param>
+    /// <returns><see langword="true"/> when <c>otp</c> or one of KeePass 2's secret fields does; <see cref="Read"/> may still refuse it.</returns>
+    internal static bool MayHold(Func<string, bool> holds)
+    {
+        ArgumentNullException.ThrowIfNull(holds);
+
+        return holds(OtpField) || _keePass2Secrets.Any(holds);
+    }
 
     /// <summary>An item's TOTP from its fields: <c>otp</c> when it holds anything, otherwise KeePass 2's <c>TimeOtp-*</c>.</summary>
     /// <param name="fields">The item's custom fields by name; any but those <see cref="IsSourceField"/> accepts are ignored.</param>

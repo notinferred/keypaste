@@ -38,9 +38,12 @@ public interface ICredentialSource
         [NotNullWhen(true)] out EntryName? name,
         out CredentialFailure failure);
 
-    /// <summary>Reads one field of one entry, with the entry's own placeholders filled in (D-0465).</summary>
+    /// <summary>Reads one field of one entry, with the entry's own placeholders filled in (D-0465), or computes its current TOTP code.</summary>
     /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
-    /// <param name="field">Which field, lower-case and exactly as the tool schema spells it.</param>
+    /// <param name="field">
+    /// Which field, exactly as the tool schema spells it, or <see cref="CredentialFields.Totp"/> for the code, which is
+    /// released with how long it stays current and never with its seed (D-0480).
+    /// </param>
     /// <param name="value">The released field, when one could be read.</param>
     /// <param name="failure">Why not, when none could.</param>
     /// <param name="unfilled">

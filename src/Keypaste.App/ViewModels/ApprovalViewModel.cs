@@ -23,9 +23,13 @@ internal sealed class ApprovalViewModel : PromptViewModel
         Entry = prompt.Entry;
         Field = prompt.Field;
         TimedSeconds = prompt.TtlSeconds;
-        Lifetime = prompt.TtlSeconds > 0
-            ? $"once, or for {ApprovalLimits.Describe(prompt.TtlSeconds)}"
-            : prompt.OnceOnly == OnceOnly.AskEveryTime ? "once only: this agent is set to Ask every time" : "once only: protected environment";
+        Lifetime = prompt.OnceOnly switch
+        {
+            _ when prompt.TtlSeconds > 0 => $"once, or for {ApprovalLimits.Describe(prompt.TtlSeconds)}",
+            OnceOnly.AskEveryTime => "once only: this agent is set to Ask every time",
+            OnceOnly.TotpCode => "once only: a TOTP code changes every period",
+            _ => "once only: protected environment",
+        };
         Reason = prompt.Reason;
         Scrubbed = (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
         {

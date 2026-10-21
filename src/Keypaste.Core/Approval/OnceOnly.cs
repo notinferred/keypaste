@@ -11,4 +11,7 @@ public enum OnceOnly
 
     /// <summary>The agent's mode for what is asked for is Ask every time.</summary>
     AskEveryTime = 2,
+
+    /// <summary>What is asked for is a TOTP code, which a timed grant would hand out after it changed (D-0480).</summary>
+    TotpCode = 3,
 }

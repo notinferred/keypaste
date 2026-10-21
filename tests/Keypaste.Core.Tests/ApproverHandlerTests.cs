@@ -365,7 +365,7 @@ public sealed class ApproverHandlerTests
         using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
-        var reply = await fixture.Handler.RequestAsync(Request(field: "totp"), "conn-1", Token);
+        var reply = await fixture.Handler.RequestAsync(Request(field: "otp"), "conn-1", Token);
 
         Assert.Equal(AuditMethod.InvalidRequest, reply.Method);
         Assert.Equal(0, fixture.Channel.Asked);
