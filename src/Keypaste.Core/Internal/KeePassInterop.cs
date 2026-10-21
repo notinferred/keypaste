@@ -786,8 +786,23 @@ internal sealed class KeePassInterop : IDisposable
         return Locate(name) is { } found
             ? found.Entry.Strings
                 .Where(field => !PwDefs.IsStandardField(field.Key) && include(field.Key))
-                .ToDictionary(field => field.Key, field => field.Value.ReadString(), StringComparer.Ordinal)
+                .ToDictionary(field => field.Key, field => Uncached(field.Value), StringComparer.Ordinal)
             : null;
+    }
+
+    /// <summary>A copy of the value that leaves it protected in the open database, where <see cref="ProtectedString.ReadString"/> would keep the plaintext for as long as the database stays open.</summary>
+    private static string Uncached(ProtectedString value)
+    {
+        char[] chars = value.ReadChars();
+
+        try
+        {
+            return new string(chars);
+        }
+        finally
+        {
+            Array.Clear(chars);
+        }
     }
 
     /// <summary>What a placeholder in a value of the one entry with this name may fill in from, or null when there is no such entry.</summary>
