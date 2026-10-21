@@ -102,7 +102,7 @@ internal static class StatusCommand
 
         List<List<string>> said =
         [
-            [Fitted(writer, DoctorCommand.Shown(path))],
+            [Fitted(writer, DoctorCommand.Shown(path, int.MaxValue))],
             [vault.Source == VaultSource.Variable ? $"from {VaultLocator.EnvironmentVariable}" : "chosen in the app"],
         ];
 
@@ -205,7 +205,18 @@ internal static class StatusCommand
 
         var ellipsis = ConsoleMarks.Carried(writer, "…", "...");
         var head = (room - ellipsis.Length) / 2;
-        var tail = room - ellipsis.Length - head;
-        return string.Concat(path.AsSpan(0, head), ellipsis, path.AsSpan(path.Length - tail));
+        var tailStart = path.Length - (room - ellipsis.Length - head);
+
+        if (char.IsLowSurrogate(path[head]))
+        {
+            head--;
+        }
+
+        if (char.IsLowSurrogate(path[tailStart]))
+        {
+            tailStart++;
+        }
+
+        return string.Concat(path.AsSpan(0, head), ellipsis, path.AsSpan(tailStart));
     }
 }

@@ -231,6 +231,20 @@ public sealed class StatusTests : IDisposable
     }
 
     [Fact]
+    public void A_vault_path_longer_than_doctor_shows_keeps_its_real_end_and_splits_no_character()
+    {
+        var path = Path.Combine(_harness.Directory, new string('v', 200), new string('v', 200), new string('v', 200), "\U0001F511" + new string('w', 28) + ".kdbx");
+        _harness.Environment[VaultLocation.EnvironmentVariable] = path;
+
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run());
+
+        var shown = Pieces("vault")[0];
+        Assert.True(shown.Length <= 68, $"{shown.Length} columns: {shown}");
+        AssertShows(path, shown);
+        Assert.DoesNotContain(shown, char.IsSurrogate);
+    }
+
+    [Fact]
     public void A_row_too_wide_breaks_between_pieces_under_the_first_value()
     {
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
