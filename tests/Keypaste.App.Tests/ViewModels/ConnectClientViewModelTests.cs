@@ -492,6 +492,25 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Inside_an_appimage_a_refused_edit_offers_the_link_run_it_made_good()
+    {
+        const string Unreadable = """{ "mcpServers": [] }""";
+        var file = Seed(Path.Combine(".cursor", "mcp.json"), Unreadable);
+        var link = FakeCliLink.At(CliLinkState.Absent);
+        using var model = Model("cursor", findServer: Through(link), web: new RecordingLauncher());
+
+        await model.PreviewAsync();
+        await model.ConfirmCommand.ExecuteAsync();
+
+        Assert.Equal(1, link.Links);
+        Assert.EndsWith("nothing was written.", model.Message, StringComparison.Ordinal);
+        Assert.Null(model.Registered);
+        Assert.True(model.OffersInstallLink);
+        Assert.StartsWith("cursor://anysphere.cursor-deeplink/mcp/install?name=keypaste&config=", model.InstallLink, StringComparison.Ordinal);
+        Assert.Equal(Unreadable, File.ReadAllText(file));
+    }
+
+    [Fact]
     public async Task A_refusal_is_reported_in_the_clients_words_and_leaves_nothing_to_check()
     {
         _runner.Refusal = "that scope is not writable here";

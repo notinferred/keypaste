@@ -342,6 +342,16 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             _ => $"{name} refused" + (result.Said is { } said ? $": {said}" : "."),
         };
 
+        // A refusal comes after the run made the link, so the tool's own link now starts this copy.
+        if (result.Status == McpSetupStatus.Refused
+            && InstallLink is null
+            && registration is not null
+            && plan.Steps.OfType<McpBridgeLink>().Any()
+            && McpInstallLink.TryCreate(client, _connector.Machine.Platform, registration, out var installLink, out _))
+        {
+            InstallLink = installLink;
+        }
+
         Registered = result.Status == McpSetupStatus.Done && !removing ? registration : null;
         _ran?.Invoke();
     }
