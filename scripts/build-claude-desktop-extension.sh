@@ -74,6 +74,13 @@ reply="$(printf 'ping\n' | launch "$work/empty")" || code=$?
 printf '%s\n' mcp --client-label claude-desktop --allow-run --expose '**' | diff - "$home/arguments" >&2 \
   || die 'the launcher did not start keypaste with the arguments setup registers for Claude Desktop'
 
+step 'the launcher prefers the installed keypaste to one on PATH' >&2
+printf '#!/bin/sh\nexit 8\n' >"$work/bin/keypaste"
+chmod +x "$work/bin/keypaste"
+code=0
+launch "$work/bin" </dev/null >/dev/null || code=$?
+[ "$code" = 7 ] || die "with keypaste installed and on PATH the launcher exited $code, not the installed bridge's 7"
+
 step 'the launcher finds keypaste on PATH' >&2
 mv "$fake" "$work/bin/keypaste"
 code=0

@@ -8,10 +8,17 @@ const path = require('node:path');
 // What `keypaste setup` registers for Claude Desktop under the default home, which follows the chosen vault (D-0389, D-0446).
 const bridgeArguments = ['mcp', '--client-label', 'claude-desktop', '--allow-run', '--expose', '**'];
 
+// Path.IsPathFullyQualified's rule (T-40): on Windows a rooted entry such as \tools still depends on the current drive.
+function isFullyQualified(directory) {
+  return process.platform === 'win32'
+    ? /^[A-Za-z]:[\\/]/.test(directory) || /^[\\/]{2}[^\\/]/.test(directory)
+    : path.isAbsolute(directory);
+}
+
 function onPath(name) {
   return (process.env.PATH || '')
     .split(path.delimiter)
-    .filter((directory) => path.isAbsolute(directory))
+    .filter(isFullyQualified)
     .map((directory) => path.join(directory, name));
 }
 
@@ -40,8 +47,32 @@ function isProgram(file) {
   }
 }
 
+// Another admin can write /Applications and Homebrew's prefix, so an installed place counts only when the file it resolves to and every directory above it belong to root or this account (T-39).
+function isOwnedHere(file) {
+  if (process.platform === 'win32') {
+    return true;
+  }
+
+  try {
+    for (let place = fs.realpathSync(file); ; place = path.dirname(place)) {
+      const owner = fs.statSync(place).uid;
+
+      if (owner !== 0 && owner !== process.getuid()) {
+        return false;
+      }
+
+      if (place === path.dirname(place)) {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+}
+
 const places = installedPlaces();
-const keypaste = [...places, ...onPath(process.platform === 'win32' ? 'keypaste.exe' : 'keypaste')].find(isProgram);
+const keypaste = places.find((file) => isProgram(file) && isOwnedHere(file))
+  ?? onPath(process.platform === 'win32' ? 'keypaste.exe' : 'keypaste').find(isProgram);
 
 if (keypaste === undefined) {
   process.stderr.write(
