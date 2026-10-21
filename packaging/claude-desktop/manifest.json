@@ -1,0 +1,35 @@
+{
+  "manifest_version": "0.3",
+  "name": "keypaste",
+  "display_name": "keypaste",
+  "version": "{version}",
+  "description": "Lets Claude ask for one credential from your KeePass database, with your approval and a full audit trail.",
+  "long_description": "This extension starts the keypaste installed on this computer as Claude's MCP server and carries no copy of its own, so install keypaste first. The server never opens your database: it asks the keypaste app or `keypaste approve`, whichever holds it unlocked, which answers under the settings you gave this agent and records each request.",
+  "author": {
+    "name": "keypaste",
+    "email": "contact@keypaste.com",
+    "url": "https://keypaste.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/notinferred/keypaste"
+  },
+  "homepage": "https://keypaste.com",
+  "license": "AGPL-3.0-only",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"]
+    }
+  },
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

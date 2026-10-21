@@ -1,0 +1,9 @@
+{
+  "name": "keypaste-mcpb-cli",
+  "private": true,
+  "description": "Anthropic's MCPB CLI at an exact version, which scripts/build-claude-desktop-extension.sh packs and validates the Claude Desktop extension with.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@anthropic-ai/mcpb": "2.1.2"
+  }
+}

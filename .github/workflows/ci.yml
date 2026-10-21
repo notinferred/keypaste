@@ -90,7 +90,7 @@ jobs:
     name: scripts + workflows
     if: ${{ !inputs.only_tools }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -109,6 +109,15 @@ jobs:
       - name: Verify the release destination check fails closed against the real aws CLI
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
+
+      # Packed and checked only; nothing uploads or publishes the bundle (G.6b).
+      - name: Pack and check the Claude Desktop extension
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' Directory.Build.props)"
+          bash scripts/build-claude-desktop-extension.sh "$version" "$RUNNER_TEMP/claude-desktop"
 
   # dotnet format reports what the build cannot, import order and this. qualification, once for every project.
   format:

@@ -76,8 +76,6 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **G.6a — Offer keypaste as a Claude Code plugin.** Needs: G.1. Ships after: 4.7c2.
   - A marketplace manifest, the bridge registration, and a skill telling agents to use keypaste rather than ask for a pasted secret.
   - It is kept on a branch until then, because a push to `main` publishes it.
-- [ ] **G.6b — Offer a Claude Desktop extension.** Needs: G.1. Ships after: 4.7c2.
-  - An `.mcpb` bundle whose small launcher starts the installed bridge rather than carrying its own copy.
 - [ ] **G.6c — List keypaste in the MCP Registry.** Needs: G.6b. Ships after: 4.7c2. Input: H-0022.
   - The registry takes `.mcpb` files only from GitHub or GitLab releases, which RELEASE does not use as a channel.
   - H-0022 decides the namespace, and whether a verified GitHub Release copy is acceptable.
