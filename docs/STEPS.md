@@ -95,8 +95,6 @@ Each row keeps its historical meaning and is expanded when selected.
   - Resume a locked session with Windows Hello, keeping the full unlock path intact.
 - [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b. Ships after: 4.7c2.
   - Touch ID, under the same session policy, using the signed app's entitlements.
-- [ ] **9.2a — Implement interoperable TOTP.** Needs: V.7a.
-  - Read and calculate KeePassXC `otp` attributes, keeping the seed protected.
 - [ ] **9.2b — Use TOTP in the app and approval bridge.** Needs: 9.2a.
   - Show the code and its countdown.
   - Let an agent be approved for a code, but never for the seed.

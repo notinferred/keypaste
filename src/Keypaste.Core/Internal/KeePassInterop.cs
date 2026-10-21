@@ -770,6 +770,19 @@ internal sealed class KeePassInterop : IDisposable
             : null;
     }
 
+    /// <summary>The values of the one entry's custom fields whose names <paramref name="include"/> accepts, or null when there is no such entry.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal Dictionary<string, string>? ReadCustomFields(EntryName name, Func<string, bool> include)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found
+            ? found.Entry.Strings
+                .Where(field => !PwDefs.IsStandardField(field.Key) && include(field.Key))
+                .ToDictionary(field => field.Key, field => field.Value.ReadString(), StringComparer.Ordinal)
+            : null;
+    }
+
     /// <summary>What a placeholder in a value of the one entry with this name may fill in from, or null when there is no such entry.</summary>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal PlaceholderFields? ReadPlaceholderFields(EntryName name)

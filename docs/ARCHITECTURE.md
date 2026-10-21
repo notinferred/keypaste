@@ -46,6 +46,7 @@ On macOS a Run confirmed in the app runs: `App/ViewModels/ProjectLaunchViewModel
 | `kp://` references and reference files | `KpReference.cs`, `EnvReferenceFile.cs`, `EnvReferenceResolution.cs` |
 | KeePass placeholders such as `{PASSWORD}`, filled in from a value's own item wherever the value leaves keypaste, and what refuses it (D-0465) | `KeePassPlaceholders.cs`, `PlaceholderFill.cs`; the item's fields are read through `Vault.FillPlaceholders` and `KeePassInterop.ReadPlaceholderFields` |
 | keypaste's own groups in the vault, hidden from every listing | `ReservedGroups.cs` |
+| An item's TOTP: reading KeePassXC's `otp` URI or KeePass 2's `TimeOtp-*` fields and computing RFC 6238 codes, the decoded seed held only there and zeroed on disposal (D-0477) | `Totp/` (`TotpSpec.cs`), read through `Vault.ReadTotp` |
 | Scoped tokens and token bundles | `Tokens/` |
 | Share links: sealing, the keypaste.com client and the vault's records | `Sharing/` |
 | Probing a KDBX header and copying another vault in (`KeePassInterop` does the clone and attach) | `Import/` |

@@ -2,6 +2,7 @@ using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Recommendations;
+using Keypaste.Core.Totp;
 
 namespace Keypaste.Core;
 
@@ -492,6 +493,26 @@ public sealed class Vault : IDisposable
         }
 
         return _interop.ReadCustomField(name, field);
+    }
+
+    /// <summary>The item's TOTP, from KeePassXC's <c>otp</c> field or, when that holds nothing, KeePass 2's <c>TimeOtp-*</c> fields (D-0477).</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="refusal">Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</param>
+    /// <returns>
+    /// The spec, which the caller disposes; null when there is no such entry, it has no TOTP, or
+    /// <paramref name="refusal"/> says why it cannot be computed.
+    /// </returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public TotpSpec? ReadTotp(EntryName name, out string? refusal)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        refusal = null;
+
+        return _interop.ReadCustomFields(name, TotpSpec.IsSourceField) is { } fields
+            ? TotpSpec.Read(fields, out refusal)
+            : null;
     }
 
     /// <summary>Fills in the KeePass placeholders a value of one item holds from that item's own fields, as this vault holds it now, saved or not (D-0465).</summary>
@@ -1569,6 +1590,10 @@ public sealed class Vault : IDisposable
     /// <summary>Sets an entry's expiry. A test seam; KeePassXC is what writes expiry.</summary>
     internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires) =>
         Change(() => _interop.SetExpiryUnchecked(name, expires), VaultEdit.Of(name));
+
+    /// <summary>Sets custom fields without <see cref="FieldNameRules"/>. A test seam; KeePassXC is what writes its own attributes, such as <c>otp</c>.</summary>
+    internal void SetFieldsUnchecked(EntryName name, IReadOnlyList<FieldWrite> writes) =>
+        Change(() => _interop.SetFields(name, writes), VaultEdit.Of(name));
 
     /// <summary>Adds a group without applying any of the rules. A test seam; nothing else uses it.</summary>
     /// <remarks>
