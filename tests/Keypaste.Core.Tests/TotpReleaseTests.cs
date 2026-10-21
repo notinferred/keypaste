@@ -2,7 +2,6 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
-using Keypaste.Core.Totp;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -194,8 +193,8 @@ public sealed class TotpReleaseTests : IDisposable
         Assert.Equal(SavedRead.Current, _vault.ReadSavedListing(out var listing));
 
         Assert.Equal(["password", CredentialFields.Totp], listing!.Single(entry => entry.Name == _github).Fields);
-        Assert.Equal(["password"], listing.Single(entry => entry.Name == _plain).Fields);
-        Assert.Empty(listing.Single(entry => entry.Name == _github).Within(ExposureReach.ProjectFields).Fields);
+        Assert.Equal(["password"], listing!.Single(entry => entry.Name == _plain).Fields);
+        Assert.Empty(listing!.Single(entry => entry.Name == _github).Within(ExposureReach.ProjectFields).Fields);
         Assert.False(EntryExposure.Permits(ExposureReach.ProjectFields, CredentialFields.Totp));
     }
 
