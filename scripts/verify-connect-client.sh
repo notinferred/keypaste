@@ -274,7 +274,8 @@ case "$(uname -s)" in
       STATUS="$(env -u KEYPASTE_VAULT NO_COLOR=1 TERM=dumb PATH="$CLIENT_PATH" script -qec "$WORK/bare.sh $CLI" /dev/null </dev/null | tr -d '\r')" \
         || die "script could not run keypaste on a pseudo-terminal"
     else
-      STATUS="$(env -u KEYPASTE_VAULT NO_COLOR=1 TERM=dumb PATH="$CLIENT_PATH" script -q /dev/null "$WORK/bare.sh" "$CLI" </dev/null | tr -d '\r')" \
+      # macOS's script echoes the end of its empty input as ^D and two backspaces before the output.
+      STATUS="$(env -u KEYPASTE_VAULT NO_COLOR=1 TERM=dumb PATH="$CLIENT_PATH" script -q /dev/null "$WORK/bare.sh" "$CLI" </dev/null | tr -d '\r\b' | sed 's/^\^D//')" \
         || die "script could not run keypaste on a pseudo-terminal"
     fi
     printf '%s\n' "$STATUS" | grep -qx 'exit=0' || die "keypaste alone on a terminal did not exit 0: $STATUS"
