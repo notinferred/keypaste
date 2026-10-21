@@ -27,6 +27,9 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     private readonly NoteKeyCheck _check = new();
 
     private readonly List<Dismissal> _dismissals;
+    private IReadOnlyList<NoteKeyFinding> _noteKeys = [];
+    private IReadOnlyList<LostProjectTag> _lost = [];
+    private IReadOnlyList<PasswordFinding> _weakReusedExpired = [];
     private IReadOnlyList<RecommendationRow> _rows = [];
     private IReadOnlyList<LostTagRow> _lostTags = [];
     private IReadOnlyList<PasswordRow> _passwords = [];
@@ -106,6 +109,25 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     {
         if (_disposed || _session.Unlocked is not { } vault)
         {
+            _noteKeys = [];
+            _lost = [];
+            _weakReusedExpired = [];
+        }
+        else
+        {
+            _noteKeys = _check.Scan(vault);
+            _lost = LostProjectTagCheck.Scan(vault);
+            _weakReusedExpired = PasswordHealthCheck.Scan(vault, _session.Clock.GetUtcNow());
+        }
+
+        Show();
+    }
+
+    /// <summary>Shows the last check's findings, each dismissed or not, without reading the vault again.</summary>
+    private void Show()
+    {
+        if (_disposed || _session.Unlocked is null)
+        {
             Rows = [];
             LostTags = [];
             Passwords = [];
@@ -113,7 +135,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         }
 
         var vaultKey = VaultKey();
-        var rows = _check.Scan(vault)
+        var rows = _noteKeys
             .Select(finding => new RecommendationRow(this, finding, IsDismissed(vaultKey, finding)))
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)
@@ -121,12 +143,12 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
             .ToList();
 
         Rows = rows;
-        LostTags = [.. LostProjectTagCheck.Scan(vault)
+        LostTags = [.. _lost
             .Select(finding => new LostTagRow(this, finding, IsDismissed(vaultKey, finding)))
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)
             .ThenBy(row => row.Tag, StringComparer.Ordinal)];
-        Passwords = [.. PasswordHealthCheck.Scan(vault, _session.Clock.GetUtcNow())
+        Passwords = [.. _weakReusedExpired
             .Select(finding => new PasswordRow(this, finding, IsDismissed(vaultKey, finding)))
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)
@@ -247,14 +269,14 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         }
 
         Message = Remember();
-        Check();
+        Show();
     }
 
     private void ReviewAgain(Dismissal dismissal)
     {
         _dismissals.Remove(dismissal);
         Message = Remember();
-        Check();
+        Show();
     }
 
     private void SelectAll()
