@@ -53,6 +53,6 @@ ci 39614028030 and app 39614028190 at `134e92d`, every job green:
 
 ## Limits and follow-ups
 
-- **The tools jobs** have not yet run against N.9's setup output. The tools-only dispatch at the end of this batch runs them.
+- **The tools jobs** ran against N.9's setup output in ci 39634014306, the tools-only run at `c208ad6`, and passed.
 - **keypaste.com** still names `keypaste agent`, until L.1 rewrites it.
 - **The class and type names** `AgentConsole` and `OwnerKind.TerminalAgent` stay.
