@@ -110,7 +110,7 @@ D-0439, D-0440; D-0358 and D-0425 amended, D-0020's line from the bridge for eve
 - A reply lost after the owner recorded it also leaves the bridge's own line. That includes a withdrawn call whose answer took longer than five seconds. For a credential or listing call, the bridge's one retry instead leaves a second owner line. These are the only cases with two lines for one call.
 - A call has no line only when the owner's log fails during the decision and the bridge then dies or cannot write its own log; nothing is released then.
 - A line names the client the requester claims, which is unauthenticated (T-3). A reply's `recorded` is the answering process's word; a process answering in the owner's place holds no vault value (T-10, T-14).
-- While the app's log will not open, the person learns of it only from the agents' refusals: no screen says so.
+- While the app's log would not open, the person learned of it only from the agents' refusals. Fixed: once a request finds the log will not open, Agents' status says every agent request is refused and why, and the tooltip on the sidebar's Agents row says so too, both read from that refusal, so an unlock alone still opens no log (D-NEW-B2) (gaps-1, RUNS-PENDING).
 - The control runs ran on `ubuntu-24.04` only.
 - The keypaste.com pages change with G.9's push to main. `scripts/verify-site-disclosure.sh` runs after that deploy, so this record does not cover the live site.
 - G.9's new lines ship as written; N.6 rewords them.

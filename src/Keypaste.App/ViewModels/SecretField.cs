@@ -119,17 +119,20 @@ internal sealed class SecretField(ClipboardCountdown clipboard) : ObservableObje
             return;
         }
 
-        Note = outcome switch
-        {
-            PasteOutcome.Pasted => string.Empty,
-            PasteOutcome.Empty => "There was nothing to paste.",
-            PasteOutcome.Refused =>
-                "That could not be pasted: it contains something no keyboard can type. Nothing was added.",
-            _ => "The clipboard could not be read.",
-        };
-
+        Note = NoteFor(outcome);
         Changed();
     }
+
+    /// <summary>What to tell the person about a paste, or empty when it added what was on the clipboard.</summary>
+    /// <remarks>Shared with the master-password fields, which paste through their own forms.</remarks>
+    internal static string NoteFor(PasteOutcome outcome) => outcome switch
+    {
+        PasteOutcome.Pasted => string.Empty,
+        PasteOutcome.Empty => "There was nothing to paste.",
+        PasteOutcome.Refused =>
+            "That could not be pasted: it contains something no keyboard can type. Nothing was added.",
+        _ => "The clipboard could not be read.",
+    };
 
     /// <summary>The entered characters, as the one string the vault write needs.</summary>
     /// <remarks>

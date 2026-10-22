@@ -140,10 +140,13 @@
                       Margin="0,0,12,0"
                       VerticalAlignment="Center">
 
-            <!-- Muted, never red. An auto-lock is the most normal thing this app does. -->
+            <!-- Muted, never red. An auto-lock is the most normal thing this app does. Its name is the
+                 warning's first line, so a screen reader announces it once while the seconds tick. -->
             <TextBlock Classes="mono sm muted"
                        Text="{Binding Countdown}"
                        IsVisible="{Binding HasCountdown}"
+                       AutomationProperties.Name="{Binding CountdownAnnouncement}"
+                       AutomationProperties.LiveSetting="Polite"
                        VerticalAlignment="Center"
                        Margin="0,0,6,0" />
 
@@ -492,7 +495,8 @@
         </StackPanel>
       </Border>
 
-      <Border Name="Toast" Classes="toast" IsVisible="{Binding HasToast}">
+      <!-- Says something and takes no press, so a click on what it covers reaches that control. -->
+      <Border Name="Toast" Classes="toast" IsVisible="{Binding HasToast}" IsHitTestVisible="False">
         <StackPanel Orientation="Horizontal" Spacing="10">
           <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" />
           <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="360" />

@@ -148,7 +148,7 @@ The app provides these shortcuts and focus navigation. Verify the full keyboard-
 | `↑` `↓` | Move within the sidebar or the recent list |
 | `Enter` | Unlock |
 | `Escape` | Clear the secret field in focus |
-| `Ctrl/Cmd+V` | Paste into an entry-password or variable-value field; the master-password fields ignore it |
+| `Ctrl/Cmd+V` | Paste into a secret field, the master-password fields included; an imported vault's password field ignores it |
 
 On macOS the modifier is Cmd; everywhere else, Ctrl.
 
@@ -183,7 +183,7 @@ A missing log is normal before the MCP bridge has initialized one. Requests and 
 
 Every field that takes a secret uses one control, which sends characters directly to a buffer wiped on every exit path. It avoids Avalonia `TextBox`, which exposes contents to accessibility and retains immutable strings in undo history. Its accessibility peer exposes no content: tests check that each of the eight fields publishes only its placeholder and a row of dots, and that two secrets of the same length are indistinguishable there.
 
-The entry-password and variable-value fields accept `Ctrl/Cmd+V`. The seven master-password fields — unlock, the two on the create form, a backup's on the restore panel, and the current, new and confirmation fields in Settings — do not, and nothing reads the clipboard on their behalf. A pasted value loses one trailing line break, since copying a token usually brings one. Anything else a keyboard cannot type is refused with a message rather than quietly removed, so what is stored is what was on the clipboard or nothing at all.
+The entry-password and variable-value fields accept `Ctrl/Cmd+V`, and so do the seven master-password fields: unlock, the two on the create form, a backup's on the restore panel, and the current, new and confirmation fields in Settings. keypaste does not clear a master password you copied to paste it, since it clears only what it put on the clipboard, so copy something else afterwards. The password field for a vault you import still takes typing only. A pasted value loses one trailing line break, since copying a token usually brings one. Anything else a keyboard cannot type is refused with a message rather than quietly removed, so what is stored is what was on the clipboard or nothing at all.
 
 Keystrokes still arrive as short-lived immutable strings, and an input method can send several characters at once; a paste arrives as one. `SECURITY.md` describes these memory and input limits.
 
@@ -221,7 +221,7 @@ CI builds and packages on three operating systems; desktop tests read secret sur
 25. Untick Generate a password, type an existing one, and read it back with `keypaste get --reveal`. Repeat with `Ctrl/Cmd+V` from a value you copied elsewhere, and once with something ending in a newline copied out of a terminal: the stored value must have no trailing newline.
 26. Edit that entry and type a replacement password. `keypaste get --reveal` returns the new one, and both Show history on its pane and KeePassXC's History tab show the old one.
 27. Untick Generate a value on a new variable, paste a value, then `keypaste run <project> -- printenv` in a terminal: the child receives exactly what you pasted. Replace it and check the same, with the old value in KeePassXC's History tab.
-28. Press `Ctrl/Cmd+V` in the unlock field with something on the clipboard: nothing is entered.
+28. Copy the vault's master password from another program, with a trailing newline, and press `Ctrl/Cmd+V` in the unlock field: it shows as many dots as the password has characters, and Unlock opens the vault. Copy something with a tab in it and paste again: the screen says it could not be pasted and nothing is added. In the import dialog's password field, `Ctrl/Cmd+V` enters nothing.
 29. Open the vault the app wrote in KeePassXC, both one it created and one it edited.
 30. Open Show history on that entry, hold a revision's password to reveal it and release to hide it. Switch screens while holding, and lock while holding: both must take it off the screen. Select a revision and check the layout at the smallest window the app allows — the entry list must still be usable.
 31. Restore the oldest revision. `keypaste get --reveal` returns it, the value it replaced is now the newest history item in both the app and KeePassXC, and the entry keeps its other fields. Restore again to go back.

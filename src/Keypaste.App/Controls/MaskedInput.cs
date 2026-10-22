@@ -66,11 +66,9 @@ internal sealed class MaskedInput : TemplatedControl
 
     /// <summary>Whether this field answers the platform's paste gesture.</summary>
     /// <remarks>
-    /// <b>Default false, and that default is the scope of the whole feature.</b> The three
-    /// master-password fields simply never set it, so they go on ignoring
-    /// <c>Ctrl</c>/<c>Cmd</c>+<c>V</c> exactly as SECURITY.md says they do. Pasting a master
-    /// password stays an open question in DECISIONS rather than something this change decided by
-    /// accident.
+    /// Default false, so a field pastes only where its view says so. A field bound to a
+    /// <see cref="Sink"/> pastes through it; a master-password field, reached by the events below,
+    /// pastes through <see cref="Pasting"/>.
     /// </remarks>
     internal static readonly StyledProperty<bool> AllowsPasteProperty =
         AvaloniaProperty.Register<MaskedInput, bool>(nameof(AllowsPaste));
@@ -125,6 +123,10 @@ internal sealed class MaskedInput : TemplatedControl
         set => SetValue(AllowsPasteProperty, value);
     }
 
+    /// <summary>What the paste gesture runs for a field with no <see cref="Sink"/>, or null for nothing.</summary>
+    /// <remarks>Not a styled property: it holds a delegate, never anything the field was given.</remarks>
+    internal Func<Task>? Pasting { get; set; }
+
     /// <summary>The paste this control last started, for a test to await.</summary>
     /// <remarks>
     /// <see cref="OnKeyDown"/> returns <c>void</c>, so the task the sink hands back has to be kept
@@ -175,8 +177,8 @@ internal sealed class MaskedInput : TemplatedControl
 
         switch (e.Key)
         {
-            case Key.V when AllowsPaste && Sink is { } sink && e.KeyModifiers == CommandModifier():
-                PasteCompleted = sink.Paste();
+            case Key.V when AllowsPaste && e.KeyModifiers == CommandModifier() && PasteTarget() is { } paste:
+                PasteCompleted = paste();
                 e.Handled = true;
                 break;
 
@@ -203,6 +205,8 @@ internal sealed class MaskedInput : TemplatedControl
 
         base.OnKeyDown(e);
     }
+
+    private Func<Task>? PasteTarget() => Sink is { } sink ? sink.Paste : Pasting;
 
     /// <summary>
     /// The modifier this platform uses for editing commands: Cmd on macOS, Ctrl elsewhere.

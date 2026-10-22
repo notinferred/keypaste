@@ -21,24 +21,28 @@ internal sealed partial class UnlockView : UserControl
         password.BackspacePressed += (_, _) => Model?.Backspace();
         password.ClearRequested += (_, _) => Model?.ClearPassword();
         password.Submitted += (_, _) => Run(Model?.UnlockCommand);
+        password.Pasting = () => Model?.PasteAsync() ?? Task.CompletedTask;
 
         var created = this.FindControl<MaskedInput>("NewPassword")!;
         created.CharacterTyped += (_, c) => Model?.TypeNew(c);
         created.BackspacePressed += (_, _) => Model?.BackspaceNew();
         created.ClearRequested += (_, _) => Model?.ClearNew();
         created.Submitted += (_, _) => this.FindControl<MaskedInput>("ConfirmPassword")?.Focus();
+        created.Pasting = () => Model?.PasteNewAsync() ?? Task.CompletedTask;
 
         var confirm = this.FindControl<MaskedInput>("ConfirmPassword")!;
         confirm.CharacterTyped += (_, c) => Model?.TypeConfirm(c);
         confirm.BackspacePressed += (_, _) => Model?.BackspaceConfirm();
         confirm.ClearRequested += (_, _) => Model?.ClearConfirm();
         confirm.Submitted += (_, _) => Run(Model?.CreateCommand);
+        confirm.Pasting = () => Model?.PasteConfirmAsync() ?? Task.CompletedTask;
 
         var backup = this.FindControl<MaskedInput>("BackupPassword")!;
         backup.CharacterTyped += (_, c) => Model?.Restore?.Type(c);
         backup.BackspacePressed += (_, _) => Model?.Restore?.Backspace();
         backup.ClearRequested += (_, _) => Model?.Restore?.ClearPassword();
         backup.Submitted += (_, _) => Run(Model?.Restore?.CheckCommand);
+        backup.Pasting = () => Model?.Restore?.PasteAsync() ?? Task.CompletedTask;
 
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);

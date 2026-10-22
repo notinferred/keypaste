@@ -118,6 +118,21 @@ internal sealed class SessionHost : IDisposable
     }
 
     /// <summary>
+    /// Why the audit log did not open when a request or a Run's check last tried it this unlock, or null
+    /// when it opened then or nothing has tried it; reading it opens nothing, so an unlock alone creates no log.
+    /// </summary>
+    internal string? LastAuditFailure
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.LastAuditFailure;
+            }
+        }
+    }
+
+    /// <summary>
     /// The session agents reaching <see cref="Endpoint"/> would be answered under, read from the
     /// authority answering them, or null when nothing here answers.
     /// </summary>
@@ -465,6 +480,8 @@ internal sealed class SessionHost : IDisposable
 
         internal string? AuditFailure => _audit.Failure;
 
+        internal string? LastAuditFailure => _audit.LastFailure;
+
         /// <summary>The session the authority answers agents under while the vault's endpoint still accepts, or null.</summary>
         internal string? Serving => AnswersAgents ? _server.Authority.Serving : null;
 
@@ -662,10 +679,23 @@ internal sealed class SessionHost : IDisposable
     {
         private readonly Lock _gate = new();
         private AuditLog? _log;
+        private string? _lastFailure;
         private bool _disposed;
 
         /// <summary>Why the log does not open now, or null when it opens.</summary>
         internal string? Failure => TryOpen(out var failure) is null ? failure : null;
+
+        /// <summary>Why the log did not open when it was last tried, or null when it opened or has not been tried; reading it opens nothing.</summary>
+        internal string? LastFailure
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _lastFailure;
+                }
+            }
+        }
 
         /// <summary>The log, or null while it cannot be opened, which refuses every request.</summary>
         internal AuditLog? Open() => TryOpen(out _);
@@ -686,6 +716,8 @@ internal sealed class SessionHost : IDisposable
                     {
                         failure = error;
                     }
+
+                    _lastFailure = failure;
                 }
 
                 return _log;

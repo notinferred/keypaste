@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Tests;
@@ -19,7 +20,7 @@ namespace Keypaste.App.Tests.Controls;
 /// <remarks>
 /// Each field is a <see cref="MaskedInput"/>, which inherits the control and not its evidence, so
 /// each is held to the same differential the unlock field is, with a guard that the sweep reached a
-/// drawn mask, and to the same refused paste.
+/// drawn mask, and takes a paste as the unlock field does.
 /// </remarks>
 public sealed class VaultAccessAutomationTests
 {
@@ -94,10 +95,11 @@ public sealed class VaultAccessAutomationTests
     [InlineData("CurrentPassword")]
     [InlineData("AccessNewPassword")]
     [InlineData("AccessConfirmPassword")]
-    public Task Each_access_field_ignores_the_paste_gesture(string name) => HeadlessSession.On(async () =>
+    public Task Each_access_field_takes_the_paste_gesture(string name) => HeadlessSession.On(async () =>
     {
         using var screen = new SettingsScreen();
         var field = screen.Field(name);
+        screen.Clipboard.Plant(_fixture + "\n");
 
         field.Focus();
         screen.Window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control);
@@ -105,12 +107,13 @@ public sealed class VaultAccessAutomationTests
         Dispatcher.UIThread.RunJobs();
         await field.PasteCompleted;
 
-        Assert.False(field.AllowsPaste);
+        Assert.True(field.AllowsPaste);
         Assert.Null(field.Sink);
-        Assert.Equal(0, field.MaskedLength);
+        Assert.Equal(_fixture.Length, field.MaskedLength);
+        AutomationSurface.AssertNothingExposes(screen.Window, _fixture);
 
         screen.Window.KeyTextInput(_alpha);
-        Assert.Equal(_alpha.Length, field.MaskedLength);
+        Assert.Equal(_fixture.Length + _alpha.Length, field.MaskedLength);
     });
 
     /// <summary>Settings over an unlocked vault, with the new-password fields showing.</summary>
@@ -126,13 +129,15 @@ public sealed class VaultAccessAutomationTests
                 Assert.Equal(UnlockOutcome.Opened, _session.TryUnlock(_fixture.Path_, master.Value));
             }
 
-            Model = new SettingsViewModel(_session, _fixture.Home, new DesktopPreferences(_fixture.Home), _ => { });
+            Model = new SettingsViewModel(_session, _fixture.Home, new DesktopPreferences(_fixture.Home), _ => { }, paste: Clipboard.TryPasteIntoAsync);
             Model.Access.SetPassword = true;
 
             Window = new Window { Content = new SettingsView { DataContext = Model } };
             Window.Show();
             Dispatcher.UIThread.RunJobs();
         }
+
+        internal FakeClipboard Clipboard { get; } = new();
 
         internal Window Window { get; }
 

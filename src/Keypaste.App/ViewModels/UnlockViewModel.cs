@@ -55,6 +55,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private readonly IVaultFilePicker _picker;
     private readonly Action<Action> _post;
     private readonly string? _keePassXcConfig;
+    private readonly Func<SecretBuffer, Task<PasteOutcome>>? _paste;
 
     private SecretBuffer _master = new();
     private SecretBuffer _new = new();
@@ -87,7 +88,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Action<Action>? post = null,
         string? message = null,
         VaultLockReason? lockedBy = null,
-        string? keePassXcConfig = null)
+        string? keePassXcConfig = null,
+        Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(picker);
@@ -99,6 +101,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _unlocked = unlocked;
         _post = post ?? (action => action());
         _keePassXcConfig = keePassXcConfig;
+        _paste = paste;
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => CanUnlock);
         BrowseCommand = new AsyncRelayCommand(BrowseAsync, () => !_busy && IsOpening);
@@ -543,6 +546,19 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         AfterTyping();
     }
 
+    /// <summary>Appends what is on the clipboard to the master password, as a person could have typed it.</summary>
+    internal Task PasteAsync() => PasteIntoAsync(pasted =>
+    {
+        _master.Append(pasted.Value);
+        AfterTyping();
+    });
+
+    /// <summary>Appends what is on the clipboard to the new master password.</summary>
+    internal Task PasteNewAsync() => PasteIntoAsync(pasted => EditCreation(() => _new.Append(pasted.Value)));
+
+    /// <summary>Appends what is on the clipboard to the confirmation.</summary>
+    internal Task PasteConfirmAsync() => PasteIntoAsync(pasted => EditCreation(() => _confirm.Append(pasted.Value)));
+
     /// <summary>Appends one character to the new master password.</summary>
     internal void TypeNew(char c) => EditCreation(() => _new.Append(c));
 
@@ -560,6 +576,35 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>Empties the confirmation.</summary>
     internal void ClearConfirm() => EditCreation(_confirm.Clear);
+
+    /// <summary>
+    /// Reads the clipboard into a buffer of the paste's own, under D-0225's rule, and appends it only once the
+    /// clipboard has answered and nothing is reading the fields, so an unlock or create never sees half a paste.
+    /// </summary>
+    private async Task PasteIntoAsync(Action<SecretBuffer> append)
+    {
+        if (_disposed || _busy || _paste is null)
+        {
+            return;
+        }
+
+        using var pasted = new SecretBuffer();
+        var outcome = await _paste(pasted).ConfigureAwait(true);
+
+        if (_disposed || _busy)
+        {
+            return;
+        }
+
+        if (outcome == PasteOutcome.Pasted)
+        {
+            append(pasted);
+        }
+        else
+        {
+            Message = SecretField.NoteFor(outcome);
+        }
+    }
 
     private void EditCreation(Action edit)
     {
@@ -677,7 +722,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Message = string.Empty;
         Restore = new RestoreBackupViewModel(
             path, _session.Clock, () => _session.IdleTimeout, _post, OnRestoredAsync, _keyfilePath, _picker.PickKeyfileAsync,
-            _hardwareKeySlot is { } slot ? () => _session.NewHardwareKey(slot) : null);
+            _hardwareKeySlot is { } slot ? () => _session.NewHardwareKey(slot) : null,
+            _paste);
     }
 
     private void CloseRestore()

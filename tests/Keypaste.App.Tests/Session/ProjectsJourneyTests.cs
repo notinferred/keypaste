@@ -245,8 +245,6 @@ public sealed class ProjectsJourneyTests
         var screen = Assert.IsType<EnvSetsViewModel>(shell.Content);
         var project = screen.OpenProject!;
 
-        // A toast, such as Save's, draws over the foot of the window for its few seconds.
-        await Until(() => !shell.HasToast);
         var run = ByName<Button>(main, "Run in a terminal");
         Press(main, run);
         await Until(() => project.Launch.IsConfirming, () => screen.Error ?? $"no confirmation and no error; the press reached {Hit(main, run)}");

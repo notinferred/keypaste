@@ -111,6 +111,10 @@ internal sealed class AppAuthority : IDisposable
     /// <remarks>Tried through the owner's own opener, as the request will be, so a log mended since the last try needs no new unlock.</remarks>
     internal string? AuditFailure => _host.AuditFailure;
 
+    /// <summary>Why the audit log did not open when a request last tried it, so every agent request is refused until it opens; null when it opened then, nothing has tried it this unlock, or no vault is unlocked here.</summary>
+    /// <remarks>Reading it opens nothing, so Agents can say it every second and an unlock alone still creates no log.</remarks>
+    internal string? LastAuditFailure => _host.LastAuditFailure;
+
     /// <summary>What the authority answering agents has waiting for a person and has granted, never a value.</summary>
     /// <remarks>Nothing while it answers no session: a lock ends the lifetime that held both (D-0313).</remarks>
     /// <summary>Raised, on whichever thread answered it, once a terminal's edit is saved in the vault.</summary>

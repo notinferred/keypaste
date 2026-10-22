@@ -316,7 +316,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 
     void ISecretSink.Clear() => ClearPassword();
 
-    // A master password is typed, never pasted, as on the unlock screen.
+    // The imported file's master password is typed, never pasted.
     Task ISecretSink.Paste() => Task.CompletedTask;
 
     /// <summary>Unlocks the file off the UI thread and lays out its rows.</summary>

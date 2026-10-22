@@ -350,7 +350,7 @@ internal sealed partial class App : Application, IDisposable
     /// <param name="window">The window a person uses.</param>
     /// <param name="session">The session activity keeps open.</param>
     /// <param name="clock">The clock the pointer throttle measures against.</param>
-    /// <param name="onActivity">What else a keystroke, click or wheel turn does.</param>
+    /// <param name="onActivity">What else a keystroke, click, wheel turn or counted pointer move does.</param>
     /// <returns>The watch, which the application owns for its lifetime.</returns>
     /// <remarks><c>internal</c> for the reason <see cref="Watch"/> is: a test runs what launch runs.</remarks>
     internal static ActivityWatch Observe(
@@ -472,7 +472,8 @@ internal sealed partial class App : Application, IDisposable
             action => Dispatcher.UIThread.Post(action),
             message,
             next is null ? reason : null,
-            KeePassXcConfig);
+            KeePassXcConfig,
+            new AvaloniaClipboard(_window).TryPasteIntoAsync);
 
         if (next is { } file)
         {

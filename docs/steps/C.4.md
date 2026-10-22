@@ -46,4 +46,4 @@ D-0417 in [DECISIONS](../../DECISIONS.md). The choices under Amendments bind onl
 - README's `env-profiles.png` still shows the screen as Env profiles; L.1 retakes the screenshots for 0.5.0.
 - The app does not rename a project, which the row did not ask for: renaming an `env/` group in Items still moves a home entry but not its tag (C.1c).
 - Run is refused on macOS until E.1d, and on Linux only a stand-in emulator has run it (R.1a).
-- On Windows the toast Save shows sat over Run in a terminal for its 2.8 seconds, so a press then did nothing; the journey waits it out. Whether a toast should cover a control at the window's foot is not settled here.
+- On Windows the toast Save shows sat over Run in a terminal for its 2.8 seconds, so a press then did nothing. Fixed: a plain toast takes no press, so a click reaches the control under it, the clipboard toast keeps its Clear now, and the journey no longer waits (gaps-1, RUNS-PENDING).

@@ -34,6 +34,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     private readonly AppVaultSession _session;
     private readonly string? _home;
     private readonly IVaultFilePicker? _picker;
+    private readonly Func<SecretBuffer, Task<PasteOutcome>>? _paste;
 
     private SecretBuffer _current = new();
     private SecretBuffer _new = new();
@@ -48,13 +49,14 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     private string _message = string.Empty;
     private bool _disposed;
 
-    internal VaultAccessViewModel(AppVaultSession session, string? home, IVaultFilePicker? picker)
+    internal VaultAccessViewModel(AppVaultSession session, string? home, IVaultFilePicker? picker, Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
         _home = home;
         _picker = picker;
+        _paste = paste;
 
         ReviewCommand = new RelayCommand(Review, () => CanReview);
         ConfirmCommand = new AsyncRelayCommand(ChangeAsync, () => _confirming && !_busy);
@@ -334,6 +336,36 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     internal void BackspaceConfirm() => Edit(_confirm.Backspace);
 
     internal void ClearConfirm() => Edit(_confirm.Clear);
+
+    /// <summary>Appends what is on the clipboard to the current master password.</summary>
+    internal Task PasteCurrentAsync() => PasteIntoAsync(pasted => _current.Append(pasted.Value));
+
+    /// <summary>Appends what is on the clipboard to the new master password.</summary>
+    internal Task PasteNewAsync() => PasteIntoAsync(pasted => _new.Append(pasted.Value));
+
+    /// <summary>Appends what is on the clipboard to the confirmation.</summary>
+    internal Task PasteConfirmAsync() => PasteIntoAsync(pasted => _confirm.Append(pasted.Value));
+
+    /// <summary>Reads the clipboard into a buffer of the paste's own, as the unlock screen does, and appends it only while the form is still being edited.</summary>
+    private async Task PasteIntoAsync(Action<SecretBuffer> append)
+    {
+        if (_disposed || !IsEditing || _paste is null)
+        {
+            return;
+        }
+
+        using var pasted = new SecretBuffer();
+        var outcome = await _paste(pasted).ConfigureAwait(true);
+
+        if (outcome == PasteOutcome.Pasted)
+        {
+            Edit(() => append(pasted));
+        }
+        else if (!_disposed)
+        {
+            Message = SecretField.NoteFor(outcome);
+        }
+    }
 
     /// <summary>
     /// Makes the change. <c>internal</c> for <see cref="UnlockViewModel.UnlockAsync"/>'s reason.

@@ -53,7 +53,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         Action<AppTheme> applyTheme,
         IVaultFilePicker? picker = null,
         RecommendationsViewModel? recommendations = null,
-        Action<DestinationKind>? open = null)
+        Action<DestinationKind>? open = null,
+        Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(preferences);
@@ -78,7 +79,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         ForgetAllCommand = new RelayCommand(ForgetAll);
         UseThisVaultCommand = new RelayCommand(UseThisVault, () => !IsThisVaultChosen && _session.VaultPath is not null);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
-        Access = new VaultAccessViewModel(session, home, picker);
+        Access = new VaultAccessViewModel(session, home, picker, paste);
         Recommendations = recommendations;
         OpenActivityLogCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Log), () => open is not null);
         OpenShareLinksCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Sharing), () => open is not null);

@@ -125,6 +125,38 @@ public sealed class ShellStatusTests
         Assert.False(shell.HasVaultChanged);
     }
 
+    /// <summary>
+    /// Another program's save, written beside the vault and renamed over it, is noticed from the vault's
+    /// folder before the five-second poll would have read the file (N.16).
+    /// </summary>
+    [Fact]
+    public async Task AnotherProgramsSave_IsNoticedBeforeThePollReadsTheFile()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+        var name = Path.GetFileName(fixture.Path_);
+        Assert.False(shell.HasVaultChanged);
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+
+        // Short of the fifth status tick, which is when the poll hashes the file.
+        var step = TimeSpan.FromMilliseconds(50);
+        var advanced = TimeSpan.Zero;
+
+        while (!shell.HasVaultChanged && advanced + step < TimeSpan.FromSeconds(5))
+        {
+            await Task.Delay(100, Token);
+            clock.Advance(step);
+            advanced += step;
+        }
+
+        Assert.True(shell.HasVaultChanged, "the save was noticed only by the poll, or not at all");
+        Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
+    }
+
     [Fact]
     public void AReload_AfterAnotherProgramChangedThePassword_LocksSoTheNewOneIsAsked()
     {
@@ -285,6 +317,82 @@ public sealed class ShellStatusTests
 
         await stop.CancelAsync();
         await Task.WhenAny(changing, Task.Delay(_connect, Token));
+    }
+
+    /// <summary>The idle warning counts the seconds left, rounded up, from the deadline the shell keeps, and is announced once.</summary>
+    [Fact]
+    public void TheIdleWarning_CountsDownEachSecond_AndIsAnnouncedOnce()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5), home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+        var announced = 0;
+        shell.PropertyChanged += (_, e) => announced += e.PropertyName == nameof(ShellViewModel.CountdownAnnouncement) ? 1 : 0;
+
+        clock.Advance(TimeSpan.FromMinutes(5) - AppVaultSession.WarningWindow + TimeSpan.FromMilliseconds(100));
+        Assert.Equal("Locking in 30 seconds.", shell.Countdown);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal("Locking in 29 seconds.", shell.Countdown);
+
+        for (var tick = 0; tick < 28; tick++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.Equal("Locking in 1 second.", shell.Countdown);
+        Assert.True(session.IsUnlocked);
+        Assert.Equal("Locking in 30 seconds.", shell.CountdownAnnouncement);
+        Assert.Equal(1, announced);
+    }
+
+    [Fact]
+    public void ActivityClearsTheIdleWarning_AndTheNextOneCountsFromItsOwnDeadline()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5), home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+
+        clock.Advance(TimeSpan.FromMinutes(5) - AppVaultSession.WarningWindow + TimeSpan.FromMilliseconds(100));
+        Assert.True(shell.HasCountdown);
+
+        session.Touch();
+        shell.ClearCountdown();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.False(shell.HasCountdown);
+        Assert.Equal(string.Empty, shell.CountdownAnnouncement);
+
+        clock.Advance(TimeSpan.FromMinutes(5) - AppVaultSession.WarningWindow - TimeSpan.FromSeconds(1));
+
+        Assert.Equal("Locking in 30 seconds.", shell.Countdown);
+        Assert.Equal("Locking in 30 seconds.", shell.CountdownAnnouncement);
+    }
+
+    /// <summary>A warning the session withdrew for activity this shell did not see goes at its deadline, rather than staying at one second.</summary>
+    [Fact]
+    public void AWarningTheSessionWithdrew_GoesAtItsDeadline()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5), home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+
+        clock.Advance(TimeSpan.FromMinutes(5) - AppVaultSession.WarningWindow + TimeSpan.FromMilliseconds(100));
+        session.Touch();
+
+        for (var tick = 0; tick < 30; tick++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.False(shell.HasCountdown);
+        Assert.True(session.IsUnlocked);
     }
 
     private static void Unlock(AppVaultSession session, TempVault fixture)

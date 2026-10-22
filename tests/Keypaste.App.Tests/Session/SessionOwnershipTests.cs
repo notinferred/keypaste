@@ -159,6 +159,60 @@ public sealed class SessionOwnershipTests
     }
 
     /// <summary>
+    /// While the log will not open, Agents and the sidebar say every request is refused, read from the
+    /// last refusal: an unlock alone creates no log and says nothing, and a mended log clears it at the
+    /// next request (G.9).
+    /// </summary>
+    [Fact]
+    public async Task Agents_says_when_the_log_could_not_be_opened_and_an_unlock_alone_opens_none()
+    {
+        using var fixture = new TempVault();
+        fixture.Sees();
+        var log = KeypasteHome.AuditPath(fixture.Home);
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), approverOverride: null, () => new NobodyToAsk());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture.Path_, TempVault.Password);
+        using var agents = new AgentActivityViewModel(authority, fixture.Home, clock);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+
+        Assert.False(File.Exists(log));
+        Assert.Null(authority.LastAuditFailure);
+        Assert.DoesNotContain("audit log", agents.Status, StringComparison.Ordinal);
+
+        Directory.CreateDirectory(log);
+        var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
+        await using var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+        Assert.NotNull(client);
+        var attached = (await client.AttachAsync(new AttachRequest(fixture.Path_), Token))?.Session;
+        Assert.NotNull(attached);
+        var refused = await client.ListAsync(Listing(fixture.Path_, attached), Token);
+        Assert.NotNull(refused);
+        Assert.False(refused.Recorded);
+
+        agents.Refresh();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        var failure = authority.LastAuditFailure;
+        Assert.NotNull(failure);
+        Assert.EndsWith(AgentActivityViewModel.Unrecorded(failure), agents.Status, StringComparison.Ordinal);
+        Assert.Equal("Refusing agents · the audit log won't open", shell.AgentsDetail);
+
+        Directory.Delete(log);
+        var listed = await client.ListAsync(Listing(fixture.Path_, attached), Token);
+        Assert.NotNull(listed);
+        Assert.True(listed.Recorded);
+
+        agents.Refresh();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Null(authority.LastAuditFailure);
+        Assert.DoesNotContain("audit log", agents.Status, StringComparison.Ordinal);
+        Assert.StartsWith("Answering agents", shell.AgentsDetail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Nothing unlocks across the endpoint: every byte of an attachment, a listing and a credential
     /// request, both ways, carries neither the master password nor the keyfile.
     /// </summary>

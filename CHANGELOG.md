@@ -21,6 +21,17 @@ An item in a project now shows an Environments card in its preview, listing each
 History in the app now compares a revision's custom fields, each marked protected or not, and its tags with the item's own, and never shows a field's value.
 
 When another program saves the vault while a change of yours is unsaved, the notice now names the items that change touched, never a value, so you know what Reload discards.
+You can now paste a master password with `Ctrl/Cmd+V` on the unlock screen, the create and restore forms and in Settings' password change, so a password kept in another manager needs no retyping. One trailing line break is dropped and anything a keyboard can't type is refused with a message, as in the other secret fields. keypaste doesn't clear a master password you copied, so copy something else afterwards.
+
+When another program such as KeePassXC or a sync tool saves the open vault, the app now says so with Reload almost at once rather than up to five seconds later, by watching the vault's folder; where the folder can't be watched it still checks every five seconds.
+
+When an agent's request finds the app's audit log won't open, the Agents screen now says that keypaste refuses every agent request until it does, with the reason, and the tooltip on the sidebar's Agents row says Refusing agents. Fixing the log file clears both at the next request; unlocking alone still creates no log.
+
+On an agent's settings panel, a choice made from the keyboard keeps the keyboard on its chip once the panel shows the change, or on the first chip of its group when that choice is no longer offered, so Tab and Space carry on from where you were.
+
+A toast in the app no longer blocks what it covers: a click where it is drawn reaches the button under it, such as Run in a terminal at the foot of a project. The clipboard's toast still takes a press on its Clear now.
+
+The app's idle warning now counts down: "Locking in 30 seconds." drops by one each second until the lock, any key, click or pointer move still takes it away, and the name it gives a screen reader is its first line, set once per warning rather than every second.
 
 An item with a TOTP now shows its code in the app, masked until you hold Reveal, with the seconds until the next code beside it, and Copy puts the code on the clipboard with the usual clearing countdown. An agent can ask for an item's current code with `request_credential` and `field` `totp`, which `list_entry_names` offers for items that have one: you allow each code once, with no timed allowance since the code changes, or the agent's Automatic mode releases it, and the log records a `totp` release. No agent, `kp://` reference or share is ever given the seed ([9.2b](docs/steps/9.2b.md)).
 

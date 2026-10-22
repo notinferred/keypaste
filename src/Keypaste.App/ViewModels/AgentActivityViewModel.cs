@@ -389,8 +389,18 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         var (caps, records) = ReadClients(forceHistory);
 
         // With clients.toml unreadable every agent request is refused, so nobody is answered without asking.
-        Status = Describe(status, status is AuthorityStatus.Serving && caps is not null ? AutomaticAgents.Named(records, caps, _clock.GetUtcNow()) : []);
+        var said = Describe(status, status is AuthorityStatus.Serving && caps is not null ? AutomaticAgents.Named(records, caps, _clock.GetUtcNow()) : []);
+        Status = status is AuthorityStatus.Serving && _authority?.LastAuditFailure is { } unopened
+            ? $"{said} {Unrecorded(unopened)}"
+            : said;
     }
+
+    /// <summary>
+    /// That every agent request is refused while the audit log will not open, as the last request found
+    /// it; said from that refusal, so the screen opens no log of its own.
+    /// </summary>
+    internal static string Unrecorded(string failure) =>
+        $"keypaste refuses every agent request while its audit log won't open: {failure.TrimEnd('.')}. Fix the log file, and the next request opens it again.";
 
     /// <summary>The records of the vault the app holds, read from the open vault, so a change not yet saved is named as it will apply.</summary>
     private IReadOnlyList<AgentRecord> Records()

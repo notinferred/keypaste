@@ -60,6 +60,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     private readonly Func<VaultRestoreReport, SecretBuffer, string?, Task> _restored;
     private readonly Func<Task<string?>> _pickKeyfile;
     private readonly Func<HardwareKey>? _newHardwareKey;
+    private readonly Func<SecretBuffer, Task<PasteOutcome>>? _paste;
 
     private SecretBuffer _password = new();
     private VaultBackupSummary? _validated;
@@ -78,7 +79,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         Func<VaultRestoreReport, SecretBuffer, string?, Task> restored,
         string? keyfilePath,
         Func<Task<string?>> pickKeyfile,
-        Func<HardwareKey>? newHardwareKey = null)
+        Func<HardwareKey>? newHardwareKey = null,
+        Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
         _vaultPath = vaultPath;
         _clock = clock;
@@ -88,6 +90,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         _keyfilePath = keyfilePath;
         _pickKeyfile = pickKeyfile;
         _newHardwareKey = newHardwareKey;
+        _paste = paste;
 
         CheckCommand = new AsyncRelayCommand(CheckAsync, () => CanCheck);
         ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => IsConfirming && !_busy);
@@ -228,6 +231,27 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     internal void Backspace() => Edit(_password.Backspace);
 
     internal void ClearPassword() => Edit(_password.Clear);
+
+    /// <summary>Appends what is on the clipboard to the backup's password once the clipboard has answered, as the unlock field does.</summary>
+    internal async Task PasteAsync()
+    {
+        if (_disposed || _busy || _paste is null)
+        {
+            return;
+        }
+
+        using var pasted = new SecretBuffer();
+        var outcome = await _paste(pasted).ConfigureAwait(true);
+
+        if (outcome == PasteOutcome.Pasted)
+        {
+            Edit(() => _password.Append(pasted.Value));
+        }
+        else if (!_disposed)
+        {
+            Message = SecretField.NoteFor(outcome);
+        }
+    }
 
     /// <summary>Drops a pending restore without a word, as a minimize does.</summary>
     internal void CancelPending()

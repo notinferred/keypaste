@@ -40,6 +40,6 @@ None.
 - **Open rows.** F.21 carries act 4's defect and its regression. F.2b3b carries act 4 again after the repair, the sleep act on Windows, and every act on Linux.
 - **Machine-driven acts.** Acts 5 and 6 were driven by the observer's own automation, not a person. Act 6 stands as a machine observation only, and the Linux focus act is F.2b3b's. The minimize acts were not made on Linux, so `MinimizeLock.IsSupported` did not change.
 - **Setup detour.** Setting up the vault, the person read the Env Sets card's directory and command fields as where a new project is saved. A new project writes nothing to the vault until its first variable, so the first attempt left the vault unchanged.
-- **Idle warning.** The idle warning's number is set once, when the warning is raised, so it stays at 29 seconds until the lock.
-- **Where these went.** Both setup and warning findings are in [BACKLOG](../BACKLOG.md). Neither contradicts [desktop](../desktop.md), which promises only that a line appears.
+- **Idle warning.** Fixed: the shell keeps the lock's deadline from the warning and redraws it each second, rounded up, a pointer move that counts as activity clears it as a key or click does, and its name for a screen reader is set once per warning as a polite live region; the tests read that name, and no screen reader has been run against it (gaps-1, RUNS-PENDING).
+- **Where these went.** The setup finding is in [BACKLOG](../BACKLOG.md). Neither finding contradicts [desktop](../desktop.md), which promises only that a line appears.
 - **Screen lock.** Windows' own screen lock did not engage on waking; that is the machine's setting, outside keypaste.

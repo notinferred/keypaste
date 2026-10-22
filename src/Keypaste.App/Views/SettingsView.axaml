@@ -369,6 +369,7 @@
 
                 <StackPanel Spacing="8" MaxWidth="420" HorizontalAlignment="Left" Width="420">
                   <ctl:MaskedInput x:Name="CurrentPassword"
+                                   AllowsPaste="True"
                                    MaskedLength="{Binding CurrentMaskedLength}"
                                    Placeholder="Current master password"
                                    IsEnabled="{Binding IsEditing}" />
@@ -378,10 +379,12 @@
                             IsEnabled="{Binding IsEditing}" />
                   <StackPanel Spacing="8" IsVisible="{Binding SetPassword}">
                     <ctl:MaskedInput x:Name="AccessNewPassword"
+                                     AllowsPaste="True"
                                      MaskedLength="{Binding NewMaskedLength}"
                                      Placeholder="New master password"
                                      IsEnabled="{Binding IsEditing}" />
                     <ctl:MaskedInput x:Name="AccessConfirmPassword"
+                                     AllowsPaste="True"
                                      MaskedLength="{Binding ConfirmMaskedLength}"
                                      Placeholder="Confirm new master password"
                                      IsEnabled="{Binding IsEditing}" />

@@ -194,6 +194,7 @@
             <StackPanel Spacing="8">
               <ctl:MaskedInput x:Name="Password"
                                Theme="{StaticResource LockField}"
+                               AllowsPaste="True"
                                MaskedLength="{Binding MaskedLength}"
                                Placeholder="Master password"
                                IsEnabled="{Binding CanTypePassword}" />
@@ -344,10 +345,12 @@
           <StackPanel Spacing="10">
             <ctl:MaskedInput x:Name="NewPassword"
                              Theme="{StaticResource LockField}"
+                             AllowsPaste="True"
                              MaskedLength="{Binding NewMaskedLength}"
                              Placeholder="New master password" />
             <ctl:MaskedInput x:Name="ConfirmPassword"
                              Theme="{StaticResource LockField}"
+                             AllowsPaste="True"
                              MaskedLength="{Binding ConfirmMaskedLength}"
                              Placeholder="Confirm master password" />
             <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
@@ -431,6 +434,7 @@
             <StackPanel Spacing="8">
               <ctl:MaskedInput x:Name="BackupPassword"
                                Theme="{StaticResource LockField}"
+                               AllowsPaste="True"
                                MaskedLength="{Binding MaskedLength}"
                                Placeholder="That backup's master password"
                                IsEnabled="{Binding IsChoosing}" />

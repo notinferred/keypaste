@@ -83,6 +83,17 @@ public sealed class ActivityWatchTests
     });
 
     [Fact]
+    public Task A_pointer_move_that_counts_clears_the_countdown_too() => Started(app =>
+    {
+        app.Window.MouseMove(_resting);
+        Assert.Equal(0, app.Activity);
+
+        app.Window.MouseMove(_resting + new Point(30, 12));
+
+        Assert.Equal(1, app.Activity);
+    });
+
+    [Fact]
     public Task A_key_counts() => Started(app =>
     {
         app.Clock.Advance(TimeSpan.FromMinutes(4));

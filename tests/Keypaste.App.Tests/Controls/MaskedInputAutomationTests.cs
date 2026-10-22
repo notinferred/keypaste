@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Tests;
@@ -299,7 +300,6 @@ public sealed class MaskedInputAutomationTests
         Assert.Contains("That backup's master password", surface, StringComparer.Ordinal);
     });
 
-    /// <summary>A master password is typed, never pasted: the restore field ignores the gesture as the unlock field does.</summary>
     private static readonly string[] _unlockScreenLabels =
     [
         "Unlock", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
@@ -307,15 +307,46 @@ public sealed class MaskedInputAutomationTests
         "That backup's key file", "Open another vault", "New vault", "Restore a backup", "More options", "Open another file…",
     ];
 
+    /// <summary>The restore field takes a pasted master password as the unlock field does, and shows only its length.</summary>
     [Fact]
-    public Task The_backup_password_field_takes_no_paste() => HeadlessSession.On(() =>
+    public Task The_backup_password_field_takes_a_paste() => HeadlessSession.On(async () =>
     {
         using var screen = new UnlockScreen();
         screen.BeginRestore();
+        screen.Clipboard.Plant(Fixture + "\r\n");
 
-        Assert.False(screen.BackupPassword.AllowsPaste);
-        Assert.Null(screen.BackupPassword.Sink);
+        await Paste(screen.Window, screen.BackupPassword);
+
+        Assert.True(screen.BackupPassword.AllowsPaste);
+        Assert.Equal(Fixture.Length, screen.Model.Restore!.MaskedLength);
+        AutomationSurface.AssertNothingExposes(screen.Window, Fixture);
     });
+
+    /// <summary>The create form's two fields each take a paste into their own buffer.</summary>
+    [Fact]
+    public Task The_create_fields_each_take_a_paste() => HeadlessSession.On(async () =>
+    {
+        using var screen = new UnlockScreen();
+        await screen.BeginCreate();
+        screen.Clipboard.Plant(Fixture);
+
+        await Paste(screen.Window, screen.NewPassword);
+        await Paste(screen.Window, screen.ConfirmPassword);
+
+        Assert.Equal(Fixture.Length, screen.Model.NewMaskedLength);
+        Assert.Equal(Fixture.Length, screen.Model.ConfirmMaskedLength);
+        AutomationSurface.AssertNothingExposes(screen.Window, Fixture);
+    });
+
+    private static async Task Paste(Window window, MaskedInput field)
+    {
+        field.Focus();
+        window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control);
+        window.KeyReleaseQwerty(PhysicalKey.V, RawInputModifiers.Control);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        await field.PasteCompleted;
+    }
 
     /// <summary>
     /// The guard against every absence above being vacuous. If the sweep were reaching nothing,
@@ -497,7 +528,7 @@ public sealed class MaskedInputAutomationTests
             _fixture.RememberSelf();
             _session = new AppVaultSession(new ManualClock(AppClock.Start));
             Picker = new FakeVaultFilePicker();
-            Model = new UnlockViewModel(_session, _fixture.Home, Picker, () => { });
+            Model = new UnlockViewModel(_session, _fixture.Home, Picker, () => { }, paste: Clipboard.TryPasteIntoAsync);
 
             Window = new Window { Content = new UnlockView { DataContext = Model } };
             Window.Show();
@@ -511,6 +542,8 @@ public sealed class MaskedInputAutomationTests
         internal UnlockViewModel Model { get; }
 
         internal FakeVaultFilePicker Picker { get; }
+
+        internal FakeClipboard Clipboard { get; } = new();
 
         internal MaskedInput Password => Field("Password");
 

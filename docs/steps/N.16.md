@@ -33,7 +33,7 @@ Every build and test ran on GitHub; this Mac built nothing.
 
 ## Limits and follow-ups
 
-- **Five seconds.** The file is hashed on the status tick, not watched, so a save can go unnoticed for up to five seconds; agents are refused from the first request after it regardless.
+- **Five seconds.** The file was hashed on the status tick, not watched, so a save could go unnoticed for up to five seconds; agents are refused from the first request after it regardless. Fixed: a watch on the vault's folder hashes the file a quarter of a second after the last change another program makes to it, a rename over it included, and the five-second poll stays for a folder that cannot be watched or a watch that misses a change (gaps-1, RUNS-PENDING).
 - **`keypaste agent` reloads by restarting.** It never edits its vault and has no screen to offer Reload.
 - **A prompt answered after a reload** releases the reloaded value under the entry name the person approved, as after an edit in the app.
 - **KeePassXC crashed once in the first-run gate.** App run 37068839445's first attempt is the first time KeePassXC's GUI died there in the app runs since 2026-09-30; it is kept here, not closed by the rerun, and has no STEPS row until it recurs or is reproduced.

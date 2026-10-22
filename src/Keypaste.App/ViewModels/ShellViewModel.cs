@@ -47,6 +47,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(2.8);
 
     private static readonly TimeSpan _statusTick = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan _countdownTick = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan _fileSettle = TimeSpan.FromMilliseconds(250);
 
     private readonly AppVaultSession _session;
     private readonly IVaultFilePicker? _picker;
@@ -54,11 +56,18 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private readonly TimeProvider _clock;
     private readonly Action<Action>? _post;
     private readonly ITimer? _statusTimer;
+    private readonly ITimer? _fileTimer;
+    private readonly FileSystemWatcher? _fileWatch;
     private ITimer? _toastTimer;
+    private ITimer? _countdownTimer;
+    private TimeSpan _lockWindow;
+    private DateTimeOffset _warnedWall;
+    private long _warnedStamp;
     private string? _notice;
     private Destination _current;
     private object? _content;
     private string _countdown = string.Empty;
+    private string _countdownAnnouncement = string.Empty;
     private string _search = string.Empty;
     private string? _toast;
     private static readonly SidebarHeading _projectsHeading = new("Projects");
@@ -202,6 +211,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ReadVaultStatus();
 
         _statusTimer = _clock.CreateTimer(_ => Post(OnStatusTick), null, _statusTick, _statusTick);
+        _fileTimer = _clock.CreateTimer(_ => Post(ReadVaultStatus), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _fileWatch = WatchVaultFile();
     }
 
     /// <summary>What the restore that opened this vault did, until it is dismissed or the vault locks.</summary>
@@ -749,10 +760,13 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// A quiet line that appears shortly before the vault locks, and disappears on any input.
+    /// A quiet line that appears shortly before the vault locks, counts the whole seconds left, rounded
+    /// up, and disappears on any input.
     /// </summary>
     /// <remarks>
-    /// Muted, not red, and not a dialog: an auto-lock is the most normal thing this app does.
+    /// Muted, not red, and not a dialog: an auto-lock is the most normal thing this app does. The seconds
+    /// are asked of the clock at each tick, as <see cref="ClipboardCountdown"/> asks it, so a late tick
+    /// never shows more time than is left.
     /// </remarks>
     internal string Countdown
     {
@@ -762,8 +776,21 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     internal bool HasCountdown => _countdown.Length > 0;
 
+    /// <summary>What a screen reader is told about the countdown: its first line, set once per warning, so it is announced once rather than every second.</summary>
+    internal string CountdownAnnouncement
+    {
+        get => _countdownAnnouncement;
+        private set => Set(ref _countdownAnnouncement, value);
+    }
+
     /// <summary>Clears the countdown, because somebody is evidently still here.</summary>
-    internal void ClearCountdown() => Countdown = string.Empty;
+    internal void ClearCountdown()
+    {
+        _countdownTimer?.Dispose();
+        _countdownTimer = null;
+        Countdown = string.Empty;
+        CountdownAnnouncement = string.Empty;
+    }
 
     /// <summary>Moves to a place by its shortcut digit.</summary>
     /// <param name="digit">A place's position in the sidebar, from 1.</param>
@@ -799,7 +826,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind)) { Login = LoginItem, CliLink = CliLink },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { Login = LoginItem, CliLink = CliLink },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),
@@ -1118,9 +1145,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
             AgentsServing = true;
-            AgentsDetail = waiting > 0
-                ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
-                : "Answering agents · " + ClientCount(clients);
+            AgentsDetail = Authority.LastAuditFailure is not null
+                ? "Refusing agents · the audit log won't open"
+                : waiting > 0
+                    ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
+                    : "Answering agents · " + ClientCount(clients);
             SetCount(DestinationKind.AgentActivity, grants + waiting);
             return;
         }
@@ -1145,10 +1174,67 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     {
         ReadAuthority();
 
-        // The file is hashed at most every five seconds; an edit or a save says so at once.
+        // The five-second poll covers a folder that cannot be watched; an edit, a save or a watched change says so at once.
         if (++_ticks % 5 == 0)
         {
             ReadVaultStatus();
+        }
+    }
+
+    /// <summary>
+    /// Watches the vault's folder, not the file alone, because another program often saves by renaming a
+    /// new file over it, and compares the file a moment after the last change it sees; null where the
+    /// folder cannot be watched, which leaves the five-second poll.
+    /// </summary>
+    private FileSystemWatcher? WatchVaultFile()
+    {
+        if (_session.VaultPath is not { } path || Path.GetDirectoryName(Path.GetFullPath(path)) is not { Length: > 0 } folder)
+        {
+            return null;
+        }
+
+        FileSystemWatcher? watch = null;
+
+        try
+        {
+            watch = new FileSystemWatcher(folder, Path.GetFileName(path));
+            watch.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime;
+            watch.Changed += OnVaultFileChanged;
+            watch.Created += OnVaultFileChanged;
+            watch.Deleted += OnVaultFileChanged;
+            watch.Renamed += OnVaultFileChanged;
+            watch.Error += OnVaultWatchError;
+            watch.EnableRaisingEvents = true;
+
+            var watching = watch;
+            watch = null;
+            return watching;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return null;
+        }
+        finally
+        {
+            watch?.Dispose();
+        }
+    }
+
+    private void OnVaultFileChanged(object? sender, FileSystemEventArgs e) => Settle();
+
+    // A watch that lost track compares rather than waiting for the poll.
+    private void OnVaultWatchError(object? sender, ErrorEventArgs e) => Settle();
+
+    /// <summary>Compares the file a moment after the last change, so a save still being written is compared once it has finished.</summary>
+    private void Settle()
+    {
+        try
+        {
+            _fileTimer?.Change(_fileSettle, Timeout.InfiniteTimeSpan);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The shell was disposed while the watch was still reporting, on a thread of its own.
         }
     }
 
@@ -1311,8 +1397,55 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
     });
 
-    private void OnLockingSoon(object? sender, TimeSpan remaining) =>
-        Countdown = $"Locking in {Math.Max(1, (int)remaining.TotalSeconds)} seconds.";
+    /// <summary>Keeps the lock's deadline from the warning and counts down to it each second.</summary>
+    private void OnLockingSoon(object? sender, TimeSpan remaining)
+    {
+        var wall = _clock.GetUtcNow();
+        var stamp = _clock.GetTimestamp();
+
+        Post(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _countdownTimer?.Dispose();
+            _lockWindow = remaining;
+            _warnedWall = wall;
+            _warnedStamp = stamp;
+            _countdownTimer = _clock.CreateTimer(_ => Post(ShowCountdown), null, _countdownTick, _countdownTick);
+            ShowCountdown();
+            CountdownAnnouncement = Countdown;
+        });
+    }
+
+    /// <summary>
+    /// Says the whole seconds left, rounded up; past the deadline with the vault still open, the
+    /// session saw activity this shell did not, so the line goes.
+    /// </summary>
+    private void ShowCountdown()
+    {
+        if (_disposed || _countdownTimer is null)
+        {
+            return;
+        }
+
+        var wall = _clock.GetUtcNow() - _warnedWall;
+        var monotonic = _clock.GetElapsedTime(_warnedStamp);
+        var left = _lockWindow - (wall > monotonic ? wall : monotonic);
+
+        if (left <= TimeSpan.Zero)
+        {
+            ClearCountdown();
+            return;
+        }
+
+        var seconds = (int)Math.Ceiling(left.TotalSeconds);
+        Countdown = seconds == 1
+            ? "Locking in 1 second."
+            : string.Create(CultureInfo.InvariantCulture, $"Locking in {seconds} seconds.");
+    }
 
     public void Dispose()
     {
@@ -1336,7 +1469,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         CloseShare();
 
         _statusTimer?.Dispose();
+        _fileWatch?.Dispose();
+        _fileTimer?.Dispose();
         _toastTimer?.Dispose();
+        _countdownTimer?.Dispose();
         EntryActivity?.Dispose();
         _import?.Dispose();
         Import = null;

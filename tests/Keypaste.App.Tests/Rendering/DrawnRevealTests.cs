@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Keypaste.App.Controls;
 using Keypaste.App.Tests.Controls;
 using Xunit;
@@ -31,6 +32,12 @@ public sealed class DrawnRevealTests
         var (cell, value) = shell.Open(surface);
         var style = TextStyle.Of(cell);
         var dots = new string('•', cell.MaskedLength);
+
+        // The env cell sits in a panel with a tooltip, whose 400 ms show timer starts at the hover on the
+        // wall clock: where frames drew slowly it opened before the press, the press closed it, and
+        // Avalonia's popup layer, which it never removes, was in the held surface alone (G.4b). The
+        // cell shows no tooltip here, so the surfaces differ only by what the hold does.
+        ToolTip.SetServiceEnabled(cell, false);
 
         // At rest with the pointer already over the cell, so the only difference the press can make
         // is the press: hovering changes IsPointerOver on the cell and every ancestor.

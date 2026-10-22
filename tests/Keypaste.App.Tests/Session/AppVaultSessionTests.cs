@@ -258,6 +258,24 @@ public sealed class AppVaultSessionTests
         Assert.Equal(1, warnings);
     }
 
+    /// <summary>The warning carries the time left when it was raised, which the shell counts down from.</summary>
+    [Fact]
+    public void The_warning_carries_the_time_left_to_the_lock()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
+
+        TimeSpan? left = null;
+        session.LockingSoon += (_, remaining) => left = remaining;
+        Unlock(session, fixture.Path_, TempVault.Password);
+
+        clock.Advance(TimeSpan.FromMinutes(5) - AppVaultSession.WarningWindow + TimeSpan.FromMilliseconds(100));
+
+        Assert.NotNull(left);
+        Assert.Equal(AppVaultSession.WarningWindow - TimeSpan.FromMilliseconds(100), left.Value);
+    }
+
     [Fact]
     public void Activity_after_a_warning_earns_another_one()
     {

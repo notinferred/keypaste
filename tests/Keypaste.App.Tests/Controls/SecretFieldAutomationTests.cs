@@ -223,31 +223,42 @@ public sealed class SecretFieldAutomationTests
     });
 
     /// <summary>
-    /// The scope of the whole feature, asserted rather than described: the master-password field
-    /// has no sink to paste into and does not answer the gesture.
+    /// The master-password field answers the gesture through its own form rather than a sink: one
+    /// trailing line break goes, as D-0225 has it, and nothing of what arrived is on the screen.
     /// </summary>
     /// <remarks>
-    /// The field is typed into afterwards and the length required to rise. Without that, a field
-    /// that had stopped receiving keyboard input at all would pass this test, and the claim would
-    /// be about a dead control rather than a refused gesture.
+    /// The field is typed into afterwards and the length required to rise again, so the paste left
+    /// the field taking keystrokes after it.
     /// </remarks>
     [Fact]
-    public Task The_unlock_field_ignores_the_paste_gesture() => HeadlessSession.On(async () =>
+    public Task The_unlock_field_takes_the_paste_gesture() => HeadlessSession.On(async () =>
     {
         using var screen = new UnlockScreen();
+        screen.Clipboard.Plant(_master + "\n");
 
-        screen.Password.Focus();
-        screen.Window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control);
-        screen.Window.KeyReleaseQwerty(PhysicalKey.V, RawInputModifiers.Control);
-        Dispatcher.UIThread.RunJobs();
-        await screen.Password.PasteCompleted;
+        await Paste(screen.Window, screen.Password);
 
-        Assert.False(screen.Password.AllowsPaste);
+        Assert.True(screen.Password.AllowsPaste);
         Assert.Null(screen.Password.Sink);
-        Assert.Equal(0, screen.Model.MaskedLength);
+        Assert.Equal(1, screen.Clipboard.ReadCount);
+        Assert.Equal(_master.Length, screen.Model.MaskedLength);
+        AutomationSurface.AssertNothingExposes(screen.Window, _master);
 
         screen.Window.KeyTextInput(_alpha);
-        Assert.Equal(_alpha.Length, screen.Model.MaskedLength);
+        Assert.Equal(_master.Length + _alpha.Length, screen.Model.MaskedLength);
+    });
+
+    /// <summary>What no keyboard can type is refused whole, and the screen says so.</summary>
+    [Fact]
+    public Task The_unlock_field_refuses_a_paste_no_keyboard_could_type() => HeadlessSession.On(async () =>
+    {
+        using var screen = new UnlockScreen();
+        screen.Clipboard.Plant("correct\thorse");
+
+        await Paste(screen.Window, screen.Password);
+
+        Assert.Equal(0, screen.Model.MaskedLength);
+        Assert.Equal(SecretField.NoteFor(PasteOutcome.Refused), screen.Model.Message);
     });
 
     /// <summary>
@@ -490,7 +501,7 @@ public sealed class SecretFieldAutomationTests
         {
             _fixture.RememberSelf();
             _session = new AppVaultSession(new ManualClock(AppClock.Start));
-            Model = new UnlockViewModel(_session, _fixture.Home, new FakeVaultFilePicker(), () => { });
+            Model = new UnlockViewModel(_session, _fixture.Home, new FakeVaultFilePicker(), () => { }, paste: Clipboard.TryPasteIntoAsync);
 
             Window = new Window { Content = new UnlockView { DataContext = Model } };
             Window.Show();
@@ -498,6 +509,8 @@ public sealed class SecretFieldAutomationTests
             // Focus is posted at Background priority, so let the dispatcher drain before typing.
             Dispatcher.UIThread.RunJobs();
         }
+
+        internal FakeClipboard Clipboard { get; } = new();
 
         internal Window Window { get; }
 

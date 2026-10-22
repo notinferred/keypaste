@@ -104,6 +104,6 @@ D-0468 and D-0469 in [DECISIONS](../../DECISIONS.md). D-0438 was amended for the
 
 - **Blacksmith** (D-0468's paid runners) waits for the founder to install its GitHub App and set a spending alert. A sizing probe then picks each job's runner.
 - **The push set** is the founder's to choose with these numbers. Jobs still queue for runners: app's queued up to 249 s after the fix.
-- **`DrawnRevealTests`.** It failed for the env surface in probe 39504250962 on Windows at the cheap cost, as it had once on Ubuntu at `1c60e88` at the production cost. The diagnosis is open, recorded in [G.4b](G.4b.md).
+- **`DrawnRevealTests`.** It failed for the env surface in probe 39504250962 on Windows at the cheap cost, as it had once on Ubuntu at `1c60e88` at the production cost. Diagnosed and fixed as [G.4b](G.4b.md) records: the cell's tooltip opened during the test's hover and left a popup layer (gaps-1, RUNS-PENDING).
 - **The new limits** for the test and desktop-test jobs rest on two runs each. A run that hits a limit is a failure to diagnose, not a reason to raise the limit.
 - **Production derivation is still managed code** on Windows and macOS: 190–720 ms per unlock against about 50 ms with Ubuntu's native library. It is a product question, not a CI one.

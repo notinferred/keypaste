@@ -48,7 +48,7 @@ internal sealed class ActivityWatch : IDisposable
     /// <param name="window">The window a person uses.</param>
     /// <param name="session">The session activity keeps open.</param>
     /// <param name="clock">The clock the pointer throttle measures against.</param>
-    /// <param name="onActivity">What else a keystroke, click or wheel turn does.</param>
+    /// <param name="onActivity">What else a keystroke, click, wheel turn or counted pointer move does.</param>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
     internal ActivityWatch(Window window, AppVaultSession session, TimeProvider clock, Action onActivity)
     {
@@ -110,6 +110,7 @@ internal sealed class ActivityWatch : IDisposable
 
         _lastPointerTouch = now;
         _session.Touch();
+        _onActivity();
     }
 
     private void OnWindowPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
