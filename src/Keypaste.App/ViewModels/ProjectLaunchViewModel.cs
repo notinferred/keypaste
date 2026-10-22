@@ -30,7 +30,7 @@ namespace Keypaste.App.ViewModels;
 /// Terminal starts presents the launch pass it earned to the app's launch endpoint, which answers
 /// whether or not agents can reach the vault (D-0451, D-0452). On Windows and Linux the app's
 /// authority writes the same History line before the terminal starts, and a Run whose line cannot
-/// be written starts nothing (D-NEW-C2).
+/// be written starts nothing (D-0496).
 /// </para>
 /// </remarks>
 internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable

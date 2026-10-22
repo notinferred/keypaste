@@ -94,7 +94,7 @@ D-0455 and D-0456, which the integrator numbers; D-0326, D-0330 and D-0380 amend
 - "Connected" says only that keypaste's entry is in the tool's settings, as G.2 reads it; a tool connected under another name or for another vault also shows Connected, and its settings are on the row of the name it was given (founder, 2026-10-12).
 - "in use now" means a bridge started under the row's name is attached; a name is whatever a bridge's configuration says, so any local program can claim it (T-36).
 - Opening Agents starts each found tool's command with `--version` and reads its configuration, `~/.claude.json` included, keeping only whether keypaste's entry is there, with no click (T-40).
-- G.8's settings panel re-reads after the person's own change and rebuilds its mode chips, so a keyboard user lost focus on the chip just pressed. Fixed: the panel gives the keyboard back to the chip that sets the same thing, or to its group's first chip when that one is gone (D-NEW-B1) (gaps-1, RUNS-PENDING).
+- G.8's settings panel re-reads after the person's own change and rebuilds its mode chips, so a keyboard user lost focus on the chip just pressed. Fixed: the panel gives the keyboard back to the chip that sets the same thing, or to its group's first chip when that one is gone (D-0493) (gaps-1, RUNS-PENDING).
 - On some Linux compositors raising a window may not bring it in front; the prompt is still disarmed and arms again a second later.
 - The frames are drawn headless in dev runs only; the full ci and app runs draw none.
 - README's Agents screenshot and its alt text show the screen before G.8; they are retaken after N.6, within L.1.

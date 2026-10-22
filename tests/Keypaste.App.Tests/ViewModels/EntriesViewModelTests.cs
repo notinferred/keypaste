@@ -56,7 +56,7 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Equal(4, context.Entries.TotalCount);
     }
 
-    /// <summary>The list shows each item's username and web address beside its title, and no other field (D-NEW-A6).</summary>
+    /// <summary>The list shows each item's username and web address beside its title, and no other field (D-0488).</summary>
     [Fact]
     public void Each_row_shows_its_username_and_web_address()
     {

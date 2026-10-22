@@ -50,7 +50,7 @@ Local, Windows 10 Pro 19045, on `main` above `a2321ac`.
 
 ## Limits and follow-ups
 
-- **Username and URL are table columns**, as KeePassXC shows them, by the founder's decision D-NEW-A6; a password, a note or a custom field's value never is (gaps-1, RUNS-PENDING).
+- **Username and URL are table columns**, as KeePassXC shows them, by the founder's decision D-0488; a password, a note or a custom field's value never is (gaps-1, RUNS-PENDING).
 - **Group order follows the vault's own order**, as KeePassXC shows it (gaps-1, RUNS-PENDING).
 - **A group row has a menu**, on a right-click or the menu key or Shift+F10: New group, Rename, Move and Delete, each opening Items' own form for that group (gaps-1, RUNS-PENDING).
 - **Plain tags are not listed in the sidebar.** A tag is a chip on the item and a search term. Projects are read from the legacy `env/` layout until C.4 reads them from tags.

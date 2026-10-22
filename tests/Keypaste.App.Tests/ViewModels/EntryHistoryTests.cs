@@ -546,7 +546,7 @@ public sealed class EntryHistoryTests : IDisposable
 
     /// <summary>
     /// A revision names its custom fields with their protection and its tags beside the item's own, and
-    /// never a field's value (D-NEW-A5).
+    /// never a field's value (D-0487).
     /// </summary>
     [Fact]
     public void A_revision_names_its_custom_fields_and_tags_and_no_value()

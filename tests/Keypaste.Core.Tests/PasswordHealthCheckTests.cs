@@ -84,7 +84,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
 
     /// <summary>
     /// A password on the common-password list is weak however long it is, while one as long, of the same
-    /// kinds of character and on no list, is not (D-NEW-C5).
+    /// kinds of character and on no list, is not (D-0499).
     /// </summary>
     /// <remarks>
     /// The first two rate at about 80 and 117 bits by their characters alone, so without the list neither

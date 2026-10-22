@@ -1287,7 +1287,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>Deletes the selected group with everything in it, in one core write, and shows the group it was in.</summary>
     /// <remarks>
     /// Where the vault has a recycle bin the whole group goes there and Trash lists each of its items, which
-    /// is where they come back from; without one only an empty group goes, for good (D-NEW-A1).
+    /// is where they come back from; without one only an empty group goes, for good (D-0483).
     /// </remarks>
     private void ConfirmDeleteGroup()
     {
@@ -1339,7 +1339,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <remarks>
     /// The copy is held in the result and followed as an organized item is, so it does not vanish under a
     /// query its new title no longer answers. A project takes one item for each variable (D-0337), so the
-    /// copy is in no project until somebody tags it, and the note says so (D-NEW-A2).
+    /// copy is in no project until somebody tags it, and the note says so (D-0484).
     /// </remarks>
     private void Duplicate()
     {

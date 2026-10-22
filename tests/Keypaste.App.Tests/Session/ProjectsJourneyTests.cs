@@ -282,7 +282,7 @@ public sealed class ProjectsJourneyTests
         return [.. report.Where(line => _reported.Any(name => line.StartsWith(name + "=", StringComparison.Ordinal) || line == name + " unset"))];
     }
 
-    /// <summary>The reason and items of the newest History line, which every Run writes (D-0452, D-NEW-C2), read beside the app holding the log open for writing.</summary>
+    /// <summary>The reason and items of the newest History line, which every Run writes (D-0452, D-0496), read beside the app holding the log open for writing.</summary>
     private static (string? Reason, List<string> Entries) LastRun()
     {
         var log = KeypasteHome.AuditPath(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));

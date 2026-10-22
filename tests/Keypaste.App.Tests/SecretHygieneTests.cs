@@ -34,7 +34,7 @@ namespace Keypaste.App.Tests;
 /// <para>
 /// <b>What may appear where.</b> A list row carries a title, a kind, a group, its agent use, a
 /// username and a URL, as KeePassXC's table does, and never a password, a note or a custom field's
-/// value (D-NEW-A6). The detail pane widens to the notes for the one entry a person selected —
+/// value (D-0488). The detail pane widens to the notes for the one entry a person selected —
 /// <c>keypaste get</c>'s scope minus the password. A password appears nowhere, in any state,
 /// including after Copy.
 /// </para>
@@ -225,7 +225,7 @@ public sealed class SecretHygieneTests
 
     /// <summary>
     /// The list holds names, usernames and URLs, and no password, note or custom field value — including
-    /// for an entry nobody selected (D-NEW-A6).
+    /// for an entry nobody selected (D-0488).
     /// </summary>
     [Fact]
     public void The_entry_list_holds_names_usernames_and_urls_and_no_secret()

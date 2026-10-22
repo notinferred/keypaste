@@ -290,7 +290,7 @@
         </StackPanel>
       </Border>
 
-      <!-- A group moves with everything in it, to the places an item can move to (D-NEW-A1). -->
+      <!-- A group moves with everything in it, to the places an item can move to (D-0483). -->
       <Border Classes="form" IsVisible="{Binding IsMovingGroup}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
@@ -336,7 +336,7 @@
 
       <DockPanel Grid.Row="0" x:Name="ListArea" IsVisible="{Binding ShowsList}">
         <!-- The columns, as KeePassXC's entry table draws them: what an item is, its username and web
-             address, and where it lives, never a password or a custom field's value (EntryRow, D-NEW-A6). -->
+             address, and where it lives, never a password or a custom field's value (EntryRow, D-0488). -->
         <Grid DockPanel.Dock="Top" Classes="table-head" ColumnDefinitions="28,1.4*,*,*,88,*,104" Margin="16,8,16,0">
           <TextBlock Grid.Column="1" Classes="th" Text="TITLE" />
           <TextBlock Grid.Column="2" x:Name="UsernameHead" Classes="th" Text="USERNAME" />
@@ -984,7 +984,7 @@
                           <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
-                        <!-- Custom fields by name and protection, and the tags: never a field's value (D-NEW-A5). -->
+                        <!-- Custom fields by name and protection, and the tags: never a field's value (D-0487). -->
                         <TextBlock Grid.Row="13" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Custom fields" Margin="0,12,0,6" />
                         <TextBlock Grid.Row="14" Grid.Column="0" Classes="caption" Text="Then" />
                         <Panel Grid.Row="14" Grid.Column="2">

@@ -87,7 +87,7 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     internal string DisplayNotes =>
         DisplayTextSanitizer.Sanitize(_notes, DisplayTextSanitizer.MaximumNotesLength).Text;
 
-    /// <summary>This revision's custom fields by name, each protected one saying so, and never a value (D-NEW-A5).</summary>
+    /// <summary>This revision's custom fields by name, each protected one saying so, and never a value (D-0487).</summary>
     internal string FieldsSummary { get; }
 
     /// <summary>This revision's own tags.</summary>

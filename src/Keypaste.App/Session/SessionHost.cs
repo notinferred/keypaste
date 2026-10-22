@@ -41,7 +41,7 @@ namespace Keypaste.App.Session;
 /// Every request answered is recorded in the home's audit log before its reply leaves. A log that
 /// cannot be opened does not stop the unlock either: each request is refused before anybody is asked,
 /// and the next one tries the log again, so mending the file needs no new unlock. A Run, which writes a
-/// line on every platform, tries it the same way before its card (D-0451, D-NEW-C2).
+/// line on every platform, tries it the same way before its card (D-0451, D-0496).
 /// </para>
 /// </remarks>
 internal sealed class SessionHost : IDisposable
@@ -353,7 +353,7 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
-    /// <summary>Records a Run the app starts itself on Windows and Linux in the authority's log, before the terminal starts (D-NEW-C2).</summary>
+    /// <summary>Records a Run the app starts itself on Windows and Linux in the authority's log, before the terminal starts (D-0496).</summary>
     /// <param name="set">The set the confirmation released.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
     /// <returns>Whether the line was written; false when nothing is hosted for that session.</returns>

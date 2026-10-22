@@ -98,7 +98,7 @@ public sealed class EntriesViewLayoutTests
                 Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
                 Assert.True(list.Bottom <= pane.Top, $"the list {list} is not above the entry's preview {pane} at {at}");
 
-                // The username and URL columns (D-NEW-A6) keep room for several characters each, side by side.
+                // The username and URL columns (D-0488) keep room for several characters each, side by side.
                 var username = Bounds(shell, shell.Named<TextBlock>("UsernameHead"));
                 var url = Bounds(shell, shell.Named<TextBlock>("UrlHead"));
                 Assert.True(username.Width >= _columnMinimum, $"the username column is {username.Width:0} px wide at {at}");

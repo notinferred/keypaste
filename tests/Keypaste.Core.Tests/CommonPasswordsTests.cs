@@ -7,7 +7,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The vendored common-password list, and the pin that makes rating against it mean something (D-NEW-C5).
+/// The vendored common-password list, and the pin that makes rating against it mean something (D-0499).
 /// </summary>
 /// <remarks>
 /// The digest and the line count are read from the file in the repository, never from

@@ -15,7 +15,7 @@ The file is the 10,000 most common passwords SecLists lists, with the one line i
 
 ## The digest
 
-**The SHA-256 pin of the decompressed file lives in exactly one place, `Keypaste.Core.Recommendations.CommonPasswords.Digest`, and is not restated here.** `CommonPasswords` hashes what the embedded resource decompresses to the first time a password is rated and throws when it does not match, so a shipped binary rates against no list it cannot vouch for (D-NEW-C5), as the word list is pinned (D-0235).
+**The SHA-256 pin of the decompressed file lives in exactly one place, `Keypaste.Core.Recommendations.CommonPasswords.Digest`, and is not restated here.** `CommonPasswords` hashes what the embedded resource decompresses to the first time a password is rated and throws when it does not match, so a shipped binary rates against no list it cannot vouch for (D-0499), as the word list is pinned (D-0235).
 
 ## Licence
 

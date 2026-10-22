@@ -239,7 +239,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <summary>
     /// Records a Run the app starts itself, on Windows and Linux, before its terminal starts, in the line a macOS
     /// Run's pass is recorded with when its window asks: the set's items, <c>prompt</c>, and the reason
-    /// <c>&lt;N&gt; variable(s), confirmed in the app</c> (D-NEW-C2).
+    /// <c>&lt;N&gt; variable(s), confirmed in the app</c> (D-0496).
     /// </summary>
     /// <param name="set">The set the app's confirmation released, read again after the person answered.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>

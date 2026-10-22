@@ -38,7 +38,7 @@ namespace Keypaste.App.Tests.Session;
 /// endpoint, an assembled <c>keypaste.app</c> whose launcher is the real one and whose <c>keypaste</c>
 /// is the built CLI, and <see cref="TerminalStandIn"/> for <c>open</c>. The launcher reads the
 /// person's own request folder, so these tests run alone. On every platform the app's real authority
-/// writes each Run's History line, on Windows and Linux before the terminal starts (D-NEW-C2).
+/// writes each Run's History line, on Windows and Linux before the terminal starts (D-0496).
 /// </para>
 /// </remarks>
 [Collection(nameof(TerminalRequestFolder))]
@@ -610,7 +610,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.True(File.Exists(Path.Combine(directory, "ran")), "the command did not run in the directory");
     }
 
-    /// <summary>A Run is recorded in one History line, which names each of thirty wide items, more than 2 KiB of names, on every platform (D-0454, D-NEW-C2).</summary>
+    /// <summary>A Run is recorded in one History line, which names each of thirty wide items, more than 2 KiB of names, on every platform (D-0454, D-0496).</summary>
     [Fact]
     public async Task A_set_from_thirty_wide_items_runs_and_its_History_line_names_every_one()
     {
@@ -644,7 +644,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             line.RootElement.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()!).Distinct().Order(StringComparer.Ordinal));
     }
 
-    /// <summary>A set whose items one History line could not name is refused unasked, before the card, on every platform, since every Run writes a line (D-NEW-C2).</summary>
+    /// <summary>A set whose items one History line could not name is refused unasked, before the card, on every platform, since every Run writes a line (D-0496).</summary>
     [Fact]
     public async Task A_set_whose_items_one_History_line_could_not_name_is_refused_before_anyone_is_asked()
     {
@@ -686,7 +686,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
     /// <summary>
     /// Every Run writes a History line, so while the app's audit log will not open a Run is refused before the card on
-    /// every platform, naming the log's error and what to do instead; mending the log needs no new unlock (T-6, D-NEW-C2).
+    /// every platform, naming the log's error and what to do instead; mending the log needs no new unlock (T-6, D-0496).
     /// </summary>
     [Fact]
     public async Task A_Run_while_the_audit_log_will_not_open_is_refused_before_anyone_is_asked()
@@ -1214,7 +1214,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         return JsonDocument.Parse(reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1]);
     }
 
-    /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it (D-0452, D-NEW-C2).</summary>
+    /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it (D-0452, D-0496).</summary>
     private void AssertRecorded(int variables, params string[] entries)
     {
         using var line = LastAuditLine();

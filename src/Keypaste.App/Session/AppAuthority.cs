@@ -23,7 +23,7 @@ namespace Keypaste.App.Session;
 /// On macOS each unlock is also served on a launch endpoint of its own, which only the run Terminal
 /// starts for a Run asks, so <see cref="LaunchFailure"/> and <see cref="IssueLaunch"/> do not depend on
 /// what agents meet (D-0451). On Windows and Linux the app starts a Run's terminal itself, and
-/// <see cref="RecordRun"/> writes its History line in the same log first (D-NEW-C2).
+/// <see cref="RecordRun"/> writes its History line in the same log first (D-0496).
 /// </para>
 /// </remarks>
 internal sealed class AppAuthority : IDisposable
@@ -200,7 +200,7 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="pass">The pass <see cref="IssueLaunch"/> returned.</param>
     internal void WithdrawLaunch(string pass) => _host.WithdrawLaunch(pass);
 
-    /// <summary>Writes the History line of a Run the app starts itself on Windows and Linux, before the terminal starts (D-NEW-C2).</summary>
+    /// <summary>Writes the History line of a Run the app starts itself on Windows and Linux, before the terminal starts (D-0496).</summary>
     /// <param name="set">The set the confirmation released, read again after the person answered.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
     /// <returns>Whether the line was written; a Run whose line was not starts nothing (T-6).</returns>

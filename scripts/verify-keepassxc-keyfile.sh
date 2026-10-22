@@ -16,7 +16,7 @@
 # with the new factors and refuses the old ones. Last, the one keyfile keypaste makes: the desktop's
 # create form makes a vault with a keyfile it writes, and its Settings replaces that keyfile with
 # another it writes, each through tests/Keypaste.AppDriver, and KeePassXC opens the vault with the
-# keyfile keypaste made and refuses the one replaced (D-NEW-D6).
+# keyfile keypaste made and refuses the one replaced (D-0506).
 #
 # WHO MAKES WHAT, which is the whole honesty of this gate:
 #
@@ -375,7 +375,7 @@ kpxc_only db-info --no-password --key-file "$(native "$only_kf")" "$(native "$on
   && die "KeePassXC still opens the keyfile-only vault with the keyfile it replaced"
 
 # ---------------------------------------------------------------------------------------
-# The keyfile the desktop makes (D-NEW-D6), through the app driver.
+# The keyfile the desktop makes (D-0506), through the app driver.
 # ---------------------------------------------------------------------------------------
 if [ "$cli_only" = false ]; then
   drv=$(app_driver)

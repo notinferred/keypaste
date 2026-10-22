@@ -141,7 +141,7 @@ public sealed class TrashTests : IDisposable
 
     /// <summary>
     /// A group deleted from Items lists each of its items here with the path it had, and restoring one
-    /// puts it back there with its history, making the group again (D-NEW-A1).
+    /// puts it back there with its history, making the group again (D-0483).
     /// </summary>
     [Fact]
     public void A_deleted_groups_items_are_listed_and_one_restores_to_its_path()

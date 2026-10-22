@@ -16,7 +16,7 @@ namespace Keypaste.App.ViewModels;
 /// <remarks>
 /// <para>
 /// <b>The list shows title, kind, group, agent use, username and URL, and never a password or a
-/// custom field's value (D-NEW-A6).</b> A username and a web address are what KeePassXC's table shows
+/// custom field's value (D-0488).</b> A username and a web address are what KeePassXC's table shows
 /// too; the password, the notes and every custom field stay out of the row, so "the list holds no
 /// secret" is a claim about the list rather than about which entry happens to be selected. An
 /// implementation that read every password into every row would fail <c>SecretHygieneTests</c> on the
@@ -25,7 +25,7 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// <b><see cref="Fields"/> and <see cref="Tags"/> are what came from a search, and neither is a
 /// value.</b> The matching happens in <see cref="Core.Vault.Search"/>: what comes back is a member of a
-/// fixed enum and the entry's own tags the query was in, which are labels rather than values (D-NEW-A3).
+/// fixed enum and the entry's own tags the query was in, which are labels rather than values (D-0485).
 /// </para>
 /// </remarks>
 internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fields = MatchedFields.None) : INotifyPropertyChanged
@@ -159,7 +159,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// A title or a group match shows its own evidence in the columns beside this one, and labelling
     /// those would be noise on every row of an ordinary search. A username or a URL column can be cut
     /// short, so a match there is still named. Field names are constants; a tag is a label, scrubbed as
-    /// a name is (D-NEW-A3).
+    /// a name is (D-0485).
     /// </remarks>
     internal string Why
     {

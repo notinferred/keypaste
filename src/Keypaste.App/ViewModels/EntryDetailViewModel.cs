@@ -1420,7 +1420,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         History.Refresh();
         Report(null);
 
-        // The list shows the username and the URL too (D-NEW-A6), so it reads them again.
+        // The list shows the username and the URL too (D-0488), so it reads them again.
         _restored(Name);
     }
 }

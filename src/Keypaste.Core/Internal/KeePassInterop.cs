@@ -41,7 +41,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The longest password, in characters, the estimator rates: its repetition pass grows with the cube of the length and runs under the vault's lock, and KeePassXC stops at the same length.</summary>
     private const int _longestRated = 256;
 
-    /// <summary>The common-password list in KeePassLib's estimator, which every estimate in this process shares, loaded once before the first rating (D-NEW-C5).</summary>
+    /// <summary>The common-password list in KeePassLib's estimator, which every estimate in this process shares, loaded once before the first rating (D-0499).</summary>
     private static readonly Lazy<bool> _commonPasswords = new(LoadCommonPasswords, LazyThreadSafetyMode.ExecutionAndPublication);
 
     private readonly PwDatabase _database;

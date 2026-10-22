@@ -2,7 +2,7 @@ using System.IO.Compression;
 
 namespace Keypaste.Core.Recommendations;
 
-/// <summary>The vendored list of the most common passwords, which KeePass's estimate rates each password against so one on it is weak (D-NEW-C5).</summary>
+/// <summary>The vendored list of the most common passwords, which KeePass's estimate rates each password against so one on it is weak (D-0499).</summary>
 /// <remarks>
 /// <para>
 /// SecLists' <c>10k-most-common.txt</c>, embedded gzipped and pinned by the SHA-256 of the bytes it

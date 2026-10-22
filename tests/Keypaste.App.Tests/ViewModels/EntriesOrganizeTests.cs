@@ -641,7 +641,7 @@ public sealed class EntriesOrganizeTests : IDisposable
         Assert.Equal("username, URL", row.Why);
     }
 
-    /// <summary>A tag the query was in labels the row with that tag, which is a label and not a value (D-NEW-A3).</summary>
+    /// <summary>A tag the query was in labels the row with that tag, which is a label and not a value (D-0485).</summary>
     [Fact]
     public void A_row_matched_on_a_tag_names_the_tag()
     {

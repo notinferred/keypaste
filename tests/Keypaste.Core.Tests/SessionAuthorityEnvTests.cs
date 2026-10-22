@@ -961,7 +961,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(_launchSpent, line.GetProperty("reason").GetString());
     }
 
-    /// <summary>A Run the app starts itself on Windows and Linux is recorded in the line a macOS Run's pass writes, unasked and only under the live session (D-NEW-C2).</summary>
+    /// <summary>A Run the app starts itself on Windows and Linux is recorded in the line a macOS Run's pass writes, unasked and only under the live session (D-0496).</summary>
     [Fact]
     public async Task A_run_the_app_starts_itself_is_recorded_as_a_macOS_runs_pass_is()
     {

@@ -43,7 +43,7 @@
     <!--
       The common passwords a password is rated against, gzipped from upstream's bytes. Provenance and
       licence: third_party/seclists-common-passwords/UPSTREAM.md. The SHA-256 of what it decompresses
-      to is pinned in Recommendations.CommonPasswords.Digest and checked at first use (D-NEW-C5).
+      to is pinned in Recommendations.CommonPasswords.Digest and checked at first use (D-0499).
     -->
     <EmbeddedResource Include="../../third_party/seclists-common-passwords/10k-most-common.txt.gz"
                       LogicalName="Keypaste.Core.10k-most-common.txt.gz" />

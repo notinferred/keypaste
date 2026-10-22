@@ -52,11 +52,11 @@ Nothing was built or run on this machine; every test runs on GitHub.
 
 ## Limits and follow-ups
 
-- The estimator rates each password against SecLists' 10,000 most common passwords, vendored and pinned by digest, so a password on that list or made of its entries is weak however long it is (D-NEW-C5) (gaps-1, RUNS-PENDING).
+- The estimator rates each password against SecLists' 10,000 most common passwords, vendored and pinned by digest, so a password on that list or made of its entries is weak however long it is (D-0499) (gaps-1, RUNS-PENDING).
 - A dismissed weak or reused password stays dismissed after it changes (D-0479).
 - An expiry that passes while the vault is unlocked is listed at the next save or unlock.
 - The check rates every password on the UI thread, under the vault's lock, after each save; the estimator rates a password of at most 256 characters, so a longer one is never reported weak though its reuse is, and a vault of many thousands of items has not been measured.
-- Custom fields are not rated or compared, because they mostly hold API keys a password-strength estimate misjudges, so an API key reused across items is not found (D-NEW-C6) (gaps-1, RUNS-PENDING).
+- Custom fields are not rated or compared, because they mostly hold API keys a password-strength estimate misjudges, so an API key reused across items is not found (D-0500) (gaps-1, RUNS-PENDING).
 - Which of `QualityCheck` and `KnownBad` KeePassXC 2.7 writes when an entry is excluded from its reports was not observed here; both are read, and only KeePassLib wrote them in the tests.
 - A password row's Open item shows its item selected in its group in Items, found by the UUID the finding carries, so a rename since the check still finds it; note-key and dropped-tag rows have no such button yet (gaps-1, RUNS-PENDING).
 - Source only.
