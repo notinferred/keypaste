@@ -31,6 +31,7 @@ When no agent has received an item, holds an allowance for it or is asking for i
 Saving Settings in the app, choosing a vault with `keypaste use`, and saving a project's directory and command now keep what a newer version of keypaste wrote into `app.toml` and `projects.json`, rather than dropping every key, section or project mapping this version does not read.
 
 keypaste now opens and saves a vault encrypted with Twofish, as KeePassXC can make one, keeping Twofish when it saves; before, such a vault did not open at all. keypaste still makes new vaults with AES-256 and never changes a vault's cipher. The Twofish code is BouncyCastle's, vendored and pinned as [third_party/bouncycastle-twofish/UPSTREAM.md](third_party/bouncycastle-twofish/UPSTREAM.md) records.
+Unlocking a vault and saving it are faster on Windows and macOS: the app and `keypaste` now derive the vault's key with the Argon2 reference library, which they carry as `argon2.dll` or `libargon2.1.dylib` beside their binaries, rather than with slower .NET code. Keep that file beside `keypaste` when you move it out of the archive; without it the key is the same and takes longer. Linux uses the system's libargon2 as before.
 
 Tagging an item into a project, in the app or with `keypaste env tag`, now names each of its variables that holds a KeePass placeholder such as `{PASSWORD}`, with the placeholder, before anything is written, because that variable carries the item's own field to whoever gets it.
 

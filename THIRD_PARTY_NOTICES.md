@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
 
 ## KeePassLib
 
@@ -21,6 +21,12 @@ Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncy
 > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The [upstream library](https://github.com/bcgit/bc-csharp) is BouncyCastle C#, tag `release-2.7.0`. Its Twofish block cipher, CBC mode and PKCS#7 padding, with the interfaces and helpers they reach, are vendored at `third_party/bouncycastle-twofish/` and compiled into KeePassLib, every type internal; [UPSTREAM.md](third_party/bouncycastle-twofish/UPSTREAM.md) records each file's upstream SHA-256 and every change. They encrypt and decrypt a vault whose cipher is Twofish. The combined distribution is AGPL-3.0-only; the code remains available under the MIT License.
+
+## Argon2 reference implementation
+
+Copyright 2015 Daniel Dinu, Dmitry Khovratovich, Jean-Philippe Aumasson and Samuel Neves. Licensed under the Creative Commons CC0 1.0 Universal waiver or the Apache License, Version 2.0, at your option; both texts are in the release archive's `LICENSE`, and at <https://creativecommons.org/publicdomain/zero/1.0/> and <https://www.apache.org/licenses/LICENSE-2.0>.
+
+On Windows and macOS the app and the CLI carry `argon2.dll` or `libargon2.1.dylib` beside their binaries, which [build-argon2.sh](scripts/build-argon2.sh) compiles unmodified from release `20190702` of the Password Hashing Competition's [phc-winner-argon2](https://github.com/P-H-C/phc-winner-argon2), its archive pinned by SHA-256. KeePassLib derives vault keys with it (DECISIONS.md D-NEW-X81). Either licence permits combining it into this AGPL-3.0-only distribution, and the library remains available under both.
 
 ## EFF Large Wordlist for Passphrases
 

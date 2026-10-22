@@ -13,8 +13,11 @@
 #                      written either way; only the permission copy is skipped, which is already
 #                      what happens on any machine without Mono.Posix installed - that is, all
 #                      of them, since .NET Core.
-#   NativeLib.cs       ProcessArchitecture probing. Falls back to IntPtr.Size at :124. Only feeds
-#                      the KeePassLibN native-library loader, which keypaste does not ship.
+#   NativeLib.cs       ProcessArchitecture probing. It picks KeePassLib's Windows Argon2 import, which
+#                      keypaste binds to the argon2.dll it carries (D-NEW-X82). A type not found falls
+#                      back to IntPtr.Size at :124, x64; a type found without its property at :118
+#                      reads no architecture, and the NativeAOT keypaste then derives Argon2 in managed
+#                      code: the same key, more slowly. No run yet shows which (F.66).
 #   IOConnection.cs    HttpWebRequest internals on remote-vault paths. keypaste opens local files
 #                      only; nothing reaches IocStream over HTTP.
 #   XmlUtilEx.cs       XmlSerializer reading a KeePass XML keyfile for KcpKeyFile. It runs in

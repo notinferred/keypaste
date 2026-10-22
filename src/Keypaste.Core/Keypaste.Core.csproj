@@ -49,6 +49,25 @@
                       LogicalName="Keypaste.Core.10k-most-common.txt.gz" />
   </ItemGroup>
 
+  <!--
+    The reference libargon2 that Internal/NativeArgon2.cs hands KeePassLib on Windows and macOS (D-NEW-X81), which
+    scripts/build-argon2.sh builds from its pinned source into artifacts/native/<rid>/. It flows into the output and
+    publish directory of every project that references Core: the app, the CLI and the tests. A build without it derives
+    the same keys with KeePassLib's managed Argon2.
+  -->
+  <PropertyGroup>
+    <KeypasteArgon2Rid>$(RuntimeIdentifier)</KeypasteArgon2Rid>
+    <KeypasteArgon2Rid Condition="'$(KeypasteArgon2Rid)' == ''">$(NETCoreSdkRuntimeIdentifier)</KeypasteArgon2Rid>
+    <KeypasteArgon2Dir>$(ArtifactsPath)/native/$(KeypasteArgon2Rid)/</KeypasteArgon2Dir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(KeypasteArgon2Dir)argon2.dll" Condition="Exists('$(KeypasteArgon2Dir)argon2.dll')"
+          Link="argon2.dll" Visible="false" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(KeypasteArgon2Dir)libargon2.1.dylib" Condition="Exists('$(KeypasteArgon2Dir)libargon2.1.dylib')"
+          Link="libargon2.1.dylib" Visible="false" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="System.Buffers.Binary" />
     <Using Include="System.Security.Cryptography" />

@@ -50,7 +50,12 @@ internal sealed class KeePassInterop : IDisposable
     private byte[]? _written;
 
     // KdfPool fills its static list without synchronization; the runtime runs this once and holds concurrent first callers until it returns (F.11).
-    static KeePassInterop() => _ = KdfPool.Engines.Count();
+    // Nothing reaches KeePassLib's native Argon2 before this has handed it keypaste's library (D-NEW-X82).
+    static KeePassInterop()
+    {
+        NativeArgon2.Register(typeof(PwDatabase).Assembly);
+        _ = KdfPool.Engines.Count();
+    }
 
     private KeePassInterop(PwDatabase database)
     {

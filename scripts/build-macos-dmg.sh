@@ -83,6 +83,8 @@ case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "usage: keypaste mcp"*) 
 open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$volume/keypaste.app" --args --selftest
 grep -q '^keypaste-app: selftest ok ' "$work/launched" \
   || die "the bundle started from $name through LaunchServices did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
+grep -q '^keypaste-app: Argon2 derived natively by .*/keypaste\.app/Contents/MacOS/libargon2\.1\.dylib$' "$work/launched" \
+  || die "the bundle started from $name did not derive with the libargon2.1.dylib in its Contents/MacOS: $(cat "$work/launched")"
 cat "$work/launched" >&2
 
 hdiutil detach "$volume" >&2 || die "$name did not detach from $volume after its checks"

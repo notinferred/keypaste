@@ -41,6 +41,8 @@ and integration accept --prepare-only and --test-only for CI or a build already 
 command. --project narrows backend or desktop to those test projects and the helpers they start,
 and --filter-class runs one test class in each.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
+On Windows and macOS each profile that builds, but compile, first builds the libargon2 the app and the
+CLI carry with scripts/build-argon2.sh, which needs curl and Visual Studio's C compiler or Xcode's clang.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
 (or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP), and Node 22 with npm and
 curl for the site's Worker. Native AOT, packaging, other operating systems and live install checks stay in CI.
@@ -128,6 +130,13 @@ prepare() {
   run dotnet build "$1" --no-restore -c Release -warnaserror
 }
 
+# The libargon2 the app and the CLI carry on Windows and macOS, built before them so every build that runs or tests them
+# derives with the shipped file (D-NEW-X82). The compile check runs nothing, so it builds without it.
+argon2=true
+build_argon2() {
+  if [ "$argon2" = true ]; then run bash scripts/build-argon2.sh; fi
+}
+
 # Test runner lines a failed run prints, repeated as annotations so the run's summary names them.
 annotate_failures() {
   local escape
@@ -163,31 +172,33 @@ prepare_projects() {
     targets+=("$dir")
     for helper in $(runtime_helpers "$dir"); do targets+=("$helper"); done
   done
+  build_argon2
   for project in "${targets[@]}"; do run dotnet restore "$(project_file "$project")" --locked-mode; done
   for project in "${targets[@]}"; do run dotnet build "$(project_file "$project")" --no-restore -c Release -warnaserror; done
 }
 test_projects() {
   local dir options
   for dir in "${projects[@]}"; do
-    options=()
+    options=(--show-live-output on)
     if [ "$dir" = tests/Keypaste.App.Tests ]; then options+=(--long-running 120); fi
     if [ -n "$filter_class" ]; then options+=(--filter-class "$filter_class"); fi
-    if [ "${#options[@]}" -gt 0 ]; then
-      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release -- "${options[@]}"
-    else
-      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release
-    fi
+    run_tests dotnet test "$(project_file "$dir")" --no-build -c Release -- "${options[@]}"
   done
 }
 
-prepare_backend() { prepare keypaste.slnx; }
+prepare_backend() {
+  build_argon2
+  prepare keypaste.slnx
+}
 # The consistency project builds the CLI the desktop gates start beside the app.
 prepare_desktop() {
+  build_argon2
   prepare keypaste.app.slnx
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
 }
+# Live output puts NativeArgon2Tests' time per pass in each runner's log.
 test_backend() {
-  run_tests dotnet test keypaste.slnx --no-build -c Release
+  run_tests dotnet test keypaste.slnx --no-build -c Release -- --show-live-output on
 }
 test_desktop() {
   run_tests dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
@@ -297,7 +308,7 @@ profile_workflows() {
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
     scripts/verify.sh scripts/verify-clipboard-markers.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
-    scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh \
+    scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh scripts/build-argon2.sh \
     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh \
     scripts/lib/*.sh packaging/macos/keypaste-launch.command
 }
@@ -324,6 +335,7 @@ profile_format() {
 # The build servers would otherwise stay resident after a development machine's check, even a failed one.
 profile_compile() {
   if [ "$list" = false ]; then trap 'dotnet build-server shutdown >/dev/null 2>&1 || true' EXIT; fi
+  argon2=false
   prepare_backend
   prepare_desktop
   profile_format

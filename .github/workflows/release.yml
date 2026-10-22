@@ -201,6 +201,11 @@ jobs:
         if: runner.os == 'macOS'
         run: xcode-select -p
 
+      # The Windows and macOS archives carry it beside keypaste; Linux finds the system's (D-NEW-X81).
+      - name: Build the libargon2 the CLI carries
+        shell: bash
+        run: bash scripts/build-argon2.sh '${{ matrix.rid }}'
+
       # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
@@ -226,6 +231,7 @@ jobs:
           p="artifacts/release/${{ matrix.rid }}/keypaste"
           [ -x "$p" ] || [ -x "$p.exe" ] || { echo "::error::no native keypaste"; exit 1; }
           for stray in artifacts/release/${{ matrix.rid }}/*.dll artifacts/release/${{ matrix.rid }}/*.runtimeconfig.json; do
+            [ "$(basename "$stray")" = argon2.dll ] && continue
             [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not an AOT binary"; exit 1; }
           done
           printed="$("$KEYPASTE_BIN" --version 2>/dev/null || "$KEYPASTE_BIN.exe" --version)"
@@ -357,6 +363,11 @@ jobs:
           if   [ -f "$src/keypaste" ];     then cp "$src/keypaste"     "$stage/"
           elif [ -f "$src/keypaste.exe" ]; then cp "$src/keypaste.exe" "$stage/"
           else echo "::error::keypaste is missing from $src"; exit 1
+          fi
+          lib="$(scripts/build-argon2.sh --name '${{ matrix.rid }}')"
+          if [ -n "$lib" ]; then
+            [ -f "$src/$lib" ] || { echo "::error::$lib, which keypaste derives keys with on ${{ matrix.rid }}, is missing from $src"; exit 1; }
+            cp "$src/$lib" "$stage/"
           fi
           cp LICENSE THIRD_PARTY_NOTICES.md "$stage"/
           name="keypaste-${VERSION}-${{ matrix.rid }}"

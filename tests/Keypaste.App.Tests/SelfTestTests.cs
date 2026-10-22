@@ -20,6 +20,7 @@ public sealed class SelfTestTests
         Assert.Equal(0, exit);
         Assert.Contains("selftest ok", stdout.ToString(), StringComparison.Ordinal);
         Assert.Contains("read back", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("keypaste-app: Argon2 derived ", stdout.ToString(), StringComparison.Ordinal);
         Assert.Empty(stderr.ToString());
         Assert.Equal(before, ScratchDirectories());
     }

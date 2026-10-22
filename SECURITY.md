@@ -71,6 +71,10 @@ A vault is unlocked by a master password, and in source by a master password and
 
 In source, the desktop app also opens a vault that needs a YubiKey slot programmed for HMAC-SHA1 challenge-response, and its Settings add or remove one; the key is derived as KeePassXC derives it, so either program opens the other's vault (D-0366). The key is asked on every open and every save, and its last answer stays in memory until the vault locks (T-37). A lost or broken key locks the vault for good: only a second key programmed beforehand with the same secret opens it, and keypaste cannot copy a secret out of a key or recover one. Backups made while the key was required need it too. The CLI and `keypaste approve` cannot open such a vault.
 
+### How a vault's key is derived
+
+KeePassLib derives each vault's key with the key derivation the vault names. In source, the app and the CLI on Windows and macOS carry `argon2.dll` or `libargon2.1.dylib`, the Argon2 reference implementation that CI compiles from release `20190702` of phc-winner-argon2, pinned by SHA-256, and KeePassLib's Argon2 runs in that native code; on Linux it uses the system's libargon2 where one is installed. The 32-byte composite key KeePassLib makes from the password, the keyfile and any hardware key's answer reaches the library only in memory allocated outside the .NET heap and zeroed afterwards, and the library wipes its own working memory before freeing it. The file is loaded by its full path beside the binary, never searched for, so whoever can replace it could already replace the binary. Where no library loads, as for a `keypaste` moved away from the file that came beside it, KeePassLib derives the same key with its own managed Argon2, more slowly (D-NEW-X81, D-NEW-X82).
+
 ### Secret input in the desktop app
 
 `ConsoleSecretPrompt` reads characters into a clearable buffer without forming a password string. Desktop input arrives from Avalonia as immutable strings that cannot be wiped, including multi-character input-method events. The OS keyboard layer, input methods and keyloggers remain outside this boundary.

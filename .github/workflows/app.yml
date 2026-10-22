@@ -56,6 +56,7 @@ on:
       - 'packaging/**'
       - 'scripts/verify-windows-installer.sh'
       - 'scripts/fetch-pinned-asset.sh'
+      - 'scripts/build-argon2.sh'
       - 'scripts/build-linux-appimage.sh'
       - 'scripts/build-macos-app.sh'
       - 'scripts/build-macos-dmg.sh'
@@ -223,6 +224,11 @@ jobs:
           set -euo pipefail
           echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
 
+      # So these builds derive keys with the library the packages carry (D-NEW-X82).
+      - name: Build the libargon2 the app and the CLI carry
+        shell: bash
+        run: bash scripts/build-argon2.sh
+
       - name: Restore and build the CLI and the app driver
         shell: bash
         run: |
@@ -275,6 +281,10 @@ jobs:
         run: |
           set -euo pipefail
           echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
+
+      - name: Build the libargon2 the app carries
+        shell: bash
+        run: bash scripts/build-argon2.sh
 
       - name: Restore and build the app driver
         shell: bash
@@ -366,6 +376,11 @@ jobs:
           echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
           echo "prerelease suffix: ${suffix:-<none>}"
 
+      # Keypaste.Core's project puts it in the payload beside the app and its keypaste (D-NEW-X82).
+      - name: Build the libargon2 the payload carries
+        shell: bash
+        run: bash scripts/build-argon2.sh '${{ matrix.rid }}'
+
       - name: Publish
         shell: bash
         run: |
@@ -399,7 +414,8 @@ jobs:
           echo "native asset files: $found"
           [ "$found" -ge 2 ] || { echo "::error::Skia/HarfBuzz natives missing from $out"; exit 1; }
 
-      # The headless selftest cannot exercise native libraries that load on first render.
+      # The headless selftest cannot exercise native libraries that load on first render. It does derive a vault's key,
+      # and names the libargon2 it derived with: the payload's on Windows and macOS, the system's on Linux (D-NEW-X82).
       - name: Start the published binary and run its selftest
         shell: bash
         run: |
@@ -408,7 +424,18 @@ jobs:
           bin="$out/keypaste-app"
           [ "${{ matrix.rid }}" = "win-x64" ] && bin="$out/keypaste-app.exe"
           [ -x "$bin" ] || { echo "::error::no binary at $bin"; exit 1; }
-          "$bin" --selftest
+          "$bin" --selftest | tr -d '\r' > "$RUNNER_TEMP/selftest.out"
+          cat "$RUNNER_TEMP/selftest.out"
+          library="$(sed -n 's/^keypaste-app: Argon2 derived natively by //p' "$RUNNER_TEMP/selftest.out")"
+          carried="$(bash scripts/build-argon2.sh --name '${{ matrix.rid }}')"
+          if [ -n "$carried" ]; then
+            case "$library" in
+              *"$carried") ;;
+              *) echo "::error::the payload derived Argon2 with ${library:-managed code}, not the $carried it carries"; exit 1 ;;
+            esac
+          else
+            [ -n "$library" ] || { echo "::error::the payload derived Argon2 in managed code: no system libargon2 loaded"; exit 1; }
+          fi
 
       - name: Check the version the binary reports
         id: v
@@ -471,7 +498,7 @@ jobs:
           out="artifacts/app/${{ matrix.rid }}"
           if [ -n "$REHEARSAL" ]; then
             scripts/sign-windows.sh --component app --rehearsal "$REHEARSAL" "$out"
-            scripts/verify-windows-signature.sh "$REHEARSAL" "$out/keypaste-app.exe" "$out/keypaste-app.dll" "$out/Keypaste.Core.dll" "$out/Keypaste.Mvvm.dll" "$out/KeePassLib.dll" "$out/keypaste.exe"
+            scripts/verify-windows-signature.sh "$REHEARSAL" "$out/keypaste-app.exe" "$out/keypaste-app.dll" "$out/Keypaste.Core.dll" "$out/Keypaste.Mvvm.dll" "$out/KeePassLib.dll" "$out/keypaste.exe" "$out/argon2.dll"
             "$out/keypaste-app.exe" --selftest
           else
             scripts/sign-windows.sh --component app "$out"

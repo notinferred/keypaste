@@ -7,7 +7,7 @@
 # gives clients; the icon, licences and Terminal's launcher go to Contents/Resources. Nothing is signed or
 # notarized while the app's signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool
 # also accepts, and the bundle is then checked as unzipped from that archive, including a --selftest started
-# through LaunchServices.
+# through LaunchServices that must derive its vault key with the libargon2.1.dylib beside the app (D-NEW-X82).
 #
 # Build logs go to stderr; the path of the archive is the only line on stdout.
 #
@@ -76,6 +76,8 @@ case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "usage: keypaste mcp"*) 
 open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$unzipped/keypaste.app" --args --selftest
 grep -q '^keypaste-app: selftest ok ' "$work/launched" \
   || die "the bundle started through LaunchServices did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
+grep -q '^keypaste-app: Argon2 derived natively by .*/keypaste\.app/Contents/MacOS/libargon2\.1\.dylib$' "$work/launched" \
+  || die "the bundle did not derive with the libargon2.1.dylib in its Contents/MacOS: $(cat "$work/launched")"
 cat "$work/launched" >&2
 
 echo "$out/$NAME"
