@@ -224,6 +224,23 @@ public sealed class SessionAuthorityEditTests : IDisposable
         Assert.Equal("old-password", Password(_github));
     }
 
+    /// <summary>A reload withdraws the question as a lock does, keeping the session (D-0412).</summary>
+    [Fact]
+    public async Task AReloadWhileThePersonIsAsked_WritesNothing()
+    {
+        _fixture.Channel.EditAnswer = ApprovalAnswer.ApprovedOnce;
+        _fixture.Channel.WhileEditing = _lifetime.Withdraw;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var reply = await client.EditAsync(Edit(new SetPassword(_github, NewSecret.Of(_sentinel))), Token);
+
+        Assert.Equal(AuditMethod.VaultChanged, reply!.Method);
+        Assert.Equal("the vault was reloaded from its file before this was saved", reply.Reason);
+        Assert.Equal("old-password", Password(_github));
+        Assert.True(_lifetime.IsLive);
+    }
+
     [Fact]
     public async Task AGeneratedValue_IsMadeByTheOwner()
     {

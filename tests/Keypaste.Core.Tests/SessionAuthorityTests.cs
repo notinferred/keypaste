@@ -341,6 +341,53 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(0, _fixture.Grants.Count);
     }
 
+    /// <summary>A reload withdraws what is waiting as a lock does while the session stays (D-0412).</summary>
+    [Fact]
+    public async Task ARequestWaitingForAPerson_IsWithdrawnAndDeniedAsReloadedWhenAReloadWithdrawsIt()
+    {
+        _fixture.Channel.Hold = true;
+        var lifetime = _lifetime!;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var pending = client.RequestAsync(Request("session-one"), Token);
+        await _fixture.Channel.Waiting.WaitAsync(_connectTimeout, Token);
+
+        lifetime.Withdraw();
+        var reply = await pending.AsTask().WaitAsync(_connectTimeout, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.VaultChanged, reply.Method);
+        Assert.Equal("the vault was reloaded from its file before anybody answered", reply.Reason);
+        Assert.Equal("session-one", reply.Session);
+        Assert.Null(reply.Value);
+        Assert.True(_fixture.Channel.Withdrawn);
+        Assert.Equal(0, _fixture.Source.Reads);
+        Assert.True(lifetime.IsLive);
+    }
+
+    [Fact]
+    public async Task AnApprovalRacingAReload_ReleasesNothing()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        var lifetime = _lifetime!;
+        _fixture.Source.During = lifetime.Withdraw;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var reply = await client.RequestAsync(Request("session-one"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.VaultChanged, reply.Method);
+        Assert.Equal("the vault was reloaded from its file before this was released", reply.Reason);
+        Assert.Null(reply.Value);
+        Assert.True(lifetime.IsLive);
+    }
+
     [Fact]
     public async Task AnAutomaticReleaseRacingTheLock_IsRefused()
     {

@@ -24,7 +24,9 @@ namespace Keypaste.Core.Ownership;
 /// <para>
 /// A request that was already being decided when the lock came is withdrawn by the lifetime's end
 /// and answered as a lock denial. Its answer commits under the lock that ends the lifetime, so a
-/// value either left before the lock or does not leave at all.
+/// value either left before the lock or does not leave at all. A reload withdraws what is waiting the
+/// same way while keeping the lifetime, and the request is answered as the vault having changed, so
+/// nothing a person approved of the copy it replaced leaves from the copy it read in (D-0412).
 /// </para>
 /// <para>
 /// An env set for <c>keypaste run --session</c> is admitted the same way and resolved under the
@@ -357,6 +359,7 @@ public sealed class SessionAuthority : IApproverHandler
             token => _inner.ListAsync(request, connectionId, token),
             lifetime,
             (method, reason) => new NamesReply(false, [], reason, true) { Refusal = method },
+            lifetime.Ended,
             withdrawn.Token).ConfigureAwait(false);
 
         if (!lifetime.TryCommit())
@@ -397,13 +400,15 @@ public sealed class SessionAuthority : IApproverHandler
             return Answer(CredentialRefused(refusal.Method, refusal.Reason));
         }
 
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
-        Withdrawals.Add(lifetime.Ended);
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.Add(waiting);
 
         var reply = await Decided(
             token => _inner.RequestAsync(request, connectionId, token),
             lifetime,
             CredentialRefused,
+            waiting,
             withdrawn.Token).ConfigureAwait(false);
 
         AlwaysForNotice? unmade = null;
@@ -414,17 +419,15 @@ public sealed class SessionAuthority : IApproverHandler
         {
             if (reply is { Decision: AuditDecision.Granted, AlwaysFor: { } scope } && request.ClientLabel is { } agent)
             {
-                unmade = await AlwaysAsync(request, agent, scope, reply.Kept, lifetime, withdrawn.Token).ConfigureAwait(false);
+                unmade = await AlwaysAsync(request, agent, scope, reply.Kept, lifetime, waiting, withdrawn.Token).ConfigureAwait(false);
             }
         }
 
-        if (!lifetime.TryCommit() && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
+        if (!lifetime.TryCommit(waiting) && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
         {
-            // The released string is dropped here, never sent: the lock came before the release.
-            var locked = reply.Decision == AuditDecision.Granted
-                ? "the vault was locked before this was released"
-                : "the vault was locked before anybody answered";
-            reply = CredentialRefused(AuditMethod.VaultLocked, locked) with { Entry = reply.Entry };
+            // The released string is dropped here, never sent: the lock or the reload came before the release.
+            var (method, reason) = WithdrawnBy(lifetime, reply.Decision == AuditDecision.Granted ? "this was released" : "anybody answered");
+            reply = CredentialRefused(method, reason) with { Entry = reply.Entry };
         }
 
         var delivered = Deliverable(reply with { Session = request.Session });
@@ -462,6 +465,7 @@ public sealed class SessionAuthority : IApproverHandler
         ProjectScope scope,
         KeptSlot? kept,
         SessionLifetime lifetime,
+        CancellationToken waiting,
         CancellationToken cancellationToken)
     {
         var client = AuditClient.Of(request.ClientName, request.ClientVersion, request.ClientLabel);
@@ -470,6 +474,7 @@ public sealed class SessionAuthority : IApproverHandler
             token => _inner.ChangeAccessAsync(agent, AccessEdit.Automatic(scope), AccessOrigin.Prompt, string.Empty, kept, token),
             lifetime,
             (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason) { Unapplied = reason },
+            waiting,
             cancellationToken).ConfigureAwait(false);
 
         _recorder.Recorded(
@@ -543,12 +548,14 @@ public sealed class SessionAuthority : IApproverHandler
                 "an agent may ask only about its own settings, and this connection did not attach as that agent"));
         }
 
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
 
         return Answer(await Decided(
             token => _inner.ChangeAccessAsync(request, token),
             lifetime,
             (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
+            waiting,
             withdrawn.Token).ConfigureAwait(false));
     }
 
@@ -579,13 +586,15 @@ public sealed class SessionAuthority : IApproverHandler
             return Answer(new EditReply(AuditDecision.Denied, AuditMethod.NoSession, "this keypaste process does not take changes from a terminal"));
         }
 
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
-        Withdrawals.Add(lifetime.Ended);
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.Add(waiting);
 
         return Answer(await Decided(
-            token => _editor.DecideAsync(request, lifetime, token),
+            token => _editor.DecideAsync(request, lifetime, waiting, token),
             lifetime,
             (method, reason) => new EditReply(AuditDecision.Denied, method, reason),
+            waiting,
             withdrawn.Token).ConfigureAwait(false));
     }
 
@@ -620,12 +629,14 @@ public sealed class SessionAuthority : IApproverHandler
             return Answer(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _lockedReason));
         }
 
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
 
         return Answer(await Decided(
             token => _inner.ChangeAccessAsync(agent, edit, AccessOrigin.Settings, string.Empty, token),
             lifetime,
             (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
+            waiting,
             withdrawn.Token).ConfigureAwait(false));
     }
 
@@ -652,12 +663,14 @@ public sealed class SessionAuthority : IApproverHandler
             return Answer(new AccessChangeReply(AuditDecision.Denied, AuditMethod.VaultLocked, _lockedReason));
         }
 
-        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+        var waiting = lifetime.Waiting;
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
 
         return Answer(await Decided(
             token => _inner.ResetCapsAsync(token),
             lifetime,
             (method, reason) => new AccessChangeReply(AuditDecision.Denied, method, reason),
+            waiting,
             withdrawn.Token).ConfigureAwait(false));
     }
 
@@ -711,6 +724,7 @@ public sealed class SessionAuthority : IApproverHandler
             token => DecideEnvAsync(request, admitted, launchOnly, token),
             admitted,
             (how, reason) => (how, Refused(request.Project, request.Profile, OutcomeOf(how), reason), false),
+            CancellationToken.None,
             cancellationToken).ConfigureAwait(false);
 
         var reply = _recorder.Recorded(
@@ -935,6 +949,7 @@ public sealed class SessionAuthority : IApproverHandler
             token => DecideRunAsync(request, asked, connectionId, admitted, token),
             admitted,
             (method, reason) => RunRefused(request, OutcomeOf(method), method, reason),
+            CancellationToken.None,
             cancellationToken).ConfigureAwait(false);
 
         var delivered = Deliverable(asked, decided with { Session = request.Session });
@@ -1215,12 +1230,14 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>
     /// A log that will not open refuses the request at once, so a person is never asked about one this
     /// owner cannot record (T-6). A request withdrawn by the lock that ended its lifetime is refused as
-    /// locked, otherwise as withdrawn.
+    /// locked, one a reload withdrew from <paramref name="waiting"/> as the vault having changed, and
+    /// otherwise as withdrawn.
     /// </remarks>
     private async ValueTask<T> Decided<T>(
         Func<CancellationToken, ValueTask<T>> decide,
         SessionLifetime lifetime,
         Func<AuditMethod, string, T> refused,
+        CancellationToken waiting,
         CancellationToken cancellationToken)
     {
         if (!_recorder.Opens)
@@ -1234,15 +1251,28 @@ public sealed class SessionAuthority : IApproverHandler
         }
         catch (OperationCanceledException)
         {
-            return lifetime.IsLive
-                ? refused(AuditMethod.Cancelled, "the request was withdrawn before it was answered")
-                : refused(AuditMethod.VaultLocked, "the vault was locked before this was answered");
+            if (!lifetime.IsLive || waiting.IsCancellationRequested)
+            {
+                var (method, reason) = WithdrawnBy(lifetime, "this was answered");
+                return refused(method, reason);
+            }
+
+            return refused(AuditMethod.Cancelled, "the request was withdrawn before it was answered");
         }
         catch (Exception)
         {
             return refused(AuditMethod.Failed, "the request could not be completed");
         }
     }
+
+    /// <summary>What a request the owner withdrew is refused as: the lock that ended its lifetime, or a reload that kept it (D-0412).</summary>
+    /// <param name="lifetime">The lifetime it was admitted to.</param>
+    /// <param name="before">What the withdrawal came before, such as "anybody answered".</param>
+    /// <returns>The method and reason its line records.</returns>
+    private static (AuditMethod Method, string Reason) WithdrawnBy(SessionLifetime lifetime, string before) =>
+        lifetime.IsLive
+            ? (AuditMethod.VaultChanged, $"the vault was reloaded from its file before {before}")
+            : (AuditMethod.VaultLocked, $"the vault was locked before {before}");
 
     /// <summary>The method a set refused for this outcome is recorded under, when nobody declined it.</summary>
     private static AuditMethod MethodOf(EnvOutcome outcome) => outcome switch
@@ -1409,6 +1439,7 @@ public sealed class SessionAuthority : IApproverHandler
             token => DecideTokenAsync(request, admitted, token),
             admitted,
             (method, reason) => (Refused(request.Project, request.Profile, OutcomeOf(method), reason), (TokenInfo?)null),
+            CancellationToken.None,
             cancellationToken).ConfigureAwait(false);
 
         var answered = _recorder.Recorded(

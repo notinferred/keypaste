@@ -389,12 +389,13 @@ internal static class ToolText
     /// <summary>Why a call was refused because the owner's copy of the vault no longer matches its file.</summary>
     internal const string VaultChanged = """
         keypaste: DENIED. The keypaste process holding this vault has a copy that no longer matches
-        the vault file: another program changed the file, or a change made in keypaste was still being
-        saved. Nothing was read or released.
+        the vault file: another program changed the file, a change made in keypaste was still being
+        saved, or the person reloaded the vault while this call waited. Nothing was read or released.
 
-        If a change was being saved, try once more. Otherwise ask the person you are working with to
-        reload the vault, with Reload in the keypaste desktop app or by restarting `keypaste approve`,
-        and then try again. This call was recorded in the audit log as denied.
+        If a change was being saved or the vault was just reloaded, try once more. Otherwise ask the
+        person you are working with to reload the vault, with Reload in the keypaste desktop app or by
+        restarting `keypaste approve`, and then try again. This call was recorded in the audit log as
+        denied.
         """;
 
     /// <summary>Why a call was refused when this server names no vault.</summary>

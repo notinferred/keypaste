@@ -31,6 +31,20 @@
     <Setter Property="MaxLines" Value="1" />
   </Style>
 
+  <!-- A run prompt's environment, on a fixed row of its own beneath the header: the name in the mono
+       face, wrapping and never trimmed, which one of at most 32 characters never needs to. -->
+  <Style Selector="Grid.prompt-environment">
+    <Setter Property="Height" Value="20" />
+  </Style>
+  <Style Selector="TextBlock.prompt-environment">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="TextTrimming" Value="None" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
   <Style Selector="Border.prompt-tile">
     <Setter Property="Width" Value="36" />
     <Setter Property="Height" Value="36" />

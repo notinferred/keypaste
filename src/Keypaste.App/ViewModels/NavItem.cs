@@ -7,6 +7,7 @@ internal sealed class NavItem : ObservableObject
 {
     private string _count = string.Empty;
     private bool _dotLive;
+    private bool _dotDanger;
     private string? _detail;
     private bool _expanded = true;
 
@@ -37,6 +38,13 @@ internal sealed class NavItem : ObservableObject
     {
         get => _dotLive;
         set => Set(ref _dotLive, value);
+    }
+
+    /// <summary>Whether the dot is red: this app holds the vault and refuses every agent request (D-0494).</summary>
+    internal bool DotDanger
+    {
+        get => _dotDanger;
+        set => Set(ref _dotDanger, value);
     }
 
     /// <summary>Whether the row folds the rows under it: Items does, over the group tree.</summary>

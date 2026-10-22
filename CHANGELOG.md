@@ -27,6 +27,12 @@ When another program such as KeePassXC or a sync tool saves the open vault, the 
 
 When an agent's request finds the app's audit log won't open, the Agents screen now says that keypaste refuses every agent request until it does, with the reason, and the tooltip on the sidebar's Agents row says Refusing agents. Fixing the log file clears both at the next request; unlocking alone still creates no log.
 
+While the app refuses every agent request because its audit log won't open, the dot on the sidebar's Agents row is now red instead of green.
+
+Reload in the app now also withdraws every agent request still waiting for your answer, as locking does, so pressing Allow on a prompt from before the reload releases nothing from what the reload read in, and the agent can ask again ([N.16](docs/steps/N.16.md)).
+
+The prompts for an agent's run and for `keypaste run --session` now show the environment on a row of its own beneath the heading, with its whole name, so a long one is never cut short ([N.6](docs/steps/N.6.md)).
+
 On an agent's settings panel, a choice made from the keyboard keeps the keyboard on its chip once the panel shows the change, or on the first chip of its group when that choice is no longer offered, so Tab and Space carry on from where you were.
 
 A toast in the app no longer blocks what it covers: a click where it is drawn reaches the button under it, such as Run in a terminal at the foot of a project. The clipboard's toast still takes a press on its Clear now.

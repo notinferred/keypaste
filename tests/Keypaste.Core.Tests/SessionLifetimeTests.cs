@@ -28,6 +28,28 @@ public sealed class SessionLifetimeTests
     }
 
     [Fact]
+    public void Withdrawing_refuses_what_was_waiting_and_keeps_the_lifetime()
+    {
+        using var lifetime = new SessionLifetime();
+        var before = lifetime.Waiting;
+
+        lifetime.Withdraw();
+
+        Assert.True(lifetime.IsLive);
+        Assert.False(lifetime.Ended.IsCancellationRequested);
+        Assert.True(before.IsCancellationRequested);
+        Assert.False(lifetime.TryCommit(before));
+
+        var after = lifetime.Waiting;
+        Assert.True(lifetime.TryCommit(after));
+
+        lifetime.End();
+
+        Assert.True(after.IsCancellationRequested);
+        Assert.False(lifetime.TryCommit(after));
+    }
+
+    [Fact]
     public void Ending_it_twice_is_not_an_error()
     {
         using var lifetime = new SessionLifetime();

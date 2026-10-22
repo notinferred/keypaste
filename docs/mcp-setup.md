@@ -224,10 +224,10 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `exposure` | A listing, naming only what the agent can see. |
 | `no-approver` | In `v0.3.0`, nobody was running `keypaste agent`; in source, nothing held the vault unlocked. |
 | `no-session` | In source: the request did not reach the current session of the process holding this server's vault — the bridge had no vault named or chosen, the process that answered holds another vault, or the vault was locked or unlocked again between attaching and asking. Nothing was considered. |
-| `vault-changed` | In source: the process holding the vault had a copy that no longer matched its file. Another program saved the file, which lasts until the person reloads the vault, or a change made in keypaste was still being saved. Nothing was read. |
+| `vault-changed` | In source: the process holding the vault had a copy that no longer matched its file. Another program saved the file, which lasts until the person reloads the vault, or a change made in keypaste was still being saved; or the person reloaded the vault while the request waited for an answer, which withdrew it. Nothing was read. |
 | `out-of-scope` | The entry was outside exposure or absent. A shared response prevents existence checks outside exposure. |
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or a request for the same field was refused a moment ago, and on an `access_change` line any request for more from an agent or a terminal was refused or went unanswered a moment ago. |
-| `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
+| `cancelled` | The client stopped waiting before anybody answered, or, on an `access_change` line, a lock or a reload took the confirmation down first. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
 | `inject-only` | The agent's settings give it no values, so a request for one was refused before anything was read ([policy.md](policy.md)). |
 | `run-off` | In source: the agent's settings do not let it run commands, so a run was refused before anything was read. |

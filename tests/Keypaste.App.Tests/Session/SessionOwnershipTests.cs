@@ -160,8 +160,8 @@ public sealed class SessionOwnershipTests
 
     /// <summary>
     /// While the log will not open, Agents and the sidebar say every request is refused, read from the
-    /// last refusal: an unlock alone creates no log and says nothing, and a mended log clears it at the
-    /// next request (G.9).
+    /// last refusal, and the sidebar's Agents dot shows danger rather than ok: an unlock alone creates no
+    /// log and says nothing, and a mended log clears it at the next request (G.9, D-0494).
     /// </summary>
     [Fact]
     public async Task Agents_says_when_the_log_could_not_be_opened_and_an_unlock_alone_opens_none()
@@ -176,10 +176,12 @@ public sealed class SessionOwnershipTests
         Unlock(authority.Session, fixture.Path_, TempVault.Password);
         using var agents = new AgentActivityViewModel(authority, fixture.Home, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var dot = shell.MainNav.Single(item => item.HasDot);
 
         Assert.False(File.Exists(log));
         Assert.Null(authority.LastAuditFailure);
         Assert.DoesNotContain("audit log", agents.Status, StringComparison.Ordinal);
+        Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
 
         Directory.CreateDirectory(log);
         var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
@@ -198,6 +200,7 @@ public sealed class SessionOwnershipTests
         Assert.NotNull(failure);
         Assert.EndsWith(AgentActivityViewModel.Unrecorded(failure), agents.Status, StringComparison.Ordinal);
         Assert.Equal("Refusing agents · the audit log won't open", shell.AgentsDetail);
+        Assert.Equal((false, true), (dot.DotLive, dot.DotDanger));
 
         Directory.Delete(log);
         var listed = await client.ListAsync(Listing(fixture.Path_, attached), Token);
@@ -210,6 +213,7 @@ public sealed class SessionOwnershipTests
         Assert.Null(authority.LastAuditFailure);
         Assert.DoesNotContain("audit log", agents.Status, StringComparison.Ordinal);
         Assert.StartsWith("Answering agents", shell.AgentsDetail, StringComparison.Ordinal);
+        Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
     }
 
     /// <summary>

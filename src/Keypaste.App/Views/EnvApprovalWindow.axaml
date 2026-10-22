@@ -24,31 +24,36 @@
   <!-- Fixed heights, as in ApprovalWindow: the command, directory and names are what the runner
        sent, so each sits in a box that wraps and scrolls and none of them can move the question or
        the buttons (THREATS.md T-2, T-30). Only the header and the requester line are trimmed to one
-       line; no part of a command is hidden past an edge. No button is the default: Enter approves
-       nothing, and Escape denies. -->
+       line; the environment, which the person decides on, has a fixed row of its own beneath the
+       header, drawn whole, and no part of a command is hidden past an edge. No button is the
+       default: Enter approves nothing, and Escape denies. -->
 
   <Border Classes="prompt">
     <StackPanel Spacing="16">
 
-      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-        <Border Grid.Column="0" Classes="prompt-tile">
-          <ctl:KpIcon Icon="terminal" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
-        </Border>
-        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-          <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
-          <!-- Docked first, the environment keeps its width and the project is trimmed to what is left. -->
-          <DockPanel HorizontalAlignment="Left">
-            <TextBlock Name="ProfileText" DockPanel.Dock="Right" Classes="prompt-sub" Text="{Binding Profile}"
-                       MaxWidth="120" TextTrimming="CharacterEllipsis" />
-            <TextBlock DockPanel.Dock="Right" Classes="prompt-sub" Text=" · environment " />
-            <TextBlock Name="ProjectText" Classes="prompt-sub" Text="{Binding Project}" TextTrimming="CharacterEllipsis" />
-          </DockPanel>
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Border Classes="dot waiting" />
-          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
-        </StackPanel>
-      </Grid>
+      <StackPanel Spacing="10">
+        <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+          <Border Grid.Column="0" Classes="prompt-tile">
+            <ctl:KpIcon Icon="terminal" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+          </Border>
+          <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
+            <DockPanel HorizontalAlignment="Left">
+              <TextBlock DockPanel.Dock="Left" Classes="prompt-sub" Text="project " />
+              <TextBlock Name="ProjectText" Classes="prompt-sub" Text="{Binding Project}" />
+            </DockPanel>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Border Classes="dot waiting" />
+            <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+          </StackPanel>
+        </Grid>
+
+        <Grid Classes="prompt-environment" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Classes="prompt-sub" Text="environment" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Name="ProfileText" Classes="prompt-environment" Text="{Binding Profile}" />
+        </Grid>
+      </StackPanel>
 
       <TextBlock Name="RequesterText" Classes="prompt-sub" TextTrimming="CharacterEllipsis"
                  Text="{Binding Requester, StringFormat='asked by {0}'}"

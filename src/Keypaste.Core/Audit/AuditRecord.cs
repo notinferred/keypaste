@@ -96,7 +96,8 @@ public enum AuditMethod
     /// nothing from it (D-0317).</summary>
     /// <remarks>
     /// Somebody else wrote the file, which lasts until a person reloads it, or a change made in the
-    /// owner has not been saved yet. The reason says which.
+    /// owner has not been saved yet, or a reload replaced the copy a request was waiting on, which
+    /// withdrew it (D-0412). The reason says which.
     /// </remarks>
     VaultChanged = 18,
 

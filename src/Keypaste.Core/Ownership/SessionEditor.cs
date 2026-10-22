@@ -63,9 +63,14 @@ public sealed class SessionEditor
     /// <summary>Decides one edit: checks it, asks the person, then writes and saves it.</summary>
     /// <param name="request">The edit, already admitted to <paramref name="lifetime"/>.</param>
     /// <param name="lifetime">The unlock it was asked under.</param>
-    /// <param name="cancellationToken">Withdraws the question when the terminal stops waiting or the vault is locked.</param>
+    /// <param name="waiting">The lifetime's <see cref="SessionLifetime.Waiting"/> as the request began, which a lock or a reload withdraws.</param>
+    /// <param name="cancellationToken">Withdraws the question when the terminal stops waiting, the vault is locked or it is reloaded.</param>
     /// <returns>What became of it.</returns>
-    internal async ValueTask<EditReply> DecideAsync(EditRequest request, SessionLifetime lifetime, CancellationToken cancellationToken)
+    internal async ValueTask<EditReply> DecideAsync(
+        EditRequest request,
+        SessionLifetime lifetime,
+        CancellationToken waiting,
+        CancellationToken cancellationToken)
     {
         var edit = request.Edit;
 
@@ -117,9 +122,9 @@ public sealed class SessionEditor
         var prompt = TerminalEditPrompt.For(edit, preview);
         var answer = await _gate.AskAsync([ApprovalGate.AskedForMore], prompt, cancellationToken).ConfigureAwait(false);
 
-        if (!lifetime.IsLive)
+        if (!lifetime.IsLive || waiting.IsCancellationRequested)
         {
-            return Refused(AuditMethod.VaultLocked, "the vault was locked before this was saved");
+            return Withdrawn(lifetime);
         }
 
         if (!answer.Releases())
@@ -143,9 +148,9 @@ public sealed class SessionEditor
             return Refused(AuditMethod.Cancelled, "the request was withdrawn before anything was written");
         }
 
-        if (!lifetime.TryCommit())
+        if (!lifetime.TryCommit(waiting))
         {
-            return Refused(AuditMethod.VaultLocked, "the vault was locked before this was saved");
+            return Withdrawn(lifetime);
         }
 
         Vault? written = null;
@@ -178,6 +183,13 @@ public sealed class SessionEditor
 
         return new EditReply(AuditDecision.Granted, AuditMethod.Prompt, "a person allowed it, and the vault holds it") { Done = done };
     }
+
+    /// <summary>The refusal of an edit a lock or a reload withdrew before it was saved (D-0412).</summary>
+    /// <remarks>Told apart by the lifetime, since a reload replaces the wait before it cancels the one it replaced.</remarks>
+    private static EditReply Withdrawn(SessionLifetime lifetime) =>
+        lifetime.IsLive
+            ? Refused(AuditMethod.VaultChanged, "the vault was reloaded from its file before this was saved")
+            : Refused(AuditMethod.VaultLocked, "the vault was locked before this was saved");
 
     /// <summary>Takes an edit back out of the vault it was made in, unless the vault was locked meanwhile and took the edit with it.</summary>
     private static void TakeBack(Vault? vault, VaultCheckpoint? checkpoint)

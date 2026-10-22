@@ -244,6 +244,7 @@
                             Name="AgentsDot"
                             Classes="dot"
                             Classes.ok="{Binding DotLive}"
+                            Classes.danger="{Binding DotDanger}"
                             Margin="8,0,0,0"
                             IsVisible="{Binding HasDot}" />
                     <Button Grid.Column="4"

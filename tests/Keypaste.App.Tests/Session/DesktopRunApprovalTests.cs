@@ -35,7 +35,8 @@ public sealed class DesktopRunApprovalTests
             var window = Assert.IsType<RunApprovalWindow>(await app.PromptAsync());
 
             Assert.Equal($"{DesktopApprovalTests.Label} wants 1 secret", Text(window, "TitleText"));
-            Assert.StartsWith("via MCP · environment dev · ", Text(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.StartsWith("via MCP · ", Text(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.Equal("dev", Text(window, "ProfileText"));
             Assert.Equal("tool: keypaste.run", Text(window, "ToolText"));
             Assert.Equal("deploy --to staging", Text(window, "CommandText"));
             Assert.StartsWith("runs ", Text(window, "ProgramText"), StringComparison.Ordinal);
@@ -129,16 +130,27 @@ public sealed class DesktopRunApprovalTests
             hostile.Close();
         });
 
-    /// <summary>The header is the one place the environment is named, so a directory long enough to fill it, shown whole in the call box, is what gets trimmed.</summary>
+    /// <summary>
+    /// The environment has a fixed row of its own, so the longest name one can have is drawn whole on one
+    /// line and moves nothing, while a directory long enough to fill the header, shown whole in the call
+    /// box, is what gets trimmed there.
+    /// </summary>
     [Fact]
-    public Task A_long_directory_leaves_the_environment_whole_in_the_header() =>
+    public Task The_longest_environment_is_drawn_whole_on_its_own_row_and_moves_nothing() =>
         HeadlessSession.On(() =>
         {
-            var (window, _) = Layout(Run("claude-code", "/home/alice/src/" + string.Join('/', Enumerable.Repeat("billing-api", 12)), "deploy") with { Profile = "prod" });
+            var longest = new string('w', EnvProfileNames.MaximumLength - 3) + "-eu";
+            var (ordinary, ordinaryLayout) = Layout(Run("claude-code", "/work", "deploy"));
+            var (window, layout) = Layout(
+                Run("claude-code", "/home/alice/src/" + string.Join('/', Enumerable.Repeat("billing-api", 12)), "deploy") with { Profile = longest });
 
-            Assert.StartsWith("via MCP · environment prod · /home/", Drawn(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.Equal(longest, Drawn(window, "ProfileText"));
+            Assert.Single(window.FindControl<TextBlock>("ProfileText")!.TextLayout.TextLines);
+            Assert.StartsWith("via MCP · /home/", Drawn(window, "SubtitleText"), StringComparison.Ordinal);
             Assert.EndsWith("…", Drawn(window, "SubtitleText"), StringComparison.Ordinal);
+            Assert.Equal(ordinaryLayout, layout);
 
+            ordinary.Close();
             window.Close();
         });
 

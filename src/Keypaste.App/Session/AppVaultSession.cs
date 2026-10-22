@@ -33,7 +33,7 @@ namespace Keypaste.App.Session;
 /// <b>Every lock ends the unlock's <see cref="SessionLifetime"/> first</b>, before the vault is
 /// disposed, whatever the reason: manual, idle, minimize, an access change, a replaced vault or
 /// shutdown. That one transition is what withdraws requests an agent has waiting and zeroes the
-/// grants they were given (D-0313).
+/// grants they were given (D-0313); a reload withdraws them too, keeping the lifetime (D-0412).
 /// </para>
 /// <para>
 /// <b>It names no Avalonia type, and must not.</b> Everything below is testable with a
@@ -897,7 +897,8 @@ internal sealed class AppVaultSession : IDisposable
     /// For a person told that another program saved the vault (D-0412). The file is opened with the
     /// key this unlock holds, so nothing is asked again except a hardware key's touch. The lifetime
     /// stays, so connected agents are not cut off, and every grant they hold is withdrawn, as after an
-    /// access change (D-0318). A change the open copy holds that no save wrote is discarded; nothing
+    /// access change (D-0318), with every request still waiting on a person, as a lock withdraws them,
+    /// so an agent asks again. A change the open copy holds that no save wrote is discarded; nothing
     /// is merged.
     /// </para>
     /// <para>
@@ -909,11 +910,13 @@ internal sealed class AppVaultSession : IDisposable
     {
         Vault? vault;
         HardwareKey? hardwareKey;
+        SessionLifetime? lifetime;
 
         lock (_gate)
         {
             vault = _vault;
             hardwareKey = _hardwareKey;
+            lifetime = _lifetime;
         }
 
         if (vault is null)
@@ -943,7 +946,9 @@ internal sealed class AppVaultSession : IDisposable
             return new ReloadResult(ReloadOutcome.Locked);
         }
 
-        // Before the swap, so no grant holding a value from the stale copy outlives it.
+        // Before the swap, so no grant holding a value from the stale copy outlives it, and no prompt a
+        // person answers afterwards releases a value from the copy that replaces it.
+        lifetime?.Withdraw();
         Edited?.Invoke(this, VaultEdit.Everything);
 
         return Swap(vault, reloaded, hardwareKey)

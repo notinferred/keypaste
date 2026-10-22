@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
@@ -14,7 +15,8 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// The app's session answers agents from the vault as last saved: an edit made on a screen is the next
 /// value released, what it touched is asked about again, and a file another program saved is refused
-/// until a person reloads it or unlocks it again (U.3, N.16, D-0317, D-0318, D-0412).
+/// until a person reloads it or unlocks it again, the reload withdrawing what was waiting on a person
+/// (U.3, N.16, D-0317, D-0318, D-0412).
 /// </summary>
 /// <remarks>
 /// Each act goes through the screen a person uses, and each request through the app's real endpoint,
@@ -242,6 +244,49 @@ public sealed class CurrentStateTests : IDisposable
         Assert.Equal(2, _prompt.Asked);
     }
 
+    /// <summary>
+    /// The person presses Allow only after the reload, on the prompt it withdrew: nothing leaves, the line
+    /// says the vault was reloaded, and the agent's next request is asked about anew.
+    /// </summary>
+    [Fact]
+    public async Task A_prompt_waiting_when_another_programs_save_is_reloaded_is_withdrawn_and_releases_nothing()
+    {
+        await using var agent = await Agent.AttachAsync(this);
+        var shown = _prompt.HoldNext();
+        var asked = agent.RequestAsync(_token);
+        var withdrawal = await shown.WaitAsync(_connect, Cancel);
+
+        using (var writer = Vault.Open(_fixture.Path_, TempVault.Password))
+        {
+            writer.UpdateEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "external" });
+            writer.Save();
+        }
+
+        using var shell = new ShellViewModel(_session, _fixture.Home, authority: null, clock: new ManualClock(AppClock.Start));
+        Assert.True(shell.HasVaultChanged);
+
+        shell.ReloadCommand.Execute(null);
+
+        Assert.False(shell.HasVaultChanged);
+        Assert.True(withdrawal.IsCancellationRequested);
+
+        _prompt.Allow();
+        var refused = await asked.WaitAsync(_connect, Cancel);
+
+        Assert.Equal(AuditMethod.VaultChanged, refused.Method);
+        Assert.Null(refused.Value);
+
+        using (var line = LastAuditLine())
+        {
+            Assert.Equal("denied", line.RootElement.GetProperty("decision").GetString());
+            Assert.Equal("vault-changed", line.RootElement.GetProperty("method").GetString());
+            Assert.Equal("the vault was reloaded from its file before anybody answered", line.RootElement.GetProperty("reason").GetString());
+        }
+
+        Assert.Equal((AuditMethod.Prompt, "external"), await agent.RequestAsync(_token));
+        Assert.Equal(2, _prompt.Asked);
+    }
+
     private void Unlock()
     {
         using var master = TempVault.Secret(TempVault.Password);
@@ -254,6 +299,15 @@ public sealed class CurrentStateTests : IDisposable
         using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
         using var entries = new EntriesViewModel(_session, countdown);
         act(entries);
+    }
+
+    /// <summary>The newest audit line, read beside the session holding the log open for writing.</summary>
+    private JsonDocument LastAuditLine()
+    {
+        using var stream = new FileStream(KeypasteHome.AuditPath(_fixture.Home), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+
+        return JsonDocument.Parse(reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1]);
     }
 
     private static EntryDetailViewModel Select(EntriesViewModel entries, string path)
@@ -330,15 +384,36 @@ public sealed class CurrentStateTests : IDisposable
         public ValueTask DisposeAsync() => _client.DisposeAsync();
     }
 
-    /// <summary>A person who approves every request put to them.</summary>
+    /// <summary>A person who approves every request put to them, at once unless told to hold the next one.</summary>
     private sealed class ApprovingPrompt : IApprovalChannel
     {
+        private readonly TaskCompletionSource _allowed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource<CancellationToken>? _held;
+
         internal int Asked { get; private set; }
 
-        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        /// <summary>Keeps the next request on screen until <see cref="Allow"/>.</summary>
+        /// <returns>What withdraws that request, once it is on screen.</returns>
+        internal Task<CancellationToken> HoldNext()
+        {
+            _held = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            return _held.Task;
+        }
+
+        /// <summary>Presses Allow on the held request, whether or not it was withdrawn meanwhile.</summary>
+        internal void Allow() => _allowed.TrySetResult();
+
+        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
         {
             Asked++;
-            return ValueTask.FromResult(ApprovalAnswer.Approved);
+
+            if (Interlocked.Exchange(ref _held, null) is { } held)
+            {
+                held.SetResult(cancellationToken);
+                await _allowed.Task.ConfigureAwait(false);
+            }
+
+            return ApprovalAnswer.Approved;
         }
     }
 }

@@ -22,27 +22,35 @@
 
   <!-- Fixed heights, as in the other prompt windows: the client, program, command, directory and
        reason are the agent's, so none of them can move the question or the buttons (THREATS.md T-2,
-       T-35). The header is one fixed row whose lines are trimmed; the call box below holds the
+       T-35). The header is one fixed row whose lines are trimmed; the environment, which the person
+       decides on, has a fixed row of its own beneath it, drawn whole; the call box below holds the
        command and directory whole, wrapping and scrolling, so no part of either is hidden past an
        edge. No button is the default: Enter approves nothing, and Escape denies. -->
 
   <Border Classes="prompt">
     <StackPanel Spacing="16">
 
-      <Grid Classes="prompt-head" Height="57" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-        <Border Grid.Column="0" Classes="prompt-tile">
-          <ctl:KpIcon Icon="bot" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
-        </Border>
-        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-          <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
-          <TextBlock Name="SubtitleText" Classes="prompt-sub" Text="{Binding Subtitle}" />
-          <TextBlock Name="ClientText" Classes="prompt-sub" Text="{Binding Client}" FontSize="12" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Border Classes="dot waiting" />
-          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
-        </StackPanel>
-      </Grid>
+      <StackPanel Spacing="10">
+        <Grid Classes="prompt-head" Height="57" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+          <Border Grid.Column="0" Classes="prompt-tile">
+            <ctl:KpIcon Icon="bot" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+          </Border>
+          <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
+            <TextBlock Name="SubtitleText" Classes="prompt-sub" Text="{Binding Subtitle}" />
+            <TextBlock Name="ClientText" Classes="prompt-sub" Text="{Binding Client}" FontSize="12" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Border Classes="dot waiting" />
+            <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+          </StackPanel>
+        </Grid>
+
+        <Grid Classes="prompt-environment" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Classes="prompt-sub" Text="environment" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Name="ProfileText" Classes="prompt-environment" Text="{Binding Profile}" />
+        </Grid>
+      </StackPanel>
 
       <Border Classes="prompt-call" Height="94">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,10">

@@ -15,7 +15,7 @@ namespace Keypaste.Core.Ownership;
 /// </para>
 /// <para>
 /// A lock while the person is being asked withdraws the question, and a lock after it commits
-/// nothing: either way no value leaves.
+/// nothing: either way no value leaves. A reload does the same while keeping the lifetime (D-0412).
 /// </para>
 /// </remarks>
 public sealed class SessionEnvResolver
@@ -103,6 +103,7 @@ public sealed class SessionEnvResolver
             return Locked(project, profile);
         }
 
+        var waiting = lifetime.Waiting;
         var resolved = Read(lifetime, resolve, project, profile);
 
         if (resolved.Outcome != EnvOutcome.Resolved)
@@ -113,8 +114,8 @@ public sealed class SessionEnvResolver
         if (confirm is not null)
         {
             var preview = resolved.Preview;
-            using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
-            Withdrawals.Add(lifetime.Ended);
+            using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+            Withdrawals.Add(waiting);
             bool confirmed;
 
             try
@@ -123,7 +124,9 @@ public sealed class SessionEnvResolver
             }
             catch (OperationCanceledException) when (withdrawn.IsCancellationRequested)
             {
-                return lifetime.IsLive ? EnvResolved.Refused(preview.Project, EnvOutcome.Declined, profile: preview.Profile) : Locked(project, profile);
+                return !lifetime.IsLive ? Locked(project, profile)
+                    : waiting.IsCancellationRequested ? Reloaded(project, profile)
+                    : EnvResolved.Refused(preview.Project, EnvOutcome.Declined, profile: preview.Profile);
             }
 
             if (!confirmed)
@@ -144,7 +147,9 @@ public sealed class SessionEnvResolver
             }
         }
 
-        return lifetime.TryCommit() ? resolved : Locked(project, profile);
+        return lifetime.TryCommit(waiting) ? resolved
+            : lifetime.IsLive ? Reloaded(project, profile)
+            : Locked(project, profile);
     }
 
     private EnvResolved Read(SessionLifetime lifetime, Func<Vault, EnvResolved> resolve, string project, string profile)
@@ -167,4 +172,7 @@ public sealed class SessionEnvResolver
 
     private static EnvResolved Locked(string project, string profile) =>
         EnvResolved.Refused(project, EnvOutcome.Locked, profile: profile);
+
+    private static EnvResolved Reloaded(string project, string profile) =>
+        EnvResolved.Refused(project, EnvOutcome.ChangedWhileAsked, profile: profile, refusal: "the vault was reloaded from its file before the set was released");
 }

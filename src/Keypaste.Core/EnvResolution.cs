@@ -30,7 +30,7 @@ public enum EnvOutcome
     /// <summary>The person asked did not confirm.</summary>
     Declined = 7,
 
-    /// <summary>The set's names changed while the person was being asked about them.</summary>
+    /// <summary>The set's names changed while the person was being asked about them, or a reload withdrew the question (D-0412).</summary>
     ChangedWhileAsked = 8,
 
     /// <summary>The request did not come from a connection attached to the session holding the vault.</summary>
@@ -90,6 +90,8 @@ public sealed record EnvPreview(string Project, IReadOnlyList<string> Keys)
 /// <summary>The result of resolving one project's env set.</summary>
 public sealed class EnvResolved
 {
+    private readonly string? _refusal;
+
     private EnvResolved(
         string project,
         string profile,
@@ -98,7 +100,8 @@ public sealed class EnvResolved
         IReadOnlyList<EnvProblem> problems,
         IReadOnlyList<EnvSource> sources,
         bool requiresLiveApproval,
-        IReadOnlyList<EnvVariable> fills)
+        IReadOnlyList<EnvVariable> fills,
+        string? refusal = null)
     {
         Project = project;
         Profile = profile;
@@ -108,6 +111,7 @@ public sealed class EnvResolved
         Sources = sources;
         RequiresLiveApproval = requiresLiveApproval;
         Fills = fills;
+        _refusal = refusal;
     }
 
     /// <summary>The project resolved.</summary>
@@ -149,7 +153,7 @@ public sealed class EnvResolved
     };
 
     /// <summary>Why nothing was released, in words a front end prefixes with its own verb, or empty when the set was.</summary>
-    public string Refusal => Outcome switch
+    public string Refusal => _refusal ?? Outcome switch
     {
         EnvOutcome.Resolved => string.Empty,
         EnvOutcome.NoProject => $"no env set for '{Project}'",
@@ -177,9 +181,19 @@ public sealed class EnvResolved
         IReadOnlyList<EnvVariable>? fills = null) =>
         new(project, profile, EnvOutcome.Resolved, variables, [], sources ?? [], requiresLiveApproval, fills ?? []);
 
+    /// <summary>A set nothing of which was released.</summary>
+    /// <param name="project">The project.</param>
+    /// <param name="outcome">Why nothing was released.</param>
+    /// <param name="problems">Each variable that cannot be released, for <see cref="EnvOutcome.Unusable"/>.</param>
+    /// <param name="profile">The profile.</param>
+    /// <param name="refusal">What <see cref="Refusal"/> says in place of the outcome's own words, or null for those.</param>
     internal static EnvResolved Refused(
-        string project, EnvOutcome outcome, IReadOnlyList<EnvProblem>? problems = null, string profile = EnvProfileNames.Default) =>
-        new(project, profile, outcome, [], problems ?? [], [], false, []);
+        string project,
+        EnvOutcome outcome,
+        IReadOnlyList<EnvProblem>? problems = null,
+        string profile = EnvProfileNames.Default,
+        string? refusal = null) =>
+        new(project, profile, outcome, [], problems ?? [], [], false, [], refusal);
 }
 
 /// <summary>One environment's variables as a listing reads them, unjudged.</summary>

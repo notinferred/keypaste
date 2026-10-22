@@ -114,6 +114,51 @@ public sealed class SessionEnvResolverTests : IDisposable
         Assert.Empty(resolved.Variables);
     }
 
+    /// <summary>A reload withdraws the question as a lock does, keeping the session (D-0412).</summary>
+    [Fact]
+    public async Task A_reload_while_the_person_is_asked_releases_nothing()
+    {
+        var lifetime = _lifetime!;
+        var asked = new TaskCompletionSource<EnvPreview>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var pending = Resolver().ResolveAsync(
+            "dev",
+            async (preview, token) =>
+            {
+                asked.SetResult(preview);
+                await Task.Delay(Timeout.Infinite, token);
+                return true;
+            },
+            Cancel).AsTask();
+
+        Assert.Equal(["TOKEN"], (await asked.Task.WaitAsync(Cancel)).Keys);
+        lifetime.Withdraw();
+
+        var resolved = await pending.WaitAsync(Cancel);
+        Assert.Equal(EnvOutcome.ChangedWhileAsked, resolved.Outcome);
+        Assert.Equal("the vault was reloaded from its file before the set was released", resolved.Refusal);
+        Assert.Empty(resolved.Variables);
+        Assert.True(lifetime.IsLive);
+    }
+
+    [Fact]
+    public async Task A_reload_after_confirming_commits_nothing()
+    {
+        var lifetime = _lifetime!;
+
+        var resolved = await Resolver().ResolveAsync(
+            "dev",
+            (_, _) =>
+            {
+                lifetime.Withdraw();
+                return ValueTask.FromResult(true);
+            },
+            Cancel);
+
+        Assert.Equal(EnvOutcome.ChangedWhileAsked, resolved.Outcome);
+        Assert.Empty(resolved.Variables);
+    }
+
     [Fact]
     public async Task A_file_another_program_saved_while_the_person_was_asked_is_refused()
     {

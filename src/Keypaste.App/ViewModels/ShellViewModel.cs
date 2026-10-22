@@ -79,6 +79,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string? _openProject;
     private bool _rebuildingSidebar;
     private bool _agentsServing;
+    private bool _agentsRefusing;
     private string _agentsDetail = string.Empty;
     private SharingViewModel? _share;
     private string _vaultStatus = string.Empty;
@@ -638,7 +639,23 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         {
             if (Set(ref _agentsServing, value))
             {
-                MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity).DotLive = value;
+                ShowAgentsDot();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether this app answers agents for the vault but refuses every request, because its audit log
+    /// will not open; the Agents row's dot then shows danger in place of ok (D-0494).
+    /// </summary>
+    internal bool AgentsRefusing
+    {
+        get => _agentsRefusing;
+        private set
+        {
+            if (Set(ref _agentsRefusing, value))
+            {
+                ShowAgentsDot();
             }
         }
     }
@@ -1159,8 +1176,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count + activity.WaitingChanges.Count + activity.WaitingEdits.Count;
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
+            AgentsRefusing = Authority.LastAuditFailure is not null;
             AgentsServing = true;
-            AgentsDetail = Authority.LastAuditFailure is not null
+            AgentsDetail = AgentsRefusing
                 ? "Refusing agents · the audit log won't open"
                 : waiting > 0
                     ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
@@ -1170,6 +1188,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
 
         AgentsServing = false;
+        AgentsRefusing = false;
         AgentsDetail = status switch
         {
             AuthorityStatus.HeldBy => "another keypaste holds this vault",
@@ -1177,6 +1196,13 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             _ => "not serving agents",
         };
         SetCount(DestinationKind.AgentActivity, 0);
+    }
+
+    private void ShowAgentsDot()
+    {
+        var agents = MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
+        agents.DotLive = _agentsServing && !_agentsRefusing;
+        agents.DotDanger = _agentsServing && _agentsRefusing;
     }
 
     private static string ClientCount(int count) => count switch

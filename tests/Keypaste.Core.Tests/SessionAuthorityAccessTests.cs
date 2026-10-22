@@ -976,6 +976,26 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         });
     }
 
+    /// <summary>A reload withdraws a confirmation on screen as a lock does, so its Allow changes nothing and the session stays (D-0412).</summary>
+    [Fact]
+    public async Task AReloadWhileAWideningIsConfirmed_ChangesNothing()
+    {
+        var lifetime = _lifetime!;
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        _fixture.Channel.WhileConfirming = lifetime.Withdraw;
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync(withClient: false);
+
+        var withdrawn = await client.ChangeAccessAsync(Change() with { Mode = "automatic" }, Token);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Cancelled), (withdrawn!.Decision, withdrawn.Method));
+        Assert.Equal(1, _fixture.Channel.AccessAsked);
+        Assert.Empty(_fixture.Settings.Written);
+        Assert.Empty(_fixture.Settings.CapsWritten);
+        Assert.Equal(["cancelled"], Lines("method"));
+        Assert.True(lifetime.IsLive);
+    }
+
     /// <summary>
     /// Resetting ceilings keypaste cannot parse waits for the person, who is shown what each agent's
     /// settings in the vault then give beyond the defaults, and is recorded under every agent; ceilings it

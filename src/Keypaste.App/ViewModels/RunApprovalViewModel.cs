@@ -26,7 +26,8 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         var who = prompt.Label ?? prompt.Client;
 
         Title = $"{who} wants {prompt.Variables.Count} secret{(prompt.Variables.Count == 1 ? string.Empty : "s")}";
-        Subtitle = $"via MCP · environment {prompt.Profile} · {prompt.Directory}";
+        Subtitle = $"via MCP · {prompt.Directory}";
+        Profile = prompt.Profile;
         Client = prompt.Label is { } label ? $"{prompt.Client} · label {label}" : prompt.Client;
         Tool = $"tool: {RunPrompt.ToolName}";
         Program = $"runs {prompt.Program}";
@@ -63,6 +64,9 @@ internal sealed class RunApprovalViewModel : PromptViewModel
     internal string Title { get; }
 
     internal string Subtitle { get; }
+
+    /// <summary>The environment the set comes from, which the prompt draws whole on a row of its own.</summary>
+    internal string Profile { get; }
 
     /// <summary>What the client calls itself and its label. Never proof of anything.</summary>
     internal string Client { get; }
