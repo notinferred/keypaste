@@ -20,4 +20,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-The CLI has no organize verb, kept by founder decision 2026-10-22. Search matches an item's own tags by substring, and `keypaste search` and the desktop's row name the tag it matched (gaps-1, RUNS-PENDING).
+The CLI has no organize verb, kept by founder decision 2026-10-22. Search matches an item's own tags by substring, and `keypaste search` and the desktop's row name the tag it matched (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).

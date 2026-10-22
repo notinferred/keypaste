@@ -37,8 +37,8 @@ Completed 2026-09-24 on `main` above `d01299b`, source only. [PRODUCT](../PRODUC
 
 Expiry is judged against the clock of the process resolving: `keypaste run` uses the machine's, the app its session's. An entry that expires after a child starts stays in that child's environment.
 
-`keypaste env export --dotenv` refuses an expired entry as `run` does, naming it and writing nothing (D-0337) (gaps-1b, RUNS-PENDING).
+`keypaste env export --dotenv` refuses an expired entry as `run` does, naming it and writing nothing (D-0337) (`d57aa9b7`; ci 39825609882, app 39825609666).
 
-The item pane shows an item's expiry beside Created, reading Expired in danger text once the session's clock has reached it, as the Projects matrix and Recommendations mark it; a person still fixes one in KeePassXC or by recreating the entry, since nothing in keypaste sets or clears an expiry (gaps-1c, RUNS-PENDING).
+The item pane shows an item's expiry beside Created, reading Expired in danger text once the session's clock has reached it, as the Projects matrix and Recommendations mark it; a person still fixes one in KeePassXC or by recreating the entry, since nothing in keypaste sets or clears an expiry (`4f19fbdc`; ci 39850506100, app 39850506098).
 
 `SessionEnvResolver` resolves every set an unlocked session releases: the app's Run and Open terminal through `AppVaultSession.Environments` ([E.1b](E.1b.md)), and the owner's answers to `keypaste run --session` ([E.1c](E.1c.md)), an agent's run and `keypaste run --token`, each passing its own confirmation.

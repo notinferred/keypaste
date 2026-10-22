@@ -53,5 +53,5 @@ Local, Windows 10 Pro 19045, on `main` above `8192987` with the step's changes u
 ## Limits and follow-ups
 
 - **Headless rendering only.** The menu, its focus and its closing are checked in frames drawn headless and with synthetic input.
-- **Settings › Advanced is now a screen of its own.** One row on Settings opens it, the activity log, share links, scoped tokens and diagnostics sit under it, and Back from each returns to it, as D-0507 records (gaps-1, RUNS-PENDING).
-- **The desktop prototype draws Agents as D-0455 left it and Settings › Advanced as a screen of its own.** It has no tokens on Agents and no select on a row, and the handoff's README describes both (gaps-1, RUNS-PENDING).
+- **Settings › Advanced is now a screen of its own.** One row on Settings opens it, the activity log, share links, scoped tokens and diagnostics sit under it, and Back from each returns to it, as D-0507 records (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
+- **The desktop prototype draws Agents as D-0455 left it and Settings › Advanced as a screen of its own.** It has no tokens on Agents and no select on a row, and the handoff's README describes both (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).

@@ -23,6 +23,6 @@ It had no STEPS row: it acts on a review of F.55 and F.56 and on the read-only t
 ## Limits and follow-ups
 
 - The test jobs' time on Windows and macOS was measured from today's runs and earlier serial dev runs: each of Core.Tests and Cli.Tests alone takes about half its time beside the other (Core 218 to 271 s alone on Windows against a 428 s median together), so the runner is saturated by real Argon2 derivations, not held by a lock. The split it suggests is a BACKLOG row, because it amends D-0423.
-- The shell set `Countdown` from the idle timer's thread, as before F.56, and `DependsOn`'s cache of each property's dependents is filled on first raise without a lock, so that first raise could race a raise on the UI thread. Fixed: the shell reads the clock on the timer's thread and makes every `Countdown` write on the UI thread through `Post`, the per-second count included (gaps-1, RUNS-PENDING).
+- The shell set `Countdown` from the idle timer's thread, as before F.56, and `DependsOn`'s cache of each property's dependents is filled on first raise without a lock, so that first raise could race a raise on the UI thread. Fixed: the shell reads the clock on the timer's thread and makes every `Countdown` write on the UI thread through `Post`, the per-second count included (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
 
 - The audit's other findings (merges, rewrites, speed-ups and the gate-script duplicates the gates changed today) were not acted on; the audit lives outside the repository, and none is a defect.

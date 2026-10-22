@@ -41,7 +41,7 @@ D-0463 in [DECISIONS](../../DECISIONS.md).
 
 ## Limits and follow-ups
 
-- Search matches an item's own tags by substring, and `search` names the tag it matched (gaps-1, RUNS-PENDING).
+- Search matches an item's own tags by substring, and `search` names the tag it matched (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
 - A custom field KeePassXC made under a standard name in another case, such as `password`, stays masked under `--reveal`, because core reads none (V.7a), by founder decision 2026-10-22 (D-0515).
 - `show` resolves a path as `get` does, so it reaches an item in keypaste's own groups when named.
 - `get` kept `--show` beside `--reveal` until [N.9](N.9.md) removed it; `get --show` now exits with a usage error saying it is now `--reveal`.

@@ -94,5 +94,5 @@ No ledger row. The theme default and the marks are BRAND's, and each colour chan
 - **Only drawn states are checked for amber.** Two requests waiting on Agents draw two amber countdowns, and a view the renderer does not reach could hold two amber elements.
 - **Headless rendering only.** The amber, mark and type checks read frames drawn headless by Skia at a scaling of 1, not a platform's own text rendering.
 - **Following the system is proven through the headless platform's colour-change event.** A real system switch on Windows, macOS and Linux is item 9 of desktop.md's checklist.
-- **The desktop prototype now draws the marks.** `docs/design/design/keypaste Desktop.dc.html` carries the "k." and "keypaste." outlines from `assets/brand/`; the CLI and brand-system prototypes still draw the monogram, and BRAND and `assets/brand/` stay the reference for the marks (gaps-1, RUNS-PENDING).
+- **The desktop prototype now draws the marks.** `docs/design/design/keypaste Desktop.dc.html` carries the "k." and "keypaste." outlines from `assets/brand/`; the CLI and brand-system prototypes still draw the monogram, and BRAND and `assets/brand/` stay the reference for the marks (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
 - **Regenerating the marks needs the recorded font file, fontTools, uharfbuzz and skia-pathops.** None of them is a build prerequisite.

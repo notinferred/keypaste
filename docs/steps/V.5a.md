@@ -16,4 +16,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-Tags and metadata depth are outside the slice. U.3 owns invalidating cached authorization after a move; THREATS T-13 records that a rename can widen a standing rule. Core copies an item beside itself, deletes a group into the recycle bin and moves one to another parent, each refusing keypaste's own groups; the desktop offers the copy in an item's ⋯ menu and the group's delete and move in its sidebar menu (gaps-1, RUNS-PENDING).
+Tags and metadata depth are outside the slice. U.3 owns invalidating cached authorization after a move; THREATS T-13 records that a rename can widen a standing rule. Core copies an item beside itself, deletes a group into the recycle bin and moves one to another parent, each refusing keypaste's own groups; the desktop offers the copy in an item's ⋯ menu and the group's delete and move in its sidebar menu (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).

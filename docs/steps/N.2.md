@@ -39,7 +39,7 @@ Local, Windows 10 Pro 19045, KeePassXC 2.7.10, on `main` above `2e8a5c5`.
 ## Limits and follow-ups
 
 - KeePassXC 2.6, which kept these keys in its roaming file, is not found.
-- A portable KeePassXC is found while it runs: `KeePassXcDatabases.LocalConfigPaths` reads `config/keepassxc_local.ini` beside the executable of each running KeePassXC whose folder holds `.portable`, before the installed copy's file, and searches no disk; `verify-keepassxc-first-run.sh` runs the portable build on Windows and the welcome lists its databases only while it runs (gaps-1, RUNS-PENDING).
+- A portable KeePassXC is found while it runs: `KeePassXcDatabases.LocalConfigPaths` reads `config/keepassxc_local.ini` beside the executable of each running KeePassXC whose folder holds `.portable`, before the installed copy's file, and searches no disk; `verify-keepassxc-first-run.sh` runs the portable build on Windows and the welcome lists its databases only while it runs (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
 - A KeePassXC database that needs a keyfile or a YubiKey opens once the person chooses them on the unlock screen: KeePassXC's `LastKeyFiles` and `LastChallengeResponse` are binary QSettings values the reader does not read.
 - There is no test through `App.Launch`: the desktop tests share one isolated home across parallel tests, so whether the welcome shows at all would depend on what another test left in `recent.toml`. The one line that hands the located file to the screen is exercised by R.1a's first act on an installed app.
 - Source only.

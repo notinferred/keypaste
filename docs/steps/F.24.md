@@ -25,4 +25,4 @@ None.
 
 ## Limits and follow-ups
 
-The CLI cases now count their expected assets from the definition, as the app cases do, so a change to the CLI targets moves the expectation with it (gaps-1c, RUNS-PENDING).
+The CLI cases now count their expected assets from the definition, as the app cases do, so a change to the CLI targets moves the expectation with it (`4f19fbdc`; ci 39850506100, app 39850506098).

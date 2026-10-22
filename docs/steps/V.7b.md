@@ -29,8 +29,8 @@ None.
 
 ## Limits and follow-ups
 
-- Core renames a custom field in one revision, keeping its protection; `keypaste field mv` renames one from a terminal, and the pane's Rename on the field's row first names what a variable's rename breaks (gaps-1, RUNS-PENDING).
-- A revision now carries its tags and its custom fields by name and protection, never a value, and History compares them with the item's own (gaps-1, RUNS-PENDING).
-- A field value, as the password, is held from the keyboard with Space or Enter on its Reveal button, which the Items pane has had since a886a611; Projects' values and a new scoped token have one too (gaps-1, RUNS-PENDING).
-- The tag box, in the item pane and the New item form, suggests the vault's project tags the item lacks as one is typed, read from tags alone, and choosing one only fills the box, so the item pane's Add tag still asks first (gaps-1c, RUNS-PENDING).
+- Core renames a custom field in one revision, keeping its protection; `keypaste field mv` renames one from a terminal, and the pane's Rename on the field's row first names what a variable's rename breaks (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
+- A revision now carries its tags and its custom fields by name and protection, never a value, and History compares them with the item's own (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
+- A field value, as the password, is held from the keyboard with Space or Enter on its Reveal button, which the Items pane has had since a886a611; Projects' values and a new scoped token have one too (`1b16a9ca`; ci 39785584625, app 39825609666 at `d57aa9b7`).
+- The tag box, in the item pane and the New item form, suggests the vault's project tags the item lacks as one is typed, read from tags alone, and choosing one only fills the box, so the item pane's Add tag still asks first (`4f19fbdc`; ci 39850506100, app 39850506098).
 - Source only. The app step ran only locally on Windows when this was recorded; `app.yml`'s KeePassXC workflows job runs it on Ubuntu 24.04 and Windows 2025, and passed in app 39646133940 at `2073f24` ([9.2b](9.2b.md)).
