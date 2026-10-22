@@ -163,7 +163,7 @@ public sealed class AppAuthorityTests
         Assert.IsType<AuthorityStatus.Serving>(authority.Status);
     }
 
-    /// <summary>The owner line and the status say who holds the vault only while it is held, with nothing typed or pressed (F04).</summary>
+    /// <summary>The owner line, the refusal naming the holder and the status say who holds the vault only while it is held, with nothing typed or pressed (F04).</summary>
     [Fact]
     public async Task Once_the_holder_lets_the_vault_go_the_owner_line_and_the_status_clear()
     {
@@ -180,16 +180,19 @@ public sealed class AppAuthorityTests
             Type(model, TempVault.Password);
             await model.UnlockAsync();
             Assert.True(model.HasOwner);
+            Assert.Contains("keypaste approve", model.Message, StringComparison.Ordinal);
 
             clock.Advance(AppVaultSession.HolderCheck);
 
             Assert.True(model.HasOwner, "the owner line went while the holder still held the vault");
+            Assert.True(model.HasMessage, "the refusal went while the holder still held the vault");
             Assert.IsType<AuthorityStatus.HeldBy>(authority.Status);
         }
 
         clock.Advance(AppVaultSession.HolderCheck);
 
         Assert.False(model.HasOwner);
+        Assert.False(model.HasMessage, "the refusal still names a holder that has gone");
         Assert.IsType<AuthorityStatus.Locked>(authority.Status);
         Assert.False(authority.Session.IsUnlocked);
         AssertNobodyHolds(fixture);

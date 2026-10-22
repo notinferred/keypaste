@@ -69,6 +69,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private bool _waitingForTouch;
     private string? _newVaultPath;
     private string _message = string.Empty;
+    private string? _heldMessage;
     private bool _failed;
     private string? _handOffPath;
     private string _owner = string.Empty;
@@ -1170,7 +1171,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private string HeldElsewhere()
     {
         var reason = _session.HeldElsewhere ?? "another keypaste process holds this vault.";
-        return char.ToUpperInvariant(reason[0]) + reason[1..];
+        return _heldMessage = char.ToUpperInvariant(reason[0]) + reason[1..];
     }
 
     private void ShowOwner() =>
@@ -1242,6 +1243,13 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         if (!_disposed)
         {
             ShowOwner();
+
+            if (Failed && _message == _heldMessage)
+            {
+                Message = string.Empty;
+            }
+
+            _heldMessage = null;
         }
     });
 
