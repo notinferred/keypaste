@@ -354,6 +354,8 @@ AGENT_SHELL=$!
 if [ -r "/proc/$AGENT_SHELL/winpid" ]; then AGENT_PID="$(cat "/proc/$AGENT_SHELL/winpid")"; else AGENT_PID="$AGENT_SHELL"; fi
 printf '%s\n' "$MASTER" >&9
 wait_for 'listening on' "$AGENT_ERR"
+# Read again once it listens: before the subshell's exec reaches the CLI, Windows' winpid is the shell's.
+if [ -r "/proc/$AGENT_SHELL/winpid" ]; then AGENT_PID="$(cat "/proc/$AGENT_SHELL/winpid")"; else AGENT_PID="$AGENT_SHELL"; fi
 
 start_run ci agent-yes
 wait_for "is asking for a project's variables" "$AGENT_ERR" 1
