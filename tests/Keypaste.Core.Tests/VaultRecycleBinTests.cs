@@ -529,6 +529,147 @@ public sealed class VaultRecycleBinTests : IDisposable
         Assert.True(vault.RecyclesDeletedEntries);
     }
 
+    // ---------------------------------------------------------------- a deleted group
+
+    /// <summary>A group goes into the bin whole, and each item in it is listed with the path it had and when its group went.</summary>
+    [Fact]
+    public void AnItemOfADeletedGroup_IsListedWithThePathItHad_AndIsLiveNowhere()
+    {
+        using var vault = Servers(out _);
+        var before = DateTime.UtcNow.AddSeconds(-1);
+
+        Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("servers"));
+
+        Assert.Equal(
+            ["servers/db/B", "servers/web/A"],
+            vault.ReadRecycled().Select(row => $"{row.OriginalGroupPath}/{row.Title}").Order(StringComparer.Ordinal));
+        Assert.All(vault.ReadRecycled(), row => Assert.True(row.DeletedUtc >= before));
+
+        Assert.DoesNotContain(vault.ReadGroupPaths(), group => group.StartsWith("servers", StringComparison.Ordinal));
+        Assert.Empty(vault.ReadEntries());
+        Assert.Empty(vault.Search("A"));
+        Assert.Null(vault.Find(new EntryName("servers/web", "A")));
+    }
+
+    /// <summary>Each item comes back at the path it had; a group on the way the vault no longer has is made again, once.</summary>
+    [Fact]
+    public void RestoringItemsOfADeletedGroup_PutsEachBackAtItsPath_MakingItsGroupsOnce()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Servers(out _, path))
+        {
+            Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("servers"));
+            vault.Save();
+        }
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            foreach (var row in vault.ReadRecycled().OrderBy(row => row.Title, StringComparer.Ordinal).Reverse())
+            {
+                Assert.Equal(RestoreOutcome.Restored, vault.RestoreRecycled(row.Id));
+            }
+
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+
+        Assert.Equal(["servers", "servers/db", "servers/web"], reopened.ReadGroupPaths().Order(StringComparer.Ordinal));
+        Assert.Equal("a-value", reopened.Find(new EntryName("servers/web", "A"))?.Password, StringComparer.Ordinal);
+        Assert.Equal("b-value", reopened.Find(new EntryName("servers/db", "B"))?.Password, StringComparer.Ordinal);
+        Assert.Empty(reopened.ReadRecycled());
+    }
+
+    /// <summary>Where the group that held the deleted one is itself gone into the bin, nothing says where to make it again.</summary>
+    [Fact]
+    public void AnItemWhoseDeletedGroupsParentIsGoneToo_ComesBackAtTheRoot()
+    {
+        using var vault = Servers(out _);
+
+        Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("servers/web"));
+        Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("servers"));
+
+        var row = vault.ReadRecycled().Single(recycled => recycled.Title == "A");
+        Assert.Null(row.OriginalGroupPath);
+
+        Assert.Equal(RestoreOutcome.RestoredToRoot, vault.RestoreRecycled(row.Id));
+        Assert.Equal("a-value", vault.Find(new EntryName(string.Empty, "A"))?.Password, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void RestoringAnItemOfADeletedGroup_OntoANameTakenAgain_IsRefusedAndWritesNothing()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Servers(out _, path))
+        {
+            Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("servers"));
+            vault.AddEntry(new VaultEntry { Title = "A", Password = "new-value", GroupPath = "servers/web" });
+            vault.Save();
+        }
+
+        AssertWritesNothing(path, vault =>
+        {
+            var row = vault.ReadRecycled().Single(recycled => recycled.Title == "A");
+            Assert.Equal(RestoreOutcome.DestinationOccupied, vault.RestoreRecycled(row.Id));
+        });
+    }
+
+    [Fact]
+    public void AnItemOfADeletedGroup_IsPurgedLikeAnyOther()
+    {
+        using var vault = Servers(out _);
+        Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("servers"));
+
+        Assert.True(vault.PurgeRecycled(vault.ReadRecycled().Single(row => row.Title == "A").Id));
+
+        Assert.Equal(1, vault.TombstoneCount);
+        Assert.Equal("B", Assert.Single(vault.ReadRecycled()).Title, StringComparer.Ordinal);
+    }
+
+    /// <summary>A group whose items were all restored stays in the bin, empty, and emptying the bin still takes it and is a change to save.</summary>
+    [Fact]
+    public void EmptyingTheBin_TakesADeletedGroupLeftWithNoItem()
+    {
+        var path = NewVaultPath();
+
+        using var vault = Seeded(out _, path);
+        vault.Save();
+        Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("env/billing"));
+        Assert.Equal(RestoreOutcome.Restored, vault.RestoreRecycled(Assert.Single(vault.ReadRecycled()).Id));
+        vault.Save();
+
+        Assert.Equal(0, vault.EmptyRecycleBin());
+
+        Assert.Equal(1, vault.TombstoneCount);
+        Assert.Equal(SavedRead.Unsaved, vault.ReadSaved(out _));
+    }
+
+    /// <summary>KeePassXC's setting is honoured for a group as for an entry: with no bin, an empty group is deleted for good.</summary>
+    [Fact]
+    public void WhenTheVaultsBinIsOff_AnEmptyGroupIsDeletedForGood()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Seeded(out _, path))
+        {
+            vault.SetRecyclesDeletedEntries(false);
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup(string.Empty, "empty", out _));
+            vault.Save();
+
+            Assert.Equal(GroupOutcome.DeletedPermanently, vault.DeleteGroup("empty"));
+            Assert.Equal(1, vault.TombstoneCount);
+            Assert.Empty(vault.ReadRecycled());
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+
+        Assert.DoesNotContain("empty", reopened.ReadGroupPaths());
+        Assert.Equal(1, reopened.TombstoneCount);
+    }
+
     // ---------------------------------------------------------------- the save boundary
 
     /// <summary>
@@ -626,6 +767,18 @@ public sealed class VaultRecycleBinTests : IDisposable
             });
         }
 
+        return vault;
+    }
+
+    /// <summary>Two entries in two groups under <c>servers</c>, saved.</summary>
+    private Vault Servers(out string path, string? at = null)
+    {
+        path = at ?? NewVaultPath();
+
+        var vault = Vault.Create(path, MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "A", Password = "a-value", GroupPath = "servers/web" });
+        vault.AddEntry(new VaultEntry { Title = "B", Password = "b-value", GroupPath = "servers/db" });
+        vault.Save();
         return vault;
     }
 

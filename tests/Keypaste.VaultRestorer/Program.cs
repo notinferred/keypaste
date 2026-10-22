@@ -28,7 +28,8 @@ namespace Keypaste.VaultRestorer;
 /// V.5a added renaming and moving. Those are core operations with no front end at all yet — V.5b is
 /// what puts them in front of a person — so every one of them comes through here, and a refusal
 /// prints the outcome's own name rather than a sentence, so the gate can assert which refusal it
-/// got. The driver goes when a shipped command-line surface performs them (D-0254).
+/// got. The driver goes when a shipped command-line surface performs them (D-0254). Moving and
+/// deleting a group came later and come through here for the same reason.
 /// </para>
 /// <para>
 /// It prints how many revisions, recycled entries or backups it saw and what it did, and never a value: the
@@ -55,6 +56,8 @@ internal static class Program
         "       vault-export <vault-path> <destination>\n" +
         "       group-create <vault-path> <parent-group-path> <name>\n" +
         "       group-rename <vault-path> <group-path> <new-name>\n" +
+        "       group-move   <vault-path> <group-path> <destination-parent-path>\n" +
+        "       group-delete <vault-path> <group-path>\n" +
         "       entry-rename <vault-path> <group-path> <title> <new-title>\n" +
         "       entry-move   <vault-path> <group-path> <title> <destination-group-path>\n" +
         "       entry-relocate <vault-path> <group-path> <title> <destination-group-path> <new-title>\n" +
@@ -105,7 +108,7 @@ internal static class Program
         }
     }
 
-    /// <summary>Creates or renames a group, and says which refusal it got when it did not.</summary>
+    /// <summary>Creates, renames, moves or deletes a group, and says which refusal it got when it did not.</summary>
     /// <remarks>
     /// The outcome's own name is printed on a refusal rather than a sentence, so the gate can
     /// assert <em>which</em> refusal happened. A gate that only checked that something failed would
@@ -113,7 +116,7 @@ internal static class Program
     /// </remarks>
     private static int Groups(string[] args, string password)
     {
-        if (args.Length != 4)
+        if (args.Length != (args[0] == "group-delete" ? 3 : 4))
         {
             Console.Error.WriteLine(_usage);
             return 2;
@@ -134,19 +137,38 @@ internal static class Program
                 outcome = vault.RenameGroup(args[2], args[3], out path);
                 break;
 
+            case "group-move":
+                outcome = vault.MoveGroup(args[2], args[3], out path);
+                break;
+
+            case "group-delete":
+                outcome = vault.DeleteGroup(args[2]);
+                path = args[2];
+                break;
+
             default:
                 Console.Error.WriteLine(_usage);
                 return 2;
         }
 
-        if (outcome is not (GroupOutcome.Created or GroupOutcome.Renamed))
+        var did = outcome switch
+        {
+            GroupOutcome.Created => "created",
+            GroupOutcome.Renamed => "renamed",
+            GroupOutcome.Moved => "moved",
+            GroupOutcome.Recycled => "recycled",
+            GroupOutcome.DeletedPermanently => "deleted",
+            _ => null,
+        };
+
+        if (did is null)
         {
             Console.Error.WriteLine($"refused: {outcome}");
             return 1;
         }
 
         vault.Save();
-        Console.WriteLine($"{(outcome is GroupOutcome.Created ? "created" : "renamed")}       {path}");
+        Console.WriteLine($"{did}       {path}");
         return 0;
     }
 

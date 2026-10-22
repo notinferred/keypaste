@@ -192,6 +192,23 @@ public sealed class EntryIdentityTests : IDisposable
     }
 
     /// <summary>
+    /// A copy's title is checked as a rename's is, so a copy never makes a path two entries answer to:
+    /// the next number is taken instead.
+    /// </summary>
+    [Fact]
+    public void Copying_SkipsATitleWhosePathAnotherEntryAlreadyAnswersTo()
+    {
+        using var vault = Collision(NewVaultPath());
+        vault.AddEntry(new VaultEntry { Title = "nested/TOKEN (copy)", Password = "slashed-copy", GroupPath = "env/dev" });
+
+        Assert.Equal(OrganizeOutcome.Copied, vault.CloneEntry(new EntryName("env/dev/nested", "TOKEN"), out var copy, out _));
+
+        Assert.Equal(new EntryName("env/dev/nested", "TOKEN (copy 2)"), copy);
+        Assert.Equal("nested", vault.Find(copy!)!.Password, StringComparer.Ordinal);
+        Assert.Equal("slashed-copy", vault.Find(new EntryName("env/dev", "nested/TOKEN (copy)"))!.Password, StringComparer.Ordinal);
+    }
+
+    /// <summary>
     /// Two entries sharing the path <c>env/dev/nested/TOKEN</c>, and a bystander. The passwords
     /// differ so a test can say which one survived rather than only how many did.
     /// </summary>

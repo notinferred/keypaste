@@ -16,4 +16,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-Clone, tags and metadata depth are outside the slice. Removing a group and moving one to another parent are not in core ([BACKLOG](../BACKLOG.md)). U.3 owns invalidating cached authorization after a move; THREATS T-13 records that a rename can widen a standing rule.
+Tags and metadata depth are outside the slice. U.3 owns invalidating cached authorization after a move; THREATS T-13 records that a rename can widen a standing rule. Core copies an item beside itself, deletes a group into the recycle bin and moves one to another parent, each refusing keypaste's own groups; the desktop offers the copy in an item's ⋯ menu and the group's delete and move in its sidebar menu (gaps-1, RUNS-PENDING).

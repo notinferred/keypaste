@@ -535,11 +535,11 @@ internal sealed class KeePassInterop : IDisposable
         return entries;
     }
 
-    /// <summary>Every entry whose title, group path, username or URL contains the query.</summary>
+    /// <summary>Every entry whose title, group path, username, URL or one of whose own tags contains the query.</summary>
     /// <remarks>
     /// The same traversal as <see cref="Collect"/>, so a result can never name a path a listing
     /// would not report, and the recycle bin is skipped for the reason <see cref="Bin"/> gives.
-    /// Only the four fields are read: <see cref="PwDefs.PasswordField"/> and
+    /// Only the four fields and the tags are read: <see cref="PwDefs.PasswordField"/> and
     /// <see cref="PwDefs.NotesField"/> are never touched here, which is what makes
     /// <see cref="MatchedFields"/>'s claim about them structural rather than a filter.
     /// </remarks>
@@ -746,25 +746,142 @@ internal sealed class KeePassInterop : IDisposable
         return GroupOutcome.Renamed;
     }
 
+    /// <summary>Moves one group, with everything under it, into another parent, mutating it in place.</summary>
+    /// <remarks>
+    /// Every check is a read and happens before the move, for the reason <see cref="Relocate"/> gives. Like
+    /// an entry's move, it records nothing about where the group came from, so the file stays KDBX 4.0 (D-0271).
+    /// </remarks>
+    internal GroupOutcome MoveGroup(string groupPath, string destinationParentPath, out string movedPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        movedPath = string.Empty;
+
+        if (LocateGroup(groupPath) is not { Parent: { } parent } located)
+        {
+            return GroupOutcome.NothingMatched;
+        }
+
+        if (IsKeypastesOwn(groupPath))
+        {
+            return GroupOutcome.NameReserved;
+        }
+
+        if (LocateGroup(destinationParentPath) is not { } destination)
+        {
+            return GroupOutcome.ParentMissing;
+        }
+
+        if (ReferenceEquals(destination.Group, located.Group) || destination.Group.IsContainedIn(located.Group))
+        {
+            return GroupOutcome.DestinationInside;
+        }
+
+        if (ReferenceEquals(destination.Group, parent))
+        {
+            return GroupOutcome.DestinationUnchanged;
+        }
+
+        string name = located.Group.Name;
+        string target = ChildPath(destinationParentPath, name);
+
+        // A move into keypaste's own groups would plant records there, and one out to the root under a
+        // reserved name would make a group keypaste assigns meaning to (D-0273).
+        if (ReservedGroups.IsReserved(destinationParentPath)
+            || ReservedGroups.IsReserved(target)
+            || IsReserved(destinationParentPath, name))
+        {
+            return GroupOutcome.NameReserved;
+        }
+
+        if (HasChildNamed(destination.Group, name, except: null))
+        {
+            return GroupOutcome.DestinationOccupied;
+        }
+
+        if (RefuseCollision(Projected(null, null, located.Group, target)) is { } collision)
+        {
+            return collision == OrganizeOutcome.DestinationOccupied
+                ? GroupOutcome.DestinationOccupied
+                : GroupOutcome.DestinationAmbiguous;
+        }
+
+        // Added before it is taken out, so a tree too deep for KeePassLib to hold is refused where it was.
+        destination.Group.AddGroup(located.Group, true, true);
+        parent.Groups.Remove(located.Group);
+
+        movedPath = target;
+        return GroupOutcome.Moved;
+    }
+
+    /// <summary>Deletes one group with everything under it: into the recycle bin, or for good when the vault has none and the group is empty.</summary>
+    /// <remarks>
+    /// <para>
+    /// A recycled group keeps its UUID, its entries and their history, and records the group it was in as
+    /// <c>PreviousParentGroup</c>, as KeePassXC does; like a recycled entry, that raises the file to KDBX 4.1
+    /// (D-0247). It gets no tombstone, for the reason <see cref="RemoveEntry"/> gives. Each item in it is
+    /// listed and restored one at a time, back to the path it had (<see cref="RestoreRecycled"/>).
+    /// </para>
+    /// <para>
+    /// Without a recycle bin only an empty group is deleted, and tombstoned; one holding anything is refused,
+    /// because nothing could bring back what it holds.
+    /// </para>
+    /// </remarks>
+    internal GroupOutcome DeleteGroup(string groupPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (LocateGroup(groupPath) is not { Parent: { } parent } located)
+        {
+            return GroupOutcome.NothingMatched;
+        }
+
+        if (IsKeypastesOwn(groupPath) || (Bin() is { } held && held.IsContainedIn(located.Group)))
+        {
+            return GroupOutcome.NameReserved;
+        }
+
+        if (!_database.RecycleBinEnabled)
+        {
+            if (located.Group.Entries.UCount > 0 || located.Group.Groups.UCount > 0)
+            {
+                return GroupOutcome.NotEmpty;
+            }
+
+            parent.Groups.Remove(located.Group);
+            _database.DeletedObjects.Add(new PwDeletedObject(located.Group.Uuid, DateTime.UtcNow));
+            return GroupOutcome.DeletedPermanently;
+        }
+
+        PwGroup bin = EnsureBin();
+
+        bin.AddGroup(located.Group, true, true);
+        parent.Groups.Remove(located.Group);
+        located.Group.PreviousParentGroup = parent.Uuid;
+        return GroupOutcome.Recycled;
+    }
+
+    /// <summary>Whether a group is one keypaste assigns meaning to: the env root, or one of its own (D-0273).</summary>
+    private static bool IsKeypastesOwn(string groupPath) =>
+        ReservedGroups.IsReserved(groupPath) || string.Equals(groupPath, EnvConvention.RootGroup, StringComparison.Ordinal);
+
     /// <summary>The custom fields of the one entry with this name, by name and flag, or null when there is no such entry.</summary>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal IReadOnlyList<EntryField>? ReadFields(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Locate(name) is not { } found)
-        {
-            return null;
-        }
-
-        return
-        [
-            .. found.Entry.Strings
-                .Where(field => !PwDefs.IsStandardField(field.Key))
-                .OrderBy(field => field.Key, StringComparer.Ordinal)
-                .Select(field => new EntryField(field.Key, field.Value.IsProtected, !FieldNameRules.IsWritable(field.Key, out _))),
-        ];
+        return Locate(name) is { } found ? FieldsOf(found.Entry) : null;
     }
+
+    /// <summary>An entry's or a revision's custom fields by name and flag, in ordinal order of name.</summary>
+    private static List<EntryField> FieldsOf(PwEntry entry) =>
+    [
+        .. entry.Strings
+            .Where(field => !PwDefs.IsStandardField(field.Key))
+            .OrderBy(field => field.Key, StringComparer.Ordinal)
+            .Select(field => new EntryField(field.Key, field.Value.IsProtected, !FieldNameRules.IsWritable(field.Key, out _))),
+    ];
 
     /// <summary>One custom field's value, or null when there is no such entry or no such field.</summary>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
@@ -788,6 +905,27 @@ internal sealed class KeePassInterop : IDisposable
                 .Where(field => !PwDefs.IsStandardField(field.Key) && include(field.Key))
                 .ToDictionary(field => field.Key, field => Uncached(field.Value), StringComparer.Ordinal)
             : null;
+    }
+
+    /// <summary>The names of the one entry's other fields, standard or custom, whose value holds a <c>{S:…}</c> naming <paramref name="field"/>, in ordinal order; null when there is no such entry.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<string>? FieldsNaming(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return null;
+        }
+
+        return
+        [
+            .. found.Entry.Strings
+                .Where(other => !string.Equals(other.Key, field, StringComparison.Ordinal)
+                    && KeePassPlaceholders.Names(Uncached(other.Value), field))
+                .Select(other => other.Key)
+                .Order(StringComparer.Ordinal),
+        ];
     }
 
     /// <summary>A copy of the value that leaves it protected in the open database, where <see cref="ProtectedString.ReadString"/> would keep the plaintext for as long as the database stays open.</summary>
@@ -1159,6 +1297,34 @@ internal sealed class KeePassInterop : IDisposable
         return 1;
     }
 
+    /// <summary>Gives one custom field another name, keeping its value and its protection, as an edit with one history revision.</summary>
+    /// <returns>0 when there is no such entry or field, otherwise 1.</returns>
+    /// <remarks>The caller has checked both names.</remarks>
+    /// <exception cref="VaultException">Another field of the entry has the new name in any case, or more than one entry answers to that name. Nothing is changed.</exception>
+    internal int RenameField(EntryName name, string field, string newName)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found || found.Entry.Strings.Get(field) is not { } value)
+        {
+            return 0;
+        }
+
+        // Case counts as taken, because a project refuses two variables that differ only in case (D-0337).
+        if (found.Entry.Strings.Any(other =>
+            !string.Equals(other.Key, field, StringComparison.Ordinal)
+            && string.Equals(other.Key, newName, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new VaultException($"'{name.Title}' already has a field called {EntryNameSanitizer.Sanitize(newName).Text}. Choose another name.");
+        }
+
+        found.Entry.CreateBackup(_database);
+        found.Entry.Strings.Remove(field);
+        found.Entry.Strings.Set(newName, value);
+        MarkEdited(found.Entry);
+        return 1;
+    }
+
     /// <summary>Every live entry with notes, by the traversal <see cref="Collect"/> uses.</summary>
     internal IReadOnlyList<EntryNotes> ReadNotes()
     {
@@ -1427,6 +1593,83 @@ internal sealed class KeePassInterop : IDisposable
         };
     }
 
+    /// <summary>
+    /// Copies the one entry with this name beside it, as a new entry under the first free title of
+    /// <c>&lt;title&gt; (copy)</c>, <c>&lt;title&gt; (copy 2)</c> and so on.
+    /// </summary>
+    /// <param name="source">The entry to copy.</param>
+    /// <param name="copy">The copy's name, or null when nothing was written.</param>
+    /// <param name="dropped">The tags the copy did not take, in the entry's order.</param>
+    /// <returns>What happened, including every reason it did not.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    /// <remarks>
+    /// The copy keeps every field, attachment, icon and setting, with a new UUID, no history, no record of
+    /// where anything came from, and its times set to now. It does not take a tag starting <c>env:</c>,
+    /// because a project refuses two entries giving one variable (D-0337).
+    /// </remarks>
+    internal OrganizeOutcome CloneEntry(EntryName source, out EntryName? copy, out IReadOnlyList<string> dropped)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        copy = null;
+        dropped = [];
+
+        if (Locate(source) is not { } found)
+        {
+            return OrganizeOutcome.NothingMatched;
+        }
+
+        if (!VaultNameRules.IsValidTitle(CopyTitle(source.Title, 1), out _))
+        {
+            return OrganizeOutcome.NameRefused;
+        }
+
+        var projected = Projected(null, null, null, null);
+        string title;
+
+        // Each candidate is a distinct title, so at most one per entry in the vault can be taken.
+        for (var copies = 1; ; copies++)
+        {
+            title = CopyTitle(source.Title, copies);
+            projected.Add((source.GroupPath, title, true));
+
+            if (RefuseCollision(projected) is null)
+            {
+                break;
+            }
+
+            projected.RemoveAt(projected.Count - 1);
+        }
+
+        PwEntry clone = found.Entry.CloneDeep();
+        clone.SetUuid(new PwUuid(true), false);
+        clone.History.Clear();
+        clone.PreviousParentGroup = PwUuid.Zero;
+        clone.UsageCount = 0;
+
+        DateTime now = DateTime.UtcNow;
+        clone.CreationTime = now;
+        clone.LastModificationTime = now;
+        clone.LastAccessTime = now;
+
+        List<string> projectTags = [.. clone.Tags.Where(tag => ProjectTag.Read(tag).Kind != ProjectTagKind.None)];
+
+        foreach (string tag in projectTags)
+        {
+            clone.RemoveTag(tag);
+        }
+
+        SetField(clone, PwDefs.TitleField, title);
+        found.Group.AddEntry(clone, true, true);
+
+        copy = new EntryName(source.GroupPath, title);
+        dropped = projectTags;
+        return OrganizeOutcome.Copied;
+
+        static string CopyTitle(string title, int copies) =>
+            copies == 1 ? $"{title} (copy)" : $"{title} (copy {copies})";
+    }
+
     /// <summary>The one live group at this path, and the group holding it.</summary>
     /// <returns>
     /// The group and its parent, with a null parent for the root group, or null when no group has
@@ -1605,7 +1848,7 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         List<RecycledEntry> rows = [];
-        CollectRecycled(bin, rows);
+        CollectRecycled(bin, bin, rows);
         return rows;
     }
 
@@ -1613,6 +1856,11 @@ internal sealed class KeePassInterop : IDisposable
     /// <param name="id">The recycled entry.</param>
     /// <param name="restored">The name the entry answers to again, or null when nothing moved.</param>
     /// <returns>What happened to the entry.</returns>
+    /// <remarks>
+    /// An entry that went into the bin inside a group goes back to the path it had, and each group on
+    /// that path the vault no longer has is made again, named and iconed as the recycled one, so the
+    /// rest of that group stays in the bin until it is restored too.
+    /// </remarks>
     internal RestoreOutcome RestoreRecycled(RecycledEntryId id, out EntryName? restored)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -1624,28 +1872,26 @@ internal sealed class KeePassInterop : IDisposable
             return RestoreOutcome.NothingMatched;
         }
 
-        PwGroup? original = OriginalGroupOf(found.Entry);
-        bool toRoot = original is null;
-        PwGroup destination = original ?? _database.RootGroup;
+        var place = OriginalPlaceOf(found.Entry, bin);
 
         // Resolved before anything moves. A restore that recreated the one condition every
         // resolver in keypaste refuses — two entries answering to one name — would deny both of
         // them to MCP and take out the whole env project for `keypaste run` (D-0091).
-        var target = new EntryName(
-            PathOf(destination) ?? string.Empty,
-            ReadField(found.Entry, PwDefs.TitleField));
+        var target = new EntryName(place?.Path ?? string.Empty, ReadField(found.Entry, PwDefs.TitleField));
 
         if (Matches(target).Count != 0)
         {
             return RestoreOutcome.DestinationOccupied;
         }
 
+        PwGroup destination = place is { } known ? Recreate(known.Parent, known.Recycled, bin) : _database.RootGroup;
+
         found.Group.Entries.Remove(found.Entry);
         found.Entry.PreviousParentGroup = PwUuid.Zero;
         destination.AddEntry(found.Entry, true, true);
         restored = target;
 
-        return toRoot ? RestoreOutcome.RestoredToRoot : RestoreOutcome.Restored;
+        return place is null ? RestoreOutcome.RestoredToRoot : RestoreOutcome.Restored;
     }
 
     /// <summary>Removes one recycled entry and its history for good.</summary>
@@ -1665,16 +1911,20 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>Removes everything in the recycle bin for good.</summary>
+    /// <param name="changed">Whether the bin held anything, a group with no entry included.</param>
     /// <returns>The number of entries removed.</returns>
-    internal int EmptyRecycleBin()
+    internal int EmptyRecycleBin(out bool changed)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        changed = false;
 
         if (Bin() is not { } bin)
         {
             return 0;
         }
 
+        changed = bin.Entries.UCount > 0 || bin.Groups.UCount > 0;
         var removed = (int)bin.GetEntriesCount(true);
 
         // Tombstones every entry and every subgroup it removes, which is what this bin's
@@ -1730,21 +1980,83 @@ internal sealed class KeePassInterop : IDisposable
         return bin;
     }
 
-    private void CollectRecycled(PwGroup group, List<RecycledEntry> rows)
+    private void CollectRecycled(PwGroup group, PwGroup bin, List<RecycledEntry> rows)
     {
         foreach (PwEntry entry in group.Entries)
         {
             rows.Add(new RecycledEntry(
                 RecycledEntryId.FromUuidHex(entry.Uuid.ToHexString()),
                 ReadField(entry, PwDefs.TitleField),
-                OriginalGroupOf(entry) is { } original ? PathOf(original) : null,
-                entry.LocationChanged));
+                OriginalPlaceOf(entry, bin)?.Path,
+                DeletedAt(entry, bin)));
         }
 
         foreach (PwGroup child in group.Groups)
         {
-            CollectRecycled(child, rows);
+            CollectRecycled(child, bin, rows);
         }
+    }
+
+    /// <summary>
+    /// Where a recycled entry goes back to: the live group it was deleted from and no group to make again,
+    /// or, for one that went into the bin inside a group, the live group that group was deleted from and
+    /// every recycled group down to the entry's, with the path the entry had. Null when neither is known.
+    /// </summary>
+    private (PwGroup Parent, List<PwGroup> Recycled, string Path)? OriginalPlaceOf(PwEntry entry, PwGroup bin)
+    {
+        List<PwGroup> recycled = [];
+
+        for (PwGroup? group = entry.ParentGroup; group is not null && !ReferenceEquals(group, bin); group = group.ParentGroup)
+        {
+            recycled.Insert(0, group);
+        }
+
+        PwUuid from = recycled.Count == 0 ? entry.PreviousParentGroup : recycled[0].PreviousParentGroup;
+
+        if (LiveGroup(from) is not { } parent || PathOf(parent) is not { } path)
+        {
+            return null;
+        }
+
+        return (parent, recycled, recycled.Aggregate(path, (joined, group) => ChildPath(joined, group.Name)));
+    }
+
+    /// <summary>When an entry went into the bin: the latest move of it or of any group holding it there.</summary>
+    private static DateTime DeletedAt(PwEntry entry, PwGroup bin)
+    {
+        DateTime at = entry.LocationChanged;
+
+        for (PwGroup? group = entry.ParentGroup; group is not null && !ReferenceEquals(group, bin); group = group.ParentGroup)
+        {
+            if (group.LocationChanged > at)
+            {
+                at = group.LocationChanged;
+            }
+        }
+
+        return at;
+    }
+
+    /// <summary>The group under <paramref name="parent"/> named as each recycled group in turn, making each one the vault no longer has.</summary>
+    private static PwGroup Recreate(PwGroup parent, List<PwGroup> recycled, PwGroup bin)
+    {
+        PwGroup current = parent;
+
+        foreach (PwGroup gone in recycled)
+        {
+            PwGroup? next = current.Groups.FirstOrDefault(child =>
+                !ReferenceEquals(child, bin) && string.Equals(child.Name, gone.Name, StringComparison.Ordinal));
+
+            if (next is null)
+            {
+                next = new PwGroup(true, true, gone.Name, gone.IconId) { CustomIconUuid = gone.CustomIconUuid };
+                current.AddGroup(next, true);
+            }
+
+            current = next;
+        }
+
+        return current;
     }
 
     private static (PwGroup Group, PwEntry Entry)? LocateRecycled(PwGroup bin, RecycledEntryId id)
@@ -1768,19 +2080,19 @@ internal sealed class KeePassInterop : IDisposable
         return null;
     }
 
-    /// <summary>The live group a recycled entry was deleted from, or null when there is none.</summary>
+    /// <summary>The live group a recycled object was deleted from, by its <c>PreviousParentGroup</c>, or null when there is none.</summary>
     /// <remarks>
     /// Null covers three cases a restore cannot tell apart and does not need to: the vault records
     /// no previous parent, the group it names is gone, and the group it names is itself recycled.
     /// </remarks>
-    private PwGroup? OriginalGroupOf(PwEntry entry)
+    private PwGroup? LiveGroup(PwUuid previousParent)
     {
-        if (entry.PreviousParentGroup.IsZero)
+        if (previousParent.IsZero)
         {
             return null;
         }
 
-        PwGroup? original = _database.RootGroup.FindGroup(entry.PreviousParentGroup, true);
+        PwGroup? original = _database.RootGroup.FindGroup(previousParent, true);
         if (original is null)
         {
             return null;
@@ -1852,7 +2164,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             PwEntry revision = found.Entry.History.GetAt(order[index]);
             revisions[index] = new EntryRevision(
-                index, revision.LastModificationTime, Read(revision, name.GroupPath));
+                index, revision.LastModificationTime, Read(revision, name.GroupPath), [.. revision.Tags], FieldsOf(revision));
         }
 
         return revisions;
@@ -2739,10 +3051,16 @@ internal sealed class KeePassInterop : IDisposable
         {
             string title = ReadField(entry, PwDefs.TitleField);
             MatchedFields fields = Matched(title, groupPath, entry, query);
+            List<string> tags = query.Length == 0 ? [] : [.. entry.Tags.Where(tag => Contains(tag, query))];
+
+            if (tags.Count > 0)
+            {
+                fields |= MatchedFields.Tag;
+            }
 
             if (query.Length == 0 || fields != MatchedFields.None)
             {
-                matches.Add(new EntryMatch(new EntryName(groupPath, title), fields));
+                matches.Add(new EntryMatch(new EntryName(groupPath, title), fields) { Tags = tags });
             }
         }
 

@@ -71,6 +71,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private bool _newFieldProtected = true;
     private EntryFieldRow? _replacingField;
     private EntryFieldRow? _removingField;
+    private EntryFieldRow? _renamingField;
+    private string _draftFieldRename = string.Empty;
+    private IReadOnlyList<string> _fieldRenameLines = [];
+    private IReadOnlyList<EnvironmentRow> _environments = [];
     private string _draftTag = string.Empty;
     private ProjectTagChange? _pendingTagChange;
 
@@ -138,6 +142,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         CancelReplaceFieldCommand = new RelayCommand(() => ReplacingField = null, () => ReplacingField is not null);
         ConfirmRemoveFieldCommand = new RelayCommand(ConfirmRemoveField, () => RemovingField is not null);
         CancelRemoveFieldCommand = new RelayCommand(() => RemovingField = null, () => RemovingField is not null);
+        ConfirmRenameFieldCommand = new RelayCommand(ConfirmRenameField, () => RenamingField is not null && DraftFieldRename.Trim().Length > 0);
+        CancelRenameFieldCommand = new RelayCommand(() => RenamingField = null, () => RenamingField is not null);
         AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(() => PendingTagChange = null, () => PendingTagChange is not null);
@@ -148,10 +154,16 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         DependsOn(nameof(HasTags), nameof(Tags));
         DependsOn(nameof(IsReplacingField), nameof(ReplacingField));
         DependsOn(nameof(ReplaceFieldPrompt), nameof(ReplacingField));
-        DependsOn(nameof(HasOwnPrimary), nameof(IsEditing), nameof(IsConfirmingRotate), nameof(IsAddingField), nameof(IsReplacingField));
+        DependsOn(nameof(HasOwnPrimary), nameof(IsEditing), nameof(IsConfirmingRotate), nameof(IsAddingField), nameof(IsReplacingField), nameof(IsRenamingField));
         DependsOn(nameof(TakesWholeView), nameof(IsEditing));
         DependsOn(nameof(IsRemovingField), nameof(RemovingField));
         DependsOn(nameof(RemoveFieldPrompt), nameof(RemovingField));
+        DependsOn(nameof(IsRenamingField), nameof(RenamingField));
+        DependsOn(nameof(RenameFieldPrompt), nameof(RenamingField));
+        DependsOn(nameof(IsConfirmingFieldRename), nameof(FieldRenameLines));
+        DependsOn(nameof(FieldsSummary), nameof(Fields));
+        DependsOn(nameof(TagsSummary), nameof(Tags));
+        DependsOn(nameof(ShowsEnvironments), nameof(Environments), nameof(IsEditing));
         DependsOn(nameof(IsConfirmingTagChange), nameof(PendingTagChange));
         DependsOn(nameof(TagChangeLines), nameof(PendingTagChange));
         DependsOn(nameof(TagChangeAction), nameof(PendingTagChange));
@@ -185,6 +197,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         DependsOn(CancelReplaceFieldCommand, nameof(ReplacingField));
         DependsOn(ConfirmRemoveFieldCommand, nameof(RemovingField));
         DependsOn(CancelRemoveFieldCommand, nameof(RemovingField));
+        DependsOn(ConfirmRenameFieldCommand, nameof(RenamingField), nameof(DraftFieldRename));
+        DependsOn(CancelRenameFieldCommand, nameof(RenamingField));
         DependsOn(AddTagCommand, nameof(DraftTag));
         DependsOn(ConfirmTagChangeCommand, nameof(PendingTagChange));
         DependsOn(CancelTagChangeCommand, nameof(PendingTagChange));
@@ -280,8 +294,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     internal bool IsReplacingField => _replacingField is not null;
 
-    /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding or replacing a field.</summary>
-    internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField;
+    /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding, replacing or renaming a field.</summary>
+    internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField || IsRenamingField;
 
     /// <summary>Whether the item takes the whole of Items, as KeePassXC's editor does: while it is edited or two revisions are compared.</summary>
     internal bool TakesWholeView => IsEditing || History.IsOpen;
@@ -298,6 +312,71 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal bool IsRemovingField => _removingField is not null;
 
     internal string RemoveFieldPrompt => $"Remove {_removingField?.DisplayName} from this item? Its value stays in the item's history.";
+
+    /// <summary>The field the rename form is for, or null.</summary>
+    internal EntryFieldRow? RenamingField
+    {
+        get => _renamingField;
+        private set
+        {
+            if (Set(ref _renamingField, value))
+            {
+                DraftFieldRename = value?.Name ?? string.Empty;
+                FieldRenameLines = [];
+            }
+        }
+    }
+
+    internal bool IsRenamingField => _renamingField is not null;
+
+    internal string RenameFieldPrompt => $"New name for {_renamingField?.DisplayName}";
+
+    /// <summary>The name being typed for the field; a change of it asks again about what the rename breaks.</summary>
+    internal string DraftFieldRename
+    {
+        get => _draftFieldRename;
+        set
+        {
+            if (Set(ref _draftFieldRename, value))
+            {
+                FieldRenameLines = [];
+            }
+        }
+    }
+
+    /// <summary>
+    /// What renaming the field breaks, shown before it is written as a project tag change is (D-0415): the
+    /// project variable it is, the <c>kp://</c> references that name it and the item's fields whose
+    /// <c>{S:…}</c> names it. Names only, never a value; empty until the rename needs asking about.
+    /// </summary>
+    internal IReadOnlyList<string> FieldRenameLines
+    {
+        get => _fieldRenameLines;
+        private set => Set(ref _fieldRenameLines, value);
+    }
+
+    internal bool IsConfirmingFieldRename => _fieldRenameLines.Count > 0;
+
+    /// <summary>Renames the field, or first says what the rename breaks.</summary>
+    internal RelayCommand ConfirmRenameFieldCommand { get; }
+
+    internal RelayCommand CancelRenameFieldCommand { get; }
+
+    /// <summary>The custom fields by name and protection, for the history's comparison; never a value.</summary>
+    internal string FieldsSummary => EntryRevisionRow.Describe(_fields.Select(field => (field.Name, field.IsProtected)));
+
+    /// <summary>The item's own tags, for the history's comparison.</summary>
+    internal string TagsSummary => EntryRevisionRow.Describe(_tags.Select(chip => chip.Tag));
+
+    /// <summary>The project environments the item's own tags put it in, for the Environments card.</summary>
+    internal IReadOnlyList<EnvironmentRow> Environments
+    {
+        get => _environments;
+        private set => Set(ref _environments, value);
+    }
+
+    /// <summary>Whether the Environments card shows: the item's own tags put it in a project.</summary>
+    internal bool ShowsEnvironments => !IsEditing && _environments.Count > 0;
 
     /// <summary>A tag being typed, added on Add tag.</summary>
     internal string DraftTag
@@ -437,6 +516,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     {
         IsAddingField = false;
         RemovingField = null;
+        RenamingField = null;
         ReplacingField = row;
         Report(null);
     }
@@ -446,7 +526,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     {
         IsAddingField = false;
         ReplacingField = null;
+        RenamingField = null;
         RemovingField = row;
+        Report(null);
+    }
+
+    /// <summary>Opens the form that gives one field another name.</summary>
+    internal void BeginRenameField(EntryFieldRow row)
+    {
+        IsAddingField = false;
+        ReplacingField = null;
+        RemovingField = null;
+        RenamingField = row;
         Report(null);
     }
 
@@ -848,6 +939,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Tags = [];
         ReplacingField = null;
         RemovingField = null;
+        RenamingField = null;
+        Environments = [];
         DraftFieldName = string.Empty;
         DraftTag = string.Empty;
         NewPassword.Dispose();
@@ -1007,6 +1100,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         {
             Fields = [.. (vault.Fields(Name) ?? []).Select(field => new EntryFieldRow(this, field))];
             Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(tag, RemoveTag))];
+            Environments = [.. (_session.ReadEnvironments(vault, Name) ?? []).Select(environment => new EnvironmentRow(environment))];
             ReadTotp(vault);
         }
         catch (VaultException e)
@@ -1057,6 +1151,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     {
         ReplacingField = null;
         RemovingField = null;
+        RenamingField = null;
         DraftFieldName = string.Empty;
         NewFieldValue.Clear();
         NewFieldProtected = true;
@@ -1100,6 +1195,89 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         {
             ReplacingField = null;
         }
+    }
+
+    /// <summary>
+    /// Renames the field in one core write, first saying what the rename breaks when the field is a project
+    /// variable or the item's own <c>{S:…}</c> names it.
+    /// </summary>
+    private void ConfirmRenameField()
+    {
+        if (RenamingField is not { } row)
+        {
+            return;
+        }
+
+        var name = DraftFieldRename.Trim();
+
+        if (!FieldNameRules.IsWritable(name, out var error))
+        {
+            Report(string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), "."));
+            return;
+        }
+
+        if (!IsConfirmingFieldRename && !string.Equals(name, row.Name, StringComparison.Ordinal) && Breaks(row, name) is { Count: > 0 } lines)
+        {
+            FieldRenameLines = lines;
+            Report(null);
+            return;
+        }
+
+        if (Write(vault => vault.RenameField(Name, row.Name, name), $"{row.DisplayName} is no longer on this item."))
+        {
+            RenamingField = null;
+        }
+    }
+
+    /// <summary>What renaming a field breaks, in sentences, or nothing when it needs no question.</summary>
+    private List<string> Breaks(EntryFieldRow row, string newName)
+    {
+        FieldRenameChange? change;
+        try
+        {
+            change = _session.Unlocked is { } vault ? FieldRenameChange.Preview(vault, Name, row.Name) : null;
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return [];
+        }
+
+        if (change is null || (!EnvConvention.IsEnvNamedField(row.Name) && change.Placeholders.Count == 0))
+        {
+            return [];
+        }
+
+        var old = row.DisplayName;
+        var renamed = EntryNameSanitizer.Sanitize(newName).Text;
+        var environments = _tags
+            .Select(chip => ProjectTag.Read(chip.Tag))
+            .Where(tag => tag.Kind == ProjectTagKind.Member)
+            .Select(tag => EntryNameSanitizer.SanitizePath($"{tag.Project}/{tag.Environment}").Text)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        List<string> lines = [];
+
+        if (EnvConvention.IsEnvNamedField(row.Name) && environments.Count > 0)
+        {
+            var where = string.Join(", ", environments);
+            lines.Add(EnvConvention.IsEnvNamedField(newName)
+                ? $"{old} is a variable of {where}. Renamed, those environments give {renamed} instead, and nothing there gives {old}."
+                : $"{old} is a variable of {where}. {renamed} is not a variable name, so those environments stop giving {old}.");
+        }
+
+        if (change.References.Count > 0)
+        {
+            lines.Add($"These references name {old} and will find nothing: {string.Join(", ", change.References)}.");
+        }
+
+        if (change.Placeholders.Count > 0)
+        {
+            var fields = string.Join(", ", change.Placeholders.Select(field => EntryNameSanitizer.Sanitize(field).Text));
+            lines.Add($"{{S:{old}}} in {fields} will fill in nothing.");
+        }
+
+        return [.. lines.Select(line => DisplayTextSanitizer.Sanitize(line).Text)];
     }
 
     private void ConfirmRemoveField()
@@ -1241,5 +1419,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         // one at every index (D-0229).
         History.Refresh();
         Report(null);
+
+        // The list shows the username and the URL too (D-NEW-A6), so it reads them again.
+        _restored(Name);
     }
 }

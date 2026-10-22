@@ -38,6 +38,7 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
 
         CopyValueCommand = new AsyncRelayCommand(CopyAsync);
         ReplaceCommand = new RelayCommand(() => _owner.BeginReplaceField(this), () => !IsReadOnly);
+        RenameCommand = new RelayCommand(() => _owner.BeginRenameField(this), () => !IsReadOnly);
         ToggleProtectionCommand = new RelayCommand(() => _owner.ToggleProtection(this), () => !IsReadOnly);
         RemoveCommand = new RelayCommand(() => _owner.BeginRemoveField(this), () => !IsReadOnly);
     }
@@ -65,12 +66,18 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
     /// <summary>What a screen reader is told the reveal does. Names the field, never the value.</summary>
     internal string RevealLabel => $"Hold to reveal {DisplayName}";
 
+    /// <summary>What the rename button is called. Names the field, never the value.</summary>
+    internal string RenameLabel => $"Rename {DisplayName}";
+
     /// <summary>What the protection button does now.</summary>
     internal string ProtectionLabel => IsProtected ? $"Stop protecting {DisplayName}" : $"Protect {DisplayName}";
 
     internal AsyncRelayCommand CopyValueCommand { get; }
 
     internal RelayCommand ReplaceCommand { get; }
+
+    /// <summary>Opens the form that gives the field another name, keeping its value and protection.</summary>
+    internal RelayCommand RenameCommand { get; }
 
     internal RelayCommand ToggleProtectionCommand { get; }
 

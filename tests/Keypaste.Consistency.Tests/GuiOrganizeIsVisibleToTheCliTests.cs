@@ -163,6 +163,47 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
         Assert.Contains("archive", fixture.Cli.Out, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A group the app moved is where <c>keypaste get</c> reads what it holds; deleted, the CLI no longer
+    /// reaches it; and an item restored from it is read again at the path it had.
+    /// </summary>
+    /// <remarks>
+    /// Each change goes through the session's write, which every screen of the app saves through, so the
+    /// CLI's own handle is the first to read what the app wrote.
+    /// </remarks>
+    [Fact]
+    public void A_group_moved_deleted_and_restored_in_the_app_is_followed_by_keypaste_get()
+    {
+        using var fixture = new VaultFixture(("seed", "seed-password"), ("servers/database", "pg-secret"));
+        Assert.Equal(UnlockOutcome.Opened, fixture.Unlock());
+
+        Assert.Equal(
+            WriteOutcome.Saved,
+            fixture.Session.Write(vault => vault.CreateGroup(string.Empty, "archive", out _), outcome => outcome == GroupOutcome.Created).Outcome);
+        Assert.Equal(
+            WriteOutcome.Saved,
+            fixture.Session.Write(vault => vault.MoveGroup("servers", "archive", out _), outcome => outcome == GroupOutcome.Moved).Outcome);
+
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "archive/servers/database", "--reveal"));
+        Assert.Equal("pg-secret", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
+        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "servers/database", "--reveal"));
+
+        Assert.Equal(
+            WriteOutcome.Saved,
+            fixture.Session.Write(vault => vault.DeleteGroup("archive/servers"), outcome => outcome == GroupOutcome.Recycled).Outcome);
+
+        Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "archive/servers/database", "--reveal"));
+
+        var recycled = Assert.Single(fixture.Unlocked.ReadRecycled());
+        Assert.Equal("archive/servers", recycled.OriginalGroupPath, StringComparer.Ordinal);
+        Assert.Equal(
+            WriteOutcome.Saved,
+            fixture.Session.Write(vault => vault.RestoreRecycled(recycled.Id), outcome => outcome == RestoreOutcome.Restored).Outcome);
+
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "archive/servers/database", "--reveal"));
+        Assert.Equal("pg-secret", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
+    }
+
     private static Screen<EntriesViewModel> Entries(VaultFixture fixture)
     {
         Assert.Equal(UnlockOutcome.Opened, fixture.Unlock());

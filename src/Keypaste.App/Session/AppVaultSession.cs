@@ -65,6 +65,8 @@ internal sealed class AppVaultSession : IDisposable
     internal static readonly TimeSpan WarningWindow = TimeSpan.FromSeconds(30);
 
     private readonly Lock _gate = new();
+    private readonly Lock _unsavedGate = new();
+    private readonly List<EntryName> _unsaved = [];
     private readonly TimeProvider _clock;
     private readonly string _home;
 
@@ -195,6 +197,32 @@ internal sealed class AppVaultSession : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal ProjectTagChange? PreviewTagChange(Vault vault, EntryName entry, IReadOnlyList<string> tags, bool adding) =>
         ProjectTagChange.Preview(vault, entry, tags, adding, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
+
+    /// <summary>
+    /// The project environments an entry's own tags put it in, each saying whether an agent gets the entry
+    /// only once a person answers, judged by the vault's agent settings beneath this computer's ceilings.
+    /// </summary>
+    /// <param name="vault">The open vault.</param>
+    /// <param name="entry">The entry.</param>
+    /// <returns>The environments, empty for an entry in no project, or null when no entry answers to the name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<EntryEnvironment>? ReadEnvironments(Vault vault, EntryName entry) =>
+        EntryEnvironment.Read(vault, entry, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
+
+    /// <summary>
+    /// The items the open vault changed since it was opened or last saved, which a reload discards: names
+    /// only, in the order they were first changed, and none for a change that named no item.
+    /// </summary>
+    internal IReadOnlyList<EntryName> Unsaved
+    {
+        get
+        {
+            lock (_unsavedGate)
+            {
+                return [.. _unsaved];
+            }
+        }
+    }
 
     /// <summary>The open vault's identity, or <see langword="null"/> when locked.</summary>
     internal VaultIdentity? Identity
@@ -551,6 +579,7 @@ internal sealed class AppVaultSession : IDisposable
                     previous.Saved -= OnVaultSaved;
                 }
 
+                ForgetUnsaved();
                 opened.Edited += OnVaultEdited;
                 opened.Saved += OnVaultSaved;
                 _vault = opened;
@@ -909,6 +938,7 @@ internal sealed class AppVaultSession : IDisposable
             _vault.Edited -= OnVaultEdited;
             _vault.Saved -= OnVaultSaved;
             _vault.Dispose();
+            ForgetUnsaved();
             reopened.Edited += OnVaultEdited;
             reopened.Saved += OnVaultSaved;
             _vault = reopened;
@@ -924,9 +954,33 @@ internal sealed class AppVaultSession : IDisposable
         return true;
     }
 
-    private void OnVaultEdited(object? sender, VaultEdit edit) => Edited?.Invoke(this, edit);
+    private void OnVaultEdited(object? sender, VaultEdit edit)
+    {
+        lock (_unsavedGate)
+        {
+            foreach (var name in edit.Entries.Where(name => !_unsaved.Contains(name)))
+            {
+                _unsaved.Add(name);
+            }
+        }
 
-    private void OnVaultSaved(object? sender, EventArgs e) => Saved?.Invoke(this, EventArgs.Empty);
+        Edited?.Invoke(this, edit);
+    }
+
+    private void OnVaultSaved(object? sender, EventArgs e)
+    {
+        ForgetUnsaved();
+        Saved?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Forgets what the vault changed, once a save wrote it or another vault took its place.</summary>
+    private void ForgetUnsaved()
+    {
+        lock (_unsavedGate)
+        {
+            _unsaved.Clear();
+        }
+    }
 
     /// <summary>Records that a person did something.</summary>
     /// <remarks>
@@ -1006,6 +1060,7 @@ internal sealed class AppVaultSession : IDisposable
                 vault.Saved -= OnVaultSaved;
             }
 
+            ForgetUnsaved();
             _timer?.Dispose();
             _timer = null;
             _claim?.Dispose();

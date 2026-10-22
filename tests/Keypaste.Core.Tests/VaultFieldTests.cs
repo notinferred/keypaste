@@ -226,6 +226,115 @@ public sealed class VaultFieldTests : IDisposable
     }
 
     [Fact]
+    public void Renaming_a_field_keeps_its_value_and_protection_in_one_revision_and_one_edit_each()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Seeded(path))
+        {
+            vault.SetFields(_stripe, [new FieldWrite("KEY", "k1"), new FieldWrite("Region", "eu", Protect: false)]);
+            vault.Save();
+            var edits = new List<VaultEdit>();
+            vault.Edited += (_, edit) => edits.Add(edit);
+
+            Assert.True(vault.RenameField(_stripe, "KEY", "STRIPE_KEY"));
+            Assert.True(vault.RenameField(_stripe, "Region", "region"));
+
+            Assert.Equal(2, edits.Count);
+            Assert.All(edits, edit => Assert.Equal([_stripe], edit.Entries));
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, _master);
+
+        Assert.Equal([new EntryField("STRIPE_KEY", true, false), new EntryField("region", false, false)], reopened.Fields(_stripe));
+        Assert.Equal("k1", reopened.ReadField(_stripe, "STRIPE_KEY"));
+        Assert.Equal("eu", reopened.ReadField(_stripe, "region"));
+
+        var history = reopened.ReadHistory(_stripe)!;
+        Assert.Equal(3, history.Count);
+        Assert.Equal([new EntryField("KEY", true, false), new EntryField("Region", false, false)], history[1].CustomFields);
+    }
+
+    [Theory]
+    [InlineData("KEY", "Region")]
+    [InlineData("KEY", "region")]
+    [InlineData("KEY", "KEY")]
+    [InlineData("KEY", "Password")]
+    [InlineData("KEY", "url")]
+    [InlineData("KEY", "otp")]
+    [InlineData("KEY", "TimeOtp-Secret")]
+    [InlineData("KEY", "TimeOtp-Secret-Base32")]
+    [InlineData("TimeOtp-Secret", "SEED")]
+    [InlineData("KEY", " padded")]
+    [InlineData("KEY", "")]
+    public void A_rename_to_a_taken_reserved_or_unwritable_name_changes_nothing(string field, string newName)
+    {
+        using var vault = Seeded(NewVaultPath());
+        vault.SetFieldsUnchecked(_stripe, [new FieldWrite("KEY", "k"), new FieldWrite("Region", "eu"), new FieldWrite("TimeOtp-Secret", "seed")]);
+        vault.Save();
+        var fields = vault.Fields(_stripe);
+        var revisions = vault.ReadHistory(_stripe)!.Count;
+        var edits = new List<VaultEdit>();
+        vault.Edited += (_, edit) => edits.Add(edit);
+
+        Assert.Throws<VaultException>(() => vault.RenameField(_stripe, field, newName));
+
+        Assert.Empty(edits);
+        Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
+        Assert.Equal(fields, vault.Fields(_stripe));
+        Assert.Equal(revisions, vault.ReadHistory(_stripe)!.Count);
+    }
+
+    [Fact]
+    public void Renaming_a_field_KeePassXC_owns_is_refused()
+    {
+        var path = NewVaultPath();
+        KdbxImportTests.WriteForeign(path, _master);
+
+        using var vault = Vault.Open(path, _master);
+
+        Assert.Throws<VaultException>(() => vault.RenameField(_checking, "otp", "OLD_OTP"));
+        Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
+    }
+
+    [Fact]
+    public void Renaming_a_field_the_entry_does_not_have_changes_nothing()
+    {
+        using var vault = Seeded(NewVaultPath());
+
+        Assert.False(vault.RenameField(_stripe, "ABSENT", "PRESENT"));
+        Assert.False(vault.RenameField(new EntryName("api", "Nobody"), "KEY", "OTHER"));
+
+        Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
+        Assert.Empty(vault.ReadHistory(_stripe)!);
+    }
+
+    /// <summary>What a rename would leave naming nothing is said before it is written, and never with a value (D-0415's pattern).</summary>
+    [Fact]
+    public void A_rename_preview_names_the_references_and_placeholders_that_name_the_field()
+    {
+        using var vault = Seeded(NewVaultPath());
+        vault.SetFields(_stripe, [new FieldWrite("STRIPE_KEY", "sk-secret"), new FieldWrite("Note", "uses {S:STRIPE_KEY} and {S:stripe_key}"), new FieldWrite("Region", "eu")]);
+        Assert.True(vault.UpdateEntry(vault.Find(_stripe)! with { Notes = "see {S:STRIPE_KEY}" }));
+        Assert.True(vault.AddTag(_stripe, "env:billing"));
+        Assert.True(vault.AddTag(_stripe, "env:billing:prod"));
+        Assert.True(vault.AddTag(_stripe, "finance"));
+
+        var change = FieldRenameChange.Preview(vault, _stripe, "STRIPE_KEY")!;
+
+        Assert.Equal(
+            ["kp://billing/dev/STRIPE_KEY", "kp://billing/prod/STRIPE_KEY", KpReferences.For(_stripe, "STRIPE_KEY")],
+            change.References);
+        Assert.Equal(["Note", "Notes"], change.Placeholders);
+        Assert.False(change.BreaksNothing);
+        Assert.DoesNotContain("sk-secret", string.Join(" ", change.References.Concat(change.Placeholders)), StringComparison.Ordinal);
+
+        Assert.True(FieldRenameChange.Preview(vault, _stripe, "Region")!.BreaksNothing);
+        Assert.Null(FieldRenameChange.Preview(vault, _stripe, "ABSENT"));
+    }
+
+    [Fact]
     public void A_write_is_never_shown_by_its_value()
     {
         var write = new FieldWrite("KEY", "the-value");

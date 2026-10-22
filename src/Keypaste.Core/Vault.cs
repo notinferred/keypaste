@@ -641,6 +641,64 @@ public sealed class Vault : IDisposable
         return Change(() => _interop.RemoveField(name, field) > 0, removed => removed ? VaultEdit.Of(name) : null);
     }
 
+    /// <summary>Gives one custom field another name as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The field's name, matched exactly.</param>
+    /// <param name="newName">What to call it.</param>
+    /// <returns><see langword="true"/> if the field was there and was renamed.</returns>
+    /// <remarks>
+    /// The value and its protection go with it, and the old name stays in the revision. Both names are
+    /// refused as <see cref="FieldNameRules.IsWritable"/> refuses them, and so is a name a TOTP is read
+    /// from (D-0477), since either rename would make or unmake the item's TOTP.
+    /// </remarks>
+    /// <exception cref="VaultException">
+    /// A name is refused, the two are the same, another field of the entry has the new name in any case,
+    /// or more than one entry answers to that name. Nothing is changed.
+    /// </exception>
+    public bool RenameField(EntryName name, string field, string newName)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(newName);
+
+        string[] names = [field, newName];
+
+        foreach (string named in names)
+        {
+            if (!FieldNameRules.IsWritable(named, out string error))
+            {
+                throw Refused(error);
+            }
+
+            if (TotpSpec.IsSourceField(named))
+            {
+                throw new VaultException($"{EntryNameSanitizer.Sanitize(named).Text} is a field an item's TOTP is read from, and keypaste does not rename one.");
+            }
+        }
+
+        if (string.Equals(field, newName, StringComparison.Ordinal))
+        {
+            throw new VaultException("The field is already called that.");
+        }
+
+        return Change(() => _interop.RenameField(name, field, newName) > 0, renamed => renamed ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>The names of the item's other fields whose value holds a <c>{S:…}</c> naming this one, which a rename would leave naming nothing.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The field's name, matched exactly.</param>
+    /// <returns>The fields' names in ordinal order, or null when no entry answers to that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<string>? FieldsNaming(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+
+        return _interop.FieldsNaming(name, field);
+    }
+
     /// <summary>Moves keys found in notes into protected fields. Call <see cref="Save"/> to persist it.</summary>
     /// <param name="check">The check that found them, while it is still undisposed.</param>
     /// <param name="findings">The findings to move, from <paramref name="check"/>.</param>
@@ -1204,7 +1262,7 @@ public sealed class Vault : IDisposable
     }
 
     /// <summary>
-    /// Every entry whose title, group path, username or URL contains <paramref name="query"/>.
+    /// Every entry whose title, group path, username, URL or one of whose own tags contains <paramref name="query"/>.
     /// </summary>
     /// <param name="query">
     /// What to look for, compared case-insensitively as a substring. An empty or whitespace query
@@ -1215,8 +1273,8 @@ public sealed class Vault : IDisposable
     /// <remarks>
     /// <para>
     /// <b>No value is returned, and the fields holding one are never read.</b> A result carries an
-    /// <see cref="EntryName"/> and a <see cref="MatchedFields"/>, both of which a listing already
-    /// discloses. The password and the notes are not compared at all: notes routinely hold recovery
+    /// <see cref="EntryName"/>, a <see cref="MatchedFields"/> and the tags matched, none of which is a
+    /// value. The password and the notes are not compared at all: notes routinely hold recovery
     /// codes, connection strings and second passwords, so matching them would make a query a way to
     /// confirm a secret without ever opening the entry that holds it (docs/STEPS.md V.5b).
     /// </para>
@@ -1518,6 +1576,49 @@ public sealed class Vault : IDisposable
         return outcome;
     }
 
+    /// <summary>
+    /// Copies the one entry with this name beside it as a new entry, in one change with no history item.
+    /// Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="name">The entry to copy.</param>
+    /// <param name="copy">The copy's name, or <see langword="null"/> when nothing was written.</param>
+    /// <param name="droppedTags">The tags starting <c>env:</c> the copy did not take, or an empty list.</param>
+    /// <returns>
+    /// <see cref="OrganizeOutcome.Copied"/>; <see cref="OrganizeOutcome.NothingMatched"/> when no live entry
+    /// outside keypaste's own groups answers to that name; <see cref="OrganizeOutcome.NameRefused"/> when the
+    /// copy's title is one no vault could address.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    /// <remarks>
+    /// The copy is titled <c>&lt;title&gt; (copy)</c>, or <c>(copy 2)</c> and onwards when that is taken
+    /// (D-0091). It keeps every field, attachment and setting, with a new identity, no history and its times
+    /// set to now, and it leaves out the entry's project tags, because a project refuses two entries giving
+    /// one variable (D-0337); <paramref name="droppedTags"/> names them so the caller can say so.
+    /// </remarks>
+    public OrganizeOutcome CloneEntry(EntryName name, out EntryName? copy, out IReadOnlyList<string> droppedTags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        copy = null;
+        droppedTags = [];
+
+        if (ReservedGroups.IsReserved(name.GroupPath))
+        {
+            return OrganizeOutcome.NothingMatched;
+        }
+
+        EntryName? made = null;
+        IReadOnlyList<string> dropped = [];
+        var outcome = Change(
+            () => _interop.CloneEntry(name, out made, out dropped),
+            _ => made is null ? null : VaultEdit.Of(made));
+        copy = made;
+        droppedTags = dropped;
+        return outcome;
+    }
+
     /// <summary>Creates one empty group. Call <see cref="Save"/> to persist it.</summary>
     /// <param name="parentGroupPath">
     /// The group to create it in, slash-separated and excluding the root; an empty string is the
@@ -1576,11 +1677,11 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(name);
 
         var path = string.Empty;
-        IReadOnlyList<EntryName> beneath = [];
+        List<EntryName> beneath = [];
         var outcome = Change(
             () =>
             {
-                beneath = [.. _interop.ReadEntries().Select(EntryName.Of).Where(entry => IsBeneath(entry.GroupPath, groupPath))];
+                beneath = Beneath(groupPath);
                 return _interop.RenameGroup(groupPath, name, out path);
             },
             renamed => renamed == GroupOutcome.Renamed
@@ -1589,6 +1690,91 @@ public sealed class Vault : IDisposable
         renamedPath = path;
         return outcome;
     }
+
+    /// <summary>Moves one group, carrying everything under it, into another parent. Call <see cref="Save"/> to
+    /// persist it.</summary>
+    /// <param name="groupPath">The group to move, slash-separated and excluding the root.</param>
+    /// <param name="destinationParentPath">
+    /// The group to move it into, slash-separated and excluding the root; an empty string is the root group.
+    /// It must already exist — nothing is created on the way.
+    /// </param>
+    /// <param name="movedPath">The path the group now has, or an empty string when nothing was written.</param>
+    /// <returns>What happened, including every reason it did not.</returns>
+    /// <exception cref="ArgumentNullException">Either argument is null.</exception>
+    /// <exception cref="VaultException">More than one group answers to either path.</exception>
+    /// <remarks>
+    /// <para>
+    /// Refused for the env root and keypaste's own groups, for a destination inside keypaste's own groups,
+    /// for the group itself or a group inside it, and for a name the destination already holds. Every entry
+    /// beneath is re-pathed, so each is checked as <see cref="RenameGroup"/> checks them, and one collision
+    /// refuses the whole move.
+    /// </para>
+    /// <para>
+    /// The group is mutated in place and keeps its UUID, and nothing records where it came from, so an
+    /// organized vault stays KDBX 4.0 (D-0271).
+    /// </para>
+    /// </remarks>
+    public GroupOutcome MoveGroup(string groupPath, string destinationParentPath, out string movedPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(groupPath);
+        ArgumentNullException.ThrowIfNull(destinationParentPath);
+
+        var path = string.Empty;
+        List<EntryName> beneath = [];
+        var outcome = Change(
+            () =>
+            {
+                beneath = Beneath(groupPath);
+                return _interop.MoveGroup(groupPath, destinationParentPath, out path);
+            },
+            moved => moved == GroupOutcome.Moved
+                ? VaultEdit.Of([.. beneath, .. beneath.Select(entry => new EntryName(path + entry.GroupPath[groupPath.Length..], entry.Title))])
+                : null);
+        movedPath = path;
+        return outcome;
+    }
+
+    /// <summary>Deletes one group with everything under it. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="groupPath">The group to delete, slash-separated and excluding the root.</param>
+    /// <returns>
+    /// <see cref="GroupOutcome.Recycled"/> or <see cref="GroupOutcome.DeletedPermanently"/> for what happened,
+    /// and every reason it did not otherwise.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="groupPath"/> is null.</exception>
+    /// <exception cref="VaultException">More than one group answers to that path.</exception>
+    /// <remarks>
+    /// <para>
+    /// Where the vault has a recycle bin the whole group goes into it, as KeePassXC deletes one: every entry
+    /// keeps its identity, fields and history, <see cref="ReadRecycled"/> lists each, and
+    /// <see cref="RestoreRecycled"/> puts one back at the path it had, making again any group on the way the
+    /// vault no longer has. Like recycling an entry, this writes the file as KDBX 4.1 (D-0247).
+    /// </para>
+    /// <para>
+    /// Without a recycle bin only an empty group is deleted, for good; one holding an item or a group is
+    /// <see cref="GroupOutcome.NotEmpty"/>. The env root, keypaste's own groups and a group holding the
+    /// recycle bin are <see cref="GroupOutcome.NameReserved"/>, and the bin itself is not a group this
+    /// reaches.
+    /// </para>
+    /// </remarks>
+    public GroupOutcome DeleteGroup(string groupPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(groupPath);
+
+        List<EntryName> beneath = [];
+        return Change(
+            () =>
+            {
+                beneath = Beneath(groupPath);
+                return _interop.DeleteGroup(groupPath);
+            },
+            deleted => deleted is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently ? VaultEdit.Of(beneath) : null);
+    }
+
+    /// <summary>Every live entry in the group at this path or under it, keypaste's own included.</summary>
+    private List<EntryName> Beneath(string groupPath) =>
+        [.. _interop.ReadEntries().Select(EntryName.Of).Where(entry => IsBeneath(entry.GroupPath, groupPath))];
 
     /// <summary>Copies groups of another vault into this one, all or none. Call <see cref="Save"/> to persist it.</summary>
     /// <param name="source">The vault copied from; <see cref="ImportSource.ApplyTo"/> has checked every destination.</param>
@@ -1684,7 +1870,8 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Change(() => _interop.EmptyRecycleBin(), removed => removed > 0 ? VaultEdit.Of() : null);
+        var changed = false;
+        return Change(() => _interop.EmptyRecycleBin(out changed), _ => changed ? VaultEdit.Of() : null);
     }
 
     /// <summary>Whether something else has written to <see cref="Path"/> since this vault read

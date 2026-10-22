@@ -91,29 +91,38 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
         DateTimeOffset now)
     {
         var store = new AgentAccessStore(vault);
-
-        bool Releases(EffectiveAccess access, IReadOnlyList<string> carried)
-        {
-            var reach = access.Reach(_everything, entry, carried);
-
-            return access.Values
-                && (reach == ExposureReach.Entry || (reach == ExposureReach.ProjectFields && hasVariables))
-                && access.Item(carried, now).Mode == AgentMode.Automatic;
-        }
-
         List<string> released = [];
 
         foreach (var name in store.List().Select(record => record.Name).Where(AgentNames.IsNamed).Distinct(StringComparer.Ordinal))
         {
             var access = EffectiveAccess.Create(name, store.Read(name), caps);
 
-            if (Releases(access, after) && !Releases(access, before))
+            if (Releases(access, entry, after, hasVariables, now) && !Releases(access, entry, before, hasVariables, now))
             {
                 released.Add(name);
             }
         }
 
         return released;
+    }
+
+    /// <summary>
+    /// Whether an agent gets an entry without asking: its settings make where the entry's tags put it
+    /// Automatic, it sees the entry through any bridge, and it is given values.
+    /// </summary>
+    /// <param name="access">What applies to the agent.</param>
+    /// <param name="entry">The entry.</param>
+    /// <param name="carried">The entry's own tags.</param>
+    /// <param name="hasVariables">Whether the entry has a field a project releases.</param>
+    /// <param name="now">What a limit on Automatic is judged against.</param>
+    /// <returns><see langword="true"/> when a request for the entry is released without a person's answer.</returns>
+    internal static bool Releases(EffectiveAccess access, EntryName entry, IReadOnlyList<string> carried, bool hasVariables, DateTimeOffset now)
+    {
+        var reach = access.Reach(_everything, entry, carried);
+
+        return access.Values
+            && (reach == ExposureReach.Entry || (reach == ExposureReach.ProjectFields && hasVariables))
+            && access.Item(carried, now).Mode == AgentMode.Automatic;
     }
 
     /// <summary>The environment the tags name, as <c>project/environment</c>; null for a malformed tag.</summary>

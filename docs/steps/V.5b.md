@@ -20,4 +20,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-The CLI has no organize or search verb. Tag search is unimplemented.
+The CLI has no organize verb. Search matches an item's own tags by substring, and `keypaste search` and the desktop's row name the tag it matched (gaps-1, RUNS-PENDING).

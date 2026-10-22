@@ -13,7 +13,10 @@
 # write. That combined act is what the desktop performs (V.5b): a person edits a title and a
 # group on one form and confirms once, so it is the path most vaults are organized by and the
 # one the assertions below have to cover. Composing a rename and a move would refuse the second
-# after the first had already changed the open vault.
+# after the first had already changed the open vault. It also MOVES a group with an entry under
+# it into another, which stays 4.0 like every organize act, and DELETES that group into the
+# recycle bin, which KeePassXC must then show there, and from which one item is restored to the
+# path it had, its groups made again.
 #
 # Two things here are keypaste's claims about the FORMAT rather than about its own reader:
 #
@@ -38,7 +41,7 @@
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
 #         KEYPASTE_RESTORER    path to the recovery driver           (default: the Release build)
 #
-# The seeding is done by the SHIPPED binary (D-0012). Only the four organize acts go through
+# The seeding is done by the SHIPPED binary (D-0012). Only the organize acts go through
 # tests/Keypaste.VaultRestorer, because no CLI verb performs them and V.5b's desktop controls are a
 # bash gate cannot press — the same argument D-0228 made for the history gate's driver, reaffirmed
 # in D-0254.
@@ -237,6 +240,32 @@ for value in v1-first v2-second v3-third; do
 done
 
 # ---------------------------------------------------------------------------------------
+# Moving a group, with an entry under it, into another group.
+# ---------------------------------------------------------------------------------------
+step "keypaste moves a group into another, and KeePassXC follows it with everything under it"
+kpnew drawer/LETTER letter-value
+said=$("$driver" group-create "$db" "" shelf) || die "group-create failed: ${said}"
+
+said=$("$driver" group-move "$db" drawer shelf) || die "group-move failed: ${said}"
+grep -qE '^moved +shelf/drawer$' <<<"$said" || die "group-move did not report the new path. It said: ${said}"
+
+assert_kdbx_40 "a group move"
+
+tree=$(kpxc ls -R -f "$db") || die "KeePassXC cannot list the file keypaste moved a group in"
+grep -qE '^shelf/drawer/LETTER$' <<<"$tree" || die "KeePassXC does not see the entry under the moved group. Its tree: ${tree}"
+grep -qE '^drawer/' <<<"$tree" && die "KeePassXC still sees the group where it was"
+
+letter=$(kpxc show -a Password "$db" 'shelf/drawer/LETTER') || die "keepassxc-cli show failed under the moved group"
+diff -u <(printf '%s\n' 'letter-value') <(printf '%s\n' "$letter") \
+  || die "the entry under the moved group does not hold its value"
+
+xml=$(kpxc export -f xml "$db") || die "keepassxc-cli export -f xml failed"
+grep -q '<PreviousParentGroup>' <<<"$xml" \
+  && die "a group move stamped PreviousParentGroup, raising the file to KDBX 4.1 for a reason only a deletion may (D-0247)."
+grep -q '<DeletedObjects/>' <<<"$xml" \
+  || die "a group move wrote a deleted-object tombstone. A merge would then delete the group in the other copy of the vault."
+
+# ---------------------------------------------------------------------------------------
 # Both directions of law 4.6: a group KeePassXC made, renamed by keypaste.
 #
 # This runs AFTER every header assertion above, because KeePassXC's own writer may raise the file
@@ -269,6 +298,43 @@ hdr=$(header "$db")
   || die "recycling did not raise the file to KDBX 4.1 (minor 0x${hdr:16:2}). The assertions that organizing leaves it at 4.0 are then checking nothing."
 
 # ---------------------------------------------------------------------------------------
+# Deleting a group: the whole group goes into the bin, as KeePassXC deletes one, and one item in
+# it comes back to the path it had.
+# ---------------------------------------------------------------------------------------
+step "keypaste deletes a group into the recycle bin, and KeePassXC finds it there whole"
+said=$("$driver" group-delete "$db" shelf) || die "group-delete failed: ${said}"
+grep -qE '^recycled +shelf$' <<<"$said" || die "group-delete did not say it recycled the group. It said: ${said}"
+
+info=$(kpxc db-info "$db") || die "KeePassXC cannot open the file keypaste deleted a group in"
+grep -Eqi '^[[:space:]]*KDF:[[:space:]]*Argon2' <<<"$info" || die "KDF changed after a group delete"
+
+tree=$(kpxc ls -R -f "$db")
+grep -qE '^Recycle Bin/shelf/drawer/LETTER$' <<<"$tree" \
+  || die "KeePassXC does not see the deleted group, with what was under it, in the recycle bin. Its tree: ${tree}"
+grep -qE '^shelf/' <<<"$tree" && die "KeePassXC still sees the deleted group where it was"
+
+# The bin already holds an entry carrying one, so the field is looked for in the group's own element.
+xml=$(kpxc export -f xml "$db")
+awk '/<Name>shelf<\/Name>/ { inside = 1 } inside && /<PreviousParentGroup>/ { found = 1 } inside && /<(Entry|Group)>/ { inside = 0 } END { exit !found }' <<<"$xml" \
+  || die "the deleted group records no PreviousParentGroup, so nothing can say where it came from"
+
+step "an item of the deleted group comes back to the path it had, and KeePassXC reads it there"
+listed=$("$driver" trash-ls "$db") || die "trash-ls failed"
+grep -qE '^ +[0-9A-F]{32} +shelf/drawer +LETTER$' <<<"$listed" \
+  || die "trash-ls does not list the item with the path it had. It said: ${listed}"
+letter_id=$(awk '$3 == "LETTER" { print $1 }' <<<"$listed")
+
+restored=$("$driver" trash-restore "$db" "$letter_id") || die "the restore driver failed on the deleted group's item"
+grep -qE '^restored +[0-9A-F]{32}$' <<<"$restored" \
+  || die "the item of a deleted group did not come back where it was. It said: ${restored}"
+
+tree=$(kpxc ls -R -f "$db")
+grep -qE '^shelf/drawer/LETTER$' <<<"$tree" || die "KeePassXC does not see the restored item at its path. Its tree: ${tree}"
+letter=$(kpxc show -a Password "$db" 'shelf/drawer/LETTER') || die "keepassxc-cli show failed on the restored item"
+diff -u <(printf '%s\n' 'letter-value') <(printf '%s\n' "$letter") \
+  || die "the restored item does not hold its value"
+
+# ---------------------------------------------------------------------------------------
 # Refusals. Each one names the refusal it expects and proves the file was never opened for
 # writing — a gate that only checked that something failed would pass with every refusal
 # collapsed into one.
@@ -292,6 +358,11 @@ step "the env root is reserved, and so is the recycle bin's name"
 refuses NameReserved group-create "$db" "" env
 refuses NameReserved group-create "$db" "" "Recycle Bin"
 refuses NameReserved group-rename "$db" archive env
+
+step "the env root is neither moved nor deleted, and no group moves into itself"
+refuses NameReserved group-move "$db" env archive
+refuses NameReserved group-delete "$db" env
+refuses DestinationInside group-move "$db" shelf shelf/drawer
 
 step "the entries the refusals named are exactly as they were"
 value=$(kpxc show -a Password "$db" 'env/invoicing/KEPT')
@@ -333,4 +404,4 @@ said=$("$driver" entry-rename "$db" env/invoicing CONTROL CONTROL_RENAMED) \
 kpxc show -a Password "$db" 'env/invoicing/CONTROL_RENAMED' >/dev/null \
   || die "KeePassXC cannot read the control rename"
 
-printf '\nORGANIZE GATE PASSED: KeePassXC reads what keypaste created, renamed and moved — separately and in one write — and the file is still KDBX 4.0.\n'
+printf '\nORGANIZE GATE PASSED: KeePassXC reads what keypaste created, renamed and moved — separately and in one write — with the file still KDBX 4.0, and finds a group keypaste deleted in its recycle bin.\n'

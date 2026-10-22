@@ -50,7 +50,7 @@ Local, Windows 10 Pro 19045, on `main` above `a2321ac`.
 
 ## Limits and follow-ups
 
-- **Username and URL are not table columns.** KeePassXC shows a username column by default. keypaste's list has never carried a field value (EntryRow, the hygiene gate), and this step kept to that. They are in the preview.
-- **Group order follows ordinal path order, not the vault's own order, which KeePassXC shows.**
-- **No context menu on a group row.** New group and Rename are in Items' header.
+- **Username and URL are table columns**, as KeePassXC shows them, by the founder's decision D-NEW-A6; a password, a note or a custom field's value never is (gaps-1, RUNS-PENDING).
+- **Group order follows the vault's own order**, as KeePassXC shows it (gaps-1, RUNS-PENDING).
+- **A group row has a menu**, on a right-click or the menu key or Shift+F10: New group, Rename, Move and Delete, each opening Items' own form for that group (gaps-1, RUNS-PENDING).
 - **Plain tags are not listed in the sidebar.** A tag is a chip on the item and a search term. Projects are read from the legacy `env/` layout until C.4 reads them from tags.

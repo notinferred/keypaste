@@ -1,7 +1,7 @@
 namespace Keypaste.Core;
 
 /// <summary>
-/// What happened when an entry was renamed or moved.
+/// What happened when an entry was renamed, moved or copied.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -45,10 +45,13 @@ public enum OrganizeOutcome
 
     /// <summary>The entry is in its new group, under its new title. One write changed both.</summary>
     RenamedAndMoved = 10,
+
+    /// <summary>A copy of the entry is beside it under a new title; the entry itself is unchanged.</summary>
+    Copied = 11,
 }
 
 /// <summary>
-/// What happened when a group was created or renamed.
+/// What happened when a group was created, renamed, moved or deleted.
 /// </summary>
 /// <remarks>
 /// Separate from <see cref="OrganizeOutcome"/> rather than shared with it: a group cannot be
@@ -69,18 +72,36 @@ public enum GroupOutcome
     /// <summary>The name is one no vault could address. See <see cref="VaultNameRules"/>.</summary>
     NameRefused = 3,
 
-    /// <summary>The name means something keypaste assigns, and is not an ordinary group's to take.</summary>
+    /// <summary>
+    /// The name means something keypaste assigns, and is not an ordinary group's to take; or the group is
+    /// one keypaste assigns meaning to and is not moved or deleted, or holds the recycle bin and is not deleted.
+    /// </summary>
     NameReserved = 4,
 
-    /// <summary>There is no such group to create this one inside.</summary>
+    /// <summary>There is no such group to create this one inside or move it into.</summary>
     ParentMissing = 5,
 
-    /// <summary>A sibling already has that name, or the rename would collide underneath.</summary>
+    /// <summary>A sibling already has that name, or the rename or move would collide underneath.</summary>
     DestinationOccupied = 6,
 
-    /// <summary>The group is already called that.</summary>
+    /// <summary>The group is already called that, or already there.</summary>
     DestinationUnchanged = 7,
 
-    /// <summary>The rename would leave two entries answering to one path.</summary>
+    /// <summary>The rename or move would leave two entries answering to one path.</summary>
     DestinationAmbiguous = 8,
+
+    /// <summary>The group is in its new parent, under the name it had, with everything under it.</summary>
+    Moved = 9,
+
+    /// <summary>The group is in the recycle bin with everything under it, and each item in it can be restored.</summary>
+    Recycled = 10,
+
+    /// <summary>The group held nothing and the vault has no recycle bin, so it is gone for good.</summary>
+    DeletedPermanently = 11,
+
+    /// <summary>The vault has no recycle bin and the group holds items or groups, which a delete would destroy for good.</summary>
+    NotEmpty = 12,
+
+    /// <summary>The destination is the group itself or a group inside it.</summary>
+    DestinationInside = 13,
 }

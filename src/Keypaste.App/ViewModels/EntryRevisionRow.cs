@@ -47,6 +47,8 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
         _username = revision.Fields.Username;
         _url = revision.Fields.Url;
         _notes = revision.Fields.Notes;
+        FieldsSummary = Describe(revision.CustomFields.Select(field => (field.Name, field.IsProtected)));
+        TagsSummary = Describe(revision.Tags);
 
         CopyPasswordCommand = new AsyncRelayCommand(() => _owner.Copy(this), () => MaskedLength > 0);
     }
@@ -84,6 +86,24 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     /// <summary>The notes this revision held, as the pane draws it.</summary>
     internal string DisplayNotes =>
         DisplayTextSanitizer.Sanitize(_notes, DisplayTextSanitizer.MaximumNotesLength).Text;
+
+    /// <summary>This revision's custom fields by name, each protected one saying so, and never a value (D-NEW-A5).</summary>
+    internal string FieldsSummary { get; }
+
+    /// <summary>This revision's own tags.</summary>
+    internal string TagsSummary { get; }
+
+    /// <summary>Custom fields as the history's comparison names them: each name, scrubbed, with "(protected)" after a protected one.</summary>
+    /// <param name="fields">The fields' names and protection.</param>
+    /// <returns>The names, comma-separated, or empty for none.</returns>
+    internal static string Describe(IEnumerable<(string Name, bool IsProtected)> fields) =>
+        string.Join(", ", fields.Select(field => EntryNameSanitizer.Sanitize(field.Name).Text + (field.IsProtected ? " (protected)" : string.Empty)));
+
+    /// <summary>Tags as the history's comparison names them, each scrubbed.</summary>
+    /// <param name="tags">The tags.</param>
+    /// <returns>The tags, comma-separated, or empty for none.</returns>
+    internal static string Describe(IEnumerable<string> tags) =>
+        string.Join(", ", tags.Select(tag => EntryNameSanitizer.Sanitize(tag).Text));
 
     /// <inheritdoc/>
     public int MaskedLength { get; }

@@ -30,4 +30,6 @@ namespace Keypaste.Core;
 /// </param>
 /// <param name="ModifiedUtc">When this revision was last modified, in UTC.</param>
 /// <param name="Fields">The values this revision held.</param>
-public sealed record EntryRevision(int Index, DateTime ModifiedUtc, VaultEntry Fields);
+/// <param name="Tags">The revision's own tags, as KeePass normalizes them.</param>
+/// <param name="CustomFields">The revision's custom fields by name and protection, in ordinal order of name, never by value.</param>
+public sealed record EntryRevision(int Index, DateTime ModifiedUtc, VaultEntry Fields, IReadOnlyList<string> Tags, IReadOnlyList<EntryField> CustomFields);

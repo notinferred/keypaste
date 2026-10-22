@@ -381,6 +381,53 @@
       </Grid>
     </Grid>
 
+    <!-- A sidebar group's menu, opened by a right-click on its row or by the menu key or Shift+F10 on the
+         chosen one, at the row. Each choice opens Items' own form for that group. -->
+    <Canvas IsVisible="{Binding HasGroupMenu}">
+      <Border x:Name="GroupMenuPanel" Classes="menu" MinWidth="200">
+        <StackPanel Spacing="2">
+          <Button x:Name="GroupMenuNewGroup"
+                  Classes="ghost menu-item"
+                  Command="{Binding NewGroupInsideCommand}"
+                  AutomationProperties.Name="New group">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ctl:KpIcon Icon="folder-plus" Size="14" />
+              <TextBlock Text="New group" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="GroupMenuRename"
+                  Classes="ghost menu-item"
+                  Command="{Binding RenameGroupCommand}"
+                  AutomationProperties.Name="Rename">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ctl:KpIcon Icon="folder-pen" Size="14" />
+              <TextBlock Text="Rename" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="GroupMenuMove"
+                  Classes="ghost menu-item"
+                  Command="{Binding MoveGroupCommand}"
+                  AutomationProperties.Name="Move">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ctl:KpIcon Icon="folder-input" Size="14" />
+              <TextBlock Text="Move" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Border Classes="divider" Margin="6,2" />
+          <Button x:Name="GroupMenuDelete"
+                  Classes="ghost menu-item danger"
+                  Foreground="{DynamicResource KpDanger}"
+                  Command="{Binding DeleteGroupCommand}"
+                  AutomationProperties.Name="Delete">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <ctl:KpIcon Icon="trash-2" Size="14" Foreground="{DynamicResource KpDanger}" />
+              <TextBlock Text="Delete" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Border>
+    </Canvas>
+
     <!-- Share…, from an item's ⋯ menu, modal over the whole window. -->
     <Border Classes="backdrop" IsVisible="{Binding HasShare}" Padding="24">
       <views:ShareDialogView DataContext="{Binding Share}" />

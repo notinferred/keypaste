@@ -28,6 +28,9 @@ public sealed class EntriesViewLayoutTests
     /// <summary>Room for two rows and the column heads, the least that still reads as a list.</summary>
     private const double _listMinimum = 100d;
 
+    /// <summary>Room for a short username or the start of a web address.</summary>
+    private const double _columnMinimum = 72d;
+
     public static TheoryData<double, double, bool> Sizes => new()
     {
         { 1000, 680, false },
@@ -94,6 +97,14 @@ public sealed class EntriesViewLayoutTests
                 panes["the divider"] = Bounds(shell, shell.Named<GridSplitter>("PaneDivider"));
                 Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
                 Assert.True(list.Bottom <= pane.Top, $"the list {list} is not above the entry's preview {pane} at {at}");
+
+                // The username and URL columns (D-NEW-A6) keep room for several characters each, side by side.
+                var username = Bounds(shell, shell.Named<TextBlock>("UsernameHead"));
+                var url = Bounds(shell, shell.Named<TextBlock>("UrlHead"));
+                Assert.True(username.Width >= _columnMinimum, $"the username column is {username.Width:0} px wide at {at}");
+                Assert.True(url.Width >= _columnMinimum, $"the URL column is {url.Width:0} px wide at {at}");
+                Assert.True(username.Right <= url.Left, $"the username column {username} runs into the URL column {url} at {at}");
+                Assert.True(content.Contains(url), $"the URL column {url} leaves the window's content {content} at {at}");
 
                 // The web address's link and its own Copy fit the preview's width, apart (N.5).
                 var link = Bounds(shell, shell.Named<Button>("OpenUrl"));

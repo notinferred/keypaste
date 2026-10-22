@@ -6,10 +6,11 @@ namespace Keypaste.Core;
 /// <remarks>
 /// <para>
 /// <b>A field name, never a value.</b> This is the whole of what a search tells a caller about the
-/// inside of an entry, and it is a fixed vocabulary of four: nothing that came out of the vault can
+/// inside of an entry, and it is a fixed vocabulary of five: nothing that came out of the vault can
 /// travel in it. A front end can say why a row is in a result without becoming a surface that
 /// displays a username, which is the line <see cref="VaultEntry"/> draws for a listing and
-/// <c>keypaste ls</c> draws for a terminal.
+/// <c>keypaste ls</c> draws for a terminal. A tag is a label rather than a value, so
+/// <see cref="EntryMatch.Tags"/> names the tags a query was in.
 /// </para>
 /// <para>
 /// <b>There is no member for a password or a note, and that is not an omission.</b>
@@ -35,6 +36,9 @@ public enum MatchedFields
 
     /// <summary>The entry's URL.</summary>
     Url = 8,
+
+    /// <summary>One of the entry's own tags, never its group's; <see cref="EntryMatch.Tags"/> names which.</summary>
+    Tag = 16,
 }
 
 /// <summary>One entry a query found, and which of its fields the query was in.</summary>
@@ -45,4 +49,8 @@ public enum MatchedFields
 /// is lossy, and a caller that looked a result up by its path could reach a different entry than the
 /// one that matched.
 /// </remarks>
-public sealed record EntryMatch(EntryName Name, MatchedFields Fields);
+public sealed record EntryMatch(EntryName Name, MatchedFields Fields)
+{
+    /// <summary>The entry's own tags the query was in, in the entry's order; empty unless <see cref="Fields"/> holds <see cref="MatchedFields.Tag"/>.</summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
+}

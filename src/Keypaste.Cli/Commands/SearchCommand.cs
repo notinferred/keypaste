@@ -7,9 +7,10 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>Finds items by name: <c>keypaste search &lt;text&gt;</c>.</summary>
 /// <remarks>
-/// Core matches titles, group paths, usernames and URLs and reads no password, note or protected
-/// field (D-0278). A row names which of the username and URL matched, in the app's fixed words, and
-/// never the value it matched in; nothing echoes the query back.
+/// Core matches titles, group paths, usernames, URLs and an item's own tags and reads no password,
+/// note or protected field (D-0278). A row names which of the username and URL matched, in the app's
+/// fixed words, and never the value it matched in, and names each tag that matched, since a tag is a
+/// label; nothing echoes the query back.
 /// </remarks>
 internal static class SearchCommand
 {
@@ -76,6 +77,13 @@ internal static class SearchCommand
                     }
 
                     writer.WriteEndArray();
+                    writer.WriteStartArray("tags");
+                    foreach (var tag in found.Match.Tags)
+                    {
+                        writer.WriteStringValue(tag);
+                    }
+
+                    writer.WriteEndArray();
                 });
 
                 return CliApp.ExitSuccess;
@@ -95,7 +103,10 @@ internal static class SearchCommand
                 var (text, altered) = ListCommand.Safe(itemPath);
                 anyAltered |= altered;
 
-                var why = Why(match.Fields);
+                var tags = match.Tags.Select(tag => EntryNameSanitizer.Sanitize(tag)).ToList();
+                anyAltered |= tags.Any(tag => tag.WasAltered);
+
+                var why = Why(match.Fields, tags);
                 context.Stdout.WriteLine(why.Length == 0 ? text : $"{text}  {style.Paint(context.Stdout, Tone.Muted, why)}");
             }
 
@@ -131,15 +142,33 @@ internal static class SearchCommand
         {
             yield return "url";
         }
+
+        if (fields.HasFlag(MatchedFields.Tag))
+        {
+            yield return "tag";
+        }
     }
 
-    /// <summary>The matched fields a row's path does not already show, in the app's words for them.</summary>
-    private static string Why(MatchedFields fields) =>
-        (fields.HasFlag(MatchedFields.Username), fields.HasFlag(MatchedFields.Url)) switch
+    /// <summary>The matched fields a row's path does not already show, in the app's words for them, then each tag that matched.</summary>
+    private static string Why(MatchedFields fields, List<SanitizedName> tags)
+    {
+        List<string> parts = [];
+
+        if (fields.HasFlag(MatchedFields.Username))
         {
-            (true, true) => "username, URL",
-            (true, false) => "username",
-            (false, true) => "URL",
-            _ => string.Empty,
-        };
+            parts.Add("username");
+        }
+
+        if (fields.HasFlag(MatchedFields.Url))
+        {
+            parts.Add("URL");
+        }
+
+        if (tags.Count > 0)
+        {
+            parts.Add((tags.Count == 1 ? "tag " : "tags ") + string.Join(", ", tags.Select(tag => tag.Text)));
+        }
+
+        return string.Join(", ", parts);
+    }
 }

@@ -59,6 +59,7 @@ public sealed partial class PlainWordsTests
             ("an item's add-field form", detail.BeginAddFieldCommand, detail.CancelAddFieldCommand),
             ("an item's replace-field form", field.ReplaceCommand, detail.CancelReplaceFieldCommand),
             ("an item's remove-field confirmation", field.RemoveCommand, detail.CancelRemoveFieldCommand),
+            ("an item's rename-field form", field.RenameCommand, detail.CancelRenameFieldCommand),
         })
         {
             Assert.True(open.CanExecute(null), state);

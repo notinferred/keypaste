@@ -139,6 +139,41 @@ public sealed class TrashTests : IDisposable
         Assert.Equal("v0", Assert.Single(revisions).Fields.Password, StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// A group deleted from Items lists each of its items here with the path it had, and restoring one
+    /// puts it back there with its history, making the group again (D-NEW-A1).
+    /// </summary>
+    [Fact]
+    public void A_deleted_groups_items_are_listed_and_one_restores_to_its_path()
+    {
+        using (var context = new Context(_vaultPath))
+        {
+            context.Entries.SelectedGroup = context.Entries.Groups.Single(node => node.Path == "servers");
+            context.Entries.BeginDeleteGroupCommand.Execute(null);
+            context.Entries.ConfirmDeleteGroupCommand.Execute(null);
+
+            Assert.Null(context.Entries.Error);
+            Assert.DoesNotContain(context.Entries.Groups, node => node.Path == "servers");
+
+            var trash = context.NewTrash();
+            var row = Assert.Single(trash.Rows);
+            Assert.Equal("production", row.DisplayTitle, StringComparer.Ordinal);
+            Assert.Equal("servers", row.Where, StringComparer.Ordinal);
+
+            trash.Selected = row;
+            trash.RestoreCommand.Execute(null);
+
+            Assert.Equal("production is back in servers.", trash.Notice, StringComparer.Ordinal);
+            Assert.True(trash.IsEmpty);
+        }
+
+        using var reopened = Vault.Open(_vaultPath, _master);
+        var name = new EntryName("servers", "production");
+
+        Assert.Equal("v1", reopened.Find(name)?.Password, StringComparer.Ordinal);
+        Assert.Equal("v0", Assert.Single(reopened.ReadHistory(name)!).Fields.Password, StringComparer.Ordinal);
+    }
+
     [Fact]
     public void A_deleted_tagged_entry_is_restored_and_its_project_holds_it_again()
     {

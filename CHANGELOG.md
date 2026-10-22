@@ -4,6 +4,24 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Search now also finds an item by any part of one of its own tags, so `prod` finds an item tagged `env:billing:prod`, in the app's search, which names the tag beside the item, and in `keypaste search`, which names the tag it matched on the item's line and in `--json`.
+
+`keypaste field mv <item> <name> <new-name>` renames a custom field, keeping its value and its protection, and the old name stays in the item's history. It refuses a name the item already has in any case, a standard name, KeePassXC's own attributes and the fields a TOTP is read from, and is refused while the app or `keypaste approve` holds the vault, naming the holder.
+
+In the app, Rename on a custom field's row does the same. For a field a project reads as a variable, or one the item's own `{S:…}` names, it first lists the environments that stop giving the variable, the `kp://` references and the fields the rename leaves naming nothing, and renames only when you press Rename again.
+
+In the app, right-clicking a group in the sidebar, or pressing the menu key or Shift+F10 on it, opens a menu with New group, Rename, Move and Delete. Move takes the group and everything in it into another group. Delete asks first, saying how many items go with it, and puts the group in the vault's recycle bin, where Trash lists each of its items and puts each back at the path it had; in a vault whose recycle bin is switched off, only an empty group can be deleted, for good. The sidebar now lists groups in the order the vault holds them, as KeePassXC does.
+
+Duplicate in an item's ⋯ menu makes a copy beside it, titled `<title> (copy)`, with its fields and attachments but none of its history, and selects it. The copy leaves out the item's project tags, because a project takes one item for each variable, and the app says which tags it left out.
+
+Items' list now shows each item's username and web address beside its title, as KeePassXC's table does. A password, a note or a custom field's value is never a column.
+
+An item in a project now shows an Environments card in its preview, listing each environment its tags put it in and saying approval required where no agent gets the item without your answer.
+
+History in the app now compares a revision's custom fields, each marked protected or not, and its tags with the item's own, and never shows a field's value.
+
+When another program saves the vault while a change of yours is unsaved, the notice now names the items that change touched, never a value, so you know what Reload discards.
+
 An item with a TOTP now shows its code in the app, masked until you hold Reveal, with the seconds until the next code beside it, and Copy puts the code on the clipboard with the usual clearing countdown. An agent can ask for an item's current code with `request_credential` and `field` `totp`, which `list_entry_names` offers for items that have one: you allow each code once, with no timed allowance since the code changes, or the agent's Automatic mode releases it, and the log records a `totp` release. No agent, `kp://` reference or share is ever given the seed ([9.2b](docs/steps/9.2b.md)).
 
 `keypaste` on its own in a terminal now shows where things stand: its version, the vault it uses and what chose it, whether the keypaste app or `keypaste approve` holds it unlocked, which AI tools are connected, and one next step, such as `keypaste setup` or opening the app. It asks for no password, starts nothing and changes nothing. In a script or a pipe, `keypaste` alone still prints the help on stderr and exits 1 ([N.8](docs/steps/N.8.md)).

@@ -39,7 +39,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private EntryDetailViewModel? _detail;
     private string _search = string.Empty;
     private string? _matchedQuery;
-    private Dictionary<EntryName, MatchedFields> _matches = [];
+    private Dictionary<EntryName, EntryMatch> _matches = [];
     private string? _error;
     private bool _isConfirmingDelete;
     private string? _notice;
@@ -48,9 +48,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private bool _isOrganizing;
     private bool _isCreatingGroup;
     private bool _isRenamingGroup;
+    private bool _isMovingGroup;
+    private bool _isConfirmingGroupDelete;
     private string _draftTitle = string.Empty;
     private string _draftGroupName = string.Empty;
     private GroupNode? _moveTarget;
+    private GroupNode? _groupMoveTarget;
     private IReadOnlyList<GroupNode> _moveTargets = [];
 
     internal EntriesViewModel(
@@ -92,7 +95,18 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             BeginRenameGroup,
             () => !IsRenamingGroup && SelectedGroup is { IsEverything: false });
         ConfirmRenameGroupCommand = new RelayCommand(ConfirmRenameGroup, () => IsRenamingGroup);
-        CancelGroupCommand = new RelayCommand(CloseGroupForms, () => IsCreatingGroup || IsRenamingGroup);
+        BeginMoveGroupCommand = new RelayCommand(
+            BeginMoveGroup,
+            () => !IsMovingGroup && SelectedGroup is { IsEverything: false });
+        ConfirmMoveGroupCommand = new RelayCommand(ConfirmMoveGroup, () => IsMovingGroup);
+        BeginDeleteGroupCommand = new RelayCommand(
+            BeginDeleteGroup,
+            () => !IsConfirmingGroupDelete && SelectedGroup is { IsEverything: false });
+        ConfirmDeleteGroupCommand = new RelayCommand(ConfirmDeleteGroup, () => IsConfirmingGroupDelete);
+        CancelGroupCommand = new RelayCommand(
+            CloseGroupForms,
+            () => IsCreatingGroup || IsRenamingGroup || IsMovingGroup || IsConfirmingGroupDelete);
+        DuplicateCommand = new RelayCommand(Duplicate, () => Selected is not null);
 
         DependsOn(nameof(CanRenameGroup), nameof(SelectedGroup));
         DependsOn(nameof(ListTitle), nameof(SelectedGroup), nameof(VaultName));
@@ -104,7 +118,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         DependsOn(nameof(IsAdding), nameof(NewItem));
         DependsOn(nameof(Selected), nameof(Rows), nameof(IsAdding));
         DependsOn(nameof(DeletePrompt), nameof(Selected));
-        DependsOn(nameof(AddIsPrimary), nameof(IsAdding), nameof(IsOrganizing), nameof(IsCreatingGroup), nameof(IsRenamingGroup), nameof(Detail));
+        DependsOn(nameof(AddIsPrimary), nameof(IsAdding), nameof(IsOrganizing), nameof(IsCreatingGroup), nameof(IsRenamingGroup), nameof(IsMovingGroup), nameof(Detail));
         DependsOn(nameof(ShowsList), nameof(IsAdding), nameof(Detail));
         DependsOn(nameof(ShowsPlaceholder), nameof(Detail), nameof(IsAdding));
         DependsOn(nameof(HasError), nameof(Error));
@@ -112,6 +126,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         DependsOn(nameof(OrganizePrompt), nameof(Selected));
         DependsOn(nameof(CreateGroupPrompt), nameof(SelectedGroup));
         DependsOn(nameof(RenameGroupPrompt), nameof(SelectedGroup));
+        DependsOn(nameof(MoveGroupPrompt), nameof(SelectedGroup));
+        DependsOn(nameof(GroupDeletePrompt), nameof(SelectedGroup), nameof(IsConfirmingGroupDelete));
         DependsOn(nameof(ShowsProjectRenameNote), nameof(IsRenamingGroup), nameof(SelectedGroup));
         DependsOn(nameof(ProjectRenameNote), nameof(ShowsProjectRenameNote), nameof(SelectedGroup));
         DependsOn(BeginAddCommand, nameof(IsAdding));
@@ -128,7 +144,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         DependsOn(ConfirmCreateGroupCommand, nameof(IsCreatingGroup));
         DependsOn(BeginRenameGroupCommand, nameof(IsRenamingGroup), nameof(SelectedGroup));
         DependsOn(ConfirmRenameGroupCommand, nameof(IsRenamingGroup));
-        DependsOn(CancelGroupCommand, nameof(IsCreatingGroup), nameof(IsRenamingGroup));
+        DependsOn(BeginMoveGroupCommand, nameof(IsMovingGroup), nameof(SelectedGroup));
+        DependsOn(ConfirmMoveGroupCommand, nameof(IsMovingGroup));
+        DependsOn(BeginDeleteGroupCommand, nameof(IsConfirmingGroupDelete), nameof(SelectedGroup));
+        DependsOn(ConfirmDeleteGroupCommand, nameof(IsConfirmingGroupDelete));
+        DependsOn(CancelGroupCommand, nameof(IsCreatingGroup), nameof(IsRenamingGroup), nameof(IsMovingGroup), nameof(IsConfirmingGroupDelete));
+        DependsOn(DuplicateCommand, nameof(Selected));
 
         Reload();
 
@@ -206,17 +227,14 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>The search box.</summary>
     /// <remarks>
     /// <para>
-    /// <b>The matching happens in <see cref="Vault.Search"/>, not here, and that is a security
-    /// decision rather than a tidiness one.</b> A query covers titles, group paths, usernames and
-    /// URLs; the last two are not on a row, so matching them in this class would mean holding every
-    /// username in the vault in order to compare it — exactly what <see cref="EntryRow"/> refuses to
-    /// carry and what the hygiene gate checks for. Core returns names and a
-    /// <see cref="MatchedFields"/>, so no value reaches this layer at all.
+    /// <b>The matching happens in <see cref="Vault.Search"/>, not here.</b> A query covers titles, group
+    /// paths, usernames, URLs and the entry's own tags, and core returns names, a
+    /// <see cref="MatchedFields"/> and the tags matched, so the rule for what a query may reach is
+    /// core's alone.
     /// </para>
     /// <para>
-    /// It follows that a password and a note cannot be searched: core never reads them. That is the
-    /// same conclusion this remark used to reach from the opposite direction, and the reasoning it
-    /// used — do not match what the row does not show — was what made a username unsearchable too.
+    /// A password, a note and a custom field cannot be searched: core never reads them, so a query is
+    /// never a way to confirm a secret without opening the entry that holds it.
     /// </para>
     /// </remarks>
     internal string Search
@@ -316,7 +334,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// since a view has one amber element (D-0375).
     /// </summary>
     internal bool AddIsPrimary =>
-        !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && _detail is not { HasOwnPrimary: true };
+        !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && !IsMovingGroup && _detail is not { HasOwnPrimary: true };
 
     /// <summary>
     /// Whether the list shows above the item's preview. A new item, an edit and a comparison of two
@@ -434,6 +452,82 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         get => _isRenamingGroup;
         private set => Set(ref _isRenamingGroup, value);
     }
+
+    /// <summary>Whether the move-group form is showing.</summary>
+    internal bool IsMovingGroup
+    {
+        get => _isMovingGroup;
+        private set => Set(ref _isMovingGroup, value);
+    }
+
+    /// <summary>Whether the group delete confirmation is showing.</summary>
+    internal bool IsConfirmingGroupDelete
+    {
+        get => _isConfirmingGroupDelete;
+        private set => Set(ref _isConfirmingGroupDelete, value);
+    }
+
+    /// <summary>The group the selected group would move into, from <see cref="MoveTargets"/>.</summary>
+    internal GroupNode? GroupMoveTarget
+    {
+        get => _groupMoveTarget;
+        set => Set(ref _groupMoveTarget, value);
+    }
+
+    /// <summary>Which group is being moved.</summary>
+    internal string MoveGroupPrompt =>
+        SelectedGroup is { IsEverything: false } group
+            ? $"Move {EntryNameSanitizer.SanitizePath(group.Path).Text} and everything in it into another group."
+            : string.Empty;
+
+    /// <summary>
+    /// What the group delete confirmation asks, naming how many items go with the group and whether
+    /// they can come back.
+    /// </summary>
+    /// <remarks>
+    /// Read from the vault for the reason <see cref="DeletePrompt"/> gives, and counted from the list,
+    /// which holds every item under the group, its subgroups' included.
+    /// </remarks>
+    internal string GroupDeletePrompt
+    {
+        get
+        {
+            if (SelectedGroup is not { IsEverything: false } group)
+            {
+                return string.Empty;
+            }
+
+            var name = EntryNameSanitizer.SanitizePath(group.Path).Text;
+            var count = _all.Count(row => group.Contains(row.GroupPath));
+            var items = count == 1 ? "1 item" : $"{count} items";
+
+            if (_session.Unlocked?.RecyclesDeletedEntries == true)
+            {
+                return count == 0
+                    ? $"Delete {name}? It goes to the vault's recycle bin."
+                    : $"Delete {name}? It and the {items} in it go to the vault's recycle bin, and Trash can put each item back.";
+            }
+
+            return count == 0 && group.Children.Count == 0
+                ? $"Delete {name}? This vault has no recycle bin, so there is no undo."
+                : $"{name} holds {(count == 0 ? "groups" : items)}, and this vault has no recycle bin, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
+        }
+    }
+
+    /// <summary>Opens the form that moves the selected group into another.</summary>
+    internal RelayCommand BeginMoveGroupCommand { get; }
+
+    /// <summary>Moves the selected group, with everything in it, in one write.</summary>
+    internal RelayCommand ConfirmMoveGroupCommand { get; }
+
+    /// <summary>Asks before deleting the selected group. It deletes nothing.</summary>
+    internal RelayCommand BeginDeleteGroupCommand { get; }
+
+    /// <summary>Deletes the selected group with everything in it, having been confirmed.</summary>
+    internal RelayCommand ConfirmDeleteGroupCommand { get; }
+
+    /// <summary>Copies the selected item beside it, under a new title, and selects the copy.</summary>
+    internal RelayCommand DuplicateCommand { get; }
 
     /// <summary>The title being typed for the selected entry.</summary>
     internal string DraftTitle
@@ -593,7 +687,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         var wantedGroup = _selectedGroup?.Path;
 
         _all = [.. vault.ReadEntries()
-            .Select(entry => new EntryRow(entry.Title, entry.GroupPath) { Kind = EntryKinds.Of(entry) })];
+            .Select(entry => new EntryRow(entry.Title, entry.GroupPath)
+            {
+                Kind = EntryKinds.Of(entry),
+                Username = entry.Username,
+                Url = entry.Url,
+            })];
         Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         MoveTargets = Groups;
         Raise(nameof(TotalCount));
@@ -653,10 +752,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         DraftTitle = string.Empty;
         DraftGroupName = string.Empty;
         MoveTarget = null;
+        GroupMoveTarget = null;
         MoveTargets = [];
         IsOrganizing = false;
         IsCreatingGroup = false;
         IsRenamingGroup = false;
+        IsMovingGroup = false;
+        IsConfirmingGroupDelete = false;
 
         Raise(nameof(Search));
     }
@@ -735,7 +837,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 .Where(row => query.Length == 0 || _matches.ContainsKey(row.Name))
                 .Select(row => query.Length == 0
                     ? row
-                    : row with { Fields = _matches[row.Name] })
+                    : row with { Fields = _matches[row.Name].Fields, Tags = _matches[row.Name].Tags })
         ];
 
         // An entry just renamed out of its own result stays where the person is looking at it. It is
@@ -778,11 +880,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         // Last write wins where a vault holds two entries of one name: the list draws both rows and
         // either one being in the result is what puts the pair on screen.
-        Dictionary<EntryName, MatchedFields> found = [];
+        Dictionary<EntryName, EntryMatch> found = [];
 
         foreach (var match in vault.Search(query))
         {
-            found[match.Name] = match.Fields;
+            found[match.Name] = match;
         }
 
         _matchedQuery = query;
@@ -1038,8 +1140,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private void BeginCreateGroup()
     {
         CloseOtherForms();
-        IsRenamingGroup = false;
-        DraftGroupName = string.Empty;
+        CloseGroupForms();
         IsCreatingGroup = true;
         Error = null;
     }
@@ -1052,9 +1153,38 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
 
         CloseOtherForms();
-        IsCreatingGroup = false;
+        CloseGroupForms();
         DraftGroupName = group.Name;
         IsRenamingGroup = true;
+        Error = null;
+    }
+
+    private void BeginMoveGroup()
+    {
+        if (SelectedGroup is not { IsEverything: false } group)
+        {
+            return;
+        }
+
+        CloseOtherForms();
+        CloseGroupForms();
+        var slash = group.Path.LastIndexOf('/');
+        var parent = slash < 0 ? string.Empty : group.Path[..slash];
+        GroupMoveTarget = MoveTargets.FirstOrDefault(node => string.Equals(node.Path, parent, StringComparison.Ordinal));
+        IsMovingGroup = true;
+        Error = null;
+    }
+
+    private void BeginDeleteGroup()
+    {
+        if (SelectedGroup is not { IsEverything: false })
+        {
+            return;
+        }
+
+        CloseOtherForms();
+        CloseGroupForms();
+        IsConfirmingGroupDelete = true;
         Error = null;
     }
 
@@ -1062,7 +1192,10 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     {
         IsCreatingGroup = false;
         IsRenamingGroup = false;
+        IsMovingGroup = false;
+        IsConfirmingGroupDelete = false;
         DraftGroupName = string.Empty;
+        GroupMoveTarget = null;
     }
 
     /// <summary>Closes whatever else is open, so one form is on screen at a time.</summary>
@@ -1107,6 +1240,154 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             GroupOutcome.Renamed,
             renamed => $"Renamed to {EntryNameSanitizer.SanitizePath(renamed).Text}.",
             follow: true);
+    }
+
+    /// <summary>Moves the selected group into the chosen one, in one core write, and follows it there.</summary>
+    /// <remarks>
+    /// The destinations are the item move's own (<see cref="MoveTargets"/>); one core refuses, such as the
+    /// group itself or a group inside it, says why rather than being hidden from the list.
+    /// </remarks>
+    private void ConfirmMoveGroup()
+    {
+        if (SelectedGroup is not { IsEverything: false } selected)
+        {
+            return;
+        }
+
+        var path = selected.Path;
+        var destination = GroupMoveTarget?.Path ?? string.Empty;
+        var write = _session.Write(
+            vault => (Outcome: vault.MoveGroup(path, destination, out var moved), Path: moved),
+            result => result.Outcome == GroupOutcome.Moved);
+
+        if (write.Problem("make your change again") is { } problem)
+        {
+            Error = problem;
+            return;
+        }
+
+        if (write.Outcome == WriteOutcome.NothingToSave)
+        {
+            Error = Refusal(write.Value.Outcome);
+            return;
+        }
+
+        var movedPath = write.Value.Path;
+        var where = destination.Length == 0 ? "the top level" : EntryNameSanitizer.SanitizePath(destination).Text;
+
+        CloseGroupForms();
+        Reload();
+
+        // The sidebar was pointing at a path that no longer exists, so it follows the group, as a rename does.
+        SelectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, movedPath, StringComparison.Ordinal)) ?? SelectedGroup;
+        Error = null;
+        Offer(null, $"Moved {EntryNameSanitizer.Sanitize(selected.Name).Text} to {where}.");
+    }
+
+    /// <summary>Deletes the selected group with everything in it, in one core write, and shows the group it was in.</summary>
+    /// <remarks>
+    /// Where the vault has a recycle bin the whole group goes there and Trash lists each of its items, which
+    /// is where they come back from; without one only an empty group goes, for good (D-NEW-A1).
+    /// </remarks>
+    private void ConfirmDeleteGroup()
+    {
+        if (SelectedGroup is not { IsEverything: false } selected)
+        {
+            return;
+        }
+
+        var path = selected.Path;
+        var count = _all.Count(row => selected.Contains(row.GroupPath));
+        var write = _session.Write(
+            vault => vault.DeleteGroup(path),
+            outcome => outcome is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently);
+
+        if (write.Problem("delete it again") is { } problem)
+        {
+            Error = problem;
+            return;
+        }
+
+        if (write.Outcome == WriteOutcome.NothingToSave)
+        {
+            Error = Refusal(write.Value);
+            return;
+        }
+
+        var name = EntryNameSanitizer.SanitizePath(path).Text;
+        var slash = path.LastIndexOf('/');
+        var parent = slash < 0 ? string.Empty : path[..slash];
+
+        CloseGroupForms();
+        Reload();
+        SelectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, parent, StringComparison.Ordinal))
+            ?? Groups.FirstOrDefault(node => node.IsEverything);
+        Error = null;
+        Offer(
+            null,
+            write.Value == GroupOutcome.DeletedPermanently
+                ? $"Deleted {name}. This vault has no recycle bin, so nothing can put it back."
+                : count == 0
+                    ? $"Moved {name} to the trash."
+                    : $"Moved {name} and the {(count == 1 ? "1 item" : $"{count} items")} in it to the trash. Trash puts each one back.");
+    }
+
+    /// <summary>
+    /// Copies the selected item beside it in one core write, selects the copy and says which project tags
+    /// it left out.
+    /// </summary>
+    /// <remarks>
+    /// The copy is held in the result and followed as an organized item is, so it does not vanish under a
+    /// query its new title no longer answers. A project takes one item for each variable (D-0337), so the
+    /// copy is in no project until somebody tags it, and the note says so (D-NEW-A2).
+    /// </remarks>
+    private void Duplicate()
+    {
+        if (Selected is not { } row)
+        {
+            return;
+        }
+
+        CloseOtherForms();
+
+        var write = _session.Write(
+            vault => (Outcome: vault.CloneEntry(row.Name, out var copy, out var dropped), Copy: copy, Dropped: dropped),
+            result => result.Outcome == OrganizeOutcome.Copied);
+
+        if (write.Problem("duplicate it again") is { } problem)
+        {
+            Error = problem;
+            return;
+        }
+
+        if (write.Outcome == WriteOutcome.NothingToSave || write.Value.Copy is not { } made)
+        {
+            Error = write.Value.Outcome == OrganizeOutcome.NameRefused
+                ? "keypaste could not give a copy of this item a title it accepts. Rename the item, then duplicate it."
+                : "That item is not in this vault any more.";
+            return;
+        }
+
+        Error = null;
+        _pinned = made;
+        Reselect(made);
+        Offer(null, Duplicated(row.Title, made.Title, write.Value.Dropped));
+    }
+
+    /// <summary>What the app says a duplicate made, naming any project tag the copy left out and never a value.</summary>
+    private static string Duplicated(string title, string copy, IReadOnlyList<string> dropped)
+    {
+        var made = $"Duplicated {EntryNameSanitizer.Sanitize(title).Text} as {EntryNameSanitizer.Sanitize(copy).Text}.";
+
+        if (dropped.Count == 0)
+        {
+            return made;
+        }
+
+        var tags = string.Join(", ", dropped.Select(tag => EntryNameSanitizer.Sanitize(tag).Text));
+        var which = dropped.Count == 1 ? $"the project tag {tags}" : $"the project tags {tags}";
+
+        return $"{made} The copy leaves out {which}, because a project takes one item for each variable. Tag the copy to put it in another environment.";
     }
 
     /// <summary>The half of a group operation that is the same for creating and renaming.</summary>
@@ -1216,7 +1497,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>What the app says when core refused a group a name.</summary>
+    /// <summary>What the app says when core refused a group a name, a move or a delete.</summary>
     private string Refusal(GroupOutcome outcome)
     {
         switch (outcome)
@@ -1226,20 +1507,27 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 return "That group is not in this vault any more.";
 
             case GroupOutcome.DestinationUnchanged:
-                return "That is already its name.";
+                return IsMovingGroup ? "The group is already there." : "That is already its name.";
 
             case GroupOutcome.DestinationOccupied:
                 return "Something in there already answers to that name. Nothing was changed.";
 
             case GroupOutcome.DestinationAmbiguous:
-                return "That rename would leave two items answering to one path, and keypaste could not tell them apart afterwards.";
+                return "That change would leave two items answering to one path, and keypaste could not tell them apart afterwards.";
+
+            case GroupOutcome.DestinationInside:
+                return "A group cannot go inside itself or a group within it. Choose another group.";
+
+            case GroupOutcome.NotEmpty:
+                return "This vault has no recycle bin, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
 
             case GroupOutcome.NameRefused:
                 VaultNameRules.IsValidGroupName(DraftGroupName.Trim(), out var why);
                 return $"keypaste will not use that group name: {why}.";
 
             case GroupOutcome.NameReserved:
-                return "env at the top level and the recycle bin are names keypaste assigns. A group cannot be created as one, renamed to one, or renamed away from one.";
+                return "env at the top level and the recycle bin are names keypaste assigns. A group cannot be created as one, renamed to one "
+                    + "or moved to the top level as env; env is not renamed, moved or deleted, and a group holding the recycle bin is not deleted.";
 
             default:
                 return "That change could not be made.";

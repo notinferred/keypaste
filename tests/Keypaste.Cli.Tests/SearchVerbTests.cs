@@ -5,8 +5,8 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>keypaste search</c>: items found by title, group, username or URL, named by path and the
-/// fields that matched, never by a value (D-0278).
+/// <c>keypaste search</c>: items found by title, group, username, URL or tag, named by path, the
+/// fields that matched and the tags that matched, never by a value (D-0278).
 /// </summary>
 public sealed class SearchVerbTests : IDisposable
 {
@@ -30,6 +30,7 @@ public sealed class SearchVerbTests : IDisposable
         });
         vault.AddEntry(new VaultEntry { GroupPath = "home/router", Title = "admin", Username = "root", Password = "pw" });
         vault.AddEntry(new VaultEntry { GroupPath = "home/router", Title = "printer", Password = "pw" });
+        Assert.True(vault.AddTag(new EntryName("home/router", "printer"), "env:office:prod"));
         vault.AddEntry(new VaultEntry { GroupPath = "acme", Title = "acme portal", Username = "admin@acme", Url = "https://acme.test", Password = "pw" });
         vault.AddEntry(new VaultEntry { Title = "Bank", Url = "https://bank.example", Password = "pw" });
         vault.AddEntry(new VaultEntry { Title = "github token record", GroupPath = ReservedGroups.Tokens, Password = "verifier" });
@@ -86,6 +87,25 @@ public sealed class SearchVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitSuccess, Run("search", "acme"));
 
         Assert.Equal(["acme/acme portal  username, URL"], Lines());
+    }
+
+    [Fact]
+    public void A_tag_match_names_the_tag()
+    {
+        _harness.AssertExit(CliApp.ExitSuccess, Run("search", "prod"));
+
+        Assert.Equal(["home/router/printer  tag env:office:prod"], Lines());
+    }
+
+    [Fact]
+    public void Json_names_the_tags_that_matched()
+    {
+        _harness.AssertExit(CliApp.ExitSuccess, Run("search", "office", "--json"));
+
+        var item = Assert.Single(JsonDocument.Parse(_harness.Out).RootElement.EnumerateArray());
+        Assert.Equal("home/router/printer", item.GetProperty("path").GetString());
+        Assert.Equal(["tag"], item.GetProperty("matched").EnumerateArray().Select(field => field.GetString()));
+        Assert.Equal(["env:office:prod"], item.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()));
     }
 
     [Fact]

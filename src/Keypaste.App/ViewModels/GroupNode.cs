@@ -55,12 +55,13 @@ internal sealed class GroupNode
     /// <summary>
     /// Builds the tree, flattened depth-first into the order a list should draw it.
     /// </summary>
-    /// <param name="groupPaths">Every group path in the vault.</param>
-    /// <returns>The root "everything" node first, then every group, parents before children.</returns>
+    /// <param name="groupPaths">Every group path in the vault, in the order the file holds them.</param>
+    /// <returns>The root "everything" node first, then every group, parents before children, siblings in the file's order.</returns>
     /// <remarks>
     /// Flattened rather than nested because the view draws an indented list rather than a
     /// <c>TreeView</c>: a tree control brings expand state, keyboard conventions and a virtualisation
     /// story for a structure that is usually three rows deep. <see cref="Depth"/> is the indent.
+    /// Siblings keep the order the file gives them, as KeePassXC draws its tree.
     /// </remarks>
     internal static IReadOnlyList<GroupNode> Flatten(IEnumerable<string> groupPaths)
     {
@@ -69,7 +70,7 @@ internal sealed class GroupNode
         var everything = new GroupNode("All items", string.Empty, 0);
         var byPath = new Dictionary<string, GroupNode>(StringComparer.Ordinal);
 
-        foreach (var path in groupPaths.OrderBy(p => p, StringComparer.Ordinal))
+        foreach (var path in groupPaths)
         {
             EnsureNode(path, everything, byPath);
         }

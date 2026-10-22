@@ -85,7 +85,7 @@ public sealed class ShellStatusTests
         Assert.Throws<VaultChangedOnDiskException>(session.Unlocked.Save);
 
         Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
-        Assert.EndsWith(" Your last change here was not saved, and reloading discards it.", shell.VaultChanged, StringComparison.Ordinal);
+        Assert.EndsWith(" Your change to env/app/MINE was not saved, and reloading discards it.", shell.VaultChanged, StringComparison.Ordinal);
 
         var before = shell.Content;
         shell.ReloadCommand.Execute(null);
@@ -96,6 +96,33 @@ public sealed class ShellStatusTests
         var titles = session.Unlocked!.ReadEntries().Select(entry => entry.Title).ToList();
         Assert.Contains("ELSEWHERE", titles);
         Assert.DoesNotContain("MINE", titles);
+    }
+
+    /// <summary>The notice names every item a reload would discard, by name and never by value, and a save that wrote them forgets them.</summary>
+    [Fact]
+    public void TheReloadNotice_NamesEachItemItWouldDiscard()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+
+        session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "SAVED", Password = "s" });
+        session.Unlocked.Save();
+        Assert.Empty(session.Unsaved);
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+        session.Unlocked.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "FIRST", Password = "secret-first" });
+        session.Unlocked.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "SECOND", Password = "secret-second" });
+
+        Assert.EndsWith(" Your changes to env/app/FIRST and env/app/SECOND were not saved, and reloading discards them.", shell.VaultChanged, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-", shell.VaultChanged, StringComparison.Ordinal);
+
+        shell.ReloadCommand.Execute(null);
+
+        Assert.Empty(session.Unsaved);
+        Assert.False(shell.HasVaultChanged);
     }
 
     [Fact]

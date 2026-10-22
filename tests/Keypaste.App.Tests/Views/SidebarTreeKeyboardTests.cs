@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
@@ -43,6 +44,46 @@ public sealed class SidebarTreeKeyboardTests
         Assert.False(container.Focusable);
         Assert.Equal("Projects", heading.Title);
     });
+
+    /// <summary>
+    /// A right-click on a group's row opens its menu there, with Items showing that group, and a choice
+    /// opens Items' form for it with the keyboard in it; a press elsewhere closes the menu.
+    /// </summary>
+    [Fact]
+    public Task A_right_click_on_a_group_opens_its_menu_and_a_choice_opens_its_form() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-tree-menu-");
+        var nav = shell.Named<ListBox>("Nav");
+
+        RightClick(shell, Assert.IsType<ListBoxItem>(nav.ContainerFromItem(Row(shell.Shell, "env"))));
+
+        Assert.Equal("env", shell.Shell.GroupMenu?.Path);
+        Assert.Equal("env", Assert.IsType<EntriesViewModel>(shell.Shell.Content).SelectedGroup?.Path);
+        Assert.True(shell.Named<Border>("GroupMenuPanel").IsEffectivelyVisible);
+
+        shell.Press(shell.Named<TextBox>("ShellSearch"));
+        shell.Release(shell.Named<TextBox>("ShellSearch"));
+        Assert.False(shell.Shell.HasGroupMenu);
+
+        RightClick(shell, Assert.IsType<ListBoxItem>(nav.ContainerFromItem(Row(shell.Shell, "env"))));
+        var rename = shell.Named<Button>("GroupMenuRename");
+        shell.Press(rename);
+        shell.Release(rename);
+        RenderedShell.Drain();
+
+        Assert.False(shell.Shell.HasGroupMenu);
+        Assert.True(Assert.IsType<EntriesViewModel>(shell.Shell.Content).IsRenamingGroup);
+        Assert.True(shell.Named<TextBox>("RenameGroupName").IsFocused);
+    });
+
+    private static void RightClick(RenderedShell shell, Control control)
+    {
+        shell.Frame();
+        var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), shell.Window)!.Value;
+        shell.Window.MouseDown(centre, MouseButton.Right);
+        shell.Window.MouseUp(centre, MouseButton.Right);
+        RenderedShell.Drain();
+    }
 
     private static GroupRow Row(ShellViewModel shell, string path) =>
         shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == path);

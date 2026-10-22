@@ -179,6 +179,125 @@ public sealed class EntriesOrganizeTests : IDisposable
     }
 
     /// <summary>
+    /// A moved group carries its items and their history in one write, and the list follows it to its
+    /// new path, as it follows a renamed one.
+    /// </summary>
+    [Fact]
+    public void A_moved_group_carries_its_items_and_the_list_follows_it()
+    {
+        using (var context = New())
+        {
+            var entries = context.Entries;
+
+            entries.SelectedGroup = Group(entries, "servers");
+            entries.BeginMoveGroupCommand.Execute(null);
+
+            Assert.True(entries.IsMovingGroup);
+            Assert.Equal(string.Empty, entries.GroupMoveTarget?.Path);
+            Assert.Same(entries.MoveTargets, entries.Groups);
+
+            entries.GroupMoveTarget = Group(entries, "env");
+            entries.ConfirmMoveGroupCommand.Execute(null);
+
+            Assert.Null(entries.Error);
+            Assert.False(entries.IsMovingGroup);
+            Assert.Equal("env/servers", entries.SelectedGroup?.Path);
+            Assert.Equal("Moved servers to env.", entries.Notice);
+            Assert.Equal(["production", "staging"], entries.Rows.Select(row => row.Title).Order(StringComparer.Ordinal));
+        }
+
+        using var reopened = Vault.Open(_vaultPath, Master);
+        var name = new EntryName("env/servers", "production");
+
+        Assert.Null(reopened.Find(new EntryName("servers", "production")));
+        Assert.Equal("second", reopened.Find(name)!.Password, StringComparer.Ordinal);
+        Assert.Equal(new[] { "first" }, reopened.ReadHistory(name)!.Select(revision => revision.Fields.Password));
+    }
+
+    /// <summary>The move offers the item move's own destinations, and one core refuses says why and writes nothing.</summary>
+    [Theory]
+    [InlineData("env/billing", "env/billing", "inside itself")]
+    [InlineData("servers", "", "already there")]
+    [InlineData("env", "servers", "keypaste assigns")]
+    public void A_refused_group_move_says_why_and_leaves_the_bytes_unchanged(string group, string target, string said)
+    {
+        var before = Digest(_vaultPath);
+
+        using var context = New();
+        var entries = context.Entries;
+
+        entries.SelectedGroup = Group(entries, group);
+        entries.BeginMoveGroupCommand.Execute(null);
+        entries.GroupMoveTarget = Group(entries, target);
+        entries.ConfirmMoveGroupCommand.Execute(null);
+
+        Assert.Contains(said, entries.Error, StringComparison.Ordinal);
+        Assert.True(entries.IsMovingGroup);
+        Assert.Equal(before, Digest(_vaultPath));
+    }
+
+    /// <summary>
+    /// Deleting a group asks first, naming how many items go with it; asking writes nothing, and the
+    /// delete puts the group and its items in the recycle bin and shows the group it was in.
+    /// </summary>
+    [Fact]
+    public void Deleting_a_group_asks_first_naming_its_items_and_recycles_them()
+    {
+        var before = Digest(_vaultPath);
+
+        using (var context = New())
+        {
+            var entries = context.Entries;
+
+            entries.SelectedGroup = Group(entries, "env/billing");
+            entries.BeginDeleteGroupCommand.Execute(null);
+
+            Assert.True(entries.IsConfirmingGroupDelete);
+            Assert.Equal(
+                "Delete env/billing? It and the 1 item in it go to the vault's recycle bin, and Trash can put each item back.",
+                entries.GroupDeletePrompt);
+            Assert.Equal(before, Digest(_vaultPath));
+
+            entries.SelectedGroup = Group(entries, "servers");
+            Assert.False(entries.IsConfirmingGroupDelete);
+
+            entries.BeginDeleteGroupCommand.Execute(null);
+            Assert.Contains("the 2 items in it", entries.GroupDeletePrompt, StringComparison.Ordinal);
+
+            entries.ConfirmDeleteGroupCommand.Execute(null);
+
+            Assert.Null(entries.Error);
+            Assert.True(entries.SelectedGroup?.IsEverything);
+            Assert.Equal("Moved servers and the 2 items in it to the trash. Trash puts each one back.", entries.Notice);
+            Assert.DoesNotContain(entries.Groups, node => node.Path == "servers");
+        }
+
+        using var reopened = Vault.Open(_vaultPath, Master);
+
+        Assert.Null(reopened.Find(new EntryName("servers", "production")));
+        Assert.Equal(
+            [("production", "servers"), ("staging", "servers")],
+            reopened.ReadRecycled().Select(recycled => (recycled.Title, recycled.OriginalGroupPath)).Order());
+    }
+
+    /// <summary>The env group is keypaste's to assign, so it is not deleted, and the screen says why.</summary>
+    [Fact]
+    public void The_env_group_is_not_deleted_and_says_why()
+    {
+        var before = Digest(_vaultPath);
+
+        using var context = New();
+        var entries = context.Entries;
+
+        entries.SelectedGroup = Group(entries, "env");
+        entries.BeginDeleteGroupCommand.Execute(null);
+        entries.ConfirmDeleteGroupCommand.Execute(null);
+
+        Assert.Contains("keypaste assigns", entries.Error, StringComparison.Ordinal);
+        Assert.Equal(before, Digest(_vaultPath));
+    }
+
+    /// <summary>
     /// Organizing can change which places an agent sees cover an entry, wherever it happens.
     /// </summary>
     [Fact]
@@ -288,6 +407,50 @@ public sealed class EntriesOrganizeTests : IDisposable
         Assert.Null(entries.Error);
         Assert.Equal("env/billing", entries.SelectedGroup?.Path);
         Assert.Contains(entries.Rows, row => row.Name == new EntryName("env/billing", "production"));
+    }
+
+    /// <summary>
+    /// A duplicate sits beside the item under a new title, with its values and no history, and is
+    /// selected; it leaves out the project tags and says so, because a project takes one item for each
+    /// variable (D-0337).
+    /// </summary>
+    [Fact]
+    public void A_duplicate_is_selected_beside_the_item_and_names_the_project_tags_it_left_out()
+    {
+        using (var vault = Vault.Open(_vaultPath, Master))
+        {
+            var key = new EntryName("env/billing", "STRIPE_KEY");
+            Assert.True(vault.AddTag(key, "env:billing"));
+            Assert.True(vault.AddTag(key, "finance"));
+            vault.Save();
+        }
+
+        using (var context = New())
+        {
+            var entries = context.Entries;
+
+            Select(entries, "env/billing", "STRIPE_KEY");
+            entries.DuplicateCommand.Execute(null);
+
+            Assert.Null(entries.Error);
+            Assert.Equal(new EntryName("env/billing", "STRIPE_KEY (copy)"), entries.Selected?.Name);
+            Assert.Equal(
+                "Duplicated STRIPE_KEY as STRIPE_KEY (copy). The copy leaves out the project tag env:billing, because a project takes one item for each variable. Tag the copy to put it in another environment.",
+                entries.Notice);
+
+            Select(entries, "servers", "production");
+            entries.DuplicateCommand.Execute(null);
+
+            Assert.Equal("Duplicated production as production (copy).", entries.Notice);
+        }
+
+        using var reopened = Vault.Open(_vaultPath, Master);
+        var copy = new EntryName("env/billing", "STRIPE_KEY (copy)");
+
+        Assert.Equal("sk", reopened.Find(copy)!.Password, StringComparer.Ordinal);
+        Assert.Equal(["finance"], reopened.Tags(copy)!);
+        Assert.Equal("second", reopened.Find(new EntryName("servers", "production (copy)"))!.Password, StringComparer.Ordinal);
+        Assert.Empty(reopened.ReadHistory(new EntryName("servers", "production (copy)"))!);
     }
 
     // ---------------------------------------------------------------- refusals
@@ -476,6 +639,26 @@ public sealed class EntriesOrganizeTests : IDisposable
 
         var row = Assert.Single(entries.Rows);
         Assert.Equal("username, URL", row.Why);
+    }
+
+    /// <summary>A tag the query was in labels the row with that tag, which is a label and not a value (D-NEW-A3).</summary>
+    [Fact]
+    public void A_row_matched_on_a_tag_names_the_tag()
+    {
+        using (var vault = Vault.Open(_vaultPath, Master))
+        {
+            Assert.True(vault.AddTag(new EntryName(string.Empty, "github"), "billing-ops"));
+            vault.Save();
+        }
+
+        using var context = New();
+        var entries = context.Entries;
+
+        entries.Search = "OPS";
+
+        var row = Assert.Single(entries.Rows);
+        Assert.Equal("github", row.Title);
+        Assert.Equal("tag billing-ops", row.Why);
     }
 
     [Fact]

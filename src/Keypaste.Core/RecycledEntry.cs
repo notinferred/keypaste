@@ -24,12 +24,15 @@ public enum RestoreOutcome
     /// <summary>No recycled entry has that identity. Nothing was changed.</summary>
     NothingMatched = 0,
 
-    /// <summary>The entry is back in the group it was deleted from.</summary>
+    /// <summary>
+    /// The entry is back in the group it was deleted from, or at the path it had when its group was
+    /// deleted, with any group on that path the vault no longer had made again.
+    /// </summary>
     Restored = 1,
 
     /// <summary>
-    /// The entry is back, in the root group, because the group it was deleted from is gone or is
-    /// itself recycled.
+    /// The entry is back, in the root group, because the group it was deleted from, or the one its
+    /// deleted group was in, is gone or is itself recycled.
     /// </summary>
     RestoredToRoot = 2,
 
@@ -135,10 +138,11 @@ public readonly record struct RecycledEntryId
 /// <param name="Id">The identity to restore or purge by.</param>
 /// <param name="Title">The entry title, verbatim and unsanitized.</param>
 /// <param name="OriginalGroupPath">
-/// The group the entry was deleted from, or null when the vault does not record one — an entry
-/// another program put in the bin, or one recycled before the original location was kept.
+/// The group the entry was deleted from, or the path it had when a group holding it was deleted; null
+/// when the vault does not record one — an entry another program put in the bin, or one recycled
+/// before the original location was kept.
 /// </param>
-/// <param name="DeletedUtc">When the entry was moved to the bin.</param>
+/// <param name="DeletedUtc">When the entry, or a group holding it, was moved to the bin.</param>
 public sealed record RecycledEntry(
     RecycledEntryId Id,
     string Title,

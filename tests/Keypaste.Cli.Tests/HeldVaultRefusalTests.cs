@@ -29,7 +29,7 @@ public sealed class HeldVaultRefusalTests : IDisposable
     {
         var data = new TheoryData<string, OwnerKind>();
 
-        foreach (var verb in new[] { "add", "set", "rm", "rotate", "field rm", "access", "env set", "env rm", "env pull", "env tag", "import" })
+        foreach (var verb in new[] { "add", "set", "rm", "rotate", "field rm", "field mv", "access", "env set", "env rm", "env pull", "env tag", "import" })
         {
             data.Add(verb, OwnerKind.DesktopApp);
             data.Add(verb, OwnerKind.TerminalAgent);
@@ -94,6 +94,7 @@ public sealed class HeldVaultRefusalTests : IDisposable
             "rm" => ["rm", "Work/github", "--yes", .. vault],
             "rotate" => ["rotate", "Work/github", .. vault],
             "field rm" => ["field", "rm", "Work/github", "KEY", .. vault],
+            "field mv" => ["field", "mv", "Work/github", "KEY", "OTHER", .. vault],
             "env tag" => ["env", "tag", "ci", "Work/github", "--yes", .. vault],
             "access" => ["access", "--password", .. vault],
             "env set" => ["env", "set", "ci", "DEPLOY_KEY=held", .. vault],

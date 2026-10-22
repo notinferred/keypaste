@@ -5,7 +5,7 @@ using Keypaste.Core.Activity;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// One line of the entry list: a name and where it lives, and nothing else.
+/// One line of the entry list: a name, where it lives, its username and its web address, and nothing else.
 /// </summary>
 /// <param name="Title">The entry's title.</param>
 /// <param name="GroupPath">Its group, or empty at the root.</param>
@@ -15,26 +15,17 @@ namespace Keypaste.App.ViewModels;
 /// </param>
 /// <remarks>
 /// <para>
-/// <b>No field value is materialised here, and that is the decision 4.1's hygiene gate existed to
-/// force.</b> A username column is a disclosure surface no CLI verb has: <c>keypaste ls</c> prints
-/// titles and groups, and that is what a listing is. It would also be readable over a shoulder and
-/// in marketing screenshots, which THREATS.md T-24 already worries about.
-/// The detail pane widens to username, URL and notes for the one entry a person selected, which is
-/// <c>keypaste get</c>'s scope minus the password.
+/// <b>The list shows title, kind, group, agent use, username and URL, and never a password or a
+/// custom field's value (D-NEW-A6).</b> A username and a web address are what KeePassXC's table shows
+/// too; the password, the notes and every custom field stay out of the row, so "the list holds no
+/// secret" is a claim about the list rather than about which entry happens to be selected. An
+/// implementation that read every password into every row would fail <c>SecretHygieneTests</c> on the
+/// entry it never selected.
 /// </para>
 /// <para>
-/// The narrower consequence is what the test relies on: because a row cannot carry a password, "the
-/// list holds no field value" is a claim about the list rather than about which entry happens to be
-/// selected. An implementation that read every password into every row would fail
-/// <c>SecretHygieneTests</c> on the entry it never selected.
-/// </para>
-/// <para>
-/// <b><see cref="Fields"/> is the one thing here that came from a search, and it is not a value.</b>
-/// V.5b matches usernames and URLs, so a row can be in a result for a reason that is nowhere on it,
-/// and saying which field matched is how the list answers "why is this here?". The matching happens
-/// in <see cref="Core.Vault.Search"/> and what comes back is a member of a four-value enum, so the
-/// username that matched never reaches this assembly — which is what keeps the paragraph above true
-/// of a filtered list as well as an unfiltered one.
+/// <b><see cref="Fields"/> and <see cref="Tags"/> are what came from a search, and neither is a
+/// value.</b> The matching happens in <see cref="Core.Vault.Search"/>: what comes back is a member of a
+/// fixed enum and the entry's own tags the query was in, which are labels rather than values (D-NEW-A3).
 /// </para>
 /// </remarks>
 internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fields = MatchedFields.None) : INotifyPropertyChanged
@@ -94,14 +85,17 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
         LastUsedText = UseText.LastUsed(use, now);
     }
 
-    /// <summary>Rows are the same row when they name the same entry for the same reason; their use is not identity.</summary>
+    /// <summary>Rows are the same row when they name the same entry, show the same fields and are found for the same reason; their use is not identity.</summary>
     /// <param name="other">The other row.</param>
     /// <returns>Whether they are equal.</returns>
     public bool Equals(EntryRow? other) =>
         other is not null
         && string.Equals(Title, other.Title, StringComparison.Ordinal)
         && string.Equals(GroupPath, other.GroupPath, StringComparison.Ordinal)
-        && Fields == other.Fields;
+        && string.Equals(Username, other.Username, StringComparison.Ordinal)
+        && string.Equals(Url, other.Url, StringComparison.Ordinal)
+        && Fields == other.Fields
+        && Tags.SequenceEqual(other.Tags, StringComparer.Ordinal);
 
     /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(Title, GroupPath, Fields);
@@ -133,6 +127,21 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     internal string Where { get; } =
         GroupPath.Length == 0 ? "—" : EntryNameSanitizer.SanitizePath(GroupPath).Text;
 
+    /// <summary>The entry's username, as the vault holds it. Never drawn; see <see cref="DisplayUsername"/>.</summary>
+    internal string Username { get; init; } = string.Empty;
+
+    /// <summary>The entry's web address, as the vault holds it. Never drawn; see <see cref="DisplayUrl"/>.</summary>
+    internal string Url { get; init; } = string.Empty;
+
+    /// <summary>The username column, scrubbed as the item's preview scrubs it.</summary>
+    internal string DisplayUsername => DisplayTextSanitizer.Sanitize(Username, DisplayTextSanitizer.MaximumLength).Text;
+
+    /// <summary>The URL column, scrubbed as the item's preview scrubs it.</summary>
+    internal string DisplayUrl => DisplayTextSanitizer.Sanitize(Url, DisplayTextSanitizer.MaximumLength).Text;
+
+    /// <summary>The entry's own tags the current query was in, or none when there is no query or it matched no tag.</summary>
+    internal IReadOnlyList<string> Tags { get; init; } = [];
+
     /// <summary>What sort of entry this is, read from which fields are filled in.</summary>
     internal EntryKind Kind { get; init; }
 
@@ -143,19 +152,38 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     internal string KindLabel => EntryKinds.Label(Kind);
 
     /// <summary>
-    /// Which fields a person cannot see on this row the query was found in, worded for the list.
+    /// Which fields beside the title and the group the query was found in, worded for the list, with the
+    /// tags it was in by name.
     /// </summary>
     /// <remarks>
-    /// Only the two that are not already on the row. A title or a group match shows its own evidence
-    /// in the two columns beside this one, and labelling those would be noise on every row of an
-    /// ordinary search. The strings are constants: nothing from the vault is interpolated here.
+    /// A title or a group match shows its own evidence in the columns beside this one, and labelling
+    /// those would be noise on every row of an ordinary search. A username or a URL column can be cut
+    /// short, so a match there is still named. Field names are constants; a tag is a label, scrubbed as
+    /// a name is (D-NEW-A3).
     /// </remarks>
-    internal string Why =>
-        (Fields.HasFlag(MatchedFields.Username), Fields.HasFlag(MatchedFields.Url)) switch
+    internal string Why
+    {
+        get
         {
-            (true, true) => "username, URL",
-            (true, false) => "username",
-            (false, true) => "URL",
-            _ => string.Empty,
-        };
+            List<string> reasons = [];
+
+            if (Fields.HasFlag(MatchedFields.Username))
+            {
+                reasons.Add("username");
+            }
+
+            if (Fields.HasFlag(MatchedFields.Url))
+            {
+                reasons.Add("URL");
+            }
+
+            if (Fields.HasFlag(MatchedFields.Tag) && Tags.Count > 0)
+            {
+                var tags = string.Join(", ", Tags.Select(tag => EntryNameSanitizer.Sanitize(tag).Text));
+                reasons.Add(Tags.Count == 1 ? $"tag {tags}" : $"tags {tags}");
+            }
+
+            return string.Join(", ", reasons);
+        }
+    }
 }

@@ -78,6 +78,38 @@ public sealed class VaultSearchTests : IDisposable
         Assert.Equal(MatchedFields.Url, match.Fields);
     }
 
+    /// <summary>A tag is matched by any part of it, so <c>prod</c> finds an item in a production environment, and the match names the tag.</summary>
+    [Fact]
+    public void ATagIsMatchedByAnyPartOfIt_AndNamed()
+    {
+        using var vault = Seeded();
+        var token = new EntryName("env/billing", "TOKEN");
+        Assert.True(vault.AddTag(token, "env:billing:prod"));
+        Assert.True(vault.AddTag(token, "finance"));
+
+        var match = Assert.Single(vault.Search("prod"), m => m.Name == token);
+
+        Assert.Equal(MatchedFields.Tag, match.Fields);
+        Assert.Equal(["env:billing:prod"], match.Tags);
+
+        var cased = Assert.Single(vault.Search("FINANCE"));
+        Assert.Equal(token, cased.Name);
+        Assert.Equal(["finance"], cased.Tags);
+    }
+
+    [Fact]
+    public void AMatchOnAnythingButATag_NamesNoTag()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.AddTag(new EntryName("servers", "PROD_DB"), "finance"));
+
+        var match = Assert.Single(vault.Search("dba@example.test"));
+
+        Assert.Equal(MatchedFields.Username, match.Fields);
+        Assert.Empty(match.Tags);
+        Assert.All(vault.Search(string.Empty), every => Assert.Empty(every.Tags));
+    }
+
     /// <summary>
     /// The load-bearing negative. The value is in the vault, and nothing finds it.
     /// </summary>

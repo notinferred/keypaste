@@ -88,6 +88,65 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Same(shell.MainNav[0], shell.SelectedSidebarRow);
     }
 
+    /// <summary>
+    /// A group row's menu shows that group in Items and each choice opens Items' own form for it, so a
+    /// group changes the same way from the sidebar as from the list header.
+    /// </summary>
+    [Fact]
+    public void A_group_rows_menu_opens_items_forms_on_that_group()
+    {
+        using var shell = Shell();
+        shell.GoTo(2);
+        var work = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "Work");
+
+        shell.OpenGroupMenu(work);
+
+        Assert.True(shell.HasGroupMenu);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Equal("Work", entries.SelectedGroup?.Path);
+
+        shell.RenameGroupCommand.Execute(null);
+        Assert.False(shell.HasGroupMenu);
+        Assert.True(entries.IsRenamingGroup);
+        Assert.Equal("Work", entries.DraftGroupName);
+
+        shell.OpenGroupMenu(work);
+        shell.NewGroupInsideCommand.Execute(null);
+        Assert.True(entries.IsCreatingGroup);
+        Assert.False(entries.IsRenamingGroup);
+        Assert.Equal("A new group inside Work.", entries.CreateGroupPrompt);
+
+        shell.OpenGroupMenu(work);
+        shell.MoveGroupCommand.Execute(null);
+        Assert.True(entries.IsMovingGroup);
+
+        shell.OpenGroupMenu(work);
+        shell.DeleteGroupCommand.Execute(null);
+        Assert.True(entries.IsConfirmingGroupDelete);
+        Assert.Contains("the 1 item in it", entries.GroupDeletePrompt, StringComparison.Ordinal);
+
+        shell.OpenGroupMenu(work);
+        shell.CloseGroupMenu();
+        Assert.False(shell.HasGroupMenu);
+        Assert.True(entries.IsConfirmingGroupDelete);
+    }
+
+    /// <summary>A group deleted from its menu leaves the sidebar's tree at once.</summary>
+    [Fact]
+    public void A_group_deleted_from_its_menu_leaves_the_tree()
+    {
+        using var shell = Shell();
+
+        shell.OpenGroupMenu(shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "Work"));
+        shell.DeleteGroupCommand.Execute(null);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.ConfirmDeleteGroupCommand.Execute(null);
+
+        Assert.Null(entries.Error);
+        Assert.Equal(["Items", "env", "Projects", "billing", "Agents"], Titles(shell));
+        Assert.Same(shell.MainNav[0], shell.SelectedSidebarRow);
+    }
+
     private static IEnumerable<string> Titles(ShellViewModel shell) =>
         shell.SidebarRows.Select(row => row switch
         {

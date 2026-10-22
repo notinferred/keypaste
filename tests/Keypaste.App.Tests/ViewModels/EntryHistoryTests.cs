@@ -544,6 +544,43 @@ public sealed class EntryHistoryTests : IDisposable
     private static string Digest(string path) =>
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
 
+    /// <summary>
+    /// A revision names its custom fields with their protection and its tags beside the item's own, and
+    /// never a field's value (D-NEW-A5).
+    /// </summary>
+    [Fact]
+    public void A_revision_names_its_custom_fields_and_tags_and_no_value()
+    {
+        const string token = "SENTINEL-HISTORY-FIELD-5c2e91";
+        var github = new EntryName(string.Empty, "github");
+
+        using (var vault = Vault.Open(_vaultPath, _master))
+        {
+            Assert.True(vault.SetFields(github, [new FieldWrite("API_TOKEN", token), new FieldWrite("Region", "eu", Protect: false)]));
+            Assert.True(vault.AddTag(github, "work"));
+            Assert.True(vault.RemoveField(github, "API_TOKEN"));
+            vault.Save();
+        }
+
+        using var context = New();
+        var history = Opened("github", context);
+        var detail = context.Entries.Detail!;
+        var newest = history.Rows[0];
+        history.Selected = newest;
+
+        Assert.Equal("API_TOKEN (protected), Region", newest.FieldsSummary);
+        Assert.Equal("work", newest.TagsSummary);
+        Assert.Equal("Region", detail.FieldsSummary);
+        Assert.Equal("work", detail.TagsSummary);
+        Assert.Equal(string.Empty, history.Rows[^1].TagsSummary);
+
+        foreach (var row in history.Rows)
+        {
+            Assert.DoesNotContain(token, row.FieldsSummary, StringComparison.Ordinal);
+            Assert.DoesNotContain("eu", row.FieldsSummary, StringComparison.Ordinal);
+        }
+    }
+
     private static EntryHistoryViewModel Select(string path, Context context)
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Path == path);

@@ -128,6 +128,133 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.Equal(revisions + 1, Revisions());
     }
 
+    /// <summary>
+    /// A field that is not a variable and that nothing names is renamed at once, as one revision that
+    /// keeps its value and protection.
+    /// </summary>
+    [Fact]
+    public void Renaming_a_plain_field_is_one_revision_that_keeps_its_value_and_protection()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        Add(detail, "Region", "eu", protect: false);
+        var revisions = Revisions();
+
+        detail.Fields.Single(field => field.Name == "Region").RenameCommand.Execute(null);
+        Assert.True(detail.IsRenamingField);
+        Assert.Equal("Region", detail.DraftFieldRename);
+
+        detail.DraftFieldRename = "Zone";
+        detail.ConfirmRenameFieldCommand.Execute(null);
+
+        Assert.Null(context.Entries.Error);
+        Assert.False(detail.IsRenamingField);
+        Assert.Contains(new EntryField("Zone", false, false), Fields());
+        Assert.DoesNotContain(Fields(), field => field.Name == "Region");
+        Assert.Equal("eu", Read("Zone"));
+        Assert.Equal(revisions + 1, Revisions());
+        Assert.Contains(detail.Fields, field => field.Name == "Zone");
+    }
+
+    /// <summary>
+    /// A field named as a project variable is renamed only after the pane has named the environments it
+    /// leaves and the references it breaks, never a value; cancelling writes nothing (D-0415's pattern).
+    /// </summary>
+    [Fact]
+    public void Renaming_a_variable_names_what_it_breaks_first_and_cancelled_writes_nothing()
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        detail.DraftTag = "env:billing:staging";
+        detail.AddTagCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Execute(null);
+        var before = File.ReadAllBytes(_vaultPath);
+
+        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Execute(null);
+        detail.DraftFieldRename = "PIN_CODE";
+        detail.ConfirmRenameFieldCommand.Execute(null);
+
+        Assert.True(detail.IsConfirmingFieldRename);
+        Assert.Equal(
+            "PIN is a variable of billing/staging. Renamed, those environments give PIN_CODE instead, and nothing there gives PIN.",
+            detail.FieldRenameLines[0]);
+        Assert.Contains(detail.FieldRenameLines, line => line.StartsWith("These references name PIN and will find nothing: kp://", StringComparison.Ordinal));
+        Assert.All(detail.FieldRenameLines, line => Assert.DoesNotContain("4321", line, StringComparison.Ordinal));
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+
+        detail.CancelRenameFieldCommand.Execute(null);
+        Assert.False(detail.IsRenamingField);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+
+        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Execute(null);
+        detail.DraftFieldRename = "PIN_CODE";
+        detail.ConfirmRenameFieldCommand.Execute(null);
+        detail.ConfirmRenameFieldCommand.Execute(null);
+
+        Assert.Null(context.Entries.Error);
+        Assert.False(detail.IsRenamingField);
+        Assert.Contains(new EntryField("PIN_CODE", true, false), Fields());
+        Assert.Equal("4321", Read("PIN_CODE"));
+    }
+
+    /// <summary>A name keypaste does not write is refused before anything is asked or written.</summary>
+    [Theory]
+    [InlineData("Password")]
+    [InlineData("otp")]
+    public void A_refused_field_rename_writes_nothing_and_says_why(string name)
+    {
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+        var before = File.ReadAllBytes(_vaultPath);
+
+        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Execute(null);
+        detail.DraftFieldRename = name;
+        detail.ConfirmRenameFieldCommand.Execute(null);
+        detail.ConfirmRenameFieldCommand.Execute(null);
+
+        Assert.NotNull(context.Entries.Error);
+        Assert.True(detail.IsRenamingField);
+        Assert.Equal(before, File.ReadAllBytes(_vaultPath));
+    }
+
+    /// <summary>
+    /// The Environments card lists each environment the item's own tags put it in, saying "approval
+    /// required" where no agent gets the item without a person's answer, which a protected environment
+    /// always is (D-0441, D-0371); an item in no project has no card.
+    /// </summary>
+    [Fact]
+    public void The_environments_card_says_where_approval_is_required()
+    {
+        using (var vault = Vault.Open(_vaultPath, _master))
+        {
+            Assert.True(ProjectScope.TryCreate("billing", "staging", out var staging, out var error), error);
+            Assert.Equal(
+                AgentAccessWrite.Written,
+                new AgentAccessStore(vault).Write("claude-code", AgentAccess.Defaults with { Projects = [new ProjectAccess(staging, AgentMode.Automatic)] }));
+            vault.Save();
+        }
+
+        using var context = new Context(_vaultPath, _directory);
+        var detail = context.Open(_checking);
+
+        Assert.False(detail.ShowsEnvironments);
+
+        detail.DraftTag = "env:billing:staging";
+        detail.AddTagCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Execute(null);
+
+        var staged = Assert.Single(detail.Environments);
+        Assert.True(detail.ShowsEnvironments);
+        Assert.Equal(("billing · staging", "set", false), (staged.Label, staged.Status, staged.RequiresApproval));
+
+        detail.DraftTag = "env:billing:prod";
+        detail.AddTagCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Execute(null);
+
+        Assert.Equal(["billing · prod", "billing · staging"], detail.Environments.Select(row => row.Label).Order(StringComparer.Ordinal));
+        Assert.All(detail.Environments, row => Assert.Equal("approval required", row.Status));
+    }
+
     [Fact]
     public void Tags_are_chips_a_project_tag_shows_its_environment_and_protection_and_each_change_is_a_revision()
     {

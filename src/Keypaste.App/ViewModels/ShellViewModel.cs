@@ -80,6 +80,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private int _ticks;
     private readonly Action<string, string?>? _openInPlace;
     private KdbxImportViewModel? _import;
+    private GroupRow? _groupMenu;
     private bool _waitingForTouch;
     private bool _disposed;
 
@@ -132,7 +133,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ClearScopeCommand = new RelayCommand(() => (Content as EntriesViewModel)?.ClearScopeCommand.Execute(null));
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && _import is null);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
+        NewGroupInsideCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginCreateGroupCommand));
+        RenameGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginRenameGroupCommand));
+        MoveGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginMoveGroupCommand));
+        DeleteGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginDeleteGroupCommand));
 
+        DependsOn(nameof(HasGroupMenu), nameof(GroupMenu));
         DependsOn(nameof(HasNotice), nameof(Notice));
         DependsOn(nameof(HasVaultChanged), nameof(VaultChanged));
         DependsOn(CancelTouchCommand, nameof(IsWaitingForTouch));
@@ -423,6 +429,68 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     internal bool HasProjects => _projects.Count > 0;
+
+    /// <summary>The group whose menu is open in the sidebar, or null.</summary>
+    internal GroupRow? GroupMenu
+    {
+        get => _groupMenu;
+        private set => Set(ref _groupMenu, value);
+    }
+
+    internal bool HasGroupMenu => _groupMenu is not null;
+
+    /// <summary>The group menu's New group: a group inside the one the menu is for.</summary>
+    internal RelayCommand NewGroupInsideCommand { get; }
+
+    /// <summary>The group menu's Rename.</summary>
+    internal RelayCommand RenameGroupCommand { get; }
+
+    /// <summary>The group menu's Move.</summary>
+    internal RelayCommand MoveGroupCommand { get; }
+
+    /// <summary>The group menu's Delete, which asks first.</summary>
+    internal RelayCommand DeleteGroupCommand { get; }
+
+    /// <summary>
+    /// Opens a sidebar group's menu, from a right-click or the keyboard's menu key, with Items showing
+    /// that group, so each choice acts on what the list shows.
+    /// </summary>
+    /// <param name="row">The group's row.</param>
+    internal void OpenGroupMenu(GroupRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        ShowGroup(row.Path);
+        GroupMenu = row;
+    }
+
+    /// <summary>Closes the group menu, choosing nothing.</summary>
+    internal void CloseGroupMenu() => GroupMenu = null;
+
+    /// <summary>
+    /// Closes the group menu and opens one of Items' group forms on its group. The forms and the writes
+    /// they make are Items' own, so a group is changed the same way from the menu and from the list header.
+    /// </summary>
+    private void FromGroupMenu(Func<EntriesViewModel, RelayCommand> form)
+    {
+        if (GroupMenu is not { } row)
+        {
+            return;
+        }
+
+        GroupMenu = null;
+        ShowGroup(row.Path);
+
+        if (Content is EntriesViewModel entries)
+        {
+            form(entries).Execute(null);
+        }
+    }
 
     /// <summary>Opens Env profiles on a project.</summary>
     internal RelayCommand<string> OpenProjectCommand { get; }
@@ -717,6 +785,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Builds the current destination's content.</summary>
     private void Show(Destination destination)
     {
+        GroupMenu = null;
+
         if (Content is EntriesViewModel previous)
         {
             previous.PropertyChanged -= OnEntriesChanged;
@@ -776,6 +846,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         if (e.PropertyName == nameof(EntriesViewModel.SearchScope))
         {
             Raise(nameof(SearchScope));
+        }
+
+        // A group made, renamed, moved or deleted on Items is in the tree at once, even one holding no item,
+        // whose change names no entry for Count to hear of.
+        if (e.PropertyName == nameof(EntriesViewModel.Groups) && sender is EntriesViewModel { Groups.Count: > 0 } entries)
+        {
+            _groups = entries.Groups;
+            RebuildSidebar();
         }
 
         if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
@@ -1122,8 +1200,33 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         VaultChanged = string.Concat(
             $"Another program saved {VaultName}. Agents are refused until you reload it.",
-            state.Unwritten ? " Your last change here was not saved, and reloading discards it." : string.Empty,
+            state.Unwritten ? Discarded() : string.Empty,
             _reloadFailure is { } failure ? $" Reloading failed: {failure}" : string.Empty);
+    }
+
+    /// <summary>What reloading would discard, naming the items changed here since the last save and never a value (D-0412).</summary>
+    private string Discarded()
+    {
+        var unsaved = _session.Unsaved;
+        var items = unsaved.Where(name => !ReservedGroups.IsReserved(name.GroupPath)).ToList();
+        List<string> named = [.. items.Take(3).Select(Core.Approval.ApprovalPrompt.Shown)];
+
+        if (items.Count > 3)
+        {
+            named.Add(items.Count == 4 ? "1 more item" : $"{items.Count - 3} more items");
+        }
+
+        if (unsaved.Count > items.Count)
+        {
+            named.Add("keypaste's own records");
+        }
+
+        return named.Count switch
+        {
+            0 => " Your last change here was not saved, and reloading discards it.",
+            1 => $" Your change to {named[0]} was not saved, and reloading discards it.",
+            _ => $" Your changes to {string.Join(", ", named.Take(named.Count - 1))} and {named[^1]} were not saved, and reloading discards them.",
+        };
     }
 
     private void Reload()
@@ -1237,6 +1340,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         EntryActivity?.Dispose();
         _import?.Dispose();
         Import = null;
+        GroupMenu = null;
         Notice = null;
         Toast = null;
         Projects = [];

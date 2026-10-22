@@ -439,6 +439,37 @@ public sealed class VaultHistoryTests : IDisposable
         Assert.All(revisions, revision => Assert.Equal("servers", revision.Fields.GroupPath, StringComparer.Ordinal));
     }
 
+    /// <summary>
+    /// A revision names the tags and custom fields it held, with each field's protection, so History can
+    /// say what an edit changed besides the password; a field's value is read only by revealing it.
+    /// </summary>
+    [Fact]
+    public void ARevision_NamesItsTagsAndCustomFieldsWithTheirProtection_AcrossAReopen()
+    {
+        var path = Seed(out _);
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            Assert.True(vault.SetFields(_production, [new FieldWrite("API_KEY", "key-value"), new FieldWrite("Region", "eu", Protect: false)]));
+            Assert.True(vault.AddTag(_production, "env:billing:prod"));
+            Assert.True(vault.RenameField(_production, "API_KEY", "STRIPE_KEY"));
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        var revisions = reopened.ReadHistory(_production)!;
+
+        // Newest first: before the rename, before the tag, before the fields.
+        Assert.Equal([new EntryField("API_KEY", true, false), new EntryField("Region", false, false)], revisions[0].CustomFields);
+        Assert.Equal(["env:billing:prod"], revisions[0].Tags);
+
+        Assert.Equal(revisions[0].CustomFields, revisions[1].CustomFields);
+        Assert.Empty(revisions[1].Tags);
+
+        Assert.Empty(revisions[2].CustomFields);
+        Assert.Empty(revisions[2].Tags);
+    }
+
     private string Seed(out IReadOnlyList<EntryRevision> beforeSaving)
     {
         var path = NewVaultPath();

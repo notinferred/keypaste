@@ -289,6 +289,168 @@ public sealed class VaultOrganizeTests : IDisposable
         Assert.NotNull(vault.Find(new EntryName("env/invoicing", "TOKEN")));
     }
 
+    [Fact]
+    public void MoveGroup_CarriesEveryEntryUnderIt_WithItsIdentityAndItsHistory()
+    {
+        var path = NewVaultPath();
+        string before;
+
+        using (var vault = Seeded(path))
+        {
+            before = vault.EntryUuid(_token)!;
+
+            Assert.Equal(GroupOutcome.Moved, vault.MoveGroup("env/billing", "keys", out var moved));
+            Assert.Equal("keys/billing", moved, StringComparer.Ordinal);
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        var movedName = new EntryName("keys/billing", "TOKEN");
+
+        Assert.Equal(before, reopened.EntryUuid(movedName));
+        Assert.DoesNotContain("env/billing", reopened.ReadGroupPaths());
+        Assert.Equal("kept", reopened.Find(new EntryName("keys/billing", "KEPT"))!.Password, StringComparer.Ordinal);
+        Assert.Equal(
+            new[] { "v2", "v1", string.Empty },
+            reopened.ReadHistory(movedName)!.Select(revision => revision.Fields.Password));
+    }
+
+    [Fact]
+    public void MoveGroup_ToTheRoot_KeepsItsName()
+    {
+        using var vault = Seeded(NewVaultPath());
+
+        Assert.Equal(GroupOutcome.Moved, vault.MoveGroup("env/shipping", string.Empty, out var moved));
+
+        Assert.Equal("shipping", moved, StringComparer.Ordinal);
+        Assert.Equal("other", vault.Find(new EntryName("shipping", "TOKEN"))!.Password, StringComparer.Ordinal);
+    }
+
+    /// <summary>A grant is held under a name, so a move reports both names of every entry it carried (D-0318).</summary>
+    [Fact]
+    public void MoveGroup_IsOneEdit_NamingEveryEntryUnderItAtBothPaths()
+    {
+        using var vault = Seeded(NewVaultPath());
+        var edits = new List<VaultEdit>();
+        vault.Edited += (_, edit) => edits.Add(edit);
+
+        Assert.Equal(GroupOutcome.Moved, vault.MoveGroup("env/billing", "keys", out _));
+
+        Assert.Equal(
+            [_token, new EntryName("env/billing", "KEPT"), new EntryName("keys/billing", "TOKEN"), new EntryName("keys/billing", "KEPT")],
+            Assert.Single(edits).Entries);
+    }
+
+    // ---------------------------------------------------------------- deleting a group
+
+    /// <summary>A group deleted where the vault has a bin goes into it whole, as KeePassXC deletes one, and a delete raises the file to 4.1 (D-0247).</summary>
+    [Fact]
+    public void DeleteGroup_PutsTheWholeGroupInTheBin_AndEveryItemInItIsRecoverable()
+    {
+        var path = NewVaultPath();
+        string before;
+
+        using (var vault = Seeded(path))
+        {
+            before = vault.EntryUuid(_token)!;
+            var edits = new List<VaultEdit>();
+            vault.Edited += (_, edit) => edits.Add(edit);
+
+            Assert.Equal(GroupOutcome.Recycled, vault.DeleteGroup("env/billing"));
+
+            Assert.Equal([_token, new EntryName("env/billing", "KEPT")], Assert.Single(edits).Entries);
+            Assert.Equal(0, vault.TombstoneCount);
+            vault.Save();
+        }
+
+        Assert.Equal(1, MinorVersion(path));
+
+        using var reopened = Vault.Open(path, MasterPassword);
+
+        Assert.DoesNotContain("env/billing", reopened.ReadGroupPaths());
+        Assert.Null(reopened.Find(_token));
+        Assert.Equal(
+            ["env/billing/KEPT", "env/billing/TOKEN"],
+            reopened.ReadRecycled().Select(row => $"{row.OriginalGroupPath}/{row.Title}").Order(StringComparer.Ordinal));
+
+        var token = reopened.ReadRecycled().Single(row => row.Title == "TOKEN");
+        Assert.Equal(RestoreOutcome.Restored, reopened.RestoreRecycled(token.Id));
+        Assert.Equal(before, reopened.EntryUuid(_token));
+        Assert.Equal(
+            new[] { "v2", "v1", string.Empty },
+            reopened.ReadHistory(_token)!.Select(revision => revision.Fields.Password));
+    }
+
+    // ---------------------------------------------------------------- duplicating an entry
+
+    [Fact]
+    public void CloneEntry_MakesANewEntryBesideIt_WithItsFieldsAndNoHistory()
+    {
+        var path = NewVaultPath();
+        var copyName = new EntryName("env/billing", "TOKEN (copy)");
+
+        using (var vault = Seeded(path))
+        {
+            Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "key-value"), new FieldWrite("Region", "eu", Protect: false)]));
+            Assert.True(vault.AddTag(_token, "finance"));
+            vault.Save();
+
+            Assert.Equal(OrganizeOutcome.Copied, vault.CloneEntry(_token, out var copy, out var dropped));
+            Assert.Equal(copyName, copy);
+            Assert.Empty(dropped);
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+
+        Assert.NotEqual(reopened.EntryUuid(_token), reopened.EntryUuid(copyName));
+
+        var original = reopened.Find(_token)!;
+        var cloned = reopened.Find(copyName)!;
+        Assert.Equal(original with { Title = copyName.Title }, cloned);
+        Assert.Equal(reopened.Fields(_token), reopened.Fields(copyName));
+        Assert.Equal("key-value", reopened.ReadField(copyName, "API_KEY"));
+        Assert.Equal(["finance"], reopened.Tags(copyName));
+        Assert.Empty(reopened.ReadHistory(copyName)!);
+        Assert.Equal(5, reopened.ReadHistory(_token)!.Count);
+    }
+
+    /// <summary>A title is taken once per group (D-0091), so a second copy is numbered.</summary>
+    [Fact]
+    public void CloneEntry_NumbersACopy_WhenTheFirstCopysTitleIsTaken()
+    {
+        using var vault = Seeded(NewVaultPath());
+
+        Assert.Equal(OrganizeOutcome.Copied, vault.CloneEntry(_token, out _, out _));
+        Assert.Equal(OrganizeOutcome.Copied, vault.CloneEntry(_token, out var second, out _));
+        Assert.Equal(OrganizeOutcome.Copied, vault.CloneEntry(_token, out var third, out _));
+
+        Assert.Equal(new EntryName("env/billing", "TOKEN (copy 2)"), second);
+        Assert.Equal(new EntryName("env/billing", "TOKEN (copy 3)"), third);
+    }
+
+    /// <summary>A project refuses two entries giving one variable (D-0337), so the copy leaves its project tags behind and says which.</summary>
+    [Fact]
+    public void CloneEntry_LeavesItsProjectTagsBehind_AndSaysWhich()
+    {
+        using var vault = Seeded(NewVaultPath());
+        Assert.True(vault.SetFields(_token, [new FieldWrite("STRIPE_KEY", "sk-1")]));
+        Assert.True(vault.AddTag(_token, "env:billing"));
+        Assert.True(vault.AddTag(_token, "finance"));
+        Assert.True(vault.AddTag(_token, "env:billing:prod"));
+        var edits = new List<VaultEdit>();
+        vault.Edited += (_, edit) => edits.Add(edit);
+
+        Assert.Equal(OrganizeOutcome.Copied, vault.CloneEntry(_token, out var copy, out var dropped));
+
+        Assert.Equal(["env:billing", "env:billing:prod"], dropped);
+        Assert.Equal(["finance"], vault.Tags(copy!));
+        Assert.Equal(["env:billing", "finance", "env:billing:prod"], vault.Tags(_token));
+        Assert.Equal([copy!], Assert.Single(edits).Entries);
+
+        Assert.Equal([new EnvSource("STRIPE_KEY", _token, "STRIPE_KEY")], EnvResolution.List(vault, "billing", "dev").Sources);
+    }
+
     // ---------------------------------------------------------------- the file the writer leaves
 
     /// <summary>
@@ -310,6 +472,7 @@ public sealed class VaultOrganizeTests : IDisposable
             Assert.Equal(
                 OrganizeOutcome.Moved,
                 vault.MoveEntry(new EntryName("env/invoicing", "API_TOKEN"), "archive", out _));
+            Assert.Equal(GroupOutcome.Moved, vault.MoveGroup("env/invoicing", "archive", out _));
             vault.Save();
         }
 

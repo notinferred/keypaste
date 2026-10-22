@@ -32,10 +32,11 @@ namespace Keypaste.App.Tests;
 /// ones it was allowed to show a moment earlier.</b>
 /// </para>
 /// <para>
-/// <b>What may appear where.</b> A list row carries a title and a group, which is what
-/// <c>keypaste ls</c> prints. The detail pane widens to username, URL and notes for the one entry a
-/// person selected — <c>keypaste get</c>'s scope minus the password. A password appears nowhere, in
-/// any state, including after Copy.
+/// <b>What may appear where.</b> A list row carries a title, a kind, a group, its agent use, a
+/// username and a URL, as KeePassXC's table does, and never a password, a note or a custom field's
+/// value (D-NEW-A6). The detail pane widens to the notes for the one entry a person selected —
+/// <c>keypaste get</c>'s scope minus the password. A password appears nowhere, in any state,
+/// including after Copy.
 /// </para>
 /// </remarks>
 public sealed class SecretHygieneTests
@@ -223,10 +224,11 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
-    /// The list holds names and no field value — including for an entry nobody selected.
+    /// The list holds names, usernames and URLs, and no password, note or custom field value — including
+    /// for an entry nobody selected (D-NEW-A6).
     /// </summary>
     [Fact]
-    public void The_entry_list_holds_names_and_no_field_value()
+    public void The_entry_list_holds_names_usernames_and_urls_and_no_secret()
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
@@ -246,16 +248,28 @@ public sealed class SecretHygieneTests
         Assert.Contains(entries.Rows, row => row.Title == SentinelUnselectedTitle);
         Assert.Contains(entries.Groups, group => group.Name == SentinelGroup);
 
-        // And then that nothing from inside an entry came with them.
-        foreach (var text in Surface(entries))
+        // The username and the URL are columns now, on purpose.
+        var chosen = entries.Rows.Single(listed => listed.Title == SentinelTitle);
+        Assert.Equal((SentinelUsername, SentinelUrl), (chosen.DisplayUsername, chosen.DisplayUrl));
+
+        // And then that no secret came with them.
+        AssertNoSecret(Surface(entries));
+    }
+
+    /// <summary>What no list row may hold: a password, a note, a custom field's value or a project's value.</summary>
+    private static void AssertNoSecret(IEnumerable<string> surfaced)
+    {
+        foreach (var text in surfaced)
         {
             foreach (var sentinel in new[]
             {
                 SentinelPassword,
                 SentinelUnselectedPassword,
-                SentinelUsername,
-                SentinelUrl,
+                SentinelSupersededPassword,
                 SentinelNotes,
+                SentinelNoteKeyValue,
+                SentinelFieldValue,
+                SentinelPlainFieldValue,
                 SentinelEnvValue,
                 SentinelOtherEnvValue,
             })
@@ -266,23 +280,16 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
-    /// A search that matched a username holds the name it found and not the username.
+    /// A search that matched a username names the field it was in, and its result holds no secret.
     /// </summary>
     /// <remarks>
-    /// <para>
     /// The test above is about an unfiltered list. This one is about the case V.5b added, where a
-    /// row is in the list <em>because of</em> a field the row does not show: the obvious way to
-    /// write that feature is to read every username into the screen and compare it there, and the
-    /// obvious way is the one this file exists to prevent.
-    /// </para>
-    /// <para>
-    /// What makes it pass is that the comparison happens in <c>Vault.Search</c> and what comes back
-    /// is an entry name and a <c>MatchedFields</c>. The row says "username", which is a constant in
-    /// this assembly, and the sweep below is what holds the difference between that and the value.
-    /// </para>
+    /// row is in the list <em>because of</em> a field: the comparison happens in <c>Vault.Search</c>,
+    /// which never reads a password, a note or a custom field, so a filtered list holds no more than
+    /// an unfiltered one does.
     /// </remarks>
     [Fact]
-    public void A_search_that_matched_a_username_holds_no_username()
+    public void A_search_that_matched_a_username_names_the_field_and_holds_no_secret()
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
@@ -299,22 +306,7 @@ public sealed class SecretHygieneTests
         Assert.Equal(SentinelTitle, row.Title);
         Assert.Equal("username", row.Why);
 
-        foreach (var text in Surface(entries))
-        {
-            foreach (var sentinel in new[]
-            {
-                SentinelPassword,
-                SentinelUnselectedPassword,
-                SentinelUsername,
-                SentinelUrl,
-                SentinelNotes,
-                SentinelEnvValue,
-                SentinelOtherEnvValue,
-            })
-            {
-                Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
-            }
-        }
+        AssertNoSecret(Surface(entries));
     }
 
     /// <summary>

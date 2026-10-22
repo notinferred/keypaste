@@ -155,7 +155,7 @@ public sealed class CliAppTests
             "  get       copy a secret to the clipboard, or print it with --reveal",
             "  show      show an item's fields and tags; values only with --reveal",
             "  set       create or update a secret, or its custom fields",
-            "  field     list or remove an item's custom fields",
+            "  field     list, rename or remove an item's custom fields",
             "  rotate    replace a secret with a new generated one",
             "  run       run a command with secrets in its environment",
             "  env       import, export and diff .env environments",

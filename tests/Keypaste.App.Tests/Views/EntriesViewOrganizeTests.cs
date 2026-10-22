@@ -133,6 +133,39 @@ public sealed class EntriesViewOrganizeTests : IDisposable
 
         // An ordinary group holds no project home, so the line about new keys stays off.
         Assert.False(Named<TextBlock>(window, "ProjectRenameNote")!.IsEffectivelyVisible);
+
+        context.Entries.BeginMoveGroupCommand.Execute(null);
+        window.UpdateLayout();
+
+        var target = Named<ComboBox>(window, "MoveGroupTarget")!;
+        Assert.True(target.IsEffectivelyVisible);
+        Assert.Same(context.Entries.Groups.Single(node => node.IsEverything), target.SelectedItem);
+        Assert.False(Named<TextBox>(window, "RenameGroupName")!.IsEffectivelyVisible);
+
+        context.Entries.BeginDeleteGroupCommand.Execute(null);
+        window.UpdateLayout();
+
+        var prompt = Named<TextBlock>(window, "GroupDeletePrompt")!;
+        Assert.True(prompt.IsEffectivelyVisible);
+        Assert.Contains("the 1 item in it", prompt.Text, StringComparison.Ordinal);
+        Assert.False(target.IsEffectivelyVisible);
+    });
+
+    /// <summary>The pane's Duplicate reaches the screen's command across the same two data contexts, and the copy is selected.</summary>
+    [Fact]
+    public Task The_pane_button_duplicates_the_item() => HeadlessSession.On(() =>
+    {
+        using var context = New();
+        var window = Shown(context);
+
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "production");
+        window.UpdateLayout();
+
+        var button = Named<Button>(window, "DuplicateEntry")!;
+        button.Command!.Execute(button.CommandParameter);
+
+        Assert.Null(context.Entries.Error);
+        Assert.Equal(new EntryName("servers", "production (copy)"), context.Entries.Selected?.Name);
     });
 
     private static T? Named<T>(Window window, string name)

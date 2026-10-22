@@ -120,6 +120,19 @@ public static class KeePassPlaceholders
         return new PlantedPlaceholders(fills, null);
     }
 
+    /// <summary>Whether a value holds a <c>{S:…}</c> naming this field exactly, which renaming the field would leave naming nothing.</summary>
+    /// <param name="value">The value.</param>
+    /// <param name="field">The field's name.</param>
+    /// <returns><see langword="true"/> when it does.</returns>
+    internal static bool Names(string value, string field)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(field);
+
+        return Scan(value).Any(token =>
+            token.Placeholder.Keyword is null && string.Equals(token.Placeholder.Field, field, StringComparison.Ordinal));
+    }
+
     /// <summary>Each placeholder in a text, left to right.</summary>
     /// <remarks>
     /// A brace opens a placeholder only when the next brace after it closes one; text between them that is no

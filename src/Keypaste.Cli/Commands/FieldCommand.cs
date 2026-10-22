@@ -6,11 +6,12 @@ using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Lists and removes an entry's custom fields: <c>keypaste field &lt;ls|rm&gt;</c>.</summary>
+/// <summary>Lists, renames and removes an entry's custom fields: <c>keypaste field &lt;ls|mv|rm&gt;</c>.</summary>
 /// <remarks>
 /// Names and protection only; a value is read with <c>get --field</c> and written with
-/// <c>set --field</c>. Removing makes a history revision, as KeePassXC's own edit does, so the
-/// value is recoverable and nothing is asked first.
+/// <c>set --field</c>. Renaming and removing each make a history revision, as KeePassXC's own edit
+/// does, so the value is recoverable and nothing is asked first. Renaming is not one of the edits
+/// sent to the app or <c>keypaste approve</c>, so it is refused while either holds the vault (D-0382).
 /// </remarks>
 internal static class FieldCommand
 {
@@ -22,6 +23,12 @@ internal static class FieldCommand
     ];
 
     private static readonly OptionSpec[] _removeOptions =
+    [
+        new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
+    ];
+
+    private static readonly OptionSpec[] _renameOptions =
     [
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
@@ -39,6 +46,9 @@ internal static class FieldCommand
         {
             case "ls":
                 return List(args, context);
+
+            case "mv":
+                return Rename(args, context);
 
             case "rm":
                 return Remove(args, context);
@@ -182,6 +192,77 @@ internal static class FieldCommand
         });
     }
 
+    private static int Rename(string[] args, CliContext context)
+    {
+        if (!CommandLine.TryParse(args, 2, _renameOptions, out var line, out var error))
+        {
+            context.Stderr.WriteLine($"keypaste field mv: {error}");
+            return CliApp.ExitUsageError;
+        }
+
+        if (line.WantsHelp)
+        {
+            context.Stdout.WriteLine("usage: keypaste field mv <item> <name> <new-name>");
+            return CliApp.ExitSuccess;
+        }
+
+        if (line.Operands.Count != 3)
+        {
+            context.Stderr.WriteLine("keypaste field mv: expected an item name, a field name and its new name");
+            return CliApp.ExitUsageError;
+        }
+
+        var (entryPath, field, newName) = (line.Operands[0], line.Operands[1], line.Operands[2]);
+
+        if (!FieldNameRules.IsWritable(field, out var nameError) || !FieldNameRules.IsWritable(newName, out nameError))
+        {
+            context.Stderr.WriteLine($"keypaste field mv: {nameError}");
+            return CliApp.ExitUsageError;
+        }
+
+        if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
+        {
+            context.Stderr.WriteLine($"keypaste field mv: {locateError}");
+            return CliApp.ExitUsageError;
+        }
+
+        return VaultSession.OpenHeld(path, line, context, vault =>
+        {
+            if (vault.Find(entryPath) is not { } entry)
+            {
+                context.Stderr.WriteLine($"keypaste field mv: no item '{Shown(entryPath)}'");
+                return CliApp.ExitNotFound;
+            }
+
+            bool renamed;
+
+            try
+            {
+                renamed = vault.RenameField(EntryName.Of(entry), field, newName);
+            }
+            catch (VaultException ex)
+            {
+                context.Stderr.WriteLine($"keypaste field mv: {ex.Message}");
+                return CliApp.ExitUsageError;
+            }
+
+            if (!renamed)
+            {
+                context.Stderr.WriteLine($"keypaste field mv: '{Shown(entry.Path)}' has no field {EntryNameSanitizer.Sanitize(field).Text}");
+                return CliApp.ExitNotFound;
+            }
+
+            vault.Save();
+
+            var style = context.ConsoleStyle;
+            var mark = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
+            context.Stderr.WriteLine(
+                $"  {mark} renamed {EntryNameSanitizer.Sanitize(field).Text} to {EntryNameSanitizer.Sanitize(newName).Text} on {Shown(entry.Path)} {style.Glyph(context.Stderr, Mark.Dot)} the old name stays in history");
+
+            return CliApp.ExitSuccess;
+        });
+    }
+
     /// <summary>Says which field left which item, and that its value stays in history.</summary>
     internal static int Removed(EditDone done, CliContext context)
     {
@@ -198,8 +279,9 @@ internal static class FieldCommand
         writer.WriteLine("usage: keypaste field <command>");
         writer.WriteLine();
         writer.WriteLine("commands:");
-        writer.WriteLine("  ls <item>           list custom fields by name and protection, never by value");
-        writer.WriteLine("  rm <item> <name>    remove a custom field; its value stays in history");
+        writer.WriteLine("  ls <item>                  list custom fields by name and protection, never by value");
+        writer.WriteLine("  mv <item> <name> <new>     rename a custom field; the old name stays in history");
+        writer.WriteLine("  rm <item> <name>           remove a custom field; its value stays in history");
         writer.WriteLine();
         writer.WriteLine("to read one: keypaste get <item> --field <name>");
         writer.WriteLine("to set one:  keypaste set <item> --field <name> [--plain]");

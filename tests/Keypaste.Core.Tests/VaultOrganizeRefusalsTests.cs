@@ -3,7 +3,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Every way the four organize operations refuse, and the one thing they all have in common: the
+/// Every way the organize operations refuse, and the one thing they all have in common: the
 /// vault is exactly as it was, on disk and in memory.
 /// </summary>
 /// <remarks>
@@ -448,6 +448,234 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         WritesNothing(vault =>
             Assert.Equal(GroupOutcome.DestinationUnchanged, vault.RenameGroup("env/billing", "billing", out _)));
+    }
+
+    // ---------------------------------------------------------------- moving and deleting a group
+
+    [Fact]
+    public void MovingOrDeletingAGroupThatIsNotThere_MatchesNothing()
+    {
+        WritesNothing(vault =>
+        {
+            Assert.Equal(GroupOutcome.NothingMatched, vault.MoveGroup("absent", "keys", out var moved));
+            Assert.Equal(string.Empty, moved, StringComparer.Ordinal);
+            Assert.Equal(GroupOutcome.NothingMatched, vault.DeleteGroup("absent"));
+
+            // The root group has no parent to leave.
+            Assert.Equal(GroupOutcome.NothingMatched, vault.MoveGroup(string.Empty, "keys", out _));
+            Assert.Equal(GroupOutcome.NothingMatched, vault.DeleteGroup(string.Empty));
+        });
+    }
+
+    /// <summary>
+    /// <c>env</c> at the root is where projects' home entries go and <c>.keypaste</c> where keypaste keeps
+    /// its own records (D-0273): neither moves or goes, and no group moves into keypaste's own.
+    /// </summary>
+    [Fact]
+    public void TheEnvRootAndKeypastesOwnGroups_AreNeitherMovedNorDeletedNorMovedInto()
+    {
+        var path = Seeded();
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "record", Password = "verifier", GroupPath = ReservedGroups.Tokens });
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(GroupOutcome.NameReserved, vault.MoveGroup("env", "keys", out _));
+            Assert.Equal(GroupOutcome.NameReserved, vault.DeleteGroup("env"));
+            Assert.Equal(GroupOutcome.NameReserved, vault.MoveGroup(ReservedGroups.Root, "keys", out _));
+            Assert.Equal(GroupOutcome.NameReserved, vault.MoveGroup(ReservedGroups.Tokens, "keys", out _));
+            Assert.Equal(GroupOutcome.NameReserved, vault.DeleteGroup(ReservedGroups.Root));
+            Assert.Equal(GroupOutcome.NameReserved, vault.DeleteGroup(ReservedGroups.Tokens));
+            Assert.Equal(GroupOutcome.NameReserved, vault.MoveGroup("keys", ReservedGroups.Root, out _));
+            Assert.Equal(GroupOutcome.NameReserved, vault.MoveGroup("keys", ReservedGroups.Tokens, out _));
+        });
+    }
+
+    /// <summary>A group named as keypaste's own groups are may live anywhere else, and is not moved to the root, where the name would mean something.</summary>
+    [Fact]
+    public void AGroupNamedForWhatKeypasteAssigns_IsNotMovedToTheRoot()
+    {
+        var path = Seeded();
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", "env", out _));
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", ReservedGroups.Root, out _));
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(GroupOutcome.NameReserved, vault.MoveGroup("keys/env", string.Empty, out _));
+            Assert.Equal(GroupOutcome.NameReserved, vault.MoveGroup("keys/" + ReservedGroups.Root, string.Empty, out _));
+        });
+    }
+
+    [Fact]
+    public void AGroupMovedIntoItselfOrAGroupInsideIt_IsRefused()
+    {
+        var path = Seeded();
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", "inner", out _));
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys/inner", "deeper", out _));
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(GroupOutcome.DestinationInside, vault.MoveGroup("keys", "keys", out _));
+            Assert.Equal(GroupOutcome.DestinationInside, vault.MoveGroup("keys", "keys/inner", out _));
+            Assert.Equal(GroupOutcome.DestinationInside, vault.MoveGroup("keys", "keys/inner/deeper", out _));
+        });
+    }
+
+    [Fact]
+    public void MovingAGroupWhereItAlreadyIs_SaysNothingChanged()
+    {
+        WritesNothing(vault =>
+            Assert.Equal(GroupOutcome.DestinationUnchanged, vault.MoveGroup("env/billing", "env", out _)));
+    }
+
+    [Fact]
+    public void MovingAGroupSomewhereThatDoesNotExist_CreatesNothingOnTheWay()
+    {
+        var path = Seeded();
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("env/shipping", "Kept")));
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(GroupOutcome.ParentMissing, vault.MoveGroup("keys", "archive/2026", out _));
+            Assert.Equal(GroupOutcome.ParentMissing, vault.MoveGroup("keys", "Recycle Bin", out _));
+            Assert.Equal(GroupOutcome.NothingMatched, vault.MoveGroup("Recycle Bin", "keys", out _));
+            Assert.Equal(GroupOutcome.NothingMatched, vault.DeleteGroup("Recycle Bin"));
+            Assert.DoesNotContain("archive", vault.ReadGroupPaths());
+        });
+    }
+
+    [Fact]
+    public void AGroupOfThatNameAtTheDestination_RefusesTheMove()
+    {
+        var path = Seeded();
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", "billing", out _));
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+            Assert.Equal(GroupOutcome.DestinationOccupied, vault.MoveGroup("env/billing", "keys", out _)));
+    }
+
+    /// <summary>The subtree case a group's own name cannot catch, as for a rename: <c>top</c> holds an entry titled <c>x/TOKEN</c>, so moving a group <c>x</c> holding <c>TOKEN</c> there makes one path name two entries.</summary>
+    [Fact]
+    public void AGroupMoveThatWouldMakeTwoEntriesAnswerToOnePath_IsRefusedWhole()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Vault.Create(path, MasterPassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "x/TOKEN", Password = "slashed", GroupPath = "top" });
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "spare/x" });
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(GroupOutcome.DestinationAmbiguous, vault.MoveGroup("spare/x", "top", out _));
+            Assert.Contains("spare/x", vault.ReadGroupPaths());
+        });
+    }
+
+    /// <summary>Without a recycle bin nothing could bring back what a group holds, so only an empty one is deleted.</summary>
+    [Fact]
+    public void WithoutABin_AGroupHoldingAnythingIsNotDeleted()
+    {
+        var path = Seeded();
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            vault.SetRecyclesDeletedEntries(false);
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup(string.Empty, "outer", out _));
+            Assert.Equal(GroupOutcome.Created, vault.CreateGroup("outer", "inner", out _));
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(GroupOutcome.NotEmpty, vault.DeleteGroup("env/billing"));
+            Assert.Equal(GroupOutcome.NotEmpty, vault.DeleteGroup("outer"));
+        });
+    }
+
+    // ---------------------------------------------------------------- duplicating an entry
+
+    [Fact]
+    public void CopyingAnEntryThatIsNotThere_MatchesNothing()
+    {
+        var path = Seeded();
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("keys", "SPARE")));
+            vault.AddEntry(new VaultEntry { Title = "record", Password = "verifier", GroupPath = ReservedGroups.Tokens });
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(OrganizeOutcome.NothingMatched, vault.CloneEntry(new EntryName("env/billing", "ABSENT"), out var copy, out var dropped));
+            Assert.Null(copy);
+            Assert.Empty(dropped);
+            Assert.Equal(OrganizeOutcome.NothingMatched, vault.CloneEntry(new EntryName("keys", "SPARE"), out _, out _));
+            Assert.Equal(OrganizeOutcome.NothingMatched, vault.CloneEntry(new EntryName(ReservedGroups.Tokens, "record"), out _, out _));
+        });
+    }
+
+    [Fact]
+    public void CopyingAnEntryWhoseCopyNoVaultCouldAddress_IsRefused()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Vault.Create(path, MasterPassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "a/b", Password = "slashed", GroupPath = "keys" });
+            vault.AddEntry(new VaultEntry { Title = " leading", Password = "padded", GroupPath = "keys" });
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+        {
+            Assert.Equal(OrganizeOutcome.NameRefused, vault.CloneEntry(new EntryName("keys", "a/b"), out _, out _));
+            Assert.Equal(OrganizeOutcome.NameRefused, vault.CloneEntry(new EntryName("keys", " leading"), out _, out _));
+        });
+    }
+
+    [Fact]
+    public void CopyingAnAmbiguousSource_IsRefusedRatherThanGuessedAt()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Vault.Create(path, MasterPassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "one", GroupPath = "env/billing" });
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "two", GroupPath = "env/billing" });
+            vault.Save();
+        }
+
+        WritesNothing(path, vault =>
+            Assert.Throws<VaultException>(() => vault.CloneEntry(_token, out _, out _)));
     }
 
     // ---------------------------------------------------------------- helpers

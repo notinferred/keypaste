@@ -56,13 +56,32 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Equal(4, context.Entries.TotalCount);
     }
 
+    /// <summary>The list shows each item's username and web address beside its title, and no other field (D-NEW-A6).</summary>
+    [Fact]
+    public void Each_row_shows_its_username_and_web_address()
+    {
+        using (var vault = Vault.Open(_vaultPath, Master))
+        {
+            vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh", Url = "https://github.com/login" });
+            vault.Save();
+        }
+
+        using var context = New();
+
+        var github = context.Entries.Rows.Single(row => row.Title == "github");
+        Assert.Equal(("me", "https://github.com/login"), (github.DisplayUsername, github.DisplayUrl));
+
+        var production = context.Entries.Rows.Single(row => row.Title == "production");
+        Assert.Equal((string.Empty, string.Empty), (production.DisplayUsername, production.DisplayUrl));
+    }
+
     /// <summary>
-    /// The group tree is built from the flat paths core hands back, parents included.
+    /// The group tree is built from the flat paths core hands back, parents included, in the order
+    /// the file holds them, as KeePassXC draws its tree.
     /// </summary>
     /// <remarks>
-    /// <c>env/billing</c> is the case that matters: core lists it, but never lists <c>env</c> as a
-    /// separate row when nothing is directly in it. A tree that took the paths literally would draw
-    /// one row called "env/billing" rather than a group inside a group.
+    /// <c>servers</c> was made before <c>env</c>, so it comes first although it sorts after it, and
+    /// <c>billing</c> is drawn inside <c>env</c> rather than as one row called "env/billing".
     /// </remarks>
     [Fact]
     public void The_group_tree_has_a_row_for_every_level()
@@ -71,8 +90,8 @@ public sealed class EntriesViewModelTests : IDisposable
 
         var labels = context.Entries.Groups.Select(group => group.Label).ToArray();
 
-        Assert.Equal(["All items", "env", "billing", "servers"], labels);
-        Assert.Equal([0, 1, 2, 1], context.Entries.Groups.Select(group => group.Depth).ToArray());
+        Assert.Equal(["All items", "servers", "env", "billing"], labels);
+        Assert.Equal([0, 1, 1, 2], context.Entries.Groups.Select(group => group.Depth).ToArray());
     }
 
     [Fact]
