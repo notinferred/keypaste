@@ -6,7 +6,8 @@ namespace Keypaste.App.ViewModels;
 /// The run command the Projects screen copies, quoted so that every shell commonly used on the platform hands
 /// <c>keypaste</c> the project whole and runs no part of its name, which is vault text (T-1): Command Prompt,
 /// PowerShell and Git Bash on Windows, and <c>sh</c>, <c>bash</c>, <c>zsh</c>, <c>fish</c> and PowerShell elsewhere.
-/// A name one of them would run or change however it is quoted gets no command (D-0453).
+/// A name one of them would run or change however it is quoted gets no command, and the line carries
+/// <c>--session</c>, so the run asks the app holding the vault and reads no master password (D-0453).
 /// </summary>
 internal static class CopiedRunCommand
 {
@@ -31,7 +32,7 @@ internal static class CopiedRunCommand
         }
 
         var profile = environment is null ? string.Empty : $"-p {environment} ";
-        return $"keypaste run {profile}{ProjectArgument(project, windows)} -- {command}";
+        return $"keypaste run --session {profile}{ProjectArgument(project, windows)} -- {command}";
     }
 
     /// <summary>

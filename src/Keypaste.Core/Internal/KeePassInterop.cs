@@ -951,6 +951,70 @@ internal sealed class KeePassInterop : IDisposable
         ];
     }
 
+    /// <summary>
+    /// For each custom field <paramref name="include"/> accepts whose value holds a KeePass placeholder, on the one entry
+    /// with this name or on one of its revisions, what it fills in or the first placeholder that refuses it, judged by
+    /// name as a terminal edit's new value is (D-0465); in ordinal order of name, or null when there is no such entry or revision.
+    /// </summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="revision">A position in <see cref="ReadHistory"/>'s order to judge that revision's fields, or null for the entry's own.</param>
+    /// <param name="include">Which custom fields are judged.</param>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<KeyValuePair<string, PlantedPlaceholders>>? ReadPlantedPlaceholders(EntryName name, int? revision, Func<string, bool> include)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return null;
+        }
+
+        PwEntry entry = found.Entry;
+
+        if (revision is { } index)
+        {
+            uint[] order = HistoryNewestFirst(found.Entry);
+
+            if (index < 0 || index >= order.Length)
+            {
+                return null;
+            }
+
+            entry = found.Entry.History.GetAt(order[index]);
+        }
+
+        List<string> names = [.. entry.Strings.Select(field => field.Key).Where(key => !PwDefs.IsStandardField(key))];
+        List<KeyValuePair<string, PlantedPlaceholders>> planted = [];
+
+        foreach (var field in entry.Strings
+            .Where(field => !PwDefs.IsStandardField(field.Key) && include(field.Key))
+            .OrderBy(field => field.Key, StringComparer.Ordinal))
+        {
+            byte[] utf8 = field.Value.ReadUtf8();
+
+            try
+            {
+                if (!utf8.AsSpan().Contains((byte)'{'))
+                {
+                    continue;
+                }
+
+                var value = Encoding.UTF8.GetString(utf8);
+
+                if (KeePassPlaceholders.Holds(value))
+                {
+                    planted.Add(KeyValuePair.Create(field.Key, KeePassPlaceholders.Planted(value, names, field.Key)));
+                }
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(utf8);
+            }
+        }
+
+        return planted;
+    }
+
     /// <summary>Whether a field a TOTP is read from holds anything on the one entry with this name, judged by the length KeePassLib keeps so no value is decrypted.</summary>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal bool MayHoldTotp(EntryName name)
@@ -2227,7 +2291,9 @@ internal sealed class KeePassInterop : IDisposable
     /// which is what <c>RestoreFromBackup</c> does when it is given the database's history settings.
     /// The entry is mutated in place, so it keeps its UUID, but <c>RestoreFromBackup</c> assigns the
     /// revision's strings, attachments, custom data, tags and auto-type: the entry becomes the revision
-    /// whole, as it does in KeePass and KeePassXC, and what it drops is in the revision just made (9.4).
+    /// whole, as it does in KeePass and KeePassXC, and what it drops is in the revision just made (9.4). Since
+    /// that puts back the revision's project tags, a front end first asks what <see cref="ProjectTagChange.Restoring"/>
+    /// says whenever they differ from the entry's (D-NEW-W22).
     /// </remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     /// <exception cref="ArgumentOutOfRangeException">

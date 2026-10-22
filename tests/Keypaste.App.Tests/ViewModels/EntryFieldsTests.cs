@@ -328,6 +328,36 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.Contains("work", Tags());
     }
 
+    /// <summary>
+    /// The pane's project tag confirmation names each variable joining whose value holds a KeePass placeholder by keyword,
+    /// since it fills in from the item wherever the variable leaves (D-0465), and never the value.
+    /// </summary>
+    [Fact]
+    public void A_project_tag_change_names_each_joining_variable_holding_a_placeholder()
+    {
+        using (var vault = Vault.Open(_vaultPath, _master))
+        {
+            Assert.True(vault.SetFields(_checking, [new FieldWrite("API_URL", "https://{USERNAME}:{S:PIN}@" + _secret)]));
+            vault.Save();
+        }
+
+        using var context = new Context(_vaultPath);
+        var detail = context.Open(_checking);
+
+        detail.DraftTag = "env:billing:staging";
+        detail.AddTagCommand.Execute(null);
+
+        Assert.True(detail.IsConfirmingTagChange);
+        Assert.Equal(
+            [
+                "env:billing:staging puts Banking/Checking in billing/staging.",
+                "Joining billing/staging: API_URL, PIN.",
+                "API_URL fills in {USERNAME} and {S:PIN} from Banking/Checking when it leaves.",
+            ],
+            detail.TagChangeLines);
+        Assert.DoesNotContain(detail.TagChangeLines, line => line.Contains(_secret, StringComparison.Ordinal) || line.Contains("4321", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void A_refused_tag_writes_nothing_and_says_why()
     {

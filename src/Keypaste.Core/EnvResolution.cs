@@ -379,25 +379,37 @@ public static class EnvResolution
 
     /// <summary>
     /// <see cref="List"/> with each value as it leaves keypaste, its own entry's placeholders filled in
-    /// (D-0465): what a plaintext export writes.
+    /// (D-0465): what a plaintext export writes, which refuses an expired entry as a run does (D-0337).
     /// </summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="project">The project name.</param>
     /// <param name="profile">The environment's name.</param>
-    /// <param name="unfilled">Each variable whose value cannot be filled in and why, naming its entry; it is left out of the listing.</param>
+    /// <param name="clock">What expiry is judged against.</param>
+    /// <param name="refused">
+    /// Each variable that cannot leave and why, naming its entry and never a value, ordinal by key: one whose entry
+    /// expired at or before now, and one whose value cannot be filled in. Each is left out of the listing.
+    /// </param>
     /// <returns>Its variables ordinal by key, then by entry, each with its source; or why there are none.</returns>
-    public static EnvListing ListFilled(Vault vault, string project, string profile, out IReadOnlyList<EnvProblem> unfilled)
+    public static EnvListing ListFilled(Vault vault, string project, string profile, TimeProvider clock, out IReadOnlyList<EnvProblem> refused)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(clock);
 
+        var now = clock.GetUtcNow();
         var members = Listed(vault.ReadEnvSnapshot(), project, profile, out var outcome);
         List<EnvMember> filled = [];
-        List<EnvProblem> refused = [];
+        List<EnvProblem> problems = [];
 
         foreach (var member in members)
         {
+            if (Expired(member, now) is { } expired)
+            {
+                problems.Add(expired);
+                continue;
+            }
+
             var fill = Fill(member);
 
             if (fill.Value is { } value)
@@ -406,11 +418,11 @@ public static class EnvResolution
             }
             else
             {
-                refused.Add(Unfilled(member, fill));
+                problems.Add(Unfilled(member, fill));
             }
         }
 
-        unfilled = refused;
+        refused = problems;
         return Listing(filled, outcome);
     }
 
@@ -460,11 +472,9 @@ public static class EnvResolution
                 yield return new EnvProblem(member.Key, $"is a custom field named like a standard one, which keypaste never releases ({at})");
             }
 
-            if (member.Entry.Entry.Expires is { } expires && expires <= now)
+            if (Expired(member, now) is { } expired)
             {
-                yield return new EnvProblem(
-                    member.Key,
-                    $"expired {expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture)} ({at})");
+                yield return expired;
             }
         }
 
@@ -482,6 +492,12 @@ public static class EnvResolution
 
     /// <summary>Why a member's value cannot leave, naming its entry and never a value.</summary>
     private static EnvProblem Unfilled(EnvMember member, PlaceholderFill fill) => new(member.Key, $"{fill.Refusal} ({Where([member])})");
+
+    /// <summary>That a member's entry expired at or before now, naming it, or null when it has not (D-0337).</summary>
+    private static EnvProblem? Expired(EnvMember member, DateTimeOffset now) =>
+        member.Entry.Entry.Expires is { } expires && expires <= now
+            ? new EnvProblem(member.Key, $"expired {expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture)} ({Where([member])})")
+            : null;
 
     /// <summary>Every variable one environment holds, ordinal by key and then by entry, and whether the environment is there.</summary>
     private static List<EnvMember> Listed(EnvSnapshot snapshot, string project, string profile, out EnvOutcome outcome)

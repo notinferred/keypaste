@@ -83,6 +83,36 @@ public sealed class EnvTagVerbTests : IDisposable
     }
 
     /// <summary>
+    /// Before y/N the verb names each variable joining whose value holds a KeePass placeholder, with its keyword, since
+    /// it fills in from the item wherever the variable leaves (D-0465); never the value or what fills in.
+    /// </summary>
+    [Fact]
+    public void Tag_names_each_joining_variable_holding_a_placeholder_by_keyword_before_asking()
+    {
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            Assert.True(vault.SetFields(_stripe, [new FieldWrite("DATABASE_URL", "postgres://app:{PASSWORD}@db")]));
+            vault.Save();
+        }
+
+        _harness.Prompt.Interactive = true;
+        _harness.Stderr.GetStringBuilder().Clear();
+        _harness.Prompt.Enqueue(_master, "n");
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("env", "tag", "billing", "services/Stripe", "--vault", _harness.VaultPath));
+
+        var said = _harness.Err.ReplaceLineEndings("\n");
+        const string named = "DATABASE_URL fills in {PASSWORD} from services/Stripe when it leaves.";
+        Assert.Contains("Joining billing/dev: DATABASE_URL, STRIPE_SECRET_KEY.", said, StringComparison.Ordinal);
+        Assert.Contains(named, said, StringComparison.Ordinal);
+        Assert.True(said.IndexOf(named, StringComparison.Ordinal) < said.IndexOf("Cancelled; nothing was written.", StringComparison.Ordinal));
+        Assert.DoesNotContain("STRIPE_SECRET_KEY fills", said, StringComparison.Ordinal);
+        Assert.DoesNotContain("stripe-login", said + _harness.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("postgres://", said + _harness.Out, StringComparison.Ordinal);
+        Assert.Empty(Tags(_stripe));
+    }
+
+    /// <summary>
     /// Before y/N, as the app does, the verb names an agent set to Automatic where the tag puts the entry,
     /// and with this computer's <c>clients.toml</c> unreadable it names the agent the vault's settings
     /// would release it to once the file reads again.

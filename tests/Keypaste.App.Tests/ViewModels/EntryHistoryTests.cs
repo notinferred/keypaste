@@ -581,6 +581,79 @@ public sealed class EntryHistoryTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A restore puts back the revision's tags, so one that would put the item in a project first says what that does,
+    /// as every tag change does (D-0415), and writes only once confirmed; Cancel writes nothing.
+    /// </summary>
+    [Fact]
+    public void A_restore_that_would_add_a_project_tag_asks_first()
+    {
+        TagAndUntag();
+
+        using var context = New();
+        var history = Opened("servers/production", context);
+        var tagged = history.Rows[0];
+        var before = Digest(_vaultPath);
+        Assert.Equal("env:billing", tagged.TagsSummary);
+
+        history.Selected = tagged;
+        history.RestoreCommand.Execute(null);
+
+        Assert.True(history.IsConfirmingRestore);
+        Assert.Equal(
+            [
+                "env:billing puts servers/production in billing/dev.",
+                "Joining billing/dev: API_KEY.",
+                "API_KEY fills in {PASSWORD} from servers/production when it leaves.",
+            ],
+            history.RestoreLines);
+        Assert.Equal(before, Digest(_vaultPath));
+
+        history.CancelRestoreCommand.Execute(null);
+        Assert.False(history.IsConfirmingRestore);
+        Assert.Equal(before, Digest(_vaultPath));
+
+        history.RestoreCommand.Execute(null);
+        Assert.True(history.IsConfirmingRestore);
+        history.ConfirmRestoreCommand.Execute(null);
+
+        Assert.Null(context.Entries.Error);
+        using var reopened = Vault.Open(_vaultPath, _master);
+        Assert.Equal(["env:billing"], reopened.Tags(_production)!);
+    }
+
+    /// <summary>A restore whose revision carries the item's own project tags changes no project, so it asks nothing.</summary>
+    [Fact]
+    public void A_restore_whose_project_tags_match_restores_without_asking()
+    {
+        TagAndUntag();
+
+        using var context = New();
+        var history = Opened("servers/production", context);
+        var revisions = history.Rows.Count;
+        var untagged = history.Rows[1];
+        Assert.Equal(string.Empty, untagged.TagsSummary);
+
+        history.Selected = untagged;
+        history.RestoreCommand.Execute(null);
+
+        Assert.False(history.IsConfirmingRestore);
+        Assert.Null(context.Entries.Error);
+        using var reopened = Vault.Open(_vaultPath, _master);
+        Assert.Empty(reopened.Tags(_production)!);
+        Assert.Equal(revisions + 1, reopened.ReadHistory(_production)!.Count);
+    }
+
+    /// <summary>Gives servers/production a variable holding <c>{PASSWORD}</c> and tags it into billing/dev and out again, so its newest revision carries the tag and the item does not.</summary>
+    private void TagAndUntag()
+    {
+        using var vault = Vault.Open(_vaultPath, _master);
+        Assert.True(vault.SetFields(_production, [new FieldWrite("API_KEY", "{PASSWORD}")]));
+        Assert.True(vault.AddTag(_production, "env:billing"));
+        Assert.True(vault.RemoveTags(_production, ["env:billing"]));
+        vault.Save();
+    }
+
     private static EntryHistoryViewModel Select(string path, Context context)
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Path == path);

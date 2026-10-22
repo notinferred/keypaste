@@ -23,7 +23,7 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// Each value is written as it leaves keypaste, its own item's placeholders filled in, and one keypaste
-/// cannot fill in refuses the whole export (D-0465).
+/// cannot fill in refuses the whole export (D-0465), as an item that has expired does (D-0337).
 /// </para>
 /// </remarks>
 internal static class EnvExportCommand
@@ -236,15 +236,19 @@ internal static class EnvExportCommand
         return CliApp.ExitInternalError;
     }
 
-    /// <summary>Refuses a value holding a placeholder keypaste cannot fill in, naming it and its entry, or null when every value fills in (D-0465).</summary>
-    private static int? Unfilled(IReadOnlyList<EnvProblem> unfilled, CliContext context)
+    /// <summary>
+    /// Refuses the export when a variable's entry has expired, as <c>run</c> does (D-0337), or its value holds a
+    /// placeholder keypaste cannot fill in (D-0465), naming each variable and its entry; null when every value may leave.
+    /// </summary>
+    private static int? Unusable(IReadOnlyList<EnvProblem> refused, CliContext context)
     {
-        if (unfilled.Count == 0)
+        if (refused.Count == 0)
         {
             return null;
         }
 
-        context.Stderr.WriteLine($"keypaste env export: {EntryNameSanitizer.Sanitize(unfilled[0].Key).Text} {unfilled[0].Reason}; nothing was written.");
+        var reasons = string.Join("; ", refused.Select(problem => $"{EntryNameSanitizer.Sanitize(problem.Key).Text} {problem.Reason}"));
+        context.Stderr.WriteLine($"keypaste env export: {reasons}; nothing was written.");
         return CliApp.ExitInternalError;
     }
 
@@ -284,13 +288,13 @@ internal static class EnvExportCommand
         bool assumeYes,
         CliContext context)
     {
-        var listing = EnvResolution.ListFilled(vault, project, profile, out var unfilled);
+        var listing = EnvResolution.ListFilled(vault, project, profile, context.Clock, out var unusable);
         var setName = EnvProfileNames.SetName(project, profile);
 
         if ((Missing(listing.Outcome, project, profile, context)
             ?? Repeated(listing, context)
             ?? NamedLikeStandard(listing, context)
-            ?? Unfilled(unfilled, context)) is { } refused)
+            ?? Unusable(unusable, context)) is { } refused)
         {
             return refused;
         }

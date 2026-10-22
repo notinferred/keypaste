@@ -41,6 +41,6 @@ Completed 2026-09-24 on `main` above `4701350`, source only. [PRODUCT](../PRODUC
 - **The command is the run's claim.** A program running as the user can show one command and start another. The prompt protects against a run the person can see is wrong (T-30).
 - **One frame.** A set larger than 64 KiB once encoded is refused whole as too large; standalone `keypaste run` still starts it.
 - **Agent Activity** lists agents' requests only. A run's prompt is in its own window and is not listed there, though it holds the slot an agent's request would take.
-- **The copied command.** Env Sets still copies `keypaste run <project> -- `, without `--session`.
+- **The copied command.** The Projects screen copies `keypaste run --session <project> -- `, so a pasted run asks the app; it names no `--vault` (D-0453) (gaps-1b, RUNS-PENDING).
 - **The real app was not clicked through.** [desktop.md](../desktop.md#checking-a-build-by-hand) item 51 was not run in this session, and no real Linux desktop observed the prompt window; the gate draws it headless.
 - **Ctrl+C while waiting** ends the runner by the default handler, and the closed pipe withdraws the prompt at the owner, as `SessionAuthorityEnvTests` shows for a runner that gives up. This was not observed with a real console signal.

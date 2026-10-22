@@ -37,7 +37,7 @@ Completed 2026-09-24 on `main` above `d01299b`, source only. [PRODUCT](../PRODUC
 
 Expiry is judged against the clock of the process resolving: `keypaste run` uses the machine's, the app its session's. An entry that expires after a child starts stays in that child's environment.
 
-`keypaste env export` still checks names only through `EnvNameRules` and does not refuse an expired entry; the Build scoped expiry to what leaves for a child.
+`keypaste env export --dotenv` refuses an expired entry as `run` does, naming it and writing nothing (D-0337) (gaps-1b, RUNS-PENDING).
 
 The app shows no expiry, so a person learns of one from the refusal and fixes it in KeePassXC or by recreating the entry; nothing in keypaste clears an expiry.
 

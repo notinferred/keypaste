@@ -146,4 +146,89 @@ public sealed class ProjectTagChangeTests : IDisposable
             "Automatic: by the vault's settings, claude-code would get services/Stripe without asking, each release recorded in history, once this computer's clients.toml can be read again; until then every agent request is refused.",
             change.Describe()[^1]);
     }
+
+    /// <summary>
+    /// A variable joining an environment whose value holds a KeePass placeholder is named with each keyword it fills in
+    /// from the entry, or with the one that refuses it, as a new value's prompt names them (D-0465); a change that puts
+    /// the entry nowhere new names none, and no line holds a value.
+    /// </summary>
+    [Fact]
+    public void Joining_names_each_variable_holding_a_placeholder_by_keyword_and_no_value()
+    {
+        Assert.True(_vault.SetFields(_stripe, [new FieldWrite("STRIPE_KEY", "sk-{USERNAME}:{PASSWORD}"), new FieldWrite("WEBHOOK", "{REF:P@I:0}")]));
+        Record("claude-code", AutomaticIn("billing", "dev"));
+
+        var described = Preview(["env:billing"], adding: true)!.Describe();
+
+        Assert.Equal(
+            [
+                "env:billing puts services/Stripe in billing/dev.",
+                "Joining billing/dev: STRIPE_KEY, WEBHOOK.",
+                "STRIPE_KEY fills in {USERNAME} and {PASSWORD} from services/Stripe when it leaves.",
+                "WEBHOOK holds {REF:…}, which keypaste does not fill in, so it is refused wherever it would leave.",
+                "Automatic: claude-code would get services/Stripe without asking, each release recorded in history.",
+            ],
+            described);
+        Assert.DoesNotContain(described, line => line.Contains("sk-", StringComparison.Ordinal) || line.Contains("login", StringComparison.Ordinal));
+
+        Assert.True(_vault.AddTag(_stripe, "env:billing"));
+        Assert.DoesNotContain(Preview(["env:billing"], adding: false)!.Describe(), line => line.Contains('{', StringComparison.Ordinal));
+        Assert.DoesNotContain(Preview(["env:billing:dev"], adding: true)!.Describe(), line => line.Contains('{', StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A restore puts back the revision's tags, so restoring one whose project tags differ from the entry's is the tag
+    /// change D-0415 asks about: what joins goes first, naming the revision's variables and their placeholders, and
+    /// what leaves names the entry's own. A revision whose project tags are the entry's changes no project.
+    /// </summary>
+    [Fact]
+    public void Restoring_a_revision_whose_project_tags_differ_is_the_tag_change_it_makes()
+    {
+        Assert.True(_vault.SetFields(_stripe, [new FieldWrite("API_URL", "https://{USERNAME}@api")]));
+        Assert.True(_vault.AddTag(_stripe, "env:billing:staging"));
+        Assert.True(_vault.RemoveTags(_stripe, ["env:billing:staging"]));
+        Assert.True(_vault.RemoveField(_stripe, "API_URL"));
+        Assert.True(_vault.AddTag(_stripe, "env:billing"));
+        Assert.True(_vault.SetFields(_stripe, [new FieldWrite("STRIPE_KEY", "s2")]));
+
+        var history = _vault.ReadHistory(_stripe)!;
+        var staging = history.Single(revision => revision.Tags is ["env:billing:staging"] && revision.CustomFields.Any(field => field.Name == "API_URL"));
+
+        Assert.Equal(
+            [
+                "env:billing:staging puts services/Stripe in billing/staging.",
+                "Joining billing/staging: API_URL, STRIPE_KEY, WEBHOOK.",
+                "API_URL fills in {USERNAME} from services/Stripe when it leaves.",
+                "Removing env:billing takes services/Stripe out of billing/dev.",
+                "Leaving billing/dev: STRIPE_KEY, WEBHOOK.",
+            ],
+            Restoring(staging).SelectMany(change => change.Describe()));
+
+        Assert.Empty(Restoring(history[0]));
+        Assert.Equal(["env:billing"], history[0].Tags);
+    }
+
+    /// <summary>
+    /// A restore that swaps the entry's tag for another reaching the same environment takes it out of none, so the
+    /// preview says the environment stays as it is rather than that the entry leaves it and joins it again.
+    /// </summary>
+    [Fact]
+    public void Restoring_a_revision_whose_tag_reaches_the_same_environment_changes_no_environment()
+    {
+        Assert.True(_vault.AddTag(_stripe, "env:billing"));
+        Assert.True(_vault.AddTag(_stripe, "env:billing:dev"));
+        Assert.True(_vault.RemoveTags(_stripe, ["env:billing"]));
+
+        var bare = _vault.ReadHistory(_stripe)!.Single(read => read.Tags is ["env:billing"]);
+
+        Assert.Equal(
+            [
+                "services/Stripe is already in billing/dev through another tag, so adding env:billing changes no environment.",
+                "services/Stripe stays in billing/dev through another tag, so removing env:billing:dev changes no environment.",
+            ],
+            Restoring(bare).SelectMany(change => change.Describe()));
+    }
+
+    private IReadOnlyList<ProjectTagChange> Restoring(EntryRevision revision) =>
+        ProjectTagChange.Restoring(_vault, _stripe, revision, ClientsPath, _now);
 }

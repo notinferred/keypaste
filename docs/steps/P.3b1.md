@@ -61,5 +61,5 @@ D-0465, and D-0359, D-0378 and D-0422 amended to it, in [DECISIONS](../../DECISI
 - An older bridge does not scrub filled parts, and every non-empty part is scrubbed however short, so a short title or user name filled into a value mangles a run's output wherever it appears.
 - KeePassXC's `\{…\}` escape is not honoured, and a generated password could, with negligible probability, hold text shaped like a placeholder.
 - A revision copy can misalign if the item is edited between reads.
-- Tagging an item into a project (`env tag`) makes its existing variables leave filled in without the prompt naming their placeholders (T-43).
+- Tagging an item into a project, in the app or at `env tag`, names each joining variable that already holds a placeholder, with its keyword, before it is written (D-NEW-W21, T-43) (gaps-1b, RUNS-PENDING).
 - Source only.

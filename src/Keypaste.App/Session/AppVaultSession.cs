@@ -199,6 +199,18 @@ internal sealed class AppVaultSession : IDisposable
         ProjectTagChange.Preview(vault, entry, tags, adding, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
 
     /// <summary>
+    /// What restoring one of an entry's revisions does to the projects it is in, each change said as a tag change
+    /// says it (D-0415); empty when the revision's project tags are the entry's own.
+    /// </summary>
+    /// <param name="vault">The open vault.</param>
+    /// <param name="entry">The entry.</param>
+    /// <param name="revision">The revision, from a reading taken since the vault last changed.</param>
+    /// <returns>The changes, in the order they are shown.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<ProjectTagChange> PreviewRestore(Vault vault, EntryName entry, EntryRevision revision) =>
+        ProjectTagChange.Restoring(vault, entry, revision, KeypasteHome.ClientsPath(_home), _clock.GetUtcNow());
+
+    /// <summary>
     /// The project environments an entry's own tags put it in, each saying whether an agent gets the entry
     /// only once a person answers, judged by the vault's agent settings beneath this computer's ceilings.
     /// </summary>

@@ -4,6 +4,14 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Tagging an item into a project, in the app or with `keypaste env tag`, now names each of its variables that holds a KeePass placeholder such as `{PASSWORD}`, with the placeholder, before anything is written, because that variable carries the item's own field to whoever gets it.
+
+In the app's History, the caption under Restore this now says a restore drops the attachments, custom fields and custom data added since that revision. When the revision's project tags differ from the item's, Restore this first says which environments the item leaves and joins, as adding a project tag does, and restores only when you confirm.
+
+`keypaste env export --dotenv` now refuses an environment holding an expired item, naming it and writing nothing, as `keypaste run` does.
+
+The run command the Projects screen copies now carries `--session`, so pasting it in a terminal asks the app for the variables rather than for the master password, and nothing starts while the app is locked.
+
 Search now also finds an item by any part of one of its own tags, so `prod` finds an item tagged `env:billing:prod`, in the app's search, which names the tag beside the item, and in `keypaste search`, which names the tag it matched on the item's line and in `--json`.
 
 `keypaste field mv <item> <name> <new-name>` renames a custom field, keeping its value and its protection, and the old name stays in the item's history. It refuses a name the item already has in any case, a standard name, KeePassXC's own attributes and the fields a TOTP is read from, and is refused while the app or `keypaste approve` holds the vault, naming the holder.

@@ -723,6 +723,22 @@ public sealed class Vault : IDisposable
         return _interop.FieldsNaming(name, field);
     }
 
+    /// <summary>
+    /// For each variable of the item, or of one of its revisions, whose value holds a KeePass placeholder, what fills in
+    /// from the item when it leaves or the first placeholder that refuses it, by keyword and never by value (D-0465).
+    /// </summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="revision">A position in <see cref="ReadHistory"/>'s order to judge that revision's variables, or null for the item's own.</param>
+    /// <returns>Each such variable in ordinal order of name, or null when there is no such entry or revision.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<KeyValuePair<string, PlantedPlaceholders>>? PlaceholdersHeld(EntryName name, int? revision = null)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.ReadPlantedPlaceholders(name, revision, EnvConvention.IsEnvNamedField);
+    }
+
     /// <summary>Moves keys found in notes into protected fields. Call <see cref="Save"/> to persist it.</summary>
     /// <param name="check">The check that found them, while it is still undisposed.</param>
     /// <param name="findings">The findings to move, from <paramref name="check"/>.</param>
@@ -867,7 +883,8 @@ public sealed class Vault : IDisposable
     /// and the entry keeps its UUID, so a restore is an edit like any other: one more revision, not
     /// a new entry. The entry's modification time becomes the moment of the restore (D-0227).
     /// <paramref name="index"/> is only meaningful against a reading of this same vault taken since
-    /// its last change.
+    /// its last change. The entry becomes the revision whole, its tags included, so a front end asks
+    /// first what <see cref="ProjectTagChange.Restoring"/> says whenever the revision's project tags differ (D-NEW-W22).
     /// </remarks>
     /// <returns>
     /// <see langword="true"/> if an entry was restored. Restoring nothing is not an error here; the

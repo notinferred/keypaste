@@ -562,6 +562,42 @@ public sealed class EnvExportTests
         Assert.DoesNotContain("sk_live_secret", harness.Out + harness.Err, StringComparison.Ordinal);
     }
 
+    /// <summary>A plaintext export refuses an item that has expired, as <c>run</c> does, naming it and writing nothing (D-0337).</summary>
+    [Fact]
+    public void Dotenv_RefusesAnExpiredItem_NamingIt_AndWritesNothing()
+    {
+        using var harness = SeededWithTwo();
+        var old = new EntryName("services", "Old");
+
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            vault.AddEntry(new VaultEntry { GroupPath = old.GroupPath, Title = old.Title, Password = "login" });
+            Assert.True(vault.SetFields(old, [new FieldWrite("OLD_TOKEN", "old-token-secret")]));
+            Assert.True(vault.AddTag(old, "env:billing"));
+            vault.SetExpiryUnchecked(old, new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
+            vault.Save();
+        }
+
+        var path = Target(harness);
+        const string said = "keypaste env export: OLD_TOKEN expired 2020-01-02 03:04:05Z (services/Old); nothing was written.";
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitInternalError, harness.Run("env", "export", "billing", path, "--dotenv", "--yes", "--vault", harness.VaultPath));
+        Assert.Contains(said, harness.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(path));
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitInternalError, harness.Run("env", "export", "billing", "--dotenv", "--stdout", "--vault", harness.VaultPath));
+        Assert.Contains(said, harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Out);
+        Assert.Empty(harness.ConsoleStyle.Alarms);
+
+        foreach (var value in new[] { "sk_live_secret", "old-token-secret" })
+        {
+            Assert.DoesNotContain(value, harness.Out + harness.Err, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public void Dotenv_WithProfile()
     {

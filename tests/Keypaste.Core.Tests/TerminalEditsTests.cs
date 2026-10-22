@@ -330,6 +330,28 @@ public sealed class TerminalEditsTests : IDisposable
             preview.Changes);
     }
 
+    /// <summary>
+    /// A tag edit's preview, which the holder's terminal and window show, names each variable joining whose value holds a
+    /// KeePass placeholder by keyword (D-0465), and never the value or what fills in.
+    /// </summary>
+    [Fact]
+    public void Env_tag_names_each_joining_variable_that_holds_a_placeholder()
+    {
+        Assert.True(_vault.SetFields(_stripe, [new FieldWrite("DATABASE_URL", "postgres://u:{PASSWORD}@db-" + _sentinel)]));
+
+        var preview = Check(new TagItem("billing", "dev", "api/Stripe", Tagging: true)).Preview!;
+
+        AssertNoValue(preview);
+        Assert.DoesNotContain(preview.Changes, sentence => sentence.Contains("login-password", StringComparison.Ordinal));
+        Assert.Equal(
+            [
+                "env:billing puts api/Stripe in billing/dev.",
+                "Joining billing/dev: DATABASE_URL.",
+                "DATABASE_URL fills in {PASSWORD} from api/Stripe when it leaves.",
+            ],
+            preview.Changes);
+    }
+
     [Fact]
     public void Tagging_twice_is_unchanged_and_untagging_removes_the_tag()
     {

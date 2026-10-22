@@ -226,16 +226,17 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.False(File.Exists(path));
     }
 
+    /// <summary>The copied command asks the app holding the vault through <c>--session</c> (D-0453) and names the selected environment.</summary>
     [Fact]
     public void RunCommand_NamesTheProfile()
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
         var project = Open(screen);
 
-        Assert.Equal("keypaste run -p dev acme-api -- npm start", project.RunCommand);
+        Assert.Equal("keypaste run --session -p dev acme-api -- npm start", project.RunCommand);
 
         project.SelectedProfile = "prod";
-        Assert.Equal("keypaste run -p prod acme-api -- npm start", project.RunCommand);
+        Assert.Equal("keypaste run --session -p prod acme-api -- npm start", project.RunCommand);
         Assert.Equal("prod", project.Launch.Profile);
         Assert.Equal("prod", project.Import.Profile);
 
@@ -247,7 +248,7 @@ public sealed class EnvProfilesTests : IDisposable
                 [new ProjectMapping(Path.GetFullPath(_fixture.Path_), "acme-api", directory, "dotnet run")]));
 
             screen.OpenCommand.Execute("acme-api");
-            Assert.Equal("keypaste run -p dev acme-api -- dotnet run", screen.OpenProject!.RunCommand);
+            Assert.Equal("keypaste run --session -p dev acme-api -- dotnet run", screen.OpenProject!.RunCommand);
         }
         finally
         {
@@ -262,13 +263,13 @@ public sealed class EnvProfilesTests : IDisposable
         using var screen = new EnvSetsViewModel(_session, _countdown);
 
         screen.OpenCommand.Execute("-web");
-        Assert.Equal("keypaste run -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
+        Assert.Equal("keypaste run --session -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
 
         screen.OpenCommand.Execute("acme-api");
-        Assert.Equal("keypaste run -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
+        Assert.Equal("keypaste run --session -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
 
-        Assert.Equal("keypaste run --project=--help -- ", EnvSetsViewModel.RunCommandFor("--help"));
-        Assert.Equal("keypaste run acme-api -- ", EnvSetsViewModel.RunCommandFor("acme-api"));
+        Assert.Equal("keypaste run --session --project=--help -- ", EnvSetsViewModel.RunCommandFor("--help"));
+        Assert.Equal("keypaste run --session acme-api -- ", EnvSetsViewModel.RunCommandFor("acme-api"));
     }
 
     /// <summary>
@@ -303,12 +304,12 @@ public sealed class EnvProfilesTests : IDisposable
     public void ACopiedRunCommand_QuotesTheNameForEachPlatformsShells_OrHasNone(string project, string posix, string? windows)
     {
         Assert.True(CopiedRunCommand.IsCopyable(project, windows: false));
-        Assert.Equal($"keypaste run -p dev {posix} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: false));
-        Assert.Equal($"keypaste run {posix} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: false));
+        Assert.Equal($"keypaste run --session -p dev {posix} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: false));
+        Assert.Equal($"keypaste run --session {posix} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: false));
 
         Assert.Equal(windows is not null, CopiedRunCommand.IsCopyable(project, windows: true));
-        Assert.Equal(windows is null ? null : $"keypaste run -p dev {windows} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: true));
-        Assert.Equal(windows is null ? null : $"keypaste run {windows} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run --session -p dev {windows} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run --session {windows} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: true));
     }
 
     /// <summary>
@@ -362,8 +363,8 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.True(card.HasRunCommand);
         Assert.Empty(card.RunCommandNote);
         Assert.True(card.CopyRunCommandCommand.CanExecute(null));
-        Assert.Equal(["run", "-p", "dev", named, "--", "npm", "start"], Pasted(card.RunCommand!));
-        Assert.Equal(["run", named, "--", "npm", "start"], Pasted(EnvSetsViewModel.RunCommandFor(project) + "npm start"));
+        Assert.Equal(["run", "--session", "-p", "dev", named, "--", "npm", "start"], Pasted(card.RunCommand!));
+        Assert.Equal(["run", "--session", named, "--", "npm", "start"], Pasted(EnvSetsViewModel.RunCommandFor(project) + "npm start"));
     }
 
     [Fact]

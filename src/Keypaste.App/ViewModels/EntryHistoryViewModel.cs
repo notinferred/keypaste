@@ -39,6 +39,7 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     private IReadOnlyList<EntryRevisionRow> _rows = [];
     private EntryRevisionRow? _selected;
     private EntryRevisionRow? _revealed;
+    private RestoreQuestion? _asking;
     private bool _isOpen;
     private bool _read;
     private int _countAtRead;
@@ -60,13 +61,19 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         _restored = restored;
 
         ToggleCommand = new RelayCommand(Toggle);
-        RestoreCommand = new RelayCommand(Restore, () => _selected is not null);
+        RestoreCommand = new RelayCommand(() => Restore(_selected, confirmed: null), () => _selected is not null);
+        ConfirmRestoreCommand = new RelayCommand(ConfirmRestore, () => Asking is not null);
+        CancelRestoreCommand = new RelayCommand(() => Asking = null, () => Asking is not null);
 
         DependsOn(nameof(ToggleLabel), nameof(IsOpen));
         DependsOn(nameof(ShowsEmptyNote), nameof(IsOpen), nameof(Rows));
         DependsOn(nameof(HasSelection), nameof(Selected));
         DependsOn(nameof(RevealedWhen), nameof(Revealed));
+        DependsOn(nameof(IsConfirmingRestore), nameof(Asking));
+        DependsOn(nameof(RestoreLines), nameof(Asking));
         DependsOn(RestoreCommand, nameof(Selected));
+        DependsOn(ConfirmRestoreCommand, nameof(Asking));
+        DependsOn(CancelRestoreCommand, nameof(Asking));
     }
 
     /// <summary>Whether the history section is showing.</summary>
@@ -90,11 +97,26 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     internal EntryRevisionRow? Selected
     {
         get => _selected;
-        set => Set(ref _selected, value);
+        set
+        {
+            if (Set(ref _selected, value))
+            {
+                Asking = null;
+            }
+        }
     }
 
     /// <summary>Whether a revision is being compared.</summary>
     internal bool HasSelection => _selected is not null;
+
+    /// <summary>
+    /// Whether a restore waits for the person to confirm what it does to the projects the item is in, because the
+    /// revision's project tags differ from the item's and a restore puts them back (D-NEW-W22).
+    /// </summary>
+    internal bool IsConfirmingRestore => _asking is not null;
+
+    /// <summary>What the waiting restore does to the item's projects, in the sentences a tag change shows (D-0415); names only, never a value.</summary>
+    internal IReadOnlyList<string> RestoreLines => _asking?.Lines ?? [];
 
     /// <summary>
     /// Whether to say the entry has never been changed.
@@ -119,11 +141,23 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         set => Set(ref _revealed, value);
     }
 
+    private RestoreQuestion? Asking
+    {
+        get => _asking;
+        set => Set(ref _asking, value);
+    }
+
     /// <summary>Opens and closes the section.</summary>
     internal RelayCommand ToggleCommand { get; }
 
-    /// <summary>Makes the selected revision the entry's current values.</summary>
+    /// <summary>Makes the selected revision the entry's current values, first asking when that changes the item's projects.</summary>
     internal RelayCommand RestoreCommand { get; }
+
+    /// <summary>Restores the revision the waiting question is about.</summary>
+    internal RelayCommand ConfirmRestoreCommand { get; }
+
+    /// <summary>Drops the waiting question, restoring nothing.</summary>
+    internal RelayCommand CancelRestoreCommand { get; }
 
     /// <summary>Reads again if the section is open, and reads nothing if it is not.</summary>
     /// <remarks>
@@ -243,16 +277,30 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         Load();
     }
 
-    private void Restore()
+    private void ConfirmRestore()
     {
-        if (_selected is not { } row)
+        if (Asking is not { } asked)
+        {
+            return;
+        }
+
+        Asking = null;
+        Restore(asked.Row, asked);
+    }
+
+    /// <summary>Restores a revision, or holds the question a change to the item's projects needs first.</summary>
+    /// <param name="row">The revision.</param>
+    /// <param name="confirmed">The question the person confirmed for it, or null when none was asked yet.</param>
+    private void Restore(EntryRevisionRow? row, RestoreQuestion? confirmed)
+    {
+        if (row is null)
         {
             return;
         }
 
         // The revision's own title: restoring one from before a rename renames the entry back.
         var restored = new EntryName(_owner.GroupPath, row.Title);
-        var write = _session.Write(vault => TryRestore(vault, row), outcome => outcome == RevisionRestore.Restored);
+        var write = _session.Write(vault => TryRestore(vault, row, confirmed), attempt => attempt.Outcome == RevisionRestore.Restored);
 
         if (write.Problem("restore this again") is { } problem)
         {
@@ -260,14 +308,21 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (write.Value == RevisionRestore.Stale)
+        if (write.Value.Outcome == RevisionRestore.Asks)
+        {
+            _owner.Report(null);
+            Asking = write.Value.Question;
+            return;
+        }
+
+        if (write.Value.Outcome == RevisionRestore.Stale)
         {
             _owner.Report(_stale);
             Load();
             return;
         }
 
-        if (write.Value == RevisionRestore.Gone)
+        if (write.Value.Outcome == RevisionRestore.Gone)
         {
             var gone = Gone();
             Forget();
@@ -284,25 +339,39 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         _restored(restored);
     }
 
-    private RevisionRestore TryRestore(Vault vault, EntryRevisionRow row)
+    /// <summary>
+    /// Restores the revision unless its project tags differ from the item's, which a restore puts back, and the person
+    /// has not confirmed what that does with the item carrying the tags it carries now (D-0415, D-NEW-W22).
+    /// </summary>
+    private RestoreAttempt TryRestore(Vault vault, EntryRevisionRow row, RestoreQuestion? confirmed)
     {
         try
         {
-            if (vault.ReadHistory(_owner.Name) is not { } fresh)
+            if (vault.ReadHistory(_owner.Name) is not { } fresh || vault.Tags(_owner.Name) is not { } held)
             {
-                return RevisionRestore.Gone;
+                return new RestoreAttempt(RevisionRestore.Gone);
             }
 
             if (!Agrees(fresh, row))
             {
-                return RevisionRestore.Stale;
+                return new RestoreAttempt(RevisionRestore.Stale);
             }
 
-            return vault.RestoreRevision(_owner.Name, row.Index) ? RevisionRestore.Restored : RevisionRestore.Gone;
+            if (confirmed is null || !confirmed.Held.SequenceEqual(held, StringComparer.Ordinal))
+            {
+                var changes = _session.PreviewRestore(vault, _owner.Name, fresh[row.Index]);
+
+                if (changes.Count > 0)
+                {
+                    return new RestoreAttempt(RevisionRestore.Asks, new RestoreQuestion(row, held, [.. changes.SelectMany(change => change.Describe())]));
+                }
+            }
+
+            return new RestoreAttempt(vault.RestoreRevision(_owner.Name, row.Index) ? RevisionRestore.Restored : RevisionRestore.Gone);
         }
         catch (ArgumentOutOfRangeException)
         {
-            return RevisionRestore.Stale;
+            return new RestoreAttempt(RevisionRestore.Stale);
         }
     }
 
@@ -351,6 +420,16 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     {
         Gone,
         Stale,
+        Asks,
         Restored,
     }
+
+    /// <summary>What one try at a restore came to, and the question it holds when it asks first.</summary>
+    private readonly record struct RestoreAttempt(RevisionRestore Outcome, RestoreQuestion? Question = null);
+
+    /// <summary>A restore waiting for the person, asked while the item carried <paramref name="Held"/>.</summary>
+    /// <param name="Row">The revision to restore.</param>
+    /// <param name="Held">The item's own tags when it was asked, so a confirmation answers only that change.</param>
+    /// <param name="Lines">What the restore does to the item's projects.</param>
+    private sealed record RestoreQuestion(EntryRevisionRow Row, IReadOnlyList<string> Held, IReadOnlyList<string> Lines);
 }
