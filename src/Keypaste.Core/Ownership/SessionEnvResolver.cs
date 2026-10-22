@@ -147,7 +147,7 @@ public sealed class SessionEnvResolver
             }
         }
 
-        return lifetime.TryCommit(waiting) ? resolved
+        return lifetime.TryCommitAfter(waiting) ? resolved
             : lifetime.IsLive ? Reloaded(project, profile)
             : Locked(project, profile);
     }

@@ -148,7 +148,7 @@ public sealed class SessionEditor
             return Refused(AuditMethod.Cancelled, "the request was withdrawn before anything was written");
         }
 
-        if (!lifetime.TryCommit(waiting))
+        if (!lifetime.TryCommitAfter(waiting))
         {
             return Withdrawn(lifetime);
         }

@@ -423,7 +423,7 @@ public sealed class SessionAuthority : IApproverHandler
             }
         }
 
-        if (!lifetime.TryCommit(waiting) && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
+        if (!lifetime.TryCommitAfter(waiting) && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
         {
             // The released string is dropped here, never sent: the lock or the reload came before the release.
             var (method, reason) = WithdrawnBy(lifetime, reply.Decision == AuditDecision.Granted ? "this was released" : "anybody answered");

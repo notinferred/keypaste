@@ -38,15 +38,15 @@ public sealed class SessionLifetimeTests
         Assert.True(lifetime.IsLive);
         Assert.False(lifetime.Ended.IsCancellationRequested);
         Assert.True(before.IsCancellationRequested);
-        Assert.False(lifetime.TryCommit(before));
+        Assert.False(lifetime.TryCommitAfter(before));
 
         var after = lifetime.Waiting;
-        Assert.True(lifetime.TryCommit(after));
+        Assert.True(lifetime.TryCommitAfter(after));
 
         lifetime.End();
 
         Assert.True(after.IsCancellationRequested);
-        Assert.False(lifetime.TryCommit(after));
+        Assert.False(lifetime.TryCommitAfter(after));
     }
 
     [Fact]

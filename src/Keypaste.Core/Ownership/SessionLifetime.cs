@@ -54,7 +54,7 @@ public sealed class SessionLifetime : IDisposable
     /// What withdraws a request that begins waiting now: cancelled when the lifetime ends or when
     /// <see cref="Withdraw"/> withdraws everything waiting on it.
     /// </summary>
-    /// <remarks>Read once as a request begins, and given back to <see cref="TryCommit(CancellationToken)"/> to release it.</remarks>
+    /// <remarks>Read once as a request begins, and given back to <see cref="TryCommitAfter(CancellationToken)"/> to release it.</remarks>
     public CancellationToken Waiting
     {
         get
@@ -113,7 +113,7 @@ public sealed class SessionLifetime : IDisposable
     /// <summary>Commits a release to this lifetime, if it is still live and nothing withdrew what the request waited on.</summary>
     /// <param name="waiting">The <see cref="Waiting"/> the request read as it began.</param>
     /// <returns>False once the lifetime has ended or <see cref="Withdraw"/> has withdrawn that wait, and then nothing may be released for it.</returns>
-    public bool TryCommit(CancellationToken waiting)
+    public bool TryCommitAfter(CancellationToken waiting)
     {
         lock (_gate)
         {
