@@ -25,4 +25,4 @@ None.
 
 ## Limits and follow-ups
 
-The CLI cases still expect a hard-coded "all 11 assets", so a change to the CLI targets needs the same derivation. Hosted `ci.yml` has not run the repair; it runs when `main` is pushed.
+The CLI cases now count their expected assets from the definition, as the app cases do, so a change to the CLI targets moves the expectation with it (gaps-1c, RUNS-PENDING).

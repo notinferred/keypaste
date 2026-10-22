@@ -15,6 +15,8 @@
 #     ran them; one whose tools jobs were skipped does not (D-0438);
 #   - the required set is read from release-targets.json, so a component with its own gate is
 #     required without an edit here, and the release workflow never requires itself;
+#   - --wait waits for the tag's own run: one still going that then succeeds is accepted, and one still going
+#     at the last poll, one that never appears and one that failed each refuse;
 #   - an empty or malformed reply, about the runs or about a run's jobs, refuses rather than counting as
 #     zero and passing something.
 #
@@ -83,11 +85,18 @@ case "$KEYPASTE_FIXTURE_SCENARIO" in
   api-empty)  printf '' ; exit 0 ;;
   api-garbage) printf 'not json at all\n' ; exit 0 ;;
 esac
-runs="$KEYPASTE_FIXTURE_RUNS"
+# A run with no status has completed. The first $KEYPASTE_FIXTURE_PENDING replies show every run still going,
+# as the API does until a run finishes; the calls are counted in a file because each call is a new process.
+runs="$(printf '%s' "$KEYPASTE_FIXTURE_RUNS" | jq -c 'map(.status = (.status // "completed"))')"
+calls=$(( $(cat "$KEYPASTE_FIXTURE_CALLS" 2>/dev/null || echo 0) + 1 ))
+echo "$calls" > "$KEYPASTE_FIXTURE_CALLS"
+if [ "$calls" -le "$KEYPASTE_FIXTURE_PENDING" ]; then
+  runs="$(printf '%s' "$runs" | jq -c 'map(.status = "in_progress" | .conclusion = null)')"
+fi
 case "$url" in
   *status=success*) runs="$(printf '%s' "$runs" | jq -c '[.[] | select(.conclusion == "success")]')" ;;
 esac
-printf '%s' "$runs" | jq -c '{workflow_runs: [.[] | {name, conclusion, id, head_branch, event}]}'
+printf '%s' "$runs" | jq -c '{workflow_runs: [.[] | {name, status, conclusion, id, head_branch, event}]}'
 FAKE
 chmod +x "$SHIM/gh"
 
@@ -110,6 +119,10 @@ run_case() {
     export KEYPASTE_FIXTURE_SCENARIO="$scenario"
     export KEYPASTE_FIXTURE_RUNS="$runs"
     export KEYPASTE_FIXTURE_JOBS="$JOBS"
+    export KEYPASTE_FIXTURE_PENDING="$PENDING"
+    export KEYPASTE_FIXTURE_CALLS="$WORK/calls-$cases_run"
+    export KEYPASTE_GATES_WAIT_POLLS=3
+    export KEYPASTE_GATES_WAIT_SECONDS=0
     bash "$subject" "${args[@]}"
   ) >"$OUT" 2>&1 || rc=$?
   [ "$rc" -eq 0 ] && accepted=$((accepted + 1))
@@ -132,6 +145,8 @@ readonly CI_ONLY_ON_A_MAIN_PUSH='[{"name":"ci","conclusion":"success","id":11,"h
 readonly APP_TWICE="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"},{"name":"app","conclusion":"success","id":23,"head_branch":"v9.9.9","event":"push"}]'
 readonly APP_ON_MAIN="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"main","event":"push"}]'
 readonly APP_ON_A_PR_NAMED_LIKE_THE_TAG="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"pull_request"}]'
+# The tag's app run still going, as release.yml finds it when both start with the tag push.
+readonly APP_GOING="[$CI_FULL"',{"name":"app","status":"in_progress","conclusion":null,"id":22,"head_branch":"v9.9.9","event":"push"}]'
 # The weekly run, and the jobs of each ci run: its tools jobs green on every runner, or skipped as a plain
 # dispatch skips them, listed once with the matrix unexpanded.
 readonly SCHEDULED_GREEN='[{"name":"ci","conclusion":"success","id":12,"head_branch":"main","event":"schedule"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"}]'
@@ -140,6 +155,7 @@ readonly TOOLS_GREEN="{\"11\":$TOOLS_RAN,\"12\":$TOOLS_RAN}"
 readonly TOOLS_SKIPPED='{"11":[{"name":"test (ubuntu-24.04)","conclusion":"success"},{"name":"tools (${{ matrix.os }})","conclusion":"skipped"}]}'
 readonly TOOLS_ONLY='{"11":[{"name":"test (ubuntu-24.04)","conclusion":"skipped"},{"name":"tools (ubuntu-24.04)","conclusion":"success"},{"name":"tools (windows-2025)","conclusion":"success"},{"name":"tools (macos-15)","conclusion":"success"}]}'
 JOBS="$TOOLS_GREEN"
+PENDING=0
 
 echo "== the shapes a tag can arrive in"
 run_case "both-green"  ok "$BOTH_GREEN"  "$SUBJECT" 0 "every required gate is green"
@@ -171,6 +187,15 @@ run_case "run-id-not-at-the-ref" ok "$APP_ON_MAIN" "$SUBJECT" 1 "a release canno
 run_case "run-id-ambiguous"   ok "$APP_TWICE"  "$SUBJECT" 1 "must not choose between them" --run-id app "$SHA" refs/tags/v9.9.9
 run_case "run-id-from-a-pr"   ok "$APP_ON_A_PR_NAMED_LIKE_THE_TAG" "$SUBJECT" 1 "a release cannot take packages from a run that did not happen" --run-id app "$SHA" refs/tags/v9.9.9
 
+echo "== the tag's own run is waited for, three polls apart here"
+PENDING=2
+run_case "wait-then-green"    ok "$BOTH_GREEN" "$SUBJECT" 0 "finished green after 3 poll(s)" --wait app "$SHA" refs/tags/v9.9.9
+PENDING=0
+run_case "wait-still-going"   ok "$APP_GOING"  "$SUBJECT" 1 "still going after 3 polls" --wait app "$SHA" refs/tags/v9.9.9
+run_case "wait-red"           ok "$APP_RED"    "$SUBJECT" 1 "finished failure" --wait app "$SHA" refs/tags/v9.9.9
+run_case "wait-never-started" ok "$APP_ON_MAIN" "$SUBJECT" 1 "appeared in 3 polls" --wait app "$SHA" refs/tags/v9.9.9
+run_case "wait-api-garbage"   api-garbage "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer" --wait app "$SHA" refs/tags/v9.9.9
+
 echo "== negative control"
 WEAK="$WORK/weakened.sh"
 # Deleting the one line that reads the definition leaves `echo ci` behind, which is exactly the
@@ -193,8 +218,8 @@ echo "  the copy without the tools requirement accepts a ci run that skipped the
 DECLARED="$(declared_cases)"
 [ -n "$DECLARED" ] || die "no case lines found in $SELF; the count this gate checks itself against is derived from them"
 [ "$cases_run" -eq "$DECLARED" ] || die "$cases_run cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
-[ "$accepted" -eq 5 ] \
-  || die "$accepted cases were accepted, expected exactly 5 (both-green, the scheduled run with its tools, the resolved run id, and the two weakened controls)"
+[ "$accepted" -eq 6 ] \
+  || die "$accepted cases were accepted, expected exactly 6 (both-green, the scheduled run with its tools, the resolved run id, the wait that ended green, and the two weakened controls)"
 
 cat <<EOF
 ok: $cases_run cases. One shape was accepted by the real script - every required gate green in a
@@ -204,7 +229,9 @@ ok: $cases_run cases. One shape was accepted by the real script - every required
     all refused. Off the same reply it resolves
     which app run built the commit, and refuses when there is none, when the only green run belongs
     to the branch rather than the tag or to a pull request whose branch carries the tag's name, and
-    when two green runs would have to be chosen between. The pre-R.0a shape, same fixture and same
+    when two green runs would have to be chosen between. It waits for the tag's own run until it finishes
+    green, and refuses one still going at the last poll, one that failed, one that never appeared and an
+    unparseable reply. The pre-R.0a shape, same fixture and same
     fake, accepts the commit whose desktop gate never ran, and the shape before D-0438 accepts the ci
     run whose tools jobs were skipped.
 not proved here: that the guard step is reached on a tag, which only a tag shows; and that GitHub

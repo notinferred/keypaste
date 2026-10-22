@@ -12,7 +12,8 @@
 # MSI appends its folder to the user Path, keeps one entry through an upgrade and removes only that entry on
 # uninstall, which an entry of the user's own, added first, shows. Open at login's Run value, written after the
 # first install as the app's Settings writes it, must come through the upgrade unchanged and be gone after the
-# uninstall. On Linux the upgrade is a download left
+# uninstall. The upgraded app then starts once and shows its window before the data is read, so what its first
+# start writes is compared too, as on Linux and macOS. On Linux the upgrade is a download left
 # beside the old image: the lower app links keypaste from Settings, a start of the higher image while the lower
 # app runs hands off to it (D-0397) and still re-points the link, the higher app then starts on its own, a later
 # start of the lower one leaves the link, and the person then deletes the lower image. Removing the image
@@ -459,14 +460,20 @@ open_at_login() {
   fact run_value_after_install "$(run_value)"
 }
 
-# --- Linux and macOS: the app a person starts -----------------------------------------------------
+# --- the app a person starts ----------------------------------------------------------------------
 
 # Every start stops the running app first, since a second start only asks the running one to show its
-# window (D-0397). macOS starts the bundle through LaunchServices.
-start_app() { # start_app <appimage|bundle> <name>
+# window (D-0397). macOS starts the bundle through LaunchServices, Windows the installed program through PowerShell.
+start_app() { # start_app <appimage|bundle|exe> <name>
   stop_app
   if [ "$PLATFORM" = macos ]; then
     APP_PID="$(mac_start "$1" "$OUT/app-$2.log")" || { echo "$APP_PID"; APP_PID=''; return 1; }
+  elif [ "$PLATFORM" = windows ]; then
+    # To a file, not a pipe: the app inherits PowerShell's handles, and an inherited pipe would hold this shell until the app exits.
+    powershell -NoProfile -NonInteractive -Command "(Start-Process -FilePath '$(cygpath -w "$1")' -RedirectStandardOutput '$(cygpath -w "$OUT/app-$2.out")' -RedirectStandardError '$(cygpath -w "$OUT/app-$2.log")' -PassThru).Id" \
+      > "$OUT/app-$2.pid" || { echo "PowerShell could not start $1"; return 1; }
+    APP_PID="$(tr -d "$CR" < "$OUT/app-$2.pid")"
+    case "$APP_PID" in '' | *[!0-9]*) echo "starting $1 gave no process ID: $APP_PID"; APP_PID=''; return 1 ;; esac
   else
     "$1" > "$OUT/app-$2.log" 2>&1 &
     APP_PID=$!
@@ -477,6 +484,8 @@ stop_app() {
   [ -n "${APP_PID:-}" ] || return 0
   if [ "$PLATFORM" = macos ]; then
     mac_quit
+  elif [ "$PLATFORM" = windows ]; then
+    taskkill //F //PID "$APP_PID" > /dev/null 2>&1 || true
   else
     pkill -f usr/bin/keypaste-app 2>/dev/null || true
     kill "$APP_PID" 2>/dev/null || true
@@ -634,9 +643,13 @@ upgrade() {
     fact products_after_upgrade "$(windows_registration_count)"
     fact registrations_after_upgrade "$(windows_registrations | tr '\n' ' ')"
     "$APP" --selftest > /dev/null || { echo 'the upgraded app failed --selftest'; return 1; }
+    # Its first start, stopped before anything is read, so the Run value and the data are compared after it.
+    start_app "$APP" higher || return 1
+    drive window 120 || { stop_app; echo "the $HIGHER app showed no window"; return 1; }
+    stop_app
     fact run_value_after_upgrade "$(run_value)"
     probe upgrade
-    echo "MajorUpgrade exited 0; $(cygpath -m "$APP") now reports $(fact_read higher_version)"
+    echo "MajorUpgrade exited 0; $(cygpath -m "$APP") now reports $(fact_read higher_version) and showed its window"
   elif [ "$PLATFORM" = macos ]; then
     # The upgraded app is left running and locked, so the data is compared with it started, before its unlock.
     dmg="$(candidate "$HIGHER")" || return 1
@@ -1014,6 +1027,8 @@ selftest() {
   set_fact upgrade-not-taken higher_version "$LOWER"
   passing two-products
   set_fact two-products products_after_upgrade 2
+  passing upgraded-showed-no-window
+  refuse_action upgraded-showed-no-window upgrade "the $HIGHER app showed no window"
   passing vault-changed
   set_fact vault-changed data_after_upgrade 'upgrade-check.kdbx'
   passing value-lost
@@ -1150,6 +1165,8 @@ selftest() {
   expect upgrade-not-taken upgrade contradiction
   expect upgrade-not-taken data-after-upgrade unreached
   expect two-products upgrade contradiction
+  expect upgraded-showed-no-window upgrade unreached
+  expect upgraded-showed-no-window data-after-upgrade unreached
   expect vault-changed data-after-upgrade contradiction
   expect vault-changed interrupted unreached
   expect value-lost data-after-upgrade contradiction

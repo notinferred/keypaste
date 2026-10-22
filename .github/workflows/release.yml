@@ -26,7 +26,8 @@ jobs:
   guard:
     name: guard
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    # Above require-green-gates.sh's 40-minute wait for the tag's app run, so the script refuses before the runner stops it.
+    timeout-minutes: 50
     permissions:
       contents: read
       actions: read
@@ -80,6 +81,9 @@ jobs:
         run: |
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
             || { echo "::error::$GITHUB_SHA is not an ancestor of main"; exit 1; }
+
+          # The tag's app run started with this one, so its verdict is waited for rather than read while it runs.
+          scripts/require-green-gates.sh --wait app "$GITHUB_SHA" "$GITHUB_REF"
 
           scripts/require-green-gates.sh "$GITHUB_SHA"
 

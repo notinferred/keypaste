@@ -62,7 +62,7 @@ Manual dispatch rehearses the build and verification without publishing. The fol
 
 | Gated path | Purpose | Other coverage |
 |---|---|---|
-| Green-gates guard | Required workflows passed on the commit, ci's with its real-tools jobs | [require-green-gates.sh](../scripts/require-green-gates.sh), exercised by [verify-green-gates.sh](../scripts/verify-green-gates.sh) with a fake `gh` |
+| Green-gates guard | Required workflows passed on the commit, ci's with its real-tools jobs, once the tag's own app run has finished, which `--wait` waits up to 40 minutes for | [require-green-gates.sh](../scripts/require-green-gates.sh), exercised by [verify-green-gates.sh](../scripts/verify-green-gates.sh) with a fake `gh` |
 | Changelog lookup | A whole-line `## <version>` heading exists | [require-changelog-section.sh](../scripts/require-changelog-section.sh) |
 | Tag/source comparison | Tag matches the source version | [require-tag-matches-source.sh](../scripts/require-tag-matches-source.sh) |
 | Publication allowlist, count and hashes | Only declared release assets become public | [require-release-assets.sh](../scripts/require-release-assets.sh) |

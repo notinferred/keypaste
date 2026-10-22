@@ -33,9 +33,16 @@
 # job its condition skipped is listed once, with its name unexpanded and its conclusion skipped, so it never
 # counts. The release's dispatch is `gh workflow run ci.yml -f tools=true` at the commit.
 #
+# A TAG'S OWN RUN IS WAITED FOR, NOT READ EARLY. release.yml starts with the tag push, as app.yml's run at the
+# tag does, and asked at once the guard found that run still going and refused, so every tag needed a release
+# re-run (G.5). --wait polls the workflow's push runs at the ref until each has finished, and refuses when none
+# of them succeeded, when none appeared, or when one is still going after the last poll; the guard calls it
+# before either question below (D-NEW-X61).
+#
 # Usage:
 #   require-green-gates.sh <sha>
 #   require-green-gates.sh --run-id <workflow> <sha> <ref>   # prints run_id=<n> for that workflow
+#   require-green-gates.sh --wait <workflow> <sha> <ref>     # returns once that workflow's run at the ref finished green
 #
 # --run-id answers a second question off the same reply: WHICH run of a component's own workflow
 # built the commit being released, so release.yml can take that run's packages rather than rebuild
@@ -46,10 +53,14 @@
 #   GITHUB_REPOSITORY        owner/name to ask about        (required)
 #   KEYPASTE_RELEASE_DEFINITION   definition to read        (default: release-targets.json)
 #   KEYPASTE_RELEASE_WORKFLOW     this workflow's path      (default: .github/workflows/release.yml)
+#   KEYPASTE_GATES_WAIT_POLLS     --wait's polls before it refuses   (default: 80)
+#   KEYPASTE_GATES_WAIT_SECONDS   seconds between them               (default: 30, so 40 minutes in all)
 set -euo pipefail
 
 readonly DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
 readonly SELF="${KEYPASTE_RELEASE_WORKFLOW:-.github/workflows/release.yml}"
+readonly WAIT_POLLS="${KEYPASTE_GATES_WAIT_POLLS:-80}"
+readonly WAIT_SECONDS="${KEYPASTE_GATES_WAIT_SECONDS:-30}"
 
 die() { echo "::error::$*" >&2; exit 1; }
 
@@ -60,14 +71,17 @@ CR="$(printf '\r')"
 MODE=gates
 WANT_WORKFLOW=""
 WANT_REF=""
-if [ "${1:-}" = "--run-id" ]; then
-  MODE=run-id
-  WANT_WORKFLOW="${2:-}"
-  shift 2 || die "usage: require-green-gates.sh --run-id <workflow> <sha> <ref>"
-  [ -n "$WANT_WORKFLOW" ] || die "usage: require-green-gates.sh --run-id <workflow> <sha> <ref>"
-  WANT_REF="${2:-}"
-  [ -n "$WANT_REF" ] || die "usage: require-green-gates.sh --run-id <workflow> <sha> <ref>"
-fi
+case "${1:-}" in
+  --run-id | --wait)
+    MODE="${1#--}"
+    usage="usage: require-green-gates.sh $1 <workflow> <sha> <ref>"
+    WANT_WORKFLOW="${2:-}"
+    shift 2 || die "$usage"
+    [ -n "$WANT_WORKFLOW" ] || die "$usage"
+    WANT_REF="${2:-}"
+    [ -n "$WANT_REF" ] || die "$usage"
+    ;;
+esac
 
 SHA="${1:-}"
 [ -n "$SHA" ] || die "usage: require-green-gates.sh <sha>"
@@ -86,6 +100,47 @@ required_workflows() {
 }
 
 required="$(required_workflows | tr '\n' ' ')"
+
+# "<status> <conclusion>" of each push run of $WANT_WORKFLOW at $WANT_REF, one per line; nothing while none exists.
+# Bound to the ref as --run-id is, so a pull request whose branch carries the tag's name is never waited for.
+tag_runs() {
+  local reply
+  reply="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&per_page=100" 2>/dev/null)" \
+    || die "could not ask $GITHUB_REPOSITORY which runs exist for $SHA"
+  [ -n "$reply" ] || die "the API returned nothing about $SHA; refusing without a verified answer"
+  printf '%s' "$reply" | jq -r --arg wf "$WANT_WORKFLOW" --arg ref "$WANT_REF" '
+    .workflow_runs
+    | if type == "array" then .[] else error("no workflow_runs") end
+    | select(.name == $wf and .event == "push" and (.head_branch == $ref or .head_branch == ($ref | sub("^refs/tags/"; ""))))
+    | "\(.status) \(.conclusion // "none")"' 2>/dev/null | tr -d "$CR" \
+    || die "could not read which $WANT_WORKFLOW runs exist for $SHA; refusing without a verified answer"
+}
+
+wait_for_tag_runs() {
+  local poll=1 states
+  case "$WAIT_POLLS" in '' | 0 | *[!0-9]*) die "KEYPASTE_GATES_WAIT_POLLS is '$WAIT_POLLS', not a number of polls" ;; esac
+  case "$WAIT_SECONDS" in '' | *[!0-9]*) die "KEYPASTE_GATES_WAIT_SECONDS is '$WAIT_SECONDS', not a number of seconds" ;; esac
+  while :; do
+    states="$(tag_runs)" || exit 1
+    if [ -n "$states" ] && ! grep -qv '^completed ' <<< "$states"; then
+      grep -qx 'completed success' <<< "$states" \
+        || die "$WANT_WORKFLOW's run at $WANT_REF for $SHA finished $(cut -d' ' -f2 <<< "$states" | sort -u | tr '\n' ' ')- a tag must not ship a commit its gates have not passed"
+      echo "  ok  $WANT_WORKFLOW's run at $WANT_REF finished green after $poll poll(s)"
+      return 0
+    fi
+    if [ "$poll" -ge "$WAIT_POLLS" ]; then
+      [ -n "$states" ] || die "no $WANT_WORKFLOW run at $WANT_REF for $SHA appeared in $WAIT_POLLS polls ${WAIT_SECONDS}s apart; refusing without the run a release takes its packages from"
+      die "$WANT_WORKFLOW's run at $WANT_REF for $SHA is still going after $WAIT_POLLS polls ${WAIT_SECONDS}s apart; re-run this release once it has finished"
+    fi
+    poll=$((poll + 1))
+    sleep "$WAIT_SECONDS"
+  done
+}
+
+if [ "$MODE" = wait ]; then
+  wait_for_tag_runs
+  exit 0
+fi
 
 runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&status=success" 2>/dev/null)" \
   || die "could not ask $GITHUB_REPOSITORY which runs succeeded for $SHA"

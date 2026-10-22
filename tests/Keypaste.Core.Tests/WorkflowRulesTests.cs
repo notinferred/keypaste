@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -194,6 +195,67 @@ public sealed class WorkflowRulesTests
             LinuxOnlyMisuses(workflows));
     }
 
+    [Fact]
+    public void AppYmlRunsOnEveryPushToMainThatChangesAFileItsProjectsCompile()
+    {
+        var root = RepoRoot();
+        var triggers = PushPaths(File.ReadAllLines(Path.Combine(root, ".github", "workflows", "app.yml")));
+
+        Assert.NotEmpty(triggers);
+
+        // What verify.sh's desktop profile builds: the app solution and the consistency project.
+        var solution = XDocument.Load(Path.Combine(root, "keypaste.app.slnx"));
+        List<string> built = [.. solution.Descendants().Where(element => element.Name.LocalName == "Project").Select(project => project.Attribute("Path")?.Value ?? string.Empty)];
+        built.Add("tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj");
+
+        var uncovered = Uncovered(
+            CompiledSources(built, project => XDocument.Load(Path.Combine(root, project))),
+            triggers);
+
+        Assert.True(
+            uncovered.Count == 0,
+            "app.yml compiles these, and a push to main that changes only one of them runs no app.yml:\n  "
+            + string.Join("\n  ", uncovered));
+    }
+
+    [Fact]
+    public void CoverageFollowsReferencesAndLinksAndReadsOnlyPushPaths()
+    {
+        var workflow = """
+            on:
+              push:
+                branches: [main]
+                paths:
+                  - 'src/App/**'
+                  - 'tests/Shared/Covered.cs'
+                tags:
+                  - 'tests/Shared/Tagged.cs'
+              pull_request:
+                paths:
+                  - 'src/Lib/**'
+            """;
+        Dictionary<string, string> projects = new(StringComparer.Ordinal)
+        {
+            ["src/App/App.csproj"] = """
+                <Project>
+                  <ItemGroup>
+                    <ProjectReference Include="../Lib/Lib.csproj" />
+                    <Compile Include="Inside/Own.cs" />
+                    <Compile Include="../../tests/Shared/Covered.cs" />
+                    <Compile Include="..\..\tests\Shared\Tagged.cs" />
+                  </ItemGroup>
+                </Project>
+                """,
+            ["src/Lib/Lib.csproj"] = "<Project />",
+        };
+
+        Assert.Equal(
+            ["src/Lib/", "tests/Shared/Tagged.cs"],
+            Uncovered(
+                CompiledSources(["src/App/App.csproj"], project => XDocument.Parse(projects[project])),
+                PushPaths(workflow.Split('\n'))));
+    }
+
     private static Dictionary<string, string> DirectScriptInvocations()
     {
         var workflows = Directory.GetFiles(
@@ -328,6 +390,113 @@ public sealed class WorkflowRulesTests
             }
         }
     }
+
+    private static List<string> PushPaths(string[] lines)
+    {
+        List<string> paths = [];
+        var root = string.Empty;
+        var trigger = string.Empty;
+        var key = string.Empty;
+        foreach (var raw in lines)
+        {
+            var line = raw.TrimEnd('\r');
+            var trimmed = line.TrimStart();
+            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+            {
+                continue;
+            }
+
+            var indent = line.Length - trimmed.Length;
+            var name = Regex.Match(trimmed, @"^([A-Za-z0-9_-]+):").Groups[1].Value;
+            if (indent == 0)
+            {
+                root = name;
+                trigger = string.Empty;
+                key = string.Empty;
+            }
+            else if (indent == 2)
+            {
+                trigger = name;
+                key = string.Empty;
+            }
+            else if (indent == 4)
+            {
+                key = name;
+            }
+            else if (root == "on" && trigger == "push" && key == "paths" && trimmed.StartsWith("- ", StringComparison.Ordinal))
+            {
+                paths.Add(trimmed[2..].Trim().Trim('\'', '"'));
+            }
+        }
+
+        return paths;
+    }
+
+    // Each project's folder, ending in a slash, and each file it compiles from outside that folder, for the
+    // projects named and every project they reference.
+    private static List<string> CompiledSources(List<string> projects, Func<string, XDocument> load)
+    {
+        List<string> sources = [];
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        Queue<string> pending = new(projects);
+        while (pending.TryDequeue(out var project))
+        {
+            if (!seen.Add(project))
+            {
+                continue;
+            }
+
+            var folder = project[..(project.LastIndexOf('/') + 1)];
+            sources.Add(folder);
+            foreach (var item in load(project).Descendants())
+            {
+                if (item.Name.LocalName is not ("Compile" or "ProjectReference") || item.Attribute("Include")?.Value is not { } include)
+                {
+                    continue;
+                }
+
+                var path = Resolve(folder, include);
+                if (item.Name.LocalName == "ProjectReference")
+                {
+                    pending.Enqueue(path);
+                }
+                else if (!path.StartsWith(folder, StringComparison.Ordinal))
+                {
+                    sources.Add(path);
+                }
+            }
+        }
+
+        return sources;
+    }
+
+    private static string Resolve(string folder, string include)
+    {
+        List<string> parts = [.. folder.Split('/', StringSplitOptions.RemoveEmptyEntries)];
+        foreach (var part in include.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (part == "..")
+            {
+                Assert.True(parts.Count > 0, $"{include} leaves the repository from {folder}");
+                parts.RemoveAt(parts.Count - 1);
+            }
+            else if (part != ".")
+            {
+                parts.Add(part);
+            }
+        }
+
+        return string.Join("/", parts);
+    }
+
+    private static List<string> Uncovered(List<string> sources, List<string> triggers) =>
+        [.. sources.Where(source => !triggers.Any(trigger => Covers(trigger, source))).Distinct().Order(StringComparer.Ordinal)];
+
+    // An entry ending in /** covers everything under its folder; any other entry covers only the path it names.
+    private static bool Covers(string trigger, string source) =>
+        trigger.EndsWith("/**", StringComparison.Ordinal)
+            ? source.StartsWith(trigger[..^2], StringComparison.Ordinal)
+            : trigger == source;
 
     private static Dictionary<string, string> IndexModes()
     {

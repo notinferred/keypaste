@@ -170,10 +170,13 @@ FAKE
   export KEYPASTE_RELEASE_DEFINITION="$ROOT/release-targets.json"
   export KEYPASTE_ORIGIN_OVERRIDE="https://fixture.invalid/v$v/"
   export KEYPASTE_SERVED="$work/served"
-  local subject="$SELF" names manifest bundle
+  local subject="$SELF" names manifest bundle count
   names="$(bash "$COMPLETION" names "$v")"
   manifest="$(bash "$COMPLETION" manifest-name "$v")"
   bundle="$(bash "$COMPLETION" bundle-name "$v")"
+  # Counted from the definition, as the app's are below, so a change to the CLI targets moves it.
+  count="$(grep -c . <<< "$names")"
+  [ "$count" -gt 0 ] || die "the release definition names no cli assets"
 
   # stage [repo] [workflow] [ref] [asset to leave unattested]
   stage() {
@@ -206,10 +209,10 @@ FAKE
   [ "$(PATH="$work/bin:$PATH" command -v gh)" = "$work/bin/gh" ] || die "the fake gh is not first on PATH"
 
   stage
-  expect accept genuine-release-downloaded "all 11 assets" -- bash "$subject" "$v" "$work/get"
-  expect accept genuine-staged-directory "all 11 assets" -- bash "$subject" --dir "$v" "$work/dist"
+  expect accept genuine-release-downloaded "all $count assets" -- bash "$subject" "$v" "$work/get"
+  expect accept genuine-staged-directory "all $count assets" -- bash "$subject" --dir "$v" "$work/dist"
   mkdir -p "$work/back\slash" && cp -R "$work/dist" "$work/back\slash/"
-  expect accept path-with-a-backslash "all 11 assets" -- bash "$subject" --dir "$v" "$work/back\slash/dist"
+  expect accept path-with-a-backslash "all $count assets" -- bash "$subject" --dir "$v" "$work/back\slash/dist"
 
   stage; printf 'the bytes Of %s\n' "$(sed -n 1p <<< "$names")" > "$work/served/$(sed -n 1p <<< "$names")"
   expect refuse changed-byte "does not match the manifest" -- bash "$subject" "$v" "$work/get1"
@@ -247,7 +250,7 @@ FAKE
   cp "$COMPLETION" "$work/weak/scripts/"
   sed 's/any(\.verificationResult\.statement\.subject\[\]?; \.digest\.sha256 == \$d)/true/' "$SELF" > "$work/weak/scripts/verify-provenance.sh"
   cmp -s "$SELF" "$work/weak/scripts/verify-provenance.sh" && die "the weakened copy still checks the verified digest"
-  expect accept weakened-believes-another-digest "all 11 assets" -- env KEYPASTE_FAKE_GH=other-digest bash "$work/weak/scripts/verify-provenance.sh" --dir "$v" "$work/dist"
+  expect accept weakened-believes-another-digest "all $count assets" -- env KEYPASTE_FAKE_GH=other-digest bash "$work/weak/scripts/verify-provenance.sh" --dir "$v" "$work/dist"
 
 
   # ---- the desktop component: its own manifest and bundle, in the same prefix.

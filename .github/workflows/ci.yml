@@ -331,6 +331,7 @@ jobs:
         run: dotnet restore keypaste.slnx --locked-mode
 
       - name: Publish the CLI with NativeAOT
+        shell: bash
         run: |
           dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj -c Release -r linux-x64 \
             --no-restore -o artifacts/release/linux-x64 2>&1 | tee /tmp/publish-cli.log

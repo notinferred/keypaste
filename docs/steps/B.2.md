@@ -35,7 +35,7 @@ None.
 ## Limits and follow-ups
 
 - In Mcp.Tests, the linked guard test's fully qualified name is now `Keypaste.Core.Tests.PoolTimelineGuardTests`, so `dev.sh --class` with that name selects Core.Tests only. Mcp.Tests still runs the guard whenever the whole project runs.
-- Nothing checks that `app.yml`'s push paths cover every file App.Tests links from another test project; a newly linked helper needs its path added by hand.
+- `WorkflowRulesTests` checks that `app.yml`'s push paths cover every project folder and linked file that the projects `app.yml` builds compile, so a helper linked without its path fails ci's backend jobs; the five Core.Tests helpers App.Tests had linked without a path are now listed (gaps-1c, RUNS-PENDING).
 - **F.28.** On macOS at the base commit, four `EnvLaunchThroughAppTests` cases fail: the screen refuses first because the app opens terminals only on Windows and Linux, while these cases expect the confirmation or the set's own refusal. No CI job runs App.Tests on macOS.
 - **F.33.** On Linux at the base commit, `SessionOwnershipTests` once found the app's endpoint still accepting a connection after a lock.
 - **F.34.** On Windows in dev run 36736924521, `SaveTimingTests.ATransactedSave_DoesNotQueueBehindAnotherSavesRetryWait` found a refused save attempt holding the save gate 3.2 s, longer than its retry wait; the same code passed there in 36728844369.
