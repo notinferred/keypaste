@@ -363,15 +363,24 @@
 
           <StackPanel Spacing="8">
             <Panel HorizontalAlignment="Center">
-              <Button Classes="quiet"
-                      IsVisible="{Binding !HasKeyfile}"
-                      Command="{Binding ChooseKeyfileCommand}"
-                      AutomationProperties.Name="Add a key file">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <ctl:KpIcon Icon="file-key" Size="14" />
-                  <TextBlock Text="Add a key file" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !HasKeyfile}">
+                <Button Classes="quiet"
+                        Command="{Binding ChooseKeyfileCommand}"
+                        AutomationProperties.Name="Add a key file">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ctl:KpIcon Icon="file-key" Size="14" />
+                    <TextBlock Text="Add a key file" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="quiet"
+                        Command="{Binding CreateKeyfileCommand}"
+                        AutomationProperties.Name="Create a key file">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ctl:KpIcon Icon="plus" Size="14" />
+                    <TextBlock Text="Create a key file" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
                 <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpTextMuted}" />
                 <TextBlock Classes="mono secondary"
@@ -392,7 +401,51 @@
             </Panel>
             <TextBlock Classes="caption"
                        TextAlignment="Center"
-                       Text="Optional, and one you already have. Losing it locks the vault." />
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding !HasKeyfileNote}"
+                       Text="Optional: one you have, or a new one keypaste makes where you choose. Losing it locks the vault." />
+            <TextBlock Classes="caption"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding HasKeyfileNote}"
+                       Text="{Binding KeyfileNote}" />
+          </StackPanel>
+
+          <!-- A YubiKey's slot as a second factor of the new vault, as Settings adds one to an open vault. -->
+          <StackPanel Spacing="8" IsVisible="{Binding OffersHardwareKey}">
+            <Panel HorizontalAlignment="Center">
+              <Button Classes="quiet"
+                      IsVisible="{Binding !UsesHardwareKey}"
+                      Command="{Binding UseHardwareKeyCommand}"
+                      AutomationProperties.Name="Add a YubiKey">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <ctl:KpIcon Icon="usb" Size="14" />
+                  <TextBlock Text="Add a YubiKey" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UsesHardwareKey}">
+                <ctl:KpIcon Icon="usb" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="mono secondary"
+                           FontSize="12"
+                           Text="{Binding HardwareKeyLabel}"
+                           VerticalAlignment="Center" />
+                <Button Classes="quiet"
+                        Content="{Binding OtherSlotLabel}"
+                        Command="{Binding SwitchSlotCommand}" />
+                <Button Classes="icon ghost sm"
+                        Width="22" Height="22"
+                        ToolTip.Tip="No YubiKey"
+                        Command="{Binding ClearHardwareKeyCommand}"
+                        AutomationProperties.Name="No YubiKey">
+                  <ctl:KpIcon Icon="x" Size="12" />
+                </Button>
+              </StackPanel>
+            </Panel>
+            <TextBlock Classes="caption"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding UsesHardwareKey}"
+                       Text="Plug in a YubiKey whose slot is programmed for HMAC-SHA1 challenge-response; Create vault asks it once. If it is lost or broken the vault can't be opened, unless a second YubiKey holds the same secret in the same slot." />
           </StackPanel>
         </StackPanel>
 

@@ -15,7 +15,12 @@
 #   the driver, so a developer's own KeePassXC settings are never read or written.
 # KeePassXC runs as its own single instance throughout, so a KeePassXC already open is left alone.
 #
-# NEGATIVE CONTROL: the check the welcome passes fails when KeePassXC's file is absent.
+# On a Windows runner, whose pinned archive is the portable build, KeePassXC first runs portable, with
+# .portable beside its executable and its settings in config/ there, and the welcome, through keypaste's
+# own locator, lists what it opened while it runs and nothing once it has closed.
+#
+# NEGATIVE CONTROL: the check the welcome passes fails when KeePassXC's file is absent, and when the
+# portable KeePassXC is no longer running.
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -76,11 +81,72 @@ export USER="keypaste-gate-$$" USERNAME="keypaste-gate-$$" TMPDIR="$dir/tmp"
 [ "$os" = windows ] && export TMP="$(native "$dir/tmp")" TEMP="$(native "$dir/tmp")"
 [ "$os" = linux ] && [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && export QT_QPA_PLATFORM=offscreen
 
+# The welcome lists exactly last.kdbx then first.kdbx, each an existing file.
+welcome_lists() {
+  local out
+  out=$(KEYPASTE_DRIVER_PASSWORD='' "$drv" welcome "$@" | tr -d '\r') || return 1
+  printf '%s\n' "$out" | sed 's/^/  offered: /'
+  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 2 ] || return 1
+  [ "$(printf '%s\n' "$out" | sed -n 1p | sed 's#.*[/\\]##')" = last.kdbx ] || return 1
+  [ "$(printf '%s\n' "$out" | sed -n 2p | sed 's#.*[/\\]##')" = first.kdbx ] || return 1
+  while IFS= read -r path; do [ -f "$path" ] || [ -f "$(cygpath -u "$path" 2>/dev/null || echo "$path")" ] || return 1; done <<<"$out"
+}
+
+# Closes the KeePassXC started as <pid> as a person does, and waits for it to end.
+close_keepassxc() {
+  if [ "$os" = windows ]; then
+    taskkill //PID "$(cat "/proc/$1/winpid")" >/dev/null
+  else
+    kill -TERM "$1"
+  fi
+  for _ in $(seq 1 60); do kill -0 "$1" 2>/dev/null || break; sleep 0.5; done
+  if kill -0 "$1" 2>/dev/null; then kill -9 "$1" 2>/dev/null || true; die "KeePassXC did not close within 30 seconds"; fi
+  wait "$1" 2>/dev/null || true
+}
+
 step "KeePassXC makes three vaults, opens them and closes"
 for name in first gone last; do
   printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$dir/vaults/$name.kdbx")" >/dev/null 2>&1 \
     || die "keepassxc-cli could not make $name.kdbx"
 done
+
+# A portable KeePassXC keeps its settings in config/ beside its executable (src/core/Config.cpp), and keypaste
+# finds it only through the running process, so its databases are offered while it runs and not once it closes.
+if [ "$os" = windows ] && [ "$mode" = default ]; then
+  step "a portable KeePassXC opens two vaults, and the welcome lists them while it runs"
+  portable=$(dirname "$gui")
+  portable_ini="$portable/config/keepassxc_local.ini"
+  rm -rf "$portable/config"
+  mkdir -p "$portable/config"
+  printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$portable/config/keepassxc.ini"
+  : > "$portable/.portable"
+
+  printf '%s\n%s\n' "$pw" "$pw" \
+    | "$gui" --pw-stdin "$(native "$dir/vaults/first.kdbx")" "$(native "$dir/vaults/last.kdbx")" \
+      >"$dir/keepassxc-portable.out" 2>&1 &
+  kpxc=$!
+  for _ in $(seq 1 120); do
+    if [ -f "$portable_ini" ] && grep -q 'LastDatabases=.*first\.kdbx' "$portable_ini" && grep -q 'LastDatabases=.*last\.kdbx' "$portable_ini"; then
+      break
+    fi
+    kill -0 "$kpxc" 2>/dev/null || die "the portable KeePassXC exited before opening the vaults: $(cat "$dir/keepassxc-portable.out")"
+    sleep 0.5
+  done
+  grep -q 'LastDatabases=.*last\.kdbx' "$portable_ini" 2>/dev/null || {
+    kill -9 "$kpxc" 2>/dev/null || true
+    die "the portable KeePassXC never listed the two vaults in $portable_ini"
+  }
+  [ ! -e "$local_ini" ] || die "the portable KeePassXC wrote the installed copy's $local_ini"
+
+  welcome_lists || { close_keepassxc "$kpxc"; die "with the portable KeePassXC running, the welcome did not list last.kdbx then first.kdbx"; }
+  close_keepassxc "$kpxc"
+
+  step "NEGATIVE CONTROL: with the portable KeePassXC closed, the welcome's check fails"
+  if welcome_lists; then
+    die "the welcome listed the portable KeePassXC's databases with no KeePassXC running, so the check cannot fail"
+  fi
+  rm -rf "$portable/.portable" "$portable/config"
+fi
 
 printf '%s\n%s\n%s\n' "$pw" "$pw" "$pw" \
   | "$gui" ${flags[@]+"${flags[@]}"} --pw-stdin \
@@ -105,14 +171,7 @@ grep -q 'LastDatabases=.*last\.kdbx' "$local_ini" 2>/dev/null || {
 sleep 2
 
 # A graceful close, which is when KeePassXC writes LastOpenedDatabases and LastActiveDatabase.
-if [ "$os" = windows ]; then
-  taskkill //PID "$(cat "/proc/$kpxc/winpid")" >/dev/null
-else
-  kill -TERM "$kpxc"
-fi
-for _ in $(seq 1 60); do kill -0 "$kpxc" 2>/dev/null || break; sleep 0.5; done
-if kill -0 "$kpxc" 2>/dev/null; then kill -9 "$kpxc" 2>/dev/null || true; die "KeePassXC did not close within 30 seconds"; fi
-wait "$kpxc" 2>/dev/null || true
+close_keepassxc "$kpxc"
 
 for key in LastActiveDatabase LastOpenedDatabases LastDatabases; do
   grep -q "^$key=" "$local_ini" || die "KeePassXC closed without writing $key to $local_ini"
@@ -122,16 +181,6 @@ echo "KeePassXC wrote its recent databases to $local_ini"
 rm "$dir/vaults/gone.kdbx"
 before="$(digest "$roaming") $(digest "$local_ini") $(digest "$dir/vaults/first.kdbx") $(digest "$dir/vaults/last.kdbx")"
 
-# The welcome lists exactly last.kdbx then first.kdbx, each an existing file.
-welcome_lists() {
-  local out
-  out=$(KEYPASTE_DRIVER_PASSWORD='' "$drv" welcome "$@" | tr -d '\r') || return 1
-  printf '%s\n' "$out" | sed 's/^/  offered: /'
-  [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 2 ] || return 1
-  [ "$(printf '%s\n' "$out" | sed -n 1p | sed 's#.*[/\\]##')" = last.kdbx ] || return 1
-  [ "$(printf '%s\n' "$out" | sed -n 2p | sed 's#.*[/\\]##')" = first.kdbx ] || return 1
-  while IFS= read -r path; do [ -f "$path" ] || [ -f "$(cygpath -u "$path" 2>/dev/null || echo "$path")" ] || return 1; done <<<"$out"
-}
 
 step "NEGATIVE CONTROL: with KeePassXC's file absent the welcome's check fails"
 if welcome_lists --keepassxc-config "$(native "$dir/absent.ini")"; then

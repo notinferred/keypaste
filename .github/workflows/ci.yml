@@ -389,7 +389,7 @@ jobs:
           scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
           # Keyfiles reach XmlSerializer, which trimming can remove; only the AOT binary shows it.
           scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
-          scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
+          scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx --cli-only
 
   # The AI tools keypaste connects, at the versions install-real-tools.sh pins, connected by keypaste setup, read back
   # with each tool's own command where it has one (VS Code's, Claude Desktop's and Windows Cursor's at the file level)

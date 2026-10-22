@@ -203,6 +203,26 @@ internal sealed class KeePassInterop : IDisposable
     /// </remarks>
     internal static bool ReadsXmlKeyfiles => _readsXmlKeyfiles.Value;
 
+    /// <summary>A new KeePass XML keyfile, version 2.0, around 32 random bytes, as KeePass's <c>KcpKeyFile.Create</c> writes one with no added entropy.</summary>
+    /// <returns>The document's bytes, which the caller zeroes.</returns>
+    internal static byte[] NewXmlKeyfile()
+    {
+        var key = CryptoRandom.Instance.GetRandomBytes(32);
+        MemoryStream buffer = new();
+
+        try
+        {
+            KfxFile.Create(0, key, null).Save(buffer);
+            return buffer.ToArray();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+            CryptographicOperations.ZeroMemory(buffer.GetBuffer());
+            buffer.Dispose();
+        }
+    }
+
     private static bool ProbeXmlKeyfiles()
     {
         try

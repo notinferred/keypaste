@@ -36,7 +36,7 @@ public sealed class LockScreenTreeTests
         File.WriteAllText(ini, $"[General]\nLastDatabases={vault.Replace(@"\", @"\\", StringComparison.Ordinal)}\n");
 
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: home.Path);
-        using var model = new UnlockViewModel(session, home.Path, new FakeVaultFilePicker(), () => { }, keePassXcConfig: ini);
+        using var model = new UnlockViewModel(session, home.Path, new FakeVaultFilePicker(), () => { }, keePassXcConfigs: () => [ini]);
         var window = Show(model);
 
         var names = Names(window);

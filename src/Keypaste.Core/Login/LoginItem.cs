@@ -47,7 +47,7 @@ public static class LoginItems
 
         if (OperatingSystem.IsMacOS())
         {
-            return new MacLaunchAgent(home, program);
+            return new MacLaunchAgent(home, program, LaunchdApproval.ForThisUser());
         }
 
         if (OperatingSystem.IsLinux())

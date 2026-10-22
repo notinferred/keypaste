@@ -10,7 +10,9 @@
 #
 # After each transition a new terminal must run the keypaste the installed app carries (G.5). On Windows the
 # MSI appends its folder to the user Path, keeps one entry through an upgrade and removes only that entry on
-# uninstall, which an entry of the user's own, added first, shows. On Linux the upgrade is a download left
+# uninstall, which an entry of the user's own, added first, shows. Open at login's Run value, written after the
+# first install as the app's Settings writes it, must come through the upgrade unchanged and be gone after the
+# uninstall. On Linux the upgrade is a download left
 # beside the old image: the lower app links keypaste from Settings, a start of the higher image while the lower
 # app runs hands off to it (D-0397) and still re-points the link, the higher app then starts on its own, a later
 # start of the lower one leaves the link, and the person then deletes the lower image. Removing the image
@@ -68,6 +70,7 @@ readonly INSTALL_FAILED='Action ended.*InstallFinalize. Return value 3|Action en
 readonly LINK_BUTTON='Link the keypaste command'
 readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
 readonly OPEN_AT_LOGIN='Open keypaste at login'
+readonly RUN_KEY='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 readonly CR=$'\r'
 readonly TAB=$'\t'
 
@@ -137,6 +140,8 @@ classify() {
     if [ "$(fact_of "$dir" lower_version)" != "$LOWER" ]; then result=contradiction; why="the installed app reports $(fact_of "$dir" lower_version), not $LOWER"
     elif [ "$(fact_of "$dir" products_after_install)" != 1 ]; then result=contradiction; why="$(fact_of "$dir" products_after_install) keypaste installations are registered after installing $LOWER, not 1"
     elif [ "$platform" = windows ] && ! terminal_runs install "$LOWER"; then :
+    elif [ "$platform" = windows ] && [ "$(fact_of "$dir" run_value_after_install)" = absent ]; then
+      result=contradiction; why="Open at login's Run value was not there after it was written"
     else result=pass; why="$detail"
     fi
   fi
@@ -167,6 +172,8 @@ classify() {
     elif [ "$platform" = linux ] && ! terminal_runs handed_off "$HIGHER"; then :
     elif ! terminal_runs upgrade "$HIGHER"; then :
     elif [ "$platform" = linux ] && ! terminal_runs older_start "$HIGHER"; then :
+    elif [ "$platform" = windows ] && [ "$(fact_of "$dir" run_value_after_upgrade)" != "$(fact_of "$dir" run_value_after_install)" ]; then
+      result=contradiction; why="the upgrade left Open at login's Run value '$(fact_of "$dir" run_value_after_upgrade)', not '$(fact_of "$dir" run_value_after_install)'"
     else result=pass; why="$detail"
     fi
   fi
@@ -227,7 +234,9 @@ classify() {
     elif [ "$platform" = windows ] && [ -z "$(fact_of "$dir" user_path_before)" ]; then result=unreached; why='the user Path was not recorded before the install'
     elif [ "$platform" = windows ] && [ "$(fact_of "$dir" user_path_after_uninstall)" != "$(fact_of "$dir" user_path_before)" ]; then
       result=contradiction; why="the uninstall left the user Path '$(fact_of "$dir" user_path_after_uninstall)', not '$(fact_of "$dir" user_path_before)' as before the install"
-    elif [ "$platform" = windows ]; then result=pass; why='the app, its user Path entry and its terminal keypaste are gone, and the vault, settings, ceilings and audit are untouched'
+    elif [ "$platform" = windows ] && [ "$(fact_of "$dir" run_value_after_uninstall)" != absent ]; then
+      result=contradiction; why="the uninstall left Open at login's Run value: $(fact_of "$dir" run_value_after_uninstall)"
+    elif [ "$platform" = windows ]; then result=pass; why='the app, its user Path entry, its terminal keypaste and its Run value are gone, and the vault, settings, ceilings and audit are untouched'
     elif [ "$platform" = macos ]; then
       result=pass; why="Finder moved the app to the Trash and the vault, settings, ceilings and audit are untouched; the link and the LaunchAgent are left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
     else result=pass; why="the app is gone and the vault, settings, ceilings and audit are untouched; the link Settings made is left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
@@ -440,6 +449,16 @@ mark_user_path() {
   echo "added $entry to the user Path"
 }
 
+# Open at login's Run value as the app writes it (WindowsRunKey), or absent.
+run_value() { powershell_out "(Get-Item '$RUN_KEY').GetValue('keypaste', 'absent')"; }
+
+# Open at login turned on as Settings does it: the Run value naming the installed app, with --background.
+open_at_login() {
+  powershell_out "New-ItemProperty -Path '$RUN_KEY' -Name keypaste -Value '\"$(cygpath -w "$APP")\" --background' -PropertyType String -Force | Out-Null" \
+    || { echo 'the Run value could not be written'; return 1; }
+  fact run_value_after_install "$(run_value)"
+}
+
 # --- Linux and macOS: the app a person starts -----------------------------------------------------
 
 # Every start stops the running app first, since a second start only asks the running one to show its
@@ -580,7 +599,8 @@ install_lower() {
     fact products_after_install "$(windows_registration_count)"
     fact registrations_after_install "$(windows_registrations | tr '\n' ' ')"
     probe install
-    echo "msiexec /i exited 0; installed $(cygpath -m "$APP") reporting $(fact_read lower_version), $(fact_read products_after_install) registered"
+    open_at_login || return 1
+    echo "msiexec /i exited 0; installed $(cygpath -m "$APP") reporting $(fact_read lower_version), $(fact_read products_after_install) registered; Open at login's Run value written"
   elif [ "$PLATFORM" = macos ]; then
     dmg="$(candidate "$LOWER")" || return 1
     APP=/Applications/keypaste.app
@@ -614,6 +634,7 @@ upgrade() {
     fact products_after_upgrade "$(windows_registration_count)"
     fact registrations_after_upgrade "$(windows_registrations | tr '\n' ' ')"
     "$APP" --selftest > /dev/null || { echo 'the upgraded app failed --selftest'; return 1; }
+    fact run_value_after_upgrade "$(run_value)"
     probe upgrade
     echo "MajorUpgrade exited 0; $(cygpath -m "$APP") now reports $(fact_read higher_version)"
   elif [ "$PLATFORM" = macos ]; then
@@ -765,6 +786,7 @@ uninstall() {
     else fact registration_after_uninstall "$(windows_registrations | tr '\n' ' ')HKCU key $(powershell_out "if (Test-Path 'HKCU:\\Software\\keypaste\\Installer') { 'present' } else { 'absent' }")"
     fi
     fact user_path_after_uninstall "$(user_path)"
+    fact run_value_after_uninstall "$(run_value)"
     echo "msiexec /x exited 0"
   elif [ "$PLATFORM" = macos ]; then
     stop_app
@@ -859,6 +881,7 @@ selftest() {
   local folder='C:\Users\runner\AppData\Local\Programs\keypaste' link=/home/runner/.local/bin/keypaste mac_link=/usr/local/bin/keypaste
   local path_before='%USERPROFILE%\AppData\Local\Microsoft\WindowsApps;C:\work\upgrade-desktop\user-path-entry'
   local bridge='usage: keypaste mcp [--vault <path>]'
+  local run_line="\"$folder\\keypaste-app.exe\" --background"
 
   # A complete, passing Windows run's records; each fixture below changes one thing.
   passing() {
@@ -910,6 +933,9 @@ selftest() {
     set_fact "$1" terminal_after_uninstall absent
     set_fact "$1" user_path_before "$path_before"
     set_fact "$1" user_path_after_uninstall "$path_before"
+    set_fact "$1" run_value_after_install "$run_line"
+    set_fact "$1" run_value_after_upgrade "$run_line"
+    set_fact "$1" run_value_after_uninstall absent
   }
   # The passing run on Linux, where the lower app links keypaste from Settings and a start of the higher, handed
   # to the running lower app, re-points it.
@@ -1056,6 +1082,14 @@ selftest() {
   drop_fact uninstall-path-unrecorded user_path_before
   drop_fact uninstall-path-unrecorded user_path_after_uninstall
 
+  # Open at login's Run value on Windows.
+  passing open-at-login-unwritten
+  set_fact open-at-login-unwritten run_value_after_install absent
+  passing upgrade-took-open-at-login
+  set_fact upgrade-took-open-at-login run_value_after_upgrade absent
+  passing uninstall-left-open-at-login
+  set_fact uninstall-left-open-at-login run_value_after_uninstall "$run_line"
+
   # A new terminal on Linux.
   passing_linux linux
   passing_linux linux-not-unlocked
@@ -1153,6 +1187,9 @@ selftest() {
   expect uninstall-left-keypaste uninstall contradiction
   expect uninstall-changed-the-path uninstall contradiction
   expect uninstall-path-unrecorded uninstall unreached
+  expect open-at-login-unwritten install-lower contradiction
+  expect upgrade-took-open-at-login upgrade contradiction
+  expect uninstall-left-open-at-login uninstall contradiction
 
   for check in "${CHECKS[@]}"; do
     if [ "$check" = downgrade-refused ]; then expect linux "$check" not-applicable; else expect linux "$check" pass; fi

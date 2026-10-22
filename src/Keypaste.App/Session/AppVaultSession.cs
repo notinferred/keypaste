@@ -618,7 +618,11 @@ internal sealed class AppVaultSession : IDisposable
     /// <param name="password">The new master password. The caller owns the buffer behind it.</param>
     /// <param name="confirmation">The same password, typed again.</param>
     /// <param name="keyfilePath">An existing keyfile the vault will need as well, or <see langword="null"/>.</param>
-    /// <returns>What <see cref="VaultCreation"/> decided.</returns>
+    /// <param name="hardwareKeySlot">The YubiKey slot the vault will need as well, or <see langword="null"/>; the first save asks it.</param>
+    /// <returns>
+    /// What <see cref="VaultCreation"/> decided, or <see cref="VaultCreationOutcome.Failed"/> with
+    /// <see cref="LastHardwareKeyFailure"/> saying why when the YubiKey did not answer.
+    /// </returns>
     /// <remarks>
     /// <para>
     /// The rules are not repeated here. Every refusal — an occupied path, an empty password, a
@@ -629,16 +633,27 @@ internal sealed class AppVaultSession : IDisposable
     /// <b>The created vault is adopted rather than reopened.</b> <see cref="Vault.Save"/> stamps the
     /// file it just wrote, so the vault handed back already detects an outside change and the
     /// refuse-a-stale-save protection is live from the first moment. Reopening would derive Argon2 a
-    /// second time to arrive at the same state.
+    /// second time to arrive at the same state. A YubiKey's slot becomes this session's with it, as
+    /// an unlock's does.
     /// </para>
     /// </remarks>
     internal VaultCreationOutcome TryCreate(
         string path,
         ReadOnlySpan<char> password,
         ReadOnlySpan<char> confirmation,
-        string? keyfilePath = null)
+        string? keyfilePath = null,
+        int? hardwareKeySlot = null)
     {
         ArgumentNullException.ThrowIfNull(path);
+
+        LastHardwareKeyFailure = null;
+
+        if (hardwareKeySlot is not null && HardwareKeys is null)
+        {
+            LastHardwareKeyFailure = new HardwareKeyException(
+                HardwareKeyFailure.Unavailable, "This build of keypaste can't reach hardware keys.");
+            return VaultCreationOutcome.Failed;
+        }
 
         if (!TryClaim(path, out var claim))
         {
@@ -647,18 +662,33 @@ internal sealed class AppVaultSession : IDisposable
 
         // Same shape and same reason as Open: the vault's ownership transfers to this session, and
         // every route out of it — Lock, Dispose, and a later unlock replacing it — disposes it.
-        // Adopt disposes it itself if this session is already gone.
+        // Adopt disposes it itself, and the key with it, if this session is already gone.
 #pragma warning disable CA2000
-        var outcome = VaultCreation.TryCreate(path, password, confirmation, keyfilePath, out var created, out _);
+        var hardwareKey = hardwareKeySlot is { } slot ? NewHardwareKey(slot) : null;
+        VaultCreationOutcome outcome;
+        Vault? created;
+
+        try
+        {
+            outcome = VaultCreation.TryCreate(path, password, confirmation, keyfilePath, hardwareKey, out created, out _);
+        }
+        catch (HardwareKeyException failed)
+        {
+            hardwareKey?.Dispose();
+            Release(claim);
+            LastHardwareKeyFailure = failed;
+            return VaultCreationOutcome.Failed;
+        }
 #pragma warning restore CA2000
 
         if (outcome != VaultCreationOutcome.Created || created is null)
         {
+            hardwareKey?.Dispose();
             Release(claim);
             return outcome;
         }
 
-        return Adopt(created, claim, hardwareKey: null) == UnlockOutcome.Opened
+        return Adopt(created, claim, hardwareKey) == UnlockOutcome.Opened
             ? VaultCreationOutcome.Created
             : VaultCreationOutcome.Failed;
     }

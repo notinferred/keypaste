@@ -50,7 +50,15 @@ internal static class Program
             args,
             home,
             CliLinks.ForThisProcess(),
-            claim => Configured(() => new App { Claim = claim }).StartWithClassicDesktopLifetime(args),
+            claim =>
+            {
+                var preferences = new DesktopPreferences(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+                var hidden = App.StartsHidden(LoginItems.StartsInBackground(args), preferences);
+
+                return Configured(
+                    () => new App { Claim = claim, Preferences = preferences, DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null },
+                    showsInDock: !hidden).StartWithClassicDesktopLifetime(args);
+            },
             Console.Error,
             ReopenWait);
     }
@@ -138,8 +146,10 @@ internal static class Program
     /// <summary>The Avalonia configuration, also used by the previewer and by headless tests.</summary>
     internal static AppBuilder BuildAvaloniaApp() => Configured(() => new App());
 
-    private static AppBuilder Configured(Func<App> app) =>
+    // Avalonia applies ShowInDock as its run loop starts, after Launch has set the Dock icon, so the two must agree.
+    private static AppBuilder Configured(Func<App> app, bool showsInDock = true) =>
         AppBuilder.Configure(app)
             .UsePlatformDetect()
+            .With(new MacOSPlatformOptions { ShowInDock = showsInDock })
             .WithInterFont();
 }

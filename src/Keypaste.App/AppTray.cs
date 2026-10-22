@@ -42,13 +42,17 @@ internal sealed class AppTray : IDisposable
     /// <summary>Whether the icon is showing.</summary>
     internal bool IsShown => _icon?.IsVisible == true;
 
+    /// <summary>The icon, once it has been shown.</summary>
+    internal TrayIcon? Icon => _icon;
+
     /// <summary>Shows or hides the icon; it is made only when first shown, so a Linux desktop that never opts in never registers one.</summary>
     internal void Show(bool shown)
     {
         if (shown && _icon is null)
         {
-            using var image = AssetLoader.Open(new Uri(OperatingSystem.IsWindows()
-                ? "avares://keypaste-app/Assets/keypaste.ico"
+            using var image = AssetLoader.Open(new Uri(
+                OperatingSystem.IsWindows() ? "avares://keypaste-app/Assets/keypaste.ico"
+                : OperatingSystem.IsMacOS() ? "avares://keypaste-app/Assets/keypaste-menu-bar.png"
                 : "avares://keypaste-app/Assets/keypaste-256.png"));
 
             _icon = new TrayIcon
@@ -57,6 +61,9 @@ internal sealed class AppTray : IDisposable
                 ToolTipText = "keypaste",
                 Menu = Menu,
             };
+
+            // The menu bar draws a template image in its own ink, light or dark.
+            MacOSProperties.SetIsTemplateIcon(_icon, OperatingSystem.IsMacOS());
             _icon.Clicked += (_, _) => _open.Command?.Execute(null);
         }
 

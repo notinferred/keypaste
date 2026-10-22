@@ -44,6 +44,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     private KeyfileChoice _hardwareKey;
     private int _newSlot = 2;
     private string? _newKeyfilePath;
+    private bool _createdKeyfile;
     private bool _confirming;
     private bool _busy;
     private string _message = string.Empty;
@@ -62,6 +63,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         ConfirmCommand = new AsyncRelayCommand(ChangeAsync, () => _confirming && !_busy);
         CancelCommand = new RelayCommand(() => Forget(string.Empty), () => _confirming && !_busy);
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => IsEditing && _picker is not null);
+        CreateKeyfileCommand = new AsyncRelayCommand(CreateKeyfileAsync, () => IsEditing && _picker is not null);
 
         DependsOn(nameof(Factors), nameof(Now));
         DependsOn(nameof(HasKeyfile), nameof(Now));
@@ -88,6 +90,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         DependsOn(ConfirmCommand, nameof(IsConfirming), nameof(Busy));
         DependsOn(CancelCommand, nameof(IsConfirming), nameof(Busy));
         DependsOn(ChooseKeyfileCommand, nameof(IsEditing));
+        DependsOn(CreateKeyfileCommand, nameof(IsEditing));
     }
 
     /// <summary>Shows the confirmation for the change the form describes.</summary>
@@ -101,6 +104,9 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 
     /// <summary>Asks for the keyfile to attach.</summary>
     internal AsyncRelayCommand ChooseKeyfileCommand { get; }
+
+    /// <summary>Makes a new keyfile where the person chooses, to attach.</summary>
+    internal AsyncRelayCommand CreateKeyfileCommand { get; }
 
     /// <summary>What unlocks the vault now, read from the vault each time.</summary>
     internal string Factors => Now is { } now ? $"This vault {Opens(now)}" : string.Empty;
@@ -264,8 +270,10 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         : string.Empty;
 
     /// <summary>Shown when a keyfile is being attached.</summary>
-    internal string KeyfileWarning => Keyfile == KeyfileChoice.Attach && _newKeyfilePath is not null
-        ? $"Keep a copy of {NewKeyfileName} somewhere other than beside the vault. Losing it locks the vault, and nothing recovers it."
+    internal string KeyfileWarning => Keyfile == KeyfileChoice.Attach && _newKeyfilePath is { } keyfile
+        ? _createdKeyfile && _session.VaultPath is { } vault
+            ? UnlockViewModel.CreatedKeyfileNote(keyfile, vault)
+            : $"Keep a copy of {NewKeyfileName} somewhere other than beside the vault. Losing it locks the vault, and nothing recovers it."
         : string.Empty;
 
     internal bool HasKeyfileWarning => KeyfileWarning.Length > 0;
@@ -529,9 +537,39 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
             return;
         }
 
+        _createdKeyfile = false;
         NewKeyfilePath = full;
         Keyfile = KeyfileChoice.Attach;
         Message = string.Empty;
+    }
+
+    /// <summary>Makes a new keyfile where the person chooses, written at once and only where nothing is, and chooses it to attach.</summary>
+    private async Task CreateKeyfileAsync()
+    {
+        if (_disposed || _picker is null || _session.VaultPath is not { } vault)
+        {
+            return;
+        }
+
+        if (await _picker.PickNewKeyfileAsync(Path.GetFileNameWithoutExtension(vault) + ".keyx").ConfigureAwait(true) is not { } picked
+            || _disposed || !IsEditing)
+        {
+            return;
+        }
+
+        var full = Path.GetFullPath(picked);
+        var outcome = VaultKeyfile.Create(full, out _);
+
+        if (outcome != KeyfileCreationOutcome.Created)
+        {
+            Message = UnlockViewModel.ExplainKeyfileCreation(outcome);
+            return;
+        }
+
+        _createdKeyfile = true;
+        NewKeyfilePath = full;
+        Keyfile = KeyfileChoice.Attach;
+        Message = $"keypaste saved {Path.GetFileName(full)}. The vault needs it only once you change access.";
     }
 
     private void Choose(bool selected, KeyfileChoice choice)
@@ -604,6 +642,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         Keyfile = KeyfileChoice.Keep;
         HardwareKey = KeyfileChoice.Keep;
         NewSlot = 2;
+        _createdKeyfile = false;
         NewKeyfilePath = null;
         Message = message;
         Raise(nameof(Now));

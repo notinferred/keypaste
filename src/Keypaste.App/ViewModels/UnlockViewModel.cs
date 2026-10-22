@@ -54,7 +54,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private readonly Action _unlocked;
     private readonly IVaultFilePicker _picker;
     private readonly Action<Action> _post;
-    private readonly string? _keePassXcConfig;
+    private readonly Func<IReadOnlyList<string>>? _keePassXcConfigs;
     private readonly Func<SecretBuffer, Task<PasteOutcome>>? _paste;
 
     private SecretBuffer _master = new();
@@ -63,6 +63,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private IReadOnlyList<RecentVault> _remembered = [];
     private string? _selectedPath;
     private string? _keyfilePath;
+    private string? _createdKeyfile;
     private int? _hardwareKeySlot;
     private bool _moreOptions;
     private bool _waitingForTouch;
@@ -88,7 +89,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Action<Action>? post = null,
         string? message = null,
         VaultLockReason? lockedBy = null,
-        string? keePassXcConfig = null,
+        Func<IReadOnlyList<string>>? keePassXcConfigs = null,
         Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -100,7 +101,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _picker = picker;
         _unlocked = unlocked;
         _post = post ?? (action => action());
-        _keePassXcConfig = keePassXcConfig;
+        _keePassXcConfigs = keePassXcConfigs;
         _paste = paste;
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => CanUnlock);
@@ -111,6 +112,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         StartRestoreCommand = new RelayCommand(StartRestore, () => !_busy && HasBackups && IsOpening);
         CloseRestoreCommand = new RelayCommand(CloseRestore, () => _restore is { Busy: false });
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy);
+        CreateKeyfileCommand = new AsyncRelayCommand(CreateKeyfileAsync, () => !_busy && _creating);
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _keyfilePath is not null);
         ShowMoreOptionsCommand = new RelayCommand(() => MoreOptions = true, () => !_moreOptions);
         UseHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = 2, () => !_busy && OffersHardwareKey && _hardwareKeySlot is null);
@@ -133,6 +135,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         DependsOn(nameof(CanTypePassword), nameof(SelectedPath), nameof(IsRestoreOnly));
         DependsOn(nameof(KeyfileName), nameof(KeyfilePath));
         DependsOn(nameof(HasKeyfile), nameof(KeyfilePath));
+        DependsOn(nameof(KeyfileNote), nameof(KeyfilePath), nameof(IsCreating), nameof(NewVaultPath));
+        DependsOn(nameof(HasKeyfileNote), nameof(KeyfileNote));
         DependsOn(nameof(ShowsHardwareKey), nameof(MoreOptions), nameof(HardwareKeySlot));
         DependsOn(nameof(OffersMoreOptions), nameof(ShowsHardwareKey));
         DependsOn(nameof(UsesHardwareKey), nameof(HardwareKeySlot));
@@ -155,6 +159,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         DependsOn(StartRestoreCommand, nameof(Busy), nameof(HasBackups), nameof(IsOpening));
         DependsOn(CloseRestoreCommand, nameof(Restore));
         DependsOn(ChooseKeyfileCommand, nameof(Busy));
+        DependsOn(CreateKeyfileCommand, nameof(Busy), nameof(IsCreating));
         DependsOn(ClearKeyfileCommand, nameof(Busy), nameof(KeyfilePath));
         DependsOn(ShowMoreOptionsCommand, nameof(MoreOptions));
         DependsOn(UseHardwareKeyCommand, nameof(Busy), nameof(HardwareKeySlot));
@@ -329,6 +334,18 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _keyfilePath is null ? string.Empty : System.IO.Path.GetFileName(_keyfilePath);
 
     internal bool HasKeyfile => _keyfilePath is not null;
+
+    /// <summary>Makes a new keyfile where the person chooses and has the new vault need it.</summary>
+    internal AsyncRelayCommand CreateKeyfileCommand { get; }
+
+    /// <summary>What the create form says about a keyfile keypaste just made for the new vault, while the form still uses it.</summary>
+    internal string KeyfileNote =>
+        _creating && _createdKeyfile is { } made && _newVaultPath is { } vault
+            && string.Equals(made, _keyfilePath, PathIdentity.Comparison)
+            ? CreatedKeyfileNote(made, vault)
+            : string.Empty;
+
+    internal bool HasKeyfileNote => KeyfileNote.Length > 0;
 
     /// <summary>Whether this build reaches hardware keys, so the screen offers one.</summary>
     internal bool OffersHardwareKey => _session.HardwareKeys is not null;
@@ -914,7 +931,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         NewVaultPath = full;
         Message = string.Empty;
+        _createdKeyfile = null;
         KeyfilePath = null;
+        HardwareKeySlot = null;
         IsCreating = true;
     }
 
@@ -940,19 +959,22 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             // Argon2 again, and off the UI thread again. Creating derives a key exactly as opening
             // does, so the window would stop painting for the same good fraction of a second.
             var keyfile = _keyfilePath;
-            var outcome = await Task.Run(() => _session.TryCreate(path, _new.Value, _confirm.Value, keyfile))
+            var slot = _hardwareKeySlot;
+            var outcome = await Task.Run(() => _session.TryCreate(path, _new.Value, _confirm.Value, keyfile, slot))
                 .ConfigureAwait(true);
 
             if (outcome == VaultCreationOutcome.Created)
             {
-                Remember(path, keyfile);
+                Remember(path, keyfile, slot);
                 ResetCreation();
                 IsCreating = false;
                 _unlocked();
                 return;
             }
 
-            Fail(_session.HeldElsewhere is not null ? HeldElsewhere() : ExplainCreation(outcome));
+            Fail(_session.HeldElsewhere is not null ? HeldElsewhere()
+                : _session.LastHardwareKeyFailure is { } keyFailure ? ExplainCreationKey(keyFailure, slot)
+                : ExplainCreation(outcome, slot));
             ShowOwner();
 
             // The passwords go whatever the answer was. A refusal means starting the pair again,
@@ -974,7 +996,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             ResetCreation();
             NewVaultPath = null;
             Message = string.Empty;
+            _createdKeyfile = null;
             KeyfilePath = RememberedKeyfile(_selectedPath);
+            HardwareKeySlot = OffersHardwareKey ? Remembered(_selectedPath)?.HardwareKeySlot : null;
             IsCreating = false;
         }
 
@@ -1001,6 +1025,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             return;
         }
 
+        _createdKeyfile = null;
         KeyfilePath = full;
 
         if (inspection.IsFragile && _creating)
@@ -1012,6 +1037,62 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             Message = inspection.IsFragile ? FragileNotice(full)! : string.Empty;
         }
     }
+
+    /// <summary>
+    /// Asks where a new keyfile should go, writes one there and has the new vault need it, saying at once to keep a
+    /// copy elsewhere.
+    /// </summary>
+    /// <remarks>
+    /// The file is written when the person chooses where, before the vault, so it is there to copy whatever happens
+    /// next; it is written only where nothing is.
+    /// </remarks>
+    internal async Task CreateKeyfileAsync()
+    {
+        if (_disposed || !_creating || _newVaultPath is not { } vault)
+        {
+            return;
+        }
+
+        if (await _picker.PickNewKeyfileAsync(System.IO.Path.GetFileNameWithoutExtension(vault) + ".keyx").ConfigureAwait(true) is not { } picked
+            || _disposed || !_creating)
+        {
+            return;
+        }
+
+        var full = System.IO.Path.GetFullPath(picked);
+        var outcome = VaultKeyfile.Create(full, out _);
+
+        if (outcome != KeyfileCreationOutcome.Created)
+        {
+            Fail(ExplainKeyfileCreation(outcome));
+            return;
+        }
+
+        _createdKeyfile = full;
+        KeyfilePath = full;
+        Message = string.Empty;
+    }
+
+    /// <summary>What a person is told about a keyfile keypaste just made for <paramref name="vault"/>: to keep a copy elsewhere, and when it sits in the vault's folder.</summary>
+    /// <param name="keyfile">The keyfile.</param>
+    /// <param name="vault">The vault it protects.</param>
+    internal static string CreatedKeyfileNote(string keyfile, string vault)
+    {
+        var name = System.IO.Path.GetFileName(keyfile);
+        var note = $"keypaste saved {name}. Keep a copy somewhere other than this computer: without it the vault can't be opened, and nothing recovers it.";
+
+        return string.Equals(System.IO.Path.GetDirectoryName(keyfile), System.IO.Path.GetDirectoryName(vault), PathIdentity.Comparison)
+            ? $"{note} It's in the vault's folder, so whoever copies that folder gets the vault and its keyfile together."
+            : note;
+    }
+
+    /// <summary>Why no keyfile was made, in the register of <see cref="Explain"/>.</summary>
+    internal static string ExplainKeyfileCreation(KeyfileCreationOutcome outcome) => outcome switch
+    {
+        KeyfileCreationOutcome.PathAlreadyExists => "There's already a file there, and keypaste won't replace it. Choose a name that isn't taken.",
+        KeyfileCreationOutcome.Unsupported => "This build of keypaste can't read a KeePass XML keyfile, so it won't make one.",
+        _ => "The keyfile couldn't be saved there. Choose another folder.",
+    };
 
     /// <summary>The T-28 warning for a keyfile keyed by its hash, or null for any other.</summary>
     private static string? FragileNotice(string? keyfile) =>
@@ -1059,7 +1140,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// the core's own failure text is not shown: a person at this screen can act on "choose another
     /// name" and cannot act on a writer's exception message.
     /// </remarks>
-    private static string ExplainCreation(VaultCreationOutcome outcome) => outcome switch
+    private static string ExplainCreation(VaultCreationOutcome outcome, int? slot) => outcome switch
     {
         VaultCreationOutcome.PathAlreadyExists => "There's already a file there. Choose a name that isn't taken.",
         VaultCreationOutcome.EmptyPassword => "A vault needs a master password.",
@@ -1068,7 +1149,21 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         VaultCreationOutcome.KeyfileIsFragile =>
             "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile.",
         VaultCreationOutcome.KeyfileIsThisVault => "A vault can't be its own keyfile. Choose another file.",
+        VaultCreationOutcome.HardwareKeyNotFound =>
+            $"No YubiKey with slot {slot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager.",
         _ => "That vault couldn't be created.",
+    };
+
+    /// <summary>Why a YubiKey gave the new vault's first save no answer, so no vault was made.</summary>
+    private static string ExplainCreationKey(HardwareKeyException failure, int? slot) => failure.Failure switch
+    {
+        HardwareKeyFailure.NotFound => "No YubiKey found. Plug it in and create the vault again.",
+        HardwareKeyFailure.MoreThanOne => "More than one YubiKey is plugged in. Leave only the one the vault will use.",
+        HardwareKeyFailure.SlotNotConfigured =>
+            $"That YubiKey's slot {slot} isn't set up for challenge-response. Program it in YubiKey Manager, or switch to the other slot.",
+        HardwareKeyFailure.TimedOut => "The YubiKey wasn't touched in time. Create the vault again and touch it when it flashes.",
+        HardwareKeyFailure.Cancelled => "Stopped waiting for the YubiKey. No vault was created.",
+        _ => failure.Message,
     };
 
     private string HeldElsewhere()
@@ -1160,7 +1255,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         if (_selectedPath is null)
         {
-            KeePassXc = [.. KeePassXcDatabases.Read(_keePassXcConfig).Select(path => new KeePassXcDatabaseItem(path))];
+            KeePassXc = _keePassXcConfigs is null
+                ? []
+                : [.. KeePassXcDatabases.ReadAll(_keePassXcConfigs()).Select(path => new KeePassXcDatabaseItem(path))];
             Raise(nameof(KeePassXc));
         }
     }

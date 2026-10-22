@@ -16,6 +16,9 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
     private static readonly FilePickerFileType _vault =
         new("KeePass vault") { Patterns = ["*.kdbx"] };
 
+    private static readonly FilePickerFileType _keyfile =
+        new("KeePass keyfile") { Patterns = ["*.keyx"] };
+
     public async Task<string?> PickExistingAsync()
     {
         var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -69,6 +72,21 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         }).ConfigureAwait(true);
 
         return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<string?> PickNewKeyfileAsync(string suggestedName)
+    {
+        // No overwrite prompt, for PickNewAsync's reason: a new keyfile never replaces a file.
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save a new keyfile",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "keyx",
+            ShowOverwritePrompt = false,
+            FileTypeChoices = [_keyfile],
+        }).ConfigureAwait(true);
+
+        return file?.TryGetLocalPath();
     }
 
     public async Task<string?> PickDotEnvAsync()

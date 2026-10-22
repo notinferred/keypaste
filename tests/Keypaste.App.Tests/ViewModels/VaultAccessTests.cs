@@ -180,6 +180,51 @@ public sealed class VaultAccessTests : IDisposable
     }
 
     [Fact]
+    public async Task A_keyfile_created_in_settings_is_written_at_once_and_needed_only_after_the_change()
+    {
+        using var session = Unlocked(_master);
+        using var settings = Settings(session);
+        var access = settings.Access;
+        var created = Path.Combine(_directory, "vault.keyx");
+        _picker.NewKeyfilePath = created;
+
+        Enter(access, _master);
+        await access.CreateKeyfileCommand.ExecuteAsync();
+
+        Assert.Equal("vault.keyx", _picker.SuggestedKeyfileName);
+        Assert.Equal(new KeyfileInspection(KeyfileOutcome.Accepted, KeyfileForm.Xml), VaultKeyfile.Inspect(created));
+        Assert.True(access.AttachKeyfile);
+        Assert.Equal(created, access.NewKeyfilePath);
+        Assert.Contains("Keep a copy", access.KeyfileWarning, StringComparison.Ordinal);
+        Assert.Contains("vault's folder", access.KeyfileWarning, StringComparison.Ordinal);
+        AssertOpens(_vaultPath, _master, null);
+
+        await Confirm(access);
+
+        Assert.Equal(created, session.Unlocked!.KeyfilePath);
+        Assert.Equal(created, Remembered().KeyfilePath);
+        AssertRefused(_vaultPath, _master, null);
+        AssertOpens(_vaultPath, _master, created);
+    }
+
+    [Fact]
+    public async Task A_keyfile_is_never_created_over_a_file_in_settings()
+    {
+        using var session = Unlocked(_master);
+        using var settings = Settings(session);
+        var access = settings.Access;
+        var before = File.ReadAllBytes(_keyA);
+        _picker.NewKeyfilePath = _keyA;
+
+        await access.CreateKeyfileCommand.ExecuteAsync();
+
+        Assert.Equal(1, _picker.NewKeyfileCalls);
+        Assert.Equal(before, File.ReadAllBytes(_keyA));
+        Assert.False(access.AttachKeyfile);
+        Assert.Contains("won't replace it", access.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_backup_made_under_the_earlier_password_and_keyfile_is_restored_from_the_unlock_screen()
     {
         using var session = Unlocked(_master);

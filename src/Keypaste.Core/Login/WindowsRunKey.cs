@@ -24,16 +24,19 @@ public interface IRunKey
     bool Delete(string name);
 }
 
-/// <summary>Windows' own switch for a Run value, which Task Manager and Settings › Apps › Startup turn off without removing the value.</summary>
+/// <summary>
+/// The system's own switch for a login entry, which turns it off without removing it: the one Windows' Task Manager
+/// and Settings › Apps › Startup set, or launchd's list of disabled agents.
+/// </summary>
 public interface IStartupApproval
 {
-    /// <summary>Whether Windows has turned a value off.</summary>
-    /// <param name="name">The Run value's name.</param>
-    /// <returns><see langword="true"/> when Windows will not start it at login.</returns>
+    /// <summary>Whether the system has turned an entry off.</summary>
+    /// <param name="name">The Run value's name, or the LaunchAgent's label.</param>
+    /// <returns><see langword="true"/> when the system will not start it at login.</returns>
     bool IsDisabled(string name);
 
-    /// <summary>Forgets Windows' switch for a value, so the value starts at login again.</summary>
-    /// <param name="name">The Run value's name.</param>
+    /// <summary>Forgets the system's switch for an entry, so the entry starts at login again.</summary>
+    /// <param name="name">The Run value's name, or the LaunchAgent's label.</param>
     /// <returns><see langword="false"/> when it could not be cleared.</returns>
     bool Clear(string name);
 }

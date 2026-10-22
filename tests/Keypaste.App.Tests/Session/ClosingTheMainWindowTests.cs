@@ -226,6 +226,36 @@ public sealed class ClosingTheMainWindowTests
         });
 
     [Fact]
+    public Task The_Dock_icon_shows_only_while_the_main_window_is_open() =>
+        HeadlessSession.On(() =>
+        {
+            using var fixture = new TempVault();
+            var dock = new List<bool>();
+
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(fixture, stays: true), DockIcon = dock.Add };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+
+            Assert.Equal(new[] { false }, dock);
+
+            Item(app, AppTray.OpenHeader).Command!.Execute(null);
+            Assert.True(app.Main!.IsVisible);
+            Assert.Equal(new[] { false, true }, dock);
+
+            app.Main.Close();
+            Assert.False(app.Main.IsVisible);
+            Assert.Equal(new[] { false, true, false }, dock);
+
+            // A Dock click while the icon shows reopens through the same Open.
+            app.OpenWindow();
+            Assert.True(app.Main.IsVisible);
+            Assert.Equal(new[] { false, true, false, true }, dock);
+            app.Main.Close();
+        });
+
+    [Fact]
     public Task Without_the_tray_a_start_at_login_shows_the_window() =>
         HeadlessSession.On(() =>
         {

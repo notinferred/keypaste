@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using Keypaste.Core.HardwareKeys;
+using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -24,6 +26,8 @@ namespace Keypaste.Core.Tests;
 public sealed class VaultCreationTests : IDisposable
 {
     private const string _password = "correct horse battery staple";
+
+    private static readonly byte[] _keySecret = Convert.FromHexString("5a4b3c2d1e0f9a8b7c6d5e4f30211203f4e5d6c7");
 
     private readonly string _directory =
         Directory.CreateTempSubdirectory("keypaste-creation-tests-").FullName;
@@ -278,6 +282,82 @@ public sealed class VaultCreationTests : IDisposable
         Assert.False(Directory.Exists(parent), "a refused create still changed the disk");
     }
 
+    [Fact]
+    public void A_vault_created_with_a_hardware_key_needs_the_password_and_the_key_to_reopen()
+    {
+        var path = Path.Combine(_directory, "yubikey.kdbx");
+        var device = new SoftwareYubiKey(_keySecret);
+        using var key = new HardwareKey(device, 2);
+
+        var outcome = VaultCreation.TryCreate(path, _password, _password, null, key, out var created, out _);
+
+        using (created)
+        {
+            Assert.Equal(VaultCreationOutcome.Created, outcome);
+            Assert.Same(key, created!.HardwareKey);
+            Assert.True(created.HasPassword);
+            Assert.NotEmpty(device.Challenges);
+        }
+
+        using (var again = new HardwareKey(new SoftwareYubiKey(_keySecret), 2))
+        using (var reopened = Vault.Open(path, _password, null, again))
+        {
+            Assert.Empty(reopened.ReadEntries());
+        }
+
+        using (var another = new HardwareKey(new SoftwareYubiKey(new byte[20]), 2))
+        {
+            Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password, null, another));
+        }
+
+        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password));
+    }
+
+    [Fact]
+    public void A_hardware_key_that_is_not_plugged_in_or_lacks_the_slot_is_refused_before_anything_is_written()
+    {
+        var parent = Path.Combine(_directory, "not-yet");
+        var path = Path.Combine(parent, "new.kdbx");
+
+        using var unplugged = new HardwareKey(new SoftwareYubiKey(_keySecret) { Connected = false }, 2);
+        using var unprogrammed = new HardwareKey(new SoftwareYubiKey(_keySecret) { Slots = [1] }, 2);
+
+        foreach (var key in new[] { unplugged, unprogrammed })
+        {
+            var outcome = VaultCreation.TryCreate(path, _password, _password, null, key, out var created, out _);
+
+            using (created)
+            {
+                Assert.Equal(VaultCreationOutcome.HardwareKeyNotFound, outcome);
+                Assert.Null(created);
+            }
+        }
+
+        Assert.False(Directory.Exists(parent), "a refused create still changed the disk");
+    }
+
+    [Fact]
+    public void A_hardware_key_that_does_not_answer_writes_no_vault_and_the_path_stays_free()
+    {
+        var parent = Path.Combine(_directory, "silent");
+        var path = Path.Combine(parent, "new.kdbx");
+        using var silent = new HardwareKey(new UntouchedKey(), 2);
+
+        var refused = Assert.Throws<HardwareKeyException>(
+            () => VaultCreation.TryCreate(path, _password, _password, null, silent, out _, out _));
+
+        Assert.Equal(HardwareKeyFailure.TimedOut, refused.Failure);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(parent));
+
+        using var touched = new HardwareKey(new SoftwareYubiKey(_keySecret), 2);
+        var outcome = VaultCreation.TryCreate(path, _password, _password, null, touched, out var created, out _);
+
+        using (created)
+        {
+            Assert.Equal(VaultCreationOutcome.Created, outcome);
+        }
+    }
+
     public void Dispose()
     {
         try
@@ -292,4 +372,13 @@ public sealed class VaultCreationTests : IDisposable
 
     private static string Digest(string path) =>
         Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+
+    /// <summary>A key with both slots programmed that is never touched in time.</summary>
+    private sealed class UntouchedKey : IChallengeResponseDevice
+    {
+        public IReadOnlyList<HardwareKeyInfo> Find() => [new HardwareKeyInfo("YubiKey 5", 12345678, [1, 2])];
+
+        public byte[] Respond(int slot, byte[] challenge, Action touchNeeded, CancellationToken cancellationToken) =>
+            throw new HardwareKeyException(HardwareKeyFailure.TimedOut, "The hardware key was not touched.");
+    }
 }

@@ -42,6 +42,15 @@ keypaste now reads the TOTP of an item KeePassXC set up in its older way, a `TOT
 
 Each value on the app's Projects screen now has a Reveal button beside Copy, and a new scoped token has one beside it, so holding Space or Enter on the button shows the value until you let go, as the Items pane's Reveal already did.
 Settings › Advanced is now a screen of its own. One Advanced row on Settings opens it, and it leads to the activity log, share links, scoped tokens and diagnostics; Back on each of those returns to Advanced, and Back on Advanced to Settings ([N.1b](docs/steps/N.1b.md)).
+The app can now make a keyfile for you: Create a key file on the create form, and Create keyfile… in Settings when changing a vault's keyfile, write a new KeePass XML keyfile where you choose, never over a file already there, and remind you to keep a copy somewhere other than this computer, saying so too when you saved it in the vault's folder. KeePassXC opens a vault protected by it. The `keypaste` CLI still makes no keyfile ([V.1a2](docs/steps/V.1a2.md)).
+
+The app's create form can now protect a new vault with a YubiKey as well as its master password: Add a YubiKey chooses the slot, Create vault asks the key once, and a key that is missing, has no such slot or is not touched in time is named with no vault written ([Creating a vault](docs/desktop.md#creating-a-vault)).
+
+On macOS, keypaste's menu bar icon is now a monochrome image that follows the menu bar's light or dark look, and the Dock icon shows only while the window is open: closing the window into the menu bar takes it away, and Open keypaste, or a Dock click while it shows, brings the window back. Open keypaste at login now reads as off while macOS lists keypaste's login agent as disabled, as `launchctl print-disabled` shows, and turning it on in Settings enables the agent again ([G.4a](docs/steps/G.4a.md)).
+
+Uninstalling keypaste on Windows now also removes Open keypaste at login, so Windows no longer tries to start an app that is gone; upgrading to a newer version keeps it on ([G.4a](docs/steps/G.4a.md)).
+
+With no recent vault, the app's first screen now also lists the databases a portable KeePassXC opened, while that KeePassXC is running: keypaste finds it through the running program's own folder and reads its `config\keepassxc_local.ini`, never searching your disks and never writing the file ([N.2](docs/steps/N.2.md)).
 
 An item with a TOTP now shows its code in the app, masked until you hold Reveal, with the seconds until the next code beside it, and Copy puts the code on the clipboard with the usual clearing countdown. An agent can ask for an item's current code with `request_credential` and `field` `totp`, which `list_entry_names` offers for items that have one: you allow each code once, with no timed allowance since the code changes, or the agent's Automatic mode releases it, and the log records a `totp` release. No agent, `kp://` reference or share is ever given the seed ([9.2b](docs/steps/9.2b.md)).
 

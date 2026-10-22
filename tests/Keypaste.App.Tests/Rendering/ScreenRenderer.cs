@@ -499,7 +499,7 @@ public sealed class ScreenRenderer
             File.WriteAllBytes(personal, [1]);
             var ini = Path.Combine(empty, "keepassxc.ini");
             File.WriteAllText(ini, $"[General]\nLastActiveDatabase={demo.Path.Replace('\\', '/')}\nLastDatabases={personal.Replace(@"\", @"\\", StringComparison.Ordinal)}\n");
-            using var fromKeePassXc = new UnlockViewModel(session, empty, picker, () => { }, keePassXcConfig: ini);
+            using var fromKeePassXc = new UnlockViewModel(session, empty, picker, () => { }, keePassXcConfigs: () => [ini]);
             window = Show(new UnlockView { DataContext = fromKeePassXc });
             Save(window, output, "81b-lock-welcome-keepassxc");
             window.Close();

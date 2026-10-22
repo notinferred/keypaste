@@ -22,7 +22,8 @@
 #                      properties, which src/Keypaste.Cli/KeyfileTrimRoots.xml keeps. Trimmed, it
 #                      threw and KcpKeyFile keyed with the file's hash (D-0294). Proved by
 #                      verify-keepassxc-xml-attach.sh and verify-keepassxc-keyfile.sh on the AOT
-#                      binary. Serialize is unreachable: keypaste never writes a keyfile.
+#                      binary. Serialize is unreachable from the CLI, which never writes a keyfile;
+#                      only the desktop makes one (D-0287).
 #
 # No entry may name src/. The script fails on that separately and unconditionally.
 # Regenerate after a deliberate change with a CLEAN publish - an incremental one emits nothing,

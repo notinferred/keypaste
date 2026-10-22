@@ -62,7 +62,7 @@ internal static class Program
         "usage: open <vault>\n" +
         "       welcome [--keepassxc-config <ini>]\n" +
         "       open-offered <n> [--keepassxc-config <ini>]\n" +
-        "       create <vault>\n" +
+        "       create <vault> [--new-keyfile <keyfile>]\n" +
         "       edit <vault> <entry-path> <notes> <url>\n" +
         "       item-new <vault> <login|apikey|database|server|securenote> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
         "       field-add <vault> <entry-path> <name> <protected | plain>\n" +
@@ -86,7 +86,7 @@ internal static class Program
         "       revision-restore <vault> <entry-path> <row | oldest>\n" +
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
-        "       access <vault> [--password] [--attach <keyfile> | --remove-keyfile]\n" +
+        "       access <vault> [--password] [--attach <keyfile> | --new-keyfile <keyfile> | --remove-keyfile]\n" +
         "       notes-review <vault>\n" +
         "       notes-move <vault> <entry-path> [<key>...]\n" +
         "       notes-dismiss <vault> <entry-path> <key>\n" +
@@ -126,11 +126,12 @@ internal static class Program
             return args switch
             {
                 ["open", var vault] => await driver.OpenAsync(vault).ConfigureAwait(true),
-                ["welcome"] => driver.Welcome(KeePassXcDatabases.LocalConfigPath()),
-                ["welcome", "--keepassxc-config", var ini] => driver.Welcome(ini),
-                ["open-offered", var row] => await driver.OpenOfferedAsync(row, KeePassXcDatabases.LocalConfigPath()).ConfigureAwait(true),
-                ["open-offered", var row, "--keepassxc-config", var ini] => await driver.OpenOfferedAsync(row, ini).ConfigureAwait(true),
+                ["welcome"] => driver.Welcome(KeePassXcDatabases.LocalConfigPaths),
+                ["welcome", "--keepassxc-config", var ini] => driver.Welcome(() => [ini]),
+                ["open-offered", var row] => await driver.OpenOfferedAsync(row, KeePassXcDatabases.LocalConfigPaths).ConfigureAwait(true),
+                ["open-offered", var row, "--keepassxc-config", var ini] => await driver.OpenOfferedAsync(row, () => [ini]).ConfigureAwait(true),
                 ["create", var vault] => await driver.CreateAsync(vault).ConfigureAwait(true),
+                ["create", var vault, "--new-keyfile", var keyfile] => await driver.CreateAsync(vault, keyfile).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url] => await driver.EditAsync(vault, entry, notes, url).ConfigureAwait(true),
                 ["item-new", var vault, var template, var folder, var title, .. var options] => await driver.NewItemAsync(vault, template, folder, title, options).ConfigureAwait(true),
                 ["field-add", var vault, var entry, var name, "protected"] => await driver.AddFieldAsync(vault, entry, name, protect: true).ConfigureAwait(true),
@@ -262,10 +263,10 @@ internal sealed class Driver(string home)
     }
 
     /// <summary>Prints the databases the first run offers from KeePassXC, one path a line, as the welcome lists them (N.2).</summary>
-    internal int Welcome(string? keePassXcConfig)
+    internal int Welcome(Func<IReadOnlyList<string>> keePassXcConfigs)
     {
         using var session = new AppVaultSession(TimeProvider.System, home: home);
-        using var unlock = new UnlockViewModel(session, home, _picker, () => { }, keePassXcConfig: keePassXcConfig);
+        using var unlock = new UnlockViewModel(session, home, _picker, () => { }, keePassXcConfigs: keePassXcConfigs);
 
         if (unlock.HasSelection)
         {
@@ -281,10 +282,10 @@ internal sealed class Driver(string home)
     }
 
     /// <summary>Chooses the welcome's <paramref name="row"/>th database from KeePassXC, counting from 1, and unlocks it.</summary>
-    internal async Task<int> OpenOfferedAsync(string row, string? keePassXcConfig)
+    internal async Task<int> OpenOfferedAsync(string row, Func<IReadOnlyList<string>> keePassXcConfigs)
     {
         using var session = new AppVaultSession(TimeProvider.System, home: home);
-        using var unlock = new UnlockViewModel(session, home, _picker, () => { }, keePassXcConfig: keePassXcConfig);
+        using var unlock = new UnlockViewModel(session, home, _picker, () => { }, keePassXcConfigs: keePassXcConfigs);
 
         if (!int.TryParse(row, NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n < 1 || n > unlock.KeePassXc.Count)
         {
@@ -302,7 +303,8 @@ internal sealed class Driver(string home)
         return await UnlockAsync(unlock, session, chosen).ConfigureAwait(true) ?? Did($"opened {chosen}");
     }
 
-    internal async Task<int> CreateAsync(string vault)
+    /// <summary>Creates a vault through the unlock screen's create form, with a keyfile the form makes at <paramref name="newKeyfile"/> when one is named.</summary>
+    internal async Task<int> CreateAsync(string vault, string? newKeyfile = null)
     {
         using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
@@ -315,7 +317,17 @@ internal sealed class Driver(string home)
             return Refused(unlock.Message);
         }
 
-        if (await ChooseKeyfileAsync(unlock).ConfigureAwait(true) is { } refused)
+        if (newKeyfile is not null)
+        {
+            _picker.NewKeyfilePath = newKeyfile;
+            await PressAsync(unlock.CreateKeyfileCommand, "Create a key file").ConfigureAwait(true);
+
+            if (!unlock.HasKeyfile)
+            {
+                return Refused(unlock.Message);
+            }
+        }
+        else if (await ChooseKeyfileAsync(unlock).ConfigureAwait(true) is { } refused)
         {
             return refused;
         }
@@ -985,6 +997,17 @@ internal sealed class Driver(string home)
                 case "--attach" when i + 1 < change.Length:
                     _picker.KeyfilePath = change[++i];
                     await PressAsync(access.ChooseKeyfileCommand, "Choose keyfile").ConfigureAwait(true);
+
+                    if (!access.AttachKeyfile)
+                    {
+                        return Refused(access.Message);
+                    }
+
+                    break;
+
+                case "--new-keyfile" when i + 1 < change.Length:
+                    _picker.NewKeyfilePath = change[++i];
+                    await PressAsync(access.CreateKeyfileCommand, "Create keyfile").ConfigureAwait(true);
 
                     if (!access.AttachKeyfile)
                     {
@@ -1803,6 +1826,8 @@ internal sealed class Driver(string home)
 
         internal string? KeyfilePath { get; set; }
 
+        internal string? NewKeyfilePath { get; set; }
+
         public Task<string?> PickExistingAsync() => Task.FromResult<string?>(null);
 
         public Task<string?> PickNewAsync() => Task.FromResult(NewPath);
@@ -1810,6 +1835,8 @@ internal sealed class Driver(string home)
         public Task<string?> PickExportDestinationAsync(string suggestedName) => Task.FromResult(ExportPath);
 
         public Task<string?> PickKeyfileAsync() => Task.FromResult(KeyfilePath);
+
+        public Task<string?> PickNewKeyfileAsync(string suggestedName) => Task.FromResult(NewKeyfilePath);
 
         public Task<string?> PickDotEnvAsync() => Task.FromResult<string?>(null);
 

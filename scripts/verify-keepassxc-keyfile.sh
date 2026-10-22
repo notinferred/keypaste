@@ -13,7 +13,10 @@
 # This one covers what docs/STEPS.md V.1a1 added: a vault KeePassXC protected with a KEYFILE is one
 # keypaste opens, writes and hands back, in every form such a keyfile can take. It also covers
 # V.1a2: `keypaste access` changes a vault's password and keyfile, and KeePassXC opens the result
-# with the new factors and refuses the old ones.
+# with the new factors and refuses the old ones. Last, the one keyfile keypaste makes: the desktop's
+# create form makes a vault with a keyfile it writes, and its Settings replaces that keyfile with
+# another it writes, each through tests/Keypaste.AppDriver, and KeePassXC opens the vault with the
+# keyfile keypaste made and refuses the one replaced (D-NEW-D6).
 #
 # WHO MAKES WHAT, which is the whole honesty of this gate:
 #
@@ -29,7 +32,9 @@
 #
 #   * EVERY read and write on the keypaste side is the SHIPPED BINARY (D-0012), through the real
 #     command line with --keyfile. A core test that called Vault.Open would prove the library and
-#     not the product; V-V.1a1 says so in as many words.
+#     not the product; V-V.1a1 says so in as many words. The keyfiles keypaste makes are the
+#     exception, because only the desktop makes one: the app driver presses the screens' own
+#     buttons, which call the code the shipped app runs.
 #
 # What this gate exists to catch, and what a unit test cannot:
 #
@@ -57,10 +62,13 @@
 #     hands stdout to a child, so a sentence about key material on stdout is somebody's script
 #     breaking. It is asserted present on stderr and absent from stdout.
 #
-# Usage:  scripts/verify-keepassxc-keyfile.sh <keyfile.kdbx>
+# Usage:  scripts/verify-keepassxc-keyfile.sh <keyfile.kdbx> [--cli-only]
+#         --cli-only leaves out the keyfiles the desktop makes, for a job that builds no app driver
+#         and checks a CLI binary alone, as the AOT job does.
 # Env:    KP_COMPAT_PASSWORD   master password for the fixtures         (required)
 #         KPXC_CLI             path to keepassxc-cli                    (default: PATH lookup)
 #         KEYPASTE_BIN         path to the keypaste binary              (default: the Release build)
+#         KEYPASTE_APP_DRIVER  path to tests/Keypaste.AppDriver         (default: the Release build)
 #
 # NEGATIVE CONTROL: this gate fails if keypaste opens a keyfile vault without its keyfile, if it
 # cannot open one of the four forms, if it cannot open a keyfile-only vault with an empty password,
@@ -69,7 +77,10 @@
 # the fragile-keyfile warning is missing from stderr or present on stdout. It also fails if
 # KeePassXC cannot open a vault with the password or keyfile `keypaste access` set, still opens it
 # with the ones replaced, sees a changed cipher or KDF, or if an access refusal writes the vault or
-# a backup, or if the copy an access change kept does not open with the old password.
+# a backup, or if the copy an access change kept does not open with the old password. Unless
+# --cli-only, it fails if what the app makes is not a KeePass 2.0 XML keyfile, if KeePassXC cannot open
+# the app's vault with it or opens it without it, if the app makes a keyfile over a file, or if
+# KeePassXC still opens the vault with the keyfile Settings replaced.
 
 set -euo pipefail
 
@@ -77,7 +88,12 @@ set -euo pipefail
 DIE_PREFIX='KEYFILE GATE FAILED: '
 
 db=${1:-}
-[ -n "$db" ] || die "usage: verify-keepassxc-keyfile.sh <keyfile.kdbx>"
+[ -n "$db" ] || die "usage: verify-keepassxc-keyfile.sh <keyfile.kdbx> [--cli-only]"
+case "${2:-}" in
+  '') cli_only=false ;;
+  --cli-only) cli_only=true ;;
+  *) die "usage: verify-keepassxc-keyfile.sh <keyfile.kdbx> [--cli-only]" ;;
+esac
 . "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
 kp=$(keypaste_bin)
@@ -358,8 +374,52 @@ kpxc_only db-info --no-password --key-file "$(native "$raw_kf")" "$(native "$onl
 kpxc_only db-info --no-password --key-file "$(native "$only_kf")" "$(native "$only")" >/dev/null 2>&1 \
   && die "KeePassXC still opens the keyfile-only vault with the keyfile it replaced"
 
+# ---------------------------------------------------------------------------------------
+# The keyfile the desktop makes (D-NEW-D6), through the app driver.
+# ---------------------------------------------------------------------------------------
+if [ "$cli_only" = false ]; then
+  drv=$(app_driver)
+  app_home="$dir/$stem-app-home"
+  app_vault="$dir/$stem-app.kdbx"
+  again_vault="$dir/$stem-app-again.kdbx"
+  app_kf="$dir/$stem-app.keyx"
+  next_kf="$dir/$stem-app-next.keyx"
+  rm -rf "$app_home" "$app_vault.backups"
+  rm -f "$app_vault" "$again_vault" "$app_kf" "$next_kf"
+  mkdir -p "$app_home"
+
+  step "the app creates a vault with a keyfile it makes; KeePassXC opens it with both and refuses the password alone"
+  said=$(KEYPASTE_HOME="$app_home" KEYPASTE_DRIVER_PASSWORD="$pw" KEYPASTE_DRIVER_NEW_PASSWORD="$pw" \
+    "$drv" create "$(native "$app_vault")" --new-keyfile "$(native "$app_kf")" | tr -d '\r') \
+    || die "the app could not create a vault with a keyfile it made. It said: ${said}"
+  grep -q '<KeyFile>' "$app_kf" && grep -q '<Version>2.0</Version>' "$app_kf" \
+    || die "what the app wrote at '$app_kf' is not a KeePass 2.0 XML keyfile"
+  opens_in_kpxc "$pw" --key-file "$(native "$app_kf")" "$(native "$app_vault")" \
+    || die "KeePassXC cannot open the vault with the keyfile the app made"
+  opens_in_kpxc "$pw" "$(native "$app_vault")" && die "KeePassXC opens the app's vault without the keyfile the app made"
+  kf_before=$(bytes "$app_kf")
+
+  step "the app never makes a keyfile over a file"
+  if said=$(KEYPASTE_HOME="$app_home" KEYPASTE_DRIVER_PASSWORD="$pw" KEYPASTE_DRIVER_NEW_PASSWORD="$pw" \
+    "$drv" create "$(native "$again_vault")" --new-keyfile "$(native "$app_kf")" | tr -d '\r'); then
+    die "the app made a keyfile over '$app_kf'. It said: ${said}"
+  fi
+  [ "$kf_before" = "$(bytes "$app_kf")" ] || die "a refused keyfile changed '$app_kf'"
+  [ ! -e "$again_vault" ] || die "a refused keyfile still left a vault at '$again_vault'"
+
+  step "Settings replaces the keyfile with one it makes; KeePassXC opens with the new one and refuses the old"
+  said=$(KEYPASTE_HOME="$app_home" KEYPASTE_DRIVER_PASSWORD="$pw" KEYPASTE_DRIVER_KEYFILE="$(native "$app_kf")" \
+    "$drv" access "$(native "$app_vault")" --new-keyfile "$(native "$next_kf")" | tr -d '\r') \
+    || die "Settings could not attach a keyfile it made. It said: ${said}"
+  opens_in_kpxc "$pw" --key-file "$(native "$next_kf")" "$(native "$app_vault")" \
+    || die "KeePassXC cannot open the vault with the keyfile Settings made"
+  opens_in_kpxc "$pw" --key-file "$(native "$app_kf")" "$(native "$app_vault")" \
+    && die "KeePassXC still opens the vault with the keyfile Settings replaced"
+fi
+
 # The vault under test is the XML one, so the caller's path names a file that exists afterwards.
 cp -f "$vault" "$db"
 
-printf '\nKEYFILE GATE PASSED: four forms, a keyfile-only vault, five refusals, a backup and access changes, on %s\n' \
-  "$("$cli" --version | tr -d '\r')"
+if [ "$cli_only" = true ]; then made='and no app-made keyfile (--cli-only)'; else made='and keyfiles the app made'; fi
+printf '\nKEYFILE GATE PASSED: four forms, a keyfile-only vault, five refusals, a backup, access changes %s, on %s\n' \
+  "$made" "$("$cli" --version | tr -d '\r')"

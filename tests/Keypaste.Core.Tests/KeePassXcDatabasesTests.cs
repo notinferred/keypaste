@@ -163,6 +163,36 @@ public sealed class KeePassXcDatabasesTests : IDisposable
             KeePassXcDatabases.LocalConfigPath(Enum.Parse<KeePassXcPlatform>(platform), home, localAppData, xdgCacheHome));
 
     [Fact]
+    public void A_portable_KeePassXC_keeps_its_local_settings_in_config_beside_its_executable()
+    {
+        var folder = Path.Combine(_directory, "KeePassXC-2.7.12-Win64");
+        Directory.CreateDirectory(folder);
+        var executable = Path.Combine(folder, "KeePassXC.exe");
+        File.WriteAllBytes(executable, [0x4D, 0x5A]);
+
+        Assert.Null(KeePassXcDatabases.PortableConfigPath(executable));
+
+        File.WriteAllBytes(Path.Combine(folder, KeePassXcDatabases.PortableMarker), []);
+
+        Assert.Equal(Path.Combine(folder, "config", "keepassxc_local.ini"), KeePassXcDatabases.PortableConfigPath(executable));
+    }
+
+    [Fact]
+    public void Several_settings_files_are_read_in_order_and_each_database_is_offered_once()
+    {
+        var portable = Vault("portable.kdbx");
+        var shared = Vault("shared.kdbx");
+        var installed = Vault("installed.kdbx");
+        var portableIni = Path.Combine(_directory, "portable.ini");
+        File.WriteAllText(portableIni, $"[General]\r\nLastDatabases={Qt(portable)}, {Qt(shared)}\r\n");
+        Write("[General]", $"LastActiveDatabase={Qt(shared)}", $"LastDatabases={Qt(installed)}");
+
+        Assert.Equal(
+            [portable, shared, installed],
+            KeePassXcDatabases.ReadAll([portableIni, Path.Combine(_directory, "absent.ini"), Ini]));
+    }
+
+    [Fact]
     public void No_home_means_no_settings_file()
     {
         Assert.Null(KeePassXcDatabases.LocalConfigPath(KeePassXcPlatform.Windows, "", "", null));

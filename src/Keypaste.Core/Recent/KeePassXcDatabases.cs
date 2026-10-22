@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Diagnostics;
+
 namespace Keypaste.Core.Recent;
 
 /// <summary>The platforms whose KeePassXC keeps its local settings in a different place.</summary>
@@ -12,8 +15,9 @@ internal enum KeePassXcPlatform
 /// The databases KeePassXC last opened on this machine, which the desktop offers on its first run.
 /// </summary>
 /// <remarks>
-/// Read from KeePassXC's local <c>keepassxc.ini</c>, and only its <c>LastActiveDatabase</c>,
-/// <c>LastOpenedDatabases</c> and <c>LastDatabases</c>; the file is never written (D-0377, T-24).
+/// Read from KeePassXC's local settings, the installed copy's <c>keepassxc.ini</c> and each running
+/// portable copy's <c>config/keepassxc_local.ini</c>, and only their <c>LastActiveDatabase</c>,
+/// <c>LastOpenedDatabases</c> and <c>LastDatabases</c>; the files are never written (D-0377, T-24).
 /// </remarks>
 public static class KeePassXcDatabases
 {
@@ -29,6 +33,12 @@ public static class KeePassXcDatabases
 
     internal const string RecentKey = "LastDatabases";
 
+    /// <summary>The name KeePassXC's own executable runs under on every platform.</summary>
+    internal const string ProcessName = "KeePassXC";
+
+    /// <summary>The file beside a portable KeePassXC's executable that keeps its settings beside it too.</summary>
+    internal const string PortableMarker = ".portable";
+
     private static readonly string[] _keys = [ActiveKey, OpenedKey, RecentKey];
 
     /// <summary>Where KeePassXC 2.7 keeps its local settings for this user, or null when that cannot be said.</summary>
@@ -42,34 +52,116 @@ public static class KeePassXcDatabases
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             Environment.GetEnvironmentVariable("XDG_CACHE_HOME"));
 
+    /// <summary>The local settings of each portable KeePassXC running now, then of the installed one.</summary>
+    /// <returns>The files' paths, each once. None is checked for existence.</returns>
+    /// <remarks>A portable copy is found only through a running KeePassXC's own executable; no disk is searched.</remarks>
+    public static IReadOnlyList<string> LocalConfigPaths()
+    {
+        var paths = new List<string>();
+
+        foreach (var executable in RunningExecutables())
+        {
+            if (PortableConfigPath(executable) is { } portable
+                && !paths.Exists(path => string.Equals(path, portable, PathIdentity.Comparison)))
+            {
+                paths.Add(portable);
+            }
+        }
+
+        if (LocalConfigPath() is { } installed)
+        {
+            paths.Add(installed);
+        }
+
+        return paths;
+    }
+
     /// <summary>The databases KeePassXC last opened that still exist, the last active first.</summary>
     /// <param name="configPath">KeePassXC's local settings file, or null for none.</param>
     /// <returns>Each existing file once, at most <see cref="Capacity"/>; empty when the file is missing, unreadable or not a settings file.</returns>
-    public static IReadOnlyList<string> Read(string? configPath)
+    public static IReadOnlyList<string> Read(string? configPath) =>
+        ReadAll(string.IsNullOrEmpty(configPath) ? [] : [configPath]);
+
+    /// <summary>The databases several KeePassXC settings files name that still exist, file by file in the order given.</summary>
+    /// <param name="configPaths">KeePassXC's local settings files.</param>
+    /// <returns>Each existing file once, at most <see cref="Capacity"/>; a file that is missing, unreadable or not a settings file adds none.</returns>
+    public static IReadOnlyList<string> ReadAll(IEnumerable<string> configPaths)
     {
-        if (string.IsNullOrEmpty(configPath) || ReadBytes(configPath) is not { } bytes)
-        {
-            return [];
-        }
+        ArgumentNullException.ThrowIfNull(configPaths);
 
         var offered = new List<string>(Capacity);
 
-        foreach (var candidate in Parse(bytes))
+        foreach (var configPath in configPaths)
         {
-            if (offered.Count == Capacity)
+            if (string.IsNullOrEmpty(configPath) || ReadBytes(configPath) is not { } bytes)
             {
-                break;
+                continue;
             }
 
-            if (FullPath(candidate) is { } full
-                && File.Exists(full)
-                && !offered.Exists(path => string.Equals(path, full, PathIdentity.Comparison)))
+            foreach (var candidate in Parse(bytes))
             {
-                offered.Add(full);
+                if (offered.Count == Capacity)
+                {
+                    return offered;
+                }
+
+                if (FullPath(candidate) is { } full
+                    && File.Exists(full)
+                    && !offered.Exists(path => string.Equals(path, full, PathIdentity.Comparison)))
+                {
+                    offered.Add(full);
+                }
             }
         }
 
         return offered;
+    }
+
+    /// <summary>Where a portable KeePassXC keeps its local settings: <c>config/keepassxc_local.ini</c> beside its executable, which <see cref="PortableMarker"/> marks portable.</summary>
+    /// <param name="executable">A KeePassXC executable.</param>
+    /// <returns>The file's path, or null when that copy is not portable.</returns>
+    internal static string? PortableConfigPath(string executable)
+    {
+        var folder = Path.GetDirectoryName(executable);
+
+        return !string.IsNullOrEmpty(folder) && File.Exists(Path.Combine(folder, PortableMarker))
+            ? Path.Combine(folder, "config", "keepassxc_local.ini")
+            : null;
+    }
+
+    /// <summary>The executable of every KeePassXC this process may read, running now.</summary>
+    private static List<string> RunningExecutables()
+    {
+        var executables = new List<string>();
+        Process[] processes;
+
+        try
+        {
+            processes = Process.GetProcessesByName(ProcessName);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or PlatformNotSupportedException or Win32Exception)
+        {
+            return executables;
+        }
+
+        foreach (var process in processes)
+        {
+            using (process)
+            {
+                try
+                {
+                    if (process.MainModule?.FileName is { Length: > 0 } executable)
+                    {
+                        executables.Add(executable);
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or Win32Exception)
+                {
+                }
+            }
+        }
+
+        return executables;
     }
 
     /// <summary>Qt's <c>QStandardPaths</c> locations KeePassXC 2.7's <c>Config</c> puts its local file in.</summary>

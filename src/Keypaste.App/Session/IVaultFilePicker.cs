@@ -33,10 +33,17 @@ internal interface IVaultFilePicker
 
     /// <summary>Asks which existing keyfile to use. Null when the person cancelled.</summary>
     /// <remarks>
-    /// Read, never written: keypaste attaches a keyfile somebody already has and makes none (D-0287).
-    /// What the file turns out to be is <see cref="Keypaste.Core.VaultKeyfile.Inspect"/>'s to say.
+    /// Read, never written. What the file turns out to be is <see cref="Keypaste.Core.VaultKeyfile.Inspect"/>'s to say.
     /// </remarks>
     Task<string?> PickKeyfileAsync();
+
+    /// <summary>Asks where a keyfile keypaste makes should go. Null when the person cancelled.</summary>
+    /// <param name="suggestedName">The file name the dialog starts with.</param>
+    /// <remarks>
+    /// The dialog does not offer to replace a file: <see cref="Keypaste.Core.VaultKeyfile.Create"/> writes only where
+    /// nothing is (D-0287).
+    /// </remarks>
+    Task<string?> PickNewKeyfileAsync(string suggestedName) => Task.FromResult<string?>(null);
 
     /// <summary>Asks which <c>.env</c> file to import. Null when the person cancelled.</summary>
     /// <remarks>Read, never written or deleted: the app leaves the file where it was.</remarks>

@@ -164,7 +164,7 @@ public sealed class FirstRunTests : IDisposable
     }
 
     private UnlockViewModel NewModel(string? keePassXcConfig) =>
-        new(_session, _home.Path, new FakeVaultFilePicker(), () => _unlocked++, keePassXcConfig: keePassXcConfig);
+        new(_session, _home.Path, new FakeVaultFilePicker(), () => _unlocked++, keePassXcConfigs: () => keePassXcConfig is null ? [] : [keePassXcConfig]);
 
     private string MakeVault(string name)
     {

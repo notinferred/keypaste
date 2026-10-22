@@ -1,6 +1,8 @@
+using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using Keypaste.Core.Login;
+using Keypaste.Core.Processes;
 using Microsoft.Win32;
 using Xunit;
 
@@ -110,7 +112,7 @@ public sealed class LoginItemTests : IDisposable
     public void The_macOS_launch_agent_starts_the_program_in_the_background_at_load()
     {
         var program = "/Applications/key & paste.app/Contents/MacOS/keypaste-app";
-        var item = new MacLaunchAgent(_home, program);
+        var item = new MacLaunchAgent(_home, program, new FakeApproval());
 
         Assert.False(item.IsEnabled);
         Assert.True(item.Enable());
@@ -143,9 +145,49 @@ public sealed class LoginItemTests : IDisposable
     [Fact]
     public void A_launch_agent_for_another_copy_reads_as_off()
     {
-        Assert.True(new MacLaunchAgent(_home, "/old/keypaste-app").Enable());
+        Assert.True(new MacLaunchAgent(_home, "/old/keypaste-app", new FakeApproval()).Enable());
 
-        Assert.False(new MacLaunchAgent(_home, "/new/keypaste-app").IsEnabled);
+        Assert.False(new MacLaunchAgent(_home, "/new/keypaste-app", new FakeApproval()).IsEnabled);
+    }
+
+    [Fact]
+    public void A_launch_agent_launchd_turned_off_reads_as_off_and_enabling_turns_it_back_on()
+    {
+        var approval = new FakeApproval();
+        var item = new MacLaunchAgent(_home, "/Applications/keypaste.app/Contents/MacOS/keypaste-app", approval);
+        Assert.True(item.Enable());
+
+        approval.Disabled.Add(MacLaunchAgent.Label);
+
+        Assert.False(item.IsEnabled);
+        Assert.True(File.Exists(item.FilePath));
+        Assert.True(item.Enable());
+        Assert.Empty(approval.Disabled);
+        Assert.True(item.IsEnabled);
+    }
+
+    [Fact]
+    public void Launchds_switch_is_read_from_its_disabled_list_for_the_agent_alone_and_cleared_by_label()
+    {
+        var runner = new LaunchctlRunner(
+            "disabled services = {\n\t\"com.apple.ScriptMenuApp\" => disabled\n\t\"com.keypaste.app.helper\" => disabled\n\t\"com.keypaste.app\" => enabled\n}\nlogin item associations = {\n}\n");
+        var approval = new LaunchdApproval(runner, 501);
+
+        Assert.False(approval.IsDisabled(MacLaunchAgent.Label));
+        Assert.Equal(new[] { "/bin/launchctl", "print-disabled", "gui/501" }, runner.Calls[^1]);
+
+        runner.Listing = "disabled services = {\n\t\"com.keypaste.app\" => disabled\n}\n";
+        Assert.True(approval.IsDisabled(MacLaunchAgent.Label));
+
+        runner.Listing = "disabled services = {\r\n\t\"com.keypaste.app\" => true\r\n}\r\n";
+        Assert.True(approval.IsDisabled(MacLaunchAgent.Label));
+
+        runner.Exit = 1;
+        Assert.False(approval.IsDisabled(MacLaunchAgent.Label));
+
+        runner.Exit = 0;
+        Assert.True(approval.Clear(MacLaunchAgent.Label));
+        Assert.Equal(new[] { "/bin/launchctl", "enable", "gui/501/com.keypaste.app" }, runner.Calls[^1]);
     }
 
     [Fact]
@@ -219,6 +261,21 @@ public sealed class LoginItemTests : IDisposable
         {
             Disabled.Remove(name);
             return true;
+        }
+    }
+
+    private sealed class LaunchctlRunner(string listing) : IProcessRunner
+    {
+        internal string Listing { get; set; } = listing;
+
+        internal int Exit { get; set; }
+
+        internal List<string[]> Calls { get; } = [];
+
+        public ProcessResult Run(string fileName, IReadOnlyList<string> arguments, string? stdin, Encoding stdinEncoding, TimeSpan timeout)
+        {
+            Calls.Add([fileName, .. arguments]);
+            return new ProcessResult(ToolFound: true, Exit, Listing, string.Empty);
         }
     }
 

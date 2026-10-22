@@ -46,6 +46,17 @@
       <RegistryValue Root="HKCU" Key="Software\keypaste\Installer" Name="UserPath" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
+    <!-- Open at login is the Run value the app writes, not a component, so an uninstall deletes it and the old version's removal in a major upgrade, which sets UPGRADINGPRODUCTCODE, keeps it. A value already gone makes reg.exe fail, which is ignored. -->
+    <CustomAction Id="RemoveOpenAtLogin"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[System64Folder]reg.exe&quot; delete HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v keypaste /f"
+                  Execute="deferred"
+                  Impersonate="yes"
+                  Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveOpenAtLogin" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+
     <Feature Id="Main">
       <ComponentGroupRef Id="Payload" />
       <ComponentRef Id="InstallFolderRemoval" />

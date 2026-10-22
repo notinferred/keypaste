@@ -191,7 +191,7 @@ internal static class AccessCommand
         writer.WriteLine("  --remove-keyfile         stop requiring the current keyfile");
         writer.WriteLine($"  --keyfile <path>         the keyfile that opens the vault now, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine();
-        writer.WriteLine("keypaste never creates a keyfile and never takes a vault's password away. The file");
+        writer.WriteLine("keypaste access never creates a keyfile or takes a vault's password away. The file");
         writer.WriteLine("the change replaces is kept, and still opens with the old credentials.");
     }
 }

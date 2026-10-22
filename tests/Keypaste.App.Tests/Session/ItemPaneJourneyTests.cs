@@ -54,7 +54,7 @@ public sealed class ItemPaneJourneyTests
             var launcher = new RecordingLauncher();
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Pickers = _ => new FakeVaultFilePicker(), WebLaunchers = _ => launcher, KeePassXcConfig = null };
+            using var app = new App { Pickers = _ => new FakeVaultFilePicker(), WebLaunchers = _ => launcher, KeePassXcConfigs = () => [] };
             app.Launch(lifetime);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
 

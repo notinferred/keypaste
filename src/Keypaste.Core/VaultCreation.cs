@@ -1,3 +1,5 @@
+using Keypaste.Core.HardwareKeys;
+
 namespace Keypaste.Core;
 
 /// <summary>Whether a path can receive a new vault.</summary>
@@ -43,6 +45,9 @@ public enum VaultCreationOutcome
 
     /// <summary>The keyfile is the new vault's own path or lies in its backup directory.</summary>
     KeyfileIsThisVault = 7,
+
+    /// <summary>No connected hardware key has the slot to protect the vault with programmed.</summary>
+    HardwareKeyNotFound = 8,
 }
 
 /// <summary>
@@ -130,6 +135,32 @@ public static class VaultCreation
         ReadOnlySpan<char> confirmation,
         string? keyfilePath,
         out Vault? created,
+        out string failure) =>
+        TryCreate(path, password, confirmation, keyfilePath, hardwareKey: null, out created, out failure);
+
+    /// <summary>
+    /// <see cref="TryCreate(string, ReadOnlySpan{char}, ReadOnlySpan{char}, string?, out Vault?, out string)"/>,
+    /// protected by a hardware key's slot as well as the password, as an access change attaches one.
+    /// </summary>
+    /// <param name="path">Where the vault goes.</param>
+    /// <param name="password">The new master password, which is still required.</param>
+    /// <param name="confirmation">The same password, typed again.</param>
+    /// <param name="keyfilePath">An existing keyfile, refused on the grounds an access change refuses one; null for none.</param>
+    /// <param name="hardwareKey">
+    /// The slot the vault will need, refused unless a connected key has it programmed; null for none. The first save
+    /// asks it, and the created vault keeps using it. The caller owns it and disposes it after the vault.
+    /// </param>
+    /// <param name="created">The open vault, or <see langword="null"/> on every refusal.</param>
+    /// <param name="failure">What the filesystem or the format said, when the outcome is <see cref="VaultCreationOutcome.Failed"/>.</param>
+    /// <returns>What happened.</returns>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer the first save, so no vault was written.</exception>
+    public static VaultCreationOutcome TryCreate(
+        string path,
+        ReadOnlySpan<char> password,
+        ReadOnlySpan<char> confirmation,
+        string? keyfilePath,
+        HardwareKey? hardwareKey,
+        out Vault? created,
         out string failure)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -167,6 +198,11 @@ public static class VaultCreation
             }
         }
 
+        if (hardwareKey is not null && !hardwareKey.IsConnected())
+        {
+            return VaultCreationOutcome.HardwareKeyNotFound;
+        }
+
         try
         {
             var directory = Path.GetDirectoryName(path);
@@ -176,12 +212,20 @@ public static class VaultCreation
             }
 
 #pragma warning disable CA2000
-            var vault = Vault.CreateWith(path, password, keyfilePath);
+            var vault = Vault.CreateWith(path, password, keyfilePath, hardwareKey);
 #pragma warning restore CA2000
+
+            var pathWasFree = !File.Exists(path);
 
             try
             {
                 vault.Save();
+            }
+            catch (HardwareKeyException) when (pathWasFree)
+            {
+                vault.Dispose();
+                ForgetEmptyFile(path);
+                throw;
             }
             catch
             {
@@ -192,7 +236,7 @@ public static class VaultCreation
             created = vault;
             return VaultCreationOutcome.Created;
         }
-        catch (VaultException ex)
+        catch (VaultException ex) when (ex is not HardwareKeyException)
         {
             failure = ex.Message;
             return VaultCreationOutcome.Failed;
@@ -206,6 +250,29 @@ public static class VaultCreation
         {
             failure = ex.Message;
             return VaultCreationOutcome.Failed;
+        }
+    }
+
+    /// <summary>Frees the path a failed first save left an empty file at.</summary>
+    /// <remarks>
+    /// A vault with no file yet is saved straight to its path, which is opened before the key is derived, so a
+    /// hardware key that does not answer leaves the file empty, and a retry would find the path taken. Only that
+    /// failure, on a path that was free just before the save, is known to have made the file: any other can come
+    /// before the path is opened, when an empty file there would be somebody else's.
+    /// </remarks>
+    private static void ForgetEmptyFile(string path)
+    {
+        try
+        {
+            var file = new FileInfo(path);
+
+            if (file.Exists && file.Length == 0)
+            {
+                file.Delete();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
         }
     }
 }

@@ -131,10 +131,12 @@ internal sealed partial class App : Application, IDisposable
             reason => Console.Error.WriteLine($"keypaste: another start of keypaste cannot reach this one: {reason}"));
 
         // The lifetime shows its main window when it starts, so a start at login names none until Open.
-        if (!(background && _preferences.StaysInTray))
+        if (!StartsHidden(background, _preferences))
         {
             desktop.MainWindow = _window;
         }
+
+        DockIcon?.Invoke(desktop.MainWindow is not null);
 
         // A prompt window still open must not keep the vault served once the main window closes (F.21).
         desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -153,7 +155,7 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>The main window <see cref="Launch"/> composed, shown or not.</summary>
     internal MainWindow? Main => _window;
 
-    /// <summary>The preferences launch composes from; <c>app.toml</c> in the keypaste home unless a test gives others.</summary>
+    /// <summary>The preferences launch composes from, which <c>Program</c> reads first; <c>app.toml</c> in the keypaste home unless a test gives others.</summary>
     internal DesktopPreferences? Preferences { get; init; }
 
     /// <summary>This process's claim on its user's home, which <c>Program.Run</c> took; none unless it gives one.</summary>
@@ -168,6 +170,15 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>What a project's Run and Open terminal start with, given the authority; the platform's own unless a test gives another.</summary>
     internal Func<AppAuthority?, ProjectLaunching> LaunchingFor { get; init; } = ProjectLaunching.ForThisMachine;
 
+    /// <summary>Shows the Dock icon while the main window is open and hides it while the app is only in the menu bar; set on macOS alone, and by a test.</summary>
+    internal Action<bool>? DockIcon { get; init; }
+
+    /// <summary>Whether a start opens no window: one at login while the app stays in the menu bar or tray.</summary>
+    /// <param name="background">Whether it is a start at login.</param>
+    /// <param name="preferences">The preferences it starts with.</param>
+    internal static bool StartsHidden(bool background, DesktopPreferences preferences) =>
+        background && preferences.StaysInTray;
+
     /// <summary>Shows the window from the menu bar or tray.</summary>
     internal void OpenWindow()
     {
@@ -177,6 +188,7 @@ internal sealed partial class App : Application, IDisposable
         }
 
         _desktop.MainWindow ??= _window;
+        DockIcon?.Invoke(true);
         _window.Show();
 
         if (_window.WindowState == WindowState.Minimized)
@@ -215,6 +227,7 @@ internal sealed partial class App : Application, IDisposable
         }
 
         _window.Hide();
+        DockIcon?.Invoke(false);
     }
 
     private void OnActivated(object? sender, ActivatedEventArgs e)
@@ -263,8 +276,8 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>How the app asks for a file; the platform's picker unless a test gives another.</summary>
     internal Func<TopLevel, IVaultFilePicker> Pickers { get; init; } = window => new StorageProviderPicker(window);
 
-    /// <summary>KeePassXC's local settings, whose databases the first run offers; where KeePassXC keeps them unless a test gives another.</summary>
-    internal string? KeePassXcConfig { get; init; } = KeePassXcDatabases.LocalConfigPath();
+    /// <summary>KeePassXC's local settings files, whose databases the first run offers; read each time the welcome shows, where KeePassXC keeps them unless a test gives others.</summary>
+    internal Func<IReadOnlyList<string>> KeePassXcConfigs { get; init; } = KeePassXcDatabases.LocalConfigPaths;
 
     /// <summary>How an item's web address reaches the browser; the platform's launcher unless a test gives another.</summary>
     internal Func<TopLevel, IWebLauncher> WebLaunchers { get; init; } = window => new PlatformWebLauncher(window);
@@ -472,7 +485,7 @@ internal sealed partial class App : Application, IDisposable
             action => Dispatcher.UIThread.Post(action),
             message,
             next is null ? reason : null,
-            KeePassXcConfig,
+            KeePassXcConfigs,
             new AvaloniaClipboard(_window).TryPasteIntoAsync);
 
         if (next is { } file)

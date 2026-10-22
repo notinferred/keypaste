@@ -62,6 +62,22 @@ public enum KeyfileOutcome
     XmlUnreadable = 5,
 }
 
+/// <summary>What happened when a new keyfile was asked for.</summary>
+public enum KeyfileCreationOutcome
+{
+    /// <summary>The keyfile is written where it was asked for.</summary>
+    Created = 0,
+
+    /// <summary>Something is already at that path, and it was not touched.</summary>
+    PathAlreadyExists = 1,
+
+    /// <summary>This build cannot read the key in a KeePass XML keyfile, so it writes none (D-0294).</summary>
+    Unsupported = 2,
+
+    /// <summary>The path was reachable and the write still failed; nothing was left at it.</summary>
+    Failed = 3,
+}
+
 /// <summary>What <see cref="VaultKeyfile.Inspect"/> made of a file.</summary>
 /// <param name="Outcome">Whether it can be used, and why not when it cannot.</param>
 /// <param name="Form">The shape it is, meaningful only once <paramref name="Outcome"/> accepted it.</param>
@@ -145,6 +161,58 @@ public static class VaultKeyfile
         return form == KeyfileForm.Xml && !ReadsXmlKeyfiles
             ? new KeyfileInspection(KeyfileOutcome.XmlUnreadable, form)
             : new KeyfileInspection(KeyfileOutcome.Accepted, form);
+    }
+
+    /// <summary>Writes a new KeePass XML keyfile, version 2.0, holding a random key, once, where the person chose.</summary>
+    /// <param name="path">Where it goes. Its directory must exist, and nothing may be at the path.</param>
+    /// <param name="failure">What the filesystem said, when the outcome is <see cref="KeyfileCreationOutcome.Failed"/>; empty otherwise.</param>
+    /// <returns>What happened.</returns>
+    /// <remarks>
+    /// The one keyfile keypaste writes, and only when a person asks for it (D-0287). The document is KeePassLib's own
+    /// and its key comes from KeePassLib's random source, so KeePass and KeePassXC read it as theirs. It is staged
+    /// beside the path, readable by its owner alone outside Windows, and moved into place without replacing anything,
+    /// so a file that arrives meanwhile is kept and the stage is deleted.
+    /// </remarks>
+    public static KeyfileCreationOutcome Create(string path, out string failure)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        failure = string.Empty;
+
+        if (!ReadsXmlKeyfiles)
+        {
+            return KeyfileCreationOutcome.Unsupported;
+        }
+
+        var full = Path.GetFullPath(path);
+
+        if (File.Exists(full) || Directory.Exists(full))
+        {
+            return KeyfileCreationOutcome.PathAlreadyExists;
+        }
+
+        var document = Internal.KeePassInterop.NewXmlKeyfile();
+
+        try
+        {
+            using var staged = Infrastructure.AtomicFile.Stage(full, document, Infrastructure.AtomicFile.OwnerOnly);
+            staged.CommitWithoutReplacing();
+            return KeyfileCreationOutcome.Created;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (File.Exists(full) || Directory.Exists(full))
+            {
+                return KeyfileCreationOutcome.PathAlreadyExists;
+            }
+
+            failure = ex.Message;
+            return KeyfileCreationOutcome.Failed;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(document);
+        }
     }
 
     private static readonly AsyncLocal<bool> _simulatedFallback = new();

@@ -138,6 +138,99 @@ public sealed class UnlockHardwareKeyTests : IDisposable
     }
 
     [Fact]
+    public async Task The_create_form_makes_a_vault_that_needs_the_yubikey_and_remembers_its_slot()
+    {
+        var path = Path.Combine(_home.Path, "created.kdbx");
+        using var model = NewModel();
+        _picker.NewPath = path;
+
+        await model.StartCreateAsync();
+        Assert.False(model.UsesHardwareKey);
+        model.UseHardwareKeyCommand.Execute(null);
+        Assert.Equal("YubiKey, slot 2", model.HardwareKeyLabel);
+        TypeNew(model, _master);
+        await model.CreateAsync();
+
+        Assert.Equal(1, _unlockedCalls);
+        Assert.Equal(2, _session.HardwareKeySlot);
+        Assert.Equal(2, RecentVaults.Load(KeypasteHome.RecentPath(_home.Path)).Single().HardwareKeySlot);
+
+        _session.Lock(VaultLockReason.Manual);
+        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
+        using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
+        using var reopened = Vault.Open(path, _master, null, key);
+        Assert.Empty(reopened.ReadEntries());
+    }
+
+    [Fact]
+    public async Task The_create_form_refuses_a_yubikey_without_the_slot_and_writes_nothing()
+    {
+        var path = Path.Combine(_home.Path, "refused.kdbx");
+        using var slotOne = new AppVaultSession(
+            new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: new SoftwareYubiKey(_secret) { Slots = [1] });
+        using var model = new UnlockViewModel(slotOne, _home.Path, _picker, () => _unlockedCalls++);
+        _picker.NewPath = path;
+
+        await model.StartCreateAsync();
+        model.UseHardwareKeyCommand.Execute(null);
+        TypeNew(model, _master);
+        await model.CreateAsync();
+
+        Assert.Equal(0, _unlockedCalls);
+        Assert.False(slotOne.IsUnlocked);
+        Assert.False(File.Exists(path));
+        Assert.True(model.IsCreating);
+        Assert.Equal(
+            "No YubiKey with slot 2 programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager.",
+            model.Message);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_touch_while_creating_leaves_no_vault_and_the_path_free()
+    {
+        var path = Path.Combine(_home.Path, "untouched.kdbx");
+        _device.NeverTouched = true;
+        using var model = NewModel();
+        _picker.NewPath = path;
+
+        await model.StartCreateAsync();
+        model.UseHardwareKeyCommand.Execute(null);
+        TypeNew(model, _master);
+
+        var creating = model.CreateAsync();
+        await Until(() => model.IsWaitingForTouch);
+        model.CancelTouchCommand.Execute(null);
+        await creating;
+
+        Assert.Equal("Stopped waiting for the YubiKey. No vault was created.", model.Message);
+        Assert.False(_session.IsUnlocked);
+        Assert.Equal(0, _unlockedCalls);
+        Assert.Equal(VaultDestination.Free, VaultCreation.Inspect(path));
+    }
+
+    [Fact]
+    public async Task Cancelling_the_create_form_gives_the_selected_vault_back_its_slot()
+    {
+        var path = MakeVault();
+        using var model = NewModel();
+        model.Offer(path);
+        model.UseHardwareKeyCommand.Execute(null);
+        Type(model, _master);
+        await model.UnlockAsync();
+        _session.Lock(VaultLockReason.Manual);
+
+        using var next = NewModel();
+        Assert.Equal(2, next.HardwareKeySlot);
+        _picker.NewPath = Path.Combine(_home.Path, "another.kdbx");
+
+        await next.StartCreateAsync();
+        Assert.Null(next.HardwareKeySlot);
+        await next.CancelCreateAsync();
+
+        Assert.Equal(2, next.HardwareKeySlot);
+    }
+
+    [Fact]
     public void A_session_that_reaches_no_hardware_keys_offers_none()
     {
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path);
@@ -168,6 +261,15 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         foreach (var c in password)
         {
             model.Type(c);
+        }
+    }
+
+    private static void TypeNew(UnlockViewModel model, string password)
+    {
+        foreach (var c in password)
+        {
+            model.TypeNew(c);
+            model.TypeConfirm(c);
         }
     }
 

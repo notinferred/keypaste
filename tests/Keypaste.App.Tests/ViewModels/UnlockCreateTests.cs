@@ -290,6 +290,80 @@ public sealed class UnlockCreateTests : IDisposable
     }
 
     [Fact]
+    public async Task A_keyfile_the_form_creates_protects_the_new_vault_and_the_form_says_to_keep_a_copy()
+    {
+        using var model = NewModel();
+        _picker.NewPath = _home.FreeVaultPath;
+        var keyfile = Path.Combine(_home.Path, "new.keyx");
+        _picker.NewKeyfilePath = keyfile;
+
+        Assert.False(model.CreateKeyfileCommand.CanExecute(null));
+        await model.StartCreateAsync();
+        await model.CreateKeyfileCommand.ExecuteAsync();
+
+        Assert.Equal("new.keyx", _picker.SuggestedKeyfileName);
+        Assert.Equal(new KeyfileInspection(KeyfileOutcome.Accepted, KeyfileForm.Xml), VaultKeyfile.Inspect(keyfile));
+        Assert.Equal(keyfile, model.KeyfilePath);
+        Assert.True(model.HasKeyfileNote);
+        Assert.Contains("Keep a copy somewhere other than this computer", model.KeyfileNote, StringComparison.Ordinal);
+        Assert.Contains("vault's folder", model.KeyfileNote, StringComparison.Ordinal);
+
+        Type(model, TempHome.Password, TempHome.Password);
+        await model.CreateAsync();
+
+        Assert.Equal(1, _unlockedCalls);
+        Assert.Equal(keyfile, Remembered().Single().KeyfilePath);
+        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(_home.FreeVaultPath, TempHome.Password));
+        using var reopened = Vault.Open(_home.FreeVaultPath, TempHome.Password, keyfile);
+        Assert.Empty(reopened.ReadEntries());
+    }
+
+    [Fact]
+    public async Task A_keyfile_saved_away_from_the_vault_is_not_called_beside_it_and_dropping_it_drops_the_note()
+    {
+        using var elsewhere = new TempHome();
+        using var model = NewModel();
+        _picker.NewPath = _home.FreeVaultPath;
+        _picker.NewKeyfilePath = Path.Combine(elsewhere.Path, "new.keyx");
+
+        await model.StartCreateAsync();
+        await model.CreateKeyfileAsync();
+
+        Assert.Contains("Keep a copy", model.KeyfileNote, StringComparison.Ordinal);
+        Assert.DoesNotContain("vault's folder", model.KeyfileNote, StringComparison.Ordinal);
+
+        model.ClearKeyfileCommand.Execute(null);
+
+        Assert.False(model.HasKeyfileNote);
+        Assert.True(File.Exists(_picker.NewKeyfilePath));
+    }
+
+    [Fact]
+    public async Task The_form_never_creates_a_keyfile_over_a_file_and_a_cancelled_picker_writes_nothing()
+    {
+        var taken = Path.Combine(_home.Path, "taken.keyx");
+        File.WriteAllText(taken, "somebody's file");
+        using var model = NewModel();
+        _picker.NewPath = _home.FreeVaultPath;
+        await model.StartCreateAsync();
+        var before = _home.Snapshot();
+
+        _picker.NewKeyfilePath = null;
+        await model.CreateKeyfileAsync();
+
+        Assert.Equal(1, _picker.NewKeyfileCalls);
+        Assert.Equal(before, _home.Snapshot());
+        Assert.Null(model.KeyfilePath);
+
+        _picker.NewKeyfilePath = taken;
+        await model.CreateKeyfileAsync();
+
+        Assert.Equal(before, _home.Snapshot());
+        Assert.Null(model.KeyfilePath);
+        Assert.Contains("won't replace it", model.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_cancelled_browse_selects_nothing()
     {
         using var model = NewModel();

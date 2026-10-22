@@ -404,6 +404,12 @@
                         <TextBlock Text="Choose keyfile…" />
                       </StackPanel>
                     </Button>
+                    <Button Classes="sm" Command="{Binding CreateKeyfileCommand}" AutomationProperties.Name="Create keyfile…">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ctl:KpIcon Icon="plus" Size="14" />
+                        <TextBlock Text="Create keyfile…" />
+                      </StackPanel>
+                    </Button>
                     <TextBlock Classes="mono secondary" Text="{Binding NewKeyfileName}" VerticalAlignment="Center"
                                ToolTip.Tip="{Binding NewKeyfilePath}" />
                   </StackPanel>

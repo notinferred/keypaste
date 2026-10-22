@@ -6,7 +6,7 @@
 -->
 <linker>
   <assembly fullname="KeePassLib">
-    <!-- Only what reading needs: keypaste never writes a keyfile (D-0287), so Save stays trimmed. -->
+    <!-- Only what reading needs: the CLI never writes a keyfile (D-0287), so Save stays trimmed. -->
     <type fullname="KeePassLib.Keys.KfxFile">
       <method name=".ctor" />
       <property name="Meta" />
