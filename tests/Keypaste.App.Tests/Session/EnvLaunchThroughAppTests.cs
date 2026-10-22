@@ -659,7 +659,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         await running.WaitAsync(Cancel);
 
         Assert.Equal(
-            "Nothing was started: dev's variables come from more items than one History line can name, and a Run from the app writes one. Copy the run command to start it in a terminal instead.",
+            "Nothing was started: dev's variables come from more items than one History line can name, and a Run from the app writes one.",
             screen.Error);
         AssertNothingStarted();
         Assert.Equal(0, _asked.Count);
@@ -686,7 +686,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
     /// <summary>
     /// Every Run writes a History line, so while the app's audit log will not open a Run is refused before the card on
-    /// every platform, naming the log's error and what to do instead; mending the log needs no new unlock (T-6, D-0496).
+    /// every platform, naming the log's error; mending the log needs no new unlock (T-6, D-0496).
     /// </summary>
     [Fact]
     public async Task A_Run_while_the_audit_log_will_not_open_is_refused_before_anyone_is_asked()
@@ -705,8 +705,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             $"Nothing was started: a Run from the app writes a History line, and the audit log at '{log}' could not be opened: ",
             screen.Error,
             StringComparison.Ordinal);
-        Assert.EndsWith(". Copy the run command to start it in a terminal instead.", screen.Error, StringComparison.Ordinal);
+        Assert.EndsWith(".", screen.Error, StringComparison.Ordinal);
         Assert.DoesNotContain("..", screen.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("run command", screen.Error, StringComparison.Ordinal);
         AssertNothingStarted();
         Assert.Equal(0, _asked.Count);
 

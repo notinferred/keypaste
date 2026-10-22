@@ -38,6 +38,11 @@ public sealed record ClientAccess(string Client, DateTimeOffset LastAt, int Rele
 /// <param name="Waiting">Whether a waiting request names it.</param>
 public sealed record EntryAgentAccess(EntryUse Use, IReadOnlyList<ClientAccess> Clients, IReadOnlyList<GrantSummary> Grants, bool Waiting);
 
+/// <summary>What one attached agent can name without having asked yet.</summary>
+/// <param name="Agent">How a screen names it: its label, else its name.</param>
+/// <param name="Reach">Whether it can name an entry, given the entry's own tags: the least of its bridge's announced exposure and its settings.</param>
+public sealed record AgentReach(string Agent, Func<EntryName, IReadOnlyList<string>, ExposureReach> Reach);
+
 /// <summary>
 /// Which entries agents use, from what is already recorded: this vault's granted audit lines, the
 /// owner's release ledger for this session and its live grants and waiting prompts (D-0361).
@@ -56,9 +61,9 @@ public sealed class EntryActivity
     private readonly HashSet<string> _waiting = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<GrantSummary>> _envGrants = new(StringComparer.Ordinal);
     private readonly ApproverActivity _live;
-    private readonly IReadOnlyList<Func<EntryName, IReadOnlyList<string>, ExposureReach>> _reach;
+    private readonly IReadOnlyList<AgentReach> _reach;
 
-    private EntryActivity(ApproverActivity live, IReadOnlyList<Func<EntryName, IReadOnlyList<string>, ExposureReach>> reach, DateTimeOffset now)
+    private EntryActivity(ApproverActivity live, IReadOnlyList<AgentReach> reach, DateTimeOffset now)
     {
         _live = live;
         _reach = reach;
@@ -71,7 +76,7 @@ public sealed class EntryActivity
     /// <param name="live">What the owner holds now.</param>
     /// <param name="session">What the owner released this session.</param>
     /// <param name="now">The time the recent window is measured from.</param>
-    /// <param name="reach">What each attached agent can name without having asked yet: the least of its bridge's announced exposure and its settings.</param>
+    /// <param name="reach">What each attached agent can name without having asked yet.</param>
     /// <returns>The picture.</returns>
     public static EntryActivity Build(
         IReadOnlyList<AuditEntry> audit,
@@ -79,7 +84,7 @@ public sealed class EntryActivity
         ApproverActivity live,
         IReadOnlyList<ReleaseSeen> session,
         DateTimeOffset now,
-        IReadOnlyList<Func<EntryName, IReadOnlyList<string>, ExposureReach>>? reach = null)
+        IReadOnlyList<AgentReach>? reach = null)
     {
         ArgumentNullException.ThrowIfNull(audit);
         ArgumentNullException.ThrowIfNull(vaultKey);
@@ -189,13 +194,29 @@ public sealed class EntryActivity
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(tags);
 
-        if (_reach.Any(reach => reach(entry, tags) != ExposureReach.None))
+        if (_reach.Any(agent => agent.Reach(entry, tags) != ExposureReach.None))
         {
             return true;
         }
 
         var access = Access(entry);
         return access.Clients.Count > 0 || access.Grants.Count > 0 || access.Waiting;
+    }
+
+    /// <summary>The attached agents that can name an entry without having asked yet.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <param name="tags">The entry's own tags, which a <c>tag:</c> pattern reads.</param>
+    /// <returns>Each such agent's name once, in ordinal order; empty when none can.</returns>
+    public IReadOnlyList<string> Seeing(EntryName entry, IReadOnlyList<string> tags)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        return [.. _reach
+            .Where(agent => agent.Reach(entry, tags) != ExposureReach.None)
+            .Select(agent => agent.Agent)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)];
     }
 
     /// <summary>What the Agent access card shows for an entry.</summary>

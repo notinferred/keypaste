@@ -755,7 +755,14 @@ public sealed class ScreenRenderer
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
 
-        // Settings whole, tall enough that nothing is below the fold.
+        // Settings whole, tall enough that nothing is below the fold, once the unlock's recommendations are in.
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (!shell.Recommendations.Checking.IsCompleted && DateTime.UtcNow < until)
+        {
+            WindowInput.Drain();
+            Thread.Sleep(1);
+        }
+
         window.Height = 1700;
         shell.Current = Destinations.Of(DestinationKind.Settings);
         Save(window, output, "95-settings-whole");

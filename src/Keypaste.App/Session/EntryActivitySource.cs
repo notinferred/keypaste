@@ -1,6 +1,7 @@
 using Keypaste.Core;
 using Keypaste.Core.Activity;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 
 namespace Keypaste.App.Session;
 
@@ -96,12 +97,12 @@ internal sealed class EntryActivitySource : IDisposable
     }
 
     /// <summary>
-    /// What agents can name here: for each attached bridge, the least of its announced exposure and
-    /// what its agent's settings let it see, so a bridge registered wide shows only what the owner allows (D-0378).
+    /// What agents can name here: for each attached bridge, named as a screen names its client, the least of its
+    /// announced exposure and what its agent's settings let it see, so a bridge registered wide shows only what the owner allows (D-0378).
     /// </summary>
-    private List<Func<EntryName, IReadOnlyList<string>, ExposureReach>> Reach()
+    private List<AgentReach> Reach()
     {
-        var reach = new List<Func<EntryName, IReadOnlyList<string>, ExposureReach>>();
+        var reach = new List<AgentReach>();
 
         foreach (var client in _authority.Clients)
         {
@@ -109,7 +110,7 @@ internal sealed class EntryActivitySource : IDisposable
                 && EntryExposure.TryCreate(client.Exposure, out var exposure, out _)
                 && _authority.Access(client.Label) is { } access)
             {
-                reach.Add((name, tags) => access.Reach(exposure, name, tags));
+                reach.Add(new AgentReach(ConnectedClient.Named(client.Label, client.Name), (name, tags) => access.Reach(exposure, name, tags)));
             }
         }
 

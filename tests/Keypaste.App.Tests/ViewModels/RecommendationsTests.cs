@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
@@ -56,9 +57,10 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Unlocking_lists_three_keys_needing_review_and_counts_them_quietly_on_settings()
+    public async Task Unlocking_lists_three_keys_needing_review_and_counts_them_quietly_on_settings()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
 
         Assert.Equal(["STRIPE_SECRET_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN"], shell.Recommendations.Rows.Select(row => row.Key));
         Assert.All(shell.Recommendations.Rows, row => Assert.Equal("Needs review", row.StateLabel));
@@ -72,13 +74,15 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Moving_every_key_writes_protected_fields_in_one_revision_and_empties_the_list()
+    public async Task Moving_every_key_writes_protected_fields_in_one_revision_and_empties_the_list()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         var list = shell.Recommendations;
 
         list.SelectAllCommand.Execute(null);
         list.MoveSelectedCommand.Execute(null);
+        await list.Checking;
 
         Assert.StartsWith("Moved 3 keys from the notes of services/Stripe", list.Message, StringComparison.Ordinal);
         Assert.Empty(list.Rows);
@@ -96,10 +100,12 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void A_dismissal_survives_a_lock_and_unlock_and_review_again_restores_it()
+    public async Task A_dismissal_survives_a_lock_and_unlock_and_review_again_restores_it()
     {
         using (var shell = Shell())
         {
+            await shell.Recommendations.Checking;
+
             var openAi = shell.Recommendations.Rows.Single(row => row.Key == "OPENAI_API_KEY");
             openAi.DismissCommand.Execute(null);
 
@@ -116,6 +122,7 @@ public sealed class RecommendationsTests : IDisposable
         Unlock();
 
         using var again = Shell();
+        await again.Recommendations.Checking;
         Assert.Equal("2", Settings(again).Count);
         var dismissed = again.Recommendations.Rows.Single(row => row.IsDismissed);
         Assert.Equal("OPENAI_API_KEY", dismissed.Key);
@@ -127,10 +134,14 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Notes_edited_between_the_check_and_the_move_refuse_the_move_and_write_nothing()
+    public async Task Notes_edited_between_the_check_and_the_move_refuse_the_move_and_write_nothing()
     {
-        List<Action> posted = [];
-        using var shell = Shell(post: posted.Add);
+        var posted = new ConcurrentQueue<Action>();
+        using var shell = Shell(post: posted.Enqueue);
+        await shell.Recommendations.Checking;
+        Run(posted);
+
+        // The save's own check stays posted and unrun, so the list keeps the findings from before the edit.
         var vault = _session.Unlocked!;
         vault.UpdateEntry(vault.Find(_stripe)! with { Notes = _notes + "\nedited" });
         vault.Save();
@@ -147,12 +158,13 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void A_field_holding_another_value_refuses_the_move_and_writes_nothing()
+    public async Task A_field_holding_another_value_refuses_the_move_and_writes_nothing()
     {
         var vault = _session.Unlocked!;
         vault.SetFields(_stripe, [new FieldWrite("STRIPE_SECRET_KEY", "sk_test_other")]);
         vault.Save();
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         var bytes = File.ReadAllBytes(_fixture.Path_);
 
         shell.Recommendations.Rows.Single(row => row.Key == "STRIPE_SECRET_KEY").MoveCommand.Execute(null);
@@ -163,12 +175,13 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void An_unreadable_dismissals_file_still_lists_every_key_and_is_never_replaced()
+    public async Task An_unreadable_dismissals_file_still_lists_every_key_and_is_never_replaced()
     {
         var path = KeypasteHome.RecommendationsPath(_fixture.Home);
         File.WriteAllText(path, "not json");
 
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         Assert.Equal(3, shell.Recommendations.NeedsReview);
 
         shell.Recommendations.Rows[0].DismissCommand.Execute(null);
@@ -189,9 +202,10 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void A_save_after_an_access_change_still_checks_the_notes_again()
+    public async Task A_save_after_an_access_change_still_checks_the_notes_again()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
 
         using (var current = TempVault.Secret(TempVault.Password))
         {
@@ -202,8 +216,58 @@ public sealed class RecommendationsTests : IDisposable
         var vault = _session.Unlocked!;
         vault.UpdateEntry(vault.Find(_plain)! with { Notes = "NEW_KEY=fresh" });
         vault.Save();
+        await shell.Recommendations.Checking;
 
         Assert.Contains(shell.Recommendations.Rows, row => row.Key == "NEW_KEY");
+    }
+
+    /// <summary>
+    /// A check reads the vault off the UI thread and shows its findings through the shell's post; of two checks in a
+    /// row only the later one's are shown, and a check a lock overtook shows nothing.
+    /// </summary>
+    [Fact]
+    public async Task Of_two_checks_in_a_row_only_the_later_findings_are_shown()
+    {
+        var posted = new ConcurrentQueue<Action>();
+        using var list = new RecommendationsViewModel(_session, _fixture.Home, post: posted.Enqueue);
+        await list.Checking;
+        Run(posted);
+        Assert.Equal(3, list.Rows.Count);
+
+        var vault = _session.Unlocked!;
+        vault.UpdateEntry(vault.Find(_plain)! with { Notes = "FIRST_KEY=one" });
+        list.Check();
+        await list.Checking;
+        vault.UpdateEntry(vault.Find(_plain)! with { Notes = "SECOND_KEY=two" });
+        list.Check();
+        await list.Checking;
+
+        Assert.True(posted.TryDequeue(out var superseded));
+        superseded();
+        Assert.Equal(3, list.Rows.Count);
+
+        Assert.True(posted.TryDequeue(out var latest));
+        latest();
+        Assert.Contains(list.Rows, row => row.Key == "SECOND_KEY");
+        Assert.DoesNotContain(list.Rows, row => row.Key == "FIRST_KEY");
+
+        vault.UpdateEntry(vault.Find(_plain)! with { Notes = "THIRD_KEY=three" });
+        list.Check();
+        await list.Checking;
+        _session.Lock(VaultLockReason.Manual);
+
+        Assert.True(posted.TryDequeue(out var overtaken));
+        overtaken();
+        Assert.DoesNotContain(list.Rows, row => row.Key == "THIRD_KEY");
+        Assert.True(posted.IsEmpty);
+    }
+
+    private static void Run(ConcurrentQueue<Action> posted)
+    {
+        while (posted.TryDequeue(out var action))
+        {
+            action();
+        }
     }
 
     private static NavItem Settings(ShellViewModel shell) =>

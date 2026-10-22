@@ -14,6 +14,12 @@ namespace Keypaste.App.ViewModels;
 /// shown anywhere else: no banner, no toast, only a quiet count on the Settings row.
 /// </para>
 /// <para>
+/// A check reads every live entry under the vault's lock and rates each password against a
+/// 10,000-word list, so it runs on the thread pool and its findings are shown on the UI thread once
+/// it finishes, unless a later check, a lock or <see cref="Dispose"/> came first. Until then the
+/// list shows the findings it had.
+/// </para>
+/// <para>
 /// A row names its entry and key or problem, never the value. Moving goes through
 /// <see cref="Vault.MoveNoteKeys"/>, which reads the values again under the vault's lock and
 /// refuses once the notes have changed since this check.
@@ -23,6 +29,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly Action<EntryName>? _open;
+    private readonly Action<Action>? _post;
     private readonly string _dismissalsPath;
     private readonly bool _dismissalsReadable;
     private readonly NoteKeyCheck _check = new();
@@ -36,13 +43,19 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     private IReadOnlyList<PasswordRow> _passwords = [];
     private string _message = string.Empty;
     private bool _disposed;
+    private int _generation;
 
-    internal RecommendationsViewModel(AppVaultSession session, string? home, Action<EntryName>? open = null)
+    /// <param name="session">The session whose vault is checked.</param>
+    /// <param name="home">The keypaste home dismissals are kept in.</param>
+    /// <param name="open">Shows an item in Items.</param>
+    /// <param name="post">Runs an action on the UI thread; null shows a check's findings on the context that asked for it.</param>
+    internal RecommendationsViewModel(AppVaultSession session, string? home, Action<EntryName>? open = null, Action<Action>? post = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
         _open = open;
+        _post = post;
         _dismissalsPath = KeypasteHome.RecommendationsPath(home);
         _dismissalsReadable = RecommendationDismissals.TryLoad(_dismissalsPath, out var dismissals);
         _dismissals = [.. dismissals];
@@ -106,22 +119,75 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
     internal RelayCommand SelectAllCommand { get; }
 
-    /// <summary>Checks the open vault's notes, tags and passwords again.</summary>
+    /// <summary>The latest check, complete once its findings are shown, or handed to the UI thread, or dropped.</summary>
+    internal Task Checking { get; private set; } = Task.CompletedTask;
+
+    /// <summary>Checks the open vault's notes, tags and passwords again, off the UI thread.</summary>
     internal void Check()
     {
+        var generation = ++_generation;
+
         if (_disposed || _session.Unlocked is not { } vault)
         {
             _noteKeys = [];
             _lost = [];
             _weakReusedExpired = [];
+            Show();
+            Checking = Task.CompletedTask;
+            return;
+        }
+
+        Checking = CheckAsync(generation, vault, _session.Clock.GetUtcNow());
+    }
+
+    private async Task CheckAsync(int generation, Vault vault, DateTimeOffset now)
+    {
+        var check = _check;
+        var scan = Task.Run(() => Scan(check, vault, now));
+        await ((Task)scan).ConfigureAwait(_post is null
+            ? ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing
+            : ConfigureAwaitOptions.SuppressThrowing);
+
+        if (_post is { } post)
+        {
+            post(() => Show(generation, vault, scan));
         }
         else
         {
-            _noteKeys = _check.Scan(vault);
-            _lost = LostProjectTagCheck.Scan(vault);
-            _weakReusedExpired = PasswordHealthCheck.Scan(vault, _session.Clock.GetUtcNow());
+            Show(generation, vault, scan);
+        }
+    }
+
+    /// <summary>Every finding, or null when a lock disposed the vault, or <see cref="Dispose"/> the check, mid-scan.</summary>
+    private static Findings? Scan(NoteKeyCheck check, Vault vault, DateTimeOffset now)
+    {
+        try
+        {
+            return new Findings(check.Scan(vault), LostProjectTagCheck.Scan(vault), PasswordHealthCheck.Scan(vault, now));
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Shows a finished scan's findings, unless a later check, a lock or <see cref="Dispose"/> came first.</summary>
+    private void Show(int generation, Vault vault, Task<Findings?> scan)
+    {
+        if (generation != _generation || _disposed || !ReferenceEquals(_session.Unlocked, vault))
+        {
+            return;
         }
 
+        // A scan that failed fails here, on the UI thread, as a check run there did.
+        if (scan.GetAwaiter().GetResult() is not { } found)
+        {
+            return;
+        }
+
+        _noteKeys = found.NoteKeys;
+        _lost = found.Lost;
+        _weakReusedExpired = found.Passwords;
         Show();
     }
 
@@ -276,6 +342,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _generation++;
         Rows = [];
         LostTags = [];
         Passwords = [];
@@ -360,4 +427,6 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
     internal static string Shown(EntryName entry) =>
         EntryNameSanitizer.SanitizePath(entry.GroupPath.Length == 0 ? entry.Title : entry.GroupPath + "/" + entry.Title).Text;
+
+    private sealed record Findings(IReadOnlyList<NoteKeyFinding> NoteKeys, IReadOnlyList<LostProjectTag> Lost, IReadOnlyList<PasswordFinding> Passwords);
 }

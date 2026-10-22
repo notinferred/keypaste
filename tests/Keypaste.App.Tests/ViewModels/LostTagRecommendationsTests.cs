@@ -61,9 +61,10 @@ public sealed class LostTagRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Unlocking_lists_the_tag_another_app_dropped_and_counts_it_quietly_on_settings()
+    public async Task Unlocking_lists_the_tag_another_app_dropped_and_counts_it_quietly_on_settings()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
 
         var lost = Assert.Single(shell.Recommendations.LostTags);
         Assert.Equal("env:billing:prod", lost.Tag);
@@ -75,9 +76,10 @@ public sealed class LostTagRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Restore_says_what_the_tag_reaches_first_and_then_puts_it_back_in_one_revision()
+    public async Task Restore_says_what_the_tag_reaches_first_and_then_puts_it_back_in_one_revision()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         var lost = Assert.Single(shell.Recommendations.LostTags);
         var bytes = File.ReadAllBytes(_fixture.Path_);
         var history = _session.Unlocked!.ReadHistory(_billing)!.Count;
@@ -91,6 +93,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         Assert.Equal(bytes, File.ReadAllBytes(_fixture.Path_));
 
         lost.ConfirmRestoreCommand.Execute(null);
+        await shell.Recommendations.Checking;
 
         var vault = _session.Unlocked!;
         Assert.Equal(["env:billing:prod"], vault.Tags(_billing));
@@ -101,10 +104,12 @@ public sealed class LostTagRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void A_dismissal_survives_a_lock_and_unlock_and_review_again_lists_it_again()
+    public async Task A_dismissal_survives_a_lock_and_unlock_and_review_again_lists_it_again()
     {
         using (var shell = Shell())
         {
+            await shell.Recommendations.Checking;
+
             Assert.Single(shell.Recommendations.LostTags).DismissCommand.Execute(null);
 
             Assert.Equal(string.Empty, Settings(shell).Count);
@@ -121,6 +126,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         Unlock();
 
         using var again = Shell();
+        await again.Recommendations.Checking;
         var dismissed = Assert.Single(again.Recommendations.LostTags);
         Assert.True(dismissed.IsDismissed);
 
@@ -130,9 +136,10 @@ public sealed class LostTagRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void A_tag_removed_in_keypaste_is_not_listed()
+    public async Task A_tag_removed_in_keypaste_is_not_listed()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
 
         Assert.DoesNotContain(shell.Recommendations.LostTags, row => row.Finding.Entry == _web);
 
@@ -141,6 +148,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         Assert.True(vault.RemoveTags(_web, ["env:web:staging"]));
         vault.Save();
         shell.Recommendations.Check();
+        await shell.Recommendations.Checking;
 
         Assert.Single(shell.Recommendations.LostTags);
         Assert.DoesNotContain(shell.Recommendations.LostTags, row => row.Finding.Entry == _web);

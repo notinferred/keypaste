@@ -39,5 +39,5 @@ Local, Windows 10 Pro 19045, on `main` above `2e3b51f`.
 - Opening an address is checked through the launcher seam: the plan's click in a source-built app on Windows, to watch the default browser open, was not made in this session, and no test watches a real browser open on any platform.
 - **A share link's audit line names no vault**, so a share made from one vault counts as a release of the item at the same path in any other, for the card as for the table's last-used dot. This predates the step and was reported to the founder rather than planned here.
 - A bridge from before this step announces nothing, so an item its agents can see shows no card until one receives it.
-- The card says nothing about why it shows when nothing has been released: its summary reads None active.
+- When nothing has been released, granted or asked for, the card's summary names the attached agents whose reach shows it, such as "claude-code can see it · nothing released", where it read None active (gaps-1c, RUNS-PENDING).
 - Source only.

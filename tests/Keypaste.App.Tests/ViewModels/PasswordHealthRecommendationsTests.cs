@@ -62,9 +62,10 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Unlocking_lists_each_weak_reused_and_expired_item_and_counts_them_quietly_on_settings()
+    public async Task Unlocking_lists_each_weak_reused_and_expired_item_and_counts_them_quietly_on_settings()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         var rows = shell.Recommendations.Passwords;
 
         Assert.Equal(
@@ -84,10 +85,12 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void No_row_and_no_stored_dismissal_holds_a_password_or_a_title()
+    public async Task No_row_and_no_stored_dismissal_holds_a_password_or_a_title()
     {
         using (var shell = Shell())
         {
+            await shell.Recommendations.Checking;
+
             var surfaced = shell.Recommendations.Passwords
                 .SelectMany(row => new[] { row.Entry, row.Problem, row.Where, row.Description, row.StateLabel, row.Finding.ToString(), row.Finding.Key })
                 .ToList();
@@ -112,10 +115,12 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void A_dismissal_survives_a_lock_and_unlock_and_review_again_lists_it_again()
+    public async Task A_dismissal_survives_a_lock_and_unlock_and_review_again_lists_it_again()
     {
         using (var shell = Shell())
         {
+            await shell.Recommendations.Checking;
+
             shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail).DismissCommand.Execute(null);
 
             Assert.Equal("3", Settings(shell).Count);
@@ -126,6 +131,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         Unlock();
 
         using var again = Shell();
+        await again.Recommendations.Checking;
         var dismissed = again.Recommendations.Passwords.Single(row => row.IsDismissed);
         Assert.Equal((_mail, PasswordProblem.Weak), (dismissed.Finding.Entry, dismissed.Finding.Problem));
         Assert.Equal("3", Settings(again).Count);
@@ -137,9 +143,10 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void A_dismissed_expiry_is_listed_again_once_a_new_expiry_passes()
+    public async Task A_dismissed_expiry_is_listed_again_once_a_new_expiry_passes()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         shell.Recommendations.Passwords.Single(row => row.Finding.Problem == PasswordProblem.Expired).DismissCommand.Execute(null);
         Assert.Equal("3", Settings(shell).Count);
 
@@ -147,6 +154,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         vault.SetExpiryUnchecked(_cloud, AppClock.Start.AddHours(-1));
         vault.Save();
         shell.Recommendations.Check();
+        await shell.Recommendations.Checking;
 
         var expired = shell.Recommendations.Passwords.Single(row => row.Finding.Problem == PasswordProblem.Expired);
         Assert.True(expired.NeedsReview);
@@ -154,24 +162,27 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Replacing_a_weak_or_reused_password_takes_its_rows_off_the_list()
+    public async Task Replacing_a_weak_or_reused_password_takes_its_rows_off_the_list()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         var vault = _session.Unlocked!;
 
         vault.UpdateEntry(vault.Find(_mail)! with { Password = _replacement });
         vault.UpdateEntry(vault.Find(_shop)! with { Password = _otherReplacement });
         vault.Save();
         shell.Recommendations.Check();
+        await shell.Recommendations.Checking;
 
         Assert.Equal([("services/Cloud", "Expired item")], shell.Recommendations.Passwords.Select(row => (row.Entry, row.Problem)));
         Assert.Equal("1", Settings(shell).Count);
     }
 
     [Fact]
-    public void Open_item_shows_the_item_selected_in_its_group_found_by_its_uuid_after_a_rename()
+    public async Task Open_item_shows_the_item_selected_in_its_group_found_by_its_uuid_after_a_rename()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         shell.Current = Destinations.Of(DestinationKind.Settings);
         var weak = shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail);
 
@@ -188,9 +199,10 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     }
 
     [Fact]
-    public void Open_item_says_so_when_the_item_has_left_the_vault()
+    public async Task Open_item_says_so_when_the_item_has_left_the_vault()
     {
         using var shell = Shell();
+        await shell.Recommendations.Checking;
         shell.Current = Destinations.Of(DestinationKind.Settings);
         var weak = shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail);
 

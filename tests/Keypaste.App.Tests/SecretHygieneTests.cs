@@ -201,12 +201,13 @@ public sealed class SecretHygieneTests
     /// before and after a lock (C.2).
     /// </summary>
     [Fact]
-    public void The_recommendations_list_holds_keys_and_no_value()
+    public async Task The_recommendations_list_holds_keys_and_no_value()
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority: null);
         var list = shell.Recommendations;
+        await list.Checking;
 
         shell.Current = Destinations.Of(DestinationKind.Settings);
         var surfaced = Surface(list).Concat(Surface(shell.Content)).ToList();

@@ -15,13 +15,18 @@ namespace Keypaste.App.ViewModels;
 /// problem imports nothing, and every message names a line and a rule, never the text.
 /// </para>
 /// <para>
-/// The file is left where it is. The CLI offers to delete it with a warning about what deleting
-/// cannot erase; the app does not repeat that offer.
+/// Once the project holds what the file holds, the app offers to delete it as <c>keypaste env pull</c> does,
+/// with the same warnings, and keeps it unless Delete is pressed. The deletion is bound to the bytes the
+/// preview read (<see cref="SourceSnapshot"/>), so a file changed since is kept.
 /// </para>
 /// </remarks>
 internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 {
     private const int _problemsShown = 10;
+
+    private const string _overwrites =
+        "Deleting removes the file but does not overwrite the disk blocks it used: on an SSD, a copy-on-write file system " +
+        "or a volume with snapshots or backups, its contents can outlive it. If these values may have leaked, rotate them.";
 
     private readonly AppVaultSession _session;
     private readonly string _project;
@@ -37,6 +42,10 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
     private IReadOnlyList<string> _rows = [];
     private string _source = string.Empty;
     private string _notes = string.Empty;
+    private SourceSnapshot? _read;
+    private SourceSnapshot? _leftover;
+    private string _leftoverPath = string.Empty;
+    private string _deleteWarning = string.Empty;
 
     internal EnvImportViewModel(
         AppVaultSession session,
@@ -62,11 +71,16 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         ChooseCommand = new AsyncRelayCommand(ChooseAsync, () => _picker is not null);
         ConfirmCommand = new RelayCommand(Confirm, () => IsPreviewing);
         CancelCommand = new RelayCommand(Clear, () => IsPreviewing);
+        DeleteSourceCommand = new RelayCommand(DeleteSource, () => IsOfferingDelete);
+        KeepSourceCommand = new RelayCommand(EndOffer, () => IsOfferingDelete);
 
         DependsOn(nameof(IsPreviewing), nameof(Document));
         DependsOn(nameof(HasNotes), nameof(Notes));
+        DependsOn(nameof(IsOfferingDelete), nameof(Leftover));
         DependsOn(ConfirmCommand, nameof(IsPreviewing));
         DependsOn(CancelCommand, nameof(IsPreviewing));
+        DependsOn(DeleteSourceCommand, nameof(IsOfferingDelete));
+        DependsOn(KeepSourceCommand, nameof(IsOfferingDelete));
     }
 
     /// <summary>The profile a file is previewed for; the preview's own profile is what Import writes to.</summary>
@@ -104,14 +118,41 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
     internal bool HasNotes => _notes.Length > 0;
 
+    /// <summary>The imported file the screen offers to delete, or empty when it offers none.</summary>
+    internal string Leftover
+    {
+        get => _leftoverPath;
+        private set => Set(ref _leftoverPath, value);
+    }
+
+    /// <summary>Whether the screen offers to delete the file it imported.</summary>
+    internal bool IsOfferingDelete => _leftoverPath.Length > 0;
+
+    /// <summary>What deleting the file cannot erase: the disk blocks it used and, inside a git repository, its history.</summary>
+    internal string DeleteWarning
+    {
+        get => _deleteWarning;
+        private set => Set(ref _deleteWarning, value);
+    }
+
     internal AsyncRelayCommand ChooseCommand { get; }
 
     internal RelayCommand ConfirmCommand { get; }
 
     internal RelayCommand CancelCommand { get; }
 
+    /// <summary>Deletes the imported file, only while it still holds what the preview read.</summary>
+    internal RelayCommand DeleteSourceCommand { get; }
+
+    /// <summary>Leaves the imported file where it is.</summary>
+    internal RelayCommand KeepSourceCommand { get; }
+
     /// <summary>Nothing read from the file outlives this.</summary>
-    public void Dispose() => Clear();
+    public void Dispose()
+    {
+        Clear();
+        EndOffer();
+    }
 
     private async Task ChooseAsync()
     {
@@ -126,6 +167,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
     internal void Preview(string path)
     {
         Clear();
+        EndOffer();
         _report(null);
 
         if (_session.Unlocked is not { } vault)
@@ -180,6 +222,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
         _planned = plan.Environment;
         _previewed = plan.Keys;
+        _read = SourceSnapshot.Take(path, bytes);
         Source = path;
         Rows = [.. plan.Keys.Select(key => $"{EntryNameSanitizer.Sanitize(key.Key).Text}  {Describe(key, plan)}")];
         Notes = NotesOf(document);
@@ -188,10 +231,12 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
     private void Confirm()
     {
-        if (_document is not { } document)
+        if (_document is not { } document || _read is not { } read)
         {
             return;
         }
+
+        var path = Source;
 
         var write = _session.Write(
             vault =>
@@ -225,7 +270,8 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
                 }
                 else
                 {
-                    _announce($"{Where} already matches the file; nothing was written.");
+                    var unchanged = OfferToDelete(path, read);
+                    _announce($"{Where} already matches the file; nothing was written.{unchanged}");
                 }
 
                 Clear();
@@ -233,7 +279,8 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
             case WriteOutcome.Saved:
                 var written = write.Value.Plan.Created.Count + write.Value.Plan.Updated.Count;
-                _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}. {Source} is still there.");
+                var kept = OfferToDelete(path, read);
+                _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}.{kept}");
                 Clear();
                 _imported();
                 return;
@@ -248,9 +295,77 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
     {
         Document = null;
         _previewed = [];
+        _read = null;
         Source = string.Empty;
         Rows = [];
         Notes = string.Empty;
+    }
+
+    /// <summary>
+    /// Offers to delete a file the project now holds the values of, when it still holds what was read,
+    /// and otherwise says why it is kept, as <c>env pull</c> does before asking.
+    /// </summary>
+    /// <returns>Why the file is kept, as a sentence starting with a space, or empty.</returns>
+    private string OfferToDelete(string path, SourceSnapshot read)
+    {
+        if (read.Matches(path))
+        {
+            _leftover = read;
+            DeleteWarning = GitRepository.Find(path) is { } repository
+                ? $"{_overwrites} It is inside the git repository at {repository}, and deleting it does not remove it from git history: " +
+                    "if it was ever committed, its values are in the repository and every clone, so treat them as leaked. git log --oneline -- <path> there shows whether it was."
+                : _overwrites;
+            Leftover = path;
+            return string.Empty;
+        }
+
+        return File.Exists(path)
+            ? $" {path} changed after keypaste read it, so what it holds now was not imported, and it was left in place."
+            : string.Empty;
+    }
+
+    private void DeleteSource()
+    {
+        if (_leftover is not { } read)
+        {
+            return;
+        }
+
+        var path = Leftover;
+        EndOffer();
+
+        var outcome = read.DeleteIfUnchanged(path, out var detail);
+        var why = detail is null ? string.Empty : $" ({detail})";
+
+        switch (outcome)
+        {
+            case SourceCleanup.Deleted:
+                _announce($"Deleted {path}.");
+                return;
+
+            case SourceCleanup.Missing:
+                _announce($"{path} was already gone, so nothing was deleted.");
+                return;
+
+            case SourceCleanup.Stranded:
+                _report($"{path} could not be removed: the file keypaste read is now at {detail} and still holds the values. Delete it yourself when you are ready.");
+                return;
+
+            case SourceCleanup.Unreadable:
+                _report($"{path} was not deleted: keypaste could not check that it still holds what was imported{why}. It may still hold the values, so delete it yourself once you have checked it.");
+                return;
+
+            default:
+                _report($"{path} was not deleted: it changed after keypaste read it, so what it holds now was not imported. Import it again to bring that in.");
+                return;
+        }
+    }
+
+    private void EndOffer()
+    {
+        _leftover = null;
+        Leftover = string.Empty;
+        DeleteWarning = string.Empty;
     }
 
     /// <summary>The project and environment imported into, as the screen names them.</summary>

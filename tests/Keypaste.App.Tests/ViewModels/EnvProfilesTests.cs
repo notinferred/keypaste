@@ -570,6 +570,132 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.DoesNotContain("services/Odd", Open(screen).Environments.SelectMany(environment => environment.Members).Select(member => member.Display));
     }
 
+    /// <summary>Once a file is imported the screen offers to delete it, as <c>keypaste env pull</c> does, and keeps it byte for byte unless Delete is pressed.</summary>
+    [Fact]
+    public void An_imported_file_is_offered_for_deletion_and_kept_unless_Delete_is_pressed()
+    {
+        var folder = Directory.CreateTempSubdirectory("keypaste-import-").FullName;
+        try
+        {
+            var file = Path.Combine(folder, ".env");
+            var written = Encoding.UTF8.GetBytes("FRESH=fresh-sentinel\n");
+            File.WriteAllBytes(file, written);
+
+            using var screen = new EnvSetsViewModel(_session, _countdown);
+            var import = Imported(screen, file);
+
+            Assert.True(import.IsOfferingDelete);
+            Assert.Equal(file, import.Leftover);
+            Assert.Contains("does not overwrite the disk blocks", import.DeleteWarning, StringComparison.Ordinal);
+            Assert.Equal("Imported 1 variable into acme-api/dev.", screen.Notice);
+
+            import.KeepSourceCommand.Execute(null);
+
+            Assert.False(import.IsOfferingDelete);
+            Assert.False(import.DeleteSourceCommand.CanExecute(null));
+            Assert.Equal(written, File.ReadAllBytes(file));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Delete_removes_the_imported_file_and_leaves_nothing_beside_it()
+    {
+        var folder = Directory.CreateTempSubdirectory("keypaste-import-").FullName;
+        try
+        {
+            var file = Path.Combine(folder, ".env");
+            File.WriteAllText(file, "FRESH=fresh-sentinel\n");
+
+            using var screen = new EnvSetsViewModel(_session, _countdown);
+            var import = Imported(screen, file);
+            import.DeleteSourceCommand.Execute(null);
+
+            Assert.Null(screen.Error);
+            Assert.Equal($"Deleted {file}.", screen.Notice);
+            Assert.False(import.IsOfferingDelete);
+            Assert.Empty(Directory.GetFileSystemEntries(folder));
+            Assert.Equal("fresh-sentinel", _session.Unlocked!.ReadField(ProjectVariables.Home("acme-api"), "FRESH"));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>The deletion is bound to the bytes the preview read: a file edited since is kept, whether before Import or before Delete.</summary>
+    [Fact]
+    public void A_file_edited_after_it_was_read_is_kept()
+    {
+        var folder = Directory.CreateTempSubdirectory("keypaste-import-").FullName;
+        try
+        {
+            var file = Path.Combine(folder, ".env");
+            File.WriteAllText(file, "FRESH=fresh-sentinel\n");
+
+            using var screen = new EnvSetsViewModel(_session, _countdown);
+            var import = Imported(screen, file);
+            File.WriteAllText(file, "FRESH=fresh-sentinel\nADDED=later\n");
+            import.DeleteSourceCommand.Execute(null);
+
+            Assert.Equal("FRESH=fresh-sentinel\nADDED=later\n", File.ReadAllText(file));
+            Assert.Contains("was not deleted: it changed after keypaste read it", screen.Error, StringComparison.Ordinal);
+            Assert.Single(Directory.GetFileSystemEntries(folder));
+
+            File.WriteAllText(file, "OTHER=one\n");
+            import.Preview(file);
+            File.WriteAllText(file, "OTHER=two\n");
+            import.ConfirmCommand.Execute(null);
+
+            Assert.False(import.IsOfferingDelete);
+            Assert.Contains("changed after keypaste read it, so what it holds now was not imported, and it was left in place.", screen.Notice, StringComparison.Ordinal);
+            Assert.Equal("OTHER=two\n", File.ReadAllText(file));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>A file inside a git repository is offered with the warning that deleting it leaves it in the repository's history.</summary>
+    [Fact]
+    public void A_file_inside_a_git_repository_is_offered_with_the_history_warning()
+    {
+        var folder = Directory.CreateTempSubdirectory("keypaste-import-").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(folder, ".git"));
+            var file = Path.Combine(Directory.CreateDirectory(Path.Combine(folder, "config")).FullName, ".env");
+            File.WriteAllText(file, "FRESH=fresh-sentinel\n");
+
+            using var screen = new EnvSetsViewModel(_session, _countdown);
+            var import = Imported(screen, file);
+
+            Assert.True(import.IsOfferingDelete);
+            Assert.Contains($"inside the git repository at {folder}", import.DeleteWarning, StringComparison.Ordinal);
+            Assert.Contains("does not remove it from git history", import.DeleteWarning, StringComparison.Ordinal);
+            Assert.Contains("every clone", import.DeleteWarning, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>Imports <paramref name="file"/> into acme-api's dev environment through the screen.</summary>
+    private static EnvImportViewModel Imported(EnvSetsViewModel screen, string file)
+    {
+        var import = Open(screen).Import;
+        import.Preview(file);
+        Assert.True(import.IsPreviewing, screen.Error);
+        import.ConfirmCommand.Execute(null);
+        Assert.Null(screen.Error);
+        return import;
+    }
+
     /// <summary>An ordinary entry holding <paramref name="key"/> as a field, with these tags, saved.</summary>
     private EntryName Tagged(string group, string title, string key, params string[] tags)
     {

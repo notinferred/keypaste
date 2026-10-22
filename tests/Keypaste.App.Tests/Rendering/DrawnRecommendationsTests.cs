@@ -20,10 +20,11 @@ public sealed class DrawnRecommendationsTests
     private const string _weak = "hunter2";
 
     [Fact]
-    public Task Settings_draws_each_key_and_no_value_and_counts_them_without_amber() => HeadlessSession.On(() =>
+    public Task Settings_draws_each_key_and_no_value_and_counts_them_without_amber() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell(
             seed: vault => vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = _stripeLogin, Notes = $"STRIPE_SECRET_KEY={_keyValue}\n{_token}" }));
+        await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
 
         shell.Show<SettingsViewModel>(DestinationKind.Settings);
         var key = shell.Window.GetVisualDescendants().OfType<TextBlock>().First(block => block.Name == "RecommendationKey" && block.Text == "STRIPE_SECRET_KEY");
@@ -46,7 +47,7 @@ public sealed class DrawnRecommendationsTests
     });
 
     [Fact]
-    public Task Settings_draws_each_weak_and_reused_password_by_item_and_never_the_password() => HeadlessSession.On(() =>
+    public Task Settings_draws_each_weak_and_reused_password_by_item_and_never_the_password() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell(
             seed: vault =>
@@ -54,6 +55,7 @@ public sealed class DrawnRecommendationsTests
                 vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Mail", Password = _weak });
                 vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Shop", Password = RenderedShell.Current });
             });
+        await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
 
         shell.Show<SettingsViewModel>(DestinationKind.Settings);
         var card = shell.Named<Border>("RecommendationsCard");
@@ -78,10 +80,12 @@ public sealed class DrawnRecommendationsTests
     });
 
     [Fact]
-    public Task No_main_screen_draws_a_recommendation_or_a_banner_for_one() => HeadlessSession.On(() =>
+    public Task No_main_screen_draws_a_recommendation_or_a_banner_for_one() => HeadlessSession.On(async () =>
     {
         using var shell = new RenderedShell(
             seed: vault => vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "p", Notes = $"STRIPE_SECRET_KEY={_keyValue}" }));
+        await shell.Shell.Recommendations.Checking.ConfigureAwait(true);
+        Assert.NotEmpty(shell.Shell.Recommendations.Rows);
 
         foreach (var destination in Destinations.Main)
         {

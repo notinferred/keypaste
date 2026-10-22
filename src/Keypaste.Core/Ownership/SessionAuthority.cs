@@ -432,7 +432,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         var delivered = Deliverable(reply with { Session = request.Session });
         var answered = Answer(delivered);
-        var client = ClientName(request.ClientLabel, request.ClientName);
+        var client = ConnectedClient.Named(request.ClientLabel, request.ClientName);
 
         if (answered is { Decision: AuditDecision.Granted, Entry: { } entry })
         {
@@ -949,7 +949,7 @@ public sealed class SessionAuthority : IApproverHandler
             return Answer(RunRefused(request, refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession, refusal.Method, refusal.Reason));
         }
 
-        var client = ClientName(request.ClientLabel, request.ClientName);
+        var client = ConnectedClient.Named(request.ClientLabel, request.ClientName);
 
         var decided = await Decided(
             token => DecideRunAsync(request, asked, connectionId, admitted, token),
@@ -1014,7 +1014,7 @@ public sealed class SessionAuthority : IApproverHandler
         // Before anything is resolved, so an agent that may not run commands learns nothing of the vault from a run.
         if (!access.Run)
         {
-            environments.Narrate?.Invoke($"refused a run for {ClientName(request.ClientLabel, request.ClientName)}: its settings do not let it run commands");
+            environments.Narrate?.Invoke($"refused a run for {ConnectedClient.Named(request.ClientLabel, request.ClientName)}: its settings do not let it run commands");
             return Refuse(EnvOutcome.Unauthorized, AuditMethod.RunOff, "this agent's settings do not let it run commands");
         }
 
@@ -1408,12 +1408,6 @@ public sealed class SessionAuthority : IApproverHandler
             ledger.Ledger.Record(entries, client, how, _clock.GetUtcNow());
         }
     }
-
-    /// <summary>How a screen and a narration name a client: its label, else its name.</summary>
-    private static string ClientName(string? label, string? name) =>
-        label is { Length: > 0 } ? EntryNameSanitizer.Sanitize(label, ApprovalPrompt.MaximumClientLength).Text
-        : name is { Length: > 0 } ? EntryNameSanitizer.Sanitize(name, ApprovalPrompt.MaximumClientLength).Text
-        : "an unnamed agent";
 
     /// <inheritdoc/>
     /// <remarks>

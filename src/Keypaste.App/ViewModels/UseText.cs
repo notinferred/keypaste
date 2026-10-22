@@ -75,9 +75,15 @@ internal static class UseText
 
     /// <summary>The Agent access card's one line.</summary>
     /// <param name="access">What the card shows.</param>
-    /// <returns>"claude-code · grant, 42m left", "cursor", "ci-staging · token" or "None active": who, never when, which the card's Last used line says.</returns>
-    internal static string Summary(EntryAgentAccess? access)
+    /// <param name="seeing">The attached agents that can name the entry without having asked yet.</param>
+    /// <returns>
+    /// "claude-code · grant, 42m left", "cursor", "ci-staging · token", "claude-code can see it · nothing released"
+    /// or "None active": who, never when, which the card's Last used line says.
+    /// </returns>
+    internal static string Summary(EntryAgentAccess? access, IReadOnlyList<string> seeing)
     {
+        ArgumentNullException.ThrowIfNull(seeing);
+
         if (access is null)
         {
             return "None active";
@@ -94,8 +100,17 @@ internal static class UseText
             return access.Clients[0].Client;
         }
 
-        return access.Waiting ? "a request is waiting" : "None active";
+        if (access.Waiting)
+        {
+            return "a request is waiting";
+        }
+
+        return seeing.Count > 0 ? $"{Listed(seeing)} can see it · nothing released" : "None active";
     }
+
+    private static string Listed(IReadOnlyList<string> names) => names.Count == 1
+        ? names[0]
+        : $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]}";
 
     /// <summary>How many lines the Agent access card lists under its summary.</summary>
     internal const int MaximumLines = 5;

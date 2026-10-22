@@ -195,7 +195,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
                 authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post);
         }
 
-        Recommendations = new RecommendationsViewModel(session, home, OpenEntry);
+        Recommendations = new RecommendationsViewModel(session, home, OpenEntry, post);
         Recommendations.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(RecommendationsViewModel.NeedsReview))

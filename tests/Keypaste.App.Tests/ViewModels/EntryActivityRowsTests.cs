@@ -58,7 +58,7 @@ public sealed class EntryActivityRowsTests
     /// <summary>
     /// The card belongs to an item agents can see: with nothing released and no bridge attached it is
     /// absent, a bridge whose agent's settings do not reach the item leaves it absent, and one whose
-    /// settings do brings it (N.5).
+    /// settings do brings it, saying which agent can see the item (N.5).
     /// </summary>
     [Fact]
     public async Task TheAgentAccessCard_ShowsOnlyWhenAgentsCanSeeTheItem()
@@ -83,7 +83,26 @@ public sealed class EntryActivityRowsTests
             using var screen = app.Screen();
             screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
             Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
-            Assert.Equal("None active", screen.Entries.Detail.AgentAccessSummary);
+            Assert.Equal("ci-probe can see it · nothing released", screen.Entries.Detail.AgentAccessSummary);
+        }
+    }
+
+    /// <summary>A grant in force is what the card says first, while an attached agent can also see the item.</summary>
+    [Fact]
+    public async Task TheAgentAccessCard_PutsAGrantBeforeTheAgentsThatCanSeeTheItem()
+    {
+        await using var app = await App.StartAsync();
+
+        await using (await app.AttachBridgeAsync(TempVault.Agent))
+        {
+            app.Person.Answer = ApprovalAnswer.Approved;
+            Assert.Equal(AuditMethod.Prompt, (await app.RequestAsync())!.Method);
+
+            using var screen = app.Screen();
+            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
+
+            Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
+            Assert.Equal("claude-code · allowance, 1h left", screen.Entries.Detail.AgentAccessSummary);
         }
     }
 

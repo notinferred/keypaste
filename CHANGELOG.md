@@ -23,6 +23,11 @@ The tag box on an item and in New item now suggests the vault's project tags as 
 An item's preview in the app now shows its expiry, set in KeePassXC, beside Created, and reads Expired in red once it has passed, so you see why a run refuses it before you start one.
 
 A value wrapped whole in `\{` and `\}`, KeePassXC's escape for text shaped like a placeholder, now leaves keypaste as KeePassXC 2.7.11 gives it: `\{PASSWORD\}` becomes `{PASSWORD}` with nothing filled in, where keypaste passed the backslashes on or, for one such as `\{S:API_KEY\}`, refused the value.
+Settings › Recommendations now checks the vault on a background thread after each unlock and save, rather than on the window's own, and updates its list and the count beside Settings when the check finishes.
+
+After Import .env on the Projects screen, the app now offers to delete the file, as `keypaste env pull` does, saying that deleting does not overwrite the disk blocks it used and, for a file inside a git repository, does not remove it from the repository's history. The file stays unless you press Delete, and a file that changed after keypaste read it is kept.
+
+When no agent has received an item, holds an allowance for it or is asking for it, the item's Agent access card now names the connected agents that can see it, such as "claude-code can see it · nothing released", rather than None active.
 
 Tagging an item into a project, in the app or with `keypaste env tag`, now names each of its variables that holds a KeePass placeholder such as `{PASSWORD}`, with the placeholder, before anything is written, because that variable carries the item's own field to whoever gets it.
 
@@ -72,7 +77,7 @@ On an agent's settings panel, a choice made from the keyboard keeps the keyboard
 A toast in the app no longer blocks what it covers: a click where it is drawn reaches the button under it, such as Run in a terminal at the foot of a project. The clipboard's toast still takes a press on its Clear now.
 
 The app's idle warning now counts down: "Locking in 30 seconds." drops by one each second until the lock, any key, click or pointer move still takes it away, and the name it gives a screen reader is its first line, set once per warning rather than every second.
-On Windows and Linux, Run in a terminal and Open terminal on the Projects screen now write a History line too, the same one a macOS Run writes, naming the project, environment and items but no value, so each Run also shows in its items' activity. As on macOS, a Run is refused before its confirmation while the app cannot open its audit log, or when its variables come from more items than one History line can name; the copied run command still works then.
+On Windows and Linux, Run in a terminal and Open terminal on the Projects screen now write a History line too, the same one a macOS Run writes, naming the project, environment and items but no value, so each Run also shows in its items' activity. As on macOS, a Run is refused before its confirmation while the app cannot open its audit log, or when its variables come from more items than one History line can name, and the refusal gives only that reason, since the copied run command meets the same refusal.
 
 Settings › Recommendations now calls a password weak when it is one of the 10,000 most common passwords, or made of them, however long it is, checked against a list built into keypaste with no network request. Each password it lists has Open item, which shows that item selected in Items, even after you renamed it. Custom fields are still not rated, since they mostly hold API keys a password-strength estimate misjudges.
 

@@ -1,4 +1,4 @@
-namespace Keypaste.Cli;
+namespace Keypaste.Core;
 
 /// <summary>Whether a path sits inside a git working tree.</summary>
 /// <remarks>
@@ -8,16 +8,20 @@ namespace Keypaste.Cli;
 /// the kind of overclaim SECURITY.md exists to avoid, and a subprocess on the secret path would
 /// need its own justification under docs/PRODUCT.md law 3.9.
 /// </remarks>
-internal static class GitRepository
+public static class GitRepository
 {
     /// <summary>The root of the repository containing <paramref name="path"/>, if any.</summary>
+    /// <param name="path">A file's full path.</param>
+    /// <returns>The directory holding the <c>.git</c> entry, or null when no directory above the file has one.</returns>
     /// <remarks>
     /// A worktree and a submodule carry a <c>.git</c> <em>file</em> rather than a directory, so
     /// both are checked; looking only for the directory would miss exactly the setups where the
     /// history is somebody else's to clean up.
     /// </remarks>
-    internal static string? Find(string path)
+    public static string? Find(string path)
     {
+        ArgumentNullException.ThrowIfNull(path);
+
         var directory = Path.GetDirectoryName(path);
 
         while (!string.IsNullOrEmpty(directory))

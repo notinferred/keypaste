@@ -134,7 +134,7 @@ public sealed class EntryActivityTests
         Assert.True(EntryExposure.TryCreate(["env/**"], out var bridge, out _));
 
         var nothing = Build();
-        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [bridge.Reach]);
+        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [new AgentReach("claude-code", bridge.Reach)]);
         var released = Build(audit: [Line("personal/github", 300)]);
 
         Assert.False(nothing.AgentsCanSee(_stripe, []));
@@ -147,10 +147,30 @@ public sealed class EntryActivityTests
     [Fact]
     public void AgentsCanSee_AnEntryTheDefaultReachesByItsProjectTag()
     {
-        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [EntryExposure.Default.Reach]);
+        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [new AgentReach("claude-code", EntryExposure.Default.Reach)]);
 
         Assert.True(reached.AgentsCanSee(_github, ["env:acme-api"]));
         Assert.False(reached.AgentsCanSee(_github, ["personal"]));
+    }
+
+    /// <summary>The card names the agents that can see an entry, each once, by what their reach covers (N.5).</summary>
+    [Fact]
+    public void Seeing_NamesEachAgentWhoseReachCoversTheEntry_Once()
+    {
+        Assert.True(EntryExposure.TryCreate(["env/**"], out var bridge, out _));
+
+        var reached = EntryActivity.Build(
+            [],
+            _vault,
+            ApproverActivity.None,
+            [],
+            _now,
+            [new AgentReach("cursor", bridge.Reach), new AgentReach("claude-code", EntryExposure.Default.Reach), new AgentReach("cursor", EntryExposure.Default.Reach)]);
+
+        Assert.Equal(["claude-code", "cursor"], reached.Seeing(_stripe, ["env:acme-api"]));
+        Assert.Equal(["cursor"], reached.Seeing(_stripe, []));
+        Assert.Empty(reached.Seeing(_github, ["personal"]));
+        Assert.Empty(Build(audit: [Line("personal/github", 30)]).Seeing(_github, []));
     }
 
     [Fact]

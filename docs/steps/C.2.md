@@ -42,7 +42,7 @@ Hosted CI has not run; `app.yml` runs the workflows gate on Ubuntu and Windows w
 - Not found: YAML-style `KEY: value`, values spanning lines, quoted values with escapes, lowercase keys, and tokens inside a sentence or behind a label. Each would need a guess the move cannot take back, so the patterns stay as they are by founder decision 2026-10-22.
 - The token list is eight services; another service's token is found only as a `KEY=value` line. It stays so by the same decision.
 - No CLI surface lists or moves findings (D-0372).
-- The check reads every entry's notes on the UI thread after each save, as the sidebar count does; a vault of many thousands of entries with long notes has not been measured.
+- The check reads every entry's notes on the thread pool after each unlock and save and shows its findings on the UI thread, dropping those a later check, a lock or closing overtook, so the list and the sidebar count change once it finishes; its time on a vault of many thousands of entries with long notes has not been measured (gaps-1c, RUNS-PENDING).
 - A dismissal is keyed by entry UUID, so a finding comes back if KeePassXC's merge gives the entry a new UUID (D-0372).
 - Password health, V.9, adds its findings to the same card.
 - Source only; the app step has run only locally on Windows.

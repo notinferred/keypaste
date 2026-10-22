@@ -1,3 +1,5 @@
+using Keypaste.Core.Approval;
+
 namespace Keypaste.Core.Clients;
 
 /// <summary>A bridge attached to the live session, as it described its client (display only, THREATS.md T-3).</summary>
@@ -17,4 +19,13 @@ public sealed record ConnectedClient(
 {
     /// <summary>The globs it said it answers with when it attached, or empty when it said none (N.5).</summary>
     public IReadOnlyList<string> Exposure { get; init; } = [];
+
+    /// <summary>How a screen and a narration name a client: its label, else its name, sanitized, else <c>an unnamed agent</c>.</summary>
+    /// <param name="label">Its label, or null.</param>
+    /// <param name="name">What it called itself, or null.</param>
+    /// <returns>The name to show.</returns>
+    public static string Named(string? label, string? name) =>
+        label is { Length: > 0 } ? EntryNameSanitizer.Sanitize(label, ApprovalPrompt.MaximumClientLength).Text
+        : name is { Length: > 0 } ? EntryNameSanitizer.Sanitize(name, ApprovalPrompt.MaximumClientLength).Text
+        : "an unnamed agent";
 }

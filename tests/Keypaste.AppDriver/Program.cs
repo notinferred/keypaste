@@ -959,6 +959,7 @@ internal sealed class Driver(string home)
         }
 
         using var list = new RecommendationsViewModel(session, home);
+        await list.Checking.ConfigureAwait(true);
         return act(list);
     }
 

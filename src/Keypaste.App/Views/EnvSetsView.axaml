@@ -302,6 +302,19 @@
                   </StackPanel>
                 </Border>
 
+                <!-- Once imported, the file can be deleted, only while it still holds what was read; kept unless Delete is pressed. -->
+                <Border Classes="card" IsVisible="{Binding Import.IsOfferingDelete}" BorderBrush="{DynamicResource KpDanger}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="body primary" Text="{Binding Import.Leftover, StringFormat='Delete {0}?'}" TextWrapping="Wrap" />
+                    <TextBlock Classes="caption" Text="{Binding Import.DeleteWarning}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="danger" Content="Delete" Command="{Binding Import.DeleteSourceCommand}"
+                              AutomationProperties.Name="{Binding Import.Leftover, StringFormat='Delete {0}'}" />
+                      <Button Classes="ghost" Content="Keep it" Command="{Binding Import.KeepSourceCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
                 <!-- The matrix: every key against every environment. A cell holds no value; the selected
                      environment's cells reveal theirs on a hold, through a control that publishes nothing to
                      the accessibility bus (THREATS.md T-22). -->
