@@ -274,9 +274,10 @@ public sealed class DesktopApprovalTests
         {
             HeldPrompt? held = null;
             await using var app = await PromptedApp.StartAsync(prompt => held = new HeldPrompt(prompt, Token));
-            var lifetime = app.Authority.Session.Lifetime!.Ended;
+            var lifetime = app.Authority.Session.Lifetime!;
+            var (ended, waiting) = (lifetime.Ended, lifetime.Waiting);
             var holding = held!;
-            holding.Holding = withdrawals => withdrawals.FirstOrDefault(token => token != lifetime);
+            holding.Holding = withdrawals => withdrawals.FirstOrDefault(token => token != ended && token != waiting);
             HeldPrompt.Asked asked;
 
             using (var peer = app.Attach())
@@ -308,16 +309,16 @@ public sealed class DesktopApprovalTests
         {
             HeldPrompt? held = null;
             await using var app = await PromptedApp.StartAsync(prompt => held = new HeldPrompt(prompt, Token));
-            var lifetime = app.Authority.Session.Lifetime!.Ended;
+            var waiting = app.Authority.Session.Lifetime!.Waiting;
             var holding = held!;
-            holding.Holding = _ => lifetime;
+            holding.Holding = _ => waiting;
 
             var released = app.ReleasedAsync(kind);
             var asked = holding.Next();
             var locking = Task.Run(() => app.Authority.Session.Lock(VaultLockReason.Idle), Token);
 
-            // The UI thread runs its queue as soon as the lock ends the lifetime, while the withdrawal is held above the gate's token.
-            Assert.True(SpinWait.SpinUntil(() => lifetime.IsCancellationRequested, _wait), "the lock never ended the lifetime");
+            // The UI thread runs its queue as soon as the lock withdraws what the request waits on, while the withdrawal is held above the gate's token.
+            Assert.True(SpinWait.SpinUntil(() => waiting.IsCancellationRequested, _wait), "the lock never withdrew the waiting request");
             WindowInput.Drain();
             Assert.False(asked.Gate.IsCancellationRequested, _holdRanLate);
             asked.Drained.SetResult();
