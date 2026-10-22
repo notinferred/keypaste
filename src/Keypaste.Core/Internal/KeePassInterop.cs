@@ -2385,7 +2385,7 @@ internal sealed class KeePassInterop : IDisposable
     /// revision's strings, attachments, custom data, tags and auto-type: the entry becomes the revision
     /// whole, as it does in KeePass and KeePassXC, and what it drops is in the revision just made (9.4). Since
     /// that puts back the revision's project tags, a front end first asks what <see cref="ProjectTagChange.Restoring"/>
-    /// says whenever they differ from the entry's (D-NEW-W22).
+    /// says whenever they differ from the entry's (D-0510).
     /// </remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     /// <exception cref="ArgumentOutOfRangeException">

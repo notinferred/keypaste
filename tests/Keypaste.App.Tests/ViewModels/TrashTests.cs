@@ -358,7 +358,7 @@ public sealed class TrashTests : IDisposable
 
     /// <summary>
     /// The refusal D-0249 requires, writing nothing, and the offer of the first free
-    /// <c>(restored)</c> title in its place (D-NEW-W32), which also writes nothing until it is taken.
+    /// <c>(restored)</c> title in its place (D-0512), which also writes nothing until it is taken.
     /// </summary>
     [Fact]
     public void A_restore_is_refused_when_the_name_has_been_taken_again_and_offers_another_title()

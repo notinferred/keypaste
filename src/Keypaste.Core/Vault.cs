@@ -884,7 +884,7 @@ public sealed class Vault : IDisposable
     /// a new entry. The entry's modification time becomes the moment of the restore (D-0227).
     /// <paramref name="index"/> is only meaningful against a reading of this same vault taken since
     /// its last change. The entry becomes the revision whole, its tags included, so a front end asks
-    /// first what <see cref="ProjectTagChange.Restoring"/> says whenever the revision's project tags differ (D-NEW-W22).
+    /// first what <see cref="ProjectTagChange.Restoring"/> says whenever the revision's project tags differ (D-0510).
     /// </remarks>
     /// <returns>
     /// <see langword="true"/> if an entry was restored. Restoring nothing is not an error here; the

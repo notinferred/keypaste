@@ -48,7 +48,7 @@ The first mutation run left a `cmd.exe` holding the test run's console, because 
 ## Limits and follow-ups
 
 - **Linux emulators.** No real Linux terminal emulator was driven: the runner has no display, so the Linux case of the app test runs a stand-in for `x-terminal-emulator`. Whether a given emulator honours the working directory and passes the environment through is observed only when R.1a runs the installed AppImage on a real desktop. `gnome-terminal` and `konsole` are given the directory explicitly because a terminal server started earlier would not share it.
-- **Windows console.** On Windows the terminal is `cmd.exe` in its own console, or in Windows Terminal where that is the default console host. There is no choice of PowerShell or another shell, kept by founder decision 2026-10-22 (D-0340, D-NEW-W43): another terminal takes Copy run command.
+- **Windows console.** On Windows the terminal is `cmd.exe` in its own console, or in Windows Terminal where that is the default console host. There is no choice of PowerShell or another shell, kept by founder decision 2026-10-22 (D-0340, D-0515): another terminal takes Copy run command.
 - **The real app was not clicked through.** The checks in [desktop.md](../desktop.md#checking-a-build-by-hand) items 49 and 50 were not run in this session.
 - **The commit before the start.** A lock after the resolver commits and before `Process.Start` returns does not recall the terminal. E.1a's commit point is where the lock boundary sits, as it is for an agent's release.
 - **After the start.** A started terminal keeps the set after a lock (PRODUCT §2). `projects.json` can be edited by any program running as the person, which is why the card names the command it will run.

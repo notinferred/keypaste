@@ -558,7 +558,7 @@ jobs:
           printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
           (cd artifacts/dist && sha256sum -c "$name.sha256")
 
-      # The zipped bundle is the DMG's input and no release package, so it stays out of artifacts/dist (D-NEW-W41).
+      # The zipped bundle is the DMG's input and no release package, so it stays out of artifacts/dist (D-0513).
       - name: Build and check the app bundle the DMG wraps
         id: bundle
         if: matrix.dmg

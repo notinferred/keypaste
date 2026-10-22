@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle and zips it as keypaste.app.zip,
 # the build intermediate build-macos-dmg.sh wraps in the DMG release-targets.json declares. The zip is no release
-# package, so nothing uploads or attests it (D-NEW-W41).
+# package, so nothing uploads or attests it (D-0513).
 #
 # The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste it
 # gives clients; the icon, licences and Terminal's launcher go to Contents/Resources. Nothing is signed or

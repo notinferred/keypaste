@@ -6,7 +6,7 @@ namespace Keypaste.Core;
 /// <summary>
 /// What adding or removing project tags on one entry does, shown to the person before it is written
 /// (D-0415): the environment it reaches, the fields that join or leave it and, for each field that joins
-/// holding a KeePass placeholder, what the placeholder fills in (D-NEW-W21), never a value.
+/// holding a KeePass placeholder, what the placeholder fills in (D-0509), never a value.
 /// </summary>
 /// <param name="Entry">The entry.</param>
 /// <param name="Tags">The tags added or removed, which all read alike (<see cref="ProjectTag.Read"/>).</param>
@@ -77,7 +77,7 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
     /// What restoring one of an entry's revisions does to the projects it is in, since the restore puts back the
     /// revision's tags: the change D-0415 asks about for each environment the revision's tags starting <c>env:</c>
     /// put the entry in, then for each they take it out of, each judged after the ones before it, so an environment
-    /// a tag the restore drops and a tag it puts back both reach is said to stay as it is (D-NEW-W22).
+    /// a tag the restore drops and a tag it puts back both reach is said to stay as it is (D-0510).
     /// </summary>
     /// <param name="vault">The open vault.</param>
     /// <param name="entry">The entry.</param>

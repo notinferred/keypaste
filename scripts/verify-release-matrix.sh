@@ -858,7 +858,7 @@ validate_packages() {
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
     code="$(package_code "$root" "$workflow")"
-    # The zipped keypaste.app the DMG is built from is a build intermediate, not a package (D-NEW-W41).
+    # The zipped keypaste.app the DMG is built from is a build intermediate, not a package (D-0513).
     for kind in msi appimage dmg; do
       case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; dmg) ext=".dmg" ;; esac
       case "$code" in *"$ext"*) ;; *) continue ;; esac

@@ -405,7 +405,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
     /// <summary>
     /// The way back when the name is taken: the same entry, identity, fields and history, under the first free
-    /// <c>(restored)</c> title, and the entry holding the name untouched (D-NEW-W32).
+    /// <c>(restored)</c> title, and the entry holding the name untouched (D-0512).
     /// </summary>
     [Fact]
     public void RestoreRecycledRenamed_PutsTheEntryBackUnderTheFirstFreeRestoredTitle()

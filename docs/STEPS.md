@@ -44,7 +44,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - An unreached act leaves the row open.
 - [ ] **4.7c2 — Publish and verify the first desktop release as 0.5.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, and 3.5a's Apple credentials.
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
-  - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-NEW-W41).
+  - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 0.5.0. This renames CHANGELOG's Unreleased section and sets the version.
   - Verify from anonymous downloads: public hashes, provenance, signatures and notarization, and an upgrade that keeps the vault, `~/.keypaste` and the recent list.
   - Rehearsal certificates, unpublished artifacts and source builds do not pass.
@@ -117,7 +117,7 @@ Each row keeps its historical meaning and is expanded when selected.
   - The desktop already unlocks a vault that needs a YubiKey slot and changes the key in Settings (D-0366), but this has not been tried with a physical key.
   - What remains:
     - creating such a vault;
-    - the CLI reaching such a vault through the app while the app holds it, and the app's KDBX import taking the key; standalone verbs and `keypaste approve` refuse it, naming the app (D-NEW-W42);
+    - the CLI reaching such a vault through the app while the app holds it, and the app's KDBX import taking the key; standalone verbs and `keypaste approve` refuse it, naming the app (D-0514);
     - real-device unlock, save and reopen with KeePassXC interoperability;
     - missing-key and wrong-key refusal;
     - documented spare-key and lost-key limits.

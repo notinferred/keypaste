@@ -16,7 +16,7 @@ Trash in the app now has Empty Trash, which erases everything in the vault's rec
 When restoring an item from Trash finds another item with its name, the app now offers Restore as `<title> (restored)`, or `(restored 2)` and onwards when that is taken too, which puts the item back with its history under that title. Nothing changes until you choose it, and the other item keeps its name.
 
 The import dialog's password field now takes `Ctrl/Cmd+V` too, as the master-password fields do: one trailing line break is dropped and anything a keyboard can't type is refused with a message.
-When a `keypaste` command or `keypaste approve` cannot open a vault the app last opened with a YubiKey, it now says that such a vault opens only in the desktop app, and that `keypaste run --session` and edits such as `keypaste set` reach it there while the app holds it, rather than only that the master password is wrong.
+When `keypaste approve` or a command such as `keypaste get` cannot open a vault the app last opened with a YubiKey, it now says that such a vault opens only in the desktop app, and that `keypaste run --session` and edits such as `keypaste set` reach it there while the app holds it, rather than only that the master password is wrong.
 
 Search now also finds an item by any part of one of its own tags, so `prod` finds an item tagged `env:billing:prod`, in the app's search, which names the tag beside the item, and in `keypaste search`, which names the tag it matched on the item's line and in `--json`.
 

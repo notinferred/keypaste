@@ -297,7 +297,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
 
             case RestoreOutcome.DestinationOccupied:
                 // Core refused the restore whole (D-0249); another title is offered when the entry can
-                // take one, and taken only on a second press (D-NEW-W32).
+                // take one, and taken only on a second press (D-0512).
                 offer = _session.Unlocked?.RenamedRestoreName(row.Id) is { } free
                     ? EntryNameSanitizer.Sanitize(free.Title).Text
                     : null;

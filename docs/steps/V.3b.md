@@ -22,4 +22,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-`verify.ps1` first failed on line endings, then passed resumed with `--from scripts`. The Trash screen empties the whole bin behind a second confirmation naming how many items go; the CLI has no verb for it (D-NEW-W31) (gaps-1b, RUNS-PENDING).
+`verify.ps1` first failed on line endings, then passed resumed with `--from scripts`. The Trash screen empties the whole bin behind a second confirmation naming how many items go; the CLI has no verb for it (D-0511) (gaps-1b, RUNS-PENDING).

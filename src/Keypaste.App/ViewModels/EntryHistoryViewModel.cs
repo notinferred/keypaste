@@ -111,7 +111,7 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Whether a restore waits for the person to confirm what it does to the projects the item is in, because the
-    /// revision's project tags differ from the item's and a restore puts them back (D-NEW-W22).
+    /// revision's project tags differ from the item's and a restore puts them back (D-0510).
     /// </summary>
     internal bool IsConfirmingRestore => _asking is not null;
 
@@ -341,7 +341,7 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Restores the revision unless its project tags differ from the item's, which a restore puts back, and the person
-    /// has not confirmed what that does with the item carrying the tags it carries now (D-0415, D-NEW-W22).
+    /// has not confirmed what that does with the item carrying the tags it carries now (D-0415, D-0510).
     /// </summary>
     private RestoreAttempt TryRestore(Vault vault, EntryRevisionRow row, RestoreQuestion? confirmed)
     {
