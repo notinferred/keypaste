@@ -44,5 +44,5 @@ Hosted CI has not run; `app.yml` runs the workflows gate on Ubuntu and Windows w
 - No CLI surface lists or moves findings (D-0372).
 - The check reads every entry's notes on the thread pool after each unlock and save and shows its findings on the UI thread, dropping those a later check, a lock or closing overtook, so the list and the sidebar count change once it finishes; its time on a vault of many thousands of entries with long notes has not been measured (gaps-1c, RUNS-PENDING).
 - A dismissal is keyed by entry UUID, so a finding comes back if KeePassXC's merge gives the entry a new UUID (D-0372).
-- Password health, V.9, adds its findings to the same card.
-- Source only; the app step has run only locally on Windows.
+- [V.9](V.9.md) lists weak, reused and expired passwords in the same Recommendations list (D-0478).
+- Source only. The app step runs in `verify-keepassxc-workflows.sh`, which app.yml's `keepassxc workflows` job runs on ubuntu-24.04 and windows-2025, green on both in app 39633992293 ([V.9](V.9.md)).

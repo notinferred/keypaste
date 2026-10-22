@@ -21,6 +21,6 @@ Completed 2026-10-02 in `aeb948f`, scripts and workflows only; dev run 370288071
 
 ## Limits and follow-ups
 
-- A home-page transcript edit is checked only in the next run that builds the binaries: a CLI, README or demo-page change, a dispatch or the weekly schedule.
-- A push to `main` that only edits `site/wrangler.jsonc` is not tested by the fields gate until a full run.
+- A home-page transcript edit was checked only in the next run that built the binaries. Since [F.52](F.52.md) every ci run runs every job (D-0423), and `site/public/index.html` is not in `paths-ignore`, so a push to `main` that edits it runs `verify-demo.sh` against the built binaries in each integration job and against the AOT binaries in `aot`.
+- A push to `main` that only edited `site/wrangler.jsonc` was not tested by the fields gate until a full run. Since [F.52](F.52.md) every ci run runs every job (D-0423), and that file is not in `paths-ignore`, so such a push runs the fields gate in each compat job.
 - The first scheduled run, and the first release cut under the new gate, are unobserved.

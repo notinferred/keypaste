@@ -65,7 +65,7 @@ The script touched each restored file so an incremental build could not keep a m
 
 The check is made before anything is read and at every read, not at the pipe write. A save by another program that lands after the read and before the reply leaves is not caught. The next request is refused.
 
-The app does not tell the person that the file changed until one of its own saves is refused. An agent's refusal says to lock and unlock, and the app's status is 4.4b's and 4.3b's to show.
+The app did not tell the person that the file changed until one of its own saves was refused, and an agent's refusal said to lock and unlock. Closed by [N.16](N.16.md): a notice with Reload sits above the screen while the file differs from the open vault, and an agent's refusal says nothing is released until a person reloads it; a watch on the vault's folder now raises the notice a quarter of a second after another program's save (gaps-1, RUNS-PENDING).
 
 An unsaved change refuses requests only while a save is in progress, unless that save failed. After a failed save the app keeps refusing agents until a later save succeeds or the vault is locked. The app already tells the person to lock and unlock in that case.
 

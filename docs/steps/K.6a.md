@@ -28,7 +28,7 @@ D-0383.
 
 ## Limits and follow-ups
 
-- **No job scoping yet.** Pull requests and `main` still run every job; K.6b adds scoping.
-- **Warnings only.** In auto mode, dev runs only warn about the aot, appcompat, markers and package lanes, and about planned Windows and macOS runners they skip.
-- **`dotnet format` is unverified.** It formats each project in the closure; that dotnet-format skips referenced projects comes from its source and was not observed.
-- **Flaky compat gate:** F.27.
+- **No job scoping.** Pull requests and `main` run every job: K.6b added scoping, and [F.52](F.52.md) removed it (D-0423).
+- **Warnings only.** In auto mode, dev runs only warned about the aot, appcompat, markers and package lanes and about the Windows and macOS runners they skipped. Auto mode is gone: `dev.yml` runs one test class, one profile on one runner, every Linux job of ci and app but compat and tools, or a relock, and is never release or integration evidence ([F.52](F.52.md), [K.6c](K.6c.md), [F.66](F.66.md), D-0460).
+- **`dotnet format` was unverified.** It formatted each project in a dev run's closure, and that it skips referenced projects came from its source and was not observed. Since [F.52](F.52.md) the `format` profile runs it once over both solutions and the consistency project (D-0423).
+- **Flaky compat gate:** F.27, closed by [F.27](F.27.md), which keeps the revision KeePassXC's merge dropped when two saves shared a second and repaired the gate's own check.

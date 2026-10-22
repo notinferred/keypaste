@@ -41,4 +41,4 @@ The row was expanded at selection against the code as it was. The founder chose 
 - A tag dropped in a version that changed nothing else is taken as deliberate. A deliberate removal saved together with another change, in an app that keeps tags, is flagged, and Dismiss clears it.
 - A dropped tag whose history KeePass has aged out (about ten versions by default) is not found.
 - Which phone apps keep tags is R.1b's to observe.
-- F.51 holds a crash of the app driver seen on macOS in dev 37397846023, after the app had refused a vault `keypaste agent` held; this step changed nothing on that path, and the macOS rerun passed.
+- A crash of the app driver seen on macOS in dev 37397846023, after the app had refused a vault `keypaste agent` held, was on a path this step did not change. Closed by [F.51](F.51.md): a race in Avalonia's headless session start left its dispatch task null for `Dispose`, and the driver's prompt screen now keeps one display for the process and never disposes it.

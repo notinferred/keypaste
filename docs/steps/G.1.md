@@ -31,5 +31,5 @@ The row was not detailed when selected, so it was expanded against the code befo
 - **`keypaste init` with no path** now targets the chosen vault and is refused because it exists; with none named or chosen it asks for the path to create.
 - **A path holding a quote, a control character or, outside Windows, a backslash** cannot be written in `app.toml` and is not recorded; Settings and `use` say that path cannot be recorded.
 - **THREATS** T-3 and T-36 name the chosen vault among what a spawning process or an agent editing its configuration can set, and T-29 states that resolution never consults which vault is held and names what records a choice; T-10 still places same-user adversaries out of scope.
-- **macOS.** Four `EnvLaunchThroughAppTests` cases fail on macOS on every branch, the defect the integration branch holds as F.28 (dev run 36732743823), so no macOS run of this step reached the session gates; FEATURES names that gap.
+- **macOS.** Four `EnvLaunchThroughAppTests` cases failed on macOS on every branch (dev run 36732743823), so no macOS run of this step reached the session gates. [F.28](F.28.md) held the app's refusal there, and [E.1d](E.1d.md) runs a project through Terminal.
 - G.2 builds on this: it registers every client without `--vault`.

@@ -23,4 +23,4 @@ Before is main `310eb8c` (ci 37633437034, app 37633436794); after is each half a
 ## Limits and follow-ups
 
 - Sleeps that are not holding a pipe stay: the lifecycle gate's two seconds in which a second start at login must not show a window, KeePassXC's two seconds to settle before a graceful close, a one-second kill grace, and the fields gate's wait for the clock's next second.
-- `AtomicReplaceTests.A_commit_replaces_the_vault_with_what_was_written` failed once on `windows-2025` with "name reserved for use by another transaction" and passed on the re-run; it is a BACKLOG observation.
+- `AtomicReplaceTests.A_commit_replaces_the_vault_with_what_was_written` failed once on `windows-2025` with "name reserved for use by another transaction" and passed on the re-run; [F.63](F.63.md) traced it to another test class's save holding the temporary's 8.3 alias, removed its BACKLOG row and skips the test on Windows.

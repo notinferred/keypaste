@@ -40,7 +40,7 @@ D-0423.
 
 ## Limits and follow-ups
 
-- The time to all green is set by Core.Tests and Cli.Tests on Windows and macOS, 5 to 7 minutes against about 2.5 on Linux. Of the process gates' roughly 7 minutes, about 5 are fixed waits. Both are BACKLOG investigation candidates.
+- The time to all green was set by Core.Tests and Cli.Tests on Windows and macOS, 5 to 7 minutes against about 2.5 on Linux, and about 5 of the process gates' roughly 7 minutes were fixed waits. [F.57](F.57.md) replaced the waits that held an agent's input with waits for each reply, and [F.66](F.66.md) gave test vaults a cheap key derivation (D-0469), which took the backend tests from 534 to 106 s on Windows and from 463 to 89 s on macOS in its probe.
 - A full run queues behind GitHub's concurrency limits; about 100 s of the pull request's 728 s was waiting for runners.
 - Nothing is cached, so each Windows job restores in about 50 s.
 - A release still needs a ci and app dispatch at the commit, since `require-green-gates.sh` is unchanged, though every push to `main` now runs every job.

@@ -41,4 +41,4 @@ Expiry is judged against the clock of the process resolving: `keypaste run` uses
 
 The item pane shows an item's expiry beside Created, reading Expired in danger text once the session's clock has reached it, as the Projects matrix and Recommendations mark it; a person still fixes one in KeePassXC or by recreating the entry, since nothing in keypaste sets or clears an expiry (gaps-1c, RUNS-PENDING).
 
-`SessionEnvResolver` has no consumer outside tests until E.1b (the app's launch) and E.1c (`keypaste run --session`), which fill its confirmation with their own prompt.
+`SessionEnvResolver` resolves every set an unlocked session releases: the app's Run and Open terminal through `AppVaultSession.Environments` ([E.1b](E.1b.md)), and the owner's answers to `keypaste run --session` ([E.1c](E.1c.md)), an agent's run and `keypaste run --token`, each passing its own confirmation.

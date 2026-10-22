@@ -42,9 +42,9 @@ The desktop suite ran 770 tests, 768 passed and 2 skipped, and `dotnet format` r
 
 ## Limits and follow-ups
 
-- The amber rule of V-N.1a is N.1a2's; until it lands, a screen may draw more than one amber element (the selected sidebar icon is one).
+- The amber rule of V-N.1a was [N.1a2](N.1a2.md)'s, which holds each frame the journey reaches to at most one amber element (D-0375); before it landed, a screen could draw more than one, the selected sidebar icon among them.
 - The journey ran headless under Skia with a fake share server and a picker that answers at once; the native file dialog and the macOS menu bar were not driven.
 - The chain verdict is asserted shown, not clean: the test process shares one audit log with other tests.
 - Project rows are 34 px like the places, not the 30 px the old section drew.
-- `scripts/exercise-desktop-install.sh` now reaches a project by its sidebar row and Agents by `Ctrl+2`, but its "Add variable" and "Check again" labels match nothing in the app: F.25 in STEPS. The exercise was not run here.
+- `scripts/exercise-desktop-install.sh` now reaches a project by its sidebar row and Agents by `Ctrl+2`, but its "Add variable" and "Check again" labels matched nothing in the app, and the exercise was not run here. Closed by [F.25](F.25.md), which named the app's controls and rewrote the exercise's acts to them; [G.5](G.5.md)'s install-desktop run 38191303484 ran the exercise on the `v0.5.0-rc.1` candidates for Windows and Linux and passed every check.
 - README's screenshots still show the old sidebar; N.7 renders them again.

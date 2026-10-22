@@ -38,5 +38,5 @@ D-0369 in [DECISIONS](../../DECISIONS.md).
 - A field KeePassXC made under a standard name in another case, such as `password`, is listed read-only and cannot be read with `--field`, which refuses standard names in any case. It stays refused by founder decision 2026-10-22 (D-0515); KeePassXC reads and renames it.
 - `set --field` cannot create an entry, and `--field` values cannot be generated.
 - `EntryRevision` still carries only the standard fields, so no surface shows a revision's custom fields.
-- The desktop shows no custom fields until V.7b, and no custom field reaches an agent until C.5a.
-- Source only; the fields gate has run only locally on Windows.
+- The desktop showed no custom fields until [V.7b](V.7b.md), and no custom field reached an agent until [C.5a1](C.5a1.md), which releases one env-named custom field by name (D-0388).
+- Source only. The fields gate ran only locally on Windows when this was recorded; `ci.yml`'s compat job runs it on Ubuntu 24.04, Windows 2025 and macOS 15, and passed in ci 39646134010 at `2073f24` ([9.2b](9.2b.md)).

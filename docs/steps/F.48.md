@@ -39,8 +39,8 @@ After the first pass, the founder asked why the change added code. The second pa
 
 ## Limits and follow-ups
 
-- `upgrade-desktop.yml` makes its fixture with a published CLI, and every published CLI predates `keypaste mcp`, so it runs again once 0.5.0 is published (D-0416). `install-desktop.yml` first meets the one binary with a 0.5.0 candidate.
+- `upgrade-desktop.yml` makes its fixture with a published CLI, and every CLI published before this step predated `keypaste mcp` (D-0416). [G.5](G.5.md)'s upgrade-desktop run 38191305339 made it with the published `0.5.0-rc.1` and passed on Windows and Linux, and its install-desktop run 38191303484 met the one binary in the `v0.5.0-rc.1` candidates, whose bridge answered on both.
 - The demo GIF's label changes at its next render. `site/web` pages and README's published-version text change at L.1.
-- STEPS E.1d still needs G.5, though the bundle carries `keypaste` since B.4b; that dependency is the founder's to re-plan.
-- F.49 holds a Windows failure seen in dev 37337588072: a grant not reused after a large listing. This step changed that test's path only in how its harness arguments are parsed, to the same options; the Windows rerun passed it, which does not close it.
-- F.50 holds `install.yml`'s Windows job, cancelled before its install block since 2026-09-21. `verify-install.sh` is byte for byte the version that passed there on 2026-09-16.
+- STEPS E.1d needed G.5, though the bundle carried `keypaste` since B.4b; the dependency stayed, and [G.5](G.5.md) landed before [E.1d](E.1d.md).
+- A Windows failure seen in dev 37337588072, a grant not reused after a large listing, was on a test whose path this step changed only in how its harness arguments are parsed, to the same options. Closed by [F.49](F.49.md): a reply write cancelled after one second ended the connection and its grants while a bridge read a large listing slowly, and a delivery now has no limit until the listener stops (D-0420).
+- `install.yml`'s Windows job had been cancelled before its install block since 2026-09-21, while `verify-install.sh` was byte for byte the version that passed there on 2026-09-16. Closed by [F.50](F.50.md): the origin check runs once in its own job, and install 37385483971 passed on all four runners.

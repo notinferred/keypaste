@@ -42,8 +42,8 @@ D-0417 in [DECISIONS](../../DECISIONS.md). The choices under Amendments bind onl
 
 ## Limits and follow-ups
 
-- `ScreenRenderer`'s new frames, `46-env-add-entry`, `47-env-remove-entry` and `48-env-ignored-tag`, are drawn only with an output folder, which no workflow sets; the journey's frames are the amber evidence.
+- `ScreenRenderer`'s new frames, `46-env-add-entry`, `47-env-remove-entry` and `48-env-ignored-tag`, are drawn only with an output folder, which since [N.3](N.3.md) dev.yml's class job sets, so `bash scripts/dev.sh --class Keypaste.App.Tests.Rendering.ScreenRenderer --os all` draws them on each runner and uploads them as `screens-<runner>`; no ci or app job sets it, so the journey's frames remain the amber evidence.
 - README's `env-profiles.png` still shows the screen as Env profiles; L.1 retakes the screenshots for 0.5.0.
 - The app does not rename a project, which the row did not ask for: renaming an `env/` group in Items still moves a home entry but not its tag (C.1c).
-- Run is refused on macOS until E.1d, and on Linux only a stand-in emulator has run it (R.1a).
+- Run opens Terminal on macOS since [E.1d](E.1d.md), except from a copy not running as `keypaste.app`; on Linux only a stand-in emulator has run it, and a real emulator waits for R.1a.
 - On Windows the toast Save shows sat over Run in a terminal for its 2.8 seconds, so a press then did nothing. Fixed: a plain toast takes no press, so a click reaches the control under it, the clipboard toast keeps its Clear now, and the journey no longer waits (gaps-1, RUNS-PENDING).

@@ -121,7 +121,7 @@ D-0435, D-0436, D-0437, D-0438; D-0333, D-0334, D-0389 and D-0431 amended; T-40.
 - A reading keypaste cannot be sure of is Unknown, so the tool's own removal runs and its failure is shown in its words even when the tool held no entry. A file tool whose file a variable moved, or whose file keypaste cannot locate, is found but skipped and counts toward exit 6. A file holding text that does not decode anywhere, another server's value included, is left alone.
 - Without a terminal and without `--yes`, `setup --remove` exits 1 before reading anything, even when no tool holds keypaste, as the founder's confirmation rule says.
 - A registration made under a custom home names its vault, so it stops following `keypaste use` until setup runs again.
-- A bridge Gemini CLI starts under a custom `KEYPASTE_HOME` derives the vault key in its own audit lines from the default home, because Gemini CLI strips the variable and the bridge takes no home; G.9 moves those lines to the owner.
+- A bridge Gemini CLI starts under a custom `KEYPASTE_HOME` derives the vault key from the default home, because Gemini CLI strips the variable and the bridge takes no home. Since [G.9](G.9.md) the owner writes the line for every call it answers, keyed by its own home, so only a line the bridge writes itself, for a call it refuses itself or that nothing holding the vault answered, still carries the default home's key (D-0439).
 - What remains of editing another program's file is T-40's.
 - G.8 sets what setup registers, and N.6 rewords setup's and Connect's new lines.
 - README and keypaste.com describe the published `v0.3.0`'s setup; L.1 rewrites them for 0.5.0.

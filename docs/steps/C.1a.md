@@ -34,8 +34,8 @@ D-0370 and D-0371 in [DECISIONS](../../DECISIONS.md). The choices the plan settl
 
 ## Limits and follow-ups
 
-- Tagged fields are not a project's variables until C.1b; `env tag` names them in advance.
-- The agent's prompt still says "protected profile" for a protected tag; N.6 owns the wording.
-- `env ls` lists a legacy project's profiles but not its variable entries as members.
-- Anyone who can edit the vault can remove a protecting tag, as they can move an entry out of a `prod` group.
-- Source only; the projects gate has run only locally on Windows.
+- [C.1b](C.1b.md) made a tagged entry's env-named custom fields its project environment's variables, the fields `env tag` names.
+- [N.6](N.6.md) reworded the prompts: `keypaste approve`'s terminal says an item a protecting tag covers "is in a protected environment", and the app's prompt says "once only: protected environment" (D-0457).
+- [C.6](C.6.md) dropped the legacy layout (D-0416): an untagged entry under `env/` makes no project, and `env ls` lists none from it.
+- Anyone who can edit the vault can remove a protecting tag; since [C.6](C.6.md) only an entry's own tags protect it, never its group (D-0416).
+- Source only. The projects gate ran only locally on Windows when this was recorded; `ci.yml`'s compat job runs it on Ubuntu 24.04, Windows 2025 and macOS 15, and passed in ci 39646134010 at `2073f24` ([9.2b](9.2b.md)).

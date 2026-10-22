@@ -31,5 +31,5 @@ D-0425.
 ## Limits and follow-ups
 
 - After a refusal, a different agent asking for the same field or the same secrets within the minute is refused too.
-- A credential release is still audited by the bridge, not the owner (D-0020).
+- Closed by [G.9](G.9.md): the owner writes the audit line of every credential request it answers, as it does for a run, and the bridge writes one only when no owner answered or it refused the request itself (D-0439).
 - With the audit log unwritable, every `run --session` release is refused, as a token's already was.

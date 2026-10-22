@@ -40,6 +40,6 @@ Completed 2026-10-02 in `ebaff92`, scripts and workflows only; full ci run 37056
 
 ## Limits and follow-ups
 
-- `app.yml` has no schedule. A runner image change reaches a cached app job only through a dispatch, a tag, the next change to its inputs, or the marker's expiry after 30 days.
-- The desktop mark is written only when every desktop test ran, so a pull request that runs part of them leaves none.
-- `dev.yml` leaves no desktop mark.
+- `app.yml` has no schedule. A runner image change reached a cached app job only through a dispatch, a tag, the next change to its inputs or the marker's expiry after 30 days, until [F.52](F.52.md) deleted the marks and every app run came to run every job (D-0423).
+- The desktop mark was written only when every desktop test ran, so a pull request that ran part of them left none; since [F.52](F.52.md) no job leaves a mark and every app run runs every desktop test on all three runners (D-0423).
+- `dev.yml` left no desktop mark; since [F.52](F.52.md) no workflow leaves one (D-0423).

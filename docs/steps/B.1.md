@@ -33,8 +33,8 @@ None.
 ## Limits and follow-ups
 
 - shellcheck covers `scripts/lib/*.sh`; the gates that source the library were outside its coverage before and still are.
-- `dev.yml`'s compat step runs neither `verify-keepassxc-xml-attach.sh`, `-workflows.sh` nor `-first-run.sh`; the ci and app dispatches above ran them.
-- On macOS the nine desktop process gates passed only in the second probe. They open descriptors with `exec {NAME}>`, which needs bash 4.1, as they did before B.1 (F.40), and dev's macOS leg stops at F.28 before reaching them; no other workflow runs them there.
-- A dev run that selects everything outlasts `dev.yml`'s 30-minute job limit on `windows-2025` (F.39); in dev 36728274698 every step had passed first.
+- `dev.yml` has had no compat step since [F.52](F.52.md) (D-0423). ci's `aot publish (linux-x64)` job runs `verify-keepassxc-xml-attach.sh`, and app's `keepassxc workflows` jobs on Linux and Windows and `keepassxc first run` jobs on all three runners run `-workflows.sh` and `-first-run.sh`.
+- On macOS the nine desktop process gates passed only in the second probe. They opened descriptors with `exec {NAME}>`, which needs bash 4.1, until [F.40](F.40.md) made them run under the stock bash 3.2 (D-0398); [F.28](F.28.md) held the tests that stopped dev's macOS leg first, and since [F.52](F.52.md) app.yml's `desktop gates` job runs them on macos-15 and windows-2025 as on Linux.
+- A dev run that selected everything outlasted `dev.yml`'s 30-minute job limit on `windows-2025`; in dev 36728274698 every step had passed first. [F.30](F.30.md) closed F.39 by raising the limit to 50 minutes, and [F.52](F.52.md) later removed that mode, running each profile as its own ci or app job (D-0423).
 - GitHub's API refused this account's calls for about 45 minutes while several branches polled their runs, so `dev.sh` exited without reporting its run and the results above were read once the limit reset.
 - The final commit adds these documents to the code the runs at `7365a6a` tested and removes one comment line from `verify-session-authority.sh`; the probes ran the final scripts.

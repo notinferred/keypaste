@@ -47,5 +47,5 @@ It runs in the desktop profile and in `app.yml`. [verify-current-state.sh](../..
 
 ## Limits and follow-ups
 
-- **A terminal edit while the app is unlocked is refused, not approved.** N.11 is that.
+- **A terminal edit while the app is unlocked was refused, not approved.** Closed by [N.11](N.11.md): every verb that edits items sends its edit to the holder, which asks in the app's prompt window or in `keypaste approve`'s terminal (D-0464); `access`, `import`, `token` and `share` stay refused.
 - **Another `KEYPASTE_HOME`, or KeePassXC, can still save behind the holder,** which then refuses agents as `vault-changed` until it is unlocked again (T-29).

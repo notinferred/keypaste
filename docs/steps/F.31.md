@@ -38,5 +38,5 @@ None.
 ## Limits and follow-ups
 
 - The name search suggests, without proving, that trimming removed the HTTP transports: NativeAOT keeps names for only some members, and `System.Net.Http.dll` is still named. No disassembly or `ilc` map was examined.
-- `docs/mcp-setup.md` ("the keypaste bridge uses local stdio and local IPC") and SECURITY.md make no claim about the SDK's contents and were left unchanged. `docs/replace-dotenv.md`'s "the vault path contains no network code" was outside the row and was not examined.
+- `docs/mcp-setup.md` ("the keypaste bridge uses local stdio and local IPC") and SECURITY.md make no claim about the SDK's contents and were left unchanged. `docs/replace-dotenv.md`'s "the vault path contains no network code" was outside the row and was not examined. It was false as written, since the vendored KeePassLib sends a path holding `://` through `WebClient`, and it now says only what the source shows: keypaste gives KeePassLib full local paths, so it opens, reads and saves the vault with no network request, and only sharing makes HTTP requests. No gate runs keypaste with the network cut (gaps-1c, RUNS-PENDING).
 - B.4b's row already carries T-9's account to the one binary.

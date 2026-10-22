@@ -35,9 +35,9 @@ D-0391 in [DECISIONS](../../DECISIONS.md). The choices under Amendments bind onl
 
 ## Limits and follow-ups
 
-- Keys are written onto tagged entries only with `keypaste set --field` until C.1c; the desktop cannot copy or edit a tagged key yet.
-- Placeholders are refused, not resolved, until P.3b1.
-- The bridge's default exposure is `env/**`, so an agent's `run` of a set with a tagged entry outside it is refused as out of scope until C.5b adds tag selectors.
-- The projects gate now drives the app, but a change to the app alone does not select the compat lane, so a pull request or dev run for such a change leaves that half to the full runs on `main`.
-- The prompts still say "profile" for an environment; N.6 owns the wording.
-- Found on the way and not caused by this step: the four macOS `EnvLaunchThroughAppTests` (F.28) and the broad Windows dev job's 30-minute limit (F.39), both since repaired, and the Windows `SaveTimingTests` failure (F.34), still open.
+- [C.1c](C.1c.md) writes keys onto tagged entries through `env set`, `env pull` and `env rm`, and in the app, where each row edits and copies the key on the entry that holds it.
+- [P.3b1](P.3b1.md) fills same-item placeholders, `{TITLE}`, `{USERNAME}`, `{PASSWORD}`, `{URL}`, `{NOTES}` and `{S:<field>}`, wherever a value leaves keypaste; any other, such as `{REF:…}` or `{TOTP}`, still refuses the value (D-0465).
+- [C.5b](C.5b.md) added tag selectors and made the bridge's default exposure `tag:env:*`, which reaches a set's tagged entries, so an agent's `run` of such a set is in scope by default.
+- The projects gate drives the app, and since [F.52](F.52.md) ci runs its compat job whatever a change touches (D-0423), so a pull request or `dev.sh` dispatch for a change to the app alone runs it.
+- The prompts say "environment" since [N.6](N.6.md) (D-0457).
+- Found on the way and not caused by this step: the four macOS `EnvLaunchThroughAppTests` (F.28), the broad Windows dev job's 30-minute limit (F.39) and the Windows `SaveTimingTests` failure (F.34), closed by [F.28](F.28.md), [F.30](F.30.md) and [F.34](F.34.md).

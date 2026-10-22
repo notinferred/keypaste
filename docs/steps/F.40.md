@@ -26,5 +26,5 @@ D-0398: the gates run under macOS's stock bash 3.2 with fixed descriptors, no `m
 
 ## Limits and follow-ups
 
-- Only `dev.yml` runs the desktop gates on macOS: `app.yml`'s desktop gate runs on Linux and `ci.yml` does not run them. A bash 4 construct added to these gates later fails only in a dev run with `--os macos`.
+- `dev.yml` was the only workflow running the desktop gates on macOS, so a bash 4 construct added to them later would have failed only in a dev run with `--os macos`. Since [F.52](F.52.md) `app.yml`'s desktop gates job runs them on macOS 15, Ubuntu 24.04 and Windows 2025 (D-0423), which holds D-0398 on every app run.
 - Nothing checks the descriptor numbers: a gate that opens a fourth long-lived input must pick a number the others do not use and close it in the substitutions that must not hold it.

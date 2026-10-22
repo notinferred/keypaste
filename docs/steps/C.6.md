@@ -37,5 +37,5 @@ D-0416 in [DECISIONS](../../DECISIONS.md). The choices under Amendments bind onl
 ## Limits and follow-ups
 
 - `scripts/exercise-desktop-upgrade.sh` builds its fixture with the published 0.3.0 CLI and reads the variable as an entry; once 0.5.0 is published, its `env set` writes a field, and the fixture follows.
-- `env rm`, `env export` and `env diff` still say "profile" where `env ls` says "environment"; N.6 owns the wording.
+- `env rm`, `env export` and `env diff` say "environment", as `env ls` does, since [N.6](N.6.md); flag names such as `--profiles` keep their spelling (D-0457).
 - The published `v0.3.0` claims in README and on keypaste.com's home page describe that release; L.1 rewrites them for 0.5.0.

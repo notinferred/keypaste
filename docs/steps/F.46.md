@@ -23,7 +23,7 @@ Completed 2026-10-02 in `392d128`, scripts and workflows only; full ci run 37036
 
 ## Limits and follow-ups
 
-- `app.yml` neither leaves nor reads markers, so desktop lanes still run on every qualifying push.
-- A marker does not record the runner image, so an image update reaches a cached lane only in the weekly full run, a dispatch, or the next change to that lane's inputs.
-- Markers last 30 days, and lane-cache.sh reads the 300 newest artifacts.
-- No push or pull request had planned with markers when this landed; this commit's push to `main` is the first.
+- `app.yml` neither left nor read markers, so desktop lanes ran on every qualifying push; since [F.52](F.52.md) neither workflow keeps markers and every ci and app run runs every job (D-0423).
+- A marker did not record the runner image, so an image update reached a cached lane only in the weekly full run, a dispatch or the next change to that lane's inputs; since [F.52](F.52.md) nothing is cached (D-0423).
+- Markers lasted 30 days, and `lane-cache.sh` read the 300 newest artifacts; [F.52](F.52.md) deleted both (D-0423).
+- No push or pull request had planned with markers when this landed, and this commit's push to `main` was the first; [F.52](F.52.md) deleted the markers five days later (D-0423).

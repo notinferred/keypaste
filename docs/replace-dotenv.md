@@ -184,7 +184,7 @@ Someone with the file and master password can read everything in that vault. If 
 
 ### Does it work offline?
 
-The vault path contains no network code and works offline.
+Yes. The vault is a file on your disk, and keypaste opens, reads and saves it with no network request. Only sharing goes online: `keypaste share` and the app's Share upload only ciphertext, to keypaste.com by default, and listing or revoking a share link asks that service about the link ([SECURITY](../SECURITY.md#plaintext-and-file-limits)).
 
 ### What does KeePassXC see?
 

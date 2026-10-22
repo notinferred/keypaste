@@ -16,4 +16,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-The CLI has no restore or export verb, kept by founder decision 2026-10-22. A missing vault is reachable only from the recent list. The KeePassXC gate ran locally. No keyfile can be supplied to a restore until V.1b.
+The CLI has no restore or export verb, kept by founder decision 2026-10-22. A missing vault is reachable only from the recent list. The KeePassXC gate ran locally when this was recorded; `ci.yml`'s compat job runs it on Ubuntu 24.04, Windows 2025 and macOS 15, and passed in ci 39646134010 at `2073f24` ([9.2b](9.2b.md)). A restore takes the keyfile a backup was made under since [V.1b](V.1b.md).

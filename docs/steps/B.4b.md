@@ -16,4 +16,4 @@ D-0418: `Keypaste.Mcp` becomes a library `Keypaste.Cli` enters through `BridgeEn
 
 ## Limits and follow-ups
 
-`keypaste-mcp` remains in doc comments, script comments, and a handful of error-message prefixes in test fixtures that use explicit paths rather than the locator — none of these affect behavior or gates, and all are addressed at L.1 when that step rewrites guides and README for 0.5.0. MCP client configurations written before this change that name `keypaste-mcp` need updating to `keypaste` with `["mcp"]` as arguments; the CHANGELOG entry notes this.
+`keypaste-mcp` is left in source only as the retired name `keypaste doctor` flags in a client's registration ([G.3](G.3.md)). The published `v0.3.0`'s install blocks in README and the guides, and `verify-install.sh`'s bridge check, still name it; L.1's row moves them to `keypaste mcp` for 0.5.0. MCP client configurations written before this change that name `keypaste-mcp` need updating to `keypaste` with `["mcp"]` as arguments; the CHANGELOG entry notes this.

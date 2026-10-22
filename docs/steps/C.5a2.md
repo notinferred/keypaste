@@ -36,4 +36,4 @@ Each check below runs on the `api/OpenAI` entry KeePassXC imported, whose passwo
 
 - **Run tool denied.** The gate shows the `run` tool's prompt naming the entry and field and the run refused; the child receiving the value is shown through `run --env-file`, not through the tool.
 - **Uploads seen in the Worker's log.** "Uploads nothing" rests on wrangler's request log; a change to its format fails the gate rather than passing it.
-- **Desktop gates on macOS run only in `dev.yml`** (F.40), so the custom-field phase's macOS evidence is 36881371090.
+- **Desktop gates on macOS** ran only in `dev.yml` when this step completed (F.40), so the custom-field phase's macOS evidence is dev 36881371090; app.yml's `desktop gates` job runs them on macos-15 since [F.52](F.52.md).
