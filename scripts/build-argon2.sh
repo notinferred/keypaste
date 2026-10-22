@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the libargon2 the app and the CLI carry beside their binaries on Windows and macOS, from the reference
-# implementation's release archive pinned below, and keeps it only once upstream's own known answers pass (D-NEW-X81).
+# implementation's release archive pinned below, and keeps it only once upstream's own known answers pass (D-0522).
 #
 # Linux keeps the system's libargon2, which KeePassLib finds by its sonames, so nothing is built there. x64 compiles
 # upstream's SSE2 code for baseline x86-64 and arm64 its portable reference code, never for the build machine's own CPU,

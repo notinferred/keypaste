@@ -37,7 +37,7 @@
 # tag does, and asked at once the guard found that run still going and refused, so every tag needed a release
 # re-run (G.5). --wait polls the workflow's push runs at the ref until each has finished, and refuses when none
 # of them succeeded, when none appeared, or when one is still going after the last poll; the guard calls it
-# before either question below (D-NEW-X61).
+# before either question below (D-0521).
 #
 # Usage:
 #   require-green-gates.sh <sha>

@@ -7,7 +7,7 @@
 # gives clients; the icon, licences and Terminal's launcher go to Contents/Resources. Nothing is signed or
 # notarized while the app's signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool
 # also accepts, and the bundle is then checked as unzipped from that archive, including a --selftest started
-# through LaunchServices that must derive its vault key with the libargon2.1.dylib beside the app (D-NEW-X82).
+# through LaunchServices that must derive its vault key with the libargon2.1.dylib beside the app (D-0523).
 #
 # Build logs go to stderr; the path of the archive is the only line on stdout.
 #

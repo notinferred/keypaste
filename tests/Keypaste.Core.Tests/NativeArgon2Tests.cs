@@ -14,8 +14,8 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// KeePassLib derives with the libargon2 keypaste carries beside its binary on Windows and macOS, or with the system's on
-/// Linux, and that derivation is the managed one byte for byte and gives the reference's known answers (D-NEW-X81,
-/// D-NEW-X82).
+/// Linux, and that derivation is the managed one byte for byte and gives the reference's known answers (D-0522,
+/// D-0523).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -189,7 +189,7 @@ public sealed class NativeArgon2Alone;
 
 /// <summary>
 /// Registers keypaste's resolver before any test reaches KeePassLib other than through <c>KeePassInterop</c>, which nothing
-/// shipped does, so no test binds KeePassLib's native Argon2 without it (D-NEW-X82).
+/// shipped does, so no test binds KeePassLib's native Argon2 without it (D-0523).
 /// </summary>
 internal static class NativeArgon2First
 {

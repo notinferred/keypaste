@@ -224,7 +224,7 @@ jobs:
           set -euo pipefail
           echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
 
-      # So these builds derive keys with the library the packages carry (D-NEW-X82).
+      # So these builds derive keys with the library the packages carry (D-0523).
       - name: Build the libargon2 the app and the CLI carry
         shell: bash
         run: bash scripts/build-argon2.sh
@@ -376,7 +376,7 @@ jobs:
           echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
           echo "prerelease suffix: ${suffix:-<none>}"
 
-      # Keypaste.Core's project puts it in the payload beside the app and its keypaste (D-NEW-X82).
+      # Keypaste.Core's project puts it in the payload beside the app and its keypaste (D-0523).
       - name: Build the libargon2 the payload carries
         shell: bash
         run: bash scripts/build-argon2.sh '${{ matrix.rid }}'
@@ -415,7 +415,7 @@ jobs:
           [ "$found" -ge 2 ] || { echo "::error::Skia/HarfBuzz natives missing from $out"; exit 1; }
 
       # The headless selftest cannot exercise native libraries that load on first render. It does derive a vault's key,
-      # and names the libargon2 it derived with: the payload's on Windows and macOS, the system's on Linux (D-NEW-X82).
+      # and names the libargon2 it derived with: the payload's on Windows and macOS, the system's on Linux (D-0523).
       - name: Start the published binary and run its selftest
         shell: bash
         run: |

@@ -11,7 +11,7 @@ public static class CoreInfo
     /// <summary>
     /// Gets the native libargon2 KeePassLib derives vault keys with in this process: the path of the file keypaste carries
     /// beside its binary, or the system library's name. <see langword="null"/> before the first derivation, and while no
-    /// library loads, when KeePassLib derives the same key in managed code (D-NEW-X82).
+    /// library loads, when KeePassLib derives the same key in managed code (D-0523).
     /// </summary>
     public static string? NativeArgon2 => Internal.NativeArgon2.Bound;
 

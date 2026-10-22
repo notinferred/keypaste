@@ -10,7 +10,7 @@ namespace Keypaste.Core;
 /// Any other text in braces, such as a JSON value or <c>${HOME}</c>, is text, and so is an unclosed brace.
 /// </para>
 /// <para>
-/// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it (D-NEW-X31): a value,
+/// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it (D-0519): a value,
 /// a field filled into one, or the inside of braces naming no placeholder, wholly wrapped in <c>\{</c> and
 /// <c>\}</c>, fills in as itself with those two made braces, and nothing in it is filled in or refused.
 /// </para>

@@ -91,7 +91,7 @@ public sealed class ProjectMappingsTests : IDisposable
         Assert.Equal("ops", Assert.Single(loaded).Project);
     }
 
-    /// <summary>What a newer version wrote and this one does not read survives a save of another mapping (D-NEW-X51).</summary>
+    /// <summary>What a newer version wrote and this one does not read survives a save of another mapping (D-0520).</summary>
     [Fact]
     public void A_mapping_it_cannot_read_and_properties_it_does_not_know_survive_a_save()
     {

@@ -216,7 +216,7 @@ public sealed record AppSettings
     /// <remarks>
     /// <para>
     /// A key of <c>[[settings]]</c> or a section this version does not read is written back as it was read,
-    /// after the preferences, so a version older than the one that wrote it does not drop it (D-NEW-X51). A
+    /// after the preferences, so a version older than the one that wrote it does not drop it (D-0520). A
     /// file that does not parse is replaced, as before. When what is kept cannot be written back as itself, or
     /// the file would no longer read whole, nothing is written and this returns <see langword="false"/>.
     /// </para>

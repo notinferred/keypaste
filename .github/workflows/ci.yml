@@ -326,7 +326,7 @@ jobs:
       - name: Install the native toolchain
         run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
 
-      # As release.yml builds it; Linux carries none and finds the system's (D-NEW-X81).
+      # As release.yml builds it; Linux carries none and finds the system's (D-0522).
       - name: Build the libargon2 the CLI carries
         shell: bash
         run: bash scripts/build-argon2.sh linux-x64

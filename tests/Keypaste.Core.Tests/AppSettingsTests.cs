@@ -200,7 +200,7 @@ public sealed class AppSettingsTests : IDisposable
         Assert.False(settings.LockWhenMinimized);
     }
 
-    /// <summary>What a newer version wrote and this one does not read survives this one's Settings and its <c>keypaste use</c> (D-NEW-X51).</summary>
+    /// <summary>What a newer version wrote and this one does not read survives this one's Settings and its <c>keypaste use</c> (D-0520).</summary>
     [Fact]
     public void A_key_and_a_section_this_version_does_not_read_survive_a_save_and_a_choice_of_vault()
     {

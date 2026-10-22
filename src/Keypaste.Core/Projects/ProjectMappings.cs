@@ -123,7 +123,7 @@ public static class ProjectMappings
     /// A mapping keeps the other properties the file gave the mapping for its vault and project, a mapping
     /// <see cref="TryLoad"/> skipped stays as it was unless one written names its vault and project, and the
     /// file's other top-level properties stay, so a version older than the one that wrote them drops none
-    /// (D-NEW-X51). A mapping <see cref="TryLoad"/> read and the caller left out is gone.
+    /// (D-0520). A mapping <see cref="TryLoad"/> read and the caller left out is gone.
     /// </para>
     /// <para>Owner-only on Unix; on Windows the file inherits the profile's ACL, as <c>app.toml</c> does.</para>
     /// </remarks>

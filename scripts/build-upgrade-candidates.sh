@@ -22,7 +22,7 @@ shift 2
 case "$rid" in win-x64 | linux-x64 | osx-arm64) ;; *) die "$rid has no desktop package to upgrade" ;; esac
 
 mkdir -p "$out"
-# Each candidate carries the libargon2 its release package does (D-NEW-X81).
+# Each candidate carries the libargon2 its release package does (D-0522).
 "$ROOT/scripts/build-argon2.sh" "$rid" >&2
 for prefix in "$@"; do
   case "$prefix" in

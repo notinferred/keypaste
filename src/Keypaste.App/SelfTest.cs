@@ -72,7 +72,7 @@ internal static class SelfTest
             stdout.WriteLine(
                 $"keypaste-app: selftest ok on {Environment.OSVersion.Platform}: " +
                 "a vault was created through Keypaste.Core, saved, reopened, and an entry read back");
-            // The packaging jobs hold each package to the library its platform derives with (D-NEW-X82).
+            // The packaging jobs hold each package to the library its platform derives with (D-0523).
             stdout.WriteLine(CoreInfo.NativeArgon2 is { } library
                 ? $"keypaste-app: Argon2 derived natively by {library}"
                 : "keypaste-app: Argon2 derived by managed code, as no native libargon2 loaded");

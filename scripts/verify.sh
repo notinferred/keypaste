@@ -131,7 +131,7 @@ prepare() {
 }
 
 # The libargon2 the app and the CLI carry on Windows and macOS, built before them so every build that runs or tests them
-# derives with the shipped file (D-NEW-X82). The compile check runs nothing, so it builds without it.
+# derives with the shipped file (D-0523). The compile check runs nothing, so it builds without it.
 argon2=true
 build_argon2() {
   if [ "$argon2" = true ]; then run bash scripts/build-argon2.sh; fi

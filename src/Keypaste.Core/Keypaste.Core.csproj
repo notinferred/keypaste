@@ -50,7 +50,7 @@
   </ItemGroup>
 
   <!--
-    The reference libargon2 that Internal/NativeArgon2.cs hands KeePassLib on Windows and macOS (D-NEW-X81), which
+    The reference libargon2 that Internal/NativeArgon2.cs hands KeePassLib on Windows and macOS (D-0522), which
     scripts/build-argon2.sh builds from its pinned source into artifacts/native/<rid>/. It flows into the output and
     publish directory of every project that references Core: the app, the CLI and the tests. A build without it derives
     the same keys with KeePassLib's managed Argon2.

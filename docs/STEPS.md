@@ -28,7 +28,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - `spctl` accepts it, and a changed byte is refused.
   - Terminal must be seen running the launcher of a downloaded bundle macOS opened. On `macos-15` Gatekeeper refuses an unsigned copy's launcher while it is quarantined ([4.7e1](steps/4.7e1.md)).
   - `upgrade-desktop.yml`'s macOS leg runs again on the first signed bundle, to see whether macOS App Management permission stops it replacing `/Applications/keypaste.app` ([4.7e2](steps/4.7e2.md)).
-  - `libargon2.1.dylib`, in the bundle's `Contents/MacOS` and beside `keypaste` in the CLI archive, is signed with the same Developer ID and hardened runtime before what loads it: the hardened runtime's library validation refuses a dylib from another team, and keypaste then derives in managed code without failing, so the signed DMG's `--selftest` must still name it (D-NEW-X82).
+  - `libargon2.1.dylib`, in the bundle's `Contents/MacOS` and beside `keypaste` in the CLI archive, is signed with the same Developer ID and hardened runtime before what loads it: the hardened runtime's library validation refuses a dylib from another team, and keypaste then derives in managed code without failing, so the signed DMG's `--selftest` must still name it (D-0523).
 - [ ] **R.1a — Exercise the integrated desktop candidate.** Needs: 9.4, 4.6, F.15, U.2, U.3, 4.4b, 4.3b, 2.6a, E.1b, E.1c, F.2b3a, F.2b3b, V.7a, V.7b, C.2, N.1a, N.1b, N.2, N.3, N.4, N.5, N.6, N.7, N.10, N.12, C.1a, C.1b, C.1c, C.3, C.4, E.1d, C.5a, C.5b, G.1, G.2, G.4a, G.5, G.8, G.9, N.16, V.11, 4.7a2.
   - Install the internal Windows MSI, macOS DMG and Linux AppImage built at a named commit.
   - In each installed app, complete T1–T4 with a disposable vault, a real MCP client and a real child process. The acts:
@@ -41,7 +41,7 @@ Package managers and agent marketplaces carry a version only after it is publish
     7. Change access.
     8. Lock, and see later releases refused as `vault-locked`.
   - Each act records the OS and version, the package and its hash, the commit and its audit lines.
-  - On the Mac and the PC, time an unlock and a save, which derive with the libargon2 the packages carry there ([F.66](steps/F.66.md), D-NEW-X81).
+  - On the Mac and the PC, time an unlock and a save, which derive with the libargon2 the packages carry there ([F.66](steps/F.66.md), D-0522).
   - An unreached act leaves the row open.
 - [ ] **4.7c2 — Publish and verify the first desktop release as 0.5.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, and 3.5a's Apple credentials.
   - Prove Windows signing with changed-byte refusal, and macOS notarization.

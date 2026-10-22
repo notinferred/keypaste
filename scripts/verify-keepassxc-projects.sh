@@ -27,7 +27,7 @@
 # custom PASSWORD field each start nothing and name their entries, and a value holding {PASSWORD}
 # reaches the child filled in from its own entry, exactly as KeePassXC shows it (P.3b1). Values using
 # KeePassXC's \{…\} escape, whole, through {S:…}, inside braces and in part, reach the child as
-# KeePassXC 2.7.11 gives them, compared with keepassxc-cli itself from 2.7.11 on (D-NEW-X31).
+# KeePassXC 2.7.11 gives them, compared with keepassxc-cli itself from 2.7.11 on (D-0519).
 # `run --session` through a real `keypaste approve`, and through the app's own prompt window held by
 # tests/Keypaste.AppDriver on an untouched copy, gets the same set after a prompt naming the source
 # entries, and the staging set is asked once only. A scoped token's run of the dev set is audited

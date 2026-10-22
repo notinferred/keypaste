@@ -201,7 +201,7 @@ jobs:
         if: runner.os == 'macOS'
         run: xcode-select -p
 
-      # The Windows and macOS archives carry it beside keypaste; Linux finds the system's (D-NEW-X81).
+      # The Windows and macOS archives carry it beside keypaste; Linux finds the system's (D-0522).
       - name: Build the libargon2 the CLI carries
         shell: bash
         run: bash scripts/build-argon2.sh '${{ matrix.rid }}'

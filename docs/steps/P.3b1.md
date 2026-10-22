@@ -59,7 +59,7 @@ D-0465, and D-0359, D-0378 and D-0422 amended to it, in [DECISIONS](../../DECISI
 - A credential that cannot be filled is refused after the Allow, and its cooldown holds the field back for a minute even once the item is fixed.
 - The log and the prompt name the field asked for, not the fields filled into it.
 - An older bridge does not scrub filled parts, and every non-empty part is scrubbed however short, so a short title or user name filled into a value mangles a run's output wherever it appears.
-- A generated password could, with negligible probability, hold text shaped like a placeholder; KeePassXC's `\{…\}` escape is honoured as KeePassXC 2.7.11 honours it, which 2.7.0 to 2.7.10 do not (D-NEW-X31) (gaps-1c, RUNS-PENDING).
+- A generated password could, with negligible probability, hold text shaped like a placeholder; KeePassXC's `\{…\}` escape is honoured as KeePassXC 2.7.11 honours it, which 2.7.0 to 2.7.10 do not (D-0519) (gaps-1c, RUNS-PENDING).
 - A revision copy fills in only while the revision at its position still holds the password the list read, checked under the lock its fields are read under, so an edit saved between the reads copies nothing and says the item changed; an edit that moves an identical password into that position still fills in from the moved revision's fields (gaps-1c, RUNS-PENDING).
 - Tagging an item into a project, in the app or at `env tag`, names each joining variable that already holds a placeholder, with its keyword, before it is written (D-0509, T-43) (gaps-1b, RUNS-PENDING).
 - Source only.

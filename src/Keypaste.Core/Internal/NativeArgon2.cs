@@ -6,7 +6,7 @@ namespace Keypaste.Core.Internal;
 /// <summary>
 /// Hands KeePassLib's native Argon2 import the libargon2 keypaste carries beside its binary on Windows and macOS, and on
 /// Linux the system's, so vault keys are derived in native code rather than by KeePassLib's slower managed Argon2
-/// (D-NEW-X81, D-NEW-X82).
+/// (D-0522, D-0523).
 /// </summary>
 /// <remarks>
 /// KeePassLib imports <c>argon2_hash</c> from <c>KeePassLibN.x64.dll</c> or <c>KeePassLibN.a64.dll</c> on Windows and from
