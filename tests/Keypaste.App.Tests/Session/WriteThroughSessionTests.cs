@@ -196,6 +196,37 @@ public sealed class WriteThroughSessionTests
         Assert.DoesNotContain("MINE", TitlesOnDisk(fixture));
     }
 
+    /// <summary>
+    /// What an agent's settings change or a terminal's edit saves goes through the unlock it was asked under:
+    /// once that unlock has ended, the next one's vault is never written, and the edit is not even run.
+    /// </summary>
+    [Fact]
+    public void An_edit_for_an_unlock_that_ended_is_refused_as_locked_and_the_next_unlock_keeps_its_vault()
+    {
+        using var fixture = new TempVault();
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        Unlock(session, fixture);
+        var asked = session.Lifetime!;
+        session.Lock(VaultLockReason.Manual);
+        Unlock(session, fixture);
+        var ran = false;
+
+        var write = session.WriteFor(
+            asked,
+            vault =>
+            {
+                ran = true;
+                return Add(vault, "MINE");
+            },
+            added => added);
+
+        Assert.Equal(WriteOutcome.Locked, write.Outcome);
+        Assert.False(ran);
+        Assert.DoesNotContain("MINE", TitlesOnDisk(fixture));
+        Assert.Null(session.Unlocked!.Find("MINE"));
+        Assert.Equal(WriteOutcome.Saved, session.WriteFor(session.Lifetime!, vault => Add(vault, "MINE"), added => added).Outcome);
+    }
+
     [Fact]
     public void Something_else_disposed_while_the_vault_stays_open_is_not_taken_for_a_lock()
     {

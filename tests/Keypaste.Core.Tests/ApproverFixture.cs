@@ -199,6 +199,9 @@ internal sealed class FakeChannel : IApprovalChannel
     /// <summary>When set, nobody answers: the prompt stays up until it is withdrawn.</summary>
     internal bool Hold { get; set; }
 
+    /// <summary>Runs while a request is on screen, before it is answered.</summary>
+    internal Action? WhileAsking { get; set; }
+
     internal int Asked { get; private set; }
 
     internal ApprovalPrompt? LastPrompt { get; private set; }
@@ -278,6 +281,7 @@ internal sealed class FakeChannel : IApprovalChannel
     private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
     {
         Asked++;
+        WhileAsking?.Invoke();
 
         if (!Hold)
         {

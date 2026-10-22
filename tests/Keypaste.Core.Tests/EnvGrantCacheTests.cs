@@ -15,7 +15,7 @@ public sealed class EnvGrantCacheTests
     private static readonly string[] _names = ["DATABASE_URL", "STRIPE_KEY"];
 
     private static void Store(EnvGrantCache cache, string key = _key, TimeSpan? ttl = null) =>
-        cache.Store(key, "billing", "dev", "npm run deploy", _names, ttl ?? _ttl, entries: [ProjectVariables.Home("billing")]);
+        Assert.True(cache.Store(key, "billing", "dev", "npm run deploy", _names, ttl ?? _ttl, cache.Generation, entries: [ProjectVariables.Home("billing")]));
 
     [Fact]
     public void AGrant_AnswersOnlyTheSameKeyAndNames()
@@ -118,7 +118,7 @@ public sealed class EnvGrantCacheTests
         Store(cache, "before");
         cache.Dispose();
 
-        Store(cache, "after");
+        Assert.False(cache.Store("after", "billing", "dev", "npm run deploy", _names, _ttl, cache.Generation, entries: [ProjectVariables.Home("billing")]));
 
         Assert.False(cache.TryUse("before", _names, out _));
         Assert.False(cache.TryUse("after", _names, out _));
@@ -176,8 +176,8 @@ public sealed class EnvGrantCacheTests
     public void RevokeLabel_EndsOnlyThatLabelsGrants()
     {
         using var cache = new EnvGrantCache(new ManualClock());
-        cache.Store("a", "p", "dev", "npm test", _names, _ttl, "Claude Code", "claude-code");
-        cache.Store("b", "p", "dev", "npm test", _names, _ttl, "Cursor", "cursor");
+        cache.Store("a", "p", "dev", "npm test", _names, _ttl, cache.Generation, "Claude Code", "claude-code");
+        cache.Store("b", "p", "dev", "npm test", _names, _ttl, cache.Generation, "Cursor", "cursor");
         Store(cache, "c");
 
         cache.RevokeLabel("claude-code");
@@ -189,7 +189,7 @@ public sealed class EnvGrantCacheTests
     public void InForce_CarriesClientLabelAndEntries()
     {
         using var cache = new EnvGrantCache(new ManualClock());
-        cache.Store("a", "p", "dev", "npm test", ["GH"], _ttl, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
+        cache.Store("a", "p", "dev", "npm test", ["GH"], _ttl, cache.Generation, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
         Store(cache, "b");
 
         var run = cache.InForce().Single(grant => grant.Key == "a");
@@ -206,7 +206,7 @@ public sealed class EnvGrantCacheTests
     {
         using var cache = new EnvGrantCache(new ManualClock());
         Store(cache, "env-set");
-        cache.Store("run", "p", "dev", "npm test", ["GH"], _ttl, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
+        cache.Store("run", "p", "dev", "npm test", ["GH"], _ttl, cache.Generation, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
 
         cache.RevokeEntries(VaultEdit.Of(ProjectVariables.Home("billing")));
         Assert.Equal(["run"], cache.InForce().Select(grant => grant.Key));
@@ -215,11 +215,35 @@ public sealed class EnvGrantCacheTests
         Assert.Empty(cache.InForce());
     }
 
+    /// <summary>
+    /// A timed allow answered after Revoke all, or after an edit or a reload ended grants, keeps nothing,
+    /// so the next run is asked again (F03).
+    /// </summary>
+    [Fact]
+    public void AGrantAskedForBeforeGrantsWereEnded_IsNotKept()
+    {
+        using var cache = new EnvGrantCache(new ManualClock());
+
+        var beforeRevokeAll = cache.Generation;
+        cache.RevokeAll();
+        Assert.False(cache.Store(_key, "billing", "dev", "npm run deploy", _names, _ttl, beforeRevokeAll));
+
+        var beforeAnEdit = cache.Generation;
+        cache.RevokeEntries(VaultEdit.Of(new EntryName("personal", "github")));
+        Assert.False(cache.Store(_key, "billing", "dev", "npm run deploy", _names, _ttl, beforeAnEdit));
+
+        Assert.Empty(cache.InForce());
+        Assert.False(cache.TryUse(_key, _names, out _));
+
+        Store(cache);
+        Assert.True(cache.TryUse(_key, _names, out _));
+    }
+
     [Fact]
     public void ARunGrant_IsListedAsRun_UnderItsClient()
     {
         using var cache = new EnvGrantCache(new ManualClock());
-        cache.Store("run", "p", "dev", "npm test", ["GH"], _ttl, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
+        cache.Store("run", "p", "dev", "npm test", ["GH"], _ttl, cache.Generation, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
         Store(cache, "env");
 
         var rows = GrantSummary.Of(ApproverActivity.None with { EnvGrants = cache.InForce() });

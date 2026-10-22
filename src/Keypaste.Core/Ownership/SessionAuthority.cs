@@ -402,7 +402,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         var waiting = lifetime.Waiting;
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
-        Withdrawals.Add(waiting);
+        Withdrawals.AddOwner(waiting);
 
         var reply = await Decided(
             token => _inner.RequestAsync(request, connectionId, token),
@@ -550,6 +550,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         var waiting = lifetime.Waiting;
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
 
         return Answer(await Decided(
             token => _inner.ChangeAccessAsync(request, token),
@@ -588,7 +589,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         var waiting = lifetime.Waiting;
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
-        Withdrawals.Add(waiting);
+        Withdrawals.AddOwner(waiting);
 
         return Answer(await Decided(
             token => _editor.DecideAsync(request, lifetime, waiting, token),
@@ -609,7 +610,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <returns>What became of it, recorded on its own line before it returns.</returns>
     /// <remarks>
     /// Kept to the live session as a request from a pipe is: a locked owner changes nothing, and a lock
-    /// while the person decides withdraws the confirmation.
+    /// or a reload while the person decides withdraws the confirmation, one not yet drawn included.
     /// </remarks>
     public async ValueTask<AccessChangeReply> ChangeAccessAsync(string agent, AccessEdit edit, string surface, CancellationToken cancellationToken)
     {
@@ -631,6 +632,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         var waiting = lifetime.Waiting;
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
 
         return Answer(await Decided(
             token => _inner.ChangeAccessAsync(agent, edit, AccessOrigin.Settings, string.Empty, token),
@@ -665,6 +667,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         var waiting = lifetime.Waiting;
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
 
         return Answer(await Decided(
             token => _inner.ResetCapsAsync(token),
@@ -848,6 +851,8 @@ public sealed class SessionAuthority : IApproverHandler
                     return true;
                 }
 
+                // Read before the person is asked, so a grant ended while they decide keeps theirs from being stored.
+                var generation = environments.Grants?.Generation ?? 0;
                 answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
 
                 // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
@@ -862,6 +867,7 @@ public sealed class SessionAuthority : IApproverHandler
                         prompt.Command,
                         preview.Keys,
                         TimeSpan.FromSeconds(grantSeconds),
+                        generation,
                         entries: [.. preview.Sources.Select(source => source.Entry).Distinct()]);
                 }
 
@@ -1104,26 +1110,27 @@ public sealed class SessionAuthority : IApproverHandler
                 "run\0" + connectionId,
                 .. entries.Select(entry => ApprovalGate.FieldKey(EntryHandle.For(entry.Name), entry.Field)).Distinct(StringComparer.Ordinal),
             ];
+            // Read before the person is asked, so a grant ended while they decide keeps theirs from being stored.
+            var generation = environments.Grants?.Generation ?? 0;
             answer = await environments.Gate.AskAsync(cooldownKeys, prompt, withdrawn).ConfigureAwait(false);
 
             // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
             withdrawn.ThrowIfCancellationRequested();
 
-            var timed = answer == ApprovalAnswer.Approved && grantSeconds > 0;
-
-            if (timed)
-            {
-                environments.Grants?.Store(
+            // A timed allow given while Revoke all, an edit or a reload ended the grants releases this run once.
+            var timed = answer == ApprovalAnswer.Approved
+                && grantSeconds > 0
+                && environments.Grants?.Store(
                     runKey,
                     prompt.Project,
                     prompt.Profile,
                     command,
                     preview.Keys,
                     TimeSpan.FromSeconds(grantSeconds),
+                    generation,
                     prompt.Client,
                     request.ClientLabel,
-                    [.. entries.Select(entry => entry.Name)]);
-            }
+                    [.. entries.Select(entry => entry.Name)]) != false;
 
             method = AuditMethod.Prompt;
             granted = timed ? grantSeconds : 0;

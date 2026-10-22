@@ -5,9 +5,10 @@
 #
 # A real keypaste mcp request raises the prompt, which shows the client's label, the entry, the field and
 # the lifetime. Approve returns the field, audited as a prompted grant naming the app's session and the
-# label. Deny, closing the prompt, the client cancelling, the bridge going away, a lock and the gate's
-# timeout each return a denial with the matching method and take the prompt down. The client cancelling
-# and the bridge going away each leave exactly one line, cancelled, which the app records. Each case uses
+# label. Deny, closing the prompt, the client cancelling, the client closing the bridge's standard input,
+# the bridge going away, a lock and the gate's timeout each return a denial with the matching method and
+# take the prompt down. The client cancelling, closing the bridge's input and the bridge going away each
+# leave exactly one line, cancelled, which the app records. Each case uses
 # a new bridge, so no grant carries from one to the next, and Deny and closing each ask for a field of
 # their own, because a refusal cools that field down for every bridge (D-0425). For an entry in one
 # project environment the prompt offers Always for it: pressed, it holds the release while the app's
@@ -260,7 +261,15 @@ exec 8>&-
 cancelled_once "$logged" "$FIRST" "the cancelled request"
 grep -q "$SECRET" "$OUT" && die "a cancelled request reached the client"
 
-# A bridge whose standard input closes waits for its call to finish, so going away is being killed.
+# A client that closes the bridge's standard input has gone, so the call it left waiting is withdrawn.
+logged=$(lines_in "$LOG")
+raise_prompt closed
+exec 8>&-
+withdrawn
+cancelled_once "$logged" "$FIRST" "the request whose bridge's input closed"
+grep -q "$SECRET" "$OUT" && die "a request whose bridge's input closed reached the client"
+
+# A bridge killed while its call waits takes the prompt down too.
 logged=$(lines_in "$LOG")
 raise_prompt gone
 if [ -r "/proc/$BRIDGE_PID/winpid" ]; then

@@ -190,7 +190,8 @@ internal sealed class RunTool(ServerOptions options, ApproverConnection approver
         // follows adds a line: a release dropped after it stays recorded.
         line.Recorded = reply is not null;
 
-        if (cancellationToken.IsCancellationRequested)
+        // A client that closed the bridge's input has gone as surely as one that cancelled.
+        if (cancellationToken.IsCancellationRequested || approver.InputEnded.IsCancellationRequested)
         {
             return Finish(client, line, Verdict.Denied(AuditMethod.Cancelled, "the agent withdrew the request"), null);
         }

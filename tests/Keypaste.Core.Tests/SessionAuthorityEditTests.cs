@@ -241,6 +241,34 @@ public sealed class SessionAuthorityEditTests : IDisposable
         Assert.True(_lifetime.IsLive);
     }
 
+    /// <summary>
+    /// A reload's withdrawal is the owner's, not a question left unanswered, so it starts no cooldown and
+    /// the edit asked again at once is put to the person, as after a lock (T-11; founder decision, 2026-10-22).
+    /// </summary>
+    [Fact]
+    public async Task AnEditAskedAgainRightAfterAReload_IsAsked()
+    {
+        _fixture.Channel.EditAnswer = ApprovalAnswer.ApprovedOnce;
+        _fixture.Channel.WhileEditing = () =>
+        {
+            _fixture.Channel.WhileEditing = null;
+            _lifetime.Withdraw();
+        };
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+
+        var withdrawn = await client.EditAsync(Edit(new SetPassword(_github, NewSecret.Of(_sentinel))), Token);
+
+        Assert.Equal(AuditMethod.VaultChanged, withdrawn!.Method);
+        Assert.False(_fixture.Gate.IsInCooldown(ApprovalGate.AskedForMore));
+
+        var again = await client.EditAsync(Edit(new SetPassword(_github, NewSecret.Of(_sentinel))), Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (again!.Decision, again.Method));
+        Assert.Equal(2, _fixture.Channel.EditAsked);
+        Assert.Equal(_sentinel, Password(_github));
+    }
+
     [Fact]
     public async Task AGeneratedValue_IsMadeByTheOwner()
     {

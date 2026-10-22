@@ -39,6 +39,7 @@ internal sealed class McpHarness : IAsyncDisposable
     private readonly List<IDisposable> _owned = [];
 
     private readonly ApproverConnection _approver;
+    private readonly CancellationTokenSource _inputEnded = new();
     private TeeStream? _transcript;
 
     private AuditLog? _audit;
@@ -95,7 +96,7 @@ internal sealed class McpHarness : IAsyncDisposable
     internal McpHarness()
     {
         Approver = new FakeApprover();
-        _approver = new ApproverConnection(Approver.PipeName, VaultPath);
+        _approver = new ApproverConnection(Approver.PipeName, VaultPath) { InputEnded = _inputEnded.Token };
     }
 
     /// <summary>
@@ -113,7 +114,7 @@ internal sealed class McpHarness : IAsyncDisposable
     {
         _vaultPath = vaultPath;
         Approver = new FakeApprover();
-        _approver = new ApproverConnection(approverPipeName, VaultPath);
+        _approver = new ApproverConnection(approverPipeName, VaultPath) { InputEnded = _inputEnded.Token };
         _approverPipeName = approverPipeName;
     }
 
@@ -208,6 +209,9 @@ internal sealed class McpHarness : IAsyncDisposable
     internal void AttachAs(McpServer server) =>
         _approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, _options ?? throw new InvalidOperationException("the harness is not serving"));
 
+    /// <summary>Ends the bridge's input as a client closing its standard input does, as <c>BridgeEntry</c> tells the connection.</summary>
+    internal Task EndInputAsync() => _inputEnded.CancelAsync();
+
     /// <summary>A tool the server is serving, for a test that calls it as the server's dispatch would.</summary>
     internal McpServerTool Tool(string name) =>
         _tools is not null && _tools.TryGetPrimitive(name, out var tool)
@@ -270,6 +274,7 @@ internal sealed class McpHarness : IAsyncDisposable
         }
 
         await _approver.DisposeAsync();
+        _inputEnded.Dispose();
         await Approver.DisposeAsync();
 
         _audit?.Dispose();

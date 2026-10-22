@@ -236,14 +236,15 @@ public sealed class ApprovalGate : IDisposable
     /// <summary>Asks a human to confirm a change that gives an agent more, under the same window, slot and cooldown.</summary>
     /// <param name="cooldownKeys">Each identity under which a refusal holds the next change back: one cooling under any of them is refused unasked, and a refusal cools all of them.</param>
     /// <param name="prompt">What the human is shown.</param>
-    /// <param name="coolUnanswered">Whether a confirmation nobody answered, because it expired or was withdrawn, cools down as a refusal does.</param>
+    /// <param name="coolUnanswered">Whether a confirmation nobody answered, because it expired or its asker withdrew it, cools down as a refusal does; one the owner withdrew never does.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>The answer, which confirms nothing unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKeys"/> or <paramref name="prompt"/> is null.</exception>
     /// <remarks>
     /// A request for more that reaches the owner from an agent or a terminal may come from a program that
     /// gains by keeping a confirmation up until somebody presses yes, so its unanswered requests hold the
-    /// next one back too (THREATS.md T-11).
+    /// next one back too (THREATS.md T-11). One the owner withdrew, by a lock or a reload, holds nothing
+    /// back: no program chose it (<see cref="Withdrawals.ByOwner"/>).
     /// </remarks>
     public ValueTask<ApprovalAnswer> AskAsync(
         IReadOnlyList<string> cooldownKeys,
@@ -285,7 +286,7 @@ public sealed class ApprovalGate : IDisposable
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>The answer, which allows nothing unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKeys"/> or <paramref name="prompt"/> is null.</exception>
-    /// <remarks>Any program can type a terminal command, so an edit nobody answered holds the next one back as a refusal does (THREATS.md T-11).</remarks>
+    /// <remarks>Any program can type a terminal command, so an edit nobody answered holds the next one back as a refusal does (THREATS.md T-11), unless the owner withdrew it by a lock or a reload.</remarks>
     public ValueTask<ApprovalAnswer> AskAsync(
         IReadOnlyList<string> cooldownKeys,
         TerminalEditPrompt prompt,
@@ -333,8 +334,9 @@ public sealed class ApprovalGate : IDisposable
 
             var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
 
+            // One the owner withdrew, by a lock or a reload, went unanswered by nobody's choice, so it holds nothing back.
             if (answer == ApprovalAnswer.Denied
-                || (coolUnanswered && answer is ApprovalAnswer.TimedOut or ApprovalAnswer.Cancelled))
+                || (coolUnanswered && (answer == ApprovalAnswer.TimedOut || (answer == ApprovalAnswer.Cancelled && !Withdrawals.ByOwner))))
             {
                 foreach (var cooldownKey in cooldownKeys)
                 {

@@ -27,6 +27,7 @@ public sealed class EnvGrantCache : IDisposable
     private readonly Lock _gate = new();
     private readonly Dictionary<string, Grant> _grants = new(StringComparer.Ordinal);
     private readonly TimeProvider _clock;
+    private long _generation;
     private bool _disposed;
 
     /// <summary>Builds an empty cache.</summary>
@@ -46,6 +47,21 @@ public sealed class EnvGrantCache : IDisposable
         ArgumentNullException.ThrowIfNull(limits);
 
         return Math.Min(limits.MaximumTtlSeconds, CeilingSeconds);
+    }
+
+    /// <summary>
+    /// How many times grants were ended for a change, by Revoke all, an edit or a reload: read before a
+    /// person is asked and given to <see cref="Store"/>, which keeps no grant asked for before one.
+    /// </summary>
+    public long Generation
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _generation;
+            }
+        }
     }
 
     /// <summary>Whether a live grant answers this request with exactly these names.</summary>
@@ -85,17 +101,24 @@ public sealed class EnvGrantCache : IDisposable
     /// <param name="command">The command, as the prompt showed it.</param>
     /// <param name="keys">The variable names the person approved.</param>
     /// <param name="ttl">How long the grant lasts.</param>
+    /// <param name="generation">The <see cref="Generation"/> read before the person was asked.</param>
     /// <param name="client">The agent client it is given to, as the prompt showed it, or null for <c>keypaste run --session</c>.</param>
     /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>
     /// <param name="entries">The entries it releases, or null for each key of <paramref name="project"/>'s <paramref name="profile"/>.</param>
-    /// <remarks>A cache that has been disposed keeps nothing: its lifetime has ended.</remarks>
-    public void Store(
+    /// <returns>Whether the grant is kept.</returns>
+    /// <remarks>
+    /// A cache that has been disposed keeps nothing: its lifetime has ended. Nor does one whose grants
+    /// were ended while the person was asked, so an answer given before Revoke all, an edit or a reload
+    /// leaves no grant after it.
+    /// </remarks>
+    public bool Store(
         string key,
         string project,
         string profile,
         string command,
         IReadOnlyList<string> keys,
         TimeSpan ttl,
+        long generation,
         string? client = null,
         string? label = null,
         IReadOnlyList<EntryName>? entries = null)
@@ -111,9 +134,9 @@ public sealed class EnvGrantCache : IDisposable
 
         lock (_gate)
         {
-            if (_disposed)
+            if (_disposed || generation != _generation)
             {
-                return;
+                return false;
             }
 
             if (_grants.TryGetValue(key, out var replaced))
@@ -129,6 +152,7 @@ public sealed class EnvGrantCache : IDisposable
             };
             _grants[key] = grant;
             grant.Expiry = _clock.CreateTimer(_ => Expire(key, grant), null, ttl, Timeout.InfiniteTimeSpan);
+            return true;
         }
     }
 
@@ -187,19 +211,31 @@ public sealed class EnvGrantCache : IDisposable
 
     /// <summary>Ends every grant releasing an entry an edit touched, so no value the vault no longer holds there is served again (D-0318).</summary>
     /// <param name="edit">What the edit touched.</param>
+    /// <remarks>It advances <see cref="Generation"/>, so no grant a person is being asked about now is kept either.</remarks>
     public void RevokeEntries(VaultEdit edit)
     {
         ArgumentNullException.ThrowIfNull(edit);
 
         var touched = edit.Entries.ToHashSet();
-        RevokeWhere((_, grant) => edit.IsEverything || grant.Entries.Any(touched.Contains));
+
+        lock (_gate)
+        {
+            _generation++;
+
+            foreach (var (key, grant) in _grants.Where(pair => edit.IsEverything || pair.Value.Entries.Any(touched.Contains)).ToList())
+            {
+                Forget(key, grant);
+            }
+        }
     }
 
-    /// <summary>Ends every grant.</summary>
+    /// <summary>Ends every grant, and keeps none a person is being asked about now.</summary>
     public void RevokeAll()
     {
         lock (_gate)
         {
+            _generation++;
+
             foreach (var (key, grant) in _grants.ToList())
             {
                 Forget(key, grant);

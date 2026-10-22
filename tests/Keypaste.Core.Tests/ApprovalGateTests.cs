@@ -474,6 +474,30 @@ public sealed class ApprovalGateTests
         Assert.True(ApprovalAnswer.ApprovedOnce.Releases());
     }
 
+    /// <summary>
+    /// A terminal's edit whose asker withdrew it holds the next request for more back, as one nobody
+    /// answered does; one the owner withdrew, by a lock or a reload, holds nothing back (T-11).
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AWithdrawnEdit_HoldsTheNextBack_OnlyWhenItsAskerWithdrewIt(bool byOwner)
+    {
+        using var withdrawing = new CancellationTokenSource();
+        var channel = new FakeChannel { EditAnswer = ApprovalAnswer.ApprovedOnce, WhileEditing = withdrawing.Cancel };
+        var (gate, _) = Build(channel);
+        using var owned = gate;
+        var edit = new TerminalEditPrompt { Command = "keypaste set", Item = "work/github", Changes = ["The password changes."] };
+
+        if (byOwner)
+        {
+            Withdrawals.AddOwner(withdrawing.Token);
+        }
+
+        Assert.Equal(ApprovalAnswer.Cancelled, await owned.AskAsync([ApprovalGate.AskedForMore], edit, withdrawing.Token));
+        Assert.Equal(!byOwner, owned.IsInCooldown(ApprovalGate.AskedForMore));
+    }
+
     /// <summary>A channel that answers what it was told to, when it is told to.</summary>
     /// <remarks>
     /// Both completion sources are built with

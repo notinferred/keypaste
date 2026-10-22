@@ -50,7 +50,7 @@ In source, Allow once releases one field and keeps nothing; Allow for 1 hour als
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  agent    claude-code
+  agent    claude-code (claude-code)
   item     env/demo/.env
   field    STRIPE_KEY
 

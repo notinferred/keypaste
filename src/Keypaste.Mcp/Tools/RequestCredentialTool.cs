@@ -204,10 +204,11 @@ internal sealed class RequestCredentialTool(
         }
 
         // Checked after the exchange as well as before, and this is the important one: a person can
-        // say yes between the client giving up and the reply arriving, and without this the bridge
-        // returns a credential for a request nobody was waiting for. A reply here is one the owner
-        // recorded, the withdrawn request's included; with none, the bridge records the call.
-        if (cancellationToken.IsCancellationRequested)
+        // say yes between the client giving up, or closing the bridge's input, and the reply arriving,
+        // and without this the bridge returns a credential for a request nobody was waiting for. A reply
+        // here is one the owner recorded, the withdrawn request's included; with none, the bridge
+        // records the call.
+        if (cancellationToken.IsCancellationRequested || approver.InputEnded.IsCancellationRequested)
         {
             return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the agent withdrew the request")
             {

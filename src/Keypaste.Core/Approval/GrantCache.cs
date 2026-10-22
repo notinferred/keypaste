@@ -67,6 +67,7 @@ public sealed class GrantCache : IDisposable
     private readonly Lock _gate = new();
     private readonly Dictionary<GrantKey, Grant> _grants = [];
     private readonly TimeProvider _clock;
+    private long _generation;
     private bool _disposed;
 
     /// <summary>Builds an empty cache.</summary>
@@ -87,6 +88,21 @@ public sealed class GrantCache : IDisposable
             lock (_gate)
             {
                 return _grants.Count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// How many times grants were ended for a change, by Revoke all, an edit or a reload: read before a
+    /// person is asked and given to <see cref="Store"/>, which keeps no grant asked for before one.
+    /// </summary>
+    public long Generation
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _generation;
             }
         }
     }
@@ -144,12 +160,16 @@ public sealed class GrantCache : IDisposable
     /// <param name="value">The released field. The cache takes a copy; the caller keeps ownership of its own.</param>
     /// <param name="ttl">How long the grant lives.</param>
     /// <param name="approved">What the person was shown and approved, kept so the grant can be listed.</param>
+    /// <param name="generation">The <see cref="Generation"/> read before the person was asked.</param>
+    /// <returns>Whether the grant is kept.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> or <paramref name="approved"/> is null.</exception>
     /// <remarks>
     /// A cache that has been disposed keeps nothing: its lifetime has ended, and a request decided
-    /// across that lock is refused by the owner rather than stored for later (D-0313).
+    /// across that lock is refused by the owner rather than stored for later (D-0313). Nor does one
+    /// whose grants were ended while the person was asked, so an answer given before Revoke all, an
+    /// edit or a reload leaves no grant after it.
     /// </remarks>
-    public void Store(GrantKey key, ReleasedField value, TimeSpan ttl, ApprovalPrompt approved)
+    public bool Store(GrantKey key, ReleasedField value, TimeSpan ttl, ApprovalPrompt approved, long generation)
     {
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(approved);
@@ -158,9 +178,9 @@ public sealed class GrantCache : IDisposable
         {
             // Before the copy, not after: a copy taken and then abandoned would be a secret nothing
             // is left holding to zero.
-            if (_disposed)
+            if (_disposed || generation != _generation)
             {
-                return;
+                return false;
             }
 
             // The copy's ownership transfers to the dictionary, and every route out of it — Forget,
@@ -179,6 +199,7 @@ public sealed class GrantCache : IDisposable
             // Inside the lock, so a grant can never be replaced between being stored and being
             // given its timer — that window would leak a timer and leave a grant that never zeroes.
             grant.Expiry = _clock.CreateTimer(_ => Expire(key, grant), null, ttl, Timeout.InfiniteTimeSpan);
+            return true;
         }
     }
 
@@ -220,7 +241,8 @@ public sealed class GrantCache : IDisposable
     /// <exception cref="ArgumentNullException"><paramref name="edit"/> is null.</exception>
     /// <remarks>
     /// A grant holds the value a person approved, so once the entry under that name has changed, the
-    /// grant would answer with something the vault no longer holds (D-0318).
+    /// grant would answer with something the vault no longer holds (D-0318). It advances
+    /// <see cref="Generation"/>, so no grant a person is being asked about now is kept either.
     /// </remarks>
     public void RevokeEntries(VaultEdit edit)
     {
@@ -230,6 +252,8 @@ public sealed class GrantCache : IDisposable
 
         lock (_gate)
         {
+            _generation++;
+
             foreach (var key in _grants.Keys.Where(k => edit.IsEverything || handles.Contains(k.Handle)).ToList())
             {
                 Forget(key, _grants[key]);

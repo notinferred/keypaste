@@ -85,6 +85,86 @@ public sealed class ApproverConnectionTests
         Assert.Single(approver.Received);
     }
 
+    /// <summary>
+    /// A credential request whose reply was lost may already have been answered by a person, so it is
+    /// reported as a failed exchange, which the bridge records, and never put to them a second time (F63).
+    /// </summary>
+    [Fact]
+    public async Task ACredentialReplyLostAfterTheOwnerHadIt_IsNotSentAgain()
+    {
+        await using var approver = new FakeApprover();
+        approver.DropOnce = () => { };
+        approver.StartApproving();
+
+        await using var connection = new ApproverConnection(approver.PipeName, _vault);
+
+        var (reply, outcome) = await connection.RequestAsync(Request(), Token);
+
+        Assert.Null(reply);
+        Assert.Equal(ApproverOutcome.Failed, outcome);
+
+        // Proving a negative, so it is given time to happen rather than checked instantly.
+        await Task.Delay(TimeSpan.FromMilliseconds(500), Token);
+
+        Assert.Single(approver.Received);
+        Assert.Equal(1, approver.Attaches);
+    }
+
+    /// <summary>
+    /// An owner that never answers holds a call no longer than the bound: the request is withdrawn there,
+    /// the owner's reply to the withdrawal comes back, and nothing is sent again (F01).
+    /// </summary>
+    [Fact]
+    public async Task AnOwnerThatNeverAnswers_IsWithdrawnAtTheBound_AndNotAskedAgain()
+    {
+        await using var approver = new FakeApprover();
+        approver.Hold = true;
+        approver.StartApproving();
+
+        // Longer than ConnectTimeout, so the bound cannot end the connect or the attach before the request is sent.
+        await using var connection = new ApproverConnection(approver.PipeName, _vault) { CredentialBound = TimeSpan.FromSeconds(2) };
+
+        var (reply, outcome) = await connection.RequestAsync(Request(), Token).AsTask().WaitAsync(_promptly, Token);
+
+        Assert.Equal(ApproverOutcome.Answered, outcome);
+        Assert.NotNull(reply);
+        Assert.Equal((AuditMethod.Cancelled, true), (reply.Method, reply.Recorded));
+        Assert.Null(reply.Value);
+
+        approver.Held.TrySetResult();
+        await Task.Delay(TimeSpan.FromMilliseconds(500), Token);
+
+        Assert.Single(approver.Received);
+    }
+
+    /// <summary>
+    /// A client that closes the bridge's standard input has gone, so a call still waiting for the owner is
+    /// withdrawn as one the client gave up on, rather than left up for a person until the window ends (F01).
+    /// </summary>
+    [Fact]
+    public async Task InputEnding_WithdrawsTheCallInFlight()
+    {
+        await using var approver = new FakeApprover();
+        approver.Hold = true;
+        approver.StartApproving();
+
+        using var inputEnded = new CancellationTokenSource();
+        await using var connection = new ApproverConnection(approver.PipeName, _vault) { InputEnded = inputEnded.Token };
+
+        var call = connection.RequestAsync(Request(), Token).AsTask();
+        await approver.Entered.Task.WaitAsync(_promptly, Token);
+
+        await inputEnded.CancelAsync();
+
+        var (reply, outcome) = await call.WaitAsync(_promptly, Token);
+
+        Assert.Equal(ApproverOutcome.Answered, outcome);
+        Assert.NotNull(reply);
+        Assert.Equal((AuditMethod.Cancelled, true), (reply.Method, reply.Recorded));
+        Assert.Null(reply.Value);
+        Assert.Single(approver.Received);
+    }
+
     /// <summary>A call given up on before it reached the owner has no reply, so the bridge records it, and nothing was sent.</summary>
     [Fact]
     public async Task ACallCancelledBeforeItIsSent_HasNoReply()

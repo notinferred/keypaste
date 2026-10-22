@@ -52,7 +52,7 @@ Both processes derive the same per-user pipe name, so [MCP configuration](mcp-se
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  agent    claude-code
+  agent    claude-code (claude-code)
   item     env/billing/.env
   field    STRIPE_KEY
 
@@ -68,7 +68,7 @@ keypaste: an agent is asking for a credential.
 
 `v0.3.0` asks `Approve? [y/N]`; `y` releases the value and keeps a grant up to `--max-ttl`, and anything else is a no.
 
-`agent` is the name the connecting program gave itself, which nothing checks. Any process that can start `keypaste mcp` can claim it; keypaste displays it but does not authorize from it. The agent's settings follow the bridge's `--client-label` instead, which is what `[a]` names.
+`agent` is the name the connecting program gave itself, which nothing checks, then in brackets the bridge's `--client-label` when it was started with one. Any process that can start `keypaste mcp` can claim the name; keypaste displays it but does not authorize from it. The agent's settings follow the label instead, which is what `[a]` names.
 
 `item` and `field` identify the requested value in your vault. A `/` inside an item title is displayed as a space so a title such as `../../prod/ROOT_TOKEN` cannot impersonate a different group path.
 

@@ -326,11 +326,13 @@ public sealed class ApproverHandler
             AlwaysFor = isProtected || item.Mode == AgentMode.Automatic ? null : AlwaysFor(access, tags),
         };
 
+        // Read before the person is asked, so a grant ended while they decide keeps theirs from being stored.
+        var generation = _grants.Generation;
         var (answer, kept) = await _gate.AskKeepingAsync(CooldownKey(key), prompt, cancellationToken).ConfigureAwait(false);
 
         try
         {
-            var reply = Answered(request, name, display, key, prompt, grantSeconds, answer, cancellationToken);
+            var reply = Answered(request, name, display, key, prompt, grantSeconds, generation, answer, cancellationToken);
 
             // Always for's release goes with the slot the gate kept, so its confirmation follows with
             // no other request in front of the person between them.
@@ -357,6 +359,7 @@ public sealed class ApproverHandler
         GrantKey key,
         ApprovalPrompt prompt,
         int grantSeconds,
+        long generation,
         ApprovalAnswer answer,
         CancellationToken cancellationToken)
     {
@@ -388,17 +391,16 @@ public sealed class ApproverHandler
 
         using (released)
         {
-            var timed = answer == ApprovalAnswer.Approved && grantSeconds > 0;
-
-            if (timed)
-            {
-                // Stored even when the reply below turns out not to fit. The size belongs to the
-                // entry rather than to the request, so every retry would end the same way — and
-                // re-prompting for each one is THREATS.md T-11 with a lever attached. From the
-                // cache, the second ask is refused without troubling anybody, and the copy is
-                // zeroed at its ordinary TTL. A once answer keeps nothing, so it asks again.
-                _grants.Store(key, released, TimeSpan.FromSeconds(grantSeconds), prompt);
-            }
+            // Stored even when the reply below turns out not to fit. The size belongs to the
+            // entry rather than to the request, so every retry would end the same way — and
+            // re-prompting for each one is THREATS.md T-11 with a lever attached. From the
+            // cache, the second ask is refused without troubling anybody, and the copy is
+            // zeroed at its ordinary TTL. A once answer keeps nothing, so it asks again, and so
+            // does a timed one given while Revoke all, an edit or a reload ended the grants: it
+            // is released once and said to be.
+            var timed = answer == ApprovalAnswer.Approved
+                && grantSeconds > 0
+                && _grants.Store(key, released, TimeSpan.FromSeconds(grantSeconds), prompt, generation);
 
             return Deliver(
                 new CredentialReply

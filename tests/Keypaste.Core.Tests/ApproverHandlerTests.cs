@@ -349,6 +349,52 @@ public sealed class ApproverHandlerTests
         Assert.Equal(2, fixture.Channel.Asked);
     }
 
+    /// <summary>
+    /// Revoke all while the person is still deciding: their timed allow releases this one request and
+    /// keeps nothing, and says it was once, so the next request is asked again (F03).
+    /// </summary>
+    [Fact]
+    public async Task AnAllowanceAnsweredAfterRevokeAll_IsReleasedOnceAndNotKept()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Channel.WhileAsking = () =>
+        {
+            fixture.Channel.WhileAsking = null;
+            fixture.Handler.RevokeAll();
+        };
+
+        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (released.Decision, released.Method));
+        Assert.Equal(Sentinel, released.Value, StringComparer.Ordinal);
+        Assert.Equal("a person approved this one request", released.Reason);
+        Assert.Equal(0, released.TtlSeconds);
+        Assert.Empty(fixture.Handler.Activity().Grants);
+        Assert.Contains("released env/dev/STRIPE_KEY to claude-code once", fixture.Narration);
+
+        var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.Prompt, again.Method);
+        Assert.Equal(2, fixture.Channel.Asked);
+        Assert.Single(fixture.Handler.Activity().Grants);
+    }
+
+    /// <summary>The same when the grants end after the vault was read and before the grant would be kept, as an edit's or a reload's can.</summary>
+    [Fact]
+    public async Task AnAllowanceWhoseGrantsEndAsItIsRead_IsReleasedOnceAndNotKept()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Source.During = () => fixture.Grants.RevokeEntries(VaultEdit.Of(new EntryName("env/dev", "STRIPE_KEY")));
+
+        var released = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Granted, released.Decision);
+        Assert.Equal(0, released.TtlSeconds);
+        Assert.Equal(0, fixture.Grants.Count);
+    }
+
     [Fact]
     public async Task ThePromptCarriesTheBridgesLabel()
     {

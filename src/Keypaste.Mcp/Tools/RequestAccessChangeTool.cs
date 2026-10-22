@@ -192,7 +192,8 @@ internal sealed class RequestAccessChangeTool(
             return new Verdict(reply.Decision, reply.Method, reply.Reason, Told(reply)) { Recorded = true };
         }
 
-        if (cancellationToken.IsCancellationRequested)
+        // A client that closed the bridge's input has gone as surely as one that cancelled.
+        if (cancellationToken.IsCancellationRequested || approver.InputEnded.IsCancellationRequested)
         {
             return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the agent withdrew the request" + named, ToolText.Cancelled);
         }

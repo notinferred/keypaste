@@ -169,8 +169,8 @@ public sealed class TerminalApprovalChannelTests
     }
 
     /// <summary>
-    /// The dialog <c>scripts/verify-demo.sh</c> diffs against five pages: the <c>for</c> line is
-    /// gone and nothing else moved.
+    /// The dialog for a bridge started with no label, which names the client alone: the <c>for</c>
+    /// line is gone and nothing else moved.
     /// </summary>
     [Fact]
     public async Task TheDialog_HasNoForLine_AndIsOtherwiseUnchanged()
@@ -203,6 +203,42 @@ public sealed class TerminalApprovalChannelTests
 
         Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
         Assert.Equal("[d] deny  [o] once  [h] 1 hour  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
+    }
+
+    /// <summary>
+    /// The credential prompt names the agent as the run prompt does: the client it says it is, then the
+    /// label its bridge was started with, which its settings follow; with no label, the client alone.
+    /// </summary>
+    [Fact]
+    public async Task TheCredentialPrompt_NamesTheClientAndItsLabel()
+    {
+        var rig = Build("d");
+        var prompt = ApprovalPrompt.For(
+            "claude-code", new EntryName("env/demo", "STRIPE_KEY"), "password", "deploy the billing service to staging", 3600, "ci-probe");
+
+        await rig.Channel.AskAsync(prompt, Token);
+
+        string[] expected =
+        [
+            string.Empty,
+            TerminalApprovalChannel.Rule,
+            "keypaste: an agent is asking for a credential.",
+            string.Empty,
+            "  agent    claude-code (ci-probe)",
+            "  item     env/demo/STRIPE_KEY",
+            "  field    password",
+            string.Empty,
+            "  the agent says it needs this because:",
+            "    deploy the billing service to staging",
+            string.Empty,
+            "  That sentence was written by the agent, not by keypaste. Treat it as a claim.",
+            string.Empty,
+            "keypaste: denied. Nothing was released.",
+            TerminalApprovalChannel.Rule,
+            string.Empty,
+        ];
+
+        Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
     }
 
     [Fact]

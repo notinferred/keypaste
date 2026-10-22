@@ -59,9 +59,18 @@ internal sealed class FakeApprover : IAsyncDisposable
 
     /// <summary>
     /// Set to end the connection without answering the next credential request, after running this
-    /// action. The bridge then reconnects and retries, which is what a test of that retry needs.
+    /// action, as a reply lost after the owner answered would leave it.
     /// </summary>
     internal Action? DropOnce { get; set; }
+
+    /// <summary>
+    /// Set to end the connection without answering the next listing, after running this action. The
+    /// bridge then reconnects and retries, which is what a test of that retry needs.
+    /// </summary>
+    internal Action? DropListingOnce { get; set; }
+
+    /// <summary>Every listing that reached the approver, in the order it arrived.</summary>
+    internal ConcurrentQueue<NamesRequest> ListingsReceived { get; } = [];
 
     /// <summary>How many attachments reached the approver.</summary>
     internal int Attaches => Volatile.Read(ref _attaches);
@@ -239,8 +248,19 @@ internal sealed class FakeApprover : IAsyncDisposable
             return ValueTask.FromResult(approver.AttachRefusal ?? AttachReply.To(approver.Session));
         }
 
-        public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(approver.Names with { Session = approver.Session, Recorded = approver.Records });
+        public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            approver.ListingsReceived.Enqueue(request);
+
+            if (approver.DropListingOnce is { } drop)
+            {
+                approver.DropListingOnce = null;
+                drop();
+                throw new IOException("the fake approver dropped this listing unanswered");
+            }
+
+            return ValueTask.FromResult(approver.Names with { Session = approver.Session, Recorded = approver.Records });
+        }
 
         public async ValueTask<CredentialReply> RequestAsync(
             CredentialRequest request,

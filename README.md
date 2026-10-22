@@ -58,7 +58,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  agent    claude-code
+  agent    claude-code (claude-code)
   item     env/demo/.env
   field    STRIPE_KEY
 

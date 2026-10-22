@@ -4,6 +4,16 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`keypaste approve`'s credential prompt now names the agent with its bridge's `--client-label` in brackets, as its run prompt and the app's prompt do, so you can tell which configured connection is asking.
+
+`keypaste mcp` now withdraws a request still waiting for your answer when its client closes the bridge's input, as when the client cancels it, so the prompt comes down rather than staying up until it times out; it also stops waiting for the app or `keypaste approve` after 70 seconds, 125 for a credential request, and it never sends a credential request a second time after losing the reply, so you are not asked twice about one you already answered.
+
+A request for more access or a terminal's edit that Reload took off the screen no longer holds the next one back for a minute, as one nobody answered does: it can be asked again at once, as after a lock.
+
+A change to an agent's settings is now saved only in the unlock it was asked in, never in the vault unlocked after a lock, and a lock or Reload just as its confirmation is about to appear keeps the window from appearing.
+
+A timed allow given in the prompt while End all, `keypaste grants revoke --all` or an edit ended the allowances now releases that one request and keeps nothing, so the agent's next request is asked about again rather than served under an allowance given before the end; History records it as allowed once. One answered as Reload ends them keeps nothing either.
+
 Tagging an item into a project, in the app or with `keypaste env tag`, now names each of its variables that holds a KeePass placeholder such as `{PASSWORD}`, with the placeholder, before anything is written, because that variable carries the item's own field to whoever gets it.
 
 In the app's History, the caption under Restore this now says a restore drops the attachments, custom fields and custom data added since that revision. When the revision's project tags differ from the item's, Restore this first says which environments the item leaves and joins, as adding a project tag does, and restores only when you confirm.

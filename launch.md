@@ -32,7 +32,7 @@ The recorded example uses a fake credential. `scripts/verify-demo.sh` compares t
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  agent    claude-code
+  agent    claude-code (claude-code)
   item     env/demo/.env
   field    STRIPE_KEY
 

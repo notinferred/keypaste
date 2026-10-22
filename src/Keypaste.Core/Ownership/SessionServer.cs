@@ -115,6 +115,14 @@ public sealed class SessionServer : IDisposable
         var envGrants = lifetime.Own(new EnvGrantCache(options.Clock));
         var launches = lifetime.Own(new LaunchPasses(options.Clock));
 #pragma warning restore CA2000
+
+        // A reload's withdrawal ends every grant and keeps none a person is asked about meanwhile (D-0412).
+        lifetime.OnWithdraw(() =>
+        {
+            grants.RevokeEntries(VaultEdit.Everything);
+            envGrants.RevokeEntries(VaultEdit.Everything);
+        });
+
         var gate = new ApprovalGate(options.Channel, options.Clock, options.Limits);
 
         try

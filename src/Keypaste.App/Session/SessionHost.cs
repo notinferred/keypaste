@@ -576,9 +576,10 @@ internal sealed class SessionHost : IDisposable
                     CurrentLifetime = () => session.Lifetime,
                     UnlockedFor = session.UnlockedFor,
                     Channel = channel,
+                    // Saved only on this unlock's vault, as a terminal's edit is, never on a later one's.
                     Settings = new VaultAgentSettings(
                         () => session.UnlockedFor(lifetime),
-                        edit => Saved(session.Write(edit, changed => changed)),
+                        edit => Saved(session.WriteFor(lifetime, edit, changed => changed)),
                         new AccessCapsSource(KeypasteHome.ClientsPath(session.Home))),
                     Hourly = hourly,
                     Audit = audit.Open,

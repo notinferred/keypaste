@@ -188,22 +188,23 @@ public sealed class SessionAttachmentTests
     }
 
     /// <summary>
-    /// A request whose reply was lost is sent again under the session it was first sent in, so an
+    /// A listing whose reply was lost is sent again under the session it was first sent in, so an
     /// owner that locked and unlocked meanwhile refuses it instead of answering it from a later unlock.
+    /// Only a listing is: nothing that can ask a person is sent twice.
     /// </summary>
     [Fact]
-    public async Task ARetriedRequest_KeepsTheSessionItWasFirstSentIn()
+    public async Task ARetriedListing_KeepsTheSessionItWasFirstSentIn()
     {
         await using var approver = new FakeApprover();
         approver.Session = "session-one";
-        approver.DropOnce = () => approver.Session = "session-two";
+        approver.DropListingOnce = () => approver.Session = "session-two";
         approver.StartApproving();
         await using var connection = new ApproverConnection(approver.PipeName, Path.Combine(Path.GetTempPath(), "retry.kdbx"));
 
-        await connection.RequestAsync(Request(), Token);
+        await connection.ListAsync(new NamesRequest(["env/**"]), Token);
 
-        Assert.Equal(2, approver.Received.Count);
-        Assert.All(approver.Received, request => Assert.Equal("session-one", request.Session));
+        Assert.Equal(2, approver.ListingsReceived.Count);
+        Assert.All(approver.ListingsReceived, request => Assert.Equal("session-one", request.Session));
         Assert.Equal(2, approver.Attaches);
     }
 

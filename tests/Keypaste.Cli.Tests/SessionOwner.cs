@@ -105,7 +105,7 @@ internal sealed class SessionOwner : IAsyncDisposable
         var key = new GrantKey("conn-" + client, EntryHandle.For(entry), field);
 
         using var value = new ReleasedField(field, Sentinel);
-        _grants.Store(key, value, TimeSpan.FromSeconds(seconds), ApprovalPrompt.For(client, entry, field, "deploy", seconds));
+        _grants.Store(key, value, TimeSpan.FromSeconds(seconds), ApprovalPrompt.For(client, entry, field, "deploy", seconds), _grants.Generation);
 
         return GrantId.Of(key);
     }

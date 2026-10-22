@@ -96,12 +96,12 @@ public sealed class OwnerDenialTests : IDisposable
     }
 
     /// <summary>
-    /// The owner locks and unlocks while a request's reply is lost. The bridge sends it again under
-    /// the session it was first sent in, and the owner refuses it rather than answering from the
-    /// later unlock.
+    /// The owner locks and unlocks while a credential request's reply is lost. A person may already
+    /// have answered it, so the bridge does not send it again: the call is refused as failed, on the
+    /// bridge's one line, and nobody is asked.
     /// </summary>
     [Fact]
-    public async Task ARequestFromAStaleSession_IsADenial_AndReleasesNothing()
+    public async Task ACredentialReplyLostToALockAndUnlock_IsNotSentAgain_AndIsTheBridgesLine()
     {
         await using var owner = Owner.Start(this, relockOnFirstRequest: true);
         var first = owner.Session;
@@ -111,13 +111,32 @@ public sealed class OwnerDenialTests : IDisposable
         var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
 
         Assert.NotEqual(first, owner.Session);
+        AssertDenied(harness, result, owner, "failed");
+    }
+
+    /// <summary>
+    /// The owner locks and unlocks while a listing's reply is lost. The bridge sends it again under
+    /// the session it was first sent in, and the owner refuses it rather than answering from the
+    /// later unlock.
+    /// </summary>
+    [Fact]
+    public async Task AListingFromAStaleSession_IsADenial_AndNamesNothing()
+    {
+        await using var owner = Owner.Start(this, relockOnFirstRequest: true);
+        var first = owner.Session;
+        await using var harness = new McpHarness(owner.PipeName, VaultPath);
+        var client = await harness.StartAsync("--expose", "env/**");
+
+        var result = await client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token);
+
+        Assert.NotEqual(first, owner.Session);
         Assert.True(result.IsError);
-        Assert.DoesNotContain(Sentinel, harness.Transcript, StringComparison.Ordinal);
-        Assert.Equal(0, owner.Asked);
+        Assert.DoesNotContain("STRIPE_KEY", TextOf(result), StringComparison.Ordinal);
 
         // The lost reply was never recorded; the retry the owner refused is, by the owner, and the
         // bridge, answered, writes nothing.
         var line = Assert.Single(owner.Log.Lines());
+        Assert.Equal(ToolText.ListToolName, line.GetProperty("tool").GetString());
         Assert.Equal("denied", line.GetProperty("decision").GetString());
         Assert.Equal("no-session", line.GetProperty("method").GetString());
         Assert.False(line.TryGetProperty("session", out _));
@@ -244,8 +263,8 @@ public sealed class OwnerDenialTests : IDisposable
     }
 
     /// <summary>
-    /// Locks and unlocks the owner when the first request arrives, and loses that request's reply by
-    /// ending its connection unanswered.
+    /// Locks and unlocks the owner when the first credential request or listing arrives, and loses that
+    /// request's reply by ending its connection unanswered.
     /// </summary>
     private sealed class RelockingOnce(IApproverHandler inner, Action relock) : IApproverHandler
     {
@@ -254,17 +273,15 @@ public sealed class OwnerDenialTests : IDisposable
         public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken) =>
             inner.AttachAsync(request, connectionId, cancellationToken);
 
-        public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken) =>
-            inner.ListAsync(request, connectionId, cancellationToken);
+        public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            DropFirst();
+            return inner.ListAsync(request, connectionId, cancellationToken);
+        }
 
         public ValueTask<CredentialReply> RequestAsync(CredentialRequest request, string connectionId, CancellationToken cancellationToken)
         {
-            if (Interlocked.Exchange(ref _dropped, 1) == 0)
-            {
-                relock();
-                throw new IOException("the owner locked and unlocked before answering");
-            }
-
+            DropFirst();
             return inner.RequestAsync(request, connectionId, cancellationToken);
         }
 
@@ -272,5 +289,14 @@ public sealed class OwnerDenialTests : IDisposable
             inner.ReleaseEnvAsync(request, connectionId, cancellationToken);
 
         public void Disconnected(string connectionId) => inner.Disconnected(connectionId);
+
+        private void DropFirst()
+        {
+            if (Interlocked.Exchange(ref _dropped, 1) == 0)
+            {
+                relock();
+                throw new IOException("the owner locked and unlocked before answering");
+            }
+        }
     }
 }

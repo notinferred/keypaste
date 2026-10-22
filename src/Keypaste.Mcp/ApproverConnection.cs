@@ -1,3 +1,4 @@
+using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 
 namespace Keypaste.Mcp;
@@ -69,9 +70,15 @@ internal readonly record struct Exchange<T>(T? Reply, ApproverOutcome Outcome, A
 /// </para>
 /// <para>
 /// <b>Attaching precedes every request</b>, so a connection left idle across a lock learns of the
-/// new session before it sends anything. A request whose reply was lost is retried with the session
+/// new session before it sends anything. A listing whose reply was lost is retried with the session
 /// it was first sent under, never a later one: the owner refuses it rather than answer it from an
-/// unlock that happened after it was asked (D-0310).
+/// unlock that happened after it was asked (D-0310). Nothing that can ask a person is sent twice.
+/// </para>
+/// <para>
+/// <b>Every exchange is bounded.</b> It is withdrawn when the client gives up, when the client closes
+/// the bridge's standard input, and once the longest wait a person could take to answer it has passed,
+/// so an owner that stopped answering cannot hold a call, or its prompt, for longer, and it is not sent
+/// again after any of these.
 /// </para>
 /// </remarks>
 /// <param name="pipeName">The owner's endpoint, or null when no vault was named.</param>
@@ -111,6 +118,21 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     /// <remarks>Display only (THREATS.md T-3): every request still carries its own exposure, which is what is enforced.</remarks>
     internal IReadOnlyList<string>? Exposure { get; set; }
 
+    /// <summary>Cancelled once the client has closed the bridge's standard input, which withdraws every exchange still in flight.</summary>
+    internal CancellationToken InputEnded { get; init; }
+
+    /// <summary>
+    /// The longest an exchange one prompt answers may take: the longest window a person can be given
+    /// to answer, and time for the answer to get home, as the CLI waits for its owner.
+    /// </summary>
+    internal TimeSpan AnswerBound { get; init; } = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
+
+    /// <summary>
+    /// The longest a credential request may take: two windows and the same margin, because Always for's
+    /// confirmation can follow its release in the one exchange.
+    /// </summary>
+    internal TimeSpan CredentialBound { get; init; } = TimeSpan.FromSeconds((2 * ApprovalLimits.MaximumWindowSeconds) + 15);
+
     /// <summary>Asks the owner to release the secrets an agent's run would inject.</summary>
     /// <param name="request">The run. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
@@ -123,6 +145,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     internal ValueTask<Exchange<RunReply>> RunAsync(RunRequest request, CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.ReleaseRunAsync(request with { Vault = vaultPath, Session = session }, token),
+            AnswerBound,
             cancellationToken,
             retry: false);
 
@@ -134,6 +157,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     internal ValueTask<Exchange<AccessChangeReply>> ChangeAccessAsync(AccessChangeRequest request, CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.ChangeAccessAsync(request with { Vault = vaultPath, Session = session }, token),
+            AnswerBound,
             cancellationToken,
             retry: false);
 
@@ -141,12 +165,15 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     /// <param name="request">What the agent asked for. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call, which withdraws a request already sent; the owner's reply to it, saying whether it was recorded, is still returned.</param>
     /// <returns>The owner's answer, and what became of the exchange.</returns>
+    /// <remarks>Never sent twice, as a run is not: a request whose reply was lost may already have been answered by a person.</remarks>
     internal ValueTask<Exchange<CredentialReply>> RequestAsync(
         CredentialRequest request,
         CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.RequestAsync(request with { Vault = vaultPath, Session = session }, token),
-            cancellationToken);
+            CredentialBound,
+            cancellationToken,
+            retry: false);
 
     /// <summary>Asks the owner which entry names may be shown.</summary>
     /// <param name="request">The exposure to apply. Its vault and session are filled in here.</param>
@@ -157,10 +184,12 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
         CancellationToken cancellationToken) =>
         ExchangeAsync(
             (client, session, token) => client.ListAsync(request with { Vault = vaultPath, Session = session }, token),
+            AnswerBound,
             cancellationToken);
 
     private async ValueTask<Exchange<T>> ExchangeAsync<T>(
         Func<ApproverClient, string, CancellationToken, ValueTask<T?>> exchange,
+        TimeSpan bound,
         CancellationToken cancellationToken,
         bool retry = true)
         where T : class
@@ -195,25 +224,31 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
 
         try
         {
-            var (client, attached, outcome) = await AttachedAsync(cancellationToken).ConfigureAwait(false);
+            // The client giving up, its closing standard input and the bound each withdraw the request
+            // the same way, and the owner's reply to the withdrawal is still read.
+            using var withdrawing = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, InputEnded);
+            withdrawing.CancelAfter(bound);
+            var withdrawn = withdrawing.Token;
+
+            var (client, attached, outcome) = await AttachedAsync(withdrawn).ConfigureAwait(false);
 
             if (client is null || attached is not { Attached: true, Session: { } session })
             {
                 return new(null, outcome, attached);
             }
 
-            var reply = await exchange(client, session, cancellationToken).ConfigureAwait(false);
+            var reply = await exchange(client, session, withdrawn).ConfigureAwait(false);
 
             if (reply is not null)
             {
                 return new(reply, ApproverOutcome.Answered);
             }
 
-            // A caller that gave up is not an owner that died, and the difference decides whether to
-            // send the request again. The connection is finished either way, but re-sending would put a
-            // request nobody is waiting for in front of a person, on a fresh connection whose id scopes a
-            // different grant and cooldown.
-            if (cancellationToken.IsCancellationRequested || !retry)
+            // A request that was withdrawn is not an owner that died, and the difference decides whether to
+            // send it again. The connection is finished either way, but re-sending would put a request
+            // nobody is waiting for in front of a person, on a fresh connection whose id scopes a different
+            // grant and cooldown; and one that can ask a person may already have been answered.
+            if (withdrawn.IsCancellationRequested || !retry)
             {
                 await DropAsync().ConfigureAwait(false);
 
@@ -224,14 +259,14 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             // owner has locked or restarted since, it refuses rather than answering from a later unlock.
             await DropAsync().ConfigureAwait(false);
 
-            var (reconnected, _, _) = await AttachedAsync(cancellationToken).ConfigureAwait(false);
+            var (reconnected, _, _) = await AttachedAsync(withdrawn).ConfigureAwait(false);
 
             if (reconnected is null)
             {
                 return new(null, ApproverOutcome.Unreachable);
             }
 
-            var retried = await exchange(reconnected, session, cancellationToken).ConfigureAwait(false);
+            var retried = await exchange(reconnected, session, withdrawn).ConfigureAwait(false);
 
             return new(retried, retried is not null ? ApproverOutcome.Answered : ApproverOutcome.Failed);
         }

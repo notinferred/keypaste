@@ -494,6 +494,27 @@ public sealed class ServerToolsTests
         Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A call the bridge reaches after its client closed standard input is never sent to the owner, and the
+    /// bridge records it as the client's withdrawal, as it records one cancelled before it was sent.
+    /// </summary>
+    [Fact]
+    public async Task ACallAfterTheClientsInputEnded_IsNeverSent_AndIsRecordedAsCancelled()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+        await harness.EndInputAsync();
+
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        Assert.True(result.IsError);
+        Assert.Equal(ToolText.Cancelled, TextOf(result));
+        Assert.DoesNotContain(FakeApprover.Sentinel, harness.Transcript, StringComparison.Ordinal);
+        Assert.Empty(harness.Approver.Received);
+        Assert.Equal("cancelled", MethodOf(Assert.Single(harness.AuditLines())));
+    }
+
     /// <summary>A listing its owner did not record names nothing to the agent, whatever the reply carried.</summary>
     [Fact]
     public async Task AListingItsOwnerDidNotRecord_NamesNothing()

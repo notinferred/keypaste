@@ -20,7 +20,7 @@ public sealed class GrantCacheTests
     private static void Store(GrantCache cache, GrantKey key, string value = "sk_live_x", TimeSpan? ttl = null)
     {
         using var released = new ReleasedField(key.Field, value);
-        cache.Store(key, released, ttl ?? _ttl, Approved(key.Field));
+        Assert.True(cache.Store(key, released, ttl ?? _ttl, Approved(key.Field), cache.Generation));
     }
 
     /// <summary>
@@ -220,6 +220,27 @@ public sealed class GrantCacheTests
         AssertNoGrant(cache, Key(connection: "one"));
     }
 
+    /// <summary>
+    /// A person can answer a prompt that was put to them before every grant was ended, by Revoke all, an
+    /// edit or a reload. Their grant is not kept: storing it after the end would undo the end (F03).
+    /// </summary>
+    [Fact]
+    public void AGrantAskedForBeforeGrantsWereEnded_IsNotKept()
+    {
+        using var cache = new GrantCache(new ManualClock());
+        var asked = cache.Generation;
+
+        cache.RevokeEntries(VaultEdit.Of(new EntryName("env/dev", "SOMETHING_ELSE")));
+
+        using var released = new ReleasedField("password", "sk_live_x");
+        Assert.False(cache.Store(Key(), released, _ttl, Approved(), asked));
+        Assert.Equal(0, cache.Count);
+        AssertNoGrant(cache, Key());
+
+        Assert.True(cache.Store(Key(), released, _ttl, Approved(), cache.Generation));
+        Assert.Equal(1, cache.Count);
+    }
+
     [Fact]
     public void ReApprovingReplacesTheGrantRatherThanKeepingBoth()
     {
@@ -324,10 +345,10 @@ public sealed class GrantCacheTests
 
         using var cache = new GrantCache(new ManualClock());
 
-        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), null!, _ttl, Approved()));
+        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), null!, _ttl, Approved(), cache.Generation));
 
         using var released = new ReleasedField("password", "sk_live_x");
-        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), released, _ttl, null!));
+        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), released, _ttl, null!, cache.Generation));
         Assert.Throws<ArgumentNullException>(() => cache.Revoke(null!));
         Assert.Throws<ArgumentNullException>(() => cache.RevokeEntries(null!));
     }

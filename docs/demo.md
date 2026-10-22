@@ -133,7 +133,7 @@ Claude calls `request_credential`, and your left terminal stops being idle:
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
 
-  agent    claude-code
+  agent    claude-code (claude-code)
   item     env/demo/.env
   field    STRIPE_KEY
 

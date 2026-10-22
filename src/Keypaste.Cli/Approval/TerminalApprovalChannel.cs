@@ -372,7 +372,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             rule,
             "keypaste: an agent is asking for a credential.",
             string.Empty,
-            $"  agent    {request.Client}",
+            $"  agent    {Named(request.Client, request.Label)}",
             $"  item     {request.Entry}",
             $"  field    {request.Field}",
             string.Empty,
@@ -419,6 +419,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     }
 
     private const string _askEveryTimeLine = "  this agent is set to Ask every time: no timed allowance is offered.";
+
+    /// <summary>The agent as both prompts name it: the client it says it is, then the label its bridge was started with.</summary>
+    private static string Named(string client, string? label) => label is { } shown ? $"{client} ({shown})" : client;
 
     /// <summary>The confirmation of a change that gives an agent more: who, what it gains, where the request says it came from, and its reason last.</summary>
     internal static string Render(AccessChangePrompt request, string rule)
@@ -491,7 +494,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     /// <summary>The run dialog: who, the exact program and command line, where, each variable and its source, and the agent's claim last.</summary>
     internal static string Render(RunPrompt request, string rule)
     {
-        var client = request.Label is { } label ? $"{request.Client} ({label})" : request.Client;
+        var client = Named(request.Client, request.Label);
         var nameWidth = request.Variables.Max(variable => variable.Name.Length);
         var entryWidth = request.Variables.Max(variable => Source(variable).Length);
 

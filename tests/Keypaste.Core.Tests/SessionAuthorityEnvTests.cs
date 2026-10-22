@@ -739,6 +739,36 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(2, _fixture.Channel.Asked);
     }
 
+    /// <summary>The server an unlock builds ends its grants when a reload withdraws what waits, so a run allowed for a while is asked about again after it (D-0412).</summary>
+    [Fact]
+    public async Task AReload_EndsTheServersEnvGrants()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var server = SessionServer.Build(new SessionServerOptions
+        {
+            Vault = VaultIdentity.Of(_directory, VaultPath),
+            Lifetime = _lifetime!,
+            CurrentLifetime = () => _lifetime,
+            UnlockedFor = lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
+            Channel = _fixture.Channel,
+            Settings = _fixture.Settings,
+            Hourly = _fixture.Hourly,
+            Audit = () => _audit,
+            WatchEdits = _ => { },
+            UnwatchEdits = _ => { },
+            Clock = _fixture.Clock,
+        });
+
+        await RunAsync(server.Authority, Request("session-one"));
+        Assert.Single(server.Authority.Activity.EnvGrants);
+
+        _lifetime!.Withdraw();
+
+        Assert.Empty(server.Authority.Activity.EnvGrants);
+        Assert.Equal(EnvOutcome.Resolved, (await RunAsync(server.Authority, Request("session-one"))).Set.Outcome);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
     [Fact]
     public async Task Activity_ListsEnvGrants_WithNamesOnly()
     {

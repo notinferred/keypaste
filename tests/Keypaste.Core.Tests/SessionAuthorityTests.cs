@@ -388,6 +388,41 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.True(lifetime.IsLive);
     }
 
+    /// <summary>
+    /// A timed allow whose release a reload withdraws as the vault is read keeps no grant either, so the
+    /// agent's next request is asked about anew rather than served from the copy the reload replaced:
+    /// the reload's withdrawal ends the grants, as the owner's server hands it to, and the allowance was
+    /// asked for before it (D-0412).
+    /// </summary>
+    [Fact]
+    public async Task AnAllowanceRacingAReload_ReleasesNothingAndKeepsNoGrant()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        var lifetime = _lifetime!;
+        lifetime.OnWithdraw(() => _fixture.Grants.RevokeEntries(VaultEdit.Everything));
+        _fixture.Source.During = () =>
+        {
+            _fixture.Source.During = null;
+            lifetime.Withdraw();
+        };
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var reply = await client.RequestAsync(Request("session-one"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.VaultChanged), (reply.Decision, reply.Method));
+        Assert.Null(reply.Value);
+        Assert.Equal(0, _fixture.Grants.Count);
+
+        var again = await client.RequestAsync(Request("session-one"), Token);
+
+        Assert.NotNull(again);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (again.Decision, again.Method));
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
     [Fact]
     public async Task AnAutomaticReleaseRacingTheLock_IsRefused()
     {

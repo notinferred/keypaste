@@ -84,11 +84,13 @@ public static class BridgeEntry
 
     private static async Task ServeAsync(ServerOptions options, AuditLog audit)
     {
+        using var inputEnded = new CancellationTokenSource();
+
         // Nothing connects here. The vault's owner is reached on the first call that needs an answer,
         // because a client spawns this server long before anybody unlocks the vault, and a bridge that
         // refused to start would look broken in the client's log rather than saying so in an
         // answer an agent can act on.
-        await using var approver = new ApproverConnection(options.ApproverName, options.VaultPath);
+        await using var approver = new ApproverConnection(options.ApproverName, options.VaultPath) { InputEnded = inputEnded.Token };
 
         var serverOptions = new McpServerOptions
         {
@@ -118,6 +120,34 @@ public static class BridgeEntry
         approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, options);
         approver.Exposure = options.Exposure.Globs;
 
+        // The server waits for the calls in flight once the client closes standard input, so a call
+        // still waiting for the owner is withdrawn then, as one the client gives up on is.
+        _ = EndWithInputAsync(transport.MessageReader.Completion, inputEnded);
+
         await server.RunAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Cancels <paramref name="inputEnded"/> once the transport has handed over the last message the client sent.</summary>
+    /// <param name="read">Completes when the client's input has ended and every message in it was read.</param>
+    /// <param name="inputEnded">What withdraws the exchanges still in flight.</param>
+    private static async Task EndWithInputAsync(Task read, CancellationTokenSource inputEnded)
+    {
+        try
+        {
+            await read.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Input that ended on an error has ended all the same.
+        }
+
+        try
+        {
+            await inputEnded.CancelAsync().ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The bridge had already finished, so nothing was left in flight to withdraw.
+        }
     }
 }

@@ -997,6 +997,63 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     }
 
     /// <summary>
+    /// A reload's withdrawal is the owner's, not a request left unanswered, so it starts no cooldown and
+    /// the same request for more asked again at once is put to the person (T-11; founder decision, 2026-10-22).
+    /// </summary>
+    [Fact]
+    public async Task ARequestForMoreAskedAgainRightAfterAReload_IsAsked()
+    {
+        var lifetime = _lifetime!;
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        _fixture.Channel.WhileConfirming = () =>
+        {
+            _fixture.Channel.WhileConfirming = null;
+            lifetime.Withdraw();
+        };
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync(withClient: false);
+
+        var withdrawn = await client.ChangeAccessAsync(Change() with { Mode = "automatic" }, Token);
+
+        Assert.Equal(AuditMethod.Cancelled, withdrawn!.Method);
+        Assert.False(_fixture.Gate.IsInCooldown(ApprovalGate.AskedForMore));
+
+        var again = await client.ChangeAccessAsync(Change() with { Mode = "automatic" }, Token);
+
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (again!.Decision, again.Method));
+        Assert.Equal(2, _fixture.Channel.AccessAsked);
+        Assert.Equal(["cancelled", "prompt"], Lines("method"));
+    }
+
+    /// <summary>
+    /// A lock while a request for more waits for its confirmation withdraws it, the confirmation not yet
+    /// drawn included, since the lock's withdrawal reaches the prompt as a credential request's does
+    /// (D-0396), and nothing is saved.
+    /// </summary>
+    [Fact]
+    public async Task ALockWhileAWideningWaits_WithdrawsItsConfirmation_AndSavesNothing()
+    {
+        var lifetime = _lifetime!;
+        var waiting = lifetime.Waiting;
+        IReadOnlyList<CancellationToken> seen = [];
+        _fixture.Channel.AccessAnswer = ApprovalAnswer.ApprovedOnce;
+        _fixture.Channel.WhileConfirming = () =>
+        {
+            seen = Withdrawals.Current;
+            lifetime.End();
+        };
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync(withClient: false);
+
+        var withdrawn = await client.ChangeAccessAsync(Change() with { Mode = "automatic" }, Token);
+
+        Assert.Contains(waiting, seen);
+        Assert.Equal(AuditDecision.Denied, withdrawn!.Decision);
+        Assert.Empty(_fixture.Settings.Written);
+        Assert.Empty(_fixture.Settings.CapsWritten);
+    }
+
+    /// <summary>
     /// Resetting ceilings keypaste cannot parse waits for the person, who is shown what each agent's
     /// settings in the vault then give beyond the defaults, and is recorded under every agent; ceilings it
     /// could not read at all are left as they are, and ones it can read have nothing to reset.
