@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
+using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Controls;
 
@@ -20,30 +22,42 @@ internal sealed class RevealButton : Button
     internal static readonly StyledProperty<RevealedValue?> TargetProperty =
         AvaloniaProperty.Register<RevealButton, RevealedValue?>(nameof(Target));
 
+    /// <summary>The row whose drawn cell a hold shows, for a button outside that cell's template; <see cref="Target"/> wins when both are set.</summary>
+    internal static readonly StyledProperty<IRevealSource?> TargetSourceProperty =
+        AvaloniaProperty.Register<RevealButton, IRevealSource?>(nameof(TargetSource));
+
     internal RevealedValue? Target
     {
         get => GetValue(TargetProperty);
         set => SetValue(TargetProperty, value);
     }
 
+    internal IRevealSource? TargetSource
+    {
+        get => GetValue(TargetSourceProperty);
+        set => SetValue(TargetSourceProperty, value);
+    }
+
     protected override Type StyleKeyOverride => typeof(Button);
+
+    private RevealedValue? Cell => Target ?? CellAsking(TargetSource);
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        Target?.BeginReveal();
+        Cell?.BeginReveal();
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        Target?.EndReveal();
+        Cell?.EndReveal();
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
-        Target?.EndReveal();
+        Cell?.EndReveal();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -52,7 +66,7 @@ internal sealed class RevealButton : Button
 
         if (e.Key is Key.Space or Key.Enter)
         {
-            Target?.BeginReveal();
+            Cell?.BeginReveal();
             e.Handled = true;
             return;
         }
@@ -66,7 +80,7 @@ internal sealed class RevealButton : Button
 
         if (e.Key is Key.Space or Key.Enter)
         {
-            Target?.EndReveal();
+            Cell?.EndReveal();
             e.Handled = true;
             return;
         }
@@ -77,12 +91,31 @@ internal sealed class RevealButton : Button
     protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
-        Target?.EndReveal();
+        Cell?.EndReveal();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        Target?.EndReveal();
+        Cell?.EndReveal();
         base.OnDetachedFromVisualTree(e);
+    }
+
+    /// <summary>The nearest drawn cell asking <paramref name="source"/>, looked for from the button's closest ancestor outward.</summary>
+    private RevealedValue? CellAsking(IRevealSource? source)
+    {
+        if (source is null)
+        {
+            return null;
+        }
+
+        foreach (var ancestor in this.GetVisualAncestors())
+        {
+            if (ancestor.GetVisualDescendants().OfType<RevealedValue>().FirstOrDefault(cell => ReferenceEquals(cell.Source, source)) is { } cell)
+            {
+                return cell;
+            }
+        }
+
+        return null;
     }
 }

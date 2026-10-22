@@ -194,7 +194,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
                 authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post);
         }
 
-        Recommendations = new RecommendationsViewModel(session, home);
+        Recommendations = new RecommendationsViewModel(session, home, OpenEntry);
         Recommendations.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(RecommendationsViewModel.NeedsReview))
@@ -991,6 +991,20 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
 
         Raise(nameof(SelectedSidebarRow));
+    }
+
+    /// <summary>Items showing <paramref name="name"/>'s group with it selected, the search cleared so the list holds it.</summary>
+    internal void OpenEntry(EntryName name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        Search = string.Empty;
+        ShowGroup(name.GroupPath);
+
+        if (Content is EntriesViewModel entries)
+        {
+            entries.Selected = entries.Rows.FirstOrDefault(row => row.Name == name);
+        }
     }
 
     /// <summary>Items showing <paramref name="path"/>, or every item when it is empty.</summary>

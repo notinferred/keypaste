@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, the EFF long word list, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
 
 ## KeePassLib
 
@@ -19,6 +19,14 @@ Copyright (c) Electronic Frontier Foundation; the list was compiled by Joseph Bo
 The [upstream file](https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt) is EFF's large wordlist for passphrases, published 2016-07-18 on its [document page](https://www.eff.org/document/passphrase-wordlists). It is vendored verbatim at `third_party/eff-large-wordlist/`; [UPSTREAM.md](third_party/eff-large-wordlist/UPSTREAM.md) records provenance, the licence reading and what the file is asserted to prove.
 
 Keypaste reads it as data: `Keypaste.Core.WordList` embeds the file, verifies its SHA-256 at first use and draws passphrase words from it. The list is not code and is not modified. The combined distribution is AGPL-3.0-only; the list remains available under CC-BY-4.0.
+
+## SecLists common passwords
+
+Copyright (c) 2018 Daniel Miessler. Licensed under the MIT License; the full text is in `third_party/seclists-common-passwords/LICENSE`.
+
+The [upstream file](https://github.com/danielmiessler/SecLists/blob/913b327317496d062bcc7cace524aaad8a693be2/Passwords/Common-Credentials/10k-most-common.txt) is SecLists' `Passwords/Common-Credentials/10k-most-common.txt` at commit `913b3273`. It is vendored gzipped at `third_party/seclists-common-passwords/`; [UPSTREAM.md](third_party/seclists-common-passwords/UPSTREAM.md) records provenance and how the compressed file is made from upstream's bytes.
+
+keypaste reads it as data: `Keypaste.Core.Recommendations.CommonPasswords` embeds the file, verifies the SHA-256 of what it decompresses to at first use, and KeePassLib's password estimate rates each password against it for Settings › Recommendations. The list is not code and its contents are not modified. The combined distribution is AGPL-3.0-only; the list remains available under the MIT License.
 
 ## Instrument Sans
 

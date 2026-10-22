@@ -41,6 +41,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The longest password, in characters, the estimator rates: its repetition pass grows with the cube of the length and runs under the vault's lock, and KeePassXC stops at the same length.</summary>
     private const int _longestRated = 256;
 
+    /// <summary>The common-password list in KeePassLib's estimator, which every estimate in this process shares, loaded once before the first rating (D-NEW-C5).</summary>
+    private static readonly Lazy<bool> _commonPasswords = new(LoadCommonPasswords, LazyThreadSafetyMode.ExecutionAndPublication);
+
     private readonly PwDatabase _database;
     private bool _disposed;
     private bool _readOnly;
@@ -928,6 +931,15 @@ internal sealed class KeePassInterop : IDisposable
         ];
     }
 
+    /// <summary>Whether a field a TOTP is read from holds anything on the one entry with this name, judged by the length KeePassLib keeps so no value is decrypted.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal bool MayHoldTotp(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found && Totp.TotpSpec.MayHold(field => found.Entry.Strings.Get(field) is { IsEmpty: false });
+    }
+
     /// <summary>A copy of the value that leaves it protected in the open database, where <see cref="ProtectedString.ReadString"/> would keep the plaintext for as long as the database stays open.</summary>
     private static string Uncached(ProtectedString value)
     {
@@ -1401,6 +1413,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        _ = _commonPasswords.Value;
         byte[] key = RandomNumberGenerator.GetBytes(32);
 
         try
@@ -2242,6 +2255,39 @@ internal sealed class KeePassInterop : IDisposable
         return Locate(name)?.Entry.Uuid.ToHexString();
     }
 
+    /// <summary>The name of the live entry outside keypaste's own groups whose KDBX UUID, as hex, is <paramref name="uuidHex"/>, or null.</summary>
+    internal EntryName? EntryNameOf(string uuidHex)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return FindLive(_database.RootGroup, string.Empty, uuidHex, Bin());
+    }
+
+    private static EntryName? FindLive(PwGroup group, string groupPath, string uuidHex, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            if (string.Equals(entry.Uuid.ToHexString(), uuidHex, StringComparison.Ordinal))
+            {
+                return new EntryName(groupPath, ReadField(entry, PwDefs.TitleField));
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            var childPath = ChildPath(groupPath, child.Name);
+
+            if (!ReferenceEquals(child, bin)
+                && !ReservedGroups.IsReserved(childPath)
+                && FindLive(child, childPath, uuidHex, bin) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>How many deleted-object tombstones the vault carries. A test seam.</summary>
     internal int TombstoneCount
     {
@@ -2891,6 +2937,12 @@ internal sealed class KeePassInterop : IDisposable
         {
             CryptographicOperations.ZeroMemory(utf8);
         }
+    }
+
+    private static bool LoadCommonPasswords()
+    {
+        PopularPasswords.Add(CommonPasswords.Read(), bGZipped: false);
+        return true;
     }
 
     private static void CollectLostProjectTags(PwGroup group, string groupPath, List<LostProjectTag> lost, PwGroup? bin)

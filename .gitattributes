@@ -23,6 +23,11 @@ third_party/KeePassLib/Keys/IChallengeResponseUserKey.cs  text eol=lf
 third_party/eff-large-wordlist/**          -text
 third_party/eff-large-wordlist/UPSTREAM.md text eol=lf
 
+# The common-password list is gzipped from SecLists' bytes, whose decompressed SHA-256 is pinned in
+# Keypaste.Core.Recommendations.CommonPasswords; the licence beside it is upstream's text.
+third_party/seclists-common-passwords/**          -text
+third_party/seclists-common-passwords/UPSTREAM.md text eol=lf
+
 *.kdbx   binary
 *.png    binary
 *.gif    binary

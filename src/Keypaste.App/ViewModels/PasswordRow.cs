@@ -17,6 +17,7 @@ internal sealed class PasswordRow
         IsDismissed = isDismissed;
         Entry = RecommendationsViewModel.Shown(finding.Entry);
 
+        OpenCommand = new RelayCommand(() => owner.Open(this));
         DismissCommand = new RelayCommand(() => owner.Dismiss(this));
         ReviewAgainCommand = new RelayCommand(() => owner.ReviewAgain(this));
     }
@@ -50,6 +51,12 @@ internal sealed class PasswordRow
 
     /// <summary>What a screen reader hears for the row.</summary>
     internal string Description => $"{Problem} {Where}, {StateLabel.ToLowerInvariant()}";
+
+    /// <summary>What a screen reader hears for Open item: the item, never its password.</summary>
+    internal string OpenLabel => $"Open {Entry} in Items";
+
+    /// <summary>Shows the item in Items, selected, where its password is replaced.</summary>
+    internal RelayCommand OpenCommand { get; }
 
     internal RelayCommand DismissCommand { get; }
 

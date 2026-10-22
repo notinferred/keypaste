@@ -1,6 +1,7 @@
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
@@ -10,7 +11,8 @@ namespace Keypaste.Cli.Commands;
 /// Without <c>--reveal</c> every value is masked, the username and URL included, and no custom field
 /// is read (D-0463). Revealed text is drawn through <see cref="DisplayTextSanitizer"/>, so a value
 /// that could misrepresent itself on a terminal is cleaned there and told on stderr; only
-/// <c>--json</c> carries the values as the vault holds them.
+/// <c>--json</c> carries the values as the vault holds them. An item with a TOTP lists <c>totp</c> with
+/// no value even then, since its code is computed only when <c>keypaste get &lt;item&gt; totp</c> asks.
 /// </remarks>
 internal static class ShowCommand
 {
@@ -82,7 +84,7 @@ internal static class ShowCommand
         });
     }
 
-    /// <summary>The standard fields that hold something, in the order agents name them, then every custom field.</summary>
+    /// <summary>The standard fields that hold something, in the order agents name them, then <c>totp</c> with no value, then every custom field.</summary>
     /// <remarks>
     /// A custom field's value is read only when it will be printed. One KeePassXC made under a standard
     /// name in another case, such as <c>password</c>, has no value core reads (V.7a), so it stays masked.
@@ -104,6 +106,7 @@ internal static class ShowCommand
             .. standard
                 .Where(field => field.Value.Length > 0)
                 .Select(field => new ShownField(field.Name, field.Label, null, reveal ? field.Value : null)),
+            .. vault.MayHoldTotp(name) ? [new ShownField(CredentialFields.Totp, CredentialFields.Totp, null, null)] : Array.Empty<ShownField>(),
             .. (vault.Fields(name) ?? [])
                 .Select(field => new ShownField(
                     field.Name,
@@ -212,6 +215,11 @@ internal static class ShowCommand
         if (!reveal && fields.Count > 0)
         {
             context.Stderr.WriteLine(style.Paint(context.Stderr, Tone.Muted, "values are hidden; --reveal prints them"));
+        }
+
+        if (fields.Any(field => field.Custom is null && field.Name == CredentialFields.Totp))
+        {
+            context.Stderr.WriteLine(style.Paint(context.Stderr, Tone.Muted, $"keypaste get {shownPath} totp gives the current TOTP code"));
         }
     }
 }

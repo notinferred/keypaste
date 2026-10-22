@@ -1,5 +1,6 @@
 using System.Reflection;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
@@ -88,6 +89,42 @@ public sealed class EntryTotpTests : IDisposable
         Assert.Contains(nameof(EntryTotpRow.Countdown), raised);
         Assert.Equal(_codeAt11, totp.Reveal());
     }
+
+    [Fact]
+    public void The_row_says_its_code_moved_on_when_the_period_ends_and_not_before()
+    {
+        using var context = new Context(_vaultPath);
+        var totp = context.Open(_github).Totp!;
+        var changes = 0;
+        totp.Changed += (_, _) => changes++;
+
+        context.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(1, changes);
+        Assert.Equal(30, totp.SecondsLeft);
+
+        context.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(1, changes);
+        Assert.Equal(_codeAt11, totp.Reveal());
+    }
+
+    [Fact]
+    public Task A_held_code_is_redrawn_as_the_next_code_when_its_period_ends() => HeadlessSession.On(() =>
+    {
+        using var context = new Context(_vaultPath);
+        var totp = context.Open(_github).Totp!;
+        var cell = new RevealedValue { Source = totp, MaskedLength = totp.MaskedLength };
+
+        cell.BeginReveal();
+        Assert.Equal(_codeAt09, cell.Rendered);
+
+        context.Clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.Equal(_codeAt11, cell.Rendered);
+
+        cell.EndReveal();
+        Assert.False(cell.IsRevealed);
+    });
 
     [Fact]
     public async Task Copy_puts_the_current_code_through_the_clipboard_countdown()

@@ -224,6 +224,8 @@
                         <TextBlock Classes="caption" Text="{Binding Where}" TextWrapping="Wrap" />
                       </StackPanel>
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Classes="sm ghost" Content="Open item" Command="{Binding OpenCommand}"
+                                AutomationProperties.Name="{Binding OpenLabel}" />
                         <Button Classes="sm ghost" Content="Dismiss" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
                         <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                       </StackPanel>

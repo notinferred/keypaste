@@ -961,6 +961,37 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(_launchSpent, line.GetProperty("reason").GetString());
     }
 
+    /// <summary>A Run the app starts itself on Windows and Linux is recorded in the line a macOS Run's pass writes, unasked and only under the live session (D-NEW-C2).</summary>
+    [Fact]
+    public async Task A_run_the_app_starts_itself_is_recorded_as_a_macOS_runs_pass_is()
+    {
+        await using var owner = Owner.Start(this);
+        var set = EnvResolution.Resolve(_vault, "dev", EnvProfileNames.Default, keys: null, _fixture.Clock);
+
+        Assert.False(owner.Authority.RecordAppRun(set, "session-zero"));
+        Assert.True(owner.Authority.RecordAppRun(set, "session-one"));
+
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Contains(owner.Authority.Released, seen => seen is { Entry: "env/dev/.env", How: "run --session" });
+
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("run", line.GetProperty("tool").GetString());
+        Assert.Equal("keypaste run --session", line.GetProperty("client").GetProperty("name").GetString());
+        Assert.Equal("granted", line.GetProperty("decision").GetString());
+        Assert.Equal("prompt", line.GetProperty("method").GetString());
+        Assert.Equal("2 variable(s), confirmed in the app", line.GetProperty("reason").GetString());
+        Assert.Equal("session-one", line.GetProperty("session").GetString());
+        Assert.Equal(["env/dev/.env"], line.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+
+        var text = AuditText();
+        Assert.DoesNotContain(_token1, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(_token2, text, StringComparison.Ordinal);
+
+        _lifetime!.End();
+        Assert.False(owner.Authority.RecordAppRun(set, "session-one"));
+        Assert.Single(AuditLines());
+    }
+
     /// <summary>A pass dies with the unlock its card was answered in, and none is issued for a session that is not the live one.</summary>
     [Fact]
     public async Task A_pass_belongs_to_the_session_its_card_was_answered_in()

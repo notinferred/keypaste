@@ -1,15 +1,18 @@
 using System.Globalization;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Retrieves a password, or one custom field: <c>keypaste get &lt;entry&gt; [--field &lt;name&gt;]</c>.</summary>
+/// <summary>Retrieves a password, one custom field or the current TOTP code: <c>keypaste get &lt;entry&gt; [totp | --field &lt;name&gt;]</c>.</summary>
 /// <remarks>
 /// Without <c>--reveal</c> the secret goes to the clipboard and never to stdout. That is the whole
 /// point of the verb: a password on stdout ends up in shell history, scrollback, and CI logs.
 /// Either way the value leaves with its own item's placeholders filled in, or not at all (D-0465).
+/// A TOTP code is computed from the opened vault at the call and its seed zeroed before it leaves;
+/// the seed itself never does.
 /// </remarks>
 internal static class GetCommand
 {
@@ -47,17 +50,30 @@ internal static class GetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste get <item> [--field <name>] [--reveal] [--timeout <seconds>]");
+            context.Stdout.WriteLine("usage: keypaste get <item> [totp | --field <name>] [--reveal] [--timeout <seconds>]");
             return CliApp.ExitSuccess;
         }
 
-        if (line.Operands.Count != 1)
+        if (line.Operands.Count is < 1 or > 2)
         {
             context.Stderr.WriteLine("keypaste get: expected exactly one item name");
             return CliApp.ExitUsageError;
         }
 
+        var totp = line.Operands.Count == 2;
+        if (totp && !string.Equals(line.Operands[1], CredentialFields.Totp, StringComparison.Ordinal))
+        {
+            context.Stderr.WriteLine($"keypaste get: after the item name only {CredentialFields.Totp} may follow; --field <name> reads a custom field");
+            return CliApp.ExitUsageError;
+        }
+
         var field = line.Value("field");
+        if (totp && field is not null)
+        {
+            context.Stderr.WriteLine($"keypaste get: {CredentialFields.Totp} and --field cannot be used together");
+            return CliApp.ExitUsageError;
+        }
+
         if (field is { Length: 0 })
         {
             context.Stderr.WriteLine("keypaste get: the field name cannot be empty");
@@ -99,6 +115,12 @@ internal static class GetCommand
             }
 
             var name = EntryName.Of(entry);
+
+            if (totp)
+            {
+                return GetTotp(context, vault, name, entryPath, reveal, timeout);
+            }
+
             var stored = field is null ? entry.Password : vault.ReadField(name, field);
             if (stored is null)
             {
@@ -128,6 +150,32 @@ internal static class GetCommand
 
             return Copy(context, secret, timeout);
         });
+    }
+
+    private static int GetTotp(CliContext context, Vault vault, EntryName name, string entryPath, bool reveal, int timeoutSeconds)
+    {
+        string code;
+
+        using (var spec = vault.ReadTotp(name, out var refusal))
+        {
+            if (spec is null)
+            {
+                context.Stderr.WriteLine(refusal is null
+                    ? $"keypaste get: '{entryPath}' has no TOTP"
+                    : $"keypaste get: the TOTP of '{entryPath}' cannot be computed: {refusal}");
+                return refusal is null ? CliApp.ExitNotFound : CliApp.ExitInternalError;
+            }
+
+            code = spec.Code(context.Clock).Value;
+        }
+
+        if (reveal)
+        {
+            context.Stdout.WriteLine(code);
+            return CliApp.ExitSuccess;
+        }
+
+        return Copy(context, code, timeoutSeconds);
     }
 
     private static int Copy(CliContext context, string secret, int timeoutSeconds)

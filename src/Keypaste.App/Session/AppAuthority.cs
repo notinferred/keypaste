@@ -22,7 +22,8 @@ namespace Keypaste.App.Session;
 /// <para>
 /// On macOS each unlock is also served on a launch endpoint of its own, which only the run Terminal
 /// starts for a Run asks, so <see cref="LaunchFailure"/> and <see cref="IssueLaunch"/> do not depend on
-/// what agents meet (D-0451).
+/// what agents meet (D-0451). On Windows and Linux the app starts a Run's terminal itself, and
+/// <see cref="RecordRun"/> writes its History line in the same log first (D-NEW-C2).
 /// </para>
 /// </remarks>
 internal sealed class AppAuthority : IDisposable
@@ -198,6 +199,12 @@ internal sealed class AppAuthority : IDisposable
     /// <summary>Forgets a pass Terminal was never handed, so nothing can present it.</summary>
     /// <param name="pass">The pass <see cref="IssueLaunch"/> returned.</param>
     internal void WithdrawLaunch(string pass) => _host.WithdrawLaunch(pass);
+
+    /// <summary>Writes the History line of a Run the app starts itself on Windows and Linux, before the terminal starts (D-NEW-C2).</summary>
+    /// <param name="set">The set the confirmation released, read again after the person answered.</param>
+    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <returns>Whether the line was written; a Run whose line was not starts nothing (T-6).</returns>
+    internal bool RecordRun(Core.EnvResolved set, string lifetimeId) => _host.RecordRun(set, lifetimeId);
 
     /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint (D-0313).</summary>
     public void Dispose()

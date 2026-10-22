@@ -112,6 +112,29 @@ public sealed class RevealedValueTests
     });
 
     [Fact]
+    public Task A_held_value_is_read_again_when_its_row_says_it_moved_on_and_not_once_released() => HeadlessSession.On(() =>
+    {
+        const string next = "SENTINEL-NEXT-VALUE-3a1f";
+        var cell = New(out var source);
+
+        source.RaiseChanged();
+        Assert.Equal(0, source.RevealCount);
+
+        cell.BeginReveal();
+        source.Value = next;
+        source.RaiseChanged();
+
+        Assert.Equal(2, source.RevealCount);
+        Assert.Equal(next, cell.Rendered);
+
+        cell.EndReveal();
+        source.RaiseChanged();
+
+        Assert.Equal(2, source.RevealCount);
+        Assert.False(cell.IsRevealed);
+    });
+
+    [Fact]
     public Task Holding_twice_asks_the_row_once() => HeadlessSession.On(() =>
     {
         var cell = New(out var source);
@@ -211,6 +234,8 @@ public sealed class RevealedValueTests
 
         internal int ConcealCount { get; private set; }
 
+        public event EventHandler? Changed;
+
         public int MaskedLength => Value?.Length ?? 0;
 
         public string? Reveal()
@@ -220,5 +245,7 @@ public sealed class RevealedValueTests
         }
 
         public void Conceal() => ConcealCount++;
+
+        internal void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
     }
 }

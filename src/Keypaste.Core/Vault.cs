@@ -171,6 +171,18 @@ public sealed class Vault : IDisposable
         return _interop.EntryUuid(name);
     }
 
+    /// <summary>The name a live item has now, found by the KDBX UUID a check such as Recommendations' carries.</summary>
+    /// <param name="entryUuid">The UUID as hex, as <see cref="EntryUuid"/> writes it.</param>
+    /// <returns>The item's name, which a rename since the check changed; null when no item outside the recycle bin and keypaste's own groups has that UUID.</returns>
+    /// <remarks>So a finding opens the item it named; every operation still addresses the item by this name.</remarks>
+    public EntryName? EntryNameOf(string entryUuid)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(entryUuid);
+
+        return _interop.EntryNameOf(entryUuid);
+    }
+
     /// <summary>How many deleted-object tombstones the vault carries.</summary>
     /// <remarks>
     /// A test seam, for the reason <see cref="EntryUuid"/> gives. V-V.3a has to be able to say
@@ -495,7 +507,7 @@ public sealed class Vault : IDisposable
         return _interop.ReadCustomField(name, field);
     }
 
-    /// <summary>The item's TOTP, from KeePassXC's <c>otp</c> field or, when that holds nothing, KeePass 2's <c>TimeOtp-*</c> fields (D-0477).</summary>
+    /// <summary>The item's TOTP, read in KeePassXC's order from its <c>TOTP Settings</c> and <c>TOTP Seed</c>, its <c>otp</c> field or KeePass 2's <c>TimeOtp-*</c> fields (D-0477).</summary>
     /// <param name="name">The entry.</param>
     /// <param name="refusal">Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</param>
     /// <returns>
@@ -513,6 +525,18 @@ public sealed class Vault : IDisposable
         return _interop.ReadCustomFields(name, TotpSpec.IsSourceField) is { } fields
             ? TotpSpec.Read(fields, out refusal)
             : null;
+    }
+
+    /// <summary>Whether the item may have a TOTP: a field one is read from holds anything, judged by length so no value is read.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns><see langword="true"/> when it may, though <see cref="ReadTotp"/> may still refuse it; <see langword="false"/> when no entry answers to that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public bool MayHoldTotp(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.MayHoldTotp(name);
     }
 
     /// <summary>Fills in the KeePass placeholders a value of one item holds from that item's own fields, as this vault holds it now, saved or not (D-0465).</summary>

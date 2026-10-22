@@ -168,6 +168,39 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         Assert.Equal("1", Settings(shell).Count);
     }
 
+    [Fact]
+    public void Open_item_shows_the_item_selected_in_its_group_found_by_its_uuid_after_a_rename()
+    {
+        using var shell = Shell();
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        var weak = shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail);
+
+        Assert.Equal("Open services/Mail in Items", weak.OpenLabel);
+        Assert.Equal(OrganizeOutcome.Renamed, _session.Unlocked!.RenameEntry(_mail, "Mailbox", out var renamed));
+
+        weak.OpenCommand.Execute(null);
+
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Equal(DestinationKind.Entries, shell.Current.Kind);
+        Assert.Equal("services", entries.SelectedGroup?.Path);
+        Assert.Equal(renamed, entries.Selected?.Name);
+        Assert.Equal("weak", weak.Finding.Key);
+    }
+
+    [Fact]
+    public void Open_item_says_so_when_the_item_has_left_the_vault()
+    {
+        using var shell = Shell();
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        var weak = shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail);
+
+        _session.Unlocked!.RemoveEntry(_mail, out _);
+        weak.OpenCommand.Execute(null);
+
+        Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
+        Assert.Equal("services/Mail is no longer in this vault.", shell.Recommendations.Message);
+    }
+
     private static void Add(Vault vault, EntryName name, string password) =>
         vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = password });
 

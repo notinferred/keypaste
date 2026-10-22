@@ -236,6 +236,40 @@ public sealed class SessionAuthority : IApproverHandler
             : null;
     }
 
+    /// <summary>
+    /// Records a Run the app starts itself, on Windows and Linux, before its terminal starts, in the line a macOS
+    /// Run's pass is recorded with when its window asks: the set's items, <c>prompt</c>, and the reason
+    /// <c>&lt;N&gt; variable(s), confirmed in the app</c> (D-NEW-C2).
+    /// </summary>
+    /// <param name="set">The set the app's confirmation released, read again after the person answered.</param>
+    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <returns><see langword="true"/> once the line is written; a Run whose line is not written, or from a session that has ended, starts nothing (T-6).</returns>
+    public bool RecordAppRun(EnvResolved set, string lifetimeId)
+    {
+        ArgumentNullException.ThrowIfNull(set);
+        ArgumentNullException.ThrowIfNull(lifetimeId);
+
+        if (set.Outcome != EnvOutcome.Resolved
+            || Live() is not { } lifetime
+            || !string.Equals(lifetime.Id, lifetimeId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var released = new EnvReply(set, set.Refusal);
+        var recorded = _recorder.Recorded(
+            released,
+            RequestRecords.EnvRun(set.Project, set.Profile, AuditMethod.Prompt, released, lifetimeId, _vault.Key, confirmedInApp: true));
+
+        if (!ReferenceEquals(recorded, released))
+        {
+            return false;
+        }
+
+        Record(lifetime, EntriesOf(set), GrantSummary.EnvClient, "run --session");
+        return true;
+    }
+
     /// <summary>Forgets a pass the app could not hand to Terminal, so nothing can present it.</summary>
     /// <param name="pass">The pass <see cref="IssueLaunch"/> returned.</param>
     public void WithdrawLaunch(string pass)

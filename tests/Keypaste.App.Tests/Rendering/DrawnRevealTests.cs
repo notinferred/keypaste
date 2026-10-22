@@ -1,6 +1,10 @@
 using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Tests.Controls;
+using Keypaste.App.ViewModels;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -92,6 +96,29 @@ public sealed class DrawnRevealTests
             locked.Shows(password.Placeholder, TextStyle.Of(placeholder), locked.Of(placeholder, shell.Window)),
             "the unlock screen is not what the next frame draws");
         AssertNoSecretIn(locked, style);
+        AssertNoSecretExposed(shell);
+    });
+
+    [Fact]
+    public Task Holding_Space_on_an_env_values_Reveal_button_draws_it_until_released() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell();
+        var (cell, value) = shell.Open("env");
+        var style = TextStyle.Of(cell);
+        var button = shell.Window.GetVisualDescendants().OfType<RevealButton>().Single(candidate => candidate.DataContext is EnvVariableRow);
+        button.Focus();
+        RenderedShell.Drain();
+
+        shell.Window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        RenderedShell.Drain();
+        var held = shell.Frame();
+        Assert.True(held.Shows(value, style, held.Of(cell, shell.Window)), "Space on the Reveal button does not draw the value");
+
+        shell.Window.KeyReleaseQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        RenderedShell.Drain();
+        var released = shell.Frame();
+        Assert.True(released.Shows(new string('•', cell.MaskedLength), style, released.Of(cell, shell.Window)), "the dots are not drawn after Space is released");
+        AssertNoSecretIn(released, style);
         AssertNoSecretExposed(shell);
     });
 

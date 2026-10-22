@@ -11,7 +11,8 @@ namespace Keypaste.App.ViewModels;
 /// <b>Neither the code nor the seed is a property of this object.</b> <see cref="Reveal"/> and Copy compute
 /// the code from the open vault at the moment of the press, as <see cref="EntryFieldRow"/> reads a value,
 /// and the spec holding the seed is zeroed before either returns. The countdown is worked out from the
-/// period alone, so a tick reads nothing from the vault.
+/// period alone, so a tick reads nothing from the vault; the tick that finds a new period raises
+/// <see cref="Changed"/>, so a hold in progress reads the new code from the vault in its turn.
 /// </para>
 /// <para>
 /// The code is masked until held, as the password is: while it is current it is a credential, and a
@@ -27,6 +28,7 @@ internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposabl
     private readonly TimeSpan _period;
     private readonly ITimer _timer;
     private int _secondsLeft;
+    private long _step;
 
     internal EntryTotpRow(EntryDetailViewModel owner, TimeProvider clock, Action<Action> post, int digits, TimeSpan period)
     {
@@ -45,6 +47,9 @@ internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposabl
         Tick();
         _timer = clock.CreateTimer(_ => post(Tick), null, _tick, _tick);
     }
+
+    /// <inheritdoc/>
+    public event EventHandler? Changed;
 
     /// <inheritdoc/>
     public int MaskedLength { get; }
@@ -74,8 +79,21 @@ internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposabl
     /// <summary>Stops the countdown.</summary>
     public void Dispose() => _timer.Dispose();
 
-    private void Tick() =>
-        SecondsLeft = (int)Math.Ceiling(TotpSpec.Remaining(_period, _clock.GetUtcNow()).TotalSeconds);
+    private void Tick()
+    {
+        var now = _clock.GetUtcNow();
+        var step = (now - DateTimeOffset.UnixEpoch).Ticks / _period.Ticks;
+
+        SecondsLeft = (int)Math.Ceiling(TotpSpec.Remaining(_period, now).TotalSeconds);
+
+        if (step == _step)
+        {
+            return;
+        }
+
+        _step = step;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     private async Task CopyAsync()
     {

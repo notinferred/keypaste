@@ -24,9 +24,14 @@
 # `keypaste share` of the field and of its reference, through the site's Worker under `wrangler dev`
 # on loopback, makes links share-crypto.js opens to that field alone, and `Recovery codes` uploads
 # nothing.
+# On a third vault KeePassXC made, `keypaste get <item> totp` gives the code `keepassxc-cli show --totp`
+# gives, read within one 30-second period and read again once when the pair straddles a period's end,
+# for an `otp` URI with SHA-1, SHA-256 and Steam's encoder, the older `TOTP Seed` and `TOTP Settings`
+# pair with digits and with Steam's `S`, KeeOTP's `key=` form and KeePass 2's `TimeOtp-*` fields (D-0477),
+# which KeePassXC reads from 2.7.10 on; an earlier one, such as Ubuntu 24.04's 2.7.6, must give that item none.
 #
-# NEGATIVE CONTROL: a corrupted expectation, a changed byte and a plain field read as protected must
-# each fail the comparison the checks here rest on.
+# NEGATIVE CONTROL: a corrupted expectation, a changed byte, a plain field read as protected and two
+# items' codes must each fail the comparison the checks here rest on.
 #
 # Usage:  scripts/verify-keepassxc-fields.sh <work-directory>
 # Needs:  jq, curl, Node 22 or later, and `npm ci` run in site/
@@ -271,6 +276,100 @@ got=$(kp_with '' get "$entry" --field MERGED --reveal 2>/dev/null) || die "keypa
 history=$(history_xml)
 grep -qF "$first" <<<"$history" || die "after the merge the history lost the first of keypaste's two saves"
 grep -qF "$saved" <<<"$history" || die "after the merge the history lost the second of keypaste's two saves"
+
+step "keypaste get <item> totp gives the code keepassxc-cli show --totp gives, within one period, for every form KeePassXC reads"
+totp_db="$dir/totp.kdbx"
+cat >"$dir/totp.xml" <<EOF
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta><Generator>verify-keepassxc-fields</Generator><DatabaseName>totp</DatabaseName></Meta>
+  <Root>
+    <Group>
+      <UUID>$(uuid root)</UUID><Name>Root</Name>
+      <Group>
+        <UUID>$(uuid totp)</UUID><Name>totp</Name>
+        <Entry>
+          <UUID>$(uuid totp-sha1)</UUID>
+          <String><Key>Title</Key><Value>Sha1</Value></String>
+          <String><Key>otp</Key><Value ProtectInMemory="True">otpauth://totp/Sha1?secret=JBSWY3DPEHPK3PXP&amp;period=30&amp;digits=6&amp;issuer=fields</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid totp-sha256)</UUID>
+          <String><Key>Title</Key><Value>Sha256</Value></String>
+          <String><Key>otp</Key><Value ProtectInMemory="True">otpauth://totp/Sha256?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA&amp;algorithm=SHA256&amp;digits=8</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid totp-steam)</UUID>
+          <String><Key>Title</Key><Value>Steam</Value></String>
+          <String><Key>otp</Key><Value ProtectInMemory="True">otpauth://totp/Steam?secret=JBSWY3DPEHPK3PXP&amp;encoder=steam&amp;digits=5</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid totp-pair)</UUID>
+          <String><Key>Title</Key><Value>Pair</Value></String>
+          <String><Key>TOTP Seed</Key><Value ProtectInMemory="True">JBSWY3DPEHPK3PXP</Value></String>
+          <String><Key>TOTP Settings</Key><Value>30;8</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid totp-pair-steam)</UUID>
+          <String><Key>Title</Key><Value>PairSteam</Value></String>
+          <String><Key>TOTP Seed</Key><Value ProtectInMemory="True">JBSWY3DPEHPK3PXP</Value></String>
+          <String><Key>TOTP Settings</Key><Value>30;S</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid totp-keeotp)</UUID>
+          <String><Key>Title</Key><Value>KeeOtp</Value></String>
+          <String><Key>otp</Key><Value ProtectInMemory="True">key=JBSWY3DPEHPK3PXP&amp;size=8&amp;step=30</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid totp-keepass2)</UUID>
+          <String><Key>Title</Key><Value>KeePass2</Value></String>
+          <String><Key>TimeOtp-Secret-Base32</Key><Value ProtectInMemory="True">JBSWY3DPEHPK3PXP</Value></String>
+          <String><Key>TimeOtp-Algorithm</Key><Value>HMAC-SHA-256</Value></String>
+          <String><Key>TimeOtp-Length</Key><Value>7</Value></String>
+        </Entry>
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>
+EOF
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/totp.xml")" "$(native "$totp_db")" \
+  || die "keepassxc-cli could not import the TOTP entries"
+
+# keypaste's current code for totp/$1.
+kp_totp() { printf '%s\n' "$pw" | "$kp" get "totp/$1" totp --reveal --vault "$totp_db" 2>"$dir/totp.err" | tr -d '\r'; }
+
+# Both codes for totp/$1, read back to back inside one 30-second period; a pair read across a period's end is read once more.
+same_totp() {
+  local title=$1 start ours theirs
+  for _ in 1 2; do
+    start=$(date +%s)
+    ours=$(kp_totp "$title") || die "keypaste get totp/${title} totp failed: $(cat "$dir/totp.err")"
+    theirs=$(kx show "$totp_db" "totp/$title" -t) || die "keepassxc-cli show --totp failed for totp/${title}"
+    if [ $((start / 30)) -eq $(($(date +%s) / 30)) ]; then
+      if [ -z "$ours" ] || [ "$ours" != "$theirs" ]; then
+        die "keypaste gives totp/${title} the code '${ours}' where KeePassXC gives '${theirs}'"
+      fi
+      printf '    %s: both give the same %s-character code\n' "$title" "${#ours}"
+      return 0
+    fi
+  done
+  die "keypaste's and KeePassXC's codes for totp/${title} could not be read within one period twice running"
+}
+totp_titles=(Sha1 Sha256 Steam Pair PairSteam KeeOtp)
+kpxc_version=$("$cli" --version | tr -d '\r')
+[[ $kpxc_version =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]] || die "keepassxc-cli --version printed no version: ${kpxc_version}"
+kpxc_major=${BASH_REMATCH[1]} kpxc_minor=${BASH_REMATCH[2]} kpxc_patch=${BASH_REMATCH[3]}
+if [ "$kpxc_major" -gt 2 ] || { [ "$kpxc_major" -eq 2 ] && { [ "$kpxc_minor" -gt 7 ] || { [ "$kpxc_minor" -eq 7 ] && [ "$kpxc_patch" -ge 10 ]; }; }; }; then
+  totp_titles+=(KeePass2)
+else
+  if kx show "$totp_db" totp/KeePass2 -t >/dev/null 2>&1; then
+    die "keepassxc-cli ${kpxc_version} gives totp/KeePass2 a TOTP, which KeePassXC reads only from 2.7.10"
+  fi
+  printf '    KeePass2: keepassxc-cli %s reads no TimeOtp-* field, so its code is not compared\n' "$kpxc_version"
+fi
+for title in "${totp_titles[@]}"; do
+  same_totp "$title"
+done
 
 step "a real keypaste approve and keypaste mcp release the env-named field KeePassXC wrote, and no other"
 openai="$dir/openai.kdbx"
@@ -601,5 +700,6 @@ fi
 [ "$(protection Region <<<"$current")" = protected ] && die "the protection reader calls a plain field protected"
 printf 'x' >>"$dir/blob.out"
 cmp -s "$dir/blob.bin" "$dir/blob.out" && die "the attachment comparison cannot see a changed byte"
+[ "$(kp_totp Sha1)" = "$(kx show "$totp_db" totp/Sha256 -t)" ] && die "the TOTP comparison matched two items' codes"
 
-printf '\nFIELDS GATE PASSED: KeePassXC reads the fields keypaste wrote with their protection, keeps its own, and keypaste reads what KeePassXC merged.\n'
+printf '\nFIELDS GATE PASSED: KeePassXC reads the fields keypaste wrote with their protection, keeps its own, keypaste reads what KeePassXC merged, and both give each TOTP the same code.\n'

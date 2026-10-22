@@ -33,4 +33,21 @@ internal interface IRevealSource
     /// model and assertable without a display.
     /// </remarks>
     void Conceal();
+
+    /// <summary>The value has moved on by itself, so a control holding it reads it again.</summary>
+    /// <remarks>
+    /// Raised by a source whose value changes with time, such as a TOTP code at the end of its period, and
+    /// carrying nothing: the control asks <see cref="Reveal"/> again, so the value still comes out of the
+    /// open vault at the moment it is drawn. A source whose value never moves on raises nothing.
+    /// </remarks>
+    event EventHandler? Changed
+    {
+        add
+        {
+        }
+
+        remove
+        {
+        }
+    }
 }

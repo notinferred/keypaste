@@ -77,6 +77,7 @@ internal sealed class RevealedValue : Control
     private const double _revealEdge = 16;
 
     private string? _shown;
+    private IRevealSource? _holding;
 
     static RevealedValue()
     {
@@ -133,7 +134,7 @@ internal sealed class RevealedValue : Control
     /// </remarks>
     internal string Rendered => _shown ?? new string('•', Math.Max(0, MaskedLength));
 
-    /// <summary>Asks the row for its value and draws it.</summary>
+    /// <summary>Asks the row for its value and draws it, and again whenever the row says its value moved on while held.</summary>
     /// <remarks>Idempotent: a second press while already revealed does not ask twice.</remarks>
     internal void BeginReveal()
     {
@@ -143,6 +144,7 @@ internal sealed class RevealedValue : Control
         }
 
         _shown = source.Reveal();
+        Hold(source);
         InvalidateVisual();
         InvalidateMeasure();
     }
@@ -156,6 +158,7 @@ internal sealed class RevealedValue : Control
     internal void EndReveal()
     {
         _shown = null;
+        Release();
         Source?.Conceal();
         InvalidateVisual();
         InvalidateMeasure();
@@ -183,6 +186,7 @@ internal sealed class RevealedValue : Control
         }
 
         _shown = null;
+        Release();
         (change.OldValue as IRevealSource)?.Conceal();
         InvalidateVisual();
         InvalidateMeasure();
@@ -232,6 +236,40 @@ internal sealed class RevealedValue : Control
 
             context.DrawText(text, default);
         }
+    }
+
+    private void Hold(IRevealSource source)
+    {
+        if (_holding is not null)
+        {
+            return;
+        }
+
+        _holding = source;
+        source.Changed += OnHeldChanged;
+    }
+
+    private void Release()
+    {
+        if (_holding is not { } held)
+        {
+            return;
+        }
+
+        held.Changed -= OnHeldChanged;
+        _holding = null;
+    }
+
+    private void OnHeldChanged(object? sender, EventArgs e)
+    {
+        if (_holding is not { } source)
+        {
+            return;
+        }
+
+        _shown = source.Reveal();
+        InvalidateVisual();
+        InvalidateMeasure();
     }
 
     /// <summary>How wide a held value may be drawn: the control's own width, or with a face, up to the clipping ancestor's edge.</summary>

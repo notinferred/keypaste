@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.Versioning;
+using System.Text.Json;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -26,8 +27,8 @@ namespace Keypaste.App.Tests.Session;
 /// where each value lives, the entry two environments share and the tag that puts its entry in no
 /// project; it adds an entry to an environment, takes another out, replaces the shared value, adds a
 /// key with no entry chosen and imports a <c>.env</c>, and a declined or refused act writes nothing;
-/// Run gives a child exactly the environment's fields, and the project mapped in <c>projects.json</c>
-/// runs too.
+/// Run gives a child exactly the environment's fields and writes its History line, on every platform,
+/// and the project mapped in <c>projects.json</c> runs too.
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="OneHomeJourneyTests"/> is, pressing controls where the window draws them,
@@ -216,6 +217,9 @@ public sealed class ProjectsJourneyTests
                 Assert.Equal(
                     [$"STRIPE_KEY={_replaced}", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY=" + unlocked.ReadField(home, "NEW_KEY"), $"IMPORTED_KEY={_imported}", "WEB_KEY unset"],
                     billing);
+                var (reason, entries) = LastRun();
+                Assert.Equal("3 variable(s), confirmed in the app", reason);
+                Assert.Equal(["env/billing/.env", "services/Stripe"], entries.Order(StringComparer.Ordinal));
 
                 // The project projects.json maps runs where it is mapped.
                 Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "web" }));
@@ -276,6 +280,18 @@ public sealed class ProjectsJourneyTests
         }
 
         return [.. report.Where(line => _reported.Any(name => line.StartsWith(name + "=", StringComparison.Ordinal) || line == name + " unset"))];
+    }
+
+    /// <summary>The reason and items of the newest History line, which every Run writes (D-0452, D-NEW-C2), read beside the app holding the log open for writing.</summary>
+    private static (string? Reason, List<string> Entries) LastRun()
+    {
+        var log = KeypasteHome.AuditPath(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+        using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        using var line = JsonDocument.Parse(reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1]);
+
+        Assert.Equal("run", line.RootElement.GetProperty("tool").GetString());
+        return (line.RootElement.GetProperty("reason").GetString(), [.. line.RootElement.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()!)]);
     }
 
     /// <summary>What the window finds at the centre of <paramref name="control"/>, for a press that did nothing.</summary>

@@ -31,6 +31,6 @@ None.
 
 - Core renames a custom field in one revision, keeping its protection; `keypaste field mv` renames one from a terminal, and the pane's Rename on the field's row first names what a variable's rename breaks (gaps-1, RUNS-PENDING).
 - A revision now carries its tags and its custom fields by name and protection, never a value, and History compares them with the item's own (gaps-1, RUNS-PENDING).
-- Reveal needs a pointer, as for the password: no keyboard gesture holds a field value.
+- A field value, as the password, is held from the keyboard with Space or Enter on its Reveal button, which the Items pane has had since a886a611; Projects' values and a new scoped token have one too (gaps-1, RUNS-PENDING).
 - The tag box takes a tag as typed; it offers no list of projects to pick from, which C.4's Projects screen may.
 - Source only; the app step has run only locally on Windows.

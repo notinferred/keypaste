@@ -22,6 +22,7 @@ namespace Keypaste.App.ViewModels;
 internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
+    private readonly Action<EntryName>? _open;
     private readonly string _dismissalsPath;
     private readonly bool _dismissalsReadable;
     private readonly NoteKeyCheck _check = new();
@@ -36,11 +37,12 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     private string _message = string.Empty;
     private bool _disposed;
 
-    internal RecommendationsViewModel(AppVaultSession session, string? home)
+    internal RecommendationsViewModel(AppVaultSession session, string? home, Action<EntryName>? open = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
+        _open = open;
         _dismissalsPath = KeypasteHome.RecommendationsPath(home);
         _dismissalsReadable = RecommendationDismissals.TryLoad(_dismissalsPath, out var dismissals);
         _dismissals = [.. dismissals];
@@ -227,6 +229,25 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
 
         Message = Moved(rows.Count, move.Entries);
         Check();
+    }
+
+    /// <summary>Shows the item a password finding names in Items, found again by its UUID so a rename since the check still finds it.</summary>
+    internal void Open(PasswordRow row)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            Message = "The vault is locked.";
+            return;
+        }
+
+        if (vault.EntryNameOf(row.Finding.EntryUuid) is not { } name)
+        {
+            Message = $"{row.Entry} is no longer in this vault.";
+            return;
+        }
+
+        Message = string.Empty;
+        _open?.Invoke(name);
     }
 
     internal void Dismiss(RecommendationRow row) =>

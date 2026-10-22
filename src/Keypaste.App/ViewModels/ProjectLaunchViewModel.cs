@@ -28,7 +28,9 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// On macOS the set never reaches Terminal: the confirmation is the same card, and the run
 /// Terminal starts presents the launch pass it earned to the app's launch endpoint, which answers
-/// whether or not agents can reach the vault (D-0451, D-0452).
+/// whether or not agents can reach the vault (D-0451, D-0452). On Windows and Linux the app's
+/// authority writes the same History line before the terminal starts, and a Run whose line cannot
+/// be written starts nothing (D-NEW-C2).
 /// </para>
 /// </remarks>
 internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
@@ -271,17 +273,38 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
             return;
         }
 
+        if (_launching.Authority is not { } authority)
+        {
+            _report("Nothing was started: a Run from the app writes a History line, and nothing in this app records one now. Copy the run command to start it in a terminal instead.");
+            return;
+        }
+
+        // A Run's line is written before it starts, so it is not confirmed while the log will not open (T-6).
+        if (authority.AuditFailure is { } unopened)
+        {
+            _report(Shown($"Nothing was started: a Run from the app writes a History line, and {unopened.TrimEnd('.')}. Copy the run command to start it in a terminal instead."));
+            return;
+        }
+
+        // The line names the session the card is answered in, which must still be the live one after Start.
+        var lifetime = _session.Lifetime?.Id;
+        string? unrecordable = null;
         EnvResolved resolved;
+
+        // A set its History line could not name is refused before the card, as on macOS.
+        ValueTask<bool> ConfirmAsync(EnvPreview preview, CancellationToken token)
+        {
+            unrecordable = SessionAuthority.Unrecordable(preview);
+
+            return unrecordable is null
+                ? AskAsync(preview, run ? mapping.Command : target!.FileName, target!.WorkingDirectory ?? string.Empty, run, token)
+                : ValueTask.FromResult(false);
+        }
 
         try
         {
             resolved = await _session.Environments
-                .ResolveAsync(
-                    _project,
-                    Profile,
-                    keys: null,
-                    (preview, token) => AskAsync(preview, run ? mapping.Command : target!.FileName, target!.WorkingDirectory ?? string.Empty, run, token),
-                    _withdrawn.Token)
+                .ResolveAsync(_project, Profile, keys: null, ConfirmAsync, _withdrawn.Token)
                 .ConfigureAwait(true);
         }
         finally
@@ -289,9 +312,21 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
             EndConfirmation();
         }
 
+        if (unrecordable is not null)
+        {
+            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app writes one. Copy the run command to start it in a terminal instead."));
+            return;
+        }
+
         if (resolved.Outcome != EnvOutcome.Resolved)
         {
             _report(Refused(resolved));
+            return;
+        }
+
+        if (lifetime is null || !authority.RecordRun(resolved, lifetime))
+        {
+            _report("Nothing was started: its History line could not be written. Check that the audit log can be written, then run it again.");
             return;
         }
 
@@ -356,7 +391,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         // The owner refuses a request it cannot record (T-6), so a Run is not confirmed while the log will not open.
         if (authority.AuditFailure is { } unopened)
         {
-            _report(Shown($"Nothing was started: a Run from the app on macOS writes a History line, and {unopened.TrimEnd('.')}. Copy the run command to start it in a terminal instead."));
+            _report(Shown($"Nothing was started: a Run from the app writes a History line, and {unopened.TrimEnd('.')}. Copy the run command to start it in a terminal instead."));
             return;
         }
 
@@ -386,7 +421,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
 
         if (unrecordable is not null)
         {
-            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app on macOS writes one. Copy the run command to start it in a terminal instead."));
+            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app writes one. Copy the run command to start it in a terminal instead."));
             return;
         }
 

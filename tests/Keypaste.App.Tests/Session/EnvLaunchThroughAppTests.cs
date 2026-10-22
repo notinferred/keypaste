@@ -37,7 +37,8 @@ namespace Keypaste.App.Tests.Session;
 /// On macOS the set reaches the child through Terminal (E.1d): the app's real authority on its own
 /// endpoint, an assembled <c>keypaste.app</c> whose launcher is the real one and whose <c>keypaste</c>
 /// is the built CLI, and <see cref="TerminalStandIn"/> for <c>open</c>. The launcher reads the
-/// person's own request folder, so these tests run alone.
+/// person's own request folder, so these tests run alone. On every platform the app's real authority
+/// writes each Run's History line, on Windows and Linux before the terminal starts (D-NEW-C2).
 /// </para>
 /// </remarks>
 [Collection(nameof(TerminalRequestFolder))]
@@ -78,9 +79,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         {
             TerminalStandIn.EmptyFolder();
             _terminal = new TerminalStandIn(_stubs);
-            _authority = new AppAuthority(_session, "kp-e1d-" + Guid.NewGuid().ToString("N")[..12], () => _asked);
         }
 
+        _authority = new AppAuthority(_session, "kp-e1d-" + Guid.NewGuid().ToString("N")[..12], () => _asked);
         Unlock();
     }
 
@@ -141,6 +142,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         var commandLine = report.Single(line => line.StartsWith("cmdline=", StringComparison.Ordinal));
         AssertNoValue(commandLine, "the child's command line");
+        AssertRecorded(2, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
 
         AssertNoValue(File.ReadAllText(KeypasteHome.ProjectsPath(_fixture.Home)), "projects.json");
         AssertNoValue(string.Join("\n", screen.Notice, screen.Error, launch.ConfirmTitle, launch.ConfirmStarts, launch.ConfirmKeys, launch.ConfirmSources), "the screen");
@@ -440,7 +442,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             Assert.Contains($"API_KEY={_apiKey}", report);
             Assert.Contains($"DB_URL={_dbUrl}", report);
 
-            using var line = JsonDocument.Parse(File.ReadLines(KeypasteHome.AuditPath(_fixture.Home)).Last());
+            using var line = LastAuditLine();
             Assert.Equal("granted", line.RootElement.GetProperty("decision").GetString());
             Assert.Equal("2 variable(s), confirmed in the app", line.RootElement.GetProperty("reason").GetString());
         }
@@ -569,7 +571,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Contains($"API_KEY={_stagingKey}", report);
         Assert.Contains($"DB_URL={_dbUrl}", report);
 
-        using var line = JsonDocument.Parse(File.ReadLines(KeypasteHome.AuditPath(_fixture.Home)).Last());
+        using var line = LastAuditLine();
         Assert.Equal("granted", line.RootElement.GetProperty("decision").GetString());
         Assert.Equal(["env/--help/.env"], line.RootElement.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()).Distinct());
     }
@@ -608,13 +610,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.True(File.Exists(Path.Combine(directory, "ran")), "the command did not run in the directory");
     }
 
-    /// <summary>The owner records a run from Terminal in one History line, which names each of thirty wide items, more than 2 KiB of names (D-0454).</summary>
+    /// <summary>A Run is recorded in one History line, which names each of thirty wide items, more than 2 KiB of names, on every platform (D-0454, D-NEW-C2).</summary>
     [Fact]
-    [SupportedOSPlatform("macos")]
-    public async Task On_macOS_a_set_from_thirty_wide_items_runs_through_Terminal_and_its_History_line_names_every_one()
+    public async Task A_set_from_thirty_wide_items_runs_and_its_History_line_names_every_one()
     {
-        Assert.SkipUnless(OperatingSystem.IsMacOS(), _macOSOnly);
-
         var items = Wide(30, 76);
 
         using var screen = Screen();
@@ -638,20 +637,17 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Contains($"API_KEY={_apiKey}", report);
         Assert.Contains($"KEY_29_{new string('W', 69)}=w29", report);
 
-        using var line = JsonDocument.Parse(File.ReadLines(KeypasteHome.AuditPath(_fixture.Home)).Last());
+        using var line = LastAuditLine();
         Assert.Equal("granted", line.RootElement.GetProperty("decision").GetString());
         Assert.Equal(
             ["env/dev/.env", .. items.Order(StringComparer.Ordinal)],
             line.RootElement.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()!).Distinct().Order(StringComparer.Ordinal));
     }
 
-    /// <summary>A set whose items one History line could not name is still refused unasked, before the card, on macOS alone: a run in Terminal writes a line, and a launch on Windows or Linux writes none.</summary>
+    /// <summary>A set whose items one History line could not name is refused unasked, before the card, on every platform, since every Run writes a line (D-NEW-C2).</summary>
     [Fact]
-    [SupportedOSPlatform("macos")]
-    public async Task On_macOS_a_set_whose_items_one_History_line_could_not_name_is_refused_before_anyone_is_asked()
+    public async Task A_set_whose_items_one_History_line_could_not_name_is_refused_before_anyone_is_asked()
     {
-        Assert.SkipUnless(OperatingSystem.IsMacOS(), _macOSOnly);
-
         // Each item's name takes more bytes in the line than its title has characters.
         Wide((SessionAuthority.MaximumAuditedEntriesBytes / EntryNameSanitizer.MaximumLength) + 1, EntryNameSanitizer.MaximumLength);
 
@@ -663,7 +659,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         await running.WaitAsync(Cancel);
 
         Assert.Equal(
-            "Nothing was started: dev's variables come from more items than one History line can name, and a Run from the app on macOS writes one. Copy the run command to start it in a terminal instead.",
+            "Nothing was started: dev's variables come from more items than one History line can name, and a Run from the app writes one. Copy the run command to start it in a terminal instead.",
             screen.Error);
         AssertNothingStarted();
         Assert.Equal(0, _asked.Count);
@@ -689,16 +685,12 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     }
 
     /// <summary>
-    /// The owner refuses a request it cannot record, so while the app's audit log will not open a Run is refused before
-    /// the card, naming the log's error and what to do instead, where a launch on Windows or Linux, writing no line,
-    /// starts; mending the log needs no new unlock.
+    /// Every Run writes a History line, so while the app's audit log will not open a Run is refused before the card on
+    /// every platform, naming the log's error and what to do instead; mending the log needs no new unlock (T-6, D-NEW-C2).
     /// </summary>
     [Fact]
-    [SupportedOSPlatform("macos")]
-    public async Task On_macOS_a_Run_while_the_audit_log_will_not_open_is_refused_before_anyone_is_asked()
+    public async Task A_Run_while_the_audit_log_will_not_open_is_refused_before_anyone_is_asked()
     {
-        Assert.SkipUnless(OperatingSystem.IsMacOS(), _macOSOnly);
-
         var log = KeypasteHome.AuditPath(_fixture.Home);
         Directory.CreateDirectory(log);
 
@@ -710,7 +702,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         await running.WaitAsync(Cancel);
 
         Assert.StartsWith(
-            $"Nothing was started: a Run from the app on macOS writes a History line, and the audit log at '{log}' could not be opened: ",
+            $"Nothing was started: a Run from the app writes a History line, and the audit log at '{log}' could not be opened: ",
             screen.Error,
             StringComparison.Ordinal);
         Assert.EndsWith(". Copy the run command to start it in a terminal instead.", screen.Error, StringComparison.Ordinal);
@@ -1211,7 +1203,29 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     private ProjectLaunching Launching() =>
         OperatingSystem.IsMacOS()
             ? ProjectLaunching.ForMacBundle(_authority, _terminal!.Bundle, _terminal.Open)
-            : new ProjectLaunching(Terminal(), _launcher, EnvironmentMerge.Inherited);
+            : new ProjectLaunching(Terminal(), _launcher, EnvironmentMerge.Inherited) { Authority = _authority };
+
+    /// <summary>The newest History line, read beside the app holding the log open for writing, which a read asking for <see cref="FileShare.Read"/> cannot share on Windows.</summary>
+    private JsonDocument LastAuditLine()
+    {
+        using var stream = new FileStream(KeypasteHome.AuditPath(_fixture.Home), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+
+        return JsonDocument.Parse(reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1]);
+    }
+
+    /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it (D-0452, D-NEW-C2).</summary>
+    private void AssertRecorded(int variables, params string[] entries)
+    {
+        using var line = LastAuditLine();
+        var root = line.RootElement;
+
+        Assert.Equal("run", root.GetProperty("tool").GetString());
+        Assert.Equal("granted", root.GetProperty("decision").GetString());
+        Assert.Equal("prompt", root.GetProperty("method").GetString());
+        Assert.Equal($"{variables} variable(s), confirmed in the app", root.GetProperty("reason").GetString());
+        Assert.Equal(entries, root.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+    }
 
     private TerminalLaunch Terminal()
     {

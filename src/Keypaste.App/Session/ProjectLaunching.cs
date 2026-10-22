@@ -23,16 +23,16 @@ internal sealed record ProjectLaunching(
     /// <summary>What runs <c>open</c> to bring Terminal up, given the plan and how long it may take.</summary>
     internal Func<TerminalOpen, TimeSpan, ProcessResult> Opener { get; init; } = TerminalLaunch.Open;
 
-    /// <summary>The authority that answers the window's <c>keypaste run --session</c>, and so issues its pass.</summary>
+    /// <summary>The authority whose log a Run's History line is written in: on macOS by answering the window's <c>keypaste run --session</c>, whose pass it issues, and on Windows and Linux before the terminal starts.</summary>
     internal AppAuthority? Authority { get; init; }
 
     /// <summary>The platform's terminal: on Windows and Linux started detached with this process's environment beneath the set, on macOS Terminal through this bundle's launcher.</summary>
-    /// <param name="authority">The app's authority, or null when nothing answers a window's run.</param>
+    /// <param name="authority">The app's authority, or null when nothing records a Run, which then starts nothing.</param>
     /// <returns>The launching.</returns>
     internal static ProjectLaunching ForThisMachine(AppAuthority? authority) =>
         OperatingSystem.IsMacOS()
             ? ThroughTerminal(TerminalLaunch.ForThisMachine(), authority, TerminalLaunch.Open)
-            : new(TerminalLaunch.ForThisMachine(), new DetachedProcessLauncher(), EnvironmentMerge.Inherited);
+            : new(TerminalLaunch.ForThisMachine(), new DetachedProcessLauncher(), EnvironmentMerge.Inherited) { Authority = authority };
 
     /// <summary>Terminal through the launcher of a <c>keypaste.app</c> other than the one this runs from.</summary>
     /// <param name="authority">The app's authority.</param>

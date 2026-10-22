@@ -82,6 +82,31 @@ public sealed class PasswordHealthCheckTests : IDisposable
             PasswordHealthCheck.Scan(vault, _now).Select(finding => (finding.Entry, finding.Problem)));
     }
 
+    /// <summary>
+    /// A password on the common-password list is weak however long it is, while one as long, of the same
+    /// kinds of character and on no list, is not (D-NEW-C5).
+    /// </summary>
+    /// <remarks>
+    /// The first two rate at about 80 and 117 bits by their characters alone, so without the list neither
+    /// would be listed; the third is the control that length and character kinds are not what decided it.
+    /// </remarks>
+    [Fact]
+    public void A_password_on_the_common_list_is_weak_however_long_it_is()
+    {
+        Seed(created =>
+        {
+            Add(created, _mail, "films+pic+galeries");
+            Add(created, _forum, "washingtoncaliforniamanchester");
+            Add(created, _shop, "qzvkx+wpt+jhrmybnd");
+        });
+
+        using var vault = Vault.Open(VaultPath, _master);
+
+        Assert.Equal(
+            [(_mail, PasswordProblem.Weak), (_forum, PasswordProblem.Weak)],
+            PasswordHealthCheck.Scan(vault, _now).Select(finding => (finding.Entry, finding.Problem)));
+    }
+
     [Fact]
     public void An_expiry_at_the_moment_of_the_check_has_passed_and_one_a_second_later_has_not()
     {

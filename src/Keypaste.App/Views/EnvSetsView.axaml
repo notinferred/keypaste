@@ -97,7 +97,7 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
 
-    <!-- A row's copy, replace and remove show while the row is hovered or holds focus. -->
+    <!-- A row's reveal, copy, replace and remove show while the row is hovered or holds focus. -->
     <Style Selector="Border.matrix-row StackPanel.row-actions">
       <Setter Property="Opacity" Value="0" />
     </Style>
@@ -427,6 +427,12 @@
                                   <ContentControl.ContentTemplate>
                                     <DataTemplate x:DataType="vm:EnvVariableRow">
                                       <StackPanel Classes="row-actions" Orientation="Horizontal" Spacing="2">
+                                        <ctl:RevealButton Classes="ghost row-action"
+                                                          TargetSource="{Binding}"
+                                                          ToolTip.Tip="Hold to reveal"
+                                                          AutomationProperties.Name="{Binding RevealLabel}">
+                                          <ctl:KpIcon Icon="eye" Size="13" />
+                                        </ctl:RevealButton>
                                         <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource CopyGlyph}"
                                                 ToolTip.Tip="Copy the value; the clipboard clears itself"
                                                 Command="{Binding CopyValueCommand}" />

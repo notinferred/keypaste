@@ -6,9 +6,10 @@ namespace Keypaste.Core.Totp;
 /// <summary>How an item's TOTP codes are computed: its seed, HMAC, length and period (RFC 6238).</summary>
 /// <remarks>
 /// <para>
-/// <see cref="Vault.ReadTotp"/> reads one from KeePassXC's <c>otp</c> field, an <c>otpauth://totp/</c> URI,
-/// or else from KeePass 2's <c>TimeOtp-*</c> fields, and refuses one it cannot compute as written, naming a
-/// field and never a value (D-0477).
+/// <see cref="Vault.ReadTotp"/> reads one as KeePassXC 2.7 does: from its older <c>TOTP Settings</c> and
+/// <c>TOTP Seed</c> pair, from its <c>otp</c> field, an <c>otpauth://totp/</c> URI or KeeOTP's <c>key=</c> form, or
+/// else from KeePass 2's <c>TimeOtp-*</c> fields. It computes the code KeePassXC shows or refuses one it cannot
+/// compute as written, naming a field and never a value (D-0477).
 /// </para>
 /// <para>
 /// The seed is held decoded only here, and <see cref="Dispose"/> zeroes it. No member, refusal or
@@ -39,6 +40,12 @@ public sealed class TotpSpec : IDisposable
     private const int _defaultDigits = 6;
     private const int _defaultPeriod = 30;
 
+    private const string _schemeName = "otpauth:";
+    private const string _steamEncoder = "steam";
+    private const string _steamShortName = "S";
+    private const string _legacySeed = "TOTP Seed";
+    private const string _legacySettings = "TOTP Settings";
+
     private const string _uriSecret = "secret";
     private const string _uriAlgorithm = "algorithm";
     private const string _uriDigits = "digits";
@@ -53,7 +60,14 @@ public sealed class TotpSpec : IDisposable
     private const string _length = "TimeOtp-Length";
     private const string _period = "TimeOtp-Period";
 
+    private const string _keeOtpKey = "key";
+    private const string _keeOtpSize = "size";
+    private const string _keeOtpStep = "step";
+    private const string _keeOtpAlgorithm = "otpHashMode";
+    private const string _keeOtpType = "type";
+
     private static readonly string[] _uriParameters = [_uriSecret, _uriAlgorithm, _uriDigits, _uriPeriod, _uriEncoder];
+    private static readonly string[] _keeOtpParameters = [_keeOtpKey, _keeOtpSize, _keeOtpStep, _keeOtpAlgorithm, _keeOtpType];
     private static readonly string[] _keePass2Secrets = [_secret, _secretHex, _secretBase32, _secretBase64];
 
     private readonly byte[] _seed;
@@ -159,23 +173,36 @@ public sealed class TotpSpec : IDisposable
         _disposed = true;
     }
 
-    /// <summary>Whether a custom field is one a TOTP is read from: <c>otp</c>, or one starting <c>TimeOtp-</c>, matched exactly as KeePassXC and KeePass 2 do.</summary>
+    /// <summary>
+    /// Whether a custom field is one a TOTP is read from: <c>otp</c>, <c>TOTP Seed</c>, <c>TOTP Settings</c>, or one
+    /// starting <c>TimeOtp-</c>, matched exactly as KeePassXC and KeePass 2 do.
+    /// </summary>
     /// <param name="name">The field's name.</param>
     /// <returns><see langword="true"/> when <see cref="Read"/> reads it.</returns>
     internal static bool IsSourceField(string name) =>
-        string.Equals(name, OtpField, StringComparison.Ordinal) || name.StartsWith(_keePass2Prefix, StringComparison.Ordinal);
+        string.Equals(name, OtpField, StringComparison.Ordinal)
+        || string.Equals(name, _legacySeed, StringComparison.Ordinal)
+        || string.Equals(name, _legacySettings, StringComparison.Ordinal)
+        || name.StartsWith(_keePass2Prefix, StringComparison.Ordinal);
 
     /// <summary>Whether an item may have a TOTP, judged by which of its seed fields hold anything, so no value is read.</summary>
     /// <param name="holds">Whether the item's custom field of this name holds anything.</param>
-    /// <returns><see langword="true"/> when <c>otp</c> or one of KeePass 2's secret fields does; <see cref="Read"/> may still refuse it.</returns>
+    /// <returns>
+    /// <see langword="true"/> when <c>otp</c>, <c>TOTP Seed</c>, <c>TOTP Settings</c> or one of KeePass 2's secret fields does;
+    /// <see cref="Read"/> may still refuse it.
+    /// </returns>
     internal static bool MayHold(Func<string, bool> holds)
     {
         ArgumentNullException.ThrowIfNull(holds);
 
-        return holds(OtpField) || _keePass2Secrets.Any(holds);
+        return holds(OtpField) || holds(_legacySeed) || holds(_legacySettings) || _keePass2Secrets.Any(holds);
     }
 
-    /// <summary>An item's TOTP from its fields: <c>otp</c> when it holds anything, otherwise KeePass 2's <c>TimeOtp-*</c>.</summary>
+    /// <summary>
+    /// An item's TOTP from its fields, in KeePassXC 2.7's order: <c>TOTP Settings</c> with <c>TOTP Seed</c> whenever the
+    /// item has <c>TOTP Settings</c>, and none when both are empty; otherwise <c>otp</c> when it holds anything, otherwise
+    /// KeePass 2's <c>TimeOtp-*</c>.
+    /// </summary>
     /// <param name="fields">The item's custom fields by name; any but those <see cref="IsSourceField"/> accepts are ignored.</param>
     /// <param name="refusal">Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</param>
     /// <returns>The spec, which the caller disposes; null when the item has none or it is refused.</returns>
@@ -183,128 +210,173 @@ public sealed class TotpSpec : IDisposable
     {
         ArgumentNullException.ThrowIfNull(fields);
 
-        return fields.TryGetValue(OtpField, out var otp) && !string.IsNullOrWhiteSpace(otp)
-            ? FromUri(otp, out refusal)
-            : FromKeePass2(fields, out refusal);
+        var seed = fields.GetValueOrDefault(_legacySeed, string.Empty);
+
+        // KeePassXC reads no other field once the item has TOTP Settings.
+        if (fields.TryGetValue(_legacySettings, out var settings))
+        {
+            if (settings.Length == 0 && seed.Length == 0)
+            {
+                refusal = null;
+                return null;
+            }
+
+            return FromSettings(settings, seed, out refusal);
+        }
+
+        if (fields.TryGetValue(OtpField, out var otp) && !string.IsNullOrWhiteSpace(otp))
+        {
+            return !IsUri(otp) && IsKeeOtp(otp) ? FromKeeOtp(otp, OtpField, out refusal) : FromUri(otp, out refusal);
+        }
+
+        return FromKeePass2(fields, out refusal);
     }
 
     /// <summary>A TOTP from KeePassXC's <c>otp</c> field: <c>otpauth://totp/[label]?secret=…</c>, with optional <c>algorithm</c>, <c>digits</c>, <c>period</c> and <c>encoder</c>.</summary>
     /// <param name="uri">The field's value.</param>
     /// <param name="refusal">Why it cannot be computed, naming a parameter and never a value; null otherwise.</param>
     /// <returns>The spec, or null when it is refused.</returns>
-    /// <remarks>Parameter names match in any case and other parameters, such as <c>issuer</c>, are ignored; a parameter given twice is refused.</remarks>
-    internal static TotpSpec? FromUri(string uri, out string? refusal)
+    /// <remarks>
+    /// Parameter names match exactly, as KeePassXC's <c>QUrlQuery</c> matches them, so <c>Digits</c> is ignored as
+    /// <c>issuer</c> is; a name with no <c>=</c> is given empty, and a parameter given twice is refused.
+    /// </remarks>
+    internal static TotpSpec? FromUri(string uri, out string? refusal) => FromUri(uri, OtpField, out refusal);
+
+    /// <summary>
+    /// A TOTP from KeeOTP's form, as KeePassXC 2.7 reads it in <c>otp</c> or <c>TOTP Settings</c>: <c>key=…</c>, the
+    /// base32 seed, with optional <c>size</c>, <c>step</c>, <c>otpHashMode</c> and <c>type</c>.
+    /// </summary>
+    /// <param name="text">The field's value.</param>
+    /// <param name="field">The field it was read from, which a refusal names.</param>
+    /// <param name="refusal">Why it cannot be computed, naming a parameter and never a value; null otherwise.</param>
+    /// <returns>The spec, or null when it is refused.</returns>
+    /// <remarks>
+    /// KeePassXC computes a TOTP whatever <c>type</c> says; keypaste refuses <c>type=hotp</c>, as it refuses an
+    /// <c>otpauth://hotp/</c> URI, and any type but <c>totp</c>.
+    /// </remarks>
+    internal static TotpSpec? FromKeeOtp(string text, string field, out string? refusal)
     {
-        ArgumentNullException.ThrowIfNull(uri);
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(field);
 
-        var text = uri.AsSpan().Trim();
+        var query = text.AsSpan().Trim();
 
-        if (!text.StartsWith(_scheme, StringComparison.OrdinalIgnoreCase))
+        if (Parameters(query, _keeOtpParameters, field, out refusal) is not { } given)
         {
-            return Refuse(out refusal, "The otp field is not an otpauth://totp/ URI.");
+            return null;
         }
 
-        text = text[_scheme.Length..];
-
-        var fragment = text.IndexOf('#');
-        if (fragment >= 0)
+        if (!given.TryGetValue(_keeOtpKey, out var key) || query[key].IsWhiteSpace())
         {
-            text = text[..fragment];
+            return Refuse(out refusal, $"The {field} field has no key.");
         }
 
-        var question = text.IndexOf('?');
-        var path = question >= 0 ? text[..question] : text;
-        var query = question >= 0 ? text[(question + 1)..] : ReadOnlySpan<char>.Empty;
-        var slash = path.IndexOf('/');
-        var type = slash >= 0 ? path[..slash] : path;
+        var type = Parameter(query, given, _keeOtpType);
 
-        if (type.Equals("hotp", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(type, "hotp", StringComparison.OrdinalIgnoreCase))
         {
-            return Refuse(out refusal, "The otp field holds a counter-based HOTP, which keypaste does not compute.");
+            return Refuse(out refusal, $"The {field} field holds a counter-based HOTP, which keypaste does not compute.");
         }
 
-        if (!type.Equals("totp", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrEmpty(type) && !string.Equals(type, "totp", StringComparison.OrdinalIgnoreCase))
         {
-            return Refuse(out refusal, "The otp field is not an otpauth://totp/ URI.");
+            return Refuse(out refusal, $"The {field} field's type must be totp.");
         }
 
-        Dictionary<string, Range> given = new(StringComparer.Ordinal);
-
-        foreach (var range in query.Split('&'))
+        if (Named(Parameter(query, given, _keeOtpAlgorithm)) is not { } algorithm)
         {
-            var (offset, length) = range.GetOffsetAndLength(query.Length);
-            var part = query.Slice(offset, length);
-            var equals = part.IndexOf('=');
-
-            if (equals < 0 || KnownParameter(part[..equals]) is not { } name)
-            {
-                continue;
-            }
-
-            if (!given.TryAdd(name, new Range(offset + equals + 1, offset + length)))
-            {
-                return Refuse(out refusal, $"The otp field gives its {name} more than once.");
-            }
+            return Refuse(out refusal, $"The {field} field's otpHashMode must be SHA1, SHA256 or SHA512.");
         }
 
-        if (!given.TryGetValue(_uriSecret, out var secret) || query[secret].IsWhiteSpace())
+        if (!TryWhole(Parameter(query, given, _keeOtpSize), _defaultDigits, FewestDigits, MostDigits, out var digits))
         {
-            return Refuse(out refusal, "The otp field has no secret.");
+            return Refuse(out refusal, $"The {field} field's size must be 6, 7 or 8.");
         }
 
-        TotpAlgorithm? algorithm = Parameter(query, given, _uriAlgorithm) switch
+        if (!TryWhole(Parameter(query, given, _keeOtpStep), _defaultPeriod, 1, LongestPeriod, out var period))
         {
-            null => TotpAlgorithm.Sha1,
-            { } named when named.Equals("SHA1", StringComparison.OrdinalIgnoreCase) => TotpAlgorithm.Sha1,
-            { } named when named.Equals("SHA256", StringComparison.OrdinalIgnoreCase) => TotpAlgorithm.Sha256,
-            { } named when named.Equals("SHA512", StringComparison.OrdinalIgnoreCase) => TotpAlgorithm.Sha512,
-            _ => null,
-        };
-
-        if (algorithm is null)
-        {
-            return Refuse(out refusal, "The otp field's algorithm must be SHA1, SHA256 or SHA512.");
+            return Refuse(out refusal, $"The {field} field's step must be a whole number of seconds from 1 to 86400.");
         }
 
-        var isSteam = false;
-
-        if (Parameter(query, given, _uriEncoder) is { } encoder)
+        if (UriSecret(query[key]) is not { } seed)
         {
-            if (!encoder.Equals("steam", StringComparison.OrdinalIgnoreCase))
-            {
-                return Refuse(out refusal, "The otp field's encoder must be steam, the only one keypaste computes.");
-            }
-
-            isSteam = true;
-        }
-
-        var digitsText = Parameter(query, given, _uriDigits);
-
-        int digits;
-        if (isSteam)
-        {
-            if (!TryWhole(digitsText, SteamDigits, SteamDigits, SteamDigits, out digits))
-            {
-                return Refuse(out refusal, "The otp field's digits must be 5 for Steam.");
-            }
-        }
-        else if (!TryWhole(digitsText, _defaultDigits, FewestDigits, MostDigits, out digits))
-        {
-            return Refuse(out refusal, "The otp field's digits must be 6, 7 or 8.");
-        }
-
-        if (!TryWhole(Parameter(query, given, _uriPeriod), _defaultPeriod, 1, LongestPeriod, out var period))
-        {
-            return Refuse(out refusal, "The otp field's period must be a whole number of seconds from 1 to 86400.");
-        }
-
-        if (UriSecret(query[secret]) is not { } seed)
-        {
-            return Refuse(out refusal, "The otp field's secret is not base32.");
+            return Refuse(out refusal, $"The {field} field's key is not base32.");
         }
 
         refusal = null;
-        return new TotpSpec(seed, algorithm.Value, digits, period, isSteam);
+        return new TotpSpec(seed, algorithm, digits, period, isSteam: false);
+    }
+
+    /// <summary>
+    /// A TOTP from KeePassXC's older pair, as KeePassXC 2.7 reads it: <c>TOTP Settings</c> holding <c>period;digits</c>,
+    /// or <c>period;S</c> for Steam's five characters every 30 seconds, with the base32 seed in <c>TOTP Seed</c>; or
+    /// <c>TOTP Settings</c> holding an <c>otpauth://totp/</c> URI or KeeOTP's form, whose own seed is read instead.
+    /// </summary>
+    /// <param name="settings">The value of <c>TOTP Settings</c>; empty means 30 seconds and 6 digits.</param>
+    /// <param name="seed">The value of <c>TOTP Seed</c>.</param>
+    /// <param name="refusal">Why it cannot be computed, naming a field and never a value; null otherwise.</param>
+    /// <returns>The spec, or null when it is refused.</returns>
+    /// <remarks>Codes are HMAC-SHA-1, the only algorithm the pair can say; anything KeePassXC would read as another period or length is refused.</remarks>
+    internal static TotpSpec? FromSettings(string settings, string seed, out string? refusal)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(seed);
+
+        if (IsUri(settings))
+        {
+            return FromUri(settings, _legacySettings, out refusal);
+        }
+
+        if (IsKeeOtp(settings))
+        {
+            return FromKeeOtp(settings, _legacySettings, out refusal);
+        }
+
+        if (string.IsNullOrWhiteSpace(seed))
+        {
+            return Refuse(out refusal, $"The {_legacySettings} field has no {_legacySeed}.");
+        }
+
+        var parts = settings.Split(';');
+        var period = _defaultPeriod;
+        var digits = _defaultDigits;
+        var isSteam = false;
+
+        if (parts.Length >= 2 && parts[1] == _steamShortName)
+        {
+            // KeePassXC computes Steam's codes every 30 seconds whatever period the pair names.
+            if (!string.IsNullOrWhiteSpace(parts[0]) && !TryWhole(parts[0], _defaultPeriod, _defaultPeriod, _defaultPeriod, out _))
+            {
+                return Refuse(out refusal, $"The {_legacySettings} field gives Steam a period other than 30 seconds.");
+            }
+
+            digits = SteamDigits;
+            isSteam = true;
+        }
+        else if (parts.Length >= 2)
+        {
+            if (!TryWhole(parts[0], _defaultPeriod, 1, LongestPeriod, out period))
+            {
+                return Refuse(out refusal, $"The {_legacySettings} field's period must be a whole number of seconds from 1 to 86400.");
+            }
+
+            if (!TryWhole(parts[1], _defaultDigits, FewestDigits, MostDigits, out digits))
+            {
+                return Refuse(out refusal, $"The {_legacySettings} field's digits must be 6, 7 or 8.");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(settings))
+        {
+            return Refuse(out refusal, $"The {_legacySettings} field is not period;digits, period;S, an otpauth://totp/ URI or KeeOTP's key= form.");
+        }
+
+        if (Base32(seed) is not { } bytes)
+        {
+            return Refuse(out refusal, $"The {_legacySeed} field is not base32.");
+        }
+
+        refusal = null;
+        return new TotpSpec(bytes, TotpAlgorithm.Sha1, digits, period, isSteam);
     }
 
     /// <summary>
@@ -342,7 +414,7 @@ public sealed class TotpSpec : IDisposable
             return null;
         }
 
-        TotpAlgorithm? algorithm = Given(fields, _algorithm)?.Trim() switch
+        TotpAlgorithm? algorithm = Given(fields, _algorithm) switch
         {
             null => TotpAlgorithm.Sha1,
             { } named when named.Equals("HMAC-SHA-1", StringComparison.OrdinalIgnoreCase) => TotpAlgorithm.Sha1,
@@ -519,13 +591,139 @@ public sealed class TotpSpec : IDisposable
         }
     }
 
-    private static string? KnownParameter(ReadOnlySpan<char> name)
+    private static TotpSpec? FromUri(string uri, string field, out string? refusal)
     {
-        foreach (var known in _uriParameters)
+        ArgumentNullException.ThrowIfNull(uri);
+
+        var text = uri.AsSpan().Trim();
+
+        if (!text.StartsWith(_scheme, StringComparison.OrdinalIgnoreCase))
         {
-            if (name.Equals(known, StringComparison.OrdinalIgnoreCase))
+            return Refuse(out refusal, $"The {field} field is not an otpauth://totp/ URI.");
+        }
+
+        text = text[_scheme.Length..];
+
+        var fragment = text.IndexOf('#');
+        if (fragment >= 0)
+        {
+            text = text[..fragment];
+        }
+
+        var question = text.IndexOf('?');
+        var path = question >= 0 ? text[..question] : text;
+        var query = question >= 0 ? text[(question + 1)..] : ReadOnlySpan<char>.Empty;
+        var slash = path.IndexOf('/');
+        var type = slash >= 0 ? path[..slash] : path;
+
+        if (type.Equals("hotp", StringComparison.OrdinalIgnoreCase))
+        {
+            return Refuse(out refusal, $"The {field} field holds a counter-based HOTP, which keypaste does not compute.");
+        }
+
+        if (!type.Equals("totp", StringComparison.OrdinalIgnoreCase))
+        {
+            return Refuse(out refusal, $"The {field} field is not an otpauth://totp/ URI.");
+        }
+
+        if (Parameters(query, _uriParameters, field, out refusal) is not { } given)
+        {
+            return null;
+        }
+
+        if (!given.TryGetValue(_uriSecret, out var secret) || query[secret].IsWhiteSpace())
+        {
+            return Refuse(out refusal, $"The {field} field has no secret.");
+        }
+
+        if (Named(Parameter(query, given, _uriAlgorithm)) is not { } algorithm)
+        {
+            return Refuse(out refusal, $"The {field} field's algorithm must be SHA1, SHA256 or SHA512.");
+        }
+
+        bool? isSteam = Parameter(query, given, _uriEncoder) switch
+        {
+            null or "" => false,
+            _steamEncoder => true,
+            _ => null,
+        };
+
+        if (isSteam is null)
+        {
+            return Refuse(out refusal, $"The {field} field's encoder must be steam, the only one keypaste computes.");
+        }
+
+        var digitsText = Parameter(query, given, _uriDigits);
+
+        int digits;
+        if (isSteam.Value)
+        {
+            // Without digits KeePassXC 2.7.10 onward computes six of Steam's characters and earlier releases five.
+            if (digitsText is null || !TryWhole(digitsText, SteamDigits, SteamDigits, SteamDigits, out digits))
             {
-                return known;
+                return Refuse(out refusal, $"The {field} field's digits must be 5 for Steam.");
+            }
+        }
+        else if (!TryWhole(digitsText, _defaultDigits, FewestDigits, MostDigits, out digits))
+        {
+            return Refuse(out refusal, $"The {field} field's digits must be 6, 7 or 8.");
+        }
+
+        if (!TryWhole(Parameter(query, given, _uriPeriod), _defaultPeriod, 1, LongestPeriod, out var period))
+        {
+            return Refuse(out refusal, $"The {field} field's period must be a whole number of seconds from 1 to 86400.");
+        }
+
+        // KeePassXC before 2.7.10 computes Steam's codes every 30 seconds whatever period the URI names.
+        if (isSteam.Value && period != _defaultPeriod)
+        {
+            return Refuse(out refusal, $"The {field} field gives Steam a period other than 30 seconds.");
+        }
+
+        if (UriSecret(query[secret]) is not { } seed)
+        {
+            return Refuse(out refusal, $"The {field} field's secret is not base32.");
+        }
+
+        refusal = null;
+        return new TotpSpec(seed, algorithm, digits, period, isSteam.Value);
+    }
+
+    /// <summary>The parameters of a query that a reader knows, by the exact name KeePassXC's <c>QUrlQuery</c> matches; a name with no <c>=</c> is given empty.</summary>
+    private static Dictionary<string, Range>? Parameters(ReadOnlySpan<char> query, string[] known, string field, out string? refusal)
+    {
+        Dictionary<string, Range> given = new(StringComparer.Ordinal);
+
+        foreach (var range in query.Split('&'))
+        {
+            var (offset, length) = range.GetOffsetAndLength(query.Length);
+            var part = query.Slice(offset, length);
+            var equals = part.IndexOf('=');
+            var end = offset + length;
+
+            if (Known(equals < 0 ? part : part[..equals], known) is not { } name)
+            {
+                continue;
+            }
+
+            if (!given.TryAdd(name, equals < 0 ? new Range(end, end) : new Range(offset + equals + 1, end)))
+            {
+                refusal = $"The {field} field gives its {name} more than once.";
+                return null;
+            }
+        }
+
+        refusal = null;
+        return given;
+    }
+
+    private static string? Known(ReadOnlySpan<char> name, string[] known)
+    {
+        foreach (var candidate in known)
+        {
+            if (name.Equals(candidate, StringComparison.Ordinal))
+            {
+                return candidate;
             }
         }
 
@@ -533,16 +731,48 @@ public sealed class TotpSpec : IDisposable
     }
 
     private static string? Parameter(ReadOnlySpan<char> query, Dictionary<string, Range> given, string name) =>
-        given.TryGetValue(name, out var range) && !query[range].IsWhiteSpace()
-            ? Uri.UnescapeDataString(query[range]).Trim()
-            : null;
+        given.TryGetValue(name, out var range) ? Uri.UnescapeDataString(query[range]) : null;
+
+    /// <summary>
+    /// An algorithm as every KeePassXC 2.7 release names one in a URI or KeeOTP's form, in any case; absent or empty
+    /// is SHA-1, as there. An <c>HMAC-SHA-</c> name is refused: 2.7.10 onward reads it and earlier releases compute SHA-1.
+    /// </summary>
+    private static TotpAlgorithm? Named(string? name) => name switch
+    {
+        null or "" => TotpAlgorithm.Sha1,
+        { } named when named.Equals("SHA1", StringComparison.OrdinalIgnoreCase) => TotpAlgorithm.Sha1,
+        { } named when named.Equals("SHA256", StringComparison.OrdinalIgnoreCase) => TotpAlgorithm.Sha256,
+        { } named when named.Equals("SHA512", StringComparison.OrdinalIgnoreCase) => TotpAlgorithm.Sha512,
+        _ => null,
+    };
+
+    private static bool IsUri(string text) => text.AsSpan().TrimStart().StartsWith(_schemeName, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsKeeOtp(string text)
+    {
+        var query = text.AsSpan().Trim();
+
+        foreach (var range in query.Split('&'))
+        {
+            var part = query[range];
+            var equals = part.IndexOf('=');
+
+            if ((equals < 0 ? part : part[..equals]).Equals(_keeOtpKey, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static string? Given(Dictionary<string, string> fields, string name) =>
         fields.TryGetValue(name, out var value) && value.Length > 0 ? value : null;
 
+    /// <summary>A whole number in a range; <paramref name="text"/> null is absent and takes <paramref name="absent"/>, while given empty is refused, as KeePassXC reads it as 0.</summary>
     private static bool TryWhole(string? text, int absent, int least, int most, out int value)
     {
-        if (string.IsNullOrWhiteSpace(text))
+        if (text is null)
         {
             value = absent;
             return true;

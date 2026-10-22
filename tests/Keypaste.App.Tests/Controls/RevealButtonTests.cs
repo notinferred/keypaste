@@ -74,6 +74,42 @@ public sealed class RevealButtonTests
         WindowInput.Release(screen.Window, screen.Button);
     });
 
+    [Fact]
+    public Task A_button_outside_the_cells_template_holds_the_cell_asking_its_row() => HeadlessSession.On(() =>
+    {
+        var source = new Source();
+        var cell = new RevealedValue { Source = source, MaskedLength = _value.Length, FontSize = 14 };
+        var other = new RevealedValue { Source = new Source(), MaskedLength = _value.Length, FontSize = 14 };
+        var button = new RevealButton { Content = "Reveal", TargetSource = source };
+        var window = new Window
+        {
+            Width = 400,
+            Height = 200,
+            Content = new StackPanel
+            {
+                Children =
+                {
+                    new Border { Child = other },
+                    new Border { Child = cell },
+                    new StackPanel { Children = { button } },
+                },
+            },
+        };
+        window.Show();
+        WindowInput.Drain();
+        button.Focus();
+
+        window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        WindowInput.Drain();
+        Assert.True(cell.IsRevealed);
+        Assert.False(other.IsRevealed);
+
+        window.KeyReleaseQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        WindowInput.Drain();
+        Assert.False(cell.IsRevealed);
+        window.Close();
+    });
+
     private sealed class Screen : IDisposable
     {
         internal Screen()

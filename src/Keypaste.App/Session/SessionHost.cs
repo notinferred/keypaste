@@ -40,8 +40,8 @@ namespace Keypaste.App.Session;
 /// <para>
 /// Every request answered is recorded in the home's audit log before its reply leaves. A log that
 /// cannot be opened does not stop the unlock either: each request is refused before anybody is asked,
-/// and the next one tries the log again, so mending the file needs no new unlock. A Run on macOS, whose
-/// window's request writes a line, tries it the same way before its card (D-0451).
+/// and the next one tries the log again, so mending the file needs no new unlock. A Run, which writes a
+/// line on every platform, tries it the same way before its card (D-0451, D-NEW-C2).
 /// </para>
 /// </remarks>
 internal sealed class SessionHost : IDisposable
@@ -353,6 +353,18 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>Records a Run the app starts itself on Windows and Linux in the authority's log, before the terminal starts (D-NEW-C2).</summary>
+    /// <param name="set">The set the confirmation released.</param>
+    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <returns>Whether the line was written; false when nothing is hosted for that session.</returns>
+    internal bool RecordRun(Core.EnvResolved set, string lifetimeId)
+    {
+        lock (_gate)
+        {
+            return _hosted?.RecordRun(set, lifetimeId) == true;
+        }
+    }
+
     /// <summary>The grants in force, as <c>keypaste grants</c> lists them: names and ids, never a value.</summary>
     internal IReadOnlyList<GrantSummary> Grants() => GrantSummary.Of(Activity);
 
@@ -537,6 +549,8 @@ internal sealed class SessionHost : IDisposable
 
         internal void WithdrawLaunch(string pass) => _server.Authority.WithdrawLaunch(pass);
 
+        internal bool RecordRun(Core.EnvResolved set, string lifetimeId) => _server.Authority.RecordAppRun(set, lifetimeId);
+
         /// <summary>Builds the unlock's authority, then binds its launch endpoint when it has one and the vault's endpoint, each reporting why it could not be bound.</summary>
         internal static Hosted Start(
             VaultIdentity vault,
@@ -672,7 +686,7 @@ internal sealed class SessionHost : IDisposable
     }
 
     /// <summary>
-    /// The home's audit log, opened at the first request or a macOS Run's check before its card, so an
+    /// The home's audit log, opened at the first request or a Run's check before its card, so an
     /// unlock alone creates no log, and tried again at the next after an open that failed.
     /// </summary>
     private sealed class AuditOpener(string path) : IDisposable
