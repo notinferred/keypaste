@@ -35,7 +35,7 @@ D-0369 in [DECISIONS](../../DECISIONS.md).
 
 ## Limits and follow-ups
 
-- A field KeePassXC made under a standard name in another case, such as `password`, is listed read-only and cannot be read with `--field`, which refuses standard names in any case.
+- A field KeePassXC made under a standard name in another case, such as `password`, is listed read-only and cannot be read with `--field`, which refuses standard names in any case. It stays refused by founder decision 2026-10-22 (D-NEW-W43); KeePassXC reads and renames it.
 - `set --field` cannot create an entry, and `--field` values cannot be generated.
 - `EntryRevision` still carries only the standard fields, so no surface shows a revision's custom fields.
 - The desktop shows no custom fields until V.7b, and no custom field reaches an agent until C.5a.

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle release-targets.json declares.
+# Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle and zips it as keypaste.app.zip,
+# the build intermediate build-macos-dmg.sh wraps in the DMG release-targets.json declares. The zip is no release
+# package, so nothing uploads or attests it (D-NEW-W41).
 #
 # The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste it
 # gives clients; the icon, licences and Terminal's launcher go to Contents/Resources. Nothing is signed or
@@ -10,16 +12,13 @@
 # Build logs go to stderr; the path of the archive is the only line on stdout.
 #
 # Usage: build-macos-app.sh <staged-payload-dir> <version> <binary-version> <out-dir>
-# Environment: KEYPASTE_RELEASE_DEFINITION  the definition to read (default: release-targets.json)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly ROOT
-readonly DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-$ROOT/release-targets.json}"
-readonly RID='osx-arm64'
+readonly NAME='keypaste.app.zip'
 
 die() { echo "::error::$*" >&2; exit 1; }
-jqr() { command jq -r "$@" | tr -d '\r'; }
 
 [ $# -eq 4 ] || die "usage: build-macos-app.sh <staged-payload-dir> <version> <binary-version> <out-dir>"
 payload="$1" version="$2" binary_version="$3" out="$4"
@@ -33,10 +32,6 @@ bundle_version="${version%%-*}"
 case "$bundle_version" in
   '' | *[!0-9.]* | .* | *. | *..*) die "$version does not start with a numeric bundle version" ;;
 esac
-
-package='.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "app-bundle")'
-[ "$(jqr "[$package] | length" "$DEFINITION" 2>/dev/null || true)" = "1" ] || die "$DEFINITION does not declare exactly one app-bundle package for app/$RID"
-name="$(jqr "$package | .pattern" "$DEFINITION" | sed -e "s/{version}/$version/g" -e "s/{rid}/$RID/g")"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -57,20 +52,20 @@ done < <(find "$app/Contents/MacOS" -type f -print0)
 chmod 755 "$app/Contents/Resources/keypaste-launch.command"
 
 mkdir -p "$out"
-rm -f "$out/$name"
-ditto -c -k --norsrc --noextattr --noacl --keepParent "$app" "$out/$name"
+rm -f "$out/$NAME"
+ditto -c -k --norsrc --noextattr --noacl --keepParent "$app" "$out/$NAME"
 
 unzipped="$work/unzipped"
-ditto -x -k "$out/$name" "$unzipped"
+ditto -x -k "$out/$NAME" "$unzipped"
 contents="$unzipped/keypaste.app/Contents"
 plist() { plutil -extract "$1" raw -o - "$contents/Info.plist"; }
 executable="$contents/MacOS/$(plist CFBundleExecutable)"
-[ -x "$executable" ] || die "$name names CFBundleExecutable $(plist CFBundleExecutable), which is not executable in Contents/MacOS"
-[ -x "$contents/MacOS/keypaste" ] || die "$name carries no executable keypaste"
-[ -x "$contents/Resources/keypaste-launch.command" ] || die "$name carries no executable Contents/Resources/keypaste-launch.command"
+[ -x "$executable" ] || die "$NAME names CFBundleExecutable $(plist CFBundleExecutable), which is not executable in Contents/MacOS"
+[ -x "$contents/MacOS/keypaste" ] || die "$NAME carries no executable keypaste"
+[ -x "$contents/Resources/keypaste-launch.command" ] || die "$NAME carries no executable Contents/Resources/keypaste-launch.command"
 cmp -s "$ROOT/packaging/macos/keypaste-launch.command" "$contents/Resources/keypaste-launch.command" \
-  || die "$name's keypaste-launch.command differs from packaging/macos's"
-[ -f "$contents/Resources/$(plist CFBundleIconFile).icns" ] || die "$name names icon $(plist CFBundleIconFile) and carries no such .icns"
+  || die "$NAME's keypaste-launch.command differs from packaging/macos's"
+[ -f "$contents/Resources/$(plist CFBundleIconFile).icns" ] || die "$NAME names icon $(plist CFBundleIconFile) and carries no such .icns"
 
 reported="$("$executable" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the bundle's binary reports $reported, not $binary_version"
@@ -83,4 +78,4 @@ grep -q '^keypaste-app: selftest ok ' "$work/launched" \
   || die "the bundle started through LaunchServices did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
 cat "$work/launched" >&2
 
-echo "$out/$name"
+echo "$out/$NAME"

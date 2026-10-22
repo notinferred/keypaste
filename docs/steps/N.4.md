@@ -25,7 +25,7 @@ Local, Windows 10 Pro 19045, KeePassXC 2.7.10, on `main` above `40acb68`.
 
 ## Limits and follow-ups
 
-- No template has more fields than the row names: a database's name or port, for example, goes in the host or the notes.
-- The CLI has no template verb; `keypaste add` is unchanged.
+- No template has more fields than the row names: a database's name or port, for example, goes in the host or the notes, or in a custom field added after the item is made. This stays so by founder decision 2026-10-22.
+- The CLI has no template verb; `keypaste add` is unchanged, and `keypaste set --field` adds a field after it.
 - The form cannot create a group; New group in Items' "+" does.
 - Source only.

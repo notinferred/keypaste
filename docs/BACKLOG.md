@@ -38,6 +38,7 @@ These are retained feature ideas, not discarded features or promises for the fir
 | Windows clipboard-history observation | The documented residual remains. A real-machine observation, former 1.5a, can establish only the tested platform behavior. |
 | Consent-based launch notifications and educational material | The existing signup promise requires confirmation before sending. Double opt-in/unsubscribe, a public demo vault, articles and talks require a selected audience and separate sending authorization. Former 5.6, 3.11. |
 | Upstream interoperability fixes | Contribute a reproducible format defect when one is found; keep required attribution and interoperability evidence. |
+| A native Wayland backend for the Linux app | The app runs under X11 or XWayland, so a Wayland desktop without XWayland cannot start it; it stays so by founder decision 2026-10-22. Reconsider when Avalonia ships a stable Wayland backend. |
 
 ## Investigation candidates
 
@@ -45,8 +46,6 @@ These observations were previously in DECISIONS. They are not completed fixes or
 
 | Observation | What must be established |
 |---|---|
-| An Automatic hourly limit is spent before an oversized release fails delivery, as a policy allowance was | Decide and test whether the limit counts authorization or delivery; retain audit truth and refusal behavior. |
-| `projects.json` is written only by the desktop but read by `keypaste run`, `env export` and `env diff` | Establish whether a CLI-only user can map a directory to a project at all, and whether a command given no project then fails without saying why. |
 | Listing source failures are recorded as `no-approver` | Reproduce the wrong audit classification while a listener exists; distinguish unavailable transport from failed vault access. |
 | Exposure parse errors lose detail when a reply is too large | Bound diagnostics at their source if a reproducible operator problem needs it; preserve the transport limit. |
 | Approver disconnects, write failures and handler exceptions lack separate diagnostics | Establish which missing observation prevents diagnosis; never log secret content. |
@@ -59,8 +58,7 @@ These observations were previously in DECISIONS. They are not completed fixes or
 | A KDBX 3.1 vault is converted to KDBX 4 on its first save, and that path is not exercised ([F.58](steps/F.58.md), FEATURES' "Not exercised") | Check in a 3.1 fixture made by another writer and test open, save, reopen and the backup kept before the conversion. |
 | Negative assertions in the desktop approval tests wait a fixed 200 ms, so they pass on a slow runner without proving the click was ignored ([F.58](steps/F.58.md)) | Give each a positive synchronisation point before asserting that nothing completed. |
 | keypaste.com's `/subscribe` has no rate limiter, unlike the share routes ([F.58](steps/F.58.md)) | Add a limiter binding and the share routes' check, and verify it on a preview deploy before `main`, since a push deploys the site. |
-| An owner that crashes leaves nothing on disk saying why ([F.58](steps/F.58.md)) | Decide what a local crash record may hold, since exception messages can carry entry names, before writing one. |
-| RELEASE's last-known-good promotion and recovery procedure is still open ([F.58](steps/F.58.md)) | Give it a STEPS row in the release track and rehearse it once before 0.5.0 is promoted. |
+| RELEASE's last-known-good promotion and recovery procedure, deferred until after the first desktop release by founder decision 2026-10-22 ([F.58](steps/F.58.md)) | After that release, give it a STEPS row in the release track and rehearse it once before a later release is promoted. |
 | `verify-keepassxc-fields.sh` on `ubuntu-24.04` waited 30 seconds for the desktop's approval prompt and none appeared, once ([F.55](steps/F.55.md)) | Whether the prompt was raised and not seen, or never raised, under a fully loaded runner. |
 | Two compat gates stopped on `windows-2025` with no log kept: `verify-keepassxc-projects.sh` for 28 minutes ([F.63](steps/F.63.md)) and `verify-keepassxc-fields.sh` for 32 ([F.65](steps/F.65.md)) | Which phase stopped and which processes were alive, from either gate's watchdog the next time it fires; then whether keypaste or the runner hung. |
 | `verify-run-session.sh` on `windows-2025` printed its last `ok` and exited 1 with no message, once (app 38834646300, attempt 1, job 116760936787; [F.63](steps/F.63.md)) | Whether its exit cleanup's `rm -rf` failed on a file a process ended by `taskkill` still held, silently because the cleanup's first `exec` sends the gate's standard error to `/dev/null`; let that error through and reproduce it before repairing. |

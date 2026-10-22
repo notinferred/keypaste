@@ -110,6 +110,8 @@ Keep the master password out of client configuration; enter it only in the appro
 
 Restart Claude Desktop. The server appears under the tools icon; if it does not, see Troubleshooting.
 
+If you set `KEYPASTE_HOME` to anything other than the default, connect Claude Desktop with `keypaste setup` or the app's Connect, which write that home's vault, audit log and `clients.toml` into its entry as flags, since Claude Desktop does not see your shell's variables. keypaste's Claude Desktop extension, which is not published yet, always starts the bridge for the default home.
+
 ## Claude Code
 
 ```sh
@@ -241,7 +243,7 @@ A granted line carries `granted_seconds`: how long the release may be reused, wh
 
 The returned value is excluded from the log. `field` records the requested field. Current source logs the sanitized resolved entry path when available, including for opaque handles, otherwise the sanitized request argument. Published `v0.1.0` records the request argument. Keep secret values out of entry names and reason excerpts.
 
-Calls are refused if the audit record cannot be written. An unwritable `~/.keypaste` can also prevent startup. The log grows without automatic rotation or trimming. On Linux and macOS, keypaste creates owner-readable logs and tightens existing permissions with a stderr notice. Windows logs inherit their directory permissions without an equivalent check.
+Calls are refused if the audit record cannot be written. An unwritable `~/.keypaste` can also prevent startup. The log grows without automatic rotation or trimming; [Archiving it](#archiving-it) says how to start a new one. On Linux and macOS, keypaste creates owner-readable logs and tightens existing permissions with a stderr notice. Windows logs inherit their directory permissions without an equivalent check, so keep `KEYPASTE_HOME` in a folder only you can read.
 
 ## Reading it
 
@@ -297,6 +299,30 @@ No release of keypaste wrote a `v:1` record, so in source one is reported as a l
 ```
 
 Unrecognized appended lines are reported by verification; new keypaste records link to the last valid chain record. Records from a newer keypaste version stop appending to avoid a fork. Upgrade or move the file aside to start a new log; the old file remains readable and verifiable.
+
+## Archiving it
+
+keypaste never rotates, trims or moves the log. To start a new one:
+
+1. Quit the app, stop `keypaste approve` and quit every AI tool that runs keypaste's bridge, so nothing has the file open or writes to it. Windows cannot move a file in use, and the app holds the log from its first agent request until it locks.
+2. Run `keypaste log verify` and keep the `Latest` hash it prints somewhere other than this computer. With nothing writing, it is the hash of the file's last record.
+3. Move the file aside, in `KEYPASTE_HOME` if you set one:
+
+```sh
+mv ~/.keypaste/audit.jsonl ~/.keypaste/audit-2026-10.jsonl
+```
+
+```powershell
+Move-Item "$HOME\.keypaste\audit.jsonl" "$HOME\.keypaste\audit-2026-10.jsonl"
+```
+
+The next record starts a new file with a chain of its own, and the archive still verifies against the hash you kept:
+
+```sh
+keypaste log verify --audit-log ~/.keypaste/audit-2026-10.jsonl --expect <hash>
+```
+
+The app's History and activity log read only `audit.jsonl`, so they stop showing what you archived; `keypaste log --audit-log <file>` still lists it.
 
 ## Checking it works without a client
 

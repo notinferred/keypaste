@@ -27,6 +27,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - Then the app is signed inside-out, notarized and stapled.
   - `spctl` accepts it, and a changed byte is refused.
   - Terminal must be seen running the launcher of a downloaded bundle macOS opened. On `macos-15` Gatekeeper refuses an unsigned copy's launcher while it is quarantined ([4.7e1](steps/4.7e1.md)).
+  - `upgrade-desktop.yml`'s macOS leg runs again on the first signed bundle, to see whether macOS App Management permission stops it replacing `/Applications/keypaste.app` ([4.7e2](steps/4.7e2.md)).
 - [ ] **R.1a — Exercise the integrated desktop candidate.** Needs: 9.4, 4.6, F.15, U.2, U.3, 4.4b, 4.3b, 2.6a, E.1b, E.1c, F.2b3a, F.2b3b, V.7a, V.7b, C.2, N.1a, N.1b, N.2, N.3, N.4, N.5, N.6, N.7, N.10, N.12, C.1a, C.1b, C.1c, C.3, C.4, E.1d, C.5a, C.5b, G.1, G.2, G.4a, G.5, G.8, G.9, N.16, V.11, 4.7a2.
   - Install the internal Windows MSI, macOS DMG and Linux AppImage built at a named commit.
   - In each installed app, complete T1–T4 with a disposable vault, a real MCP client and a real child process. The acts:
@@ -39,10 +40,11 @@ Package managers and agent marketplaces carry a version only after it is publish
     7. Change access.
     8. Lock, and see later releases refused as `vault-locked`.
   - Each act records the OS and version, the package and its hash, the commit and its audit lines.
+  - On the Mac and the PC, time an unlock and a save, whose key derivation is managed code there; a native Argon2 library is reconsidered only if the delay is noticeable ([F.66](steps/F.66.md)).
   - An unreached act leaves the row open.
 - [ ] **4.7c2 — Publish and verify the first desktop release as 0.5.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, and 3.5a's Apple credentials.
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
-  - `osx-arm64` declares the `.app.zip` and the DMG. `require-release-assets.sh --publishable` requires every declared package offered, and `verify-desktop-candidate.sh` stages only the DMG, so either the zip stops being a declared package or the candidate check accepts each declared `osx-arm64` kind.
+  - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-NEW-W41).
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 0.5.0. This renames CHANGELOG's Unreleased section and sets the version.
   - Verify from anonymous downloads: public hashes, provenance, signatures and notarization, and an upgrade that keeps the vault, `~/.keypaste` and the recent list.
   - Rehearsal certificates, unpublished artifacts and source builds do not pass.
@@ -52,6 +54,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - README, keypaste.com and the guides lead with the v1.8 positioning and name 0.5.0.
   - They link its three desktop downloads, hashes and verification steps.
   - They take a new user from the download to a working vault, a project run and a connected agent, as that version behaves.
+  - README's demo GIF and every screenshot are re-rendered from the 0.5.0 binaries.
   - They give the issue route and the private security-reporting route.
   - The launch copy says what keypaste adds over Varlock's KeePass plugin, Strongbox MCP and 1Password Environments, and links the safe-agent guide (L.3).
   - The guides name only the phone apps R.1b's round-trip passed.
@@ -74,7 +77,8 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **G.6a — Offer keypaste as a Claude Code plugin.** Needs: G.1. Ships after: 4.7c2.
   - A marketplace manifest, the bridge registration, and a skill telling agents to use keypaste rather than ask for a pasted secret.
   - It is kept on a branch until then, because a push to `main` publishes it.
-- [ ] **G.6c — List keypaste in the MCP Registry.** Needs: G.6b. Ships after: 4.7c2. Input: H-0022.
+- [ ] **G.6c — Publish the Claude Desktop extension and list keypaste in the MCP Registry.** Needs: G.6b. Ships after: 4.7c2. Input: H-0022.
+  - The extension G.6b packs becomes a release asset, signed with `mcpb sign`, and an install check sees Claude Desktop install it and start `keypaste mcp` through it.
   - The registry takes `.mcpb` files only from GitHub or GitLab releases, which RELEASE does not use as a channel.
   - H-0022 decides the namespace, and whether a verified GitHub Release copy is acceptable.
 - [ ] **G.6d — Offer a Gemini CLI extension.** Needs: G.1. Ships after: 4.7c2.
@@ -113,7 +117,7 @@ Each row keeps its historical meaning and is expanded when selected.
   - The desktop already unlocks a vault that needs a YubiKey slot and changes the key in Settings (D-0366), but this has not been tried with a physical key.
   - What remains:
     - creating such a vault;
-    - opening it from the CLI and `keypaste approve`;
+    - the CLI reaching such a vault through the app while the app holds it, and the app's KDBX import taking the key; standalone verbs and `keypaste approve` refuse it, naming the app (D-NEW-W42);
     - real-device unlock, save and reopen with KeePassXC interoperability;
     - missing-key and wrong-key refusal;
     - documented spare-key and lost-key limits.

@@ -98,7 +98,7 @@ keypaste run -p staging acme-api -- npm start
 
 `keypaste env export acme-api -p staging > .env.keypaste` writes one reference per variable, such as `DATABASE_URL=kp://acme-api/staging/DATABASE_URL`, and no value, so the file can be committed. `kp:///<group>/<title>#username` names a field of any vault entry. `keypaste run --env-file .env.keypaste -- npm start` resolves every reference or starts nothing, and `-p` moves each `kp://<project>/…` reference to that profile.
 
-Once the desktop app has saved a directory for the project, `keypaste run -- npm start` there uses the project `projects.json` maps it to, and uses `./.env.keypaste` only when that file names nothing but that project's variables and literal values. A file naming vault entries or another project needs `--env-file`. A found or named reference file is always announced with its project and profile, and every literal is listed before the vault is opened, because a cloned repository's file can put values such as `HTTPS_PROXY` beside your secrets. A literal that cannot be shown whole on one line, because it is very long or holds line breaks, tabs, trailing spaces or invisible characters, is refused.
+Once the desktop app has saved a directory for the project, `keypaste run -- npm start` there uses the project `projects.json` maps it to, and uses `./.env.keypaste` only when that file names nothing but that project's variables and literal values. A file naming vault entries or another project needs `--env-file`. Only the desktop app maps a directory to a project, so without it name the project, as in `keypaste run acme-api -- npm start`, or the reference file, as in `keypaste run --env-file .env.keypaste -- npm start`; given neither, `run` starts nothing and says which to add. A found or named reference file is always announced with its project and profile, and every literal is listed before the vault is opened, because a cloned repository's file can put values such as `HTTPS_PROXY` beside your secrets. A literal that cannot be shown whole on one line, because it is very long or holds line breaks, tabs, trailing spaces or invisible characters, is refused.
 
 <a id="minute-4--the-rest-of-the-repo"></a>
 
@@ -158,7 +158,7 @@ keypaste env export dev .env --dotenv
 Write 4 values to '/repo/app/.env'? [y/N]
 ```
 
-Export requires `--force` to overwrite an existing file. Linux and macOS exports are owner-readable; Windows has no equivalent permission control and reports that limit.
+Export requires `--force` to overwrite an existing file. Linux and macOS exports are owner-readable. On Windows the file takes its folder's permissions, which keypaste does not narrow and says so, so export only into a folder others cannot read.
 
 Export uses single quotes where possible, which are literal in `motdotla/dotenv`, `python-dotenv`, `joho/godotenv`, Docker Compose v2 and `sh`. Apostrophes and carriage returns require double quotes and escapes; keypaste names those keys on stderr because readers differ in escape handling. Avoid `docker run --env-file`, which preserves quotes and escapes literally.
 

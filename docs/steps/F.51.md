@@ -32,5 +32,5 @@ None.
 
 ## Limits and follow-ups
 
-- The race stays in Avalonia. The app tests start their session the same way and never dispose it, so they cannot hit it; the app itself does not use `HeadlessUnitTestSession`. Reporting it upstream is outside this step.
+- The race stays in Avalonia. The app tests start their session the same way and never dispose it, so they cannot hit it; the app itself does not use `HeadlessUnitTestSession`. It is not reported upstream, by founder decision 2026-10-22, since it has no effect on the product.
 - macOS and Windows did not reproduce it in three minutes each; how often it happens there is not measured.

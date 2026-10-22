@@ -858,8 +858,9 @@ validate_packages() {
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
     code="$(package_code "$root" "$workflow")"
-    for kind in msi appimage app-bundle dmg; do
-      case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; app-bundle) ext=".app.zip" ;; dmg) ext=".dmg" ;; esac
+    # The zipped keypaste.app the DMG is built from is a build intermediate, not a package (D-NEW-W41).
+    for kind in msi appimage dmg; do
+      case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; dmg) ext=".dmg" ;; esac
       case "$code" in *"$ext"*) ;; *) continue ;; esac
       declared="$(count_of "$def" "[.components.\"$c\".targets[]?.packages[]? | select(.kind == \"$kind\")]")"
       [ "${declared:-0}" -ge 1 ] \
@@ -1328,10 +1329,6 @@ expect_repo_refusal "appimage-undeclared" "builds an appimage package and app de
   "$(mutate appimage-undeclared '(.components.app.targets[] | select(.rid == "linux-x64")) |= del(.packages)')" \
   "$FAKE"
 
-expect_repo_refusal "app-bundle-undeclared" "builds an app-bundle package and app declares none" \
-  "$(mutate app-bundle-undeclared '(.components.app.targets[] | select(.rid == "osx-arm64")) |= del(.packages)')" \
-  "$FAKE"
-
 expect_repo_refusal "dmg-undeclared" "builds an dmg package and app declares none" \
   "$(mutate dmg-undeclared '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages) |= map(select(.kind != "dmg"))')" \
   "$FAKE"
@@ -1390,11 +1387,6 @@ sed_inplace 's/| \.packages\[\] | select(\.kind == "appimage")/| .appimage | sel
 expect_repo_refusal "appimage-name-not-read-from-the-definition" "builds an appimage package without reading its name from the definition" \
   "$FAKE/release-targets.json" "$FAKE"
 cp scripts/build-linux-appimage.sh "$FAKE/scripts/build-linux-appimage.sh"
-
-sed_inplace 's/| \.packages\[\] | select(\.kind == "app-bundle")/| .bundle | select(.kind == "app-bundle")/' "$FAKE/scripts/build-macos-app.sh"
-expect_repo_refusal "app-bundle-name-not-read-from-the-definition" "builds an app-bundle package without reading its name from the definition" \
-  "$FAKE/release-targets.json" "$FAKE"
-cp scripts/build-macos-app.sh "$FAKE/scripts/build-macos-app.sh"
 
 sed_inplace 's/| \.packages\[\] | select(\.kind == "dmg")/| .image | select(.kind == "dmg")/' "$FAKE/scripts/build-macos-dmg.sh"
 expect_repo_refusal "dmg-name-not-read-from-the-definition" "builds an dmg package without reading its name from the definition" \

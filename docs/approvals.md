@@ -133,6 +133,8 @@ An explicit refusal tells the agent not to retry. The same request is refused fo
 
 Only one request is displayed at a time. Additional requests on that connection, including entry listings, receive `BUSY` immediately. They are not queued, and the response does not identify the call already in progress.
 
+There is no pause button for an agent that keeps asking. Its settings are the pause: set Give values to No and May run commands to Off in its Settings on the app's Agents screen, or run `keypaste clients <agent> --values no --run off`. A change that gives an agent less applies at once, so from then on its requests for a value or a command are refused before anything in the vault is looked up, with no prompt. A request it makes to change its own settings is still put to you, and turning values or commands back on gives it more, so you confirm that too ([policy](policy.md)).
+
 In source, a request whose client gives up, or whose `keypaste mcp` goes away, is withdrawn from the prompt rather than waiting out its 45 seconds.
 
 ## Approving in the desktop app

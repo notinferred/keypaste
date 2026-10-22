@@ -97,5 +97,5 @@ D-0455 and D-0456, which the integrator numbers; D-0326, D-0330 and D-0380 amend
 - G.8's settings panel re-reads after the person's own change and rebuilds its mode chips, so a keyboard user lost focus on the chip just pressed. Fixed: the panel gives the keyboard back to the chip that sets the same thing, or to its group's first chip when that one is gone (D-0493) (gaps-1, RUNS-PENDING).
 - On some Linux compositors raising a window may not bring it in front; the prompt is still disarmed and arms again a second later.
 - The frames are drawn headless in dev runs only; the full ci and app runs draw none.
-- README's Agents screenshot and its alt text show the screen before G.8; they are retaken after N.6, within L.1.
+- README's Agents screenshot and its alt text show the screen before G.8; by founder decision 2026-10-22 they are retaken with the demo GIF and every other screenshot in L.1, from the 0.5.0 binaries.
 - N.6 checks Agents' text in its last pass after N.3 lands.

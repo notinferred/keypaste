@@ -60,7 +60,7 @@ D-0464, and D-0382, D-0439 and D-0445 amended to it, in [DECISIONS](../../DECISI
 
 - A lock waits for a save already queued at the holder, as F.35 found.
 - The access-change path keeps gaps this step did not copy: it does not commit within the asking unlock, it writes to whatever vault is unlocked, and it does not register its withdrawal with the lifetime.
-- A form open on the same item in the app saves over a terminal's edit when the person saves it, and the edit stays in the item's history.
+- A form open on the same item in the app saves over a terminal's edit when the person saves it, and the edit stays in the item's history. The last save wins by founder decision 2026-10-22 (D-NEW-W43), as [desktop](../desktop.md#editing-your-vault) says.
 - Routed, a verb reads its values before the holder checks the item, so a refusal comes after typing.
 - A pipe left open and silent counts as holding nothing more after two seconds.
 - The cooldown a refused edit starts also holds the person's own next edit or `keypaste mcp policy` for that minute.

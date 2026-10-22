@@ -141,9 +141,9 @@ D-0431, D-0432, D-0433; T-39.
 - macOS has no install or upgrade observation; 4.7e owns it.
 - The rehearsals verified no attestation and are not release evidence; only the runs against `v0.5.0-rc.1` are.
 - Release run 38189762435's first attempt failed in its guard with "no successful app run for 1b71162e… at refs/tags/v0.5.0-rc.1", having found ci and app green on the commit. `release.yml` starts with the tag push, while the tag's own app run, whose packages a release takes, was still running. Nothing was built or published. After that app run succeeded, a re-run passed. A tag therefore needs a release re-run whenever the guard runs before the tag's app run finishes.
-- Uninstalling leaves the Linux script and the macOS link, as removing the app leaves its login entry (G.4a); each then starts nothing. A backup that Replace kept stays where it is.
+- Uninstalling leaves the Linux script and the macOS link, as removing the app leaves its login entry (G.4a); each then starts nothing. A backup that Replace kept stays where it is. These stay by founder decision 2026-10-22, and [desktop](../desktop.md#removing-keypaste) gives the commands that remove them.
 - A Linux desktop session that began before `~/.local/bin` existed finds the link only after the next login; Settings says so.
 - The new-shell probe on Linux models a stock Ubuntu login, not the runner image's own account (Amendments).
 - The macOS link is on every account's PATH and points into a bundle the installing account can write (T-39, accepted by the founder).
 - A `keypaste` earlier on the terminal's PATH still wins. On Windows it wins over the MSI's entry, which also puts the folder's other files on PATH. On Linux and macOS it wins over the link. On macOS Settings names a copy in `~/.local/bin` or `/opt/homebrew/bin`. A copy that a shell profile puts first anywhere else goes unseen, because Settings starts no shell to ask.
-- The Windows desktop ZIP gets no PATH entry; a Linux desktop archive can be linked from Settings.
+- The Windows desktop ZIP gets no PATH entry, kept by founder decision 2026-10-22; a Linux desktop archive can be linked from Settings.

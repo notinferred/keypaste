@@ -21,4 +21,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-The CLI has no trash verb, so recovery from a terminal alone means KeePassXC. A vault that has recycled anything is written as KDBX 4.1. U.3 owns invalidating an already-open session and its grants after a delete.
+The CLI has no trash verb, kept by founder decision 2026-10-22, so recovery from a terminal alone means KeePassXC. A vault that has recycled anything is written as KDBX 4.1. U.3 owns invalidating an already-open session and its grants after a delete.

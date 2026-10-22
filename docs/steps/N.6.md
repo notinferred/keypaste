@@ -108,7 +108,7 @@ D-0457 and D-0458. D-0417's "environment" now holds on every surface; no row is 
 
 ## Limits and follow-ups
 
-- **The README demo GIF has not been re-rendered.** `docs/demo/keypaste-demo.gif` still shows the prompt's `client` and `entry` rows and the log's old headers, and G.8's earlier demo; its re-render is the founder's call after N.6.
+- **The README demo GIF has not been re-rendered.** `docs/demo/keypaste-demo.gif` still shows the prompt's `client` and `entry` rows and the log's old headers, and G.8's earlier demo; by founder decision 2026-10-22 it is re-rendered with every screenshot in L.1, from the 0.5.0 binaries.
 - **keypaste.com.** site/public/index.html's transcript changes deploy with the push to main through Cloudflare's Git integration, and `scripts/verify-site-disclosure.sh` runs after that deploy; its result is not in this record.
 - **Names kept until N.9.** `keypaste grants`, `--expose`, `--session`, `--profiles`, `--entry`, `-p`, `--client-label`, `--client` and `clients.toml` keep their names while the help beside them says allowance, can see, environment and agent. The MCP tools and arguments `list_entry_names`, `request_credential`, `entry` and `profile`, the structured-result keys, and the audit values `keypaste log` shows as recorded, such as `granted`, `exposure` and `grant-cache`, also keep theirs.
 - **Prose left to L.1.** The guides', FEATURES' and keypaste.com content pages' prose still uses the old words where it quotes nothing N.6 changed. docs/design/README.md's prototype state and the desktop prototype now use the new words (gaps-1, RUNS-PENDING).

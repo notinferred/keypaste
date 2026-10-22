@@ -38,9 +38,9 @@ D-0474 (the bundle and its launcher) and D-0475 (packing and checking it in CI).
 
 ## Limits and follow-ups
 
-- **Held for the founder: publication has no row.** Removing G.6b's row leaves the bundle's release asset, any `mcpb sign` signature and its installation verification in Claude Desktop with no STEPS row. G.6c covers only the Registry listing. Adding a row for them, or folding them into G.6c, is a publication choice, so it was not taken here.
+- **Publication belongs to G.6c.** By founder decision 2026-10-22, G.6c carries the bundle's release asset, its `mcpb sign` signature and its installation check in Claude Desktop with the Registry listing, which needs the same hosted file.
 - **Only the Linux path is checked.** The check runs only the launcher's Linux branch, `~/.local/bin` and PATH. Its macOS and Windows places, its passing over an installed copy another account owns, its Windows rule that skips a drive-relative PATH entry such as `\tools`, and Claude Desktop installing and starting the bundle, run in no check until the bundle's installation is verified.
 - **Claude Desktop can hold keypaste twice.** If setup or Connect has already written keypaste's entry into `claude_desktop_config.json`, installing the extension gives Claude Desktop two keypaste servers under one label. Setup does not yet detect the extension.
-- **No custom home.** A `KEYPASTE_HOME` other than the default, which setup pins with flags (D-0389), is not supported by the extension.
+- **No custom home.** A `KEYPASTE_HOME` other than the default, which setup pins with flags (D-0389), is not supported by the extension. By founder decision 2026-10-22 it stays so: [mcp-setup](../mcp-setup.md#claude-desktop) says to connect Claude Desktop under a custom home with `keypaste setup` or the app's Connect.
 - **Time limits are estimates.** The step's 2-minute limit and the job's 5 minutes are estimates until ci 39633992142 and app 39633992293 show the step's time.
 - **The CLI calls version 0.3 unfinished.** The CLI's own 0.3 schema file is marked work in progress, while the specification calls 0.3 current.

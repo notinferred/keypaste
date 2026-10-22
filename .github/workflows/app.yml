@@ -122,7 +122,7 @@ jobs:
             ''|*[!0-9]*) echo "::error::release-targets.json did not answer with a target count"; exit 1 ;;
           esac
           [ "$n" -ge 1 ] || { echo "::error::release-targets.json packages no app targets"; exit 1; }
-          targets="$(jq -c --argjson linux_only "$LINUX_ONLY" '[.components.app.targets[] | select(($linux_only | not) or (.rid | startswith("linux-"))) | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0), appimage: ([.packages[]? | select(.kind == "appimage")] | length > 0), bundle: ([.packages[]? | select(.kind == "app-bundle")] | length > 0), dmg: ([.packages[]? | select(.kind == "dmg")] | length > 0)}]' release-targets.json)"
+          targets="$(jq -c --argjson linux_only "$LINUX_ONLY" '[.components.app.targets[] | select(($linux_only | not) or (.rid | startswith("linux-"))) | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0), appimage: ([.packages[]? | select(.kind == "appimage")] | length > 0), dmg: ([.packages[]? | select(.kind == "dmg")] | length > 0)}]' release-targets.json)"
           kept="$(jq length <<< "$targets")"
           if [ "$LINUX_ONLY" = true ] && [ "$WORKFLOW" = dev ]; then
             [ "$kept" -ge 1 ] || { echo "::error::release-targets.json packages no Linux app target"; exit 1; }
@@ -558,27 +558,22 @@ jobs:
           printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
           (cd artifacts/dist && sha256sum -c "$name.sha256")
 
-      - name: Build and check the internal app bundle the definition declares
+      # The zipped bundle is the DMG's input and no release package, so it stays out of artifacts/dist (D-NEW-W41).
+      - name: Build and check the app bundle the DMG wraps
         id: bundle
-        if: matrix.bundle
+        if: matrix.dmg
         shell: bash
         env:
           VERSION: ${{ steps.v.outputs.version }}
           REPORTED: ${{ steps.v.outputs.reported }}
         run: |
           set -euo pipefail
-          bundle="$(scripts/build-macos-app.sh artifacts/stage "$VERSION" "$REPORTED" artifacts/dist)"
-
-          name="$(basename "$bundle")"
-          hash="$(shasum -a 256 < "$bundle" | cut -d' ' -f1)"
-          [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $name"; exit 1; }
-          printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
-          (cd artifacts/dist && shasum -a 256 -c "$name.sha256")
+          bundle="$(scripts/build-macos-app.sh artifacts/stage "$VERSION" "$REPORTED" artifacts/bundle)"
           echo "zip=$bundle" >> "$GITHUB_OUTPUT"
 
       # Every build's bundle, as install-desktop checks only a dispatched candidate's installed copy (G.5).
       - name: Check a new terminal runs the bundle's keypaste through its link
-        if: matrix.bundle
+        if: matrix.dmg
         shell: bash
         env:
           BUNDLE: ${{ steps.bundle.outputs.zip }}
@@ -620,12 +615,6 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: artifacts/dist/keypaste-app-*.AppImage
-
-      - name: Attest the internal app bundle
-        if: github.ref_type == 'tag' && matrix.bundle && steps.rehearsal.outputs.trusted == ''
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: artifacts/dist/keypaste-app-*.app.zip
 
       - name: Attest the internal DMG
         if: github.ref_type == 'tag' && matrix.dmg && steps.rehearsal.outputs.trusted == ''

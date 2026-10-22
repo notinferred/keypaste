@@ -2,6 +2,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Recent;
 
 namespace Keypaste.Cli;
 
@@ -16,6 +17,11 @@ namespace Keypaste.Cli;
 /// </remarks>
 internal static class VaultSession
 {
+    /// <summary>What a refused open adds when the missing factor may be a hardware key, which only the app asks (D-0366).</summary>
+    internal const string HardwareKeyRefusal =
+        "keypaste: a vault that also needs a YubiKey opens only in the desktop app; the CLI cannot ask a hardware key. "
+        + "While the app holds the vault, `keypaste run --session` and edits such as `keypaste set` reach it there.";
+
     /// <summary>Opens the vault at <paramref name="path"/> and runs <paramref name="body"/>.</summary>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
     /// <param name="line">
@@ -28,7 +34,8 @@ internal static class VaultSession
     /// <param name="namesHardwareKeys">
     /// Whether a refusal also says a hardware key cannot be the missing factor. keypaste cannot tell a
     /// wrong secret from a challenge-response vault, and a verb about access is where somebody with
-    /// one would look for the reason.
+    /// one would look for the reason. Every verb says it for a vault <c>recent.toml</c> remembers the
+    /// app opening with a hardware key.
     /// </param>
     internal static int Open(
         string path, CommandLine line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false)
@@ -63,10 +70,9 @@ internal static class VaultSession
             context.Stderr.WriteLine(keyfile is null
                 ? "keypaste: wrong master password"
                 : "keypaste: wrong master password or keyfile");
-            if (namesHardwareKeys)
+            if (namesHardwareKeys || LastOpenedWithHardwareKey(path, context))
             {
-                context.Stderr.WriteLine(
-                    "keypaste: a vault that also needs a hardware key opens only in the desktop app; the CLI cannot ask a YubiKey yet.");
+                context.Stderr.WriteLine(HardwareKeyRefusal);
             }
 
             return CliApp.ExitAuthFailed;
@@ -264,6 +270,16 @@ internal static class VaultSession
         KeyfileOutcome.XmlUnreadable => UnreadableKeyfile.Explain(path),
         _ => $"the keyfile '{path}' cannot be used",
     };
+
+    /// <summary>Whether <c>recent.toml</c> remembers the app last opening the vault at <paramref name="path"/> with a hardware key.</summary>
+    private static bool LastOpenedWithHardwareKey(string path, CliContext context)
+    {
+        var recent = KeypasteHome.RecentPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+        var full = Path.GetFullPath(path);
+
+        return RecentVaults.Load(recent)
+            .Any(vault => vault.HardwareKeySlot is not null && string.Equals(vault.Path, full, PathIdentity.Comparison));
+    }
 
     /// <summary>Says, once, that keypaste has started keeping copies beside this vault.</summary>
     /// <remarks>
