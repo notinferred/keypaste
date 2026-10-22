@@ -363,7 +363,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal RelayCommand CancelRenameFieldCommand { get; }
 
     /// <summary>The custom fields by name and protection, for the history's comparison; never a value.</summary>
-    internal string FieldsSummary => EntryRevisionRow.Describe(_fields.Select(field => (field.Name, field.IsProtected)));
+    internal string FieldsSummary => EntryRevisionRow.Describe(_fields.Select(row => (row.Name, row.IsProtected)));
 
     /// <summary>The item's own tags, for the history's comparison.</summary>
     internal string TagsSummary => EntryRevisionRow.Describe(_tags.Select(chip => chip.Tag));
