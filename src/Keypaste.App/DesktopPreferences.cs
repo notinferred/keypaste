@@ -15,9 +15,9 @@ namespace Keypaste.App;
 /// </para>
 /// <para>
 /// The screen and the session now hold the same object, so what is displayed is what is in force
-/// rather than a second read that happens to agree with the first. Only the chosen vault is read
-/// again, when saving; any other edit made by hand while the app is running takes effect at the
-/// next launch.
+/// rather than a second read that happens to agree with the first. Only the chosen vault, and what
+/// this version does not read, are read again when saving; any other edit made by hand while the
+/// app is running takes effect at the next launch.
 /// </para>
 /// <para>
 /// <b>Loading never writes.</b> <see cref="AppSettings.Load"/> answers a file it cannot parse with

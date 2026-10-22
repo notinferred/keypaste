@@ -28,6 +28,9 @@ Settings › Recommendations now checks the vault on a background thread after e
 After Import .env on the Projects screen, the app now offers to delete the file, as `keypaste env pull` does, saying that deleting does not overwrite the disk blocks it used and, for a file inside a git repository, does not remove it from the repository's history. The file stays unless you press Delete, and a file that changed after keypaste read it is kept.
 
 When no agent has received an item, holds an allowance for it or is asking for it, the item's Agent access card now names the connected agents that can see it, such as "claude-code can see it · nothing released", rather than None active.
+Saving Settings in the app, choosing a vault with `keypaste use`, and saving a project's directory and command now keep what a newer version of keypaste wrote into `app.toml` and `projects.json`, rather than dropping every key, section or project mapping this version does not read.
+
+keypaste now opens and saves a vault encrypted with Twofish, as KeePassXC can make one, keeping Twofish when it saves; before, such a vault did not open at all. keypaste still makes new vaults with AES-256 and never changes a vault's cipher. The Twofish code is BouncyCastle's, vendored and pinned as [third_party/bouncycastle-twofish/UPSTREAM.md](third_party/bouncycastle-twofish/UPSTREAM.md) records.
 
 Tagging an item into a project, in the app or with `keypaste env tag`, now names each of its variables that holds a KeePass placeholder such as `{PASSWORD}`, with the placeholder, before anything is written, because that variable carries the item's own field to whoever gets it.
 

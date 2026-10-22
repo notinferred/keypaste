@@ -43,6 +43,9 @@ namespace KeePassLib.Cryptography.Cipher
 					cp = new CipherPool();
 					cp.AddCipher(new StandardAesEngine());
 					cp.AddCipher(new ChaCha20Engine());
+#if KEYPASTE_TWOFISH
+					cp.AddCipher(new TwofishCipherEngine());
+#endif
 
 					m_poolGlobal = cp;
 				}

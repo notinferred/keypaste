@@ -86,6 +86,8 @@ public sealed record AppSettings
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
 
+    private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey];
+
     private static readonly string[] _header =
     [
         "keypaste keeps the desktop app's preferences here, and the vault agents and the CLI use.",
@@ -206,16 +208,24 @@ public sealed record AppSettings
         return true;
     }
 
-    /// <summary>Writes the preferences, replacing whatever was there.</summary>
+    /// <summary>Writes the preferences, keeping every other key and section the file holds.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
     /// <param name="settings">What to write.</param>
     /// <returns><see langword="true"/> when the file was written.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="path"/> or <paramref name="settings"/> is null.</exception>
     /// <remarks>
+    /// <para>
+    /// A key of <c>[[settings]]</c> or a section this version does not read is written back as it was read,
+    /// after the preferences, so a version older than the one that wrote it does not drop it (D-NEW-X51). A
+    /// file that does not parse is replaced, as before. When what is kept cannot be written back as itself, or
+    /// the file would no longer read whole, nothing is written and this returns <see langword="false"/>.
+    /// </para>
+    /// <para>
     /// Owner-only on Unix. On Windows the file inherits the profile's ACL, which is the protection
     /// <c>audit.jsonl</c> and <c>recent.toml</c> already rely on and is stated rather than implied.
     /// A failure to write is swallowed and reported in the return value: losing a preference is not
     /// worth interrupting anybody.
+    /// </para>
     /// </remarks>
     public static bool Save(string path, AppSettings settings)
     {
@@ -246,6 +256,18 @@ public sealed record AppSettings
             writer.Text(VaultKey, RecentVaults.Portable(vault), _vaultComment);
         }
 
+        if (!TryKeep(writer, Existing(path)))
+        {
+            return false;
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(writer.ToString());
+
+        if (!Toml.TryDecode(bytes, TomlLimits.Paths, out var text, out _) || !Toml.TryParse(text, TomlLimits.Paths, out _, out _))
+        {
+            return false;
+        }
+
         try
         {
             if (Path.GetDirectoryName(Path.GetFullPath(path)) is { Length: > 0 } directory)
@@ -253,13 +275,83 @@ public sealed record AppSettings
                 Directory.CreateDirectory(directory);
             }
 
-            AtomicFile.Write(path, Encoding.UTF8.GetBytes(writer.ToString()));
+            AtomicFile.Write(path, bytes);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return false;
         }
+    }
+
+    /// <summary>The sections the file at <paramref name="path"/> holds, or none when it is absent or does not read whole.</summary>
+    private static TomlDocument Existing(string path)
+    {
+        try
+        {
+            return Toml.TryDecode(File.ReadAllBytes(path), TomlLimits.Paths, out var text, out _)
+                && Toml.TryParse(text, TomlLimits.Paths, out var document, out _)
+                    ? document
+                    : TomlDocument.Empty;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return TomlDocument.Empty;
+        }
+    }
+
+    /// <summary>Writes back what <paramref name="existing"/> holds beyond the preferences: the other keys of its first <c>[[settings]]</c>, then every other section.</summary>
+    /// <returns><see langword="false"/> when something kept cannot be written so that it reads back as itself.</returns>
+    private static bool TryKeep(TomlWriter writer, TomlDocument existing)
+    {
+        var section = existing.Tables.FirstOrDefault(table => string.Equals(table.Name, SectionName, StringComparison.Ordinal));
+
+        try
+        {
+            if (section is not null && !TryWrite(writer, section.Pairs.Where(pair => !_knownKeys.Contains(pair.Key, StringComparer.Ordinal))))
+            {
+                return false;
+            }
+
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section)))
+            {
+                writer.BlankLine().Table(table.Name);
+
+                if (!TryWrite(writer, table.Pairs))
+                {
+                    return false;
+                }
+            }
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryWrite(TomlWriter writer, IEnumerable<TomlPair> pairs)
+    {
+        foreach (var pair in pairs)
+        {
+            switch (pair.Value.Kind)
+            {
+                case TomlValueKind.Text when writer.CanWrite(pair.Key, pair.Value.Text):
+                    writer.Text(pair.Key, pair.Value.Text);
+                    break;
+                case TomlValueKind.Number:
+                    writer.Number(pair.Key, pair.Value.Number);
+                    break;
+                case TomlValueKind.Array when writer.CanWriteStrings(pair.Key, pair.Value.Items):
+                    writer.Strings(pair.Key, pair.Value.Items);
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>Whether <paramref name="vaultPath"/> can be written as <see cref="Vault"/> and read back as itself.</summary>

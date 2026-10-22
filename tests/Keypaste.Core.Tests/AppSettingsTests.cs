@@ -1,3 +1,4 @@
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Settings;
 using Xunit;
 
@@ -197,6 +198,30 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Equal(AppTheme.Dark, settings.Theme);
         Assert.Equal(AppSettings.Default.IdleTimeoutSeconds, settings.IdleTimeoutSeconds);
         Assert.False(settings.LockWhenMinimized);
+    }
+
+    /// <summary>What a newer version wrote and this one does not read survives this one's Settings and its <c>keypaste use</c> (D-NEW-X51).</summary>
+    [Fact]
+    public void A_key_and_a_section_this_version_does_not_read_survive_a_save_and_a_choice_of_vault()
+    {
+        File.WriteAllText(SettingsFile, "[[settings]]\ntheme = \"dark\"\nlater_choice = \"kept\"\nlater_count = 3\n\n[[later]]\nnames = [\"a\", \"b\"]\n");
+        var vault = Path.Combine(_directory, "chosen.kdbx");
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { Theme = AppTheme.Light }));
+        Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(_directory, vault, onlyIfNone: false));
+
+        var settings = AppSettings.Load(SettingsFile);
+        Assert.Equal(AppTheme.Light, settings.Theme);
+        Assert.Equal(vault, settings.Vault);
+
+        Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var error), error);
+        var section = Assert.Single(document.Tables, table => string.Equals(table.Name, AppSettings.SectionName, StringComparison.Ordinal));
+        Assert.True(section.TryGet("later_choice", out var choice));
+        Assert.Equal("kept", choice.Value.Text);
+        Assert.True(section.TryGet("later_count", out var count));
+        Assert.Equal(3, count.Value.Number);
+        var later = Assert.Single(document.Tables, table => string.Equals(table.Name, "later", StringComparison.Ordinal));
+        Assert.Equal(["a", "b"], Assert.Single(later.Pairs).Value.Items);
     }
 
     /// <summary>

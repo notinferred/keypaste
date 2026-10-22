@@ -91,6 +91,48 @@ public sealed class ProjectMappingsTests : IDisposable
         Assert.Equal("ops", Assert.Single(loaded).Project);
     }
 
+    /// <summary>What a newer version wrote and this one does not read survives a save of another mapping (D-NEW-X51).</summary>
+    [Fact]
+    public void A_mapping_it_cannot_read_and_properties_it_does_not_know_survive_a_save()
+    {
+        WriteFile();
+        Assert.True(ProjectMappings.TryLoad(File_, out var loaded));
+
+        var added = new ProjectMapping(Path.Combine(_directory, "a.kdbx"), "web", _directory, "npm start");
+        Assert.True(ProjectMappings.Save(File_, ProjectMappings.Put(loaded, added)));
+
+        using var document = JsonDocument.Parse(File.ReadAllBytes(File_));
+        Assert.Equal(2, document.RootElement.GetProperty("version").GetInt32());
+        var items = document.RootElement.GetProperty("projects").EnumerateArray().ToList();
+        Assert.Equal(3, items.Count);
+        Assert.Equal("relative", Item(items, "dev").GetProperty("directory").GetString());
+        Assert.Equal("dev-note", Item(items, "dev").GetProperty("note").GetString());
+        Assert.Equal("pwsh", Item(items, "ops").GetProperty("shell").GetString());
+
+        Assert.True(ProjectMappings.TryLoad(File_, out var reloaded));
+        Assert.Equal(["ops", "web"], reloaded.Select(mapping => mapping.Project));
+    }
+
+    [Fact]
+    public void Replacing_a_mapping_keeps_the_properties_it_does_not_know_and_takes_the_place_of_one_it_could_not_read()
+    {
+        WriteFile();
+        Assert.True(ProjectMappings.TryLoad(File_, out var loaded));
+        var ops = Assert.Single(loaded);
+
+        Assert.True(ProjectMappings.Save(File_, ProjectMappings.Put(loaded, ops with { Command = "make deploy" })));
+        Assert.True(ProjectMappings.TryLoad(File_, out loaded));
+        Assert.True(ProjectMappings.Save(File_, ProjectMappings.Put(loaded, ops with { Project = "dev" })));
+
+        using var document = JsonDocument.Parse(File.ReadAllBytes(File_));
+        var items = document.RootElement.GetProperty("projects").EnumerateArray().ToList();
+        Assert.Equal(2, items.Count);
+        Assert.Equal("make deploy", Item(items, "ops").GetProperty("command").GetString());
+        Assert.Equal("pwsh", Item(items, "ops").GetProperty("shell").GetString());
+        Assert.Equal(_directory, Item(items, "dev").GetProperty("directory").GetString());
+        Assert.Equal("dev-note", Item(items, "dev").GetProperty("note").GetString());
+    }
+
     [Theory]
     [InlineData("relative/dir", "make", false)]
     [InlineData(null, "", false)]
@@ -101,4 +143,21 @@ public sealed class ProjectMappingsTests : IDisposable
         Assert.Equal(usable, ProjectMappings.IsUsable(directory ?? _directory, command, out var error));
         Assert.Equal(usable, error.Length == 0);
     }
+
+    /// <summary>A file a newer version might write: a top-level property, a mapping with a relative directory and a note, and one with a shell.</summary>
+    private void WriteFile()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(File_)!);
+        var vault = JsonEncodedText.Encode(Path.Combine(_directory, "a.kdbx"));
+        var directory = JsonEncodedText.Encode(_directory);
+        File.WriteAllText(File_, $$"""
+            { "version": 2, "projects": [
+              { "vault": "{{vault}}", "project": "dev", "directory": "relative", "command": "make", "note": "dev-note" },
+              { "vault": "{{vault}}", "project": "ops", "directory": "{{directory}}", "command": "make", "shell": "pwsh" }
+            ] }
+            """);
+    }
+
+    private static JsonElement Item(List<JsonElement> items, string project) =>
+        Assert.Single(items, item => string.Equals(item.GetProperty("project").GetString(), project, StringComparison.Ordinal));
 }

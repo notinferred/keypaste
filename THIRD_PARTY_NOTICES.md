@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
 
 ## KeePassLib
 
@@ -8,9 +8,19 @@ Copyright © 2003–2021 Dominik Reichl <dominik.reichl@t-online.de>. Licensed u
 
 The [upstream library](https://keepass.info/) is KeePass 2.61, using Timothy Byrd's [KeePassNetStandard port](https://github.com/TimothyByrd/KeePassNetStandard), tag `v2.61`. Source is vendored at `third_party/KeePassLib/`; [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md) records provenance and compile-time modifications.
 
-KeePassLib provides the KDBX4 format, Argon2 key derivation and AES-256/ChaCha20 ciphers. Keypaste implements no cryptography of its own.
+KeePassLib provides the KDBX4 format, Argon2 key derivation and AES-256/ChaCha20 ciphers, and reads and writes Twofish through BouncyCastle's code below. Keypaste implements no cryptography of its own.
 
 The GPL-2.0-or-later grant permits the GPLv3 option, and AGPL-3.0 §13 permits the combination. The combined distribution is AGPL-3.0-only; KeePassLib remains available under GPL-2.0-or-later.
+
+## BouncyCastle Twofish
+
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org). Licensed under the MIT License, whose notice follows as upstream's `LICENSE.md` gives it, which `third_party/bouncycastle-twofish/LICENSE` holds:
+
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sub license, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The [upstream library](https://github.com/bcgit/bc-csharp) is BouncyCastle C#, tag `release-2.7.0`. Its Twofish block cipher, CBC mode and PKCS#7 padding, with the interfaces and helpers they reach, are vendored at `third_party/bouncycastle-twofish/` and compiled into KeePassLib, every type internal; [UPSTREAM.md](third_party/bouncycastle-twofish/UPSTREAM.md) records each file's upstream SHA-256 and every change. They encrypt and decrypt a vault whose cipher is Twofish. The combined distribution is AGPL-3.0-only; the code remains available under the MIT License.
 
 ## EFF Large Wordlist for Passphrases
 

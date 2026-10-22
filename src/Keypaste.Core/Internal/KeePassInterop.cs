@@ -3673,10 +3673,6 @@ internal sealed class KeePassInterop : IDisposable
 
     private static readonly PwUuid _chaCha20Uuid = new ChaCha20Engine().CipherUuid;
 
-    /// <summary>Twofish, which KeePassLib does not carry and KeePassXC writes.</summary>
-    private static readonly PwUuid _twofishUuid = new(
-        [0xAD, 0x68, 0xF2, 0x9F, 0x57, 0x6F, 0x4B, 0xB9, 0xA3, 0x6A, 0xD4, 0x7A, 0xF9, 0x65, 0x34, 0x6C]);
-
     /// <summary>Reads a KDBX file's unencrypted outer header: its version, cipher and KDF.</summary>
     /// <returns>What the header says, or null with <paramref name="error"/> set.</returns>
     internal static KdbxProbe? Probe(string path, out string error)
@@ -3759,7 +3755,7 @@ internal sealed class KeePassInterop : IDisposable
     private static string CipherName(PwUuid uuid) =>
         uuid.Equals(StandardAesEngine.AesUuid) ? "AES-256"
         : uuid.Equals(_chaCha20Uuid) ? "ChaCha20"
-        : uuid.Equals(_twofishUuid) ? "Twofish"
+        : uuid.Equals(TwofishCipherEngine.TwofishUuid) ? "Twofish"
         : "unknown";
 
     private static string KdfName(byte[] parameters)

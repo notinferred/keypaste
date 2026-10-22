@@ -31,6 +31,8 @@ public static class ProjectMappings
     /// <summary>The longest command accepted, in characters.</summary>
     public const int MaximumCommandLength = 4096;
 
+    private static readonly string[] _fields = ["vault", "project", "directory", "command"];
+
     /// <summary>Reads the mappings.</summary>
     /// <param name="path">The file, from <see cref="Audit.KeypasteHome.ProjectsPath"/>.</param>
     /// <param name="mappings">Every well-formed mapping, or none when this returns false.</param>
@@ -41,51 +43,15 @@ public static class ProjectMappings
 
         mappings = [];
 
-        if (!File.Exists(path))
+        using var document = Parse(path, out var absent);
+
+        if (document is null)
         {
-            return true;
+            return absent;
         }
 
-        try
-        {
-            var bytes = File.ReadAllBytes(path);
-
-            if (bytes.Length > MaximumBytes)
-            {
-                return false;
-            }
-
-            using var document = JsonDocument.Parse(bytes);
-
-            if (document.RootElement.ValueKind != JsonValueKind.Object
-                || !document.RootElement.TryGetProperty("projects", out var projects)
-                || projects.ValueKind != JsonValueKind.Array)
-            {
-                return false;
-            }
-
-            List<ProjectMapping> read = [];
-
-            foreach (var item in projects.EnumerateArray())
-            {
-                if (Text(item, "vault") is { } vault
-                    && Text(item, "project") is { } project
-                    && Text(item, "directory") is { } directory
-                    && Text(item, "command") is { } command
-                    && Path.IsPathFullyQualified(vault)
-                    && IsUsable(directory, command, out _))
-                {
-                    read.Add(new ProjectMapping(vault, project, directory, command));
-                }
-            }
-
-            mappings = read;
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return false;
-        }
+        mappings = [.. Projects(document).Select(Read).OfType<ProjectMapping>()];
+        return true;
     }
 
     /// <summary>The mapping for one project of one vault, or null.</summary>
@@ -148,15 +114,26 @@ public static class ProjectMappings
         return true;
     }
 
-    /// <summary>Writes the mappings, replacing the file.</summary>
+    /// <summary>Writes the mappings, keeping what the file holds that <see cref="TryLoad"/> does not read.</summary>
     /// <param name="path">The file.</param>
     /// <param name="mappings">What to write.</param>
     /// <returns>Whether the file was written.</returns>
-    /// <remarks>Owner-only on Unix; on Windows the file inherits the profile's ACL, as <c>app.toml</c> does.</remarks>
+    /// <remarks>
+    /// <para>
+    /// A mapping keeps the other properties the file gave the mapping for its vault and project, a mapping
+    /// <see cref="TryLoad"/> skipped stays as it was unless one written names its vault and project, and the
+    /// file's other top-level properties stay, so a version older than the one that wrote them drops none
+    /// (D-NEW-X51). A mapping <see cref="TryLoad"/> read and the caller left out is gone.
+    /// </para>
+    /// <para>Owner-only on Unix; on Windows the file inherits the profile's ACL, as <c>app.toml</c> does.</para>
+    /// </remarks>
     public static bool Save(string path, IReadOnlyList<ProjectMapping> mappings)
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(mappings);
+
+        using var existing = Parse(path, out _);
+        JsonElement[] items = existing is null ? [] : [.. Projects(existing)];
 
         using var buffer = new MemoryStream();
 
@@ -172,10 +149,33 @@ public static class ProjectMappings
                 writer.WriteString("project", mapping.Project);
                 writer.WriteString("directory", mapping.Directory);
                 writer.WriteString("command", mapping.Command);
+
+                if (Array.Find(items, item => Names(item, mapping)) is { ValueKind: JsonValueKind.Object } before)
+                {
+                    foreach (var property in before.EnumerateObject().Where(member => !_fields.Contains(member.Name, StringComparer.Ordinal)))
+                    {
+                        property.WriteTo(writer);
+                    }
+                }
+
                 writer.WriteEndObject();
             }
 
+            foreach (var item in items.Where(element => Read(element) is null && !mappings.Any(mapping => Names(element, mapping))))
+            {
+                item.WriteTo(writer);
+            }
+
             writer.WriteEndArray();
+
+            if (existing is not null)
+            {
+                foreach (var property in existing.RootElement.EnumerateObject().Where(member => !member.NameEquals("projects")))
+                {
+                    property.WriteTo(writer);
+                }
+            }
+
             writer.WriteEndObject();
         }
 
@@ -194,6 +194,75 @@ public static class ProjectMappings
             return false;
         }
     }
+
+    /// <summary>Reads the file as a document whose root holds a <c>projects</c> array.</summary>
+    /// <param name="path">The file.</param>
+    /// <param name="absent">Whether there is no file at all, rather than one that cannot be read.</param>
+    /// <returns>The document, or null.</returns>
+    private static JsonDocument? Parse(string path, out bool absent)
+    {
+        absent = !File.Exists(path);
+
+        if (absent)
+        {
+            return null;
+        }
+
+        try
+        {
+            var bytes = File.ReadAllBytes(path);
+
+            if (bytes.Length > MaximumBytes)
+            {
+                return null;
+            }
+
+            JsonDocument? document = JsonDocument.Parse(bytes);
+
+            try
+            {
+                if (document.RootElement.ValueKind != JsonValueKind.Object
+                    || !document.RootElement.TryGetProperty("projects", out var projects)
+                    || projects.ValueKind != JsonValueKind.Array)
+                {
+                    return null;
+                }
+
+                var read = document;
+                document = null;
+                return read;
+            }
+            finally
+            {
+                document?.Dispose();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static JsonElement.ArrayEnumerator Projects(JsonDocument document) =>
+        document.RootElement.GetProperty("projects").EnumerateArray();
+
+    /// <summary>The mapping an element of the file describes, or null when a field is missing or unusable.</summary>
+    private static ProjectMapping? Read(JsonElement item) =>
+        Text(item, "vault") is { } vault
+        && Text(item, "project") is { } project
+        && Text(item, "directory") is { } directory
+        && Text(item, "command") is { } command
+        && Path.IsPathFullyQualified(vault)
+        && IsUsable(directory, command, out _)
+            ? new ProjectMapping(vault, project, directory, command)
+            : null;
+
+    /// <summary>Whether an element of the file names the same vault and project as <paramref name="mapping"/>.</summary>
+    private static bool Names(JsonElement item, ProjectMapping mapping) =>
+        Text(item, "vault") is { } vault
+        && Text(item, "project") is { } project
+        && string.Equals(vault, mapping.Vault, PathIdentity.Comparison)
+        && string.Equals(project, mapping.Project, StringComparison.Ordinal);
 
     private static string? Text(JsonElement item, string name) =>
         item.ValueKind == JsonValueKind.Object

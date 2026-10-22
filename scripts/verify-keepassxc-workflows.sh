@@ -17,8 +17,17 @@
 # byte for byte, and reports the cipher and KDF it chose. Every refusal leaves the vault byte-identical
 # and keeps no backup. Creation runs once, through both front ends.
 #
+# KeePassXC imports a document with no custom data as KDBX 3.1. The app unlocks it without writing, and the CLI's
+# first save writes KDBX 4.0 with KeePassXC's cipher and KDF and keeps the 3.1 file whole as its one backup, which
+# KeePassXC still reads.
+#
+# keepassxc-cli cannot choose a cipher, so the app driver writes a Twofish vault with the vendored library, as
+# KeePass with its Twofish plugin writes one. The shipped CLI saves it and KeePassXC reads it as Twofish; KeePassXC
+# then saves an entry of its own into it, keeping Twofish; the CLI reads that entry, and the app reads it and saves.
+#
 # NEGATIVE CONTROL: a vault KeePassXC stripped of an attachment, and one imported without its entry
-# CustomData, must each fail the same check every workflow passes.
+# CustomData, must each fail the same check every workflow passes, and KeePassXC's AES vault must fail the
+# Twofish check.
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -583,6 +592,86 @@ new_pw=
 intact "$db" servers/database
 
 # ---------------------------------------------------------------------------------------
+# KDBX 3.1, which KeePassXC writes under its default AES-KDF when nothing needs KDBX 4.
+# ---------------------------------------------------------------------------------------
+step "KDBX 3.1: the CLI's first save writes KDBX 4 with KeePassXC's cipher and KDF and keeps the 3.1 file as its backup"
+db="$dir/kdbx31.kdbx"
+cur_pw=$pw cur_kf= new_pw=
+cat >"$dir/seed31.xml" <<EOF
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta><Generator>verify-keepassxc-workflows</Generator><DatabaseName>kp31</DatabaseName></Meta>
+  <Root>
+    <Group>
+      <UUID>$(uuid root31)</UUID><Name>Root</Name>
+      <Group>
+        <UUID>$(uuid env31)</UUID><Name>env</Name>
+        <Group>
+          <UUID>$(uuid kp31)</UUID><Name>kp31</Name>
+          <Entry>
+            <UUID>$(uuid deploy31)</UUID>
+            <Tags>env:kp31</Tags>
+            <String><Key>Title</Key><Value>deploy</Value></String>
+            <String><Key>TOKEN</Key><Value ProtectInMemory="True">t31-1</Value></String>
+          </Entry>
+        </Group>
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>
+EOF
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/seed31.xml")" "$(native "$db")" \
+  || die "KeePassXC could not import the KDBX 3.1 seed"
+[ "$(header "$db" | cut -c17-24)" = "01000300" ] || die "KeePassXC did not write KDBX 3.1 from a document with no custom data: $(header "$db")"
+container=$(kx db-info "$db" | grep -E '^(Cipher|KDF):') || die "KeePassXC cannot report on the KDBX 3.1 vault"
+cp "$db" "$dir/kdbx31.kpxc"
+did "the app's unlock" app open "$db"
+cmp -s "$db" "$dir/kdbx31.kpxc" || die "the app's unlock wrote to the KDBX 3.1 vault"
+did "keypaste env set" kp_cli "$db" env set kp31 TOKEN=t31-2
+[ "$(header "$db" | cut -c17-24)" = "00000400" ] || die "the CLI's first save did not write KDBX 4.0: $(header "$db")"
+listed=$(kx db-info "$db" | grep -E '^(Cipher|KDF):') || die "KeePassXC cannot report on the vault the CLI converted"
+[ "$listed" = "$container" ] || die "the CLI's save changed the cipher or KDF KeePassXC chose, from '$container' to '$listed'"
+expect "$db" env/kp31/deploy TOKEN t31-2
+[ "$(copies "$db")" = 1 ] || die "the first save kept $(copies "$db") backups, not one"
+first=$(ls -1 "$db.backups")
+cmp -s "$db.backups/$first" "$dir/kdbx31.kpxc" || die "the backup is not the KDBX 3.1 file KeePassXC wrote"
+expect "$db.backups/$first" env/kp31/deploy TOKEN t31-1
+did "the app's unlock" app open "$db"
+
+# ---------------------------------------------------------------------------------------
+# Twofish, which keepassxc-cli cannot choose (D-0292).
+# ---------------------------------------------------------------------------------------
+# Whether KeePassXC reads the vault at $1 as Twofish. A vault it cannot open fails the gate, so the AES control
+# cannot pass by not opening. Captured first, so grep -q cannot close the pipe on it.
+twofish() { local info; info=$(kx db-info "$1") || die "KeePassXC cannot open $1"; grep -Eq '^Cipher:[[:space:]]*Twofish' <<<"$info"; }
+
+step "Twofish: KeePassXC reads a Twofish vault the CLI saved, the CLI reads one KeePassXC saved, and the app saves it"
+db="$dir/twofish.kdbx"
+cur_pw=$pw cur_kf= new_pw=
+twofish "$dir/control.kdbx" && die "the Twofish check passes KeePassXC's AES vault"
+new_pw=tf-1
+did "the driver writing a Twofish vault" app twofish-create "$db"
+new_pw=
+twofish "$db" || die "KeePassXC does not read the driver's vault as Twofish"
+did "keypaste env set" kp_cli "$db" env set tf TOKEN=tf-2
+twofish "$db" || die "the CLI's save did not keep Twofish"
+[ "$(header "$db" | cut -c21-22)" = "04" ] || die "the CLI's save of the Twofish vault is not KDBX 4"
+expect "$db" env/tf/deploy TOKEN tf-2
+kx add "$db" env/tf/from-kpxc -g -L 24 -l -U -n >/dev/null || die "KeePassXC could not add an entry to the Twofish vault"
+twofish "$db" || die "KeePassXC's save did not keep Twofish"
+written=$(value "$db" env/tf/from-kpxc Password) || die "KeePassXC cannot read the password it generated"
+[ -n "$written" ] || die "KeePassXC generated an empty password, so nothing would be compared"
+listed=$(kp_cli "$db" get env/tf/from-kpxc --reveal | tr -d '\r') || die "keypaste get cannot open the Twofish vault KeePassXC saved"
+[ "$listed" = "$written" ] || die "the CLI does not read the password KeePassXC wrote into the Twofish vault"
+did "the app's unlock" app open "$db"
+new_pw=tf-app
+did "the app's edit" app edit "$db" env/tf/from-kpxc "written by the app" "https://tf.example"
+new_pw=
+twofish "$db" || die "the app's save did not keep Twofish"
+expect "$db" env/tf/from-kpxc Password tf-app
+expect "$db" env/tf/deploy TOKEN tf-2
+
+# ---------------------------------------------------------------------------------------
 # Creation, through both front ends, read by KeePassXC.
 # ---------------------------------------------------------------------------------------
 step "create: keypaste init makes a vault KeePassXC opens and reads"
@@ -600,5 +689,5 @@ cur_kf=
 kx db-info "$dir/created-app.kdbx" >/dev/null 2>&1 && die "KeePassXC opens the app's vault without its keyfile"
 refused "the app creating over an existing vault" "$dir/created-cli.kdbx" app create "$dir/created-cli.kdbx"
 
-printf '\nWORKFLOWS GATE PASSED: three KeePassXC vaults through the CLI and the app, one item from each template on a fourth, creation, and every refusal byte-identical, on %s\n' \
+printf '\nWORKFLOWS GATE PASSED: three KeePassXC vaults through the CLI and the app, one item from each template on a fourth, a KDBX 3.1 conversion, a Twofish vault both ways, creation, and every refusal byte-identical, on %s\n' \
   "$("$cli" --version | tr -d '\r')"

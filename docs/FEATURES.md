@@ -49,6 +49,10 @@ KeePassXC makes three vaults by importing one KeePass XML document: one behind a
 
 After every write in the table, KeePassXC checks four things. It still finds the custom data, custom fields, tag and auto-type on the entries themselves, not only in history. It exports both attachments byte for byte. Its cipher and KDF are unchanged. The file is still KDBX 4.
 
+A KDBX 3.1 vault, which KeePassXC writes from a document with no custom data, unlocks in the desktop without a write, and the CLI's first save writes it as KDBX 4.0 with KeePassXC's cipher and KDF, keeping the 3.1 file byte for byte as its one backup, which KeePassXC still reads (gaps-1c, RUNS-PENDING).
+
+A Twofish vault, which `keepassxc-cli` cannot make, is written by the app driver as KeePass with its Twofish plugin writes one. KeePassXC reads it as Twofish after the CLI saves it, then saves an entry into it, which the CLI reads and the desktop reads and saves; the vault stays Twofish throughout (D-0292) (gaps-1c, RUNS-PENDING).
+
 These are refused, and each leaves the vault byte-identical with no backup taken:
 
 - Opening with a wrong password, or with a missing or wrong keyfile, from either front end.
@@ -66,9 +70,8 @@ These are refused, and each leaves the vault byte-identical with no backup taken
 
 Not exercised:
 
-- KDBX 3.1.
 - A vault protected by a real YubiKey (see Hardware-key unlock above).
-- ChaCha20 or Twofish.
+- ChaCha20.
 - An Argon2 vault made by KeePassXC, because `keepassxc-cli` cannot choose a KDF.
 - Custom icons and KeePassXC's browser-integration data.
 

@@ -133,4 +133,4 @@ If the required audit record cannot be appended, Keypaste refuses the credential
 
 ## Maintainer note
 
-The reporting mailbox has been tested from an external address. GitHub private vulnerability reporting is currently disabled. KeePassLib provenance and local changes are recorded in [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md). Reports to this project and upstream do not automatically reach one another.
+The reporting mailbox has been tested from an external address. GitHub private vulnerability reporting is currently disabled. KeePassLib provenance and local changes are recorded in [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md), and those of the BouncyCastle Twofish code it compiles in, which encrypts a Twofish vault, in [its own](third_party/bouncycastle-twofish/UPSTREAM.md). Reports to this project and upstream do not automatically reach one another.

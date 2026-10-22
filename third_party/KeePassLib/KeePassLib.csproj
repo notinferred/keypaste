@@ -48,10 +48,14 @@
       KEYPASTE_ATOMIC_REPLACE
                          commits a save with one rename over the vault where upstream deletes
                          the vault and then renames, so no moment leaves nothing at its path.
+      KEYPASTE_TWOFISH   registers KeePass's Twofish cipher, which upstream carries only as a
+                         plugin, so a Twofish vault KeePassXC wrote opens and saves keeping its
+                         cipher. Its block cipher, mode and padding are BouncyCastle's, compiled
+                         in from ../bouncycastle-twofish below.
 
-      All five are grep-able markers. Every site they guard is listed in UPSTREAM.md.
+      All six are grep-able markers. Every site they guard is listed in UPSTREAM.md.
     -->
-    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE;KEYPASTE_ATOMIC_REPLACE</DefineConstants>
+    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE;KEYPASTE_ATOMIC_REPLACE;KEYPASTE_TWOFISH</DefineConstants>
 
     <!--
       docs/PRODUCT.md §3.9: dependencies on the secret path are minimised. This project has
@@ -88,6 +92,15 @@
       the last consumer of CryptoUtil.ProtectData.
     -->
     <Compile Remove="Keys\KcpUserAccount.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      BouncyCastle C#'s Twofish, CBC mode and PKCS#7 padding, which KEYPASTE_TWOFISH's engine runs a
+      Twofish vault through. Vendored beside this project with its own licence, every type internal so
+      this assembly exports none: ../bouncycastle-twofish/UPSTREAM.md.
+    -->
+    <Compile Include="../bouncycastle-twofish/src/**/*.cs" Link="BouncyCastle/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

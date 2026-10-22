@@ -55,6 +55,10 @@ namespace Keypaste.AppDriver;
 /// <para>
 /// <c>launch</c> starts the app itself through <c>keypaste-app</c>'s own start, as <see cref="AppLaunch"/> says.
 /// </para>
+/// <para>
+/// <c>twofish-create</c> is no act of the app's: it writes the Twofish vault the workflows gate starts from, which
+/// <c>keepassxc-cli</c> cannot make, as <see cref="TwofishVault"/> says.
+/// </para>
 /// </remarks>
 internal static class Program
 {
@@ -103,6 +107,7 @@ internal static class Program
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
+        "       twofish-create <vault>\n" +
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
         "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed)\n" +
@@ -172,6 +177,7 @@ internal static class Program
                 ["tags-dismiss", var vault, var entry, var tag] => await driver.DismissLostTagAsync(vault, entry, tag).ConfigureAwait(true),
                 ["tags-again", var vault, var entry, var tag] => await driver.ReviewLostTagAgainAsync(vault, entry, tag).ConfigureAwait(true),
                 ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
+                ["twofish-create", var vault] => TwofishVault.Create(vault),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 ["launch"] => AppLaunch.Run(KeypasteHome.Resolve(home), []),
                 ["launch", "--background"] => AppLaunch.Run(KeypasteHome.Resolve(home), ["--background"]),

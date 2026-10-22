@@ -7,7 +7,7 @@ namespace Keypaste.Core.Import;
 /// <param name="Path">The file, as a full path.</param>
 /// <param name="FileName">Its file name.</param>
 /// <param name="Version"><c>KDBX 4.1</c>, <c>KDBX 4.0</c> or <c>KDBX 3.1</c>.</param>
-/// <param name="Cipher"><c>AES-256</c>, <c>ChaCha20</c>, <c>Twofish</c> or <c>unknown</c>.</param>
+/// <param name="Cipher"><c>AES-256</c>, <c>ChaCha20</c> or <c>Twofish</c>, each of which keypaste opens and saves, or <c>unknown</c>.</param>
 /// <param name="Kdf"><c>Argon2id</c>, <c>Argon2d</c>, <c>AES-KDF</c> or <c>unknown</c>.</param>
 /// <param name="SiblingKeyfile">A <c>&lt;stem&gt;.keyx</c> or <c>&lt;stem&gt;.key</c> beside the file, or null.</param>
 public sealed record KdbxProbe(string Path, string FileName, string Version, string Cipher, string Kdf, string? SiblingKeyfile);

@@ -253,13 +253,13 @@ Evidence: `ClipboardCountdownTests` and `ClipboardWritesDoNotOutliveTheAppTests`
 
 ## T-20 — A stolen vault file
 
-A copied vault permits offline guessing without access to the original machine. KDBX4 supplies AES-256 or ChaCha20 content encryption, Argon2 key derivation and HMAC integrity. keypaste vendors the format implementation and adds no cryptography (laws 2.1 and 3.6).
+A copied vault permits offline guessing without access to the original machine. KDBX4 supplies content encryption, AES-256 or ChaCha20, or Twofish in a vault another application made with it, together with Argon2 key derivation and HMAC integrity. keypaste vendors the format implementation and BouncyCastle's Twofish, and adds no cryptography (laws 2.1 and 3.6, D-0292).
 
 Protection depends on the passphrase and the file's KDF parameters. Offline attempts have no keypaste rate limit, lockout or audit record. Recovering the passphrase exposes names as well as values, including from an older stolen copy. keypaste cannot compensate for a weak passphrase.
 
 The separate audit file remains plaintext across vault locks. Released values are not deliberately logged, but names and request arguments can themselves contain sensitive text (T-9); T-5 covers integrity.
 
-Evidence: `verify-keepassxc-compat.sh` and `verify-keepassxc-writeback.sh` run against real `keepassxc-cli` on all three operating systems and check the written format's interoperability. They do not test passphrase strength.
+Evidence: `verify-keepassxc-compat.sh` and `verify-keepassxc-writeback.sh` run against real `keepassxc-cli` on all three operating systems and check the written format's interoperability, and `verify-keepassxc-workflows.sh` has KeePassXC read a Twofish vault keypaste saved and keypaste read one KeePassXC saved. `TwofishCipherTests` holds the Twofish engine to its authors' published answers. None of them tests passphrase strength.
 
 ## Out of scope, with reasons rather than silence
 

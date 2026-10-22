@@ -68,6 +68,16 @@ Where Transactional NTFS is not used, which is always off Windows, `FileTransact
 |---|---|
 | `Serialization/FileTransactionEx.cs` | `CommitWriteTransaction` moves a local temporary file over the vault in one call instead of deleting and renaming |
 
+### `KEYPASTE_TWOFISH`
+
+KeePass reads and writes Twofish only through its TwofishCipher plugin, so upstream's `CipherPool` holds AES and ChaCha20 alone and a Twofish vault KeePassXC wrote failed to open with "unknown cipher". This guard registers Twofish under the UUID the plugin and KeePassXC write, `ad68f29f-576f-4bb9-a36a-d47af965346c`: a 256-bit key and a 128-bit IV, in CBC mode with PKCS#7 padding. The block cipher, the mode and the padding are BouncyCastle C#'s, vendored at [../bouncycastle-twofish](../bouncycastle-twofish/UPSTREAM.md) and compiled into this assembly as internal types; the engine only moves whole blocks through them and zeroes its key copies when its stream closes. Every reader and writer of a KDBX file takes its cipher from `CipherPool.GlobalPool`, so the CLI and the desktop both open and save Twofish vaults with no registration of their own and no reflection. keypaste never chooses Twofish: a vault keeps the cipher it was opened with (D-0292).
+
+| File | Change |
+|---|---|
+| `Cryptography/Cipher/TwofishCipherEngine.cs` | New: the engine and the CBC transform it streams through |
+| `Cryptography/Cipher/CipherPool.cs` | `GlobalPool` adds `TwofishCipherEngine` after AES and ChaCha20 |
+| `KeePassLib.csproj` | Defines the guard and compiles `../bouncycastle-twofish/src/**/*.cs` |
+
 ### Files excluded from compilation
 
 | Path | Reason |
@@ -78,7 +88,7 @@ Where Transactional NTFS is not used, which is always off Windows, `FileTransact
 | `Utility/GfxUtil.cs` | System.Drawing image decoding, used only by `PwCustomIcon` |
 | `Keys/KcpUserAccount.cs` | Machine-bound Windows account key; incompatible with the portable-vault scope and the last consumer of `CryptoUtil.ProtectData` |
 
-The project has zero `PackageReference` entries and an empty `net10.0` dependency set in `packages.lock.json` (D-0004).
+The project has zero `PackageReference` entries and an empty `net10.0` dependency set in `packages.lock.json` (D-0004). The BouncyCastle sources it compiles are vendored files, not a package.
 
 ## Re-merging an upstream security patch
 
