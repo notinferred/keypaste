@@ -1991,6 +1991,98 @@ internal sealed class KeePassInterop : IDisposable
         return place is null ? RestoreOutcome.RestoredToRoot : RestoreOutcome.Restored;
     }
 
+    /// <summary>The name <see cref="RestoreRecycledRenamed"/> would give a recycled entry now, or null when it would refuse.</summary>
+    internal EntryName? RenamedRestoreName(RecycledEntryId id)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Bin() is not { } bin || LocateRecycled(bin, id) is not { } found)
+        {
+            return null;
+        }
+
+        var groupPath = OriginalPlaceOf(found.Entry, bin)?.Path ?? string.Empty;
+        return FreeRestoredTitle(found.Entry, groupPath) is { } title ? new EntryName(groupPath, title) : null;
+    }
+
+    /// <summary>
+    /// Puts a recycled entry back where <see cref="RestoreRecycled"/> would, under the first free title of
+    /// <c>&lt;title&gt; (restored)</c>, <c>&lt;title&gt; (restored 2)</c> and so on.
+    /// </summary>
+    /// <param name="id">The recycled entry.</param>
+    /// <param name="restored">The name the entry answers to now, or null when nothing moved.</param>
+    /// <returns>What happened to the entry; <see cref="RestoreOutcome.DestinationOccupied"/> when no title is free for it.</returns>
+    internal RestoreOutcome RestoreRecycledRenamed(RecycledEntryId id, out EntryName? restored)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        restored = null;
+
+        if (Bin() is not { } bin || LocateRecycled(bin, id) is not { } found)
+        {
+            return RestoreOutcome.NothingMatched;
+        }
+
+        var place = OriginalPlaceOf(found.Entry, bin);
+        var groupPath = place?.Path ?? string.Empty;
+
+        if (FreeRestoredTitle(found.Entry, groupPath) is not { } title)
+        {
+            return RestoreOutcome.DestinationOccupied;
+        }
+
+        PwGroup destination = place is { } known ? Recreate(known.Parent, known.Recycled, bin) : _database.RootGroup;
+
+        found.Group.Entries.Remove(found.Entry);
+        found.Entry.PreviousParentGroup = PwUuid.Zero;
+        destination.AddEntry(found.Entry, true, true);
+        SetField(found.Entry, PwDefs.TitleField, title);
+
+        // Newer so a merge keeps the title; no revision, because a rename overwrites no value.
+        MarkEdited(found.Entry);
+        restored = new EntryName(groupPath, title);
+
+        return place is null ? RestoreOutcome.RestoredToRoot : RestoreOutcome.Restored;
+    }
+
+    /// <summary>
+    /// The first title of <c>&lt;title&gt; (restored)</c>, <c>(restored 2)</c> and onwards that no live entry answers to by
+    /// name or by path in <paramref name="groupPath"/>, or null for an entry going back into keypaste's own groups, whose
+    /// records are found by title, or one whose title cannot take the suffix.
+    /// </summary>
+    private string? FreeRestoredTitle(PwEntry entry, string groupPath)
+    {
+        string title = ReadField(entry, PwDefs.TitleField);
+
+        if (ReservedGroups.IsReserved(groupPath) || !VaultNameRules.IsValidTitle(RestoredTitle(title, 1), out _))
+        {
+            return null;
+        }
+
+        // The entry is in the bin, which no projection reads, so only the live entries are counted against each candidate.
+        var projected = Projected(null, null, null, null);
+        string candidate;
+
+        // Each candidate is a distinct title, so at most one per entry in the vault can be taken.
+        for (var restores = 1; ; restores++)
+        {
+            candidate = RestoredTitle(title, restores);
+            projected.Add((groupPath, candidate, true));
+
+            if (RefuseCollision(projected) is null)
+            {
+                break;
+            }
+
+            projected.RemoveAt(projected.Count - 1);
+        }
+
+        return candidate;
+
+        static string RestoredTitle(string title, int restores) =>
+            restores == 1 ? $"{title} (restored)" : $"{title} (restored {restores})";
+    }
+
     /// <summary>Removes one recycled entry and its history for good.</summary>
     /// <returns>Whether an entry was removed.</returns>
     internal bool PurgeRecycled(RecycledEntryId id)

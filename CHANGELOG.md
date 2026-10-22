@@ -11,6 +11,11 @@ In the app's History, the caption under Restore this now says a restore drops th
 `keypaste env export --dotenv` now refuses an environment holding an expired item, naming it and writing nothing, as `keypaste run` does.
 
 The run command the Projects screen copies now carries `--session`, so pasting it in a terminal asks the app for the variables rather than for the master password, and nothing starts while the app is locked.
+Trash in the app now has Empty Trash, which erases everything in the vault's recycle bin, with its history, once you confirm a second time; the confirmation says how many items go, and the button is greyed out while Trash is empty. The `keypaste` CLI has no command for it.
+
+When restoring an item from Trash finds another item with its name, the app now offers Restore as `<title> (restored)`, or `(restored 2)` and onwards when that is taken too, which puts the item back with its history under that title. Nothing changes until you choose it, and the other item keeps its name.
+
+The import dialog's password field now takes `Ctrl/Cmd+V` too, as the master-password fields do: one trailing line break is dropped and anything a keyboard can't type is refused with a message.
 
 Search now also finds an item by any part of one of its own tags, so `prod` finds an item tagged `env:billing:prod`, in the app's search, which names the tag beside the item, and in `keypaste search`, which names the tag it matched on the item's line and in `--json`.
 
@@ -245,7 +250,7 @@ The desktop's locked unlock screen restores a backup, opened with the master pas
 
 A save over an existing vault first copies it into `<vault>.backups` beside it, keeping five, once per unlock and at most every fifteen minutes. A save whose copy cannot be written does not happen, and nothing turns that off. Each copy opens with the master password it was made under and is another offline guessing target; five copies beside the file do not survive losing the disk ([V.4a](docs/steps/V.4a.md)).
 
-The desktop's Trash screen restores one recycled entry, or erases one behind its own confirmation, and Delete offers an immediate Restore; emptying the whole bin stays in KeePassXC ([V.3b](docs/steps/V.3b.md)).
+The desktop's Trash screen restores one recycled entry, or erases one behind its own confirmation, and Delete offers an immediate Restore ([V.3b](docs/steps/V.3b.md)).
 
 `keypaste rm` and the desktop's Delete move an entry to the vault's KDBX recycle bin with its fields and history, unless the vault's recycle bin is switched off; a recycled entry is hidden from listing, `keypaste run` and agents. A vault that has recycled anything is written as KDBX 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read ([V.3a](docs/steps/V.3a.md)).
 
@@ -253,7 +258,7 @@ Passphrases: `--generate --words N` on `add` and `env set`, the desktop's Genera
 
 The desktop shows an entry's history and restores a revision; the replaced value stays in history, so a restore can be undone by another.
 
-The desktop stores an existing secret typed or pasted into a masked field. Paste drops one trailing line break and refuses anything a keyboard could not type; the master-password fields still ignore paste.
+The desktop stores an existing secret typed or pasted into a masked field. Paste drops one trailing line break and refuses anything a keyboard could not type.
 
 The entry pane shows usernames, URLs and notes with their punctuation and line breaks intact, while still replacing bidi overrides, zero-width characters and other text that can misrepresent itself.
 

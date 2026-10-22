@@ -208,11 +208,12 @@
         </Grid>
       </Panel>
 
-      <!-- What opens the file. The password goes to a buffer and is cleared once it has been tried. -->
+      <!-- What opens the file. The password, typed or pasted, goes to a buffer and is cleared once it has been tried. -->
       <StackPanel Spacing="8" IsVisible="{Binding NeedsUnlock}">
         <TextBlock Classes="label" Text="Password for this file" />
         <ctl:MaskedInput x:Name="ImportPassword"
                          Sink="{Binding}"
+                         AllowsPaste="True"
                          MaskedLength="{Binding PasswordLength}"
                          FontFamily="{DynamicResource KpMono}"
                          FontSize="14"

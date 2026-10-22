@@ -357,11 +357,11 @@ public sealed class TrashTests : IDisposable
     }
 
     /// <summary>
-    /// The refusal D-0249 requires, worded for somebody who cannot rename in the app yet, and
-    /// writing nothing.
+    /// The refusal D-0249 requires, writing nothing, and the offer of the first free
+    /// <c>(restored)</c> title in its place (D-NEW-W32), which also writes nothing until it is taken.
     /// </summary>
     [Fact]
-    public void A_restore_is_refused_when_the_name_has_been_taken_again()
+    public void A_restore_is_refused_when_the_name_has_been_taken_again_and_offers_another_title()
     {
         using var context = new Context(_vaultPath);
 
@@ -376,9 +376,200 @@ public sealed class TrashTests : IDisposable
 
         Assert.Null(trash.Notice);
         Assert.NotNull(trash.Error);
-        Assert.Contains("cannot go back yet", trash.Error, StringComparison.Ordinal);
+        Assert.Contains("cannot go back under its own name", trash.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("KeePassXC", trash.Error, StringComparison.Ordinal);
+        Assert.True(trash.OffersRestoreAs);
+        Assert.Equal("Restore as production (restored)", trash.RestoreAsLabel, StringComparer.Ordinal);
+        Assert.True(trash.RestoreAsCommand.CanExecute(null));
         Assert.Equal(before, Digest(_vaultPath));
         Assert.Single(trash.Rows);
+    }
+
+    /// <summary>
+    /// Taking the offer puts the deleted entry back, with its history, under the first free title, the
+    /// <c>(restored)</c> one being taken too, and leaves the entry holding the name as it was.
+    /// </summary>
+    [Fact]
+    public void Restore_as_puts_it_back_under_the_first_free_restored_title()
+    {
+        using (var context = new Context(_vaultPath))
+        {
+            Delete(context, "servers/production");
+            Add(context, "servers/production");
+            Add(context, "servers/production (restored)");
+
+            var trash = context.NewTrash();
+            trash.Selected = Assert.Single(trash.Rows);
+            trash.RestoreCommand.Execute(null);
+
+            Assert.Equal("Restore as production (restored 2)", trash.RestoreAsLabel, StringComparer.Ordinal);
+
+            trash.RestoreAsCommand.Execute(null);
+
+            Assert.Equal("production is back in servers as production (restored 2).", trash.Notice, StringComparer.Ordinal);
+            Assert.Null(trash.Error);
+            Assert.False(trash.OffersRestoreAs);
+            Assert.True(trash.IsEmpty);
+        }
+
+        using var reopened = Vault.Open(_vaultPath, _master);
+        var back = new EntryName("servers", "production (restored 2)");
+
+        Assert.Equal("v1", reopened.Find(back)?.Password, StringComparer.Ordinal);
+        Assert.Equal("v0", Assert.Single(reopened.ReadHistory(back)!).Fields.Password, StringComparer.Ordinal);
+        Assert.NotEqual("v1", reopened.Find(new EntryName("servers", "production"))?.Password, StringComparer.Ordinal);
+        Assert.NotNull(reopened.Find(new EntryName("servers", "production (restored)")));
+    }
+
+    /// <summary>Choosing another row drops the offer and the refusal naming it, which concerned only the row they were made for.</summary>
+    [Fact]
+    public void The_offer_of_another_title_goes_with_the_selection()
+    {
+        using var context = new Context(_vaultPath);
+
+        Delete(context, "servers/production");
+        Add(context, "servers/production");
+        Delete(context, "env/billing/.env");
+
+        var trash = context.NewTrash();
+        trash.Selected = trash.Rows.Single(row => row.Title == "production");
+        trash.RestoreCommand.Execute(null);
+        Assert.True(trash.OffersRestoreAs);
+
+        trash.Selected = trash.Rows.Single(row => row.Title == ".env");
+
+        Assert.False(trash.OffersRestoreAs);
+        Assert.False(trash.RestoreAsCommand.CanExecute(null));
+        Assert.Null(trash.Error);
+    }
+
+    /// <summary>
+    /// An item recycled after Empty Trash asked, as a terminal's <c>keypaste rm</c> sent through the app recycles one,
+    /// was never counted by the confirmation, so nothing is erased and the list is read again.
+    /// </summary>
+    [Fact]
+    public void Emptying_erases_nothing_when_the_trash_changed_after_it_asked()
+    {
+        using var context = new Context(_vaultPath);
+
+        Delete(context, "servers/production");
+
+        var trash = context.NewTrash();
+        trash.EmptyCommand.Execute(null);
+
+        var vault = context.Session.Unlocked!;
+        Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("env/billing", ".env")));
+        vault.Save();
+        var before = Digest(_vaultPath);
+
+        trash.ConfirmEmptyCommand.Execute(null);
+
+        Assert.Equal(
+            "The trash changed after you asked, so nothing was deleted. Check what is in it and empty it again.",
+            trash.Error,
+            StringComparer.Ordinal);
+        Assert.Null(trash.Notice);
+        Assert.False(trash.IsConfirmingEmpty);
+        Assert.Equal(2, trash.Rows.Count);
+        Assert.Equal(2, vault.ReadRecycled().Count);
+        Assert.Equal(before, Digest(_vaultPath));
+    }
+
+    /// <summary>
+    /// Emptying the bin is the same second deliberate act as erasing one entry: asking names how many go and
+    /// writes nothing, Keep them writes nothing, and only the confirmation erases every entry and its history.
+    /// </summary>
+    [Fact]
+    public void Emptying_the_trash_needs_its_own_confirmation_naming_how_many_go()
+    {
+        using (var context = new Context(_vaultPath))
+        {
+            Delete(context, "servers/production");
+            Delete(context, "env/billing/.env");
+
+            var trash = context.NewTrash();
+            Assert.Equal(2, trash.Rows.Count);
+            Assert.True(trash.EmptyCommand.CanExecute(null));
+            trash.Selected = trash.Rows[0];
+
+            var armed = Digest(_vaultPath);
+            trash.EmptyCommand.Execute(null);
+
+            Assert.True(trash.IsConfirmingEmpty);
+            Assert.Equal(
+                "Delete all 2 items in the trash and their history for good? This cannot be undone.",
+                trash.EmptyPrompt,
+                StringComparer.Ordinal);
+            Assert.False(trash.PurgeCommand.CanExecute(null));
+            Assert.False(trash.RestoreCommand.CanExecute(null));
+            Assert.Equal(armed, Digest(_vaultPath));
+
+            trash.CancelEmptyCommand.Execute(null);
+
+            Assert.False(trash.IsConfirmingEmpty);
+            Assert.Equal(armed, Digest(_vaultPath));
+            Assert.Equal(2, trash.Rows.Count);
+
+            trash.EmptyCommand.Execute(null);
+            trash.ConfirmEmptyCommand.Execute(null);
+
+            Assert.Equal("The trash is empty. 2 items and their history are gone.", trash.Notice, StringComparer.Ordinal);
+            Assert.Null(trash.Error);
+            Assert.False(trash.IsConfirmingEmpty);
+            Assert.True(trash.IsEmpty);
+            Assert.False(trash.EmptyCommand.CanExecute(null));
+        }
+
+        using var reopened = Vault.Open(_vaultPath, _master);
+
+        Assert.Empty(reopened.ReadRecycled());
+        Assert.Null(reopened.Find(new EntryName("servers", "production")));
+        Assert.Null(reopened.ReadHistory(new EntryName("servers", "production")));
+        Assert.Empty(EnvResolution.List(reopened, "billing", "dev").Variables);
+    }
+
+    [Fact]
+    public void Empty_trash_is_disabled_while_the_trash_is_empty()
+    {
+        using var context = new Context(_vaultPath);
+
+        Assert.True(context.Trash.IsEmpty);
+        Assert.False(context.Trash.EmptyCommand.CanExecute(null));
+        Assert.Equal(string.Empty, context.Trash.EmptyPrompt, StringComparer.Ordinal);
+
+        Delete(context, "servers/production");
+        var trash = context.NewTrash();
+        Assert.True(trash.EmptyCommand.CanExecute(null));
+        Assert.Equal(
+            "Delete the one item in the trash and its history for good? This cannot be undone.",
+            trash.EmptyPrompt,
+            StringComparer.Ordinal);
+
+        trash.Selected = Assert.Single(trash.Rows);
+        trash.RestoreCommand.Execute(null);
+
+        Assert.True(trash.IsEmpty);
+        Assert.False(trash.EmptyCommand.CanExecute(null));
+    }
+
+    /// <summary>The list's changes announce whether Empty Trash can be pressed, or the button keeps the state it was drawn in.</summary>
+    [Fact]
+    public void Reading_the_bin_announces_whether_it_can_be_emptied()
+    {
+        using var context = new Context(_vaultPath);
+
+        Delete(context, "servers/production");
+
+        var trash = context.NewTrash();
+        trash.Selected = Assert.Single(trash.Rows);
+        var asked = 0;
+        trash.EmptyCommand.CanExecuteChanged += (_, _) => asked++;
+        var raised = Record(trash);
+
+        trash.RestoreCommand.Execute(null);
+
+        Assert.True(asked > 0);
+        Assert.Contains(nameof(TrashViewModel.EmptyPrompt), raised);
     }
 
     /// <summary>

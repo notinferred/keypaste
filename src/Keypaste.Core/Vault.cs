@@ -1889,6 +1889,47 @@ public sealed class Vault : IDisposable
             _ => restored is null ? null : VaultEdit.Of(restored));
     }
 
+    /// <summary>The name <see cref="RestoreRecycledRenamed"/> would put a recycled entry back under now.</summary>
+    /// <param name="id">The identity from <see cref="ReadRecycled"/>.</param>
+    /// <returns>
+    /// The first free title of <c>&lt;title&gt; (restored)</c>, <c>(restored 2)</c> and onwards, in the group a
+    /// restore puts the entry back in; null when no recycled entry has that identity, when it goes back into
+    /// keypaste's own groups, or when its title cannot take the suffix.
+    /// </returns>
+    public EntryName? RenamedRestoreName(RecycledEntryId id)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.RenamedRestoreName(id);
+    }
+
+    /// <summary>Puts a recycled entry back under a title of its own, for when another entry has taken its name.
+    /// Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="id">The identity from <see cref="ReadRecycled"/>.</param>
+    /// <param name="restored">The name the entry answers to now, or <see langword="null"/> when nothing changed.</param>
+    /// <returns>
+    /// <see cref="RestoreOutcome.Restored"/> or <see cref="RestoreOutcome.RestoredToRoot"/> as <see cref="RestoreRecycled"/>
+    /// returns them; <see cref="RestoreOutcome.NothingMatched"/>; <see cref="RestoreOutcome.DestinationOccupied"/> when no
+    /// title is offered, as <see cref="RenamedRestoreName"/> says. Nothing is changed unless this is a restore.
+    /// </returns>
+    /// <remarks>
+    /// The entry goes back where <see cref="RestoreRecycled"/> puts it, with its identity, fields and history, titled
+    /// <c>&lt;title&gt; (restored)</c>, or <c>(restored 2)</c> and onwards, the first that no other entry answers to by
+    /// name or by path, as <see cref="CloneEntry"/> names a copy (D-0484). The title is written in the same change and
+    /// takes no history item, as a rename takes none, so KeePassXC reads one edit of the title.
+    /// </remarks>
+    public RestoreOutcome RestoreRecycledRenamed(RecycledEntryId id, out EntryName? restored)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        EntryName? result = null;
+        var outcome = Change(
+            () => _interop.RestoreRecycledRenamed(id, out result),
+            _ => result is null ? null : VaultEdit.Of(result));
+        restored = result;
+        return outcome;
+    }
+
     /// <summary>Removes one recycled entry and its history for good. Call <see cref="Save"/> to
     /// persist it.</summary>
     /// <param name="id">The identity from <see cref="ReadRecycled"/>.</param>

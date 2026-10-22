@@ -21,6 +21,7 @@ public sealed class ShellImportTests : IDisposable
     private readonly TempVault _vault = new();
     private readonly AppVaultSession _session;
     private readonly FakeVaultFilePicker _picker = new();
+    private readonly FakeClipboard _clipboard = new();
     private readonly List<(string Path, string? Keyfile)> _opened = [];
     private readonly string _source;
     private readonly string _keyfile;
@@ -172,8 +173,9 @@ public sealed class ShellImportTests : IDisposable
         Assert.False(import.HasMessage);
     }
 
+    /// <summary>The dialog the shell opens pastes through the shell's clipboard, the source Settings' master-password fields read (D-0495).</summary>
     [Fact]
-    public async Task The_password_arrives_through_the_field_sink_and_paste_adds_nothing()
+    public async Task The_password_arrives_through_the_field_sink_and_pastes_from_the_shells_clipboard()
     {
         using var shell = NewShell();
         shell.OpenImport(_source);
@@ -181,11 +183,13 @@ public sealed class ShellImportTests : IDisposable
 
         sink.Type('a');
         sink.Type('b');
+        _clipboard.Plant("cd\n");
         await sink.Paste();
-        Assert.Equal(2, shell.Import!.PasswordLength);
+        Assert.Equal(1, _clipboard.ReadCount);
+        Assert.Equal(4, shell.Import!.PasswordLength);
 
         sink.Backspace();
-        Assert.Equal(1, shell.Import.PasswordLength);
+        Assert.Equal(3, shell.Import.PasswordLength);
 
         sink.Clear();
         Assert.Equal(0, shell.Import.PasswordLength);
@@ -214,7 +218,7 @@ public sealed class ShellImportTests : IDisposable
     });
 
     private ShellViewModel NewShell() =>
-        new(_session, _vault.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: _picker,
+        new(_session, _vault.Home, null, clipboard: _clipboard, clock: new ManualClock(AppClock.Start), picker: _picker,
             openInPlace: (path, keyfile) => _opened.Add((path, keyfile)));
 
     private static async Task Unlock(KdbxImportViewModel import)

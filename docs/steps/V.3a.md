@@ -16,7 +16,7 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 | id | date | decision | supersedes |
 |---|---|---|---|
-| D-0249 | 2026-09-20 | A restore is refused whole when another entry already answers to the name it would produce, and lands at the root when the group it came from is gone or is itself recycled | inventing a destination for a recovery; recreating the ambiguity D-0091 refuses |
+| D-0249 | 2026-09-20 | A restore is refused whole when another entry already answers to the name it would produce, and lands at the root when the group it came from is gone or is itself recycled; the app then offers the entry back under a free `(restored)` title as a restore of its own (D-NEW-W32) | inventing a destination for a recovery; recreating the ambiguity D-0091 refuses |
 | D-0250 | 2026-09-20 | A recycled entry is addressed by an opaque identity carried on its trash row rather than by name, path or list position, because two entries of one title land in one bin and an index addresses a reading rather than a thing | name-only addressing, for a deleted entry |
 
 ## Limits and follow-ups

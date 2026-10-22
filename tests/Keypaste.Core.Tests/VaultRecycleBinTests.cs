@@ -403,6 +403,94 @@ public sealed class VaultRecycleBinTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// The way back when the name is taken: the same entry, identity, fields and history, under the first free
+    /// <c>(restored)</c> title, and the entry holding the name untouched (D-NEW-W32).
+    /// </summary>
+    [Fact]
+    public void RestoreRecycledRenamed_PutsTheEntryBackUnderTheFirstFreeRestoredTitle()
+    {
+        var path = NewVaultPath();
+        string uuid;
+
+        using (var vault = Seeded(out _, path))
+        {
+            uuid = vault.EntryUuid(_token)!;
+            Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token, out var id));
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "new-value", GroupPath = "env/billing" });
+
+            var offered = vault.RenamedRestoreName(id);
+            Assert.Equal(new EntryName("env/billing", "TOKEN (restored)"), offered);
+
+            Assert.Equal(RestoreOutcome.Restored, vault.RestoreRecycledRenamed(id, out var restored));
+            Assert.Equal(offered, restored);
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        var back = new EntryName("env/billing", "TOKEN (restored)");
+
+        Assert.Equal("v3", reopened.Find(back)?.Password, StringComparer.Ordinal);
+        Assert.Equal(uuid, reopened.EntryUuid(back), StringComparer.Ordinal);
+        Assert.Equal(3, reopened.ReadHistory(back)?.Count);
+        Assert.Equal("new-value", reopened.Find(_token)?.Password, StringComparer.Ordinal);
+        Assert.Empty(reopened.ReadRecycled());
+    }
+
+    /// <summary>A <c>(restored)</c> title already taken by name or by path is passed over, as a copy's numbering passes one over (D-0484).</summary>
+    [Fact]
+    public void RestoreRecycledRenamed_NumbersTheTitle_WhenTheFirstIsTakenToo()
+    {
+        using var vault = Seeded(out _);
+        Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token, out var id));
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "new-value", GroupPath = "env/billing" });
+        vault.AddEntry(new VaultEntry { Title = "TOKEN (restored)", Password = "kept", GroupPath = "env/billing" });
+        vault.AddEntry(new VaultEntry { Title = "billing/TOKEN (restored 2)", Password = "by-path", GroupPath = "env" });
+
+        Assert.Equal(RestoreOutcome.Restored, vault.RestoreRecycledRenamed(id, out var restored));
+
+        Assert.Equal(new EntryName("env/billing", "TOKEN (restored 3)"), restored);
+        Assert.Equal("v3", vault.Find(restored!)?.Password, StringComparer.Ordinal);
+        Assert.Equal("kept", vault.Find(new EntryName("env/billing", "TOKEN (restored)"))?.Password, StringComparer.Ordinal);
+    }
+
+    /// <summary>A title no vault could address with the suffix is offered nothing, and the restore writes nothing.</summary>
+    [Fact]
+    public void RestoreRecycledRenamed_IsRefusedAndWritesNothing_WhenTheTitleCannotTakeTheSuffix()
+    {
+        var path = NewVaultPath();
+        var slashed = new EntryName("keys", "a/b");
+
+        using (var vault = Vault.Create(path, MasterPassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "a/b", Password = "first", GroupPath = "keys" });
+            vault.Save();
+            Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(slashed));
+            vault.AddEntry(new VaultEntry { Title = "a/b", Password = "second", GroupPath = "keys" });
+            vault.Save();
+        }
+
+        AssertWritesNothing(path, vault =>
+        {
+            var id = Assert.Single(vault.ReadRecycled()).Id;
+
+            Assert.Null(vault.RenamedRestoreName(id));
+            Assert.Equal(RestoreOutcome.DestinationOccupied, vault.RestoreRecycledRenamed(id, out var restored));
+            Assert.Null(restored);
+        });
+    }
+
+    [Fact]
+    public void RestoreRecycledRenamed_OnAnIdNothingAnswersTo_IsRefused()
+    {
+        using var vault = Seeded(out _);
+        Assert.True(RecycledEntryId.TryParse("0123456789ABCDEF0123456789ABCDEF", out var absent));
+
+        Assert.Null(vault.RenamedRestoreName(absent));
+        Assert.Equal(RestoreOutcome.NothingMatched, vault.RestoreRecycledRenamed(absent, out var restored));
+        Assert.Null(restored);
+    }
+
     // RestoredToRoot needs another program to remove the group, so verify-keepassxc-recyclebin.sh proves it with keepassxc-cli rmdir.
 
     [Fact]

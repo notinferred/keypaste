@@ -39,7 +39,8 @@ public enum RestoreOutcome
     /// <summary>
     /// Another entry already answers to the name the restore would produce, so nothing was
     /// changed. Two entries of one name is the ambiguity every resolver in keypaste refuses
-    /// (DECISIONS.md D-0091); a recovery must not create it.
+    /// (DECISIONS.md D-0091); a recovery must not create it. <see cref="Vault.RestoreRecycledRenamed"/>
+    /// answers this only when it has no title to offer, as <see cref="Vault.RenamedRestoreName"/> says.
     /// </summary>
     DestinationOccupied = 3,
 }

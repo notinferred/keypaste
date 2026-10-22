@@ -29,6 +29,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     private readonly Action<string> _announce;
     private readonly Func<Task<string?>>? _pickKeyfile;
     private readonly Func<Task>? _chooseAnother;
+    private readonly Func<SecretBuffer, Task<PasteOutcome>>? _paste;
     private readonly string _fileName;
     private readonly SecretBuffer _password = new();
 
@@ -51,13 +52,15 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <param name="announce">Says what an import did, once it is saved.</param>
     /// <param name="pickKeyfile">Asks which keyfile opens the file; null where nothing can ask.</param>
     /// <param name="chooseAnother">Asks for another file when this one cannot be read; null where nothing can ask.</param>
+    /// <param name="paste">Reads the clipboard into a buffer under D-0225's rule, as for the master-password fields; null where nothing can paste.</param>
     internal KdbxImportViewModel(
         AppVaultSession session,
         string path,
         Action<string, string?> openInPlace,
         Action<string> announce,
         Func<Task<string?>>? pickKeyfile = null,
-        Func<Task>? chooseAnother = null)
+        Func<Task>? chooseAnother = null,
+        Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(path);
@@ -69,6 +72,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         _announce = announce;
         _pickKeyfile = pickKeyfile;
         _chooseAnother = chooseAnother;
+        _paste = paste;
         _fileName = System.IO.Path.GetFileName(path);
 
         if (KdbxImport.TryProbe(path, out var probe, out var error))
@@ -141,6 +145,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 
     /// <summary>Whether the password and keyfile are still wanted before rows can show.</summary>
     internal bool NeedsUnlock => !_disposed && _probe is not null && _source is null && !_keepInPlace;
+
+    /// <summary>Whether a paste may join the password: the field is showing and no unlock is reading it.</summary>
+    private bool TakesPassword => NeedsUnlock && !_busy;
 
     /// <summary>Whether the confirm button shows: the file was read and nothing more is needed to unlock it.</summary>
     internal bool ShowsConfirm => IsReadable && !NeedsUnlock;
@@ -316,8 +323,38 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 
     void ISecretSink.Clear() => ClearPassword();
 
-    // The imported file's master password is typed, never pasted.
-    Task ISecretSink.Paste() => Task.CompletedTask;
+    Task ISecretSink.Paste() => PastePasswordAsync();
+
+    /// <summary>
+    /// Reads the clipboard into a buffer of the paste's own, as the master-password fields do (D-0495), and appends
+    /// it only once the clipboard has answered and while the file still waits for its password and is not being unlocked.
+    /// </summary>
+    internal async Task PastePasswordAsync()
+    {
+        if (!TakesPassword || _paste is null)
+        {
+            return;
+        }
+
+        using var pasted = new SecretBuffer();
+        var outcome = await _paste(pasted).ConfigureAwait(true);
+
+        if (!TakesPassword)
+        {
+            return;
+        }
+
+        if (outcome == PasteOutcome.Pasted)
+        {
+            _password.Append(pasted.Value);
+            Raise(nameof(PasswordLength));
+            Message = string.Empty;
+        }
+        else
+        {
+            Message = SecretField.NoteFor(outcome);
+        }
+    }
 
     /// <summary>Unlocks the file off the UI thread and lays out its rows.</summary>
     /// <remarks>Internal so a test can await what <see cref="UnlockCommand"/> starts.</remarks>

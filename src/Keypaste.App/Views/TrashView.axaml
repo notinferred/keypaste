@@ -35,26 +35,34 @@
         <TextBlock Classes="h1" Text="Trash" />
         <TextBlock Classes="subtitle" Text="{Binding Note}" MaxWidth="620" HorizontalAlignment="Left" />
       </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top"
-                  IsVisible="{Binding !IsEmpty}">
-        <TextBlock Classes="caption" Text="Select an item to restore or delete it" VerticalAlignment="Center"
-                   Margin="0,0,4,0" IsVisible="{Binding AwaitsSelection}" />
-        <Button Name="RestoreButton" Command="{Binding RestoreCommand}" AutomationProperties.Name="Restore">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <ctl:KpIcon Icon="history" Size="14" />
-            <TextBlock Text="Restore" />
-          </StackPanel>
-        </Button>
-        <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}" AutomationProperties.Name="Delete for good">
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEmpty}">
+          <TextBlock Classes="caption" Text="Select an item to restore or delete it" VerticalAlignment="Center"
+                     Margin="0,0,4,0" IsVisible="{Binding AwaitsSelection}" />
+          <Button Name="RestoreButton" Command="{Binding RestoreCommand}" AutomationProperties.Name="Restore">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="history" Size="14" />
+              <TextBlock Text="Restore" />
+            </StackPanel>
+          </Button>
+          <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}" AutomationProperties.Name="Delete for good">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="trash-2" Size="14" />
+              <TextBlock Text="Delete for good" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+        <!-- Every row at once, so it stays in its place and is only greyed out while the bin is empty. -->
+        <Button Name="EmptyButton" Classes="ghost" Command="{Binding EmptyCommand}" AutomationProperties.Name="Empty Trash">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <ctl:KpIcon Icon="trash-2" Size="14" />
-            <TextBlock Text="Delete for good" />
+            <TextBlock Text="Empty Trash" />
           </StackPanel>
         </Button>
       </StackPanel>
     </Grid>
 
-    <!-- The one place KpDanger appears here. A restore is ordinary; erasing a value is not. -->
+    <!-- KpDanger marks the two ways to erase. A restore is ordinary; erasing a value is not. -->
     <Border Grid.Row="1"
             IsVisible="{Binding IsConfirmingPurge}"
             Margin="0,0,0,12"
@@ -68,6 +76,24 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
           <Button Classes="ghost" Content="Keep it" Command="{Binding CancelPurgeCommand}" />
           <Button Classes="danger" Content="Delete for good" Command="{Binding ConfirmPurgeCommand}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Emptying the bin asks in the same place, naming how many items go. -->
+    <Border Grid.Row="1"
+            IsVisible="{Binding IsConfirmingEmpty}"
+            Margin="0,0,0,12"
+            Classes="card"
+            Background="{DynamicResource KpDangerTint}"
+            BorderBrush="{DynamicResource KpDanger}">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <ctl:KpIcon Grid.Column="0" Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpDanger}" />
+        <TextBlock Grid.Column="1" Text="{Binding EmptyPrompt}" TextWrapping="Wrap" FontSize="13"
+                   VerticalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+          <Button Classes="ghost" Content="Keep them" Command="{Binding CancelEmptyCommand}" />
+          <Button Classes="danger" Content="Empty Trash" Command="{Binding ConfirmEmptyCommand}" />
         </StackPanel>
       </Grid>
     </Border>
@@ -92,10 +118,21 @@
             BorderBrush="Transparent"
             Padding="12,9"
             Margin="0,0,0,12">
-      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
         <ctl:KpIcon Grid.Column="0" Icon="alert-triangle" Size="15" VerticalAlignment="Top" Foreground="{DynamicResource KpDanger}" />
         <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12.5"
                    Foreground="{DynamicResource KpTextPrimary}" />
+        <!-- When the name is taken, the way back under another one; nothing moves until it is pressed. -->
+        <Button Grid.Column="2"
+                Name="RestoreAsButton"
+                Classes="sm"
+                MaxWidth="320"
+                VerticalAlignment="Center"
+                IsVisible="{Binding OffersRestoreAs}"
+                Command="{Binding RestoreAsCommand}"
+                AutomationProperties.Name="{Binding RestoreAsLabel}">
+          <TextBlock Text="{Binding RestoreAsLabel}" TextTrimming="CharacterEllipsis" />
+        </Button>
       </Grid>
     </Border>
 

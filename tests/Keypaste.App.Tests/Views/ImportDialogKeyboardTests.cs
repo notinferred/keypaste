@@ -4,9 +4,13 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.Controls;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -79,6 +83,51 @@ public sealed class ImportDialogKeyboardTests
         Assert.True(closed);
     });
 
+    /// <summary>
+    /// The imported file's password field answers the paste gesture as the master-password fields do (D-0495):
+    /// one trailing line break goes, nothing of it is on the screen, and what was pasted opens the file.
+    /// </summary>
+    [Fact]
+    public Task The_password_field_takes_a_paste_that_opens_the_file() => HeadlessSession.On(async () =>
+    {
+        using var fixture = new TempVault();
+        using var session = Open(fixture);
+        var clipboard = new FakeClipboard();
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, _ => { }, paste: clipboard.TryPasteIntoAsync);
+        var window = Show(import);
+        var field = PasswordField(window);
+        clipboard.Plant(_sourcePassword + "\n");
+
+        await Paste(window, field);
+
+        Assert.True(field.AllowsPaste);
+        Assert.Equal(1, clipboard.ReadCount);
+        Assert.Equal(_sourcePassword.Length, field.MaskedLength);
+        AutomationSurface.AssertNothingExposes(window, _sourcePassword);
+
+        Drain(import.UnlockAsync());
+
+        Assert.True(import.IsDecrypted, import.Message);
+        Assert.Equal(0, import.PasswordLength);
+    });
+
+    /// <summary>What no keyboard can type is refused whole, and the dialog says so.</summary>
+    [Fact]
+    public Task The_password_field_refuses_a_paste_no_keyboard_could_type() => HeadlessSession.On(async () =>
+    {
+        using var fixture = new TempVault();
+        using var session = Open(fixture);
+        var clipboard = new FakeClipboard();
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, _ => { }, paste: clipboard.TryPasteIntoAsync);
+        var window = Show(import);
+        clipboard.Plant("import\tsource");
+
+        await Paste(window, PasswordField(window));
+
+        Assert.Equal(0, import.PasswordLength);
+        Assert.Equal(SecretField.NoteFor(PasteOutcome.Refused), import.Message);
+    });
+
     [Theory]
     [InlineData("cancel")]
     [InlineData("escape")]
@@ -144,6 +193,19 @@ public sealed class ImportDialogKeyboardTests
         window.Show();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         return window;
+    }
+
+    private static MaskedInput PasswordField(Window window) =>
+        window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == "ImportPassword");
+
+    private static async Task Paste(Window window, MaskedInput field)
+    {
+        field.Focus();
+        window.KeyPressQwerty(PhysicalKey.V, RawInputModifiers.Control);
+        window.KeyReleaseQwerty(PhysicalKey.V, RawInputModifiers.Control);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        await field.PasteCompleted;
     }
 
     private static void Drain(Task task)

@@ -30,7 +30,6 @@ These are retained feature ideas, not discarded features or promises for the fir
 | A clean inherited environment | `run --no-inherit` may solve specific tool needs; `env diff` and `--json` output already exist. Avoid silently skipping unusable values. |
 | Shell/direnv integration or stopping launched programs on lock | Ordinary environments are copied into processes. Any convenience must state descendant exposure and cannot promise to revoke delivered credentials. |
 | Secret rotation reminders and deliberate history removal | Reminders do not rotate a provider credential; purging a leaked value is explicit and cannot erase existing copies or backups. |
-| Pasting an imported vault's master password | The seven master-password fields take a paste under D-0225's rule (D-0495); the import dialog's field for the imported file's password still takes typing only, and whether it should paste too waits on the founder. |
 | Command palette and additional generator recipes | Add when they improve an observed frequent task; existing CLI recipe controls are not proof of desktop controls. |
 | Unusual-request notices | Agents' settings are kept and edited in the vault since G.8; a notice that an agent's requests look unusual is not authorization. Avoid automatic broadening, circular unlock rules or inferred trust from a client label. |
 | Git secret hooks and conflict guidance | Potential project tooling; a warning or file-sync guide does not implement merge or guarantee secret removal from history. |
