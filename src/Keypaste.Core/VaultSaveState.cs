@@ -22,7 +22,8 @@ public enum VaultSaveStatus
 /// <param name="Unwritten">Whether, the file having changed, this vault also holds a change of its own that no save wrote.</param>
 public sealed record VaultSaveState(VaultSaveStatus Status, DateTimeOffset? SavedAt, bool Unwritten = false);
 
-/// <summary>When an entry was created and last modified.</summary>
+/// <summary>When an entry was created and last modified, and when it expires.</summary>
 /// <param name="Created">When it was created.</param>
 /// <param name="Modified">When any field of it last changed.</param>
-public sealed record EntryTimes(DateTimeOffset Created, DateTimeOffset Modified);
+/// <param name="Expires">When it expires, or null when it never does; KeePassXC sets it, and keypaste only reads it (D-0337).</param>
+public sealed record EntryTimes(DateTimeOffset Created, DateTimeOffset Modified, DateTimeOffset? Expires);

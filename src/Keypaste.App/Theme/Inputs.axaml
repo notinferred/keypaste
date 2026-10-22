@@ -5,6 +5,7 @@
     Fields and choices. A focused field gets a 1px amber border and a 3px amber glow. Classes:
       TextBox.search       28px titlebar/list search field
       TextBox.mono         Fragment Mono for keys, values and paths
+      AutoCompleteBox.mono the same for a field that suggests, its suggestions included
       Border.segmented     the track around a segmented control; put RadioButton.segment (or
                            ToggleButton.segment) inside a horizontal StackPanel in it
       ListBox.segmented    the same look for a bound list of choices; its items are styled in
@@ -21,6 +22,13 @@
   </Style>
   <Style Selector="TextBox.mono">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+  <Style Selector="AutoCompleteBox.mono">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+  <Style Selector="AutoCompleteBox.mono /template/ TextBox">
     <Setter Property="FontSize" Value="12.5" />
   </Style>
 

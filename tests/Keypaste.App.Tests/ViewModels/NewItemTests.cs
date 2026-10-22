@@ -60,6 +60,24 @@ public sealed class NewItemTests : IDisposable
         Assert.Equal(ItemTemplate.Login, form.Template);
     }
 
+    /// <summary>The tag box offers each environment the vault's items are tagged into, less a tag already added, and a tag that puts no item in a project offers nothing.</summary>
+    [Fact]
+    public void The_tag_box_offers_the_vaults_project_tags_less_those_added()
+    {
+        Assert.True(_session.Unlocked!.AddTag(new EntryName("Work", "github"), "env:billing:prod"));
+        Assert.True(_session.Unlocked.AddTag(new EntryName("Work", "github"), "work"));
+        Assert.True(_session.Unlocked.AddTag(new EntryName("Work/Archive", "old"), "env:billing"));
+        var form = NewItemForm.Open(_entries, "Work/gitlab");
+
+        Assert.Equal(["env:billing", "env:billing:prod"], form.TagSuggestions);
+
+        form.DraftTag = form.TagSuggestions[1];
+        form.AddTagCommand.Execute(null);
+
+        Assert.Equal(["env:billing:prod"], form.Tags.Select(chip => chip.Tag));
+        Assert.Equal(["env:billing"], form.TagSuggestions);
+    }
+
     [Fact]
     public void A_login_is_its_username_password_and_web_address()
     {

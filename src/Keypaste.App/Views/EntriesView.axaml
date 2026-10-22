@@ -622,11 +622,14 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBox x:Name="NewItemTag"
-                           Classes="mono"
-                           Text="{Binding DraftTag}"
-                           PlaceholderText="env:project:prod"
-                           Width="220" />
+                  <!-- Suggests the vault's project tags as one is typed; choosing one fills the box for Add tag. -->
+                  <AutoCompleteBox x:Name="NewItemTag"
+                                   Classes="mono"
+                                   Text="{Binding DraftTag, Mode=TwoWay}"
+                                   ItemsSource="{Binding TagSuggestions}"
+                                   FilterMode="ContainsOrdinal"
+                                   PlaceholderText="env:project:prod"
+                                   Width="220" />
                   <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
                 </StackPanel>
               </StackPanel>
@@ -1412,11 +1415,15 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBox x:Name="NewTag"
-                               Classes="mono"
-                               Text="{Binding DraftTag}"
-                               PlaceholderText="env:project:prod"
-                               Width="220" />
+                      <!-- Suggests the vault's project tags the item lacks as one is typed; choosing one fills the box,
+                           and Add tag still asks first for a project tag (D-0415). -->
+                      <AutoCompleteBox x:Name="NewTag"
+                                       Classes="mono"
+                                       Text="{Binding DraftTag, Mode=TwoWay}"
+                                       ItemsSource="{Binding TagSuggestions}"
+                                       FilterMode="ContainsOrdinal"
+                                       PlaceholderText="env:project:prod"
+                                       Width="220" />
                       <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
                     </StackPanel>
 
@@ -1509,6 +1516,18 @@
                         <Grid ColumnDefinitions="140,*">
                           <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="Created" />
                           <TextBlock Grid.Column="1" x:Name="CreatedText" FontSize="12.5" Classes="primary" Text="{Binding Created}" />
+                        </Grid>
+                      </Border>
+                      <!-- An expiry KeePassXC set, shown as Expired in danger text once the session's clock passes it (D-0337). -->
+                      <Border Classes="meta" IsVisible="{Binding HasExpiry}">
+                        <Grid ColumnDefinitions="140,*">
+                          <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="{Binding ExpiryLabel}" />
+                          <TextBlock Grid.Column="1"
+                                     x:Name="ExpiryText"
+                                     FontSize="12.5"
+                                     Classes.primary="{Binding !IsExpired}"
+                                     Classes.danger="{Binding IsExpired}"
+                                     Text="{Binding Expiry}" />
                         </Grid>
                       </Border>
                       <Border Classes="meta">

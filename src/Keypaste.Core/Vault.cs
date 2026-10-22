@@ -147,7 +147,7 @@ public sealed class Vault : IDisposable
         return new Vault(KeePassInterop.Reopen(Path, key), Path, stamp);
     }
 
-    /// <summary>When the entry with this name was created and last modified.</summary>
+    /// <summary>When the entry with this name was created and last modified, and when it expires.</summary>
     /// <param name="name">The entry.</param>
     /// <returns>Its times, or null when no entry answers to that name.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
@@ -544,7 +544,7 @@ public sealed class Vault : IDisposable
     /// <param name="value">The value as the vault holds it.</param>
     /// <returns>
     /// The value as it leaves keypaste, or why it cannot leave; null when it holds a placeholder and no item
-    /// answers to that name. A value holding none comes back as it is, and nothing is read.
+    /// answers to that name. A value holding none comes back as it is, any escape made braces, and nothing is read.
     /// </returns>
     /// <remarks>What is shown or edited stays the stored text; only what leaves is filled in.</remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
@@ -561,25 +561,28 @@ public sealed class Vault : IDisposable
         }
     }
 
-    /// <summary><see cref="FillPlaceholders(EntryName, string)"/> for a value of one of the item's revisions, from that revision's own fields.</summary>
+    /// <summary><see cref="FillPlaceholders(EntryName, string)"/> for the password of one of the item's revisions, from that revision's own fields.</summary>
     /// <param name="name">The item the revision belongs to.</param>
     /// <param name="revision">The revision's position in <see cref="ReadHistory"/>'s order.</param>
-    /// <param name="value">The value as the revision holds it.</param>
+    /// <param name="password">The revision's password, as a reading that named this position gave it.</param>
     /// <returns>
-    /// The value as it leaves keypaste, or why it cannot leave; null when it holds a placeholder and the item has
-    /// no revision at that position. A value holding none comes back as it is, and nothing is read.
+    /// The password as it leaves keypaste, or why it cannot leave; null when the item has no revision at that
+    /// position or the one there no longer holds that password, judged under the lock its fields are read under,
+    /// so an edit saved since the reading cannot fill it in from another revision's fields.
     /// </returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
-    public PlaceholderFill? FillPlaceholders(EntryName name, int revision, string value)
+    public PlaceholderFill? FillPlaceholders(EntryName name, int revision, string password)
     {
         ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(password);
 
         lock (_state)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            return Filled(value, () => _interop.ReadPlaceholderFields(name, revision));
+            return _interop.RevisionHoldsPassword(name, revision, password)
+                ? Filled(password, () => _interop.ReadPlaceholderFields(name, revision))
+                : null;
         }
     }
 
@@ -1077,12 +1080,13 @@ public sealed class Vault : IDisposable
 
     private static PlaceholderFill? Filled(string value, Func<PlaceholderFields?> read)
     {
-        if (!KeePassPlaceholders.Holds(value))
+        if (KeePassPlaceholders.HoldsPlaceholder(value))
         {
-            return PlaceholderFill.Filled(value, []);
+            return read() is { } fields ? KeePassPlaceholders.Fill(value, () => fields) : null;
         }
 
-        return read() is { } fields ? KeePassPlaceholders.Fill(value, () => fields) : null;
+        // At most an escape is left to fill in, and an escape reads no field, so the item is not read.
+        return KeePassPlaceholders.Fill(value, static () => throw new System.Diagnostics.UnreachableException());
     }
 
     /// <summary>Each entry directly in one of keypaste's own groups, with one of its string fields, but only while this vault holds exactly what its file holds.</summary>

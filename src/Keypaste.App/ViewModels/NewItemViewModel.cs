@@ -41,6 +41,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     internal const string HostField = "Host";
 
     private readonly AppVaultSession _session;
+    private IReadOnlyList<string> _projectTags;
     private ItemTemplate _template = ItemTemplate.Login;
     private FolderChoice _folder;
     private string _title = string.Empty;
@@ -65,6 +66,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(groupPaths);
 
         _session = session;
+        _projectTags = session.Unlocked is { } vault ? ProjectCatalog.MemberTags(vault) : [];
 
         Folders =
         [
@@ -84,6 +86,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         DependsOn(nameof(ShowsHost), nameof(Template));
         DependsOn(nameof(ShowsKey), nameof(Template));
         DependsOn(nameof(HasError), nameof(Error));
+        DependsOn(nameof(TagSuggestions), nameof(Tags));
         DependsOn(AddTagCommand, nameof(DraftTag));
     }
 
@@ -218,6 +221,9 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         set => Set(ref _draftTag, value);
     }
 
+    /// <summary>The vault's project tags not yet added, which the tag box offers as a tag is typed; choosing one only fills <see cref="DraftTag"/>.</summary>
+    internal IReadOnlyList<string> TagSuggestions => [.. _projectTags.Except(_tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
+
     internal RelayCommand AddTagCommand { get; }
 
     /// <summary>Why the last Create wrote nothing, or null.</summary>
@@ -320,6 +326,8 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     {
         Password.Dispose();
         KeyValue.Dispose();
+        _projectTags = [];
+        Raise(nameof(TagSuggestions));
     }
 
     private bool TryNewPassword(out string password)

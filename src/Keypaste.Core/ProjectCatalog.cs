@@ -72,6 +72,28 @@ public sealed class ProjectCatalog
         return _memberships.TryGetValue(entry, out var found) ? found : [];
     }
 
+    /// <summary>
+    /// Each project tag that puts an entry of an open vault in an environment, once each and in ordinal order, as
+    /// <see cref="Read"/> counts membership but read from the entries' tags alone, so no value is read.
+    /// </summary>
+    /// <param name="vault">The vault.</param>
+    /// <returns>Tags such as <c>env:billing</c> and <c>env:billing:prod</c>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="vault"/> is null.</exception>
+    public static IReadOnlyList<string> MemberTags(Vault vault)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+
+        return
+        [
+            .. vault.ReadTags()
+                .Where(entry => !ReservedGroups.IsReserved(entry.Name.GroupPath))
+                .SelectMany(entry => entry.Tags)
+                .Where(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal),
+        ];
+    }
+
     /// <summary>Reads the projects an open vault holds.</summary>
     /// <param name="vault">The vault.</param>
     /// <returns>Its projects and the tags it ignored.</returns>

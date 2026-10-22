@@ -57,6 +57,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private bool _isConfirmingRotate;
     private string _created = string.Empty;
     private string _rotated = string.Empty;
+    private string _expiry = string.Empty;
+    private bool _isExpired;
     private string? _uuid;
     private EntryAgentAccess? _agentAccess;
     private bool _showsAgentAccess;
@@ -76,6 +78,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private IReadOnlyList<string> _fieldRenameLines = [];
     private IReadOnlyList<EnvironmentRow> _environments = [];
     private string _draftTag = string.Empty;
+    private IReadOnlyList<string> _tagSuggestions = [];
     private ProjectTagChange? _pendingTagChange;
 
     internal EntryDetailViewModel(
@@ -169,6 +172,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         DependsOn(nameof(TagChangeAction), nameof(PendingTagChange));
         DependsOn(nameof(ShowsAgentAccessSummary), nameof(AgentLines));
         DependsOn(nameof(HasBeenUsed), nameof(LastUsedText));
+        DependsOn(nameof(HasExpiry), nameof(Expiry));
+        DependsOn(nameof(ExpiryLabel), nameof(IsExpired));
         DependsOn(nameof(KindLabel), nameof(Kind));
         DependsOn(nameof(Location), nameof(KindLabel), nameof(GroupPath));
         DependsOn(nameof(OpensUrl), nameof(Url));
@@ -385,6 +390,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         set => Set(ref _draftTag, value);
     }
 
+    /// <summary>The vault's project tags this item does not carry, which the tag box offers as a tag is typed; choosing one only fills <see cref="DraftTag"/>.</summary>
+    internal IReadOnlyList<string> TagSuggestions
+    {
+        get => _tagSuggestions;
+        private set => Set(ref _tagSuggestions, value);
+    }
+
     internal RelayCommand BeginAddFieldCommand { get; }
 
     internal RelayCommand ConfirmAddFieldCommand { get; }
@@ -497,17 +509,32 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             return null;
         }
 
-        if (filled?.Value is { Length: > 0 } value)
+        if (filled is null)
+        {
+            Report("That item could not be read. The vault may have locked.");
+            return null;
+        }
+
+        return Leaving(filled, what, refused);
+    }
+
+    /// <summary>A value of this item filled in as it leaves keypaste, or null once why it cannot leave was reported.</summary>
+    /// <param name="filled">The value with its placeholders filled in, or why it cannot leave.</param>
+    /// <param name="what">What the value is, as a sentence about it starts, such as <c>The password</c>.</param>
+    /// <param name="refused">What does not happen to it when it cannot leave, such as <c>copied</c>.</param>
+    /// <returns>The filled value, never empty, or null.</returns>
+    internal string? Leaving(PlaceholderFill filled, string what, string refused)
+    {
+        ArgumentNullException.ThrowIfNull(filled);
+
+        if (filled.Value is { Length: > 0 } value)
         {
             return value;
         }
 
-        Report(filled switch
-        {
-            null => "That item could not be read. The vault may have locked.",
-            { Refusal: { } refusal } => DisplayTextSanitizer.Sanitize($"{what} {refusal}, so it was not {refused}.").Text + " Edit the item so keypaste can fill it in.",
-            _ => $"{what} fills in as empty, so it was not {refused}.",
-        });
+        Report(filled.Refusal is { } refusal
+            ? DisplayTextSanitizer.Sanitize($"{what} {refusal}, so it was not {refused}.").Text + " Edit the item so keypaste can fill it in."
+            : $"{what} fills in as empty, so it was not {refused}.");
         return null;
     }
 
@@ -587,6 +614,26 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         get => _rotated;
         private set => Set(ref _rotated, value);
     }
+
+    /// <summary>When the item expires or expired, its local date and time as the metadata row shows it; empty when it never expires.</summary>
+    internal string Expiry
+    {
+        get => _expiry;
+        private set => Set(ref _expiry, value);
+    }
+
+    /// <summary>Whether the item has an expiry, so its metadata row shows.</summary>
+    internal bool HasExpiry => _expiry.Length > 0;
+
+    /// <summary>Whether its expiry has passed by the session's clock, as a run judges it (D-0337).</summary>
+    internal bool IsExpired
+    {
+        get => _isExpired;
+        private set => Set(ref _isExpired, value);
+    }
+
+    /// <summary>The expiry row's label.</summary>
+    internal string ExpiryLabel => _isExpired ? "Expired" : "Expires";
 
     /// <summary>
     /// Whether the Agent access card shows: an agent attached here whose settings reach this entry
@@ -937,6 +984,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Totp = null;
         TotpProblem = null;
         Tags = [];
+        TagSuggestions = [];
         ReplacingField = null;
         RemovingField = null;
         RenamingField = null;
@@ -1057,7 +1105,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         try
         {
             var now = _session.Clock.GetUtcNow();
-            Created = UseText.Dated(vault.ReadTimes(Name)?.Created, now);
+            var times = vault.ReadTimes(Name);
+            Created = UseText.Dated(times?.Created, now);
+            Expiry = UseText.LocalMinute(times?.Expires);
+            IsExpired = times?.Expires <= now;
             Rotated = UseText.Dated(EntryRotation.LastRotated(vault, Name), now);
             _uuid = vault.EntryUuid(Name);
             Raise(nameof(KdbxEntry));
@@ -1100,6 +1151,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         {
             Fields = [.. (vault.Fields(Name) ?? []).Select(field => new EntryFieldRow(this, field))];
             Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(tag, RemoveTag))];
+            TagSuggestions = [.. ProjectCatalog.MemberTags(vault).Except(_tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
             Environments = [.. (_session.ReadEnvironments(vault, Name) ?? []).Select(environment => new EnvironmentRow(environment))];
             ReadTotp(vault);
         }

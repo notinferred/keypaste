@@ -10,6 +10,11 @@ namespace Keypaste.Core;
 /// Any other text in braces, such as a JSON value or <c>${HOME}</c>, is text, and so is an unclosed brace.
 /// </para>
 /// <para>
+/// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it (D-NEW-X31): a value,
+/// a field filled into one, or the inside of braces naming no placeholder, wholly wrapped in <c>\{</c> and
+/// <c>\}</c>, fills in as itself with those two made braces, and nothing in it is filled in or refused.
+/// </para>
+/// <para>
 /// <c>{TITLE}</c>, <c>{USERNAME}</c>, <c>{PASSWORD}</c>, <c>{URL}</c>, <c>{NOTES}</c> and <c>{S:…}</c> fill in
 /// from the item's own fields, each filled in its turn; filled text is not scanned again, as in KeePassXC. A
 /// <c>{S:…}</c> reads a standard field or a custom one <see cref="Approval.CredentialFields.IsCustom"/> accepts,
@@ -30,6 +35,8 @@ public static class KeePassPlaceholders
     private const string _namedShown = "{S:…}";
     private const string _dateTime = "DT_";
     private const string _dateTimeShown = "{DT_…}";
+    private const string _escapeOpen = @"\{";
+    private const string _escapeClose = @"\}";
 
     private const string _notFilled = "keypaste does not fill in";
     private const string _neverReleased = "names a field keypaste never releases";
@@ -58,7 +65,7 @@ public static class KeePassPlaceholders
 
     private static readonly string[] _unfilledPrefixes = ["REF:", "URL:", "T-CONV:", "T-REPLACE-RX:"];
 
-    /// <summary>Whether a value holds any placeholder, filled in or not: the test made before any field is read.</summary>
+    /// <summary>Whether a value holds any placeholder, filled in or not, or an escape: whether it leaves keypaste other than as it is held.</summary>
     /// <param name="value">The value.</param>
     /// <returns><see langword="true"/> when <see cref="Fill"/> would change or refuse it.</returns>
     internal static bool Holds(string value)
@@ -66,6 +73,16 @@ public static class KeePassPlaceholders
         ArgumentNullException.ThrowIfNull(value);
 
         return Scan(value).Any();
+    }
+
+    /// <summary>Whether a value holds a placeholder, filled in or not, an escape aside: the test made before any field is read.</summary>
+    /// <param name="value">The value.</param>
+    /// <returns><see langword="true"/> when <see cref="Fill"/> could read its item's fields or would refuse it.</returns>
+    internal static bool HoldsPlaceholder(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        return Scan(value).Any(token => token.Placeholder is not null);
     }
 
     /// <summary>Fills in every placeholder a value holds from its own item's fields, or refuses it whole.</summary>
@@ -89,7 +106,10 @@ public static class KeePassPlaceholders
     /// <param name="held">The name of each custom field its item has once the edit is written.</param>
     /// <param name="field">The field the value is written to, such as <c>Password</c> or <c>API_KEY</c>, so a value naming it is a loop; null when none.</param>
     /// <returns>What fills in when the value leaves, or the first placeholder that refuses it.</returns>
-    /// <remarks>Only the value's own placeholders are judged; what the fields they name hold is judged when the value leaves.</remarks>
+    /// <remarks>
+    /// Only the value's own placeholders are judged; what the fields they name hold is judged when the value leaves.
+    /// An escape plants nothing, so a value that is wholly one fills in nothing and is refused nowhere.
+    /// </remarks>
     internal static PlantedPlaceholders Planted(string value, IEnumerable<string> held, string? field = null)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -98,7 +118,7 @@ public static class KeePassPlaceholders
         var fields = PlaceholderFields.Named(held);
         List<string> fills = [];
 
-        foreach (var placeholder in Scan(value).Select(token => token.Placeholder))
+        foreach (var placeholder in Scan(value).Select(token => token.Placeholder).OfType<Placeholder>())
         {
             var shown = placeholder.Shown(fields);
             var refused = placeholder.Field is not { } named ? _notFilled
@@ -130,20 +150,40 @@ public static class KeePassPlaceholders
         ArgumentNullException.ThrowIfNull(field);
 
         return Scan(value).Any(token =>
-            token.Placeholder.Keyword is null && string.Equals(token.Placeholder.Field, field, StringComparison.Ordinal));
+            token.Placeholder is { Keyword: null } named && string.Equals(named.Field, field, StringComparison.Ordinal));
     }
 
-    /// <summary>Each placeholder in a text, left to right.</summary>
+    /// <summary>Each placeholder and escape in a text, left to right.</summary>
     /// <remarks>
+    /// <para>
     /// A brace opens a placeholder only when the next brace after it closes one; text between them that is no
     /// placeholder leaves the opening brace as text, and the scan goes on after it. A conversion or reference
     /// that another brace opens inside, such as <c>{T-CONV:/{USERNAME}/Upper/}</c>, which KeePass fills in before
     /// converting, is a placeholder keypaste does not fill in, so the value is refused rather than half filled.
+    /// </para>
+    /// <para>
+    /// A text wholly wrapped in <c>\{</c> and <c>\}</c> is one escape and holds nothing else. Braces whose inside
+    /// is wholly one, such as <c>{\{PASSWORD\}}</c>, are a placeholder KeePassXC does not know, whose inside it
+    /// fills in as it fills in a value, so that inside is an escape too.
+    /// </para>
     /// </remarks>
     private static IEnumerable<Token> Scan(string text)
     {
+        if (Escaped(text))
+        {
+            yield return new Token(0, text.Length - 1, null);
+            yield break;
+        }
+
         for (var open = text.IndexOf('{', StringComparison.Ordinal); open >= 0;)
         {
+            if (EscapeInside(text, open) is { } close)
+            {
+                yield return new Token(open + 1, close - 1, null);
+                open = text.IndexOf('{', close + 1);
+                continue;
+            }
+
             var next = text.IndexOfAny(_braces, open + 1);
 
             if (next < 0)
@@ -169,6 +209,48 @@ public static class KeePassPlaceholders
 
             open = text.IndexOf('{', next + 1);
         }
+    }
+
+    /// <summary>Whether a text is wholly KeePassXC's escape, starting <c>\{</c> and ending <c>\}</c>.</summary>
+    private static bool Escaped(string text) =>
+        text.StartsWith(_escapeOpen, StringComparison.Ordinal) && text.EndsWith(_escapeClose, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Where the braces opening at <paramref name="open"/> close when their inside is wholly an escape, matched as
+    /// KeePassXC's pattern matches braces, every pair balanced and none empty; null when they do not.
+    /// </summary>
+    private static int? EscapeInside(string text, int open)
+    {
+        if (!text.AsSpan(open + 1).StartsWith(_escapeOpen, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var depth = 0;
+        var empty = true;
+
+        for (var at = open; at < text.Length; at++)
+        {
+            if (text[at] == '{')
+            {
+                depth++;
+                empty = true;
+            }
+            else if (text[at] != '}')
+            {
+                empty = false;
+            }
+            else if (empty)
+            {
+                return null;
+            }
+            else if (--depth == 0)
+            {
+                return Escaped(text[(open + 1)..at]) ? at : null;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>The placeholder the text between two braces names, or null when it is text.</summary>
@@ -216,8 +298,11 @@ public static class KeePassPlaceholders
     /// <summary>Why a field a placeholder names cannot be read.</summary>
     private static string Unreadable(string field, PlaceholderFields fields) => fields.Has(field) ? _neverReleased : _noField;
 
-    /// <summary>One placeholder in a text, from its opening brace to its closing one, or to just before a brace that opens inside it.</summary>
-    private readonly record struct Token(int Open, int Close, Placeholder Placeholder);
+    /// <summary>
+    /// One placeholder in a text, from its opening brace to its closing one, or to just before a brace that opens
+    /// inside it; or, with no placeholder, an escape from its backslash to its closing brace.
+    /// </summary>
+    private readonly record struct Token(int Open, int Close, Placeholder? Placeholder);
 
     /// <summary>One placeholder as written.</summary>
     /// <param name="Keyword">How it is shown, or null for a <c>{S:…}</c>, whose field is named only when its item has one by that name.</param>
@@ -261,36 +346,45 @@ public static class KeePassPlaceholders
             var builder = new StringBuilder();
             var height = 0;
             var position = 0;
+            var scanned = false;
             Placeholder? last = null;
 
             foreach (var token in Scan(text))
             {
                 builder.Append(text, position, token.Open - position);
                 position = token.Close + 1;
-                last = token.Placeholder;
+                scanned = true;
 
-                if (Resolve(last, level) is not { } filled)
+                if (token.Placeholder is not { } placeholder)
+                {
+                    builder.Append('{').Append(text, token.Open + 2, token.Close - token.Open - 3).Append('}');
+                    continue;
+                }
+
+                last = placeholder;
+
+                if (Resolve(placeholder, level) is not { } filled)
                 {
                     return null;
                 }
 
                 if (builder.Length + filled.Text.Length > MaximumLength)
                 {
-                    return Refuse(last, _long);
+                    return Refuse(placeholder, _long);
                 }
 
                 builder.Append(filled.Text);
                 height = Math.Max(height, filled.Height + 1);
             }
 
-            if (last is null)
+            if (!scanned)
             {
                 return new FilledText(text, 0);
             }
 
             builder.Append(text, position, text.Length - position);
 
-            return builder.Length > MaximumLength ? Refuse(last, _long) : new FilledText(builder.ToString(), height);
+            return last is not null && builder.Length > MaximumLength ? Refuse(last, _long) : new FilledText(builder.ToString(), height);
         }
 
         private FilledText? Resolve(Placeholder placeholder, int level)

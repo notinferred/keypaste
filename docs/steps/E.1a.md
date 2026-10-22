@@ -39,6 +39,6 @@ Expiry is judged against the clock of the process resolving: `keypaste run` uses
 
 `keypaste env export --dotenv` refuses an expired entry as `run` does, naming it and writing nothing (D-0337) (gaps-1b, RUNS-PENDING).
 
-The app shows no expiry, so a person learns of one from the refusal and fixes it in KeePassXC or by recreating the entry; nothing in keypaste clears an expiry.
+The item pane shows an item's expiry beside Created, reading Expired in danger text once the session's clock has reached it, as the Projects matrix and Recommendations mark it; a person still fixes one in KeePassXC or by recreating the entry, since nothing in keypaste sets or clears an expiry (gaps-1c, RUNS-PENDING).
 
 `SessionEnvResolver` has no consumer outside tests until E.1b (the app's launch) and E.1c (`keypaste run --session`), which fill its confirmation with their own prompt.

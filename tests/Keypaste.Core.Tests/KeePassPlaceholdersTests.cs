@@ -201,6 +201,76 @@ public sealed class KeePassPlaceholdersTests
         Assert.Equal(new PlaceholderRefusal("{PASSWORD}", "leads back to itself"), KeePassPlaceholders.Planted("x{PASSWORD}", [], "Password").Refused);
     }
 
+    /// <summary>
+    /// KeePassXC's escape, as 2.7.11's <c>Entry::resolveMultiplePlaceholdersRecursive</c> reads it: a text wholly
+    /// wrapped in <c>\{</c> and <c>\}</c> has those two made braces and nothing in it filled in, and so has the inside
+    /// of braces that name no placeholder; an escape that does not wrap the whole text is text.
+    /// </summary>
+    [Theory]
+    [InlineData(@"\{PASSWORD\}", "{PASSWORD}")]
+    [InlineData(@"\{S:API_KEY\}", "{S:API_KEY}")]
+    [InlineData(@"\{REF:P@I:0123\}", "{REF:P@I:0123}")]
+    [InlineData(@"\{a{PASSWORD}b\}", "{a{PASSWORD}b}")]
+    [InlineData(@"\{\}", "{}")]
+    [InlineData(@"\{x\}\}", @"{x\}}")]
+    [InlineData(@"{\{PASSWORD\}}", "{{PASSWORD}}")]
+    [InlineData(@"{\{REF:P@I:0123\}}x", "{{REF:P@I:0123}}x")]
+    [InlineData(@"x\{PASSWORD\}", @"x\{PASSWORD\}")]
+    [InlineData(@"\{PASSWORD\}x", @"\{PASSWORD\}x")]
+    [InlineData(@"{\{}\}}", @"{\{}\}}")]
+    public void An_escape_fills_in_as_itself_with_its_escapes_made_braces_reading_no_field(string value, string filled)
+    {
+        var reads = 0;
+
+        PlaceholderFields Read()
+        {
+            reads++;
+            return _stripe;
+        }
+
+        var fill = KeePassPlaceholders.Fill(value, Read);
+
+        Assert.Null(fill.Refusal);
+        Assert.Equal(filled, fill.Value);
+        Assert.Empty(fill.Parts);
+        Assert.Equal(0, reads);
+        Assert.Equal(!string.Equals(value, filled, StringComparison.Ordinal), KeePassPlaceholders.Holds(value));
+        Assert.False(KeePassPlaceholders.HoldsPlaceholder(value));
+    }
+
+    [Fact]
+    public void An_escape_beside_a_placeholder_leaves_the_placeholder_to_fill_in_or_refuse()
+    {
+        Assert.Equal("a{{S:API_KEY}}b" + _password, KeePassPlaceholders.Fill(@"a{\{S:API_KEY\}}b{PASSWORD}", () => _stripe).Value);
+        Assert.Equal(@"\" + _password, KeePassPlaceholders.Fill(@"\{PASSWORD}", () => _stripe).Value);
+        Assert.Equal(_refused + "{REF:…}, which keypaste does not fill in", KeePassPlaceholders.Fill(@"{\{x\}}{REF:P@I:0123}", () => _stripe).Refusal);
+    }
+
+    [Fact]
+    public void A_field_that_is_an_escape_fills_in_with_its_escapes_made_braces()
+    {
+        var fields = Fields(new VaultEntry { Title = "Escape", Password = @"\{S:NOPE\}" }, ("RAW_KEY", @"\{USERNAME\}"));
+
+        var fill = KeePassPlaceholders.Fill("a{PASSWORD}b{S:RAW_KEY}", () => fields);
+
+        Assert.Equal("a{S:NOPE}b{USERNAME}", fill.Value);
+        Assert.Equal(["{S:NOPE}", "{USERNAME}"], fill.Parts);
+    }
+
+    [Fact]
+    public void An_escape_plants_nothing_and_names_no_field()
+    {
+        var whole = KeePassPlaceholders.Planted(@"\{S:NEW_KEY\}", []);
+        var inside = KeePassPlaceholders.Planted(@"{\{REF:T@I:0\}}{USERNAME}", []);
+
+        Assert.Empty(whole.Fills);
+        Assert.Null(whole.Refused);
+        Assert.Equal(["{USERNAME}"], inside.Fills);
+        Assert.Null(inside.Refused);
+        Assert.False(KeePassPlaceholders.Names(@"\{S:API_KEY}\}", "API_KEY"));
+        Assert.True(KeePassPlaceholders.Names(@"x\{S:API_KEY}\}", "API_KEY"));
+    }
+
     private static PlaceholderFields Fields(VaultEntry entry, params (string Name, string Value)[] custom) =>
         PlaceholderFields.Of(entry, custom.Select(field => KeyValuePair.Create(field.Name, field.Value)), custom.Select(field => field.Name));
 

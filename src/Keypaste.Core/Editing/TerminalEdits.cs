@@ -677,7 +677,15 @@ public static class TerminalEdits
             }
 
             var planted = KeePassPlaceholders.Planted(text, names ??= held(), value.Field);
-            sentences.Add(planted.Refused is { } refused ? value.RefusedBy(refused) : value.Fills([.. planted.Fills]));
+
+            if (planted.Refused is { } refused)
+            {
+                sentences.Add(value.RefusedBy(refused));
+            }
+            else if (planted.Fills.Count > 0)
+            {
+                sentences.Add(value.Fills([.. planted.Fills]));
+            }
         }
 
         return sentences;

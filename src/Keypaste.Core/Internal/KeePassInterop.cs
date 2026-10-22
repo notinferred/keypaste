@@ -999,11 +999,11 @@ internal sealed class KeePassInterop : IDisposable
                     continue;
                 }
 
-                var value = Encoding.UTF8.GetString(utf8);
+                var judged = KeePassPlaceholders.Planted(Encoding.UTF8.GetString(utf8), names, field.Key);
 
-                if (KeePassPlaceholders.Holds(value))
+                if (judged.Refused is not null || judged.Fills.Count > 0)
                 {
-                    planted.Add(KeyValuePair.Create(field.Key, KeePassPlaceholders.Planted(value, names, field.Key)));
+                    planted.Add(KeyValuePair.Create(field.Key, judged));
                 }
             }
             finally
@@ -1067,6 +1067,39 @@ internal sealed class KeePassInterop : IDisposable
         return revision >= 0 && revision < order.Length
             ? PlaceholderFieldsOf(found.Entry.History.GetAt(order[revision]), name.GroupPath)
             : null;
+    }
+
+    /// <summary>
+    /// Whether the revision at this position in <see cref="ReadHistory"/>'s order holds exactly this password; false
+    /// when there is no such entry or revision. The revision's copy is zeroed before this returns.
+    /// </summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal bool RevisionHoldsPassword(EntryName name, int revision, string password)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return false;
+        }
+
+        uint[] order = HistoryNewestFirst(found.Entry);
+
+        if (revision < 0 || revision >= order.Length)
+        {
+            return false;
+        }
+
+        char[] held = found.Entry.History.GetAt(order[revision]).Strings.GetSafe(PwDefs.PasswordField).ReadChars();
+
+        try
+        {
+            return held.AsSpan().SequenceEqual(password.AsSpan());
+        }
+        finally
+        {
+            Array.Clear(held);
+        }
     }
 
     /// <summary>Each live entry directly in each group at this path by its groups' own names, by UUID and title, with one of its string fields, in traversal order.</summary>
@@ -2359,7 +2392,7 @@ internal sealed class KeePassInterop : IDisposable
         return revisions;
     }
 
-    /// <summary>When the one entry with this name was created and last modified, or null when there is none.</summary>
+    /// <summary>When the one entry with this name was created and last modified, and when it expires, or null when there is none.</summary>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal EntryTimes? ReadTimes(EntryName name)
     {
@@ -2372,7 +2405,8 @@ internal sealed class KeePassInterop : IDisposable
 
         return new EntryTimes(
             new DateTimeOffset(DateTime.SpecifyKind(found.Entry.CreationTime, DateTimeKind.Utc)),
-            new DateTimeOffset(DateTime.SpecifyKind(found.Entry.LastModificationTime, DateTimeKind.Utc)));
+            new DateTimeOffset(DateTime.SpecifyKind(found.Entry.LastModificationTime, DateTimeKind.Utc)),
+            found.Entry.Expires ? new DateTimeOffset(TimeUtil.ToUtc(found.Entry.ExpiryTime, true)) : null);
     }
 
     /// <summary>Puts the revision at this position in <see cref="ReadHistory"/>'s order back as the
@@ -3109,7 +3143,7 @@ internal sealed class KeePassInterop : IDisposable
 
         try
         {
-            if (utf8.AsSpan().Contains((byte)'{') && KeePassPlaceholders.Holds(Encoding.UTF8.GetString(utf8)))
+            if (utf8.AsSpan().Contains((byte)'{') && KeePassPlaceholders.HoldsPlaceholder(Encoding.UTF8.GetString(utf8)))
             {
                 return (null, null);
             }

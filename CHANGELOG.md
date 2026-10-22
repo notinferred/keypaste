@@ -18,6 +18,11 @@ Locking the app with Lock, `Ctrl/Cmd+L`, the tray or menu bar or `keypaste lock`
 The unlock screen's line naming the program that holds a vault, such as `keypaste approve`, now goes within a few seconds of that program letting the vault go, without anything typed or pressed.
 
 The notice that an agent asked for a vault while the app was locked now opens at the top-right of the screen, where it doesn't cover the unlock form.
+The tag box on an item and in New item now suggests the vault's project tags as you type, such as `env:billing:prod`, leaving out the ones the item already has. Choosing one only fills the box, and on an item Add tag still says what a project tag reaches before it writes anything.
+
+An item's preview in the app now shows its expiry, set in KeePassXC, beside Created, and reads Expired in red once it has passed, so you see why a run refuses it before you start one.
+
+A value wrapped whole in `\{` and `\}`, KeePassXC's escape for text shaped like a placeholder, now leaves keypaste as KeePassXC 2.7.11 gives it: `\{PASSWORD\}` becomes `{PASSWORD}` with nothing filled in, where keypaste passed the backslashes on or, for one such as `\{S:API_KEY\}`, refused the value.
 
 Tagging an item into a project, in the app or with `keypaste env tag`, now names each of its variables that holds a KeePass placeholder such as `{PASSWORD}`, with the placeholder, before anything is written, because that variable carries the item's own field to whoever gets it.
 

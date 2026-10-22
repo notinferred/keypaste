@@ -154,12 +154,14 @@ public sealed class PasswordHealthCheckTests : IDisposable
             Add(created, _shop, Reference);
             Add(created, _mail, "{username}");
             Add(created, _wiki, "{ab}");
+            Add(created, _bank, @"\{ab\}");
         });
 
         using var vault = Vault.Open(VaultPath, _master);
 
-        var weak = Assert.Single(PasswordHealthCheck.Scan(vault, _now));
-        Assert.Equal((_wiki, PasswordProblem.Weak), (weak.Entry, weak.Problem));
+        var findings = PasswordHealthCheck.Scan(vault, _now);
+        Assert.Equal([_wiki, _bank], findings.Select(finding => finding.Entry));
+        Assert.All(findings, finding => Assert.Equal(PasswordProblem.Weak, finding.Problem));
     }
 
     [Fact]

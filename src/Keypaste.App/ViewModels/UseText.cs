@@ -67,6 +67,12 @@ internal static class UseText
         return $"{when.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} · {ago}";
     }
 
+    /// <summary>A moment as the detail pane's expiry row shows it: <c>yyyy-MM-dd HH:mm</c>, local time.</summary>
+    /// <param name="at">The time, or null.</param>
+    /// <returns>The row's text, or empty.</returns>
+    internal static string LocalMinute(DateTimeOffset? at) =>
+        at is { } moment ? moment.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) : string.Empty;
+
     /// <summary>The Agent access card's one line.</summary>
     /// <param name="access">What the card shows.</param>
     /// <returns>"claude-code · grant, 42m left", "cursor", "ci-staging · token" or "None active": who, never when, which the card's Last used line says.</returns>

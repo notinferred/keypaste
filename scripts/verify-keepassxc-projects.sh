@@ -25,7 +25,9 @@
 # ordinary entry, `env export` writes a reference for each tagged key and `env diff` compares the
 # environments' key names. A key on two entries, an expired member, {REF:…} in a value and a
 # custom PASSWORD field each start nothing and name their entries, and a value holding {PASSWORD}
-# reaches the child filled in from its own entry, exactly as KeePassXC shows it (P.3b1).
+# reaches the child filled in from its own entry, exactly as KeePassXC shows it (P.3b1). Values using
+# KeePassXC's \{…\} escape, whole, through {S:…}, inside braces and in part, reach the child as
+# KeePassXC 2.7.11 gives them, compared with keepassxc-cli itself from 2.7.11 on (D-NEW-X31).
 # `run --session` through a real `keypaste approve`, and through the app's own prompt window held by
 # tests/Keypaste.AppDriver on an untouched copy, gets the same set after a prompt naming the source
 # entries, and the staging set is asked once only. A scoped token's run of the dev set is audited
@@ -430,6 +432,34 @@ out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/filled.kdbx" -- "$ch
   || die "keypaste run failed on a value holding {PASSWORD}: $(cat "$dir/filled.err")"
 [ "$out" = "$shown" ] || die "the child got DATABASE_URL as ${out}, and KeePassXC shows ${shown}"
 grep -qF -- '-c1b' "$dir/filled.err" && die "keypaste run printed a value: $(cat "$dir/filled.err")"
+
+step "P.3b1: values using KeePassXC's \\{…\\} escape reach the child as KeePassXC 2.7.11 gives them, nothing in an escape filled in"
+escaped_keys=(ESCAPED_WHOLE ESCAPED_FIELD ESCAPED_GROUP ESCAPED_PART)
+escape="<Entry><UUID>$(uuid fescape)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Escape</Value></String>"
+escape+='<String><Key>Password</Key><Value ProtectInMemory="True">escape-login-c1b</Value></String>'
+escape+='<String><Key>ESCAPED_WHOLE</Key><Value ProtectInMemory="True">\{PASSWORD\}</Value></String>'
+escape+='<String><Key>ESCAPED_FIELD</Key><Value ProtectInMemory="True">x{S:ESCAPED_WHOLE}y</Value></String>'
+escape+='<String><Key>ESCAPED_GROUP</Key><Value ProtectInMemory="True">{\{S:ESCAPED_WHOLE\}}</Value></String>'
+escape+='<String><Key>ESCAPED_PART</Key><Value ProtectInMemory="True">a\{PASSWORD\}</Value></String></Entry>'
+make_fields escaped "$escape" 'db-c1b' ''
+# What Entry::resolveMultiplePlaceholdersRecursive gives each key from KeePassXC 2.7.11 on, one per line.
+escaped_expected=$'{PASSWORD}\nx{PASSWORD}y\n{{S:ESCAPED_WHOLE}}\na\\{PASSWORD\\}'
+out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/escaped.kdbx" -- "$child" -c 'printf "%s\n" "${ESCAPED_WHOLE-unset}" "${ESCAPED_FIELD-unset}" "${ESCAPED_GROUP-unset}" "${ESCAPED_PART-unset}"' 2>"$dir/escaped.err" | tr -d '\r') \
+  || die "keypaste run failed on values using the escape: $(cat "$dir/escaped.err")"
+[ "$out" = "$escaped_expected" ] || die "the child got the escaped values as: ${out}"
+grep -qF -- '-c1b' "$dir/escaped.err" && die "keypaste run printed a value: $(cat "$dir/escaped.err")"
+shown=$(for key in "${escaped_keys[@]}"; do kx show "$dir/escaped.kdbx" services/Escape -a "$key" || exit 1; done) \
+  || die "keepassxc-cli could not show the escaped values"
+kpxc_version=$("$cli" --version | tr -d '\r')
+[[ $kpxc_version =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]] || die "keepassxc-cli --version printed no version: ${kpxc_version}"
+if (( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] >= 20711 )); then
+  [ "$shown" = "$escaped_expected" ] || die "keepassxc-cli ${kpxc_version} shows the escaped values as: ${shown}"
+  printf '    keepassxc-cli %s and keypaste give each escaped value alike\n' "$kpxc_version"
+else
+  [ "$(head -n 1 <<<"$shown")" = '{PASSWORD}' ] \
+    && die "keepassxc-cli ${kpxc_version} reads the \\{…\\} escape, which KeePassXC does only from 2.7.11"
+  printf '    keepassxc-cli %s predates the %s escape (2.7.11), so keypaste is held to what 2.7.11 gives\n' "$kpxc_version" '\{…\}'
+fi
 
 step "C.5b: under the default exposure an agent lists the tagged entries with their variables and tags, gets a variable, never a password, and runs billing from services/"
 exposed="$dir/exposed.kdbx"
@@ -1248,4 +1278,4 @@ out=$(printf '%s\n' "$pw" | OLD_KEY=old-c1b "$kp" run billing --vault "$fields" 
   || die "keypaste run with OLD_KEY inherited failed: $(cat "$dir/run.err")"
 [ "$out" = "$dev_set" ] && die "a child holding OLD_KEY still matched the dev set — the run comparisons cannot see OLD_KEY"
 
-printf '\n%s\n' "PROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, a value's {PASSWORD} reaches a child as KeePassXC fills it in, a tag KeePassXC dropped with another change is flagged and restored, and agents' settings survive KeePassXC's saves and merge into one entry per agent, the newer record whole."
+printf '\n%s\n' "PROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, a value's {PASSWORD} reaches a child as KeePassXC fills it in and one using KeePassXC's escape as 2.7.11 reads it, a tag KeePassXC dropped with another change is flagged and restored, and agents' settings survive KeePassXC's saves and merge into one entry per agent, the newer record whole."

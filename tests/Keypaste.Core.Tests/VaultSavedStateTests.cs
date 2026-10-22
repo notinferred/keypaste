@@ -294,9 +294,21 @@ public sealed class VaultSavedStateTests : IDisposable
     }
 
     [Fact]
-    public void A_revision_fills_in_from_its_own_fields()
+    public void An_escaped_value_comes_back_with_its_escape_made_braces_without_its_item_being_read()
     {
         using var vault = Seeded();
+        var missing = new EntryName("env/billing", "MISSING");
+
+        Assert.Equal(SavedRead.Current, vault.ReadSavedFill(missing, @"\{PASSWORD\}", out var fill));
+        Assert.Equal("{PASSWORD}", fill?.Value);
+        Assert.Equal("{{S:API_KEY}}", vault.FillPlaceholders(missing, @"{\{S:API_KEY\}}")?.Value);
+    }
+
+    [Fact]
+    public void A_revision_fills_in_its_password_from_its_own_fields()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.UpdateEntry(new VaultEntry { GroupPath = _token.GroupPath, Title = _token.Title, Password = "{S:API_KEY}" }));
         Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "k1")]));
         Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "k2")]));
 
@@ -305,7 +317,29 @@ public sealed class VaultSavedStateTests : IDisposable
         Assert.Equal(
             "holds the KeePass placeholder {S:…}, which names no field of its item",
             vault.FillPlaceholders(_token, 1, "{S:API_KEY}")!.Refusal);
-        Assert.Null(vault.FillPlaceholders(_token, 2, "{S:API_KEY}"));
+        Assert.Equal("v1", vault.FillPlaceholders(_token, 2, "v1")!.Value);
+        Assert.Null(vault.FillPlaceholders(_token, 3, "v1"));
+    }
+
+    /// <summary>
+    /// A revision's password is filled in only while the revision at that position still holds it, judged under the
+    /// lock its fields are read under, so an edit saved after the history was read fills in nothing from the wrong
+    /// revision's fields (P.3b1).
+    /// </summary>
+    [Fact]
+    public void A_password_the_revision_at_that_position_no_longer_holds_is_not_filled_in()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.UpdateEntry(new VaultEntry { GroupPath = _token.GroupPath, Title = _token.Title, Password = "{S:API_KEY}" }));
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "k1")]));
+        Assert.Equal("v1", vault.FillPlaceholders(_token, 1, "v1")!.Value);
+
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "k2")]));
+
+        Assert.Null(vault.FillPlaceholders(_token, 1, "v1"));
+        Assert.Null(vault.FillPlaceholders(_token, 0, "v1"));
+        Assert.Null(vault.FillPlaceholders(_token, 0, "{S:API_KEY}x"));
+        Assert.Equal("v1", vault.FillPlaceholders(_token, 2, "v1")!.Value);
     }
 
     [Fact]

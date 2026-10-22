@@ -293,6 +293,16 @@ public sealed class TerminalEditsTests : IDisposable
     }
 
     [Fact]
+    public void A_value_wholly_escaped_as_KeePassXC_escapes_one_plants_nothing()
+    {
+        var preview = Check(new SetFields(_stripe, [new FieldWrite("API_KEY", @"\{S:NOPE\}")])).Preview!;
+
+        var only = Assert.Single(preview.Changes);
+        Assert.DoesNotContain("fills in", only, StringComparison.Ordinal);
+        Assert.DoesNotContain("refused", only, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Env_set_names_what_its_value_plants_from_the_item_it_is_written_to()
     {
         Apply(new TagItem("billing", "dev", "api/Stripe", Tagging: true));
