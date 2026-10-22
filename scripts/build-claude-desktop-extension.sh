@@ -3,8 +3,9 @@
 # integrity scripts/mcpb-cli locks, whose install scripts never run (G.6b). The CLI validates the manifest and packs;
 # the bundle it unpacks must hold only the manifest, icon and launcher, never a copy of keypaste, and that launcher,
 # started as Claude Desktop starts it, must run the installed keypaste with setup's arguments over the same stdio,
-# pass its exit code back, skip a relative PATH entry, and say keypaste is not installed when it finds none. It runs
-# on Linux, where the launcher looks only in ~/.local/bin and on PATH. Nothing is uploaded or published.
+# pass its exit code back, prefer it to another keypaste on PATH (T-39), find one on PATH when none is installed,
+# skip a relative PATH entry, and say keypaste is not installed when it finds none. It runs on Linux, where the
+# launcher looks only in ~/.local/bin and on PATH. Nothing is uploaded or published.
 #
 # Logs go to stderr; the path of the bundle is the only line on stdout.
 #

@@ -321,7 +321,6 @@ public sealed class StatusTests : IDisposable
         File.WriteAllText(path, new JsonObject { ["mcpServers"] = servers }.ToJsonString());
     }
 
-    /// <summary>The path as printed: itself, or its start and end around an ellipsis.</summary>
     /// <summary>Listens on <paramref name="pipe"/> for one attach naming no AI tool and answers it with <paramref name="reply"/>.</summary>
     private static async Task AnswerOnceAsync(string pipe, AttachReply reply, CancellationToken cancellationToken)
     {
@@ -336,6 +335,7 @@ public sealed class StatusTests : IDisposable
         await framer.WriteAsync(ApproverProtocol.Encode(reply), cancellationToken);
     }
 
+    /// <summary>The path as printed: itself, or its start and end around an ellipsis.</summary>
     private static void AssertShows(string path, string shown)
     {
         var cut = shown.IndexOf('…', StringComparison.Ordinal);

@@ -39,7 +39,7 @@ D-0474 (the bundle and its launcher) and D-0475 (packing and checking it in CI).
 ## Limits and follow-ups
 
 - **Held for the founder: publication has no row.** Removing G.6b's row leaves the bundle's release asset, any `mcpb sign` signature and its installation verification in Claude Desktop with no STEPS row. G.6c covers only the Registry listing. Adding a row for them, or folding them into G.6c, is a publication choice, so it was not taken here.
-- **Only the Linux path is checked.** The check runs only the launcher's Linux branch, `~/.local/bin` and PATH. Its macOS and Windows places, and Claude Desktop installing and starting the bundle, run in no check until the bundle's installation is verified.
+- **Only the Linux path is checked.** The check runs only the launcher's Linux branch, `~/.local/bin` and PATH. Its macOS and Windows places, its passing over an installed copy another account owns, its Windows rule that skips a drive-relative PATH entry such as `\tools`, and Claude Desktop installing and starting the bundle, run in no check until the bundle's installation is verified.
 - **Claude Desktop can hold keypaste twice.** If setup or Connect has already written keypaste's entry into `claude_desktop_config.json`, installing the extension gives Claude Desktop two keypaste servers under one label. Setup does not yet detect the extension.
 - **No custom home.** A `KEYPASTE_HOME` other than the default, which setup pins with flags (D-0389), is not supported by the extension.
 - **Time limits are estimates.** The step's 2-minute limit and the job's 5 minutes are estimates until ci 39633992142 and app 39633992293 show the step's time.

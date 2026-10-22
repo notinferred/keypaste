@@ -23,21 +23,23 @@
 # fix, and changes no tool's configuration, the pinned audit log or the default home's (D-0467).
 # VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. On Linux and macOS, codex
 # sandbox runs a shell from the project folder as docs/safe-agents.md sets Codex: its write inside that folder lands,
-# its appends to ~/.keypaste/clients.toml and to Codex's config.toml are refused and change neither (L.3). setup --remove --dry-run then finds every registration,
-# so each of keypaste's readers reads the file its tool wrote on this runner, and on Windows starts Codex and Gemini
-# CLI through node.exe, never cmd.exe. The backups equal the seeds. A second connect changes no entry and no backup.
-# Removing leaves no tool listing keypaste and gives each seeded file back byte for byte, and a second removal calls
-# every tool not connected. No configuration or backup holds the master password or names a keyfile.
+# its appends to ~/.keypaste/clients.toml and to Codex's config.toml are refused and change neither (L.3).
+# setup --remove --dry-run then finds every registration, so each of keypaste's readers reads the file its tool wrote
+# on this runner, and on Windows starts Codex and Gemini CLI through node.exe, never cmd.exe. The backups equal the
+# seeds. A second connect changes no entry and no backup. Removing leaves no tool listing keypaste and gives each
+# seeded file back byte for byte, and a second removal calls every tool not connected. No configuration or backup
+# holds the master password or names a keyfile.
 #
-# NEGATIVE CONTROL: this fails if setup changes a file without --yes, if a removal with nothing to remove runs a
-# tool or changes a byte, if any tool is not configured, if keypaste doctor finds something to fix or a configured
-# tool's registration anything but working, or changes a tool's configuration, the pinned audit log or the default
-# home's, if a tool's reader does not find keypaste, if Gemini CLI's bridge does not reach the pinned audit log, if
-# an entry names another program, vault, audit log, ceilings, approver or label or leaves out run or every item's
-# reach, if a seeded file loses another entry, if VS Code would write the entry differently, if Codex's sandbox
-# refuses a write inside its workspace or lets one change keypaste's home or Codex's configuration, if keypaste's reader for a tool misses the entry that tool wrote, if Windows starts a tool
-# through cmd.exe, if a backup differs from its seed or changes on a second connect, if removal leaves keypaste
-# anywhere or a seeded file changed, if a second removal is not a no-op, or if a secret reaches a configuration.
+# NEGATIVE CONTROL: this fails if setup changes a file without --yes, if a removal with nothing to remove runs a tool
+# or changes a byte, if any tool is not configured, if keypaste doctor finds something to fix or a configured tool's
+# registration anything but working, or changes a tool's configuration, the pinned audit log or the default home's,
+# if a tool's reader does not find keypaste, if Gemini CLI's bridge does not reach the pinned audit log, if an entry
+# names another program, vault, audit log, ceilings, approver or label or leaves out run or every item's reach, if a
+# seeded file loses another entry, if VS Code would write the entry differently, if Codex's sandbox refuses a write
+# inside its workspace or lets one change keypaste's home or Codex's configuration, if keypaste's reader for a tool
+# misses the entry that tool wrote, if Windows starts a tool through cmd.exe, if a backup differs from its seed or
+# changes on a second connect, if removal leaves keypaste anywhere or a seeded file changed, if a second removal is
+# not a no-op, or if a secret reaches a configuration.
 # These checks must never be skipped or soft-passed.
 set -euo pipefail
 
