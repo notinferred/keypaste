@@ -163,6 +163,38 @@ public sealed class AppAuthorityTests
         Assert.IsType<AuthorityStatus.Serving>(authority.Status);
     }
 
+    /// <summary>The owner line and the status say who holds the vault only while it is held, with nothing typed or pressed (F04).</summary>
+    [Fact]
+    public async Task Once_the_holder_lets_the_vault_go_the_owner_line_and_the_status_clear()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var authority = Launch(fixture, clock);
+        using var model = new UnlockViewModel(authority.Session, fixture.Home, new FakeVaultFilePicker(), () => { });
+        Assert.True(model.Offer(fixture.Path_));
+
+        Assert.True(VaultClaim.TryAcquire(fixture.Home, fixture.Path_, OwnerKind.TerminalAgent, out var claim, out _));
+
+        using (claim)
+        {
+            Type(model, TempVault.Password);
+            await model.UnlockAsync();
+            Assert.True(model.HasOwner);
+
+            clock.Advance(AppVaultSession.HolderCheck);
+
+            Assert.True(model.HasOwner, "the owner line went while the holder still held the vault");
+            Assert.IsType<AuthorityStatus.HeldBy>(authority.Status);
+        }
+
+        clock.Advance(AppVaultSession.HolderCheck);
+
+        Assert.False(model.HasOwner);
+        Assert.IsType<AuthorityStatus.Locked>(authority.Status);
+        Assert.False(authority.Session.IsUnlocked);
+        AssertNobodyHolds(fixture);
+    }
+
     [Fact]
     public async Task Quitting_answers_a_waiting_request_as_locked_before_the_endpoint_stops()
     {

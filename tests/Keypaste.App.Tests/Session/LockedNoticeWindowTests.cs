@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
@@ -125,6 +126,37 @@ public sealed class LockedNoticeWindowTests
             await PromptedApp.WithdrawnAsync(notice);
             Assert.Equal(0, opened);
         });
+
+    /// <summary>The notice opens at the top-right of its screen's working area, clear of the main window centred below it, whose unlock form it would otherwise cover.</summary>
+    [Fact]
+    public Task The_notice_opens_top_right_clear_of_the_centred_main_window() =>
+        HeadlessSession.On(() =>
+        {
+            var main = new MainWindow();
+            main.Show();
+            var notice = Notice(new ManualClock(AppClock.Start), () => { });
+            notice.Show();
+            WindowInput.Drain();
+
+            var screens = notice.Screens;
+            Assert.NotNull(screens);
+            var screen = screens.ScreenFromWindow(notice) ?? screens.Primary;
+            Assert.NotNull(screen);
+            var area = screen.WorkingArea;
+            var shown = Bounds(notice);
+            var centred = Bounds(main);
+
+            Assert.True(area.Contains(centred.Center), $"the main window at {centred} is not on the notice's screen {area}");
+            Assert.False(shown.Intersects(centred), $"the notice at {shown} covers the main window at {centred}");
+            Assert.True(area.Contains(shown), $"the notice at {shown} is not inside the working area {area}");
+            Assert.True(shown.X > area.Center.X && shown.Bottom < area.Center.Y, $"the notice at {shown} is not at the top-right of {area}");
+
+            notice.Close();
+            main.Close();
+        });
+
+    private static PixelRect Bounds(Window window) =>
+        new(window.Position, PixelSize.FromSize(window.Bounds.Size, window.DesktopScaling));
 
     private static LockedNoticeWindow Notice(TimeProvider clock, Action open) => new("vault.kdbx", open, clock);
 }

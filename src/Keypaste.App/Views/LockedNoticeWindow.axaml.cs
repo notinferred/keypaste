@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -8,6 +9,9 @@ namespace Keypaste.App.Views;
 /// <summary>Tells the person, without taking focus, that an agent asked for a vault while the app was locked (D-0466).</summary>
 internal sealed partial class LockedNoticeWindow : PromptWindow
 {
+    /// <summary>How far the notice keeps from its screen's edges, in device-independent pixels.</summary>
+    private const double _edge = 8;
+
     public LockedNoticeWindow()
     {
         AvaloniaXamlLoader.Load(this);
@@ -16,6 +20,7 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
 
         // Focused once the person brings it forward, never as it opens, which would take the keyboard from the window they are typing in.
         Activated += (_, _) => dismiss.Focus();
+        Opened += (_, _) => PlaceWhereNotificationsSit();
     }
 
     /// <summary>A notice naming the vault an agent asked for, whose Open keypaste is armed a moment after it opens.</summary>
@@ -36,6 +41,23 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
             open();
         };
         Opened += (_, _) => _ = ArmAsync(clock);
+    }
+
+    /// <summary>
+    /// Moves the notice to the top-right of the working area of the screen it opened on, where system notifications
+    /// sit, clear of the unlock form at the centre of the main window.
+    /// </summary>
+    private void PlaceWhereNotificationsSit()
+    {
+        if (Screens is not { } screens || (screens.ScreenFromWindow(this) ?? screens.Primary) is not { } screen)
+        {
+            return;
+        }
+
+        var area = screen.WorkingArea;
+        var width = (int)Math.Ceiling(Width * DesktopScaling);
+        var edge = (int)Math.Round(_edge * DesktopScaling);
+        Position = new PixelPoint(area.Right - width - edge, area.Y + edge);
     }
 
     /// <summary>Lets Open keypaste be pressed, as <see cref="PromptViewModel.ArmingDelay"/> after opening does.</summary>

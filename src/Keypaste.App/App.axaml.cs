@@ -33,6 +33,7 @@ internal sealed partial class App : Application, IDisposable
 {
     private AppVaultSession? _session;
     private AppAuthority? _authority;
+    private Task? _ending;
     private DesktopPreferences? _preferences;
     private MinimizeLock? _minimize;
     private ActivityWatch? _activity;
@@ -110,7 +111,7 @@ internal sealed partial class App : Application, IDisposable
 
         ShowUnlock(home);
 
-        _tray = new AppTray(OpenWindow, () => _session?.Lock(VaultLockReason.Manual), () => _session?.IsUnlocked == true, Quit);
+        _tray = new AppTray(OpenWindow, () => _ = _session?.LockAsync(VaultLockReason.Manual), () => _session?.IsUnlocked == true, Quit);
         _tray.Show(_preferences.StaysInTray);
         _preferences.Changed += OnPreferencesChanged;
         _window.Closing += OnMainWindowClosing;
@@ -218,7 +219,7 @@ internal sealed partial class App : Application, IDisposable
         var unlocked = _session.IsUnlocked;
 
         // Locking also stops a hardware key waiting for its touch, so an unlock under way cannot finish with a later touch.
-        _session.Lock(VaultLockReason.Closed);
+        _ = _session.LockAsync(VaultLockReason.Closed);
 
         if (!unlocked)
         {
@@ -414,6 +415,9 @@ internal sealed partial class App : Application, IDisposable
         if (_shuttingDown || _shell is null)
         {
             Dispose();
+
+            // A second request while the quit below is stopping the endpoint ends the process only once it has stopped (D-0392).
+            _ending?.Wait();
             return;
         }
 
@@ -425,9 +429,32 @@ internal sealed partial class App : Application, IDisposable
         _ = Dispatcher.UIThread.InvokeAsync(async () =>
         {
             await shell.Clipboard.CloseAsync().ConfigureAwait(true);
-            Dispose();
+            await QuitAsync().ConfigureAwait(true);
             _desktop?.Shutdown();
         });
+    }
+
+    /// <summary>
+    /// Hides the window, so nothing reaches the screens it disposes, drops what <see cref="Dispose"/> drops, then waits
+    /// for the authority to end on a thread of its own, so the app keeps responding while the endpoint stops (D-0392).
+    /// </summary>
+    private async Task QuitAsync()
+    {
+        var authority = _authority;
+        _authority = null;
+
+        if (_window is { IsVisible: true } window)
+        {
+            window.Hide();
+        }
+
+        Dispose();
+
+        if (authority is not null)
+        {
+            _ending = authority.QuitAsync();
+            await _ending.ConfigureAwait(true);
+        }
     }
 
     private void OnLocked(object? sender, VaultLockReason reason)
@@ -451,7 +478,7 @@ internal sealed partial class App : Application, IDisposable
     private void OpenInPlace(string path, string? keyfile)
     {
         _openNext = (path, keyfile);
-        _session?.Lock(VaultLockReason.Manual);
+        _ = _session?.LockAsync(VaultLockReason.Manual);
     }
 
     /// <summary>What the unlock screen says when an access change could not carry on with the vault open.</summary>

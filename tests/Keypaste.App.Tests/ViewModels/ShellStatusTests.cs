@@ -4,6 +4,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -12,11 +13,12 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The titlebar says whether the file holds what is open, and the MCP card counts the distinct
-/// clients attached to the live session (D-0361).
+/// clients attached to the live session (D-0361); Lock gives the window back before the endpoint has stopped.
 /// </summary>
 public sealed class ShellStatusTests
 {
     private static readonly TimeSpan _connect = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan _absent = TimeSpan.FromMilliseconds(300);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -319,6 +321,71 @@ public sealed class ShellStatusTests
         await Task.WhenAny(changing, Task.Delay(_connect, Token));
     }
 
+    /// <summary>
+    /// Lock returns to its caller, the window, at once, and completes only once the endpoint has stopped, which waits
+    /// here for a prompt that comes down after its withdrawal, as F.35 found the pool can make any delivery wait (D-0392).
+    /// </summary>
+    [Fact]
+    public async Task Lock_GivesTheWindowBackBeforeTheEndpointHasStopped()
+    {
+        using var fixture = new TempVault();
+        fixture.Sees("cc");
+        var clock = new ManualClock(AppClock.Start);
+        var prompt = new ComesDownWhenTold();
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => prompt);
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
+
+        await using var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+        Assert.NotNull(client);
+        Assert.True((await client.AttachAsync(new AttachRequest(fixture.Path_) { Client = new("claude", "1", "cc") }, Token))!.Attached);
+        var pending = client.RequestAsync(
+            new CredentialRequest
+            {
+                Entry = "example",
+                Field = "password",
+                Reason = "run the tests",
+                TtlSeconds = 60,
+                Exposure = ["**"],
+                ClientName = "claude",
+                ClientLabel = "cc",
+                Vault = fixture.Path_,
+                Session = serving.Session,
+            },
+            Token).AsTask();
+        await prompt.Asked.WaitAsync(_connect, Token);
+
+        Task locking;
+
+        // Down on every way out: a prompt left up holds the endpoint's stop, and the authority's disposal behind it, for good.
+        try
+        {
+            var returned = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = Task.Run(() => returned.SetResult(shell.LockCommand.ExecuteAsync()), Token);
+            locking = await returned.Task.WaitAsync(_connect, Token);
+            await prompt.Withdrawn.WaitAsync(_connect, Token);
+
+            Assert.False(authority.Session.IsUnlocked);
+            Assert.False(locking.IsCompleted, "Lock finished before the endpoint could have stopped");
+        }
+        finally
+        {
+            prompt.ComeDown();
+        }
+
+        await locking.WaitAsync(_connect, Token);
+        var reply = await pending.WaitAsync(_connect, Token);
+        await using var afterLock = await ApproverClient.TryConnectAsync(serving.Endpoint, _absent, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditMethod.VaultLocked, reply.Method);
+        Assert.Null(reply.Value);
+        Assert.Null(afterLock);
+    }
+
     /// <summary>The idle warning counts the seconds left, rounded up, from the deadline the shell keeps, and is announced once.</summary>
     [Fact]
     public void TheIdleWarning_CountsDownEachSecond_AndIsAnnouncedOnce()
@@ -427,5 +494,27 @@ public sealed class ShellStatusTests
     {
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ApprovalAnswer.Denied);
+    }
+
+    /// <summary>A prompt that comes down only when the test says, however long after its withdrawal.</summary>
+    private sealed class ComesDownWhenTold : IApprovalChannel
+    {
+        private readonly TaskCompletionSource _asked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _withdrawn = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _down = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal Task Asked => _asked.Task;
+
+        internal Task Withdrawn => _withdrawn.Task;
+
+        internal void ComeDown() => _down.TrySetResult();
+
+        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            using var withdrawal = cancellationToken.Register(() => _withdrawn.TrySetResult());
+            _asked.TrySetResult();
+            await _down.Task.ConfigureAwait(false);
+            return ApprovalAnswer.Denied;
+        }
     }
 }

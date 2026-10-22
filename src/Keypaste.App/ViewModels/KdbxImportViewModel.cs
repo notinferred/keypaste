@@ -30,6 +30,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     private readonly Func<Task<string?>>? _pickKeyfile;
     private readonly Func<Task>? _chooseAnother;
     private readonly Func<SecretBuffer, Task<PasteOutcome>>? _paste;
+    private readonly Action<Action>? _post;
     private readonly string _fileName;
     private readonly SecretBuffer _password = new();
 
@@ -53,6 +54,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <param name="pickKeyfile">Asks which keyfile opens the file; null where nothing can ask.</param>
     /// <param name="chooseAnother">Asks for another file when this one cannot be read; null where nothing can ask.</param>
     /// <param name="paste">Reads the clipboard into a buffer under D-0225's rule, as for the master-password fields; null where nothing can paste.</param>
+    /// <param name="post">Runs an action on the UI thread, where a lock, which may run on another, closes the dialog; null closes it where the lock runs.</param>
     internal KdbxImportViewModel(
         AppVaultSession session,
         string path,
@@ -60,7 +62,8 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         Action<string> announce,
         Func<Task<string?>>? pickKeyfile = null,
         Func<Task>? chooseAnother = null,
-        Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
+        Func<SecretBuffer, Task<PasteOutcome>>? paste = null,
+        Action<Action>? post = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(path);
@@ -73,6 +76,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         _pickKeyfile = pickKeyfile;
         _chooseAnother = chooseAnother;
         _paste = paste;
+        _post = post;
         _fileName = System.IO.Path.GetFileName(path);
 
         if (KdbxImport.TryProbe(path, out var probe, out var error))
@@ -542,7 +546,17 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         return DisplayTextSanitizer.Sanitize(why).Text;
     }
 
-    private void OnLocked(object? sender, VaultLockReason reason) => Dispose();
+    private void OnLocked(object? sender, VaultLockReason reason)
+    {
+        if (_post is { } post)
+        {
+            post(Dispose);
+        }
+        else
+        {
+            Dispose();
+        }
+    }
 
     private static string Show(string? name) => name is null ? string.Empty : EntryNameSanitizer.SanitizePath(name).Text;
 

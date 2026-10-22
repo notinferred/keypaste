@@ -62,7 +62,7 @@ D-0466 in [DECISIONS](../../DECISIONS.md). T-7, T-10, T-11 and T-29 in [THREATS]
 
 - Whether the notice stays above other windows and leaves the keyboard alone on each desktop cannot be seen headless; R.1a checks it by hand.
 - A process of the same user that takes the name first makes agents be told the app is locked when it is not (T-29), and a second start by the same user can still show the unlock screen (D-0397).
-- The notice may sit over the unlock form.
+- The notice opens at the top-right of its screen's working area, where system notifications sit, clear of the unlock form at the centre of the main window; on a screen with little room above that window it can still cover the window's top-right corner (gaps-1c, RUNS-PENDING).
 - Deleting `app.toml` while the app is locked is not followed until the next lock. Where the system refuses the file watch, such as at Linux's limit on watches, the chosen vault is read again only at the next lock or change of the unlock screen.
 - With no app running, each refusal for want of an owner spends up to 200 ms on the knock.
 - Knocks in quick succession could go unheard. On Windows, a bridge that hung up before the app waited again was lost. On Unix, making the endpoint anew dropped a bridge queued behind the one being answered. [F.66](F.66.md) found both and fixed them.

@@ -168,6 +168,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         DependsOn(CancelTouchCommand, nameof(IsWaitingForTouch));
 
         _session.WaitingForTouch += OnWaitingForTouch;
+        _session.HolderLeft += OnHolderLeft;
         Reload();
         LockNote = lockedBy is { } reason ? DescribeLock(reason, session.Clock.GetLocalNow(), session.IdleTimeout) : string.Empty;
 
@@ -1236,6 +1237,14 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Project();
     }
 
+    private void OnHolderLeft(object? sender, EventArgs e) => _post(() =>
+    {
+        if (!_disposed)
+        {
+            ShowOwner();
+        }
+    });
+
     private void OnWaitingForTouch(object? sender, bool waiting) => _post(() =>
     {
         if (!_disposed)
@@ -1326,6 +1335,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _session.WaitingForTouch -= OnWaitingForTouch;
+        _session.HolderLeft -= OnHolderLeft;
         _restore?.Dispose();
         _master.Dispose();
         _new.Dispose();

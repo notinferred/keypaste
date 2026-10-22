@@ -64,7 +64,11 @@ internal sealed class AppVaultSession : IDisposable
     /// <summary>How long before locking the user is warned.</summary>
     internal static readonly TimeSpan WarningWindow = TimeSpan.FromSeconds(30);
 
+    /// <summary>How often a vault another process held at a refused unlock is tried again, until it is free.</summary>
+    internal static readonly TimeSpan HolderCheck = TimeSpan.FromSeconds(3);
+
     private readonly Lock _gate = new();
+    private readonly Lock _claiming = new();
     private readonly Lock _unsavedGate = new();
     private readonly List<EntryName> _unsaved = [];
     private readonly TimeProvider _clock;
@@ -76,6 +80,8 @@ internal sealed class AppVaultSession : IDisposable
     private VaultClaim? _claim;
     private SessionLifetime? _lifetime;
     private ITimer? _timer;
+    private ITimer? _holderWatch;
+    private string? _heldPath;
     private DateTimeOffset _activityWall;
     private long _activityStamp;
     private TimeSpan _idleTimeout;
@@ -322,11 +328,15 @@ internal sealed class AppVaultSession : IDisposable
         }
     }
 
-    /// <summary>Why the last unlock or create was refused as <see cref="UnlockOutcome.HeldElsewhere"/>.</summary>
+    /// <summary>Why the last unlock or create was refused as <see cref="UnlockOutcome.HeldElsewhere"/>, until that vault is free again.</summary>
     internal string? HeldElsewhere { get; private set; }
 
-    /// <summary>The process that held the vault when the last unlock or create was refused, when it named itself.</summary>
+    /// <summary>The process that held the vault when the last unlock or create was refused, when it named itself, until that vault is free again.</summary>
+    /// <remarks>The vault's claim is tried every <see cref="HolderCheck"/> meanwhile, since a holder from the command line names no endpoint to ask.</remarks>
     internal VaultOwner? HeldBy { get; private set; }
+
+    /// <summary>Raised, on the clock's thread, once the vault <see cref="HeldBy"/> named a holder for is free again and both are cleared.</summary>
+    internal event EventHandler? HolderLeft;
 
     /// <summary>Raised once per idle period, <see cref="WarningWindow"/> before locking.</summary>
     internal event EventHandler<TimeSpan>? LockingSoon;
@@ -515,17 +525,73 @@ internal sealed class AppVaultSession : IDisposable
                 claim = held;
                 HeldElsewhere = null;
                 HeldBy = null;
+                WatchHolder(null);
                 return true;
             }
         }
 
-        // Ownership passes to Adopt, or back through Release on every refusal after this.
+        bool taken;
+        string? refusal;
+        VaultOwner? holder;
+
+        // Never beside the holder check's own brief claim, which would refuse this unlock in this process's name.
+        lock (_claiming)
+        {
+            // Ownership passes to Adopt, or back through Release on every refusal after this.
 #pragma warning disable CA2000
-        var taken = VaultClaim.TryAcquire(_home, path, OwnerKind.DesktopApp, out claim, out var refusal, out var holder);
+            taken = VaultClaim.TryAcquire(_home, path, OwnerKind.DesktopApp, out claim, out refusal, out holder);
 #pragma warning restore CA2000
-        HeldElsewhere = refusal;
-        HeldBy = holder;
+        }
+
+        lock (_gate)
+        {
+            HeldElsewhere = refusal;
+            HeldBy = holder;
+            WatchHolder(holder is null ? null : path);
+        }
+
         return taken;
+    }
+
+    /// <summary>Tries the claim on <paramref name="path"/> every <see cref="HolderCheck"/> until it is free, or stops trying when null. Call under the lock.</summary>
+    private void WatchHolder(string? path)
+    {
+        _holderWatch?.Dispose();
+        _holderWatch = null;
+        _heldPath = path;
+
+        if (path is not null && !_disposed)
+        {
+            _holderWatch = _clock.CreateTimer(_ => CheckHolder(path), null, HolderCheck, HolderCheck);
+        }
+    }
+
+    /// <summary>Takes and at once gives back the claim on a vault another process held, and clears who held it once that works.</summary>
+    private void CheckHolder(string path)
+    {
+        lock (_claiming)
+        {
+            if (!VaultClaim.TryAcquire(_home, path, OwnerKind.DesktopApp, out var probe, out _, out _))
+            {
+                return;
+            }
+
+            probe.Dispose();
+        }
+
+        lock (_gate)
+        {
+            if (!string.Equals(_heldPath, path, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            WatchHolder(null);
+            HeldElsewhere = null;
+            HeldBy = null;
+        }
+
+        HolderLeft?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Gives back a claim an unlock took and did not use.</summary>
@@ -842,12 +908,13 @@ internal sealed class AppVaultSession : IDisposable
     /// <see cref="WriteResult{T}.Unwritten"/> is set.
     /// </para>
     /// <para>
-    /// Outside <c>_gate</c>, because a save can wait for a hardware key's touch, which <see cref="Lock(VaultLockReason)"/>
-    /// cancels.
+    /// Outside <c>_gate</c>, because a save can wait for a hardware key's touch or behind another save in this
+    /// process, and <see cref="Lock(VaultLockReason)"/> cancels either wait, so the save writes nothing and is
+    /// answered as locked.
     /// </para>
     /// </remarks>
     internal WriteResult<T> Write<T>(Func<Vault, T> edit, Func<T, bool> changed) =>
-        WriteTo(() => Unlocked, edit, changed);
+        WriteTo(UnlockedNow, edit, changed);
 
     /// <summary>Runs one edit against the vault <paramref name="lifetime"/> unlocked and saves it, as <see cref="Write{T}(Func{Vault, T}, Func{T, bool})"/> does.</summary>
     /// <typeparam name="T">What the edit returns.</typeparam>
@@ -859,19 +926,29 @@ internal sealed class AppVaultSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(lifetime);
 
-        return WriteTo(() => UnlockedFor(lifetime), edit, changed);
+        return WriteTo(() => UnlockedFor(lifetime) is { } vault ? (vault, lifetime.Ended) : null, edit, changed);
     }
 
-    private static WriteResult<T> WriteTo<T>(Func<Vault?> open, Func<Vault, T> edit, Func<T, bool> changed)
+    /// <summary>The open vault and what its lifetime's end cancels, or null when locked.</summary>
+    private (Vault Vault, CancellationToken Locked)? UnlockedNow()
+    {
+        lock (_gate)
+        {
+            return _vault is { } vault && _lifetime is { } lifetime ? (vault, lifetime.Ended) : null;
+        }
+    }
+
+    private static WriteResult<T> WriteTo<T>(Func<(Vault Vault, CancellationToken Locked)?> open, Func<Vault, T> edit, Func<T, bool> changed)
     {
         ArgumentNullException.ThrowIfNull(edit);
         ArgumentNullException.ThrowIfNull(changed);
 
-        if (open() is not { } vault)
+        if (open() is not { } opened)
         {
             return new WriteResult<T>(WriteOutcome.Locked);
         }
 
+        var vault = opened.Vault;
         T? value = default;
         var edited = false;
 
@@ -885,7 +962,7 @@ internal sealed class AppVaultSession : IDisposable
             }
 
             edited = true;
-            vault.Save();
+            vault.SaveUnlessCancelled(opened.Locked);
             return new WriteResult<T>(WriteOutcome.Saved, value);
         }
         catch (VaultChangedOnDiskException)
@@ -896,7 +973,11 @@ internal sealed class AppVaultSession : IDisposable
         {
             return new WriteResult<T>(WriteOutcome.Failed, value, edited, e.Message);
         }
-        catch (ObjectDisposedException) when (!ReferenceEquals(open(), vault))
+        catch (ObjectDisposedException) when (!ReferenceEquals(open()?.Vault, vault))
+        {
+            return new WriteResult<T>(WriteOutcome.Locked, value);
+        }
+        catch (OperationCanceledException) when (opened.Locked.IsCancellationRequested)
         {
             return new WriteResult<T>(WriteOutcome.Locked, value);
         }
@@ -1123,6 +1204,32 @@ internal sealed class AppVaultSession : IDisposable
         }
     }
 
+    /// <summary>Locks as <see cref="Lock(VaultLockReason)"/> does, on a thread of its own, for a person's lock asked on the UI thread.</summary>
+    /// <param name="reason">Why.</param>
+    /// <returns>Completes once that lock has returned, so its endpoint has stopped (D-0392) while the window kept painting.</returns>
+    internal Task LockAsync(VaultLockReason reason) => OnItsOwnThread(() => Lock(reason));
+
+    /// <summary>Runs <paramref name="work"/> on a thread of its own, which starts at once however busy the thread pool is.</summary>
+    /// <param name="work">What to run.</param>
+    /// <returns>Completes when <paramref name="work"/> has.</returns>
+    /// <remarks>
+    /// Not the pool's: a lock waits for the pool to deliver what agents are owed (F.35), and must not first wait for it to start.
+    /// Not a task's either: an exception ends the process, as one on the UI thread did, so a lock started and not awaited never fails unseen.
+    /// </remarks>
+    internal static Task OnItsOwnThread(Action work)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            work();
+            done.SetResult();
+        })
+        { IsBackground = true };
+
+        thread.Start();
+        return done.Task;
+    }
+
     /// <summary>Ends a lifetime, then disposes the vault it was answered from and the hardware key's last answer.</summary>
     /// <remarks>
     /// <para>
@@ -1151,6 +1258,7 @@ internal sealed class AppVaultSession : IDisposable
             }
 
             _disposed = true;
+            WatchHolder(null);
         }
 
         Lock(VaultLockReason.Shutdown);

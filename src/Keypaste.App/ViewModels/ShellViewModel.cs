@@ -130,7 +130,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             _clock,
             post);
 
-        LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
+        LockCommand = new AsyncRelayCommand(() => _session.LockAsync(VaultLockReason.Manual));
         DismissNoticeCommand = new RelayCommand(() => Notice = null);
         ReloadCommand = new RelayCommand(Reload);
         DismissToastCommand = new RelayCommand(() => Toast = null);
@@ -567,7 +567,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             Imported,
             _picker is null ? null : _picker.PickKeyfileAsync,
             _picker is null ? null : PickImportAsync,
-            Clipboard.TryPasteIntoAsync);
+            Clipboard.TryPasteIntoAsync,
+            _post);
 
         import.Closed += (_, _) =>
         {
@@ -629,8 +630,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         private set => Set(ref _vaultStatusDetail, value);
     }
 
-    /// <summary>Locks now.</summary>
-    internal RelayCommand LockCommand { get; }
+    /// <summary>Locks now, off the UI thread, so the window keeps painting until the endpoint has stopped.</summary>
+    internal AsyncRelayCommand LockCommand { get; }
 
     /// <summary>Whether this app is answering agents for the vault, as its authority says; the Agents row's dot.</summary>
     internal bool AgentsServing

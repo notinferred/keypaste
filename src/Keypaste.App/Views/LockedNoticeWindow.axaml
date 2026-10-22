@@ -12,8 +12,7 @@
                     TransparencyLevelHint="Transparent"
                     Background="Transparent"
                     Topmost="True"
-                    ShowActivated="False"
-                    WindowStartupLocation="CenterScreen">
+                    ShowActivated="False">
 
   <Window.Styles>
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />

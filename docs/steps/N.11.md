@@ -58,7 +58,7 @@ D-0464, and D-0382, D-0439 and D-0445 amended to it, in [DECISIONS](../../DECISI
 
 ## Limits and follow-ups
 
-- A lock waits for a save already queued at the holder, as F.35 found.
+- A lock fails a save still queued at the holder behind another save, which writes nothing and is refused as `vault-locked`, and waits only for one already writing (D-0392) (gaps-1c, RUNS-PENDING).
 - The access-change path kept gaps this step did not copy: it did not commit within the asking unlock, it wrote to whatever vault was unlocked, and it did not register its withdrawal with the lifetime. Fixed: the app saves an agent's settings only through the unlock they were asked under, refused as locked once it has ended, and a lock or a reload withdraws a confirmation not yet drawn, as it does a credential request's (D-0396) (gaps-1c, RUNS-PENDING).
 - A form open on the same item in the app saves over a terminal's edit when the person saves it, and the edit stays in the item's history. The last save wins by founder decision 2026-10-22 (D-0515), as [desktop](../desktop.md#editing-your-vault) says.
 - Routed, a verb reads its values before the holder checks the item, so a refusal comes after typing.

@@ -43,9 +43,7 @@ public sealed class AccessibleDriveTests
         Assert.Contains(EnvResolution.List(shell.Session.Unlocked!, "billing", "dev").Variables, variable => variable.Key == "APP_ADDED");
 
         Named<IInvokeProvider>(shell, "Lock now", AutomationControlType.Button).Invoke();
-        RenderedShell.Drain();
-
-        Assert.True(shell.IsLocked);
+        shell.UntilLocked();
     });
 
     [Fact]

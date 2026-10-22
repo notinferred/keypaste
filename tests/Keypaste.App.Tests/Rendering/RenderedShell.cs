@@ -191,8 +191,20 @@ internal sealed class RenderedShell : IDisposable
     {
         Window.KeyPressQwerty(PhysicalKey.L, _command);
         Window.KeyReleaseQwerty(PhysicalKey.L, _command);
-        Drain();
+        UntilLocked();
     }
+
+    /// <summary>Runs the window's work until a person's lock, which runs off the UI thread, has put the unlock screen up.</summary>
+    internal void UntilLocked() =>
+        Assert.True(
+            SpinWait.SpinUntil(
+                () =>
+                {
+                    Drain();
+                    return IsLocked;
+                },
+                TimeSpan.FromSeconds(10)),
+            "the lock did not put the unlock screen up");
 
     internal T Named<T>(string name)
         where T : Control =>

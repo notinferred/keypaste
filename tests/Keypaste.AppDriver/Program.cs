@@ -1084,7 +1084,7 @@ internal sealed class Driver(string home)
             session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
             prompt,
-            // `keypaste lock` locks it as launch composes the app, on the thread this hold runs on.
+            // `keypaste lock` locks it as launch composes the app, started from the thread this hold runs on.
             AppAuthority.RequestLock(session, action => Post(context, () =>
             {
                 action();

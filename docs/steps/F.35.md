@@ -33,7 +33,7 @@ D-0392.
 
 ## Limits and follow-ups
 
-- A lock or quit now lasts as long as the pool takes to deliver what it owes, and the app's window does not respond meanwhile. With the pool held, one took 18.5 s; under the suite's own load the slowest took 1.15 s.
-- A handler that ignored its withdrawal would now hold the lock rather than lose its answer; the app's prompt window acknowledges a withdrawal as it happens. N.11 would put saves on this path, and `_saveGate.Wait()` cannot be cancelled, so a lock would wait for a save already queued there.
+- A lock or quit now lasts as long as the pool takes to deliver what it owes. With the pool held, one took 18.5 s; under the suite's own load the slowest took 1.15 s. A person's lock and a quit with the vault open run on a thread of their own, so the window keeps responding meanwhile (D-0392) (gaps-1c, RUNS-PENDING). A lock from a touch or the window's activation past the idle deadline, a minimize or an unlock finishing behind a window closed into the tray still runs on the UI thread; a quit with the vault already locked waits there for a lock still stopping the endpoint, and so does the window's read of what agents meet when it lands while a stop is under way.
+- A handler that ignored its withdrawal would now hold the lock rather than lose its answer; the app's prompt window acknowledges a withdrawal as it happens. A save still queued at the save gate when the lock ends the lifetime fails, writes nothing and is answered as locked, so a lock waits only for a save already writing (D-0392) (gaps-1c, RUNS-PENDING).
 - No test blocks a write at a lock: a denial fits every platform's pipe buffer, and a larger reply is cut by D-0315's bound.
 - No CHANGELOG entry: the desktop session is unreleased, its Unreleased entry already says a lock answers a waiting request as `vault-locked`, and a lock that freezes the window needs a starved pool.

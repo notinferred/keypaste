@@ -46,7 +46,7 @@ internal sealed class AppAuthority : IDisposable
         _host = new SessionHost(session, approverOverride, approvals, requestLock, servesLaunches: OperatingSystem.IsMacOS());
     }
 
-    /// <summary>What <c>keypaste lock</c> does to the app: locks the session as requested, on the thread <paramref name="post"/> runs it on.</summary>
+    /// <summary>What <c>keypaste lock</c> does to the app: locks the session as requested, started from the thread <paramref name="post"/> runs it on and run off it.</summary>
     /// <param name="session">The session to lock.</param>
     /// <param name="post">Runs an action on the UI thread; launch posts through the dispatcher.</param>
     /// <returns>The action the authority runs, answering once it has ended the session.</returns>
@@ -55,7 +55,7 @@ internal sealed class AppAuthority : IDisposable
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(post);
 
-        return () => post(() => session.Lock(VaultLockReason.Requested));
+        return () => post(() => _ = session.LockAsync(VaultLockReason.Requested));
     }
 
     /// <summary>The session agents are answered from.</summary>
@@ -212,4 +212,8 @@ internal sealed class AppAuthority : IDisposable
         Session.Dispose();
         _host.Dispose();
     }
+
+    /// <summary>Quits as <see cref="Dispose"/> does, on a thread of its own, so a window awaiting it keeps painting while the endpoint stops (D-0392).</summary>
+    /// <returns>Completes once the endpoint has stopped.</returns>
+    internal Task QuitAsync() => AppVaultSession.OnItsOwnThread(Dispose);
 }

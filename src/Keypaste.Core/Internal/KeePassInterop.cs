@@ -2620,6 +2620,11 @@ internal sealed class KeePassInterop : IDisposable
     /// abandons the save. Null when the caller has already taken its backup, or has none to take.
     /// </param>
     /// <param name="keyChange">A key change this save commits, verifying the bytes before they replace the vault; null for an ordinary save.</param>
+    /// <param name="cancellationToken">
+    /// Fails an attempt still waiting for the gate, or about to wait for it, with
+    /// <see cref="OperationCanceledException"/>, so a save queued behind another writes nothing once
+    /// its caller has given up on it; an attempt that holds the gate finishes.
+    /// </param>
     internal void Save(
         Func<bool>? hasChangedOnDisk,
         Action<int>? waitBetweenAttempts,
@@ -2627,7 +2632,8 @@ internal sealed class KeePassInterop : IDisposable
         int attempts = SaveAttempts,
         Action<int>? duringAttempt = null,
         Action<string>? beforeReplacing = null,
-        KeyChange? keyChange = null)
+        KeyChange? keyChange = null,
+        CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -2639,7 +2645,7 @@ internal sealed class KeePassInterop : IDisposable
         clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
         for (int attempt = 1;
-            !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt, ref beforeReplacing, keyChange);
+            !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt, ref beforeReplacing, keyChange, cancellationToken);
             attempt++)
         {
             var retry = attempt;
@@ -2678,10 +2684,11 @@ internal sealed class KeePassInterop : IDisposable
         int attempts,
         Action<int>? duringAttempt,
         ref Action<string>? beforeReplacing,
-        KeyChange? keyChange)
+        KeyChange? keyChange,
+        CancellationToken cancellationToken)
     {
         clock.BeginAttempt();
-        var gated = EnterGateIfTransacting(clock);
+        var gated = EnterGateIfTransacting(clock, cancellationToken);
         var strandedATemporary = false;
 
         try
@@ -2770,14 +2777,14 @@ internal sealed class KeePassInterop : IDisposable
     /// (<c>TheVendoredSaveTransactsOnlyOverAnExistingFile</c> pins the rule this restates).
     /// </para>
     /// </remarks>
-    private bool EnterGateIfTransacting(SaveClock clock)
+    private bool EnterGateIfTransacting(SaveClock clock, CancellationToken cancellationToken)
     {
         if (!File.Exists(_database.IOConnectionInfo.Path))
         {
             return false;
         }
 
-        clock.WaitForGate(Volatile.Read(ref _gateHolder), _saveGate.Wait);
+        clock.WaitForGate(Volatile.Read(ref _gateHolder), () => _saveGate.Wait(cancellationToken));
         Volatile.Write(ref _gateHolder, clock.Operation);
         return true;
     }

@@ -2001,6 +2001,19 @@ public sealed class Vault : IDisposable
         Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts, backUp: !_backedUp);
     }
 
+    /// <summary>Writes the vault as <see cref="Save"/> does, unless <paramref name="cancellationToken"/> is
+    /// cancelled while the save waits behind another save in this process.</summary>
+    /// <param name="cancellationToken">Cancelled once the save must not begin writing, as when the unlock it was made under ends.</param>
+    /// <exception cref="OperationCanceledException">Cancelled before the save began writing; nothing was written.</exception>
+    /// <exception cref="VaultChangedOnDiskException">Something else wrote to <see cref="Path"/>.</exception>
+    public void SaveUnlessCancelled(CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfRekeyed();
+
+        Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts, backUp: !_backedUp, cancellationToken: cancellationToken);
+    }
+
     /// <summary>Writes the vault to <see cref="Path"/>, discarding whatever else was written
     /// there.</summary>
     /// <remarks>
@@ -2440,7 +2453,8 @@ public sealed class Vault : IDisposable
         bool backUp = false,
         bool applyFloor = true,
         KeePassInterop.KeyChange? keyChange = null,
-        Action? afterReplacing = null)
+        Action? afterReplacing = null,
+        CancellationToken cancellationToken = default)
     {
         var clock = new SaveClock();
         var succeeded = false;
@@ -2460,7 +2474,8 @@ public sealed class Vault : IDisposable
             _interop.Save(
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
                 backUp ? path => PreserveBefore(path, applyFloor) : null,
-                keyChange);
+                keyChange,
+                cancellationToken);
             afterReplacing?.Invoke();
             var stamp = clock.Stamp(() => _interop.WrittenDigest ?? SourceSnapshot.Digest(Path));
 

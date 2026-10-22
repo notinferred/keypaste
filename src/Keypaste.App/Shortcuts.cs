@@ -84,7 +84,7 @@ internal sealed class Shortcuts : IDisposable
 
         if (e.Key == Key.L)
         {
-            _session.Lock(VaultLockReason.Manual);
+            _ = _session.LockAsync(VaultLockReason.Manual);
             e.Handled = true;
             return;
         }

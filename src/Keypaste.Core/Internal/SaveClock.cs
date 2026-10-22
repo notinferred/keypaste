@@ -48,6 +48,9 @@ internal sealed class SaveClock
     /// <summary>Raised once per save, successful or not. Nothing subscribes outside a test.</summary>
     internal static event Action<SaveTiming>? Observed;
 
+    /// <summary>Raised as an attempt begins waiting for the gate, with the operation holding it then. Nothing subscribes outside a test.</summary>
+    internal static event Action<long>? WaitingForGate;
+
     internal long Operation { get; } = Interlocked.Increment(ref _lastOperation);
 
     internal T Check<T>(Func<T> read) => Time(read, elapsed => _check = elapsed);
@@ -59,6 +62,7 @@ internal sealed class SaveClock
     /// <summary>Times this attempt's wait for the gate, which <paramref name="heldBy"/> held as it began.</summary>
     internal void WaitForGate(long heldBy, Action wait)
     {
+        WaitingForGate?.Invoke(heldBy);
         Time(wait, elapsed => Current = Current with { Gate = elapsed, HeldBy = heldBy });
         _gatedAttempt = _attempts.Count - 1;
         _gateTaken = Stopwatch.GetTimestamp();
