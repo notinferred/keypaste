@@ -445,7 +445,7 @@ public sealed class VaultOrganizeTests : IDisposable
 
         Assert.Equal(["env:billing", "env:billing:prod"], dropped);
         Assert.Equal(["finance"], vault.Tags(copy!));
-        Assert.Equal(["env:billing", "finance", "env:billing:prod"], vault.Tags(_token));
+        Assert.Equal(["env:billing", "env:billing:prod", "finance"], vault.Tags(_token));
         Assert.Equal([copy!], Assert.Single(edits).Entries);
 
         Assert.Equal([new EnvSource("STRIPE_KEY", _token, "STRIPE_KEY")], EnvResolution.List(vault, "billing", "dev").Sources);
