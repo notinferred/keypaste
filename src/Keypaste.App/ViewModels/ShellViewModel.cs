@@ -134,7 +134,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ReloadCommand = new RelayCommand(Reload);
         DismissToastCommand = new RelayCommand(() => Toast = null);
         OpenProjectCommand = new RelayCommand<string>(OpenProject);
-        BackCommand = new RelayCommand(() => Current = Destinations.PlaceOf(Current), () => HasBack);
+        BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
         NewProjectCommand = new RelayCommand(NewProject);
         ImportEnvCommand = new RelayCommand(ImportEnv);
         ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && _share is null);
@@ -506,14 +506,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Opens Env profiles on a project.</summary>
     internal RelayCommand<string> OpenProjectCommand { get; }
 
-    /// <summary>Goes up from a screen under a place to the place.</summary>
+    /// <summary>Goes up from a screen to the screen or place it sits under.</summary>
     internal RelayCommand BackCommand { get; }
 
     /// <summary>Whether the shell shows a screen under a place, which offers Back.</summary>
     internal bool HasBack => !_current.IsPlace;
 
-    /// <summary>What Back says: the place it returns to.</summary>
-    internal string BackTitle => Destinations.PlaceOf(_current).Title;
+    /// <summary>What Back says: the screen or place it returns to.</summary>
+    internal string BackTitle => Destinations.UpOf(_current).Title;
 
     /// <summary>Items' "+" menu: New project, on Env profiles.</summary>
     internal RelayCommand NewProjectCommand { get; }
@@ -834,6 +834,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowToast),
             DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home),
+            DestinationKind.Advanced => new AdvancedViewModel(_session, kind => Current = Destinations.Of(kind)),
             _ => null,
         };
 

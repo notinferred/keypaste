@@ -51,6 +51,10 @@
       <views:DiagnosticsView />
     </DataTemplate>
 
+    <DataTemplate DataType="vm:AdvancedViewModel">
+      <views:AdvancedView />
+    </DataTemplate>
+
   </UserControl.DataTemplates>
 
   <UserControl.Styles>

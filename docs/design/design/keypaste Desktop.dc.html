@@ -10,119 +10,170 @@
 <helmet><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fragment+Mono"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css"><style>body{margin:0;background:#111214;color:#F2F2F0;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#F2B544;text-decoration:none}a:hover{color:#F7C566}*{box-sizing:border-box}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2A2C30;border-radius:5px;border:2px solid #111214}</style></helmet>
 <div data-screen-label="Desktop app" style="height:100vh;min-height:640px;display:grid;grid-template-rows:40px minmax(0,1fr);background:#111214;color:#F2F2F0;overflow:hidden;position:relative">
 <div style="display:grid;grid-template-columns:232px minmax(0,1fr) auto;align-items:center;border-bottom:1px solid #26282C;background:#18191C">
-<div style="display:flex;gap:8px;padding:0 16px"><span style="width:12px;height:12px;border-radius:50%;background:#3A3D43"></span><span style="width:12px;height:12px;border-radius:50%;background:#3A3D43"></span><span style="width:12px;height:12px;border-radius:50%;background:#3A3D43"></span></div>
-<div style="justify-self:center;width:min(440px,100%);height:28px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #26282C;font-size:12.5px;color:#8E9096;min-width:0;overflow:hidden"><i class="icon-search" style="font-size:13px;flex:none"></i><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Search secrets, agents, projects</span><span style="flex:none;margin-left:auto;font-family:'Fragment Mono',monospace;font-size:10.5px;padding:1px 6px;border-radius:4px;background:#24262A">⌘K</span></div>
+<div style="height:40px"></div>
+<div style="justify-self:center;width:min(440px,100%);height:28px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #26282C;font-size:12.5px;color:#8E9096;min-width:0;overflow:hidden"><i class="icon-search" style="font-size:13px;flex:none"></i><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ searchText }}</span><sc-if value="{{ hasScope }}"><span style="flex:none;height:20px;padding:0 4px 0 7px;display:flex;align-items:center;gap:4px;border-radius:4px;background:#24262A;font-family:'Fragment Mono',monospace;font-size:11px;color:#C9CACD">{{ group }}<i onClick="{{ clearScope }}" class="icon-x" style="font-size:11px;color:#8E9096;cursor:pointer"></i></span></sc-if><span style="flex:none;margin-left:auto;font-family:'Fragment Mono',monospace;font-size:10.5px;padding:1px 6px;border-radius:4px;background:#24262A">⌘K</span></div>
 <div style="display:flex;align-items:center;gap:6px;padding:0 12px;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096"><span style="display:flex;align-items:center;gap:6px;padding:0 8px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.80 0.13 155)"></span>acme.kdbx · saved</span><span onClick="{{ doLock }}" style="white-space:nowrap;flex:none;height:26px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:6px;background:#24262A;color:#C9CACD;cursor:pointer" style-hover="background:#2A2C30"><i class="icon-lock" style="font-size:12px"></i>lock</span></div>
 </div>
 <div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:0">
-<aside style="display:flex;flex-direction:column;gap:20px;padding:16px 10px;background:#18191C;border-right:1px solid #26282C;min-height:0;overflow:auto">
-<div style="display:flex;align-items:center;gap:8px;padding:0 8px"><svg width="22" height="22" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"></polygon></svg><span style="font-size:19px;font-weight:600;letter-spacing:-0.045em">keypaste</span></div>
+<aside style="display:flex;flex-direction:column;padding:16px 10px;background:#18191C;border-right:1px solid #26282C;min-height:0;overflow:auto">
+<div style="padding:2px 8px 22px 10px"><svg width="104" height="21.05" viewBox="0 0 494.08 100" role="img" aria-label="keypaste"><path fill="#F2F2F0" d="M189.85 100H218.85V91.95H209.2V71.5Q212.2 75.25 216.2 77.4Q221.2 80.1 227.5 80.1Q235.55 80.1 241.43 76.55Q247.3 73 250.5 66.7Q253.7 60.4 253.7 52.25Q253.7 46.15 251.85 41.05Q250 35.95 246.65 32.2Q243.3 28.45 238.7 26.4Q234.1 24.35 228.55 24.35Q223.15 24.35 219.28 26.35Q215.4 28.35 212.98 31.87Q210.55 35.4 209.6 40H209.2V25.45H189.85V33.5H199.8V91.95H189.85ZM19.3 70.95V62.9L32.4 52.55L46.15 70.95H37V79H64.5V70.95H57.75L39.3 47.15L56.55 33.5H63.85V25.45H29.25V33.5H44.45L19.3 53.9V0H0V8.05H9.9V70.95H0V79H27.9V70.95ZM97.4 80Q106.15 80 112.7 75.9Q119.25 71.8 122.15 64.7L113.25 61.35Q111.3 66 107.17 68.67Q103.05 71.35 97.3 71.35Q91.75 71.35 87.78 68.92Q83.8 66.5 81.7 62.25Q80.15 59.15 79.7 55.4H123.05Q123.15 54.95 123.2 54.27Q123.25 53.6 123.25 52.4Q123.25 44.15 120.08 37.85Q116.9 31.55 110.97 28Q105.05 24.45 96.9 24.45Q88.85 24.45 82.8 28.02Q76.75 31.6 73.4 37.92Q70.05 44.25 70.05 52.4Q70.05 60.5 73.35 66.72Q76.65 72.95 82.8 76.47Q88.95 80 97.4 80ZM447.1 80Q455.85 80 462.4 75.9Q468.95 71.8 471.85 64.7L462.95 61.35Q461 66 456.88 68.67Q452.75 71.35 447 71.35Q441.45 71.35 437.48 68.92Q433.5 66.5 431.4 62.25Q429.85 59.15 429.4 55.4H472.75Q472.85 54.95 472.9 54.27Q472.95 53.6 472.95 52.4Q472.95 44.15 469.78 37.85Q466.6 31.55 460.68 28Q454.75 24.45 446.6 24.45Q438.55 24.45 432.5 28.02Q426.45 31.6 423.1 37.92Q419.75 44.25 419.75 52.4Q419.75 60.5 423.05 66.72Q426.35 72.95 432.5 76.47Q438.65 80 447.1 80ZM305.45 79H316.95V70.95H309.4V42.8Q309.4 36.6 307 32.52Q304.6 28.45 299.83 26.4Q295.05 24.35 287.85 24.35Q281.1 24.35 276.33 26.15Q271.55 27.95 268.73 31.57Q265.9 35.2 265 40.65L274 42.5Q274.95 37.75 278.3 35.38Q281.65 33 287.5 33Q291.55 33 294.35 34.17Q297.15 35.35 298.58 37.65Q300 39.95 300 43.35V44.95L279.7 49.15Q271.05 50.95 267.3 54.52Q263.55 58.1 263.55 64.7Q263.55 72.05 267.95 75.88Q272.35 79.7 280.75 79.7Q288.95 79.7 293.7 75.4Q298.45 71.1 299.6 62.7H300V72.55Q300 75.65 301.4 77.33Q302.8 79 305.45 79ZM160.6 25.45V33.5H170.3L156.8 68.65H156.6L142.65 33.5H151.35V25.45H125.95V33.5H132.5L151.6 80.15L150.3 83.4Q148.6 87.5 144.48 89.62Q140.35 91.75 135.15 91.75H129.7V100H135.15Q143.9 100 149.9 96.25Q155.9 92.5 158.75 85.5L179.7 33.5H185.4V25.45ZM351.3 80Q360 80 364.38 75.88Q368.75 71.75 368.75 64.45Q368.75 57.35 364.13 53.15Q359.5 48.95 348.2 47.2Q341.1 46 337.78 44.08Q334.45 42.15 334.45 38.8Q334.45 35.85 336.78 33.95Q339.1 32.05 343.5 32.05Q348.95 32.05 352.68 34.9Q356.4 37.75 357.2 42.2H366.6V25.45H357.2V36.6H356.8Q356.35 33 354.62 30.27Q352.9 27.55 349.7 26Q346.5 24.45 341.6 24.45Q333.65 24.45 329.35 28.5Q325.05 32.55 325.05 39.05Q325.05 45.65 329.95 49.8Q334.85 53.95 346.65 55.8Q353.85 56.95 356.62 58.88Q359.4 60.8 359.4 64.45Q359.4 68.35 356.73 70.38Q354.05 72.4 349 72.4Q343 72.4 339.05 69.55Q335.1 66.7 334.25 62.2H324.85V79H334.25V68.1H334.65Q335.15 71.6 337.18 74.28Q339.2 76.95 342.73 78.47Q346.25 80 351.3 80ZM208.9 52.4Q208.9 46.6 211 42.17Q213.1 37.75 217.05 35.27Q221 32.8 226.45 32.8Q231.7 32.8 235.68 35.27Q239.65 37.75 241.83 42.12Q244 46.5 244 52.25Q244 57.95 241.9 62.33Q239.8 66.7 235.88 69.18Q231.95 71.65 226.45 71.65Q220.9 71.65 216.95 69.18Q213 66.7 210.95 62.38Q208.9 58.05 208.9 52.4ZM393.4 64.65V33.5H410.85L410.95 25.45H393.4V11.95H384V25.45H375V33.5H384V64.65Q384 69.4 385.53 72.83Q387.05 76.25 390.18 78.12Q393.3 80 398.2 80Q402.95 80 405.95 78.2Q408.95 76.4 410.38 72.95Q411.8 69.5 411.8 64.55V59.4H403.45V64.65Q403.45 68 402.15 69.72Q400.85 71.45 398.4 71.45Q395.95 71.45 394.68 69.78Q393.4 68.1 393.4 64.65ZM113.7 48.25H79.85Q80.35 45 81.7 42.25Q83.9 37.85 87.8 35.38Q91.7 32.9 96.9 32.9Q102.3 32.9 106.1 35.35Q109.9 37.8 111.9 42Q113.25 44.85 113.7 48.25ZM463.4 48.25H429.55Q430.05 45 431.4 42.25Q433.6 37.85 437.5 35.38Q441.4 32.9 446.6 32.9Q452 32.9 455.8 35.35Q459.6 37.8 461.6 42Q462.95 44.85 463.4 48.25ZM300.35 51.55Q300.25 57.4 298.1 61.85Q295.8 66.5 291.73 69.08Q287.65 71.65 282.3 71.65Q277.9 71.65 275.6 69.75Q273.3 67.85 273.3 64.1Q273.3 60.75 275.25 58.77Q277.2 56.8 281.25 55.85Z"></path><path fill="#F2B544" d="M480.45 79H494.08V65.37H480.45Z"></path></svg></div>
 <nav style="display:grid;gap:2px">
-<sc-for list="{{ nav }}" as="item" hint-placeholder-count="5">
-<div onClick="{{ item.onClick }}" style="height:34px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;background:{{ item.bg }};color:{{ item.fg }}" style-hover="background:#24262A"><i class="icon-{{ item.icon }}" style="font-size:16px;color:{{ item.ic }}"></i>{{ item.label }}<span style="margin-left:auto;font-family:'Fragment Mono',monospace;font-size:11px;color:{{ item.cc }}">{{ item.count }}</span></div>
+<sc-for list="{{ sideRows }}" as="r" hint-placeholder-count="9">
+<sc-if value="{{ r.isPlace }}"><div onClick="{{ r.onClick }}" style="height:34px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;background:{{ r.bg }};color:{{ r.fg }}" style-hover="background:#24262A"><i class="icon-{{ r.icon }}" style="font-size:16px;color:{{ r.ic }}"></i>{{ r.label }}<span style="margin-left:auto;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">{{ r.count }}</span><sc-if value="{{ r.dot }}"><span title="Answering agents from this app" style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span></sc-if><sc-if value="{{ r.fold }}"><i onClick="{{ r.onFold }}" title="Show or hide the groups" class="icon-{{ r.fold }}" style="font-size:12px;color:#8E9096"></i></sc-if></div></sc-if>
+<sc-if value="{{ r.isGroup }}"><div onClick="{{ r.onClick }}" style="height:28px;padding:0 10px 0 {{ r.indent }};display:grid;grid-template-columns:16px auto minmax(0,1fr);align-items:center;border-radius:7px;font-size:13px;cursor:pointer;background:{{ r.bg }};color:{{ r.fg }}" style-hover="background:#24262A"><span onClick="{{ r.onFold }}" style="display:flex;align-items:center;justify-content:center"><sc-if value="{{ r.fold }}"><i class="icon-{{ r.fold }}" style="font-size:12px;color:#8E9096"></i></sc-if></span><i class="icon-folder" style="font-size:14px;margin:0 8px 0 4px;color:{{ r.ic }}"></i><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span></div></sc-if>
+<sc-if value="{{ r.isHeading }}"><div style="padding:14px 10px 6px;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em">PROJECTS</div></sc-if>
+<sc-if value="{{ r.isProject }}"><div onClick="{{ r.onClick }}" style="height:30px;padding:0 10px 0 24px;display:flex;align-items:center;gap:10px;border-radius:7px;font-family:'Fragment Mono',monospace;font-size:12px;cursor:pointer;background:{{ r.bg }};color:{{ r.fg }}" style-hover="background:#24262A"><i class="icon-folder-git-2" style="font-size:14px;color:{{ r.ic }}"></i>{{ r.label }}<span style="margin-left:auto;font-size:11px;color:#8E9096">{{ r.count }}</span></div></sc-if>
 </sc-for>
 </nav>
-<div style="display:grid;gap:2px">
-<div style="padding:0 10px 6px;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em">PROJECTS</div>
-<sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
-<div style="height:30px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-{{ p.icon }}" style="font-size:14px;color:#8E9096"></i>{{ p.name }}<span style="margin-left:auto;font-size:11px;color:#8E9096">{{ p.n }}</span></div>
+<div style="margin-top:auto;padding-top:12px;display:grid;gap:2px">
+<sc-for list="{{ footRows }}" as="r" hint-placeholder-count="2">
+<div onClick="{{ r.onClick }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;background:{{ r.bg }};color:{{ r.fg }}" style-hover="background:#24262A"><i class="icon-{{ r.icon }}" style="font-size:14px;color:{{ r.ic }}"></i>{{ r.label }}<span style="margin-left:auto;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">{{ r.count }}</span></div>
 </sc-for>
-</div>
-<div style="margin-top:auto;display:grid;gap:8px">
-<div onClick="{{ openImport }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-size:13px;color:#C9CACD;cursor:pointer;border:1px dashed #3A3D43" style-hover="background:#24262A"><i class="icon-file-input" style="font-size:15px;color:#8E9096"></i>Import .kdbx</div>
-<div onClick="{{ simulate }}" style="padding:10px;border-radius:8px;background:#111214;border:1px solid #26282C;display:grid;gap:4px;cursor:pointer" style-hover="border-color:#3A3D43">
-<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500"><i class="icon-plug" style="font-size:14px;color:#F2B544"></i>MCP server<span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:11px;color:oklch(0.80 0.13 155)"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>running</span></div>
-<div style="font-family:'Fragment Mono',monospace;font-size:10.5px;color:#8E9096">stdio · 3 clients · click to simulate a request</div>
-</div>
 </div>
 </aside>
-<main style="min-width:0;min-height:0;overflow:auto">
-<sc-if value="{{ isVault }}" hint-placeholder-val="{{ true }}">
-<div data-screen-label="Secrets" style="height:100%;display:grid;grid-template-columns:minmax(240px,34%) minmax(0,1fr)">
-<div style="border-right:1px solid #26282C;display:flex;flex-direction:column;min-height:0">
-<div style="padding:16px 16px 12px;display:grid;gap:12px;border-bottom:1px solid #26282C">
-<div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Fragment Mono',monospace;font-size:13px">acme/api</span><span style="height:20px;padding:0 7px;display:flex;align-items:center;border-radius:4px;background:#24262A;font-family:'Fragment Mono',monospace;font-size:11px;color:#C9CACD">dev</span><span style="white-space:nowrap;flex:none;margin-left:auto;height:28px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#F2B544;color:#111214;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#F7C566"><i class="icon-plus" style="font-size:13px"></i>New</span></div>
-<div style="height:30px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #26282C;font-size:12.5px;color:#8E9096"><i class="icon-filter" style="font-size:13px"></i>Filter 7 secrets</div>
+<main style="min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column">
+<sc-if value="{{ hasBack }}"><div style="padding:12px 24px 0;flex:none"><span onClick="{{ goBack }}" title="Back to {{ backTitle }}" style="display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;border-radius:7px;font-size:12.5px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-chevron-left" style="font-size:13px"></i>{{ backTitle }}</span></div></sc-if>
+<sc-if value="{{ isItems }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Items" style="flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(100px,2fr) 1px minmax(140px,3fr)">
+<div style="padding:16px 16px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #26282C">
+<span style="font-family:'Fragment Mono',monospace;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ listTitle }}</span>
+<sc-if value="{{ canRenameGroup }}"><span title="Rename group" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#8E9096;cursor:pointer" style-hover="background:#24262A"><i class="icon-folder-pen" style="font-size:14px"></i></span></sc-if>
+<span style="position:relative;margin-left:auto;flex:none">
+<span onClick="{{ toggleNew }}" style="white-space:nowrap;height:28px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#F2B544;color:#111214;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#F7C566"><i class="icon-plus" style="font-size:13px"></i>New<i class="icon-chevron-down" style="font-size:12px"></i></span>
+<sc-if value="{{ newOpen }}"><div style="position:absolute;right:0;top:34px;z-index:5;width:220px;padding:6px;border-radius:10px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 8px 24px rgba(0,0,0,.35);display:grid;gap:2px">
+<sc-for list="{{ newMenu }}" as="m" hint-placeholder-count="5"><div onClick="{{ m.onClick }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:6px;font-size:13px;color:#F2F2F0;cursor:pointer" style-hover="background:#24262A"><i class="icon-{{ m.icon }}" style="font-size:14px;color:#8E9096"></i>{{ m.label }}</div></sc-for>
+</div></sc-if>
+</span>
 </div>
-<div style="overflow:auto;padding:6px">
-<sc-for list="{{ secrets }}" as="x" hint-placeholder-count="7">
-<div onClick="{{ x.onClick }}" style="height:52px;padding:0 10px;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:4px 10px;align-content:center;align-items:center;border-radius:7px;cursor:pointer;background:{{ x.bg }};box-shadow:{{ x.bar }}" style-hover="background:#1D1E22"><i class="icon-{{ x.icon }}" style="font-size:15px;color:{{ x.ic }}"></i><span style="font-family:'Fragment Mono',monospace;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.key }}</span><span style="display:flex;align-items:center;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">{{ x.used }}<span style="width:6px;height:6px;border-radius:50%;background:{{ x.dot }}"></span></span><span></span><span style="font-size:11.5px;color:#8E9096">{{ x.kind }}</span></div>
+<div style="overflow:auto;padding:6px 10px;min-height:0">
+<div style="min-width:760px;height:28px;padding:0 10px;display:grid;grid-template-columns:28px minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.1fr) 96px minmax(0,.9fr) 92px;gap:10px;align-items:center;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span></span><span>TITLE</span><span>USERNAME</span><span>URL</span><span>KIND</span><span>GROUP</span><span style="text-align:right">LAST USED</span></div>
+<sc-for list="{{ rows }}" as="x" hint-placeholder-count="6">
+<div onClick="{{ x.onClick }}" style="min-width:760px;height:36px;padding:0 10px;display:grid;grid-template-columns:28px minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.1fr) 96px minmax(0,.9fr) 92px;gap:10px;align-items:center;border-radius:7px;cursor:pointer;background:{{ x.bg }};box-shadow:{{ x.bar }}" style-hover="background:#1D1E22"><i class="icon-{{ x.icon }}" style="font-size:15px;color:{{ x.ic }}"></i><span style="font-family:{{ x.font }};font-size:{{ x.size }};font-weight:{{ x.weight }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.title }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:{{ x.userC }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.userText }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:{{ x.urlC }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.urlText }}</span><span style="font-size:12.5px;color:#8E9096">{{ x.kind }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#8E9096;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.group }}</span><span style="display:flex;align-items:center;justify-content:flex-end;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">{{ x.used }}<span style="width:6px;height:6px;border-radius:50%;background:{{ x.dot }}"></span></span></div>
 </sc-for>
 </div>
-</div>
-<div style="overflow:auto;padding:28px 32px;display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-content:start;max-width:820px;min-width:0">
+<div title="Drag to resize" style="background:#26282C;cursor:row-resize"></div>
+<div style="overflow:auto;min-height:0">
+<div style="padding:28px 32px;display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-content:start;max-width:820px;min-width:0">
 <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-<div style="display:grid;gap:6px;min-width:0"><span style="font-family:'Fragment Mono',monospace;font-size:22px;letter-spacing:-0.01em;overflow-wrap:anywhere">{{ cur.key }}</span><span style="font-size:13px;color:#8E9096;overflow-wrap:anywhere">{{ cur.kind }} · acme.kdbx › acme › api › dev</span></div>
+<div style="display:grid;gap:6px;min-width:0"><span style="font-family:{{ cur.font }};font-size:22px;font-weight:{{ cur.titleWeight }};letter-spacing:-0.01em;overflow-wrap:anywhere">{{ cur.title }}</span><span style="font-size:13px;color:#8E9096;overflow-wrap:anywhere">{{ cur.kind }} · acme.kdbx › {{ cur.pathText }}</span></div>
 <div style="margin-left:auto;display:flex;gap:6px;font-size:12.5px;font-weight:500">
-<span onClick="{{ copyVal }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-copy" style="font-size:13px"></i>Copy</span>
-<span style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-refresh-cw" style="font-size:13px"></i>Rotate</span>
-<span style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:#2A2C30"><i class="icon-ellipsis" style="font-size:14px"></i></span>
+<span onClick="{{ copySecret }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-copy" style="font-size:13px"></i>Copy</span>
+<span onClick="{{ rotate }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-refresh-cw" style="font-size:13px"></i>Rotate</span>
+<span style="position:relative;flex:none">
+<span onClick="{{ toggleMenu }}" title="More" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-ellipsis" style="font-size:14px"></i></span>
+<sc-if value="{{ menuOpen }}"><div style="position:absolute;right:0;top:36px;z-index:5;width:280px;padding:6px;border-radius:10px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 8px 24px rgba(0,0,0,.35);display:grid;gap:2px;font-weight:400">
+<div onClick="{{ toggleMenu }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:6px;font-size:13px;cursor:pointer" style-hover="background:#24262A"><i class="icon-pencil" style="font-size:14px;color:#8E9096"></i>Edit fields</div>
+<div onClick="{{ toggleMenu }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:6px;font-size:13px;cursor:pointer" style-hover="background:#24262A"><i class="icon-folder-input" style="font-size:14px;color:#8E9096"></i>Rename or move</div>
+<div onClick="{{ openShare }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:6px;font-size:13px;cursor:pointer" style-hover="background:#24262A"><i class="icon-link" style="font-size:14px;color:#8E9096"></i>Share…</div>
+<div style="margin:4px 0;border-top:1px solid #2C2E33"></div>
+<sc-if value="{{ cur.hasRef }}"><div title="Use this in .env.keypaste with keypaste run, or in an agent's run tool when the agent's settings allow it." style="padding:6px 10px 0;font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow-wrap:anywhere">{{ cur.ref }}</div></sc-if>
+<div style="padding:4px 10px 0;font-size:12px;color:#8E9096">KeePass item ID</div>
+<div style="padding:2px 10px 6px;font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD">{{ cur.uuid }}</div>
+<sc-if value="{{ cur.hasRef }}"><div onClick="{{ copyRef }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:6px;font-size:13px;cursor:pointer" style-hover="background:#24262A"><i class="icon-copy" style="font-size:14px;color:#8E9096"></i>Copy the reference</div></sc-if>
+<div style="margin:4px 0;border-top:1px solid #2C2E33"></div>
+<div onClick="{{ toggleMenu }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:6px;font-size:13px;color:oklch(0.74 0.14 25);cursor:pointer" style-hover="background:rgba(240,120,110,.12)"><i class="icon-trash-2" style="font-size:14px"></i>Delete</div>
+</div></sc-if>
+</span>
 </div>
 </div>
-<div style="display:grid;gap:8px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Value</span>
-<div style="min-height:40px;padding:4px 4px 4px 12px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:13px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ valueText }}</span><span onClick="{{ toggleReveal }}" style="white-space:nowrap;flex:none;height:30px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:5px;font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-{{ revealIcon }}" style="font-size:14px"></i>{{ revealLabel }}</span></div>
+<div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px 16px;align-items:center;font-size:13px">
+<sc-if value="{{ cur.hasUser }}"><span style="font-size:12px;font-weight:500;color:#C9CACD">Username</span><div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="font-family:'Fragment Mono',monospace;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ cur.user }}</span><span onClick="{{ copyUser }}" style="margin-left:auto;flex:none;height:28px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:6px;font-size:12px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-copy" style="font-size:13px"></i>Copy</span></div></sc-if>
+<sc-for list="{{ cur.fields }}" as="f" hint-placeholder-count="1"><span style="font-family:{{ f.font }};font-size:12px;font-weight:500;color:#C9CACD;overflow:hidden;text-overflow:ellipsis">{{ f.label }}</span><div style="min-height:40px;padding:4px 4px 4px 12px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:14px;min-width:0"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.text }}</span><span onClick="{{ toggleReveal }}" style="white-space:nowrap;flex:none;height:30px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:5px;font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-{{ revealIcon }}" style="font-size:14px"></i>{{ revealLabel }}</span></div></sc-for>
+<sc-if value="{{ cur.hasUrl }}"><span style="font-size:12px;font-weight:500;color:#C9CACD">URL</span><div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="display:flex;align-items:center;gap:6px;font-family:'Fragment Mono',monospace;font-size:13px;color:#F2F2F0;text-decoration:underline;text-underline-offset:3px;cursor:pointer;overflow:hidden;white-space:nowrap">{{ cur.url }}<i class="icon-external-link" style="font-size:13px;flex:none"></i></span><span onClick="{{ copyUrl }}" style="margin-left:auto;flex:none;height:28px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:6px;font-size:12px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-copy" style="font-size:13px"></i>Copy</span></div></sc-if>
+<sc-if value="{{ cur.hasNotes }}"><span style="align-self:start;font-size:12px;font-weight:500;color:#C9CACD">Notes</span><span style="font-size:13px;line-height:1.5;color:#C9CACD">{{ cur.notes }}</span></sc-if>
+<sc-if value="{{ cur.hasTags }}"><span style="font-size:12px;font-weight:500;color:#C9CACD">Tags</span><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ cur.tags }}" as="t" hint-placeholder-count="2"><span style="height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:11px;color:#C9CACD">{{ t }}</span></sc-for></div></sc-if>
 </div>
-<div style="display:grid;gap:8px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Reference</span>
-<div style="height:36px;padding:0 12px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#18191C;border:1px solid #26282C;font-family:'Fragment Mono',monospace;font-size:12.5px;color:#C9CACD;min-width:0"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ref }}</span><i class="icon-copy" style="flex:none;margin-left:auto;font-size:13px;color:#8E9096"></i></div>
-<span style="font-size:12px;color:#8E9096">Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it. keypaste puts the value into the command's environment, not into the file.</span>
-</div>
+<sc-if value="{{ cur.hasCards }}">
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
-<div style="padding:16px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px;align-content:start"><span style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:#C9CACD"><i class="icon-bot" style="font-size:14px;color:#8E9096"></i>Agent access</span><span style="font-family:'Fragment Mono',monospace;font-size:12.5px">{{ cur.agents }}</span><span style="font-size:12px;color:#8E9096">Last used {{ cur.used }}</span></div>
-<div style="padding:16px;border-radius:10px;border:1px solid #26282C;display:grid;gap:8px;align-content:start;font-family:'Fragment Mono',monospace;font-size:12px"><span style="display:flex;align-items:center;gap:8px;font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;color:#C9CACD"><i class="icon-layers" style="font-size:14px;color:#8E9096"></i>Profiles</span><span style="display:flex;justify-content:space-between"><span>dev</span><span style="color:oklch(0.80 0.13 155)">set</span></span><span style="display:flex;justify-content:space-between"><span>staging</span><span style="color:oklch(0.80 0.13 155)">set</span></span><span style="display:flex;justify-content:space-between"><span>prod</span><span style="color:#F2B544">approval required</span></span></div>
+<sc-if value="{{ cur.hasAgents }}"><div style="padding:16px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px;align-content:start"><span style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:#C9CACD"><i class="icon-bot" style="font-size:14px;color:#8E9096"></i>Agent access</span><span style="font-size:12.5px">{{ cur.agents }}</span><span style="font-size:12px;color:#8E9096">Last used {{ cur.used }}</span></div></sc-if>
+<sc-if value="{{ cur.hasEnvs }}"><div style="padding:16px;border-radius:10px;border:1px solid #26282C;display:grid;gap:8px;align-content:start;font-family:'Fragment Mono',monospace;font-size:12px"><span style="display:flex;align-items:center;gap:8px;font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;color:#C9CACD"><i class="icon-layers" style="font-size:14px;color:#8E9096"></i>Environments</span><sc-for list="{{ cur.envs }}" as="e" hint-placeholder-count="3"><span style="display:flex;justify-content:space-between;gap:12px"><span>{{ e.name }}</span><span style="font-family:'Instrument Sans',sans-serif;color:{{ e.c }}">{{ e.state }}</span></span></sc-for></div></sc-if>
 </div>
+</sc-if>
 <div style="display:grid;gap:0;border-top:1px solid #26282C;font-size:12.5px">
-<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">Created</span><span>2026-03-14 · you</span></div>
-<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">Rotated</span><span>2026-09-02 · 22 days ago</span></div>
-<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">KDBX entry</span><span style="font-family:'Fragment Mono',monospace;font-size:12px">uuid 9f3c…41ab · field Password</span></div>
+<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">Created</span><span style="font-family:'Fragment Mono',monospace;font-size:12px">{{ cur.created }}</span></div>
+<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">Rotated</span><span style="font-family:'Fragment Mono',monospace;font-size:12px">{{ cur.rotated }}</span></div>
+</div>
 </div>
 </div>
 </div>
 </sc-if>
 <sc-if value="{{ isAgents }}" hint-placeholder-val="{{ false }}">
-<div data-screen-label="Agents" style="padding:28px 32px;display:grid;gap:28px;max-width:1080px">
-<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Agents</h1><span style="font-size:13px;color:#8E9096">MCP clients and tokens that can ask for secrets. Every request goes through you or a grant.</span></div><span style="white-space:nowrap;flex:none;margin-left:auto;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#33363B"><i class="icon-plus" style="font-size:13px"></i>Connect client</span></div>
+<div data-screen-label="Agents" style="padding:28px 32px;display:grid;gap:28px;max-width:1080px;align-content:start">
+<div style="display:grid;gap:12px">
+<div style="display:flex;align-items:flex-start;gap:16px"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Agents</h1><span style="font-size:13px;line-height:1.5;color:#8E9096;max-width:640px">Connect your AI tools and choose what each may see. A request waits for your answer in its own window, unless you set that agent to Automatic, which never covers commands.</span></div><span onClick="{{ openHistory }}" style="white-space:nowrap;flex:none;margin-left:auto;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;font-size:12.5px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-history" style="font-size:13px"></i>History</span></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#8E9096"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.80 0.13 155)"></span>Answering agents from this app · process <span style="font-family:'Fragment Mono',monospace;font-size:12px">4120</span> · unlock <span style="font-family:'Fragment Mono',monospace;font-size:12px">1c08…</span></div>
+</div>
+<sc-if value="{{ waiting }}">
 <div style="display:grid;gap:10px">
-<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-hourglass" style="font-size:15px;color:#F2B544"></i>Active grants</div>
-<sc-if value="{{ hasGrants }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-clock" style="font-size:15px;color:#8E9096"></i>Waiting for you<span style="margin-left:auto;font-size:12.5px;font-weight:400;color:#8E9096">Answer in the prompt window</span></div>
 <div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
-<sc-for list="{{ grants }}" as="g" hint-placeholder-count="2">
+<div style="padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:16px;align-items:center">
+<div style="display:grid;gap:4px;min-width:0"><span style="font-size:13.5px;font-weight:600">claude-code</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Work/github · password</span></div>
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#F2B544">0:28</span>
+<span onClick="{{ showPrompt }}" style="white-space:nowrap;height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;font-size:12px;font-weight:500;cursor:pointer" style-hover="background:#33363B">Show the prompt</span>
+</div>
+</div>
+</div>
+</sc-if>
+<div style="display:grid;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-hourglass" style="font-size:15px;color:#8E9096"></i>Allowances<sc-if value="{{ hasAllowances }}"><span onClick="{{ endAll }}" style="margin-left:auto;white-space:nowrap;height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:rgba(240,120,110,.12);color:oklch(0.74 0.14 25);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:rgba(240,120,110,.2)">End all</span></sc-if></div>
+<sc-if value="{{ !hasAllowances }}"><span style="font-size:12.5px;color:#8E9096">No allowance is in force, so the next request asks you.</span></sc-if>
+<sc-if value="{{ hasAllowances }}">
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
+<sc-for list="{{ allowances }}" as="g" hint-placeholder-count="2">
 <div style="padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:16px;align-items:center;border-bottom:1px solid #26282C">
-<div style="display:grid;gap:4px;min-width:0"><span style="font-size:13.5px;font-weight:600">{{ g.agent }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.secrets }} · {{ g.scope }}</span></div>
-<div style="display:grid;gap:6px"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#F2B544">{{ g.left }}</span><span style="height:3px;border-radius:2px;background:#2A2C30;overflow:hidden"><span style="display:block;height:100%;width:{{ g.pct }};background:#F2B544"></span></span></div>
-<span onClick="{{ g.revoke }}" style="white-space:nowrap;flex:none;height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:rgba(240,120,110,.12);color:oklch(0.74 0.14 25);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:rgba(240,120,110,.2)">Revoke</span>
+<div style="display:grid;gap:4px;min-width:0"><span style="font-size:13.5px;font-weight:600">{{ g.agent }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.what }}</span></div>
+<div style="display:grid;gap:6px"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#C9CACD">{{ g.left }}</span><span style="height:3px;border-radius:2px;background:#2A2C30;overflow:hidden"><span style="display:block;height:100%;width:{{ g.pct }};background:#8E9096"></span></span></div>
+<span onClick="{{ g.onEnd }}" style="white-space:nowrap;flex:none;height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:rgba(240,120,110,.12);color:oklch(0.74 0.14 25);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:rgba(240,120,110,.2)">End</span>
 </div>
 </sc-for>
 </div>
 </sc-if>
 </div>
 <div style="display:grid;gap:10px">
-<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-plug" style="font-size:15px;color:#8E9096"></i>MCP clients</div>
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
-<sc-for list="{{ agents }}" as="a" hint-placeholder-count="3">
-<div style="padding:16px;border-radius:10px;background:#18191C;border:1px solid #26282C;display:grid;gap:14px">
-<div style="display:flex;align-items:center;gap:10px"><span style="width:32px;height:32px;border-radius:8px;background:#2A2C30;display:flex;align-items:center;justify-content:center;font-family:'Fragment Mono',monospace;font-size:12px">{{ a.init }}</span><div style="display:grid;gap:2px"><span style="font-size:14px;font-weight:600">{{ a.name }}</span><span style="font-size:12px;color:#8E9096">{{ a.client }}</span></div><span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:{{ a.c }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ a.status }}</span></div>
-<div style="display:grid;gap:6px"><span style="font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em">POLICY</span><div style="height:32px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-size:12.5px;min-width:0"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.policy }}</span><i class="icon-chevron-down" style="flex:none;margin-left:auto;font-size:13px;color:#8E9096"></i></div></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-plug" style="font-size:15px;color:#8E9096"></i>AI tools</div>
+<span style="font-size:12.5px;color:#8E9096">Found on this computer, and any agent that asked in the last 30 days. Settings follow each one's name.</span>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
+<sc-for list="{{ tools }}" as="t" hint-placeholder-count="4">
+<div style="padding:14px 16px;display:grid;gap:12px;border-bottom:1px solid #26282C">
+<div style="display:flex;align-items:flex-start;gap:12px">
+<span style="flex:none;width:32px;height:32px;border-radius:8px;background:#2A2C30;display:flex;align-items:center;justify-content:center;font-family:'Fragment Mono',monospace;font-size:12px">{{ t.init }}</span>
+<div style="display:grid;gap:3px;min-width:0"><span style="font-size:14px;font-weight:600">{{ t.name }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:{{ t.textC }}"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:{{ t.dotC }}"></span>{{ t.status }}</span><span style="font-size:12px;color:#8E9096">{{ t.caption }}</span></div>
+<sc-if value="{{ t.offersConnect }}"><span onClick="{{ t.onConnect }}" style="margin-left:auto;flex:none;white-space:nowrap;height:30px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#33363B">Connect</span></sc-if>
+</div>
+<sc-if value="{{ t.hasSettings }}"><span onClick="{{ t.onToggle }}" style="justify-self:start;margin-left:44px;height:28px;padding:0 8px;display:flex;align-items:center;gap:6px;border-radius:7px;font-size:12.5px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-{{ t.chevron }}" style="font-size:13px"></i>Settings</span></sc-if>
+<sc-if value="{{ t.open }}">
+<div style="margin-left:44px;padding:16px;border-radius:10px;background:#18191C;border:1px solid #26282C;display:grid;gap:14px">
+<sc-if value="{{ t.connected }}"><div style="display:flex;gap:6px"><span style="height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;font-size:12px;font-weight:500;cursor:pointer" style-hover="background:#33363B">Connect again</span><span style="height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:rgba(240,120,110,.12);color:oklch(0.74 0.14 25);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:rgba(240,120,110,.2)">Disconnect</span></div></sc-if>
+<div style="display:grid;gap:4px"><span style="font-size:15px;font-weight:600;letter-spacing:-0.01em">Settings for {{ t.name }}</span><span style="font-size:12.5px;color:#8E9096">These follow the name {{ t.name }}, whichever program uses it.</span></div>
+<div style="display:grid;grid-template-columns:140px minmax(0,1fr);gap:12px;align-items:center;font-size:12.5px">
+<span style="color:#8E9096">Mode</span><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ t.modes }}" as="m" hint-placeholder-count="3"><span onClick="{{ m.onClick }}" style="height:26px;padding:0 10px;display:flex;align-items:center;border-radius:6px;border:1px solid #2C2E33;background:{{ m.bg }};color:{{ m.fg }};cursor:pointer">{{ m.label }}</span></sc-for></div>
+<span style="color:#8E9096">Give values</span><span>Yes, after you allow each one</span>
+<span style="color:#8E9096">May run commands</span><span>No</span>
+<span style="color:#8E9096">Can see</span><div style="display:flex;flex-wrap:wrap;gap:6px"><span style="height:26px;padding:0 10px;display:flex;align-items:center;border-radius:6px;border:1px solid #2C2E33;background:#2A2C30">All projects</span><span style="height:26px;padding:0 10px;display:flex;align-items:center;border-radius:6px;border:1px solid #2C2E33;color:#C9CACD">Only these</span><span style="height:26px;padding:0 4px;display:flex;align-items:center;color:#C9CACD;text-decoration:underline;text-underline-offset:3px;cursor:pointer">Advanced: patterns</span></div>
+<span style="color:#8E9096">Limits</span><span><span style="font-family:'Fragment Mono',monospace">20</span> an hour, no end date</span>
+</div>
+</div>
+</sc-if>
 </div>
 </sc-for>
 </div>
 </div>
 <div style="display:grid;gap:10px">
-<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-ticket" style="font-size:15px;color:#8E9096"></i>Scoped tokens<span style="margin-left:auto;font-size:12px;font-weight:500;color:#F2B544;cursor:pointer">New token</span></div>
-<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden;font-size:12.5px">
-<div style="display:grid;grid-template-columns:1.1fr 1fr 1.5fr .8fr .6fr;gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>NAME</span><span>TOKEN</span><span>SCOPE</span><span>MODE</span><span>EXPIRES</span></div>
-<sc-for list="{{ tokens }}" as="k" hint-placeholder-count="2">
-<div style="display:grid;grid-template-columns:1.1fr 1fr 1.5fr .8fr .6fr;gap:12px;padding:12px 16px;border-top:1px solid #26282C;align-items:center"><span style="font-weight:500">{{ k.name }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD">{{ k.tok }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ k.scope }}</span><span style="justify-self:start;height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:11px">{{ k.mode }}</span><span style="color:#8E9096">{{ k.exp }}</span></div>
-</sc-for>
-</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-history" style="font-size:15px;color:#8E9096"></i>Since you unlocked</div>
+<span style="font-size:12.5px;color:#8E9096">{{ sinceCount }}</span>
+<div style="max-height:360px;overflow:auto;padding:12px 14px;border-radius:10px;background:#0C0D0E;border:1px solid #26282C;display:grid;gap:2px;font-family:'Fragment Mono',monospace;font-size:12px;line-height:1.7;color:#C9CACD"><sc-for list="{{ sinceLines }}" as="line" hint-placeholder-count="4"><span style="white-space:pre">{{ line }}</span></sc-for></div>
 </div>
 </div>
 </sc-if>
-<sc-if value="{{ isActivity }}" hint-placeholder-val="{{ false }}">
-<div data-screen-label="Activity" style="padding:28px 32px;display:grid;gap:20px;max-width:1080px">
-<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Activity</h1><span style="font-size:13px;color:#8E9096">Every request, grant, injection and share. Stored inside the vault, signed, append-only.</span></div>
-<div style="margin-left:auto;display:inline-flex;padding:2px;border-radius:7px;background:#18191C;border:1px solid #26282C;font-size:12px;font-weight:500">
+<sc-if value="{{ isLogLike }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Activity log" style="padding:28px 32px;display:grid;gap:20px;max-width:1080px;align-content:start">
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">{{ logTitle }}</h1><span style="font-size:13px;color:#8E9096">{{ logSubtitle }}</span></div>
+<sc-if value="{{ isLog }}"><div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+<span onClick="{{ verifyChain }}" style="white-space:nowrap;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;font-size:12.5px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-shield-check" style="font-size:13px"></i>Verify chain</span>
+<div style="display:inline-flex;padding:2px;border-radius:7px;background:#18191C;border:1px solid #26282C;font-size:12px;font-weight:500">
 <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4"><span onClick="{{ f.onClick }}" style="padding:5px 12px;border-radius:5px;cursor:pointer;background:{{ f.bg }};color:{{ f.fg }}">{{ f.label }}</span></sc-for>
-</div></div>
+</div></div></sc-if></div>
 <div style="border-radius:10px;border:1px solid #26282C;overflow-x:auto;font-size:12.5px">
 <div style="min-width:680px;display:grid;grid-template-columns:64px 110px 100px minmax(0,1.6fr) minmax(0,1fr) 100px;gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>TIME</span><span>ACTOR</span><span>ACTION</span><span>SECRETS</span><span>WHERE</span><span>RESULT</span></div>
 <sc-for list="{{ activity }}" as="r" hint-placeholder-count="6">
@@ -131,166 +182,329 @@
 </div>
 </div>
 </sc-if>
-<sc-if value="{{ isEnv }}" hint-placeholder-val="{{ false }}">
-<div data-screen-label="Env profiles" style="padding:28px 32px;display:grid;gap:24px;max-width:1080px">
-<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Env profiles</h1><span style="font-size:13px;color:#8E9096"><span style="font-family:'Fragment Mono',monospace">acme/api</span> · one set of keys, a value per environment</span></div>
+<sc-if value="{{ isTrash }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Trash" style="padding:28px 32px;display:grid;gap:20px;max-width:1080px;align-content:start">
+<div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Trash</h1>
+<div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500"><sc-if value="{{ !trashSel }}"><span style="font-weight:400;color:#8E9096">Select an item to restore or delete it</span></sc-if><span onClick="{{ restore }}" style="white-space:nowrap;height:30px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;opacity:{{ trashOpacity }};cursor:pointer" style-hover="background:#33363B">Restore</span><span onClick="{{ purge }}" style="white-space:nowrap;height:30px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:rgba(240,120,110,.12);color:oklch(0.74 0.14 25);opacity:{{ trashOpacity }};cursor:pointer" style-hover="background:rgba(240,120,110,.2)">Delete for good</span></div></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden;font-size:12.5px">
+<div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 140px;gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>NAME</span><span>DELETED FROM</span><span>DELETED</span></div>
+<sc-for list="{{ trash }}" as="d" hint-placeholder-count="2">
+<div onClick="{{ d.onClick }}" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 140px;gap:12px;padding:11px 16px;border-top:1px solid #26282C;align-items:center;cursor:pointer;background:{{ d.bg }};box-shadow:{{ d.bar }}"><span style="font-weight:500">{{ d.name }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#8E9096">{{ d.from }}</span><span style="font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096">{{ d.when }}</span></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Settings" style="padding:28px 32px;display:grid;gap:20px;max-width:760px;align-content:start">
+<div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Settings</h1><span style="font-size:13px;color:#8E9096">Saved on this machine, and in force as soon as you change them.</span></div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-clipboard-check" style="font-size:16px;color:#8E9096"></i>Recommendations</div>
+<div style="padding:14px 20px;font-size:12.5px;line-height:1.5;color:#8E9096">Keys left in notes, passwords that are weak, reused or past their expiry date, and project tags another app dropped, checked on this machine when you unlock and after each save. Nothing changes until you choose.</div>
+<div style="padding:12px 20px;border-top:1px solid #26282C;display:flex;align-items:center;gap:12px"><div style="display:grid;gap:3px"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500">Weak password<span style="height:20px;padding:0 6px;display:flex;align-items:center;border-radius:4px;border:1px solid #2C2E33;font-size:11.5px;font-weight:400;color:#C9CACD">needs review</span></span><span style="font-size:12.5px;color:#8E9096">bank in Personal</span></div><span style="margin-left:auto;height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;font-size:12px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">Dismiss</span></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-shield" style="font-size:16px;color:#8E9096"></i>Security</div>
+<div style="padding:14px 20px;display:flex;align-items:flex-start;gap:24px"><div style="display:grid;gap:4px"><span style="font-size:13.5px;font-weight:500">Lock the vault after</span><span style="font-size:12.5px;line-height:1.5;color:#8E9096">Counted from the last key or click. A machine that sleeps for longer than this wakes locked. Ctrl+L locks now.</span></div><span style="margin-left:auto;flex:none;min-width:160px;height:32px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-size:13px">15 minutes<i class="icon-chevron-down" style="margin-left:auto;font-size:13px;color:#8E9096"></i></span></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-rotate-cw" style="font-size:16px;color:#8E9096"></i>Startup</div>
+<div style="padding:14px 20px;display:flex;align-items:flex-start;gap:12px"><span style="flex:none;width:32px;height:18px;border-radius:9px;background:#2A2C30;position:relative;margin-top:1px"><span style="position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8E9096"></span></span><div style="display:grid;gap:4px"><span style="font-size:13.5px;font-weight:500">Keep keypaste in the tray when the window closes</span><span style="font-size:12.5px;line-height:1.5;color:#8E9096">Closing the window still locks the vault. Open, Lock and Quit are on the icon's menu. Some Linux desktops show no tray icon.</span></div></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-sun" style="font-size:16px;color:#8E9096"></i>Appearance</div>
+<div style="padding:14px 20px;display:flex;align-items:center;gap:24px"><div style="display:grid;gap:4px"><span style="font-size:13.5px;font-weight:500">Theme</span><span style="font-size:12.5px;color:#8E9096">System follows the operating system's light or dark setting.</span></div><div style="margin-left:auto;display:inline-flex;padding:2px;border-radius:7px;background:#111214;border:1px solid #26282C;font-size:12px;font-weight:500"><sc-for list="{{ themes }}" as="m" hint-placeholder-count="3"><span onClick="{{ m.onClick }}" style="padding:5px 12px;border-radius:5px;cursor:pointer;background:{{ m.bg }};color:{{ m.fg }}">{{ m.label }}</span></sc-for></div></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-key-round" style="font-size:16px;color:#8E9096"></i>Vault access</div>
+<div style="padding:14px 20px;display:flex;align-items:flex-start;gap:24px"><div style="display:grid;gap:4px"><span style="font-size:13.5px;font-weight:500">Master password, keyfile and YubiKey</span><span style="font-size:12.5px;color:#C9CACD">This vault opens with its master password and the YubiKey in slot 2.</span></div><span style="margin-left:auto;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#33363B">Change…</span></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-history" style="font-size:16px;color:#8E9096"></i>Backups</div>
+<div style="padding:14px 20px;display:grid;gap:10px"><span style="font-size:12.5px;line-height:1.5;color:#8E9096">A save keeps the file it replaces: the first save after each unlock, no more often than every fifteen minutes, keeping the last 5. Each copy opens with the master password it was made under, and none of them recovers a forgotten one.</span><div style="padding:9px 12px;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD">~/vaults/acme.kdbx.backups</div><span style="font-size:13px">5 copies, the newest from 2026-10-21 09:40.</span><span style="font-size:12.5px;color:#8E9096">To put one back, lock keypaste and choose Restore a backup on the unlock screen.</span></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-download" style="font-size:16px;color:#8E9096"></i>Export</div>
+<div style="padding:14px 20px;display:flex;align-items:flex-start;gap:24px"><span style="font-size:12.5px;line-height:1.5;color:#8E9096">Copies beside the vault do not survive losing the disk or the folder. Export an encrypted copy and keep it on another disk. It opens with this vault's master password.</span><span style="margin-left:auto;flex:none;white-space:nowrap;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#33363B"><i class="icon-file-lock-2" style="font-size:13px"></i>Export an encrypted copy…</span></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-terminal" style="font-size:16px;color:#8E9096"></i>Agents and the CLI</div>
+<div style="padding:14px 20px;display:grid;gap:6px"><span style="font-size:13px">Agents and the keypaste CLI use this vault, <span style="font-family:'Fragment Mono',monospace;font-size:12px">~/vaults/acme.kdbx</span>, when no <span style="font-family:'Fragment Mono',monospace;font-size:12px">--vault</span> is given.</span><span style="font-size:12.5px;line-height:1.5;color:#8E9096">An AI tool that is already running keeps the vault it started with until it restarts keypaste mcp. An AI tool connected with --vault keeps that vault.</span></div>
+<div style="padding:14px 20px;border-top:1px solid #26282C;display:flex;align-items:flex-start;gap:24px"><div style="display:grid;gap:4px"><span style="font-size:13.5px;font-weight:500">keypaste in a terminal</span><span style="font-size:13px"><span style="font-family:'Fragment Mono',monospace;font-size:12px">/usr/local/bin/keypaste</span> runs this app's keypaste.</span></div></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:16px 20px 4px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-folder-open" style="font-size:16px;color:#8E9096"></i>Recent vaults</div>
+<div style="padding:14px 20px;display:flex;align-items:flex-start;gap:24px"><span style="font-size:12.5px;line-height:1.5;color:#8E9096">keypaste remembers the paths of vaults you have opened on this machine, where the keyfile each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material.</span><span style="margin-left:auto;flex:none;white-space:nowrap;height:30px;padding:0 12px;display:flex;align-items:center;border-radius:7px;font-size:12.5px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">Forget them all</span></div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<div style="padding:14px 20px;display:flex;align-items:center;gap:12px"><i class="icon-layers" style="font-size:16px;color:#8E9096"></i><div style="display:grid;gap:4px"><span style="font-size:13.5px;font-weight:500">Advanced</span><span style="font-size:12.5px;color:#8E9096">The activity log, share links, scoped tokens and diagnostics.</span></div><span onClick="{{ openAdvanced }}" style="margin-left:auto;flex:none;height:28px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;font-size:12px;font-weight:500;cursor:pointer" style-hover="background:#33363B">Open</span></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isAdvanced }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Settings › Advanced" style="padding:28px 32px;display:grid;gap:20px;max-width:760px;align-content:start">
+<div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Advanced</h1><span style="font-size:13px;color:#8E9096">What the everyday screens leave out, each on a screen of its own.</span></div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C">
+<sc-for list="{{ advanced }}" as="a" hint-placeholder-count="4">
+<div style="padding:14px 20px;display:flex;align-items:center;gap:24px;border-top:{{ a.line }}"><div style="display:grid;gap:4px"><span style="font-size:13.5px;font-weight:500">{{ a.label }}</span><span style="font-size:12.5px;line-height:1.5;color:#8E9096">{{ a.caption }}</span></div><span onClick="{{ a.onClick }}" style="margin-left:auto;flex:none;height:28px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;font-size:12px;font-weight:500;cursor:pointer" style-hover="background:#33363B">Open</span></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isShares }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Share links" style="padding:28px 32px;display:grid;gap:20px;max-width:1080px;align-content:start">
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Share links</h1><span style="font-size:13px;color:#8E9096">Links you made from an item's ⋯ menu, end-to-end encrypted. The key lives in the link itself, so our relay never sees it.</span></div><span onClick="{{ checkStatus }}" style="white-space:nowrap;flex:none;margin-left:auto;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#33363B"><i class="icon-refresh-cw" style="font-size:13px"></i>Check status</span></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
+<sc-for list="{{ shares }}" as="h" hint-placeholder-count="3">
+<div style="padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 16px;border-bottom:1px solid #26282C;align-items:center"><span style="font-family:'Fragment Mono',monospace;font-size:13px">{{ h.what }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:{{ h.c }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ h.status }}</span><span style="grid-row:span 2;height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;font-size:12px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">{{ h.action }}</span><span style="font-size:12px;color:#8E9096">{{ h.to }} · {{ h.rule }}</span></div>
+</sc-for>
+</div>
+<span style="font-size:12.5px;color:#8E9096">Opening this screen asks the share server nothing. Check status asks how many views each link has left.</span>
+</div>
+</sc-if>
+<sc-if value="{{ isTokens }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Scoped tokens" style="padding:28px 32px;display:grid;gap:20px;max-width:1080px;align-content:start">
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Scoped tokens</h1><span style="font-size:13px;line-height:1.5;color:#8E9096;max-width:620px">A token lets a script or CI job run with a scoped set, without you or the vault's password. It only feeds keypaste run and never prints a value.</span></div><span onClick="{{ newToken }}" style="white-space:nowrap;flex:none;margin-left:auto;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#F2B544;color:#111214;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#F7C566"><i class="icon-plus" style="font-size:13px"></i>New token</span></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden;font-size:12.5px">
+<div style="display:grid;grid-template-columns:1.1fr 1fr 1.5fr .8fr .6fr;gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>NAME</span><span>TOKEN</span><span>SCOPE</span><span>MODE</span><span>EXPIRES</span></div>
+<sc-for list="{{ tokens }}" as="k" hint-placeholder-count="2">
+<div style="display:grid;grid-template-columns:1.1fr 1fr 1.5fr .8fr .6fr;gap:12px;padding:12px 16px;border-top:1px solid #26282C;align-items:center"><span style="font-weight:500">{{ k.name }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD">{{ k.tok }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ k.scope }}</span><span style="justify-self:start;height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:11px">{{ k.mode }}</span><span style="color:#8E9096">{{ k.exp }}</span></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isDiagnostics }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Diagnostics" style="padding:28px 32px;display:grid;gap:20px;max-width:760px;align-content:start">
+<div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Diagnostics</h1><span style="font-size:13px;color:#8E9096">The vault, the folder and the version this app is using, for when something is not where you expected.</span></div>
+<div style="padding:16px 20px;border-radius:10px;background:#18191C;border:1px solid #26282C;display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 12px;font-size:12px">
+<span style="color:#8E9096">Vault</span><span style="font-family:'Fragment Mono',monospace;color:#C9CACD;overflow-wrap:anywhere">~/vaults/acme.kdbx</span>
+<span style="color:#8E9096">keypaste home</span><span style="font-family:'Fragment Mono',monospace;color:#C9CACD;overflow-wrap:anywhere">~/.keypaste</span>
+<span style="font-family:'Fragment Mono',monospace;color:#8E9096">KEYPASTE_HOME</span><span style="font-family:'Fragment Mono',monospace;color:#C9CACD">not set</span>
+<span style="color:#8E9096">Version</span><span style="font-family:'Fragment Mono',monospace;color:#C9CACD">0.5.0.0</span>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isProject }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Projects" style="padding:28px 32px;display:grid;gap:24px;max-width:1080px;align-content:start">
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;display:flex;align-items:center;gap:8px;font-size:24px;font-weight:600;letter-spacing:-0.03em;cursor:pointer">{{ project }}<i class="icon-chevron-down" style="font-size:16px;color:#8E9096"></i></h1><span style="font-size:13px;color:#8E9096">One set of keys, with a value for each environment.</span></div>
 <div style="margin-left:auto;display:flex;gap:6px;font-size:12.5px;font-weight:500"><span onClick="{{ importEnv }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-file-up" style="font-size:13px"></i>Import .env</span><span onClick="{{ exportEnv }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-file-down" style="font-size:13px"></i>Export .env.keypaste</span></div></div>
 <div style="border-radius:10px;border:1px solid #26282C;overflow:hidden;font-size:12.5px">
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>KEY</span><span>DEV</span><span>STAGING</span><span style="display:flex;align-items:center;gap:6px">PROD<i class="icon-shield-check" style="font-size:12px;color:#F2B544"></i></span></div>
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr)) 120px;gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>KEY</span><span>DEV</span><span>STAGING</span><span style="display:flex;align-items:center;gap:6px">PROD<i class="icon-shield-check" style="font-size:12px"></i></span><span style="justify-self:end;color:#C9CACD;cursor:pointer">+ ENVIRONMENT</span></div>
 <sc-for list="{{ envRows }}" as="e" hint-placeholder-count="6">
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:12px;padding:11px 16px;border-top:1px solid #26282C;align-items:center;font-family:'Fragment Mono',monospace;font-size:12.5px"><span>{{ e.key }}</span><span style="color:{{ e.d.c }}">{{ e.d.t }}</span><span style="color:{{ e.s.c }}">{{ e.s.t }}</span><span style="color:{{ e.p.c }}">{{ e.p.t }}</span></div>
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr)) 120px;gap:12px;padding:11px 16px;border-top:1px solid #26282C;align-items:center;font-family:'Fragment Mono',monospace;font-size:12.5px"><span>{{ e.key }}</span><span style="color:{{ e.d.c }}">{{ e.d.t }}</span><span style="color:{{ e.s.c }}">{{ e.s.t }}</span><span style="color:{{ e.p.c }}">{{ e.p.t }}</span><span></span></div>
 </sc-for>
+</div>
+<div style="display:grid;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;font-family:'Fragment Mono',monospace;font-size:12px;font-weight:500;color:#C9CACD">{{ env }}<span style="margin-left:auto;font-family:'Instrument Sans',sans-serif;height:28px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;font-size:12px;cursor:pointer" style-hover="background:#33363B"><i class="icon-plus" style="font-size:12px"></i>Add item</span></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden;font-size:12.5px">
+<sc-for list="{{ envItems }}" as="i" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:12px;padding:11px 16px;border-bottom:1px solid #26282C;align-items:center"><span style="font-family:'Fragment Mono',monospace;font-size:12px">{{ i.path }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ i.keys }}</span><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">{{ i.also }}</span></div>
+</sc-for>
+</div>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
 <div style="border-radius:10px;background:#0C0D0E;border:1px solid #26282C;overflow:hidden">
-<div style="height:36px;padding:0 6px 0 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1D1E22;font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096"><i class="icon-file-code" style="font-size:13px"></i>.env.keypaste<span style="margin-left:auto;display:inline-flex;padding:2px;border-radius:6px;background:#18191C;font-family:'Instrument Sans',sans-serif;font-size:11.5px;font-weight:500"><sc-for list="{{ profiles }}" as="p" hint-placeholder-count="3"><span onClick="{{ p.onClick }}" style="padding:3px 9px;border-radius:4px;cursor:pointer;background:{{ p.bg }};color:{{ p.fg }}">{{ p.name }}</span></sc-for></span></div>
+<div style="height:36px;padding:0 6px 0 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1D1E22;font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096"><i class="icon-file-code" style="font-size:13px"></i>.env.keypaste<span style="margin-left:auto;display:inline-flex;padding:2px;border-radius:6px;background:#18191C;font-family:'Instrument Sans',sans-serif;font-size:11.5px;font-weight:500"><sc-for list="{{ envChips }}" as="p" hint-placeholder-count="3"><span onClick="{{ p.onClick }}" style="padding:3px 9px;border-radius:4px;cursor:pointer;background:{{ p.bg }};color:{{ p.fg }}">{{ p.name }}</span></sc-for></span></div>
 <div style="padding:12px 14px;display:grid;gap:2px;font-family:'Fragment Mono',monospace;font-size:12px;line-height:1.7;color:#C9CACD;overflow:auto"><sc-for list="{{ envFile }}" as="line" hint-placeholder-count="6"><span style="white-space:nowrap">{{ line }}</span></sc-for></div>
 </div>
 <div style="padding:18px;border-radius:10px;border:1px solid #26282C;display:grid;gap:12px;align-content:start">
-<span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-terminal" style="font-size:15px;color:#8E9096"></i>Run with this profile</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-terminal" style="font-size:15px;color:#8E9096"></i>Run with this environment</span>
 <div style="padding:10px 12px;border-radius:6px;background:#0C0D0E;border:1px solid #26282C;font-family:'Fragment Mono',monospace;font-size:12.5px;display:flex;align-items:center;gap:8px"><span style="color:#F2B544">›</span>{{ runCmd }}<i class="icon-copy" style="margin-left:auto;font-size:13px;color:#8E9096"></i></div>
 <span style="font-size:12.5px;line-height:1.5;color:#8E9096">Values go only into the command's environment and are never written to disk. The command, anything it starts and other programs running as you can read them.</span>
-<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Through an agent or a token, a prod profile is asked about live every time and never kept in a grant.</span>
+<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Through an agent or a token, prod is asked about live every time and never kept in an allowance.</span>
 </div>
 </div>
 </div>
 </sc-if>
-<sc-if value="{{ isSharing }}" hint-placeholder-val="{{ false }}">
-<div data-screen-label="Sharing" style="padding:28px 32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;max-width:1080px;align-items:start">
-<div style="display:grid;gap:16px">
-<div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Sharing</h1><span style="font-size:13px;color:#8E9096">End-to-end encrypted links. The key lives in the URL fragment, so our relay never sees it.</span></div>
-<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
-<sc-for list="{{ shares }}" as="h" hint-placeholder-count="3">
-<div style="padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;border-bottom:1px solid #26282C;align-items:center"><span style="font-family:'Fragment Mono',monospace;font-size:13px">{{ h.what }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:{{ h.c }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ h.status }}</span><span style="font-size:12px;color:#8E9096">{{ h.to }} · {{ h.rule }}</span></div>
-</sc-for>
+</main>
 </div>
-</div>
-<div style="padding:20px;border-radius:14px;background:#18191C;border:1px solid #26282C;display:grid;gap:14px">
-<span style="font-size:15px;font-weight:600;letter-spacing:-0.01em">New share link</span>
-<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">What</span><div style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12.5px">STRIPE_SECRET_KEY<i class="icon-chevron-down" style="margin-left:auto;font-size:13px;color:#8E9096"></i></div></div>
-<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Recipient</span><div style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-size:13px">sam@acme.dev</div></div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Expires</span><div style="display:inline-flex;padding:2px;border-radius:7px;background:#111214;border:1px solid #26282C;font-size:12px;font-weight:500"><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">1h</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;background:#2A2C30">24h</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">7d</span></div></div>
-<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Views</span><div style="display:inline-flex;padding:2px;border-radius:7px;background:#111214;border:1px solid #26282C;font-size:12px;font-weight:500"><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;background:#2A2C30">1</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">3</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">10</span></div></div>
-</div>
-<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:16px;height:16px;border-radius:4px;background:#F2B544;color:#111214;display:flex;align-items:center;justify-content:center"><i class="icon-check" style="font-size:12px"></i></span>Require a passphrase, sent separately</div>
-<span onClick="{{ createShare }}" style="height:34px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#F7C566"><i class="icon-link" style="font-size:14px"></i>Create and copy link</span>
-</div>
-</div>
-</sc-if>
 <sc-if value="{{ approval }}" hint-placeholder-val="{{ false }}">
 <div style="position:absolute;inset:0;background:rgba(8,9,10,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10">
-<div data-screen-label="MCP approval" style="width:min(460px,100%);border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:20px;display:grid;gap:16px">
-<div style="display:flex;align-items:center;gap:12px"><span style="width:36px;height:36px;border-radius:9px;background:#2A2C30;display:flex;align-items:center;justify-content:center"><i class="icon-bot" style="font-size:18px"></i></span><div style="display:grid;gap:2px"><span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">claude-code wants 2 secrets</span><span style="font-size:12.5px;color:#8E9096">via MCP · ~/acme/api · profile dev</span></div><span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px;color:#F2B544"><span style="width:6px;height:6px;border-radius:50%;background:#F2B544;box-shadow:0 0 0 3px rgba(242,181,68,.2)"></span>0:28</span></div>
-<div style="padding:10px 12px;border-radius:7px;background:#111214;font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096;line-height:1.6">tool: keypaste.run<br><span style="color:#C9CACD">npm run migrate</span></div>
-<div style="border-radius:7px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12.5px"><div style="display:flex;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #2C2E33"><span>DATABASE_URL</span><span style="color:#8E9096">inject only</span></div><div style="display:flex;justify-content:space-between;padding:9px 12px"><span>STRIPE_SECRET_KEY</span><span style="color:#8E9096">inject only</span></div></div>
-<div style="font-size:12.5px;line-height:1.5;color:#8E9096">keypaste will add these to the command's environment. The agent sees the names, never the values.</div>
-<div style="display:flex;gap:8px;font-size:13px;font-weight:500"><span onClick="{{ deny }}" style="white-space:nowrap;flex:none;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">Deny</span><span onClick="{{ once }}" style="white-space:nowrap;flex:none;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B">Allow once</span><span onClick="{{ hour }}" style="white-space:nowrap;flex:none;margin-left:auto;height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-weight:600;cursor:pointer" style-hover="background:#F7C566">Allow for 1 hour<span style="font-family:'Fragment Mono',monospace;font-size:11px;opacity:.7">⏎</span></span></div>
+<div data-screen-label="Credential prompt" style="width:min(508px,100%);border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:20px;display:grid;gap:16px">
+<div style="display:flex;align-items:center;gap:12px"><span style="width:36px;height:36px;border-radius:9px;background:#2A2C30;display:flex;align-items:center;justify-content:center"><i class="icon-bot" style="font-size:18px"></i></span><div style="display:grid;gap:2px"><span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">claude-code wants 1 secret</span><span style="font-size:12.5px;color:#8E9096">via MCP · label claude-code</span></div><span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px;color:#C9CACD"><span style="width:6px;height:6px;border-radius:50%;background:#8E9096"></span>0:28</span></div>
+<div style="padding:10px 12px;border-radius:7px;background:#111214;font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096;line-height:1.6">tool: keypaste.request_credential<br><span style="color:#C9CACD">Work/github</span></div>
+<div style="display:grid;gap:8px">
+<div style="border-radius:7px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12.5px"><div style="display:flex;justify-content:space-between;padding:9px 12px"><span>password</span><span style="color:#8E9096">value goes to the agent</span></div></div>
+<span style="font-size:12.5px;color:#8E9096">You can allow it <span style="color:#C9CACD">once, or for 1 hour</span></span>
+</div>
+<div style="display:grid;gap:6px"><span style="font-size:12.5px;color:#8E9096">The agent says it needs this because</span><div style="max-height:78px;overflow:auto;padding:10px 12px;border-radius:7px;border:1px solid #2C2E33;font-size:13px;line-height:1.5">Push the release branch for the api service.</div><span style="font-size:12.5px;color:#8E9096">That sentence was written by the agent, not by keypaste. Treat it as a claim.</span></div>
+<div style="font-size:12.5px;line-height:1.5;color:#8E9096">Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected.</div>
+<div style="display:flex;gap:8px;font-size:13px;font-weight:500"><span onClick="{{ deny }}" title="Esc denies" style="white-space:nowrap;flex:none;height:34px;padding:0 12px;display:flex;align-items:center;gap:8px;border-radius:7px;color:#C9CACD;cursor:pointer;box-shadow:0 0 0 2px #1D1E22,0 0 0 4px #F2B544" style-hover="background:#24262A">Deny<span style="font-family:'Fragment Mono',monospace;font-size:10.5px;padding:1px 5px;border-radius:4px;background:#24262A;color:#8E9096">esc</span></span><span onClick="{{ once }}" style="white-space:nowrap;flex:none;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;opacity:{{ allowOpacity }};cursor:{{ allowCursor }}" style-hover="background:#33363B">Allow once</span><span onClick="{{ hour }}" style="white-space:nowrap;flex:none;margin-left:auto;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:7px;background:#F2B544;color:#111214;font-weight:600;opacity:{{ allowOpacity }};cursor:{{ allowCursor }}" style-hover="background:#F7C566">Allow for 1 hour</span></div>
 </div>
 </div>
 </sc-if>
 <sc-if value="{{ importOpen }}" hint-placeholder-val="{{ false }}">
 <div style="position:absolute;inset:0;background:rgba(8,9,10,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10">
-<div data-screen-label="KDBX import" style="width:min(520px,100%);border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:20px;display:grid;gap:16px">
-<div style="display:flex;align-items:center;gap:10px"><i class="icon-file-input" style="font-size:18px;color:#F2B544"></i><span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Import a KDBX vault</span><span onClick="{{ closeImport }}" style="margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#8E9096;cursor:pointer" style-hover="background:#2A2C30"><i class="icon-x" style="font-size:15px"></i></span></div>
-<div style="padding:14px;border-radius:10px;border:1px dashed #3A3D43;display:flex;align-items:center;gap:12px"><i class="icon-file-lock-2" style="font-size:22px;color:#8E9096"></i><div style="display:grid;gap:2px"><span style="font-family:'Fragment Mono',monospace;font-size:13px">acme.kdbx</span><span style="font-size:12px;color:#8E9096">KDBX 4.1 · Argon2id · 142 entries · key file + password</span></div><span style="margin-left:auto;font-size:12px;color:oklch(0.80 0.13 155);display:flex;align-items:center;gap:5px"><i class="icon-lock-open" style="font-size:13px"></i>Decrypted</span></div>
-<div style="display:grid;gap:8px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Map groups to projects</span>
+<div data-screen-label="KeePass import" style="width:min(560px,100%);border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:20px;display:grid;gap:16px">
+<div style="display:flex;align-items:center;gap:10px"><i class="icon-file-input" style="font-size:18px;color:#8E9096"></i><span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Import a KeePass database</span><span onClick="{{ closeImport }}" style="margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#8E9096;cursor:pointer" style-hover="background:#2A2C30"><i class="icon-x" style="font-size:15px"></i></span></div>
+<div style="padding:14px;border-radius:10px;border:1px dashed #3A3D43;display:flex;align-items:center;gap:12px"><i class="icon-file-lock-2" style="font-size:22px;color:#8E9096"></i><div style="display:grid;gap:2px;min-width:0"><span style="font-family:'Fragment Mono',monospace;font-size:13px">old-work.kdbx</span><span style="font-size:12px;color:#8E9096">KeePass database 4.1 · Argon2id · 142 items · key file + password</span></div><span style="margin-left:auto;flex:none;font-size:12px;color:oklch(0.80 0.13 155);display:flex;align-items:center;gap:5px"><i class="icon-lock-open" style="font-size:13px"></i>Decrypted</span></div>
+<sc-if value="{{ !inPlace }}">
+<div style="display:grid;gap:8px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Map groups into this vault</span>
 <div style="border-radius:7px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12px">
-<div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;padding:9px 12px;border-bottom:1px solid #2C2E33;align-items:center"><span style="color:#C9CACD">Work/Acme/API</span><i class="icon-arrow-right" style="font-size:12px;color:#8E9096"></i><span>acme/api</span></div>
-<div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;padding:9px 12px;border-bottom:1px solid #2C2E33;align-items:center"><span style="color:#C9CACD">Work/Acme/Web</span><i class="icon-arrow-right" style="font-size:12px;color:#8E9096"></i><span>acme/web</span></div>
-<div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;padding:9px 12px;align-items:center"><span style="color:#C9CACD">SSH</span><i class="icon-arrow-right" style="font-size:12px;color:#8E9096"></i><span>infra</span></div>
-</div></div>
-<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:32px;height:18px;border-radius:9px;background:#F2B544;position:relative;flex:none"><span style="position:absolute;top:2px;left:16px;width:14px;height:14px;border-radius:50%;background:#111214"></span></span>Keep editing this file in place, so KeePassXC and other KDBX apps stay in sync</div>
-<div style="display:flex;gap:8px;font-size:13px;font-weight:500"><span onClick="{{ closeImport }}" style="white-space:nowrap;flex:none;margin-left:auto;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">Cancel</span><span onClick="{{ doImport }}" style="white-space:nowrap;flex:none;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:7px;background:#F2B544;color:#111214;font-weight:600;cursor:pointer" style-hover="background:#F7C566">Import 142 entries</span></div>
+<sc-for list="{{ importRows }}" as="m" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:16px minmax(0,1fr) 20px minmax(0,1fr);gap:10px;padding:8px 12px;border-bottom:1px solid #2C2E33;align-items:center"><span onClick="{{ m.onToggle }}" title="Copy this group" style="width:16px;height:16px;border-radius:4px;border:1px solid #3A3D43;color:#F2F2F0;display:flex;align-items:center;justify-content:center;cursor:pointer"><sc-if value="{{ m.include }}"><i class="icon-check" style="font-size:11px"></i></sc-if></span><span style="display:flex;align-items:center;gap:6px;min-width:0;color:#C9CACD"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.src }}</span><span style="flex:none;font-size:11px;color:#8E9096">{{ m.count }}</span></span><i class="icon-arrow-right" style="font-size:12px;color:#8E9096"></i><span style="height:28px;padding:0 8px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;color:{{ m.destC }};overflow:hidden;white-space:nowrap">{{ m.dest }}</span></div>
+</sc-for>
+</div>
+<span style="font-size:12.5px;color:#8E9096">Not copied: Recycle Bin (12 items)</span>
+</div>
+</sc-if>
+<div style="display:grid;gap:6px"><div onClick="{{ toggleInPlace }}" style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><span style="width:32px;height:18px;border-radius:9px;background:{{ switchBg }};position:relative;flex:none"><span style="position:absolute;top:2px;left:{{ knobLeft }};width:14px;height:14px;border-radius:50%;background:{{ knobBg }}"></span></span>Keep editing this file in place, so KeePassXC and other KeePass apps stay in sync</div>
+<sc-if value="{{ inPlace }}"><span style="margin-left:42px;font-size:12.5px;line-height:1.5;color:#8E9096">acme.kdbx locks and old-work.kdbx opens as the vault; you type its password once more there. Nothing is copied.</span></sc-if></div>
+<div style="display:flex;gap:8px;font-size:13px;font-weight:500"><span onClick="{{ closeImport }}" style="white-space:nowrap;flex:none;margin-left:auto;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">Cancel</span><span onClick="{{ doImport }}" style="white-space:nowrap;flex:none;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:7px;background:#F2B544;color:#111214;font-weight:600;cursor:pointer" style-hover="background:#F7C566">{{ confirmText }}</span></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ shareOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(8,9,10,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10">
+<div data-screen-label="Share" style="width:min(440px,100%);padding:20px;border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);display:grid;gap:14px">
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:15px;font-weight:600;letter-spacing:-0.01em">Share {{ cur.title }}</span><span onClick="{{ closeShare }}" style="margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#8E9096;cursor:pointer" style-hover="background:#2A2C30"><i class="icon-x" style="font-size:15px"></i></span></div>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">What</span><div style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12.5px">{{ shareField }}<i class="icon-chevron-down" style="margin-left:auto;font-size:13px;color:#8E9096"></i></div></div>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Recipient</span><div style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-size:13px">sam@acme.example</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Expires</span><div style="display:flex;padding:2px;border-radius:7px;background:#111214;border:1px solid #26282C;font-size:12px;font-weight:500"><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">1h</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;background:#2A2C30">24h</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">7d</span></div></div>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Views</span><div style="display:flex;padding:2px;border-radius:7px;background:#111214;border:1px solid #26282C;font-size:12px;font-weight:500"><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;background:#2A2C30">1</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">3</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">10</span></div></div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:16px;height:16px;border-radius:4px;border:1px solid #3A3D43;background:#2A2C30;color:#F2F2F0;display:flex;align-items:center;justify-content:center"><i class="icon-check" style="font-size:12px"></i></span>Require a passphrase, sent separately</div>
+<span onClick="{{ createShare }}" style="height:34px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#F7C566"><i class="icon-link" style="font-size:14px"></i>Create and copy link</span>
 </div>
 </div>
 </sc-if>
 <sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
 <div data-screen-label="Unlock" style="position:absolute;inset:0;z-index:20;background:#111214;background-image:linear-gradient(#18191C 1px,transparent 1px),linear-gradient(90deg,#18191C 1px,transparent 1px);background-size:16px 16px;display:flex;align-items:center;justify-content:center;padding:24px">
 <div style="width:min(360px,100%);display:grid;gap:18px;justify-items:center;text-align:center">
-<svg width="56" height="56" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"></polygon></svg>
-<div style="display:grid;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-0.03em">acme.kdbx is locked</span><span style="font-size:13px;color:#8E9096">Agents are paused until you unlock.</span></div>
-<div style="width:100%;height:40px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#18191C;border:1px solid #F2B544;box-shadow:0 0 0 3px rgba(242,181,68,.15);font-family:'Fragment Mono',monospace;font-size:14px;letter-spacing:.14em">••••••••••<span style="width:1.5px;height:18px;background:#F2B544;margin-left:2px"></span></div>
+<svg width="63.05" height="56" viewBox="0 0 88.95 79" role="img" aria-label="keypaste"><path fill="#F2F2F0" d="M20.95 69.2V62.45L33.35 53.15L45.35 69.2H37.2V79H65.8V69.2H59.35L41.95 46.75L58.05 34.7H65.15V24.9H29.75V34.7H43.55L20.95 52.2V0H0V9.8H9.3V69.2H0V79H28.75V69.2Z"></path><path fill="#F2B544" d="M73.8 79H88.95V63.86H73.8Z"></path></svg>
+<div style="display:grid;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-0.03em">acme.kdbx is locked</span><span style="font-size:13px;color:#8E9096">Enter its master password to open it.</span></div>
+<div style="width:100%;height:40px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#18191C;border:1px solid #F2B544;box-shadow:0 0 0 3px rgba(242,181,68,.15);font-family:'Fragment Mono',monospace;font-size:14px;letter-spacing:.14em;color:#8E9096"><span style="letter-spacing:normal;font-family:'Instrument Sans',sans-serif;font-size:13px">Master password</span><span style="width:1.5px;height:18px;background:#F2B544;margin-left:2px"></span></div>
 <span onClick="{{ doUnlock }}" style="width:100%;height:38px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:#F7C566">Unlock</span>
-<span onClick="{{ doUnlock }}" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#C9CACD;cursor:pointer"><i class="icon-usb" style="font-size:14px;color:#8E9096"></i>Touch YubiKey 5C to unlock</span>
+<span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#C9CACD;cursor:pointer"><i class="icon-file-key" style="font-size:14px;color:#8E9096"></i>Unlock with a key file too</span>
+<span onClick="{{ toggleMore }}" style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#8E9096;cursor:pointer"><i class="icon-{{ moreChevron }}" style="font-size:13px"></i>More options</span>
+<sc-if value="{{ moreOptions }}"><span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#C9CACD;cursor:pointer"><i class="icon-usb" style="font-size:14px;color:#8E9096"></i>Unlock with a YubiKey too</span></sc-if>
 </div>
 </div>
 </sc-if>
 <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
-<div style="position:absolute;right:20px;bottom:20px;z-index:30;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:#24262A;border:1px solid #3A3D43;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:13px"><i class="icon-circle-check" style="font-size:15px;color:oklch(0.80 0.13 155)"></i>{{ toast }}</div>
+<div style="position:absolute;right:20px;bottom:20px;z-index:30;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:#24262A;border:1px solid #3A3D43;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:13px"><i class="icon-{{ toastIcon }}" style="font-size:15px;color:oklch(0.80 0.13 155)"></i>{{ toast }}<sc-if value="{{ toastClip }}"><span style="color:#8E9096">Clears in 20s</span><span onClick="{{ clearClip }}" style="color:#C9CACD;text-decoration:underline;text-underline-offset:3px;cursor:pointer">Clear now</span></sc-if></div>
 </sc-if>
-</main>
-</div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script>
-const G='oklch(0.80 0.13 155)',R='oklch(0.74 0.14 25)',B='oklch(0.78 0.10 245)',A='#F2B544',M='#8E9096';
-const SECRETS=[
- {key:'DATABASE_URL',icon:'database',kind:'Connection string',used:'4m ago',dot:A,value:'postgres://api:demo-7Hq2x@db.internal:5432/acme',agents:'claude-code · grant, 42m left'},
- {key:'STRIPE_SECRET_KEY',icon:'credit-card',kind:'API key',used:'in use',dot:A,value:'sk_live_demo_51NfQ2kLx9vT4bY',agents:'claude-code · grant, 42m left'},
- {key:'OPENAI_API_KEY',icon:'key-round',kind:'API key',used:'1h ago',dot:G,value:'sk-proj-demo-a91Kd0Lm2Q',agents:'cursor · allow once, unused'},
- {key:'REDIS_URL',icon:'server',kind:'Connection string',used:'3h ago',dot:'#55575C',value:'redis://default:demo@cache.internal:6379',agents:'None active'},
- {key:'JWT_SIGNING_KEY',icon:'key-round',kind:'Signing key',used:'2d ago',dot:'#55575C',value:'demo-hs256-f3a9c1e07b2d44',agents:'None active'},
- {key:'SENTRY_DSN',icon:'bug',kind:'URL',used:'5d ago',dot:'#55575C',value:'https://demo@o0.ingest.sentry.io/1',agents:'ci-github-actions · token'},
- {key:'deploy@acme-prod',icon:'key-square',kind:'SSH key · ed25519',used:'1d ago',dot:'#55575C',value:'SHA256:demoQ3k1v9x0bW7yYt2',agents:'None active'}];
-const AGENTS=[
- {name:'claude-code',client:'Claude Code · MCP stdio',policy:'Session grants up to 1h',status:'Connected',c:G,init:'cc'},
- {name:'cursor',client:'Cursor · MCP stdio',policy:'Ask every time',status:'Connected',c:G,init:'cu'},
- {name:'local-evals',client:'python · scoped token',policy:'Inject only',status:'Idle',c:M,init:'le'}];
+const G='oklch(0.80 0.13 155)',R='oklch(0.74 0.14 25)',B='oklch(0.78 0.10 245)',A='#F2B544',M='#8E9096',S='#C9CACD',IDLE='#55575C';
+const MONO="'Fragment Mono',monospace",SANS="'Instrument Sans',sans-serif",MASK='••••••••••••••••••••••••';
+const SCREENS={items:{title:'Items'},agents:{title:'Agents'},trash:{title:'Trash'},settings:{title:'Settings'},project:{title:'Projects',up:'items'},history:{title:'History',up:'agents'},advanced:{title:'Advanced',up:'settings'},log:{title:'Activity log',up:'advanced'},shares:{title:'Share links',up:'advanced'},tokens:{title:'Scoped tokens',up:'advanced'},diagnostics:{title:'Diagnostics',up:'advanced'}};
+const placeOf=v=>SCREENS[v].up?placeOf(SCREENS[v].up):v;
+const GROUPS=[{path:'Work',label:'Work',depth:0,kids:true},{path:'Work/acme',label:'acme',depth:1,kids:false,parent:'Work'},{path:'Personal',label:'Personal',depth:0,kids:false}];
+const PROJECTS=[{name:'acme-api',n:'5'},{name:'acme-web',n:'2'}];
+const ITEMS=[
+ {id:'github',title:'github',icon:'globe',kind:'Login',user:'dev@acme.example',url:'https://github.com/login',group:'Work',used:'in use',dot:B,fields:[{label:'Password',value:'demo-gh-7Hq2xL9v'}],notes:'Recovery codes are in the safe.',tags:[],agents:'claude-code · allowed for 1 hour, 42 min left',envs:[],uuid:'9f3c2a71…41ab',created:'2026-03-14 · you',rotated:'2026-09-02 · 49 days ago'},
+ {id:'aws',title:'aws-console',icon:'globe',kind:'Login',user:'acme-admin',url:'https://console.aws.amazon.com',group:'Work',used:'2d ago',dot:IDLE,fields:[{label:'Password',value:'demo-aws-Lm2Q0k1v'}],notes:'',tags:[],agents:'',envs:[],uuid:'2b8e0c19…d7f0',created:'2026-01-20 · you',rotated:'2026-07-11 · 102 days ago'},
+ {id:'db',title:'DATABASE_URL',mono:true,icon:'key-round',kind:'API key',user:'',url:'',group:'Work/acme',used:'4m ago',dot:G,fields:[{label:'DATABASE_URL',key:true,value:'postgres://api:demo-7Hq2x@db.internal:5432/acme'}],notes:'',tags:['env:acme-api:dev','env:acme-api:staging'],agents:'claude-code · allowed once, used',envs:[{name:'acme-api · dev',state:'set'},{name:'acme-api · staging',state:'set'}],ref:'kp://acme-api/dev/DATABASE_URL',uuid:'51d0e4aa…0c3e',created:'2026-03-14 · you',rotated:'2026-09-02 · 49 days ago'},
+ {id:'stripe',title:'STRIPE_SECRET_KEY',mono:true,icon:'key-round',kind:'API key',user:'',url:'',group:'Work/acme',used:'1h ago',dot:G,fields:[{label:'STRIPE_SECRET_KEY',key:true,value:'sk_live_demo_51NfQ2kLx9vT4bY'}],notes:'',tags:['env:acme-api'],agents:'',envs:[{name:'acme-api · dev',state:'set'},{name:'acme-api · staging',state:'set'},{name:'acme-api · prod',state:'approval required'}],ref:'kp://acme-api/prod/STRIPE_SECRET_KEY',uuid:'c4a19b02…77e1',created:'2026-04-02 · you',rotated:'2026-10-01 · 20 days ago'},
+ {id:'openai',title:'OPENAI_API_KEY',mono:true,icon:'key-round',kind:'API key',user:'',url:'',group:'Work/acme',used:'never',dot:IDLE,fields:[{label:'OPENAI_API_KEY',key:true,value:'sk-proj-demo-a91Kd0Lm2Q'}],notes:'',tags:['env:acme-api:dev'],agents:'',envs:[{name:'acme-api · dev',state:'set'}],ref:'kp://acme-api/dev/OPENAI_API_KEY',uuid:'0e6f73bd…9a24',created:'2026-05-30 · you',rotated:'never'},
+ {id:'deploy',title:'deploy@acme-prod',icon:'server',kind:'Server',user:'deploy',url:'ssh://acme-prod.internal',group:'Work/acme',used:'1d ago',dot:IDLE,fields:[{label:'Password',value:'demo-ssh-Q3k1v9x0'}],notes:'Key-only login since September; the password is for the console.',tags:[],agents:'',envs:[],uuid:'7a2d5e90…e5b3',created:'2026-02-08 · you',rotated:'2026-09-15 · 36 days ago'},
+ {id:'bank',title:'bank',icon:'globe',kind:'Login',user:'me@example.com',url:'https://bank.example.com',group:'Personal',used:'never',dot:IDLE,fields:[{label:'Password',value:'demo-bank-2016'}],notes:'',tags:[],agents:'',envs:[],uuid:'e19c3f48…12d6',created:'2025-11-02 · you',rotated:'never'},
+ {id:'wifi',title:'home wifi',icon:'sticky-note',kind:'Secure note',user:'',url:'',group:'Personal',used:'never',dot:IDLE,fields:[],notes:'Network acme-home; the password is on the router label.',tags:[],agents:'',envs:[],uuid:'3f0b8d27…6c81',created:'2025-11-02 · you',rotated:'never'}];
+const TOOLS=[
+ {name:'claude-code',init:'cc',status:'Connected · in use now',dotC:G,textC:G,caption:'Ask, allow for a while · can see all projects',connected:true},
+ {name:'cursor',init:'cu',status:'Connected · last asked 2 h ago',dotC:G,textC:G,caption:'Ask every time · can see acme-api',connected:true},
+ {name:'Codex',init:'cx',status:'Not connected',dotC:IDLE,textC:M,caption:'Found on this computer',offersConnect:true},
+ {name:'Every other agent',init:'*',status:'For any agent with no settings of its own',dotC:IDLE,textC:M,caption:'Ask every time · can see all projects'}];
+const MODES=['Ask every time','Ask, allow for a while','Automatic'];
 const TOKENS=[
- {name:'ci-github-actions',tok:'kpt_ci_7d2e…b90f',scope:'read:acme/api/staging/*',mode:'inject-only',exp:'29 days'},
- {name:'local-evals',tok:'kpt_lc_3a11…e04c',scope:'read:acme/api/dev/OPENAI_API_KEY',mode:'inject-only',exp:'6 days'}];
+ {name:'ci-github-actions',tok:'kpt_ci_7d2e…b90f',scope:'read:acme-api/staging/*',mode:'inject-only',exp:'29 days'},
+ {name:'local-evals',tok:'kpt_lc_3a11…e04c',scope:'read:acme-api/dev/OPENAI_API_KEY',mode:'inject-only',exp:'6 days'}];
 const ACT=[
- {t:'14:32:08',actor:'claude-code',kind:'agent',action:'Injected',what:'DATABASE_URL, STRIPE_SECRET_KEY',where:'acme/api · dev',res:'Granted',c:G},
- {t:'14:31:51',actor:'claude-code',kind:'agent',action:'Requested',what:'2 secrets',where:'acme/api · dev',res:'Approved 1h',c:G},
- {t:'14:02:17',actor:'cursor',kind:'agent',action:'Requested',what:'AWS_SECRET_ACCESS_KEY',where:'infra · prod',res:'Denied',c:R},
- {t:'13:40:00',actor:'ci-github-actions',kind:'agent',action:'Injected',what:'6 secrets',where:'acme/api · staging',res:'Token',c:B},
- {t:'12:15:33',actor:'you',kind:'you',action:'Shared',what:'STRIPE_SECRET_KEY',where:'maya@acme.dev',res:'Link · 24h',c:M},
- {t:'11:58:02',actor:'claude-code',kind:'agent',action:'Grant expired',what:'REDIS_URL',where:'acme/api · dev',res:'Expired',c:M},
- {t:'09:12:45',actor:'you',kind:'you',action:'Unlocked',what:'acme.kdbx',where:'YubiKey 5C',res:'OK',c:G}];
-const ENV=[['DATABASE_URL',1,1,1],['STRIPE_SECRET_KEY',1,1,1],['OPENAI_API_KEY',1,2,0],['REDIS_URL',1,1,1],['JWT_SIGNING_KEY',1,1,1],['SENTRY_DSN',0,1,1]];
+ {t:'14:32:08',actor:'claude-code',kind:'agent',action:'Requested',what:'github',where:'Work',res:'Approved 1h',c:G},
+ {t:'14:02:17',actor:'cursor',kind:'agent',action:'Requested',what:'STRIPE_SECRET_KEY',where:'acme-api · prod',res:'Denied',c:R},
+ {t:'13:40:00',actor:'ci-github-actions',kind:'agent',action:'Injected',what:'6 secrets',where:'acme-api · staging',res:'Token',c:B},
+ {t:'13:12:45',actor:'claude-code',kind:'agent',action:'Requested',what:'DATABASE_URL',where:'acme-api · dev',res:'Approved once',c:G},
+ {t:'12:15:33',actor:'you',kind:'you',action:'Shared',what:'STRIPE_SECRET_KEY',where:'maya@acme.example',res:'Link',c:M},
+ {t:'11:58:02',actor:'cursor',kind:'agent',action:'Requested',what:'OPENAI_API_KEY',where:'acme-api · dev',res:'No answer',c:M},
+ {t:'09:12:45',actor:'you',kind:'you',action:'Changed settings',what:'cursor',where:'acme-api',res:'Allowed',c:G}];
+const ENV=[['DATABASE_URL',1,1,0],['STRIPE_SECRET_KEY',1,1,1],['OPENAI_API_KEY',1,2,0],['REDIS_URL',1,1,1],['SENTRY_DSN',0,1,1]];
+const ENV_ITEMS={dev:[{path:'Work/acme/DATABASE_URL',keys:'DATABASE_URL',also:'also staging'},{path:'Work/acme/STRIPE_SECRET_KEY',keys:'STRIPE_SECRET_KEY',also:'also staging, prod'},{path:'Work/acme/OPENAI_API_KEY',keys:'OPENAI_API_KEY',also:''}],staging:[{path:'Work/acme/DATABASE_URL',keys:'DATABASE_URL',also:'also dev'},{path:'Work/acme/STRIPE_SECRET_KEY',keys:'STRIPE_SECRET_KEY',also:'also dev, prod'}],prod:[{path:'Work/acme/STRIPE_SECRET_KEY',keys:'STRIPE_SECRET_KEY',also:'also dev, staging'}]};
 const SHARES=[
- {what:'STRIPE_SECRET_KEY',to:'maya@acme.dev',rule:'1 view · 24h · passphrase',status:'Opened 12:20',c:G},
- {what:'acme/api · staging (6)',to:'Anyone with the passphrase',rule:'3 views · 7 days',status:'1 of 3 views',c:A},
- {what:'deploy@acme-prod',to:'jordan@acme.dev',rule:'1 view · 1h',status:'Expired',c:M}];
+ {what:'STRIPE_SECRET_KEY',to:'maya@acme.example',rule:'1 view · 24h · passphrase',status:'Opened 12:20',c:G,action:'Remove'},
+ {what:'github · password',to:'jordan@acme.example',rule:'3 views · 7 days',status:'1 of 3 views left',c:S,action:'Revoke'},
+ {what:'deploy@acme-prod · password',to:'ops',rule:'1 view · 1h',status:'Expired',c:M,action:'Remove'}];
+const TRASH=[{name:'old-staging-db',from:'Work/acme',when:'2026-10-19 16:02'},{name:'netflix',from:'Personal',when:'2026-10-02 08:41'}];
+const ADVANCED=[
+ {id:'log',label:'Activity log',caption:'Every agent request, allowance, token run and share on this machine, with a check that none was changed.'},
+ {id:'shares',label:'Share links',caption:"Links you make from an item's Share… are listed here. 1 may still open."},
+ {id:'tokens',label:'Scoped tokens',caption:"Let a script or CI job run with a scoped set, without you or the vault's password."},
+ {id:'diagnostics',label:'Diagnostics',caption:'The vault, the folder and the version this app is using.'}];
 class Component extends DCLogic {
-  state={view:'vault',sel:'DATABASE_URL',reveal:false,approval:false,importOpen:false,locked:false,profile:'dev',filter:'all',toast:null,
-    grants:[{id:1,agent:'claude-code',secrets:'DATABASE_URL, STRIPE_SECRET_KEY',scope:'acme/api/dev',left:'42m left',pct:'70%'},{id:2,agent:'cursor',secrets:'OPENAI_API_KEY',scope:'acme/web/dev',left:'Once, unused',pct:'100%'}]};
-  componentDidMount(){this.t=setTimeout(()=>this.setState({approval:true}),1600);}
-  componentWillUnmount(){clearTimeout(this.t);clearTimeout(this.tt);}
-  toast(msg){clearTimeout(this.tt);this.setState({toast:msg});this.tt=setTimeout(()=>this.setState({toast:null}),2800);}
+  state={view:'items',group:'',sel:'github',reveal:false,newOpen:false,menuOpen:false,treeOpen:true,workOpen:true,project:'acme-api',env:'dev',filter:'all',theme:'System',
+    approval:false,armed:false,waiting:true,importOpen:false,inPlace:false,shareOpen:false,locked:false,moreOptions:false,trashSel:null,toast:null,toastClip:false,
+    open:{'claude-code':true},modes:{'claude-code':'Ask, allow for a while','cursor':'Ask every time','Every other agent':'Ask every time'},
+    allowances:[{id:1,agent:'claude-code',what:'Work/github · password',left:'42 min left',pct:'70%'}],
+    include:{'Work/Acme/API':true,'Work/Acme/Web':true,'SSH':true,'Personal':false}};
+  componentDidMount(){this.t=setTimeout(()=>this.openPrompt(),1600);}
+  componentWillUnmount(){clearTimeout(this.t);clearTimeout(this.tt);clearTimeout(this.ta);}
+  openPrompt(){clearTimeout(this.ta);this.setState({approval:true,armed:false});this.ta=setTimeout(()=>this.setState({armed:true}),1000);}
+  toast(msg,clip){clearTimeout(this.tt);this.setState({toast:msg,toastClip:!!clip});this.tt=setTimeout(()=>this.setState({toast:null,toastClip:false}),2800);}
+  go(view,extra){this.setState({view,newOpen:false,menuOpen:false,...(extra||{})});}
   renderVals(){
     const s=this.state,set=o=>()=>this.setState(o);
-    const nav=[['vault','vault','Secrets','142'],['agents','bot','Agents',String(s.grants.length)],['activity','activity','Activity',''],['env','layers','Env profiles','3'],['sharing','link','Sharing','2']].map(([id,icon,label,count])=>{const on=s.view===id;return{icon,label,count,onClick:set({view:id}),bg:on?'#2A2C30':'transparent',fg:on?'#F2F2F0':'#C9CACD',ic:on?A:M,cc:id==='agents'&&s.grants.length?A:M};});
-    const cur=SECRETS.find(x=>x.key===s.sel)||SECRETS[0];
-    const secrets=SECRETS.map(x=>{const on=x.key===s.sel;return{...x,onClick:()=>this.setState({sel:x.key,reveal:false}),bg:on?'rgba(242,181,68,.10)':'transparent',bar:on?'inset 2px 0 0 #F2B544':'none',ic:on?A:M};});
-    const cell=v=>v===1?{t:'••••••',c:'#C9CACD'}:v===2?{t:'differs',c:A}:{t:'missing',c:R};
-    const envRows=ENV.map(([k,d,st,p])=>({key:k,d:cell(d),s:cell(st),p:cell(p)}));
-    const profiles=['dev','staging','prod'].map(p=>({name:p,onClick:set({profile:p}),bg:s.profile===p?'#2A2C30':'transparent',fg:s.profile===p?'#F2F2F0':M}));
+    const place=placeOf(s.view),up=SCREENS[s.view].up;
+    const on=(yes,o)=>({bg:yes?'#2A2C30':'transparent',fg:yes?'#F2F2F0':S,ic:yes?'#F2F2F0':M,...o});
+    const sideRows=[on(s.view==='items'&&!s.group,{isPlace:true,icon:'vault',label:'Items',count:String(ITEMS.length),fold:s.treeOpen?'chevron-down':'chevron-right',onClick:()=>this.go('items',{group:''}),onFold:e=>{e.stopPropagation();this.setState({treeOpen:!s.treeOpen});}})];
+    if(s.treeOpen){GROUPS.filter(g=>!g.parent||s.workOpen).forEach(g=>sideRows.push(on(s.view==='items'&&s.group===g.path,{isGroup:true,label:g.label,indent:(10+14*g.depth)+'px',fold:g.kids?(s.workOpen?'chevron-down':'chevron-right'):'',onClick:()=>this.go('items',{group:g.path}),onFold:e=>{if(g.kids){e.stopPropagation();this.setState({workOpen:!s.workOpen});}}})));}
+    sideRows.push({isHeading:true});
+    PROJECTS.forEach(p=>sideRows.push(on(s.view==='project'&&s.project===p.name,{isProject:true,label:p.name,count:p.n,onClick:()=>this.go('project',{project:p.name})})));
+    sideRows.push(on(place==='agents',{isPlace:true,icon:'bot',label:'Agents',count:s.waiting?'1':'',dot:G,onClick:()=>this.go('agents')}));
+    const footRows=[on(place==='trash',{icon:'trash-2',label:'Trash',count:String(TRASH.length),onClick:()=>this.go('trash')}),on(place==='settings',{icon:'settings',label:'Settings',count:'1',onClick:()=>this.go('settings')})];
+    const shown=ITEMS.filter(x=>!s.group||x.group===s.group||x.group.startsWith(s.group+'/'));
+    const cur0=ITEMS.find(x=>x.id===s.sel)||ITEMS[0];
+    const cur={...cur0,font:cur0.mono?MONO:SANS,titleWeight:cur0.mono?'400':'600',pathText:cur0.group.split('/').join(' › '),hasUser:!!cur0.user,hasUrl:!!cur0.url,hasNotes:!!cur0.notes,hasTags:cur0.tags.length>0,hasRef:!!cur0.ref,hasAgents:!!cur0.agents,hasEnvs:cur0.envs.length>0,hasCards:!!cur0.agents||cur0.envs.length>0,
+      fields:cur0.fields.map(f=>({label:f.label,font:f.key?MONO:SANS,text:s.reveal?f.value:MASK})),envs:cur0.envs.map(e=>({...e,c:e.state==='set'?G:S}))};
+    const rows=shown.map(x=>{const sel=x.id===cur0.id;return{...x,onClick:()=>this.setState({sel:x.id,reveal:false,menuOpen:false}),bg:sel?'rgba(242,181,68,.10)':'transparent',bar:sel?'inset 2px 0 0 #F2B544':'none',ic:sel?'#F2F2F0':M,font:x.mono?MONO:SANS,size:x.mono?'13px':'13.5px',weight:x.mono?'400':'500',userText:x.user||'—',userC:x.user?S:IDLE,urlText:x.url||'—',urlC:x.url?S:IDLE,group:x.group||'—'};});
+    const newMenu=[['New item','plus'],['New group','folder-plus'],['New project','folder-git-2'],['Import .env','file-up'],['Import KeePass database','file-input']].map(([label,icon])=>({label,icon,onClick:()=>{this.setState({newOpen:false});if(icon==='file-input'){this.setState({importOpen:true});}else if(icon==='folder-git-2'){this.go('project');}}}));
+    const logLike=s.view==='log'||s.view==='history';
     const filters=[['all','All'],['agent','Agents'],['you','You'],['denied','Denied']].map(([id,l])=>({label:l,onClick:set({filter:id}),bg:s.filter===id?'#2A2C30':'transparent',fg:s.filter===id?'#F2F2F0':M}));
-    const activity=ACT.filter(a=>s.filter==='all'||(s.filter==='denied'?a.res==='Denied':a.kind===s.filter));
-    const decide=(msg,grant)=>()=>{this.setState(st=>({approval:false,grants:grant?[{id:Date.now(),agent:'claude-code',secrets:'DATABASE_URL, STRIPE_SECRET_KEY',scope:'acme/api/dev',left:'60m left',pct:'100%'},...st.grants.filter(g=>g.id!==1)]:st.grants}));this.toast(msg);};
+    const activity=s.view==='history'?ACT.filter(a=>a.kind==='agent'):ACT.filter(a=>s.filter==='all'||(s.filter==='denied'?a.res==='Denied':a.kind===s.filter));
+    const tools=TOOLS.map(t=>{const named=!t.offersConnect,open=!!s.open[t.name];return{...t,hasSettings:named,open:named&&open,chevron:open?'chevron-down':'chevron-right',onToggle:()=>this.setState(st=>({open:{...st.open,[t.name]:!st.open[t.name]}})),onConnect:()=>this.toast(`Connect ${t.name}: its plan is shown before anything changes`),
+      modes:MODES.filter(m=>t.name!=='Every other agent'||m!=='Automatic').map(m=>{const chosen=s.modes[t.name]===m;return{label:m,bg:chosen?'#2A2C30':'transparent',fg:chosen?'#F2F2F0':S,onClick:()=>{if(m==='Automatic'){this.toast(`Making ${t.name} Automatic waits for your answer in the prompt window`);}else{this.setState(st=>({modes:{...st.modes,[t.name]:m}}));}}};})};});
+    const cell=v=>v===1?{t:'••••••',c:S}:v===2?{t:'differs',c:S}:{t:'missing',c:R};
+    const envRows=ENV.map(([k,d,st,p])=>({key:k,d:cell(d),s:cell(st),p:cell(p)}));
+    const envChips=['dev','staging','prod'].map(p=>({name:p,onClick:set({env:p}),bg:s.env===p?'#2A2C30':'transparent',fg:s.env===p?'#F2F2F0':M}));
+    const includedCount=[['Work/Acme/API',38],['Work/Acme/Web',21],['SSH',9],['Personal',74]].reduce((n,[k,c])=>n+(s.include[k]?c:0),0);
+    const importRows=[['Work/Acme/API','38','Work/acme'],['Work/Acme/Web','21','Work/acme-web'],['SSH','9','Servers'],['Personal','74','Personal']].map(([src,count,dest])=>{const inc=!!s.include[src];return{src,count,dest,include:inc,destC:inc?'#F2F2F0':IDLE,onToggle:()=>this.setState(st=>({include:{...st.include,[src]:!st.include[src]}}))};});
+    const decide=(msg,keep)=>()=>{if(!s.armed&&keep!==null){return;}this.setState(st=>({approval:false,waiting:false,allowances:keep?[{id:Date.now(),agent:'claude-code',what:'Work/github · password',left:'60 min left',pct:'100%'},...st.allowances.filter(g=>g.id!==1)]:st.allowances}));this.toast(msg);};
     return {
-      nav,cur,secrets,envRows,profiles,filters,activity,agents:AGENTS,tokens:TOKENS,shares:SHARES,
-      projects:[{name:'acme/api',icon:'folder-git-2',n:'24'},{name:'acme/web',icon:'folder-git-2',n:'18'},{name:'infra',icon:'server',n:'31'},{name:'personal',icon:'user',n:'69'}],
-      grants:s.grants.map(g=>({...g,revoke:()=>{this.setState(st=>({grants:st.grants.filter(x=>x.id!==g.id)}));this.toast(`Revoked ${g.agent}'s grant`);}})),
-      hasGrants:s.grants.length>0,
-      isVault:s.view==='vault',isAgents:s.view==='agents',isActivity:s.view==='activity',isEnv:s.view==='env',isSharing:s.view==='sharing',
-      valueText:s.reveal?cur.value:'••••••••••••••••••••••••',revealIcon:s.reveal?'eye-off':'eye',revealLabel:s.reveal?'Hide':'Reveal',
-      toggleReveal:set({reveal:!s.reveal}),
-      copyVal:()=>this.toast(`Copied ${cur.key}. Clipboard clears in 30s`),
-      ref:`kp://acme-api/dev/${cur.key}`,
-      profile:s.profile,runCmd:`keypaste run -p ${s.profile} -- npm start`,
-      envFile:ENV.map(([k])=>`${k}=kp://acme-api/${s.profile}/${k}`),
-      exportEnv:()=>this.toast(`Exported .env.keypaste for ${s.profile}. References only, no values`),
-      importEnv:()=>this.toast('Imported 6 keys from .env into acme/api/dev'),
-      createShare:()=>this.toast('Share link copied. Expires in 24h, 1 view'),
-      approval:s.approval,simulate:set({approval:true}),
-      deny:decide('Denied claude-code',false),once:decide('Allowed once. Injected into pid 48213',false),hour:decide('Granted claude-code for 1 hour',true),
-      importOpen:s.importOpen,openImport:set({importOpen:true}),closeImport:set({importOpen:false}),
-      doImport:()=>{this.setState({importOpen:false});this.toast('Imported 142 entries from acme.kdbx');},
-      locked:s.locked,doLock:set({locked:true,approval:false}),doUnlock:()=>{this.setState({locked:false});this.toast('Unlocked with YubiKey 5C');},
-      toastOn:!!s.toast,toast:s.toast
+      searchText:s.group?'Search in this group':'Search all items',hasScope:!!s.group&&s.view==='items',group:s.group,clearScope:()=>this.setState({group:''}),
+      sideRows,footRows,hasBack:!!up,backTitle:up?SCREENS[up].title:'',goBack:()=>up&&this.go(up),
+      isItems:s.view==='items',isAgents:s.view==='agents',isTrash:s.view==='trash',isSettings:s.view==='settings',isAdvanced:s.view==='advanced',isShares:s.view==='shares',isTokens:s.view==='tokens',isDiagnostics:s.view==='diagnostics',isProject:s.view==='project',
+      isLogLike:logLike,isLog:s.view==='log',logTitle:s.view==='history'?'History':'Activity log',
+      logSubtitle:s.view==='history'?'What agents and tokens asked for, and what came of it. Kept on this machine, hash-chained, append-only.':'Every agent request, allowance, token run and share. Kept on this machine, hash-chained, append-only.',
+      listTitle:s.group||'acme.kdbx',canRenameGroup:!!s.group,newOpen:s.newOpen,toggleNew:set({newOpen:!s.newOpen,menuOpen:false}),newMenu,rows,cur,
+      menuOpen:s.menuOpen,toggleMenu:set({menuOpen:!s.menuOpen,newOpen:false}),openShare:set({menuOpen:false,shareOpen:true}),
+      copySecret:()=>this.toast(`${cur0.fields.length?cur0.fields[0].label:'Notes'} copied.`,true),copyUser:()=>this.toast('Username copied.',true),copyUrl:()=>this.toast('URL copied.',true),
+      copyRef:()=>{this.setState({menuOpen:false});this.toast('Reference copied. It holds no value.');},rotate:()=>this.toast(`Rotate ${cur0.title}: the new value is shown before it is saved`),
+      clearClip:()=>{clearTimeout(this.tt);this.setState({toast:null,toastClip:false});},
+      revealIcon:s.reveal?'eye-off':'eye',revealLabel:s.reveal?'Hide':'Reveal',toggleReveal:set({reveal:!s.reveal}),
+      openHistory:()=>this.go('history'),waiting:s.waiting,showPrompt:()=>this.openPrompt(),
+      hasAllowances:s.allowances.length>0,allowances:s.allowances.map(g=>({...g,onEnd:()=>{this.setState(st=>({allowances:st.allowances.filter(x=>x.id!==g.id)}));this.toast(`Ended ${g.agent}'s allowance`);}})),
+      endAll:()=>{this.setState({allowances:[]});this.toast('Ended every allowance');},tools,
+      sinceCount:'4 records since you unlocked.',sinceLines:['  time (UTC)           agent              item                         decision  method','  2026-10-21 13:12:45  claude-code        Work/acme/DATABASE_URL       granted   prompt','  2026-10-21 13:40:00  ci-github-actions  acme-api · staging           granted   token','  2026-10-21 14:02:17  cursor             Work/acme/STRIPE_SECRET_KEY  denied    prompt','  2026-10-21 14:32:08  claude-code        Work/github                  granted   prompt'],
+      filters,activity,verifyChain:()=>this.toast('The chain is intact: 214 records, none changed'),
+      trash:TRASH.map(d=>{const sel=s.trashSel===d.name;return{...d,onClick:set({trashSel:d.name}),bg:sel?'rgba(242,181,68,.10)':'transparent',bar:sel?'inset 2px 0 0 #F2B544':'none'};}),
+      trashSel:!!s.trashSel,trashOpacity:s.trashSel?'1':'.45',restore:()=>s.trashSel&&this.toast(`Restored ${s.trashSel} to its group`),purge:()=>s.trashSel&&this.toast(`${s.trashSel} is deleted for good`),
+      themes:['System','Light','Dark'].map(m=>({label:m,onClick:set({theme:m}),bg:s.theme===m?'#2A2C30':'transparent',fg:s.theme===m?'#F2F2F0':M})),
+      openAdvanced:()=>this.go('advanced'),advanced:ADVANCED.map((a,i)=>({...a,line:i?'1px solid #26282C':'none',onClick:()=>this.go(a.id)})),
+      shares:SHARES,checkStatus:()=>this.toast('Asked the share server: 1 link may still open'),tokens:TOKENS,newToken:()=>this.toast('New token: name it, give it a scope and an expiry'),
+      project:s.project,env:s.env,envRows,envChips,envItems:ENV_ITEMS[s.env],
+      envFile:ENV.map(([k])=>`${k}=kp://${s.project}/${s.env}/${k}`),runCmd:`keypaste run -p ${s.env} ${s.project} -- npm start`,
+      exportEnv:()=>this.toast(`Exported .env.keypaste for ${s.env}. References only, no values`),importEnv:()=>this.toast(`Imported 5 keys from .env into ${s.project} · ${s.env}`),
+      approval:s.approval,allowOpacity:s.armed?'1':'.45',allowCursor:s.armed?'pointer':'default',
+      deny:decide('Denied claude-code',null),once:decide('Allowed claude-code once',false),hour:decide('Allowed claude-code for 1 hour',true),
+      importOpen:s.importOpen,closeImport:set({importOpen:false}),inPlace:s.inPlace,toggleInPlace:set({inPlace:!s.inPlace}),importRows,
+      switchBg:s.inPlace?'#F2F2F0':'#2A2C30',knobLeft:s.inPlace?'16px':'2px',knobBg:s.inPlace?'#111214':'#8E9096',
+      confirmText:s.inPlace?'Open old-work.kdbx':`Import ${includedCount} items`,
+      doImport:()=>{this.setState({importOpen:false});this.toast(s.inPlace?'acme.kdbx locked; old-work.kdbx asks for its password':`Imported ${includedCount} items from old-work.kdbx`);},
+      shareOpen:s.shareOpen,closeShare:set({shareOpen:false}),shareField:cur0.fields.length?cur0.fields[0].label:'Notes',
+      createShare:()=>{this.setState({shareOpen:false});this.toast('Link copied. It opens once, within 24 hours');},
+      locked:s.locked,doLock:set({locked:true,approval:false,newOpen:false,menuOpen:false,shareOpen:false,importOpen:false}),doUnlock:set({locked:false}),
+      moreOptions:s.moreOptions,toggleMore:set({moreOptions:!s.moreOptions}),moreChevron:s.moreOptions?'chevron-down':'chevron-right',
+      toastOn:!!s.toast,toast:s.toast,toastClip:s.toastClip,toastIcon:s.toastClip?'clipboard-check':'circle-check'
     };
   }
 }

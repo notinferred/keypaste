@@ -53,5 +53,5 @@ Local, Windows 10 Pro 19045, on `main` above `8192987` with the step's changes u
 ## Limits and follow-ups
 
 - **Headless rendering only.** The menu, its focus and its closing are checked in frames drawn headless and with synthetic input.
-- **Settings' Advanced card is still a card.** Its rows open screens; there is no Advanced screen of its own.
-- **The prototypes in `docs/design/design/` still draw tokens on Agents and a select on each card.** The handoff's README now describes the moved screens.
+- **Settings › Advanced is now a screen of its own.** One row on Settings opens it, the activity log, share links, scoped tokens and diagnostics sit under it, and Back from each returns to it, as D-NEW-E1 records (gaps-1, RUNS-PENDING).
+- **The desktop prototype draws Agents as D-0455 left it and Settings › Advanced as a screen of its own.** It has no tokens on Agents and no select on a row, and the handoff's README describes both (gaps-1, RUNS-PENDING).

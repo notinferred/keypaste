@@ -16,7 +16,7 @@ namespace Keypaste.App.ViewModels;
 internal sealed record IdleChoice(int Seconds, string Label);
 
 /// <summary>
-/// Settings, with Advanced's way to the screens the everyday ones leave out.
+/// Settings, with the way to Advanced, which leads to the screens the everyday ones leave out.
 /// </summary>
 /// <remarks>
 /// Every change is written immediately and applied immediately — there is no Save button and no way
@@ -81,11 +81,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
         Access = new VaultAccessViewModel(session, home, picker, paste);
         Recommendations = recommendations;
-        OpenActivityLogCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Log), () => open is not null);
-        OpenShareLinksCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Sharing), () => open is not null);
-        OpenScopedTokensCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Tokens), () => open is not null);
-        OpenDiagnosticsCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Diagnostics), () => open is not null);
-        ShareLinksNote = ShareLinksNoteOf(session);
+        OpenAdvancedCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Advanced), () => open is not null);
         LinkCliCommand = new AsyncRelayCommand(LinkCliAsync, () => OffersCliLink && !IsCliLinking);
         BeginReplaceCliCommand = new RelayCommand(
             () => IsConfirmingCliReplace = true,
@@ -110,38 +106,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         DependsOn(CancelReplaceCliCommand, nameof(IsConfirmingCliReplace), nameof(IsCliLinking));
     }
 
-    /// <summary>Settings › Advanced: the whole activity log, with its hash check.</summary>
-    internal RelayCommand OpenActivityLogCommand { get; }
-
-    /// <summary>Settings › Advanced: the share links made from this vault.</summary>
-    internal RelayCommand OpenShareLinksCommand { get; }
-
-    /// <summary>Settings › Advanced: the vault's scoped tokens, minting and revoking one.</summary>
-    internal RelayCommand OpenScopedTokensCommand { get; }
-
-    /// <summary>Settings › Advanced: the paths and version this app is using.</summary>
-    internal RelayCommand OpenDiagnosticsCommand { get; }
-
-    /// <summary>How many of this vault's links may still open, from their recorded expiry only.</summary>
-    internal string ShareLinksNote { get; }
-
-    private static string ShareLinksNoteOf(AppVaultSession session)
-    {
-        if (session.Unlocked is not { } vault)
-        {
-            return string.Empty;
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var open = new Core.Sharing.ShareStore(vault).List().Count(share => share.Expires > now);
-
-        return open switch
-        {
-            0 => "Links you make from an item's Share… are listed here. None may still open.",
-            1 => "Links you make from an item's Share… are listed here. 1 may still open.",
-            _ => string.Create(CultureInfo.InvariantCulture, $"Links you make from an item's Share… are listed here. {open} may still open."),
-        };
-    }
+    /// <summary>Settings › Advanced, the screen that leads to the activity log, share links, scoped tokens and diagnostics.</summary>
+    internal RelayCommand OpenAdvancedCommand { get; }
 
     /// <summary>Recommendations, owned by the shell for the unlock; null where no shell built this screen.</summary>
     internal RecommendationsViewModel? Recommendations { get; }

@@ -22,9 +22,9 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// V-N.1b: through the app as launch composes it (D-0342), each advanced feature is reached from its
-/// one home: scoped tokens, the log's hash check and diagnostics from Settings' Advanced card, and an
-/// agent's settings from the Settings disclosure on its row on Agents; none of them is left on Agents or
-/// on Settings' page.
+/// one home: scoped tokens, the log's hash check and diagnostics from Settings › Advanced, and an
+/// agent's settings from the Settings disclosure on its row on Agents; none of them is left on Agents,
+/// on Settings' page or on Advanced's.
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="FourPlacesJourneyTests"/> is, pressing controls where the window draws them.
@@ -77,12 +77,18 @@ public sealed class OneHomeJourneyTests
             await Until(() => root.Content is ShellView);
             var shell = Assert.IsType<ShellViewModel>(Assert.IsType<ShellView>(root.Content).DataContext);
 
-            // Settings' own page opens each advanced screen and carries none of their controls or facts.
+            // Settings' own page opens Advanced, which opens each advanced screen; neither carries their controls or facts.
             Chord(main, PhysicalKey.Digit4);
             AssertNamesNone(main, "Settings");
+            Assert.Contains("Open Advanced", AutomationNames(main));
+            Assert.DoesNotContain("Open the scoped tokens", AutomationNames(main));
+            AmberElements.AssertOne(main, null, "Settings");
+            Press(main, Named<Button>(main, "OpenAdvanced"));
+            Assert.IsType<AdvancedViewModel>(shell.Content);
+            AssertNamesNone(main, "Advanced");
             Assert.Contains("Open the scoped tokens", AutomationNames(main));
             Assert.Contains("Open diagnostics", AutomationNames(main));
-            AmberElements.AssertOne(main, null, "Settings");
+            AmberElements.AssertOne(main, null, "Advanced");
 
             // A scoped token minted, copied and revoked, from Settings › Advanced.
             Press(main, Named<Button>(main, "OpenScopedTokens"));

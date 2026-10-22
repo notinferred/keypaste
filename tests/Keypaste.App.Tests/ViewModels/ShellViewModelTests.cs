@@ -185,8 +185,13 @@ public sealed class ShellViewModelTests : IDisposable
         shell.Current = Destinations.Of(DestinationKind.Log);
         Assert.Equal("Settings", shell.SelectedFooter?.Title);
         Assert.True(shell.HasBack);
-        Assert.Equal("Settings", shell.BackTitle);
+        Assert.Equal("Advanced", shell.BackTitle);
         Assert.False(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
+
+        shell.BackCommand.Execute(null);
+        Assert.IsType<AdvancedViewModel>(shell.Content);
+        Assert.Equal("Settings", shell.SelectedFooter?.Title);
+        Assert.Equal("Settings", shell.BackTitle);
 
         shell.BackCommand.Execute(null);
         Assert.IsType<SettingsViewModel>(shell.Content);
@@ -200,16 +205,36 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Settings_advanced_opens_the_activity_log_and_the_share_links()
+    public void Settings_opens_advanced_as_a_screen_under_it_and_back_returns_to_settings()
     {
         using var shell = Shell();
         shell.GoTo(4);
 
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenActivityLogCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Execute(null);
+
+        Assert.IsType<AdvancedViewModel>(shell.Content);
+        Assert.Equal("Advanced", shell.CurrentTitle);
+        Assert.Equal("Settings", shell.SelectedFooter?.Title);
+        Assert.Equal("Back to Settings", $"Back to {shell.BackTitle}");
+        Assert.Equal(0, shell.Current.Shortcut);
+
+        shell.BackCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content);
+        Assert.False(shell.HasBack);
+    }
+
+    [Fact]
+    public void Settings_advanced_opens_the_activity_log_and_the_share_links()
+    {
+        using var shell = Shell();
+        shell.GoTo(4);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Execute(null);
+
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenActivityLogCommand.Execute(null);
         Assert.IsType<LogViewModel>(shell.Content);
 
         shell.BackCommand.Execute(null);
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenShareLinksCommand.Execute(null);
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenShareLinksCommand.Execute(null);
         Assert.IsType<SharingViewModel>(shell.Content);
         Assert.Equal("Share links", shell.CurrentTitle);
     }
@@ -219,13 +244,15 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
         shell.GoTo(4);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Execute(null);
 
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenScopedTokensCommand.Execute(null);
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenScopedTokensCommand.Execute(null);
         Assert.IsType<ScopedTokensViewModel>(shell.Content);
-        Assert.Equal("Back to Settings", $"Back to {shell.BackTitle}");
+        Assert.Equal("Back to Advanced", $"Back to {shell.BackTitle}");
+        Assert.Equal("Settings", shell.SelectedFooter?.Title);
 
         shell.BackCommand.Execute(null);
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenDiagnosticsCommand.Execute(null);
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenDiagnosticsCommand.Execute(null);
         Assert.IsType<DiagnosticsViewModel>(shell.Content);
         Assert.Equal("Diagnostics", shell.CurrentTitle);
     }

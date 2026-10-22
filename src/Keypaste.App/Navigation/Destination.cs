@@ -32,6 +32,9 @@ internal enum DestinationKind
 
     /// <summary>The paths and version this app uses, under Settings › Advanced.</summary>
     Diagnostics = 9,
+
+    /// <summary>The way to the screens the everyday ones leave out, under Settings.</summary>
+    Advanced = 10,
 }
 
 /// <summary>Where a place sits in the sidebar.</summary>
@@ -56,7 +59,7 @@ internal enum DestinationPlacement
 /// h1 with its title above it; a restyled screen that lays out edge to edge sets this.
 /// </param>
 /// <param name="Parent">
-/// The place a screen sits under, reached from it and left by Back, or null for one of the four places
+/// The screen a screen sits under, reached from it and left by Back, or null for one of the four places
 /// the sidebar lists (D-0374).
 /// </param>
 internal sealed record Destination(
@@ -86,10 +89,11 @@ internal static class Destinations
         new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer, OwnsHeader: true),
         new(DestinationKind.EnvSets, "Projects", "layers", OwnsHeader: true, Parent: DestinationKind.Entries),
         new(DestinationKind.AgentHistory, "History", "history", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
-        new(DestinationKind.Log, "Activity log", "activity", OwnsHeader: true, Parent: DestinationKind.Settings),
-        new(DestinationKind.Sharing, "Share links", "link", OwnsHeader: true, Parent: DestinationKind.Settings),
-        new(DestinationKind.Tokens, "Scoped tokens", "ticket", OwnsHeader: true, Parent: DestinationKind.Settings),
-        new(DestinationKind.Diagnostics, "Diagnostics", "bug", OwnsHeader: true, Parent: DestinationKind.Settings),
+        new(DestinationKind.Advanced, "Advanced", "layers", OwnsHeader: true, Parent: DestinationKind.Settings),
+        new(DestinationKind.Log, "Activity log", "activity", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Sharing, "Share links", "link", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Tokens, "Scoped tokens", "ticket", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Diagnostics, "Diagnostics", "bug", OwnsHeader: true, Parent: DestinationKind.Advanced),
     ];
 
     /// <summary>The four places, in the order the sidebar reads and the digits count.</summary>
@@ -103,8 +107,12 @@ internal static class Destinations
 
     internal static Destination Of(DestinationKind kind) => All.Single(d => d.Kind == kind);
 
-    /// <summary>The place a screen is under, or the screen itself when it is a place.</summary>
+    /// <summary>The place a screen is under, however deep, or the screen itself when it is a place.</summary>
     internal static Destination PlaceOf(Destination destination) =>
+        destination.Parent is { } parent ? PlaceOf(Of(parent)) : destination;
+
+    /// <summary>The screen Back goes to: the one a screen sits under, or the screen itself when it is a place.</summary>
+    internal static Destination UpOf(Destination destination) =>
         destination.Parent is { } parent ? Of(parent) : destination;
 
     internal static int ShortcutOf(Destination destination)

@@ -173,6 +173,7 @@ public sealed class FourPlacesJourneyTests
             // Settings › Advanced: the whole log and its check, then the share links, revoked.
             Chord(main, PhysicalKey.Digit4);
             AmberElements.AssertOne(main, null, "Settings");
+            Press(main, Named<Button>(main, "OpenAdvanced"));
             Press(main, Named<Button>(main, "OpenActivityLog"));
             var log = Assert.IsType<LogViewModel>(shell.Content);
             Press(main, Named<Button>(main, "VerifyChain"));

@@ -76,7 +76,7 @@ public sealed partial class PlainWordsTests
         RenderedShell.Drain();
         said.AddRange(Shown(shell.Window, "an item's history"));
 
-        foreach (var kind in new[] { DestinationKind.AgentHistory, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
+        foreach (var kind in new[] { DestinationKind.AgentHistory, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
         {
             shell.Shell.Current = Destinations.Of(kind);
             RenderedShell.Drain();

@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             x:Class="Keypaste.App.Views.AdvancedView"
+             x:DataType="vm:AdvancedViewModel">
+
+  <UserControl.Styles>
+    <!-- Settings' card: rows split by hairlines. -->
+    <Style Selector="Border.settings">
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Border.settings-row">
+      <Setter Property="Padding" Value="20,14" />
+    </Style>
+    <Style Selector="Border.settings-row:nth-child(n+2)">
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+    </Style>
+    <Style Selector="TextBlock.row-label">
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="LineHeight" Value="18.75" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer>
+    <StackPanel Margin="{DynamicResource KpScreenPadding}" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="h1" Text="Advanced" />
+        <TextBlock Classes="subtitle" Text="What the everyday screens leave out, each on a screen of its own." />
+      </StackPanel>
+
+      <Border Classes="card filled settings">
+        <StackPanel>
+          <Border Classes="settings-row">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Classes="row-label" Text="Activity log" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Every agent request, allowance, token run and share on this machine, with a check that none was changed." />
+              </StackPanel>
+              <Button Grid.Column="1" Name="OpenActivityLog" Classes="sm" Content="Open" VerticalAlignment="Center"
+                      AutomationProperties.Name="Open the activity log"
+                      Command="{Binding OpenActivityLogCommand}" />
+            </Grid>
+          </Border>
+          <Border Classes="settings-row">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Classes="row-label" Text="Share links" />
+                <TextBlock Name="ShareLinksNote" Classes="caption" TextWrapping="Wrap" Text="{Binding ShareLinksNote}" />
+              </StackPanel>
+              <Button Grid.Column="1" Name="OpenShareLinks" Classes="sm" Content="Open" VerticalAlignment="Center"
+                      AutomationProperties.Name="Open the share links"
+                      Command="{Binding OpenShareLinksCommand}" />
+            </Grid>
+          </Border>
+          <Border Classes="settings-row">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Classes="row-label" Text="Scoped tokens" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Let a script or CI job run with a scoped set, without you or the vault's password." />
+              </StackPanel>
+              <Button Grid.Column="1" Name="OpenScopedTokens" Classes="sm" Content="Open" VerticalAlignment="Center"
+                      AutomationProperties.Name="Open the scoped tokens"
+                      Command="{Binding OpenScopedTokensCommand}" />
+            </Grid>
+          </Border>
+          <Border Classes="settings-row">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+              <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Classes="row-label" Text="Diagnostics" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="The vault, the folder and the version this app is using." />
+              </StackPanel>
+              <Button Grid.Column="1" Name="OpenDiagnostics" Classes="sm" Content="Open" VerticalAlignment="Center"
+                      AutomationProperties.Name="Open diagnostics"
+                      Command="{Binding OpenDiagnosticsCommand}" />
+            </Grid>
+          </Border>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

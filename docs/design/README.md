@@ -1,19 +1,19 @@
 # Handoff: keypaste — desktop app, CLI, brand system
 
 ## Overview
-keypaste is an open-source, local password manager on a KeePass database, for people who keep their passwords in KeePass and write software ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes the current screens were built from; [ROADMAP](../../ROADMAP.md) has the simpler app that replaces parts of them. Core ideas:
-- **MCP server**: agents in AI tools (claude-code, cursor, …) request secrets over MCP. A human approves each request (deny / allow once / allow for 1h), or a time-boxed **allowance** covers it.
-- **Inject first**: agents list key *names*; a value reaches an agent only through a request the person approves, and `keypaste run -p dev -- cmd` injects values into a child process instead.
-- **Projects**: one key set per project, with a value per environment (dev / staging / prod). Prod always needs a live approval.
+keypaste is an open-source, local password manager on a KeePass database, for people who keep their passwords in KeePass and write software ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes: `keypaste Desktop.dc.html` draws the app as the decisions in force on 2026-10-21 have it, and the CLI and brand-system prototypes are older. Core ideas:
+- **Agents**: an agent in an AI tool (Claude Code, Cursor, Codex, …) asks keypaste for an item over MCP. You answer each request in its own prompt window (Deny, Allow once, Allow for 1 hour), an **allowance** with a duration covers it, or that agent's settings make it Automatic.
+- **Inject first**: agents list item *names*; a value reaches an agent only through a request you allow, and `keypaste run -p dev acme-api -- cmd` injects values into a child process instead.
+- **Projects**: an item's `env:` tags put it in a project, with a value for each environment (dev / staging / prod); no group makes a project (D-0416). A protected environment such as prod is asked about every time.
 - **.env import/export**: export writes `.env.keypaste` containing **references only** (`KEY=kp://project/environment/KEY`), which is safe to commit.
 - **Sharing**: end-to-end encrypted, expiring, view-limited links; the key lives in the URL fragment.
-- **Scoped tokens**: for CI and scripts, e.g. `read:acme/api/staging/*`, inject-only, with expiry.
-- **KeePass database**: import a .kdbx and keep editing it in place, so it stays compatible with KeePassXC and other KeePass apps.
+- **Scoped tokens**: for CI and scripts, e.g. `read:acme-api/staging/*`, inject-only, with expiry.
+- **KeePass database**: open a .kdbx and keep editing it in place, so it stays compatible with KeePassXC and other KeePass apps, or import its groups into this vault's groups.
 
-Surfaces: **desktop app** (Electron/Tauri/native; your choice) and **CLI**.
+Surfaces: the **desktop app** (Avalonia, `src/Keypaste.App`) and the **CLI**.
 
 ## About the design files
-The files in `design/` are **design references built in HTML**: prototypes of the intended look and behavior, not production code. Recreate them in the target codebase's environment and patterns. If there is no codebase yet, a good fit is **Tauri + React + TypeScript** for desktop and **Rust or Go** for the CLI/MCP server, but pick what suits the project.
+The files in `design/` are **design references built in HTML**: prototypes of the intended look and behavior, not production code. The app rebuilds them in Avalonia from the brushes and classes in `src/Keypaste.App/Theme/`.
 
 To view them, open any `design/*.dc.html` in a browser (`support.js` must sit next to it; fonts and icons load from CDNs). All styling is inline, so read exact values straight from the markup. Demo data and handlers are in the `<script data-dc-script>` class at the bottom of `keypaste Desktop.dc.html`.
 
@@ -47,28 +47,30 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 
 **App shell**: full window; grid rows `40px / 1fr`.
 - **Titlebar** (`#18191C`, bottom border `#26282C`): columns `232px | 1fr | auto`.
-  - Window controls: three 12px circles `#3A3D43`, gap 8.
+  - Window buttons are the platform's own (D-NEW-E2): macOS draws its traffic lights over the empty first column, above the sidebar, and Windows and Linux draw their caption buttons at the right, past a 140px inset the titlebar leaves them. The prototype draws neither and leaves the first column empty.
   - Search, centered, `min(440px,100%)` × 28, radius 6, bg `#111214`, border `#26282C`, 12.5px muted. The app's only search (D-0374). Placeholder "Search all items", or "Search in this group" with the group as a chip (clearable) inside the field. ⌘K keycap is mono 10.5 on `#24262A`, radius 4.
   - Right side: status "● acme.kdbx · saved" (mono 11, green dot 6px) and a "lock" button (26h, `#24262A`, radius 6).
-- **Sidebar**, 232px (`#18191C`, right border), padding 16/10, gap 20:
-  - The wordmark alone, 104px wide (BRAND: never beside the icon).
+- **Sidebar**, 232px (`#18191C`, right border), padding 16/10:
+  - The wordmark alone, 104px wide and 22 above the list (BRAND: never beside the icon).
   - Four places (D-0374), one list read top to bottom: Items, with a chevron that folds the vault's group tree beneath it (D-0376: rows 28h, 13/400, folder icon 14px, 14px indent a level, a 16px chevron on a group with groups inside it); a PROJECTS heading (table-heading style, not selectable) over each env project's row (indented, mono 12, with count); then Agents; Trash and Settings quieter at the foot. `Ctrl/Cmd+1`–`4` in that order; Left and Right fold the chosen row.
-  - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or the text colour when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents.
+  - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or the text colour when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents. Trash and Settings are quieter: 32h, 13/500, icon 14px.
   - No Import row and no MCP server card: import is in Items' "+" menu, and what the card said is the Agents row's tooltip.
-- **Back**: a screen under a place (a project's screen, Agents › History, and Settings › Advanced's activity log, share links, scoped tokens and diagnostics) has a ghost "‹ <place>" button above its title.
+- **Back**: a screen under a place (a project's screen, Agents › History, Settings › Advanced, and Advanced's activity log, share links, scoped tokens and diagnostics) has a ghost "‹ <screen>" button above its title, naming the screen it returns to: from the activity log it returns to Advanced, and from Advanced to Settings (D-NEW-E1). The sidebar keeps the place selected.
 
 **1. Items**, as KeePassXC's main window (D-0376): the list header, then the table over the chosen item's preview, split 2:3 by a draggable 1px line (the table at least 100px tall, the preview 140px). A new item, an edit or a comparison of two revisions takes the whole area below the header.
-- List header: the group or project path (mono 13), environment badge "dev" (20h, `#24262A`, radius 4, mono 11), Rename group (a 14px folder-pen icon) while a group is chosen, and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New group, New project, Import .env, Import KeePass database. No filter field: the titlebar search is the only one.
-- Table: column heads TITLE, USERNAME, URL, KIND, GROUP, LAST USED (table-heading style), then rows 36h, radius 7, grid `28px | 1.4fr | 1fr | 1fr | 88px | 1fr | 104px`: kind icon, title (sans 13.5/500, a variable's key mono 13) with the matched field ("username", "URL") or tag ("tag env:billing:prod") after it in a search, username and URL (mono 12 muted), kind (12.5 muted), group or "project · environment" (mono 12 muted), and "last used" (mono 11) with a 6px dot. The dot is blue for in use, green for recently granted, `#55575C` for idle. A password, a note or a custom field's value is never a column (D-NEW-A6).
+- List header: the chosen group's path (mono 13), or the vault's file name while every item shows; Rename group (a 14px folder-pen icon) while a group is chosen; and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New group, New project, Import .env, Import KeePass database. No filter field: the titlebar search is the only one.
+- Table: column heads TITLE, USERNAME, URL, KIND, GROUP, LAST USED (table-heading style), then rows 36h, radius 7, grid `28px | 1.3fr | 1fr | 1.1fr | 96px | .9fr | 92px`, at least 760px wide and scrolling sideways below that: kind icon, title (sans 13.5/500, a variable's key mono 13) with the matched field ("username", "URL") or tag ("tag env:billing:prod") after it in a search, username and URL (mono 12, secondary; "—" in the disabled colour when empty), kind (12.5 muted), group (mono 12 muted, "—" at the top level), and "last used" (mono 11) with a 6px dot. The dot is blue for in use, green for recently used, `#55575C` for idle. The username and URL are the only field values that are columns (D-NEW-A6): a password, a custom field or the notes never is.
   - Hover bg `#1D1E22`. Selected: bg `rgba(242,181,68,.10)`, `box-shadow: inset 2px 0 0 #F2B544`, icon in the text colour.
 - New item (N.4): the templates Login, API key, Database, Server and Secure note as a row of selectable chips with their icons (globe, key-round, database, server, sticky-note), then Title and Folder side by side (Folder a dropdown of the vault's groups, "Top level" first, 14px indent a level), the template's own fields, Notes, Tags as chips with an add box, and Create, the form's one amber element, beside a ghost Cancel.
 - Preview (padding 28/32, gap 24, max-width 820); username, password or value, URL and notes are one row each, the label in a 96px column to the left of its value:
-  - Title (sans 22/600; a variable's key in mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
-  - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
+  - Title (sans 22/600; a variable's key in mono 22) and path "Kind · acme.kdbx › Work › acme". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
+  - **Username** in mono, with its own Copy.
+  - **Password** field, or a variable's protected field under its key in mono (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters at 14px, with a Reveal/Hide toggle.
   - **URL**: a web address is an underlined mono link with a 13px external-link icon, in primary text, never amber, with its own Copy; any other value is plain text with a caption saying keypaste opens only web addresses (N.5).
-  - Two cards: Agent access, shown only when agents can see the item, and Environments (dev set / staging set / prod "approval required" in secondary text).
+  - **Notes**, then **Tags** as outlined chips (mono 11).
+  - Two cards: Agent access, shown only when agents can see the item, and Environments, shown only when the item's tags put it in a project: each project and environment, "set" in ok text, or "approval required" in secondary text where an agent's settings ask.
   - Metadata rows (140px label column): Created, Rotated.
-  - The ⋯ menu ends, above Delete, with the reference (`kp://acme-api/dev/KEY`, mono 12, its helper as a tooltip), the KeePass item ID and Copy the reference (N.5).
+  - The ⋯ menu: Edit fields, Rename or move, Share…, then, above Delete, the reference of an item in a project (`kp://acme-api/dev/KEY`, mono 12, its helper as a tooltip), the KeePass item ID and Copy the reference (N.5).
 
 **2. Agents** (D-0455, D-0456): one page read top to bottom, padding 28/32, max-width 1080, sections 28 apart. Nothing on it answers a request.
 - Header: h1 "Agents" over the subtitle "Connect your AI tools and choose what each may see. A request waits for your answer in its own window, unless you set that agent to Automatic, which never covers commands."; beneath, a 6px green dot and the caption "Answering agents from this app · process 4120 · unlock 1c08…", its process and unlock in mono, while the app answers agents, else a card with a 15px amber alert-triangle saying why agents cannot reach the vault. A ghost "History" button (30h, 13px history icon) sits at the right.
@@ -84,45 +86,52 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - The first level, with every disclosure and pane closed, holds at most twelve kinds of control, a control repeated on every row counted once.
 
 **3. Activity log** (Settings › Advanced; Agents › History is the same table held to Agents, with no filter and no Verify chain)
-- Segmented filter: All / Agents / You / Denied.
+- A ghost "Verify chain" and the segmented filter: All / Agents / You / Denied.
 - Table columns `64 | 110 | 100 | 1.6fr | 1fr | 100`, min-width 680, scrolls horizontally: TIME (mono muted), ACTOR, ACTION, SECRETS (mono), WHERE (mono muted), RESULT (colored dot + label: Allowed / Approved 1h = ok, Denied = danger, Token = info, Expired / Link = muted).
-- Subtitle: "Every agent request, allowance, token run and share. Kept on this machine, hash-chained, append-only."
+- Subtitle: "Every agent request, allowance, token run and share. Kept on this machine, hash-chained, append-only." History's: "What agents and tokens asked for, and what came of it. Kept on this machine, hash-chained, append-only."
 
-**4. Projects** (D-0417; the prototype still calls it Env profiles)
+**4. Projects** (D-0417), opened from a project's row in the sidebar
 - Title: the open project's name, sans 24/600, which is also its picker; "Projects" when none is open. Header actions: "Import .env", "Export .env.keypaste".
 - A card listing each tag that starts `env:` and puts its item in no project, muted icon, no amber.
-- Matrix with columns KEY | DEV | STAGING | PROD (shield icon on PROD), and "+ ENVIRONMENT". Cells: "••••••" (set), "differs" (secondary), "missing" (danger), and under a value its entry and the other environments that entry serves (mono 11, muted).
-- Items: a table per environment, its name as the table heading with "Add item", each row the item's path, its keys, "also staging" (mono 11, muted) and a Remove action shown on hover. Add item opens a form with a filter and a list of items; choosing one, or Remove, shows what the tag change reaches, with "Add to staging" as the primary or "Remove from dev" in danger, and "Keep it".
+- Matrix with columns KEY | DEV | STAGING | PROD (a muted shield icon on PROD), and "+ ENVIRONMENT". Cells: "••••••" (set), "differs" (secondary), "missing" (danger), and under a value its item and the other environments that item serves (mono 11, muted).
+- Items: a table per environment (the prototype shows the one its environment toggle picks), its name as the table heading with "Add item", each row the item's path, its keys, "also staging" (mono 11, muted) and a Remove action shown on hover. Add item opens a form with a filter and a list of items; choosing one, or Remove, shows what the tag change reaches, with "Add to staging" as the primary or "Remove from dev" in danger, and "Keep it".
 - Below it, two panels:
   - `.env.keypaste` preview (terminal style) with a dev/staging/prod segmented toggle that rewrites the references.
-  - "Run with this environment" card showing the command `keypaste run -p <environment> -- npm start` plus explanatory copy.
+  - "Run with this environment" card showing the command `keypaste run -p <environment> <project> -- npm start` plus explanatory copy.
 
 **Scoped tokens** (Settings › Advanced): a table with columns NAME, TOKEN, SCOPE, MODE (outlined chip), EXPIRES. "New token" is the screen's primary, and the form's Create token, then the minted token's Copy, take its place while shown.
 
 **Diagnostics** (Settings › Advanced): the vault, keypaste's home, `KEYPASTE_HOME` and the version, labels muted 12, values mono 12.
 
-**5. Sharing**: Settings › Advanced › Share links is the share list (what, recipient · rule, status dot). The "New share link" form is the Share… dialog an item's ⋯ menu opens:
-- What (the item, fixed) and Recipient.
+**5. Sharing**: Settings › Advanced › Share links is the share list (what, recipient · rule, status dot, Revoke or Remove) with "Check status". The "New share link" form is the Share… dialog an item's ⋯ menu opens, titled "Share <item>":
+- What (one of the item's fields) and Recipient.
 - Expires segmented control: 1h / **24h** / 7d. Views: **1** / 3 / 10.
 - "Require a passphrase, sent separately" checkbox.
 - Primary button "Create and copy link".
 
+**Settings**: h1 "Settings" over "Saved on this machine, and in force as soon as you change them.", max-width 760, cards 20 apart (radius 10, panel fill, a 16px muted icon and a 13/600 heading, rows 20/14 split by hairlines): Recommendations, Security, Startup, Appearance, Vault access, Backups, Export, Agents and the CLI, Recent vaults, then one row, "Advanced" with its caption and Open, which opens Settings › Advanced (D-NEW-E1). No amber.
+
+**Settings › Advanced**: h1 "Advanced" over "What the everyday screens leave out, each on a screen of its own.", then one card with a row each for Activity log, Share links, Scoped tokens and Diagnostics: the name (13.5/500), a caption, and Open, which opens that screen under Advanced.
+
+**Trash**: h1 "Trash" with Restore and Delete for good (danger) at the right, and "Select an item to restore or delete it" until one is chosen; a table NAME, DELETED FROM, DELETED, its chosen row marked as Items marks one.
+
 **Overlays**
-- **MCP approval dialog** (the key moment), 460 max, radius 14, `#1D1E22`, border `#3A3D43`:
-  - Bot tile, "claude-code wants 2 secrets" (16/600), "via MCP · environment dev · ~/acme/api", and a countdown "0:28" (mono 11 secondary) with a muted dot: the primary answer is the prompt's one amber element.
-  - Tool call box (mono 11.5): "tool: keypaste.run / npm run migrate".
-  - Secrets list with "inject only" tags.
-  - Explainer text, then the buttons Deny (ghost) · Allow once (secondary) · **Allow for 1 hour ⏎** (primary, right-aligned).
-- **KeePass database import dialog**:
-  - File card: "acme.kdbx · KeePass database 4.1 · Argon2id · 142 items · key file + password · Decrypted".
-  - Group → project mapping rows.
-  - Toggle: "Keep editing this file in place, so KeePassXC and other KeePass apps stay in sync".
-  - Buttons: Cancel / "Import 142 items".
+- **Credential prompt** (D-0326), a fixed-layout window of its own, 508 wide, radius 14, `#1D1E22`, border `#3A3D43`; every block has a fixed height, so nothing the agent writes moves the question, the item or the buttons (T-2):
+  - Bot tile, "claude-code wants 1 secret" (16/600), "via MCP · label claude-code" (12.5 muted), and a countdown "0:28" (mono 11 secondary) with a muted dot.
+  - Tool call box (mono 11.5): "tool: keypaste.request_credential" over the item, `Work/github`.
+  - The field, `password`, tagged "value goes to the agent", then "You can allow it once, or for 1 hour".
+  - "The agent says it needs this because" over the reason in a box that scrolls, then "That sentence was written by the agent, not by keypaste. Treat it as a claim." and the warning that allowing returns the value itself to the agent.
+  - Deny (ghost) · Allow once (secondary) · **Allow for 1 hour** (primary, right-aligned, the prompt's one amber element). No button is the default, so Enter allows nothing: focus starts on Deny, drawn with the focus ring, Escape denies, and both allows stay disarmed for their first second on screen and for a second after Agents brings the prompt forward (D-0456).
+- **KeePass database import dialog** (D-0356, D-0416), from Items' New menu:
+  - File card: "old-work.kdbx" over "KeePass database 4.1 · Argon2id · 142 items · key file + password", and "Decrypted" in ok text.
+  - "Map groups into this vault": a row for each source group, with a checkbox that includes it (strong border, the check in the text colour), its path and item count (mono 12 and 11), an arrow, and the group of this vault it is copied into, an editable field (mono 12) that is disabled while the row is left out. Under the rows, what no import copies: "Not copied: Recycle Bin (12 items)". Groups map only to groups: a project comes from the items' own tags.
+  - The switch "Keep editing this file in place, so KeePassXC and other KeePass apps stay in sync" (the track in the text colour when on). On, the rows give way to a note that the open vault locks and this file opens as the vault, with nothing copied.
+  - Buttons: Cancel / "Import 68 items", counting the included rows, or "Open old-work.kdbx" when the file is kept in place.
 - **Lock screen**: full-window with a 16px hairline grid background.
-  - 56px mark, "acme.kdbx is locked", "Enter its master password to open it." It says nothing of agents (N.2).
+  - The "k." icon 56px tall, "acme.kdbx is locked", "Enter its master password to open it." It says nothing of agents (N.2).
   - Focused password field with an amber caret, amber "Unlock" button, the key-file line, then "More options", which reveals "Unlock with a YubiKey too"; a vault that last opened with a YubiKey shows it directly. While the key waits for a touch, its waiting dot is the amber element and Unlock is secondary.
   - With no vault selected, the welcome: "Open a vault", then, when KeePassXC has opened databases here, a KEEPASSXC LAST OPENED list (table-heading style, rows as the recent list's, file name in mono with the path in a tooltip) above "Open another file…" and "Create a new vault…", neither amber; with nothing from KeePassXC, the amber "Open a vault…" and "Create a new vault…".
-- **Toast**, bottom-right 20px: `#24262A`, border `#3A3D43`, radius 10, green check icon, auto-dismisses after 2.8s.
+- **Toast**, bottom-right 20px: `#24262A`, border `#3A3D43`, radius 10, green check icon, auto-dismisses after 2.8s. A copy's toast says "<field> copied." with "Clears in 20s" (muted) and a Clear now link, behind a clipboard-check icon.
 
 ## CLI (`keypaste CLI.dc.html`)
 Rules: 80 columns; amber = needs you (prompt `›`, commands in help, pending boxes, cursor); green ✓ = done; red = refused or missing; grey = everything else. `--json` for piping. Values are never printed without `--reveal`. See the file for exact output of:
@@ -134,20 +143,23 @@ Rules: 80 columns; amber = needs you (prompt `›`, commands in help, pending bo
 - `--help`, with commands grouped as SECRETS: get, set, run, env · AGENTS: mcp, grants, token, log · VAULT: import, share, lock
 
 ## Interactions & state (prototype)
-State: `view`, `sel` (selected secret), `reveal`, `approval`, `importOpen`, `locked`, `profile`, `filter`, `grants[]`, `toast`.
-- The approval dialog auto-opens 1.6s after load; clicking the MCP server card re-opens it.
+State: `view` (the screen; one under a place names its parent, where Back goes), `group` (the group Items shows), `sel` (the chosen item), `reveal`, `newOpen`, `menuOpen`, `approval` and `armed`, `waiting`, `allowances[]`, `open` and `modes` (each agent's Settings), `importOpen`, `inPlace`, `include` (the import's rows), `shareOpen`, `locked`, `moreOptions`, `project`, `env`, `filter`, `theme`, `trashSel`, `toast`.
+- The credential prompt opens 1.6s after load, and Show the prompt on Agents opens it again; its allows do nothing for its first second.
   - Deny → toast "Denied claude-code".
-  - Allow once → toast "Allowed once. Injected into pid 48213".
-  - Allow 1h → adds or refreshes a 60-minute grant, then shows a toast.
-  - Real app: Enter = primary; the dialog times out as a Deny after 30s.
-- Selecting a secret resets `reveal` to false. Copy shows a toast and **clears the clipboard after the product's clipboard window (20 s)**.
+  - Allow once → toast "Allowed claude-code once".
+  - Allow for 1 hour → adds or refreshes a 60-minute allowance, then shows a toast.
+  - Real app: no button is the default, so Enter allows nothing; Escape denies, and an unanswered prompt is denied at its deadline, 45 seconds by default.
+- The sidebar: Items' chevron folds the group tree and Work's folds its child; a group shows its items, a project's row opens Projects, and Trash and Settings sit at the foot.
+- Choosing an item resets `reveal` to false. Copy shows the clipboard toast; the real app **clears the clipboard after the product's clipboard window (20 s)**. Connect and Rotate show a toast where the app opens a pane.
+- Settings' Advanced row opens Settings › Advanced, whose rows open the activity log, share links, scoped tokens and diagnostics; Back goes up one screen at a time.
 - Lock hides everything and pauses agents; unlocking (password or hardware key) restores the app.
-- The profile toggle rewrites the `.env.keypaste` preview and the run command.
+- The environment toggle on Projects rewrites the `.env.keypaste` preview, the environment's items and the run command.
+- The import's checkboxes recount its button, and its switch turns the button into "Open old-work.kdbx".
 
 ## Assets
-- The marks, the icon "k." and the wordmark "keypaste.", are in [`assets/brand/`](../../assets/brand), and [BRAND](../BRAND.md) says which file serves which use. The prototypes still draw the earlier monogram.
-- Icons: **Lucide**, 1.5px stroke (the prototype uses the `lucide-static` icon font). Use `lucide-react` or equivalent. Sizes: 16px lists, 14px fields, 20px sidebar.
-- Fonts: Instrument Sans and Fragment Mono (Google Fonts, OFL). Self-host them in the app.
+- The marks, the icon "k." and the wordmark "keypaste.", are in [`assets/brand/`](../../assets/brand), and [BRAND](../BRAND.md) says which file serves which use. The desktop prototype draws them from those outlines; the CLI and brand-system prototypes still draw the earlier monogram.
+- Icons: **Lucide**, 1.5px stroke. The prototype uses the `lucide-static` icon font; the app draws the same icons with `KpIcon` from `src/Keypaste.App/Theme/Icons.axaml`, which `scripts/lucide-to-axaml.py` generates. Sizes: 16px for the sidebar's places and 14px at its foot, 15px in the item list.
+- Fonts: Instrument Sans and Fragment Mono (Google Fonts, OFL). The prototype loads them from Google Fonts; the app carries them in `src/Keypaste.App/Assets/Fonts`.
 
 ## Files
 - `design/keypaste Desktop.dc.html`: interactive desktop prototype

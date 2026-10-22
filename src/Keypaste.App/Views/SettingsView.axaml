@@ -589,63 +589,21 @@
           </StackPanel>
         </Border>
 
-        <!-- Settings › Advanced: what the everyday screens leave out (D-0374). -->
+        <!-- Settings › Advanced, a screen of its own with what the everyday screens leave out (D-0374). -->
         <Border Name="AdvancedCard" Classes="card filled settings">
-          <StackPanel>
-            <Border Classes="settings-head">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <ctl:KpIcon Icon="layers" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Classes="section" Text="Advanced" />
+          <Border Classes="settings-row">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+              <ctl:KpIcon Grid.Column="0" Icon="layers" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <TextBlock Classes="row-label" Text="Advanced" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="The activity log, share links, scoped tokens and diagnostics." />
               </StackPanel>
-            </Border>
-            <Border Classes="settings-row">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                <StackPanel Grid.Column="0" Spacing="4">
-                  <TextBlock Classes="row-label" Text="Activity log" />
-                  <TextBlock Classes="caption" TextWrapping="Wrap"
-                             Text="Every agent request, allowance, token run and share on this machine, with a check that none was changed." />
-                </StackPanel>
-                <Button Grid.Column="1" Name="OpenActivityLog" Classes="sm" Content="Open" VerticalAlignment="Center"
-                        AutomationProperties.Name="Open the activity log"
-                        Command="{Binding OpenActivityLogCommand}" />
-              </Grid>
-            </Border>
-            <Border Classes="settings-row">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                <StackPanel Grid.Column="0" Spacing="4">
-                  <TextBlock Classes="row-label" Text="Share links" />
-                  <TextBlock Name="ShareLinksNote" Classes="caption" TextWrapping="Wrap" Text="{Binding ShareLinksNote}" />
-                </StackPanel>
-                <Button Grid.Column="1" Name="OpenShareLinks" Classes="sm" Content="Open" VerticalAlignment="Center"
-                        AutomationProperties.Name="Open the share links"
-                        Command="{Binding OpenShareLinksCommand}" />
-              </Grid>
-            </Border>
-            <Border Classes="settings-row">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                <StackPanel Grid.Column="0" Spacing="4">
-                  <TextBlock Classes="row-label" Text="Scoped tokens" />
-                  <TextBlock Classes="caption" TextWrapping="Wrap"
-                             Text="Let a script or CI job run with a scoped set, without you or the vault's password." />
-                </StackPanel>
-                <Button Grid.Column="1" Name="OpenScopedTokens" Classes="sm" Content="Open" VerticalAlignment="Center"
-                        AutomationProperties.Name="Open the scoped tokens"
-                        Command="{Binding OpenScopedTokensCommand}" />
-              </Grid>
-            </Border>
-            <Border Classes="settings-row">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                <StackPanel Grid.Column="0" Spacing="4">
-                  <TextBlock Classes="row-label" Text="Diagnostics" />
-                  <TextBlock Classes="caption" TextWrapping="Wrap"
-                             Text="The vault, the folder and the version this app is using." />
-                </StackPanel>
-                <Button Grid.Column="1" Name="OpenDiagnostics" Classes="sm" Content="Open" VerticalAlignment="Center"
-                        AutomationProperties.Name="Open diagnostics"
-                        Command="{Binding OpenDiagnosticsCommand}" />
-              </Grid>
-            </Border>
-          </StackPanel>
+              <Button Grid.Column="2" Name="OpenAdvanced" Classes="sm" Content="Open" VerticalAlignment="Center"
+                      AutomationProperties.Name="Open Advanced"
+                      Command="{Binding OpenAdvancedCommand}" />
+            </Grid>
+          </Border>
         </Border>
 
       </StackPanel>
