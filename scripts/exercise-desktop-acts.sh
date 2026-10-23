@@ -640,6 +640,7 @@ keepassxc_create() {
   done
   DRIVE_TREE_DIR="$(native "$OUT")"
   export DRIVE_TREE_DIR
+  # Windows' Save dialog shows UI Automation only bare panes, so its file name is typed as a person types it.
   # shellcheck disable=SC2154 # kpxc.sh sets pw.
   if kpxc_drive KeePassXC window 60 && kpxc_drive KeePassXC invoke 'Create Database' \
     && kpxc_drive "$wizard" invoke Continue && kpxc_drive "$wizard" invoke Continue \
@@ -648,7 +649,8 @@ keepassxc_create() {
     && kpxc_drive "$wizard" invoke Done && kpxc_drive 'Weak password' invoke 'Continue with weak password' \
     && main="$(kpxc_drive KeePassXC windows | tr -d "$CR" | grep -m 1 'KeePassXC$')" && echo "the database is open in '$main'" \
     && kpxc_drive "$main" invoke 'Save Database' \
-    && kpxc_drive 'Save database as' set-named 'File name:' "$(native "$VAULT")" && kpxc_drive 'Save database as' invoke Save \
+    && kpxc_drive 'Save database as' key ctrl+a && kpxc_drive 'Save database as' type "$(native "$VAULT")" \
+    && kpxc_drive 'Save database as' key Return \
     && wait_for_file "$VAULT" 30; then
     if kill -0 "$pid" 2> /dev/null; then close_keepassxc "$pid" || return 1; else echo 'KeePassXC ended by itself after saving'; fi
     echo "KeePassXC's Create Database window made $VAULT_NAME"
