@@ -222,6 +222,33 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     /// <summary>
+    /// With no UI thread to post to, a check shows its findings on the thread that asked for it before returning, so
+    /// nothing else touches the list while its owner goes on.
+    /// </summary>
+    [Fact]
+    public async Task With_no_UI_thread_a_check_shows_its_findings_on_the_thread_that_asked()
+    {
+        var (asked, shown, rows) = await Task.Run(() =>
+        {
+            using var list = new RecommendationsViewModel(_session, _fixture.Home);
+            var shownOn = 0;
+            list.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(RecommendationsViewModel.Rows))
+                {
+                    shownOn = Environment.CurrentManagedThreadId;
+                }
+            };
+
+            list.Check();
+            return (Environment.CurrentManagedThreadId, shownOn, list.Rows.Count);
+        });
+
+        Assert.Equal(asked, shown);
+        Assert.Equal(3, rows);
+    }
+
+    /// <summary>
     /// A check reads the vault off the UI thread and shows its findings through the shell's post; of two checks in a
     /// row only the later one's are shown, and a check a lock overtook shows nothing.
     /// </summary>
