@@ -851,7 +851,7 @@ act_project_run() {
   attempt tag drive set-named id:NewTag "env:$PROJECT" || return 1
   attempt add-tag drive invoke 'Add tag' || return 1
   saved tagged_ms confirm-tag drive invoke 'Add tag[2]' || return 1
-  attempt projects drive select Projects || return 1
+  attempt project drive select "$PROJECT" || return 1
   attempt key-row drive find "$FIELD" || return 1
   attempt directory drive set-named 'Project directory' "$(native "$RUN_DIR")" || return 1
   attempt command drive set-named Command "$(child_command)" || return 1
@@ -869,7 +869,7 @@ act_edit_rerun() {
   attempt value drive type "$VALUE2" || return 1
   saved replaced_ms confirm drive invoke 'Replace[2]' || return 1
   fact field_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
-  attempt projects drive select Projects || return 1
+  attempt project drive select "$PROJECT" || return 1
   run_child
 }
 
@@ -879,7 +879,7 @@ act_connect() {
   attempt agents shortcut 2 || return 1
   attempt offered drive wait "Connect $TOOL" 90 || return 1
   attempt connect drive invoke "Connect $TOOL" || return 1
-  attempt plan drive read 'What Run it will do' || return 1
+  attempt plan drive read id:ConnectPlan || return 1
   attempt run-it drive invoke 'Run it' || return 1
   attempt registered wait_registration 60 || return 1
   fact registration "$(registration_json)"
