@@ -338,12 +338,19 @@ switch ($Action) {
     $element = Until 30 { Named $First $Invokable }
     if (-not $element) { Missing "no button '$First'" }
     Enabled $element $First
-    if (Has $element Invoke) {
-      $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-    } else {
-      $element.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+    try {
+      if (Has $element Invoke) {
+        $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+      } else {
+        $element.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+      }
+      Write-Output "invoked '$First'"
+    } catch {
+      # Qt presses a tool button within the call, so a modal window the press opens, such as a file dialog, holds the
+      # call past UI Automation's timeout; the window that opened is the next verb's to find.
+      if ("$($_.Exception.InnerException.HResult)" -ne '-2146233083') { throw }
+      Write-Output "invoked '$First', which had not returned when UI Automation's timeout passed"
     }
-    Write-Output "invoked '$First'"
   }
   'toggle' {
     $element = Until 30 { Named $First $Toggleable }
