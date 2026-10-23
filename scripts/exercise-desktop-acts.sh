@@ -887,9 +887,15 @@ act_first_run() {
   # Timed inside the driver, from Return to the item list, since starting a driver can take longer than an unlock.
   attempt unlock drive key-wait Return "$ENTRY_FIELD" 60 || {
     if [ "$PLATFORM" = linux ]; then
-      fact probe_invoke "$(drive invoke Unlock 2>&1 | tr '\n' ' ')"
-      fact probe_after_invoke "$(drive wait 'Lock now' 60 2>&1 | head -c 600 | tr '\n' ' ')"
-      screenshot probe-invoked
+      local wid
+      wid="$(xdotool search --name '^keypaste$' | head -n 1)"
+      fact probe_windows "$(xdotool search --name '^keypaste$' | tr '\n' ' ') focus $(xdotool getwindowfocus) active $(xdotool getactivewindow)"
+      xdotool windowactivate --sync "$wid"
+      sleep 0.5
+      fact probe_focus_after_activate "$(xdotool getwindowfocus) wid $wid"
+      xdotool key --clearmodifiers Return
+      fact probe_after_xtest "$(drive wait 'Lock now' 30 2>&1 | head -c 300 | tr '\n' ' ')"
+      screenshot probe-xtest
     fi
     return 1
   }

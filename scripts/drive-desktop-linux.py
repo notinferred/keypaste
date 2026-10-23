@@ -269,8 +269,9 @@ def act(action, args):
 
     if action == "type":
         wid = foreground()
+        focus = subprocess.run(["xdotool", "getwindowfocus"], capture_output=True, text=True).stdout.strip()
         subprocess.run(["xdotool", "type", "--window", wid, "--delay", "40", args[0]], check=True, timeout=60)
-        return f"typed {len(args[0])} characters"
+        return f"typed {len(args[0])} characters\nprobe: window {wid} focus {focus}"
 
     if action == "key":
         wid = foreground()
@@ -288,12 +289,13 @@ def act(action, args):
             looks.append(time.monotonic() - began)
             return found
 
+        focus = subprocess.run(["xdotool", "getwindowfocus"], capture_output=True, text=True).stdout.strip()
         sent = time.monotonic()
         subprocess.run(["xdotool", "key", "--window", wid, chord], check=True, timeout=10)
         element = until(seconds, probe)
         elapsed = round((time.monotonic() - sent) * 1000)
         if element is None:
-            raise missing(locator, f"nothing named '{locator}' appeared within {seconds} s of {chord}")
+            raise missing(locator, f"nothing named '{locator}' appeared within {seconds} s of {chord}; probe: window {wid} focus {focus}")
         fastest, slowest = round(min(looks) * 1000), round(max(looks) * 1000)
         return f"found '{locator}' {elapsed} ms after {chord}\n{len(looks)} looks took {fastest} to {slowest} ms each"
 
