@@ -936,8 +936,8 @@ act_restore() {
   attempt actions drive toggle 'More actions' || return 1
   attempt history drive invoke id:HistoryToggle || return 1
   attempt revision drive select-nth id:Revisions 1 || return 1
-  attempt restore-this drive invoke id:RestoreRevision || return 1
-  saved revision_ms restore-revision drive invoke Restore || return 1
+  # Restore this asks first only for a revision whose project tags differ, and this one's do not.
+  saved revision_ms restore-revision drive invoke id:RestoreRevision || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
   # The open history takes the whole of Items; hiding it brings the list back.
   attempt hide-history drive invoke 'Hide history' || return 1
