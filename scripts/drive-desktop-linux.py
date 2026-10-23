@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""4.7b: drives an installed keypaste desktop app from outside its process through AT-SPI and xdotool (D-0199).
+"""4.7b, R.1a: drives an installed keypaste desktop app from outside its process through AT-SPI and xdotool (D-0199).
 
-One action per call; prints what it saw and exits non-zero when the action could not be done. Needs an X
+One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb could
+not be done, 2 when this driver does not implement it. DRIVE_WINDOW names the app's window to act in. Needs an X
 display, a session bus with org.a11y.Status enabled, python3-gi with Atspi, xdotool and ImageMagick.
 """
 
+import os
+import re
 import subprocess
 import sys
 import time
@@ -14,10 +17,15 @@ import gi
 gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi, GLib  # noqa: E402
 
-TITLE = "keypaste"
+TITLE = os.environ.get("DRIVE_WINDOW") or "keypaste"
+UNIMPLEMENTED = {"windows", "key-wait", "wait", "wait-gone", "read", "select-nth", "check", "click", "right-click", "focus"}
 
 
 class Refused(Exception):
+    pass
+
+
+class Unimplemented(Exception):
     pass
 
 
@@ -53,11 +61,20 @@ def descendants(root, depth=0):
         yield from descendants(root.get_child_at_index(i), depth + 1)
 
 
-def named(name, predicate=lambda e: True):
-    frame = window()
-    for element in descendants(frame):
-        if element.get_name() == name and predicate(element):
-            return element
+def named(locator, predicate=lambda e: True):
+    """A name, or id:<automation id>, either with [n] for the nth match in tree order."""
+    index = 1
+    counted = re.fullmatch(r"(.*)\[(\d+)\]", locator)
+    if counted:
+        locator, index = counted.group(1), int(counted.group(2))
+    if locator.startswith("id:"):
+        raise Unimplemented("the id: locator")
+    seen = 0
+    for element in descendants(window()):
+        if element.get_name() == locator and predicate(element):
+            seen += 1
+            if seen == index:
+                return element
     return None
 
 
@@ -66,7 +83,7 @@ def has(element, interface):
 
 
 def xwindow():
-    ids = subprocess.run(["xdotool", "search", "--sync", "--name", f"^{TITLE}$"],
+    ids = subprocess.run(["xdotool", "search", "--sync", "--name", f"^{re.escape(TITLE)}$"],
                          capture_output=True, text=True, timeout=30, check=True).stdout.split()
     if not ids:
         raise Refused("no X window named keypaste")
@@ -81,6 +98,9 @@ def foreground():
 
 
 def act(action, args):
+    if action in UNIMPLEMENTED:
+        raise Unimplemented(f"the verb {action}")
+
     if action == "window":
         frame = until(int(args[0]), window)
         if frame is None:
@@ -167,7 +187,7 @@ def act(action, args):
             raise Refused(f"no field named '{args[0]}'")
         return set_text(edit, args[1], f"the field named '{args[0]}'")
 
-    raise Refused(f"no action named {action}")
+    raise Refused(f"no verb named {action}")
 
 
 def set_text(edit, value, what):
@@ -180,11 +200,14 @@ def set_text(edit, value, what):
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: drive-desktop-linux.py <action> [args...]")
-        return 2
+        print("usage: drive-desktop-linux.py <verb> [args...]")
+        return 1
     try:
         print(act(sys.argv[1], sys.argv[2:]))
         return 0
+    except Unimplemented as what:
+        print(f"{what} not implemented on linux")
+        return 2
     except (Refused, subprocess.SubprocessError, GLib.Error) as error:
         print(error)
         return 1

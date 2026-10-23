@@ -1,10 +1,11 @@
-// 4.7e: drives an installed keypaste desktop app from outside its process through the macOS accessibility API, System
-// Events' keystrokes, and screencapture (D-0199).
+// 4.7e, R.1a: drives an installed keypaste desktop app from outside its process through the macOS accessibility API,
+// System Events' keystrokes, and screencapture (D-0199).
 //
-// One action per call; prints what it saw and exits non-zero when the action could not be done. Needs Accessibility
-// and Apple Events to System Events for the process that runs osascript, which a hosted runner grants.
+// One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb could
+// not be done, 2 when this driver does not implement it. DRIVE_WINDOW names the app's window to act in. Needs
+// Accessibility and Apple Events to System Events for the process that runs osascript, which a hosted runner grants.
 //
-// Usage: osascript -l JavaScript drive-desktop-macos.js <pid> <action> [args...]
+// Usage: osascript -l JavaScript drive-desktop-macos.js <pid> <verb> [args...]
 //        osascript -l JavaScript drive-desktop-macos.js - dialog|press <process-name> [button]
 ObjC.import('Foundation');
 ObjC.import('AppKit');
@@ -12,7 +13,8 @@ ObjC.import('CoreGraphics');
 ObjC.import('ApplicationServices');
 ObjC.import('stdlib');
 
-const TITLE = 'keypaste';
+const TITLE = ObjC.unwrap($.NSProcessInfo.processInfo.environment.objectForKey($('DRIVE_WINDOW'))) || 'keypaste';
+const UNIMPLEMENTED = new Set(['windows', 'key-wait', 'wait', 'wait-gone', 'read', 'select-nth', 'check', 'click', 'right-click', 'focus']);
 const DEPTH = 40;
 const LIMIT = 4000;
 const FIELDS = new Set(['AXTextField', 'AXTextArea']);
@@ -21,6 +23,8 @@ const shell = Application.currentApplication();
 shell.includeStandardAdditions = true;
 
 class Refused extends Error {}
+
+class Unimplemented extends Error {}
 
 function print(text) {
   $.NSFileHandle.fileHandleWithStandardOutput.writeData($(`${text}\n`).dataUsingEncoding($.NSUTF8StringEncoding));
@@ -100,13 +104,22 @@ function texts(node) {
   return [node.title, node.value, node.description];
 }
 
-function find(pid, predicate, seconds = 60) {
+// A locator is a name, or id:<automation id>, either with [n] for the nth match in tree order.
+function locate(locator) {
+  const counted = /^(.*)\[(\d+)\]$/.exec(locator);
+  const name = counted ? counted[1] : locator;
+  if (name.startsWith('id:')) throw new Unimplemented('the id: locator');
+  return { name, index: counted ? Number(counted[2]) : 1 };
+}
+
+function find(pid, predicate, seconds = 60, index = 1) {
   return until(seconds, () => {
     const frame = window(pid);
     if (!frame) return null;
     const all = nodes(frame);
-    const index = all.findIndex(node => predicate(node));
-    return index < 0 ? null : { node: all[index], all, index };
+    let seen = 0;
+    const at = all.findIndex(node => predicate(node) && ++seen === index);
+    return at < 0 ? null : { node: all[at], all, index: at };
   });
 }
 
@@ -165,7 +178,14 @@ function dialog(name) {
   }));
 }
 
+// The element a verb's locator names, among those the predicate accepts.
+function located(pid, locator, predicate) {
+  const { name, index } = locate(locator);
+  return find(pid, node => named(name)(node) && predicate(node), 60, index);
+}
+
 function act(pid, action, args) {
+  if (UNIMPLEMENTED.has(action)) throw new Unimplemented(`the verb ${action}`);
   switch (action) {
     case 'window': {
       const frame = until(Number(args[0]), () => window(pid));
@@ -187,11 +207,11 @@ function act(pid, action, args) {
       const chord = /^(cmd|ctrl)\+(.)$/.exec(args[0]);
       if (args[0] === 'Return') events.keyCode(36);
       else if (chord) events.keystroke(chord[2], { using: chord[1] === 'cmd' ? 'command down' : 'control down' });
-      else throw new Refused(`no key named ${args[0]}`);
+      else throw new Unimplemented(`the chord ${args[0]}`);
       return `sent ${args[0]}`;
     }
     case 'find': {
-      const found = find(pid, named(args[0]));
+      const found = located(pid, args[0], () => true);
       if (!found) throw new Refused(`nothing named '${args[0]}' appeared`);
       return `found '${args[0]}' as ${found.node.role}`;
     }
@@ -201,7 +221,7 @@ function act(pid, action, args) {
       return texts(found.node).find(t => t.startsWith(args[0]));
     }
     case 'select': {
-      const found = find(pid, named(args[0]));
+      const found = located(pid, args[0], () => true);
       if (!found) throw new Refused(`no text '${args[0]}' to select`);
       for (let at = found.index; at >= 0; at = found.all[at].parent) {
         const item = found.all[at];
@@ -216,21 +236,21 @@ function act(pid, action, args) {
     case 'invoke':
     case 'toggle': {
       // Avalonia lists no actions on macOS, yet performs AXPress.
-      const found = find(pid, node => named(args[0])(node) && /Button|CheckBox/.test(node.role));
+      const found = located(pid, args[0], node => /Button|CheckBox/.test(node.role));
       if (!found) throw new Refused(`no button '${args[0]}'`);
       const status = $.AXUIElementPerformAction(found.node.element, $('AXPress'));
       if (status !== 0) throw new Refused(`'${args[0]}' refused AXPress (${status})`);
       return `invoked '${args[0]}'`;
     }
     case 'set-after': {
-      const found = find(pid, node => named(args[0])(node) && node.role === 'AXStaticText');
+      const found = located(pid, args[0], node => node.role === 'AXStaticText');
       if (!found) throw new Refused(`no label '${args[0]}'`);
       const field = found.all.slice(found.index + 1).find(node => node.parent === found.node.parent && FIELDS.has(node.role));
       if (!field) throw new Refused(`no field after '${args[0]}'`);
       return setText(field, args[1], `the field after '${args[0]}'`);
     }
     case 'set-named': {
-      const found = find(pid, node => named(args[0])(node) && FIELDS.has(node.role));
+      const found = located(pid, args[0], node => FIELDS.has(node.role));
       if (!found) throw new Refused(`no field named '${args[0]}'`);
       return setText(found.node, args[1], `the field named '${args[0]}'`);
     }
@@ -246,18 +266,22 @@ function act(pid, action, args) {
       return `pressed '${args[1]}' in ${args[0]}`;
     }
     default:
-      throw new Refused(`no action named ${action}`);
+      throw new Refused(`no verb named ${action}`);
   }
 }
 
 function run(argv) {
   if (argv.length < 2) {
-    print('usage: drive-desktop-macos.js <pid> <action> [args...]');
-    $.exit(2);
+    print('usage: drive-desktop-macos.js <pid> <verb> [args...]');
+    $.exit(1);
   }
   try {
     print(act(Number(argv[0]), argv[1], argv.slice(2)));
   } catch (error) {
+    if (error instanceof Unimplemented) {
+      print(`${error.message} not implemented on macos`);
+      $.exit(2);
+    }
     print(error instanceof Refused ? error.message : `${argv[1]} failed: ${error.message}`);
     $.exit(1);
   }

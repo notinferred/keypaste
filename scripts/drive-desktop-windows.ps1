@@ -1,10 +1,12 @@
-# 4.7b: drives an installed keypaste desktop app from outside its process through UI Automation (D-0199).
-# One action per call; prints what it saw and exits non-zero when the action could not be done.
+# 4.7b, R.1a: drives an installed keypaste desktop app from outside its process through UI Automation (D-0199).
+# One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb
+# could not be done, 2 when this driver does not implement it. DRIVE_WINDOW names the app's window to act in.
 param(
   [Parameter(Mandatory = $true)][string]$Action,
   [Parameter(Mandatory = $true)][int]$AppPid,
   [string]$First = '',
-  [string]$Second = ''
+  [string]$Second = '',
+  [string]$Third = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,8 +15,11 @@ Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.For
 $Auto = [System.Windows.Automation.AutomationElement]
 $Scope = [System.Windows.Automation.TreeScope]
 $Walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+$Title = if ($env:DRIVE_WINDOW) { $env:DRIVE_WINDOW } else { 'keypaste' }
 
 function Fail([string]$why) { Write-Output $why; exit 1 }
+
+function Unimplemented([string]$what) { Write-Output "$what not implemented on windows"; exit 2 }
 
 function Until([int]$seconds, [scriptblock]$probe) {
   $deadline = [DateTime]::UtcNow.AddSeconds($seconds)
@@ -29,16 +34,28 @@ function Until([int]$seconds, [scriptblock]$probe) {
 function Window {
   $condition = New-Object System.Windows.Automation.AndCondition(
     (New-Object System.Windows.Automation.PropertyCondition($Auto::ProcessIdProperty, $AppPid)),
-    (New-Object System.Windows.Automation.PropertyCondition($Auto::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)))
+    (New-Object System.Windows.Automation.PropertyCondition($Auto::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)),
+    (New-Object System.Windows.Automation.PropertyCondition($Auto::NameProperty, $Title)))
   $Auto::RootElement.FindFirst($Scope::Children, $condition)
 }
 
-function Named([string]$name, [System.Windows.Automation.ControlType]$type) {
+# A locator is a name, id:<automation id>, either with [n] for the nth match in tree order.
+function Named([string]$locator, [System.Windows.Automation.ControlType]$type) {
   $window = Window
   if (-not $window) { return $null }
-  $condition = New-Object System.Windows.Automation.PropertyCondition($Auto::NameProperty, $name)
+  $index = 1
+  if ($locator -match '^(.*)\[(\d+)\]$') { $locator = $Matches[1]; $index = [int]$Matches[2] }
+  $condition = if ($locator.StartsWith('id:')) {
+    New-Object System.Windows.Automation.PropertyCondition($Auto::AutomationIdProperty, $locator.Substring(3))
+  } else {
+    New-Object System.Windows.Automation.PropertyCondition($Auto::NameProperty, $locator)
+  }
+  $seen = 0
   foreach ($element in $window.FindAll($Scope::Descendants, $condition)) {
-    if (-not $type -or $element.Current.ControlType -eq $type) { return $element }
+    if (-not $type -or $element.Current.ControlType -eq $type) {
+      $seen++
+      if ($seen -eq $index) { return $element }
+    }
   }
   return $null
 }
@@ -64,7 +81,7 @@ function Foreground {
 switch ($Action) {
   'window' {
     $window = Until ([int]$First) { Window }
-    if (-not $window) { Fail "no window for process $AppPid within $First s" }
+    if (-not $window) { Fail "no window '$Title' for process $AppPid within $First s" }
     Write-Output "window '$($window.Current.Name)' $($window.Current.BoundingRectangle)"
   }
   'screenshot' {
@@ -90,7 +107,7 @@ switch ($Action) {
     $chord = switch -Regex ($First) {
       '^Return$' { '{ENTER}' }
       '^ctrl\+(\d)$' { '^' + $Matches[1] }
-      default { Fail "no chord named $First" }
+      default { Unimplemented "the chord $First" }
     }
     Foreground
     [System.Windows.Forms.SendKeys]::SendWait($chord)
@@ -153,5 +170,6 @@ switch ($Action) {
     if ($value.Current.Value -ne $Second) { Fail "the field named '$First' reads '$($value.Current.Value)'" }
     Write-Output "set the field named '$First'"
   }
-  default { Fail "no action named $Action" }
+  { $_ -in 'windows', 'key-wait', 'wait', 'wait-gone', 'read', 'select-nth', 'check', 'click', 'right-click', 'focus' } { Unimplemented "the verb $Action" }
+  default { Fail "no verb named $Action" }
 }
