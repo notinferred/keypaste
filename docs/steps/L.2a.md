@@ -31,6 +31,6 @@ D-0402: `site/web` is a separate project, built by wrangler's build step. The fi
 - The content pages have no content security policy yet: what Mermaid needs under a strict one is unverified without a browser (L.2b).
 - Nobody has looked at the pages in a browser yet: rendering, the theme switch, the diagram animation and search are unverified.
 - Branch pushes that touch `site/` build in Cloudflare, so the non-production deploy command must only upload a version; site/README now says so, and the dashboard setting is unconfirmed.
-- An unknown path still gets the Worker's plain 404, not Starlight's 404 page.
+- **For 1.0.0.** An unknown path still gets the Worker's plain 404, not Starlight's 404 page: `wrangler.jsonc`'s `assets` sets no `not_found_handling`, so an unmatched path reaches the Worker's `new Response("Not found\n", { status: 404 })` in `site/src/worker.js`. Have the Worker fetch `/404` from `env.ASSETS` and return its body and headers with status 404, keeping the plain text only when that fetch fails, and check the live answer on the branch's preview version before integrating, since the push to `main` deploys (D-0127). A new `site/test/worker.test.mjs`, using `share-api.test.mjs`'s fake `ASSETS` and run by hand since no workflow runs `node --test` in `site/`, must show an unknown path answered 404 with the built page's body, and the plain text when the page cannot be fetched.
 - The home page repeats the labels from `products.json`, so a release changes both.
 - There is no CHANGELOG entry: the site is not part of a product release.

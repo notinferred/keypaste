@@ -73,8 +73,8 @@ The linearization point is the commit check, not the pipe write. A release that 
 
 A read can still happen for a request the lock is withdrawing: its token is checked just before reading, and the commit check then drops the value. What the lock guarantees is that nothing is released.
 
-`keypaste agent` still has no idle lock, by founder choice. Its SIGTERM step is exercised on Linux only. On Windows, Ctrl+C and console close go through the same registration, but no gate delivers them.
+`keypaste agent` still has no idle lock, by founder choice. Its SIGTERM step runs on Linux and macOS. On Windows, Ctrl+C and console close go through the same registration, but no gate delivers them; [F.37](F.37.md) carries that gate for 1.0.0.
 
 The app still answers from the snapshot it opened (U.3), and has no approval of its own (4.4). The status read from the authority and crash takeover are 4.4b's. Launches through the session do not exist yet. E.1a is expected to commit through the same lifetime.
 
-From reading `TerminalApprovalChannel`, not reproduced in this step: standard input closing at the agent's prompt is answered as a person's denial. It is audited as `prompt` and starts the refusal cooldown. The gate keeps the agent's input open, so it does not meet this.
+**For 1.0.0.** Standard input closing at `keypaste approve`'s prompt is answered as a person's denial: `ConsoleSecretPrompt.ReadChoice` returns null at end of input and `TerminalApprovalChannel.AnswerAsync` maps null to `Denied`, which is audited as `prompt` and starts the refusal cooldown, and so is every later request; the `y`-only confirmations do the same. The gate keeps the approver's input open, so it does not meet this. `ISecretPrompt.ReadChoice` should report end of input apart from an unrecognised line, and `AnswerAsync` answer it `ApprovalAnswer.NoChannel`, recorded as `no-approver` with no cooldown, saying that standard input closed and nothing was released. `TerminalApprovalChannelTests`, with `CliHarness.ReadChoice` at end of input, must show the answer `NoChannel` and a second request for the same field asked rather than refused for the cooldown.

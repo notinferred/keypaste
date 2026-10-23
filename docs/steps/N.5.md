@@ -37,7 +37,7 @@ Local, Windows 10 Pro 19045, on `main` above `2e3b51f`.
 ## Limits and follow-ups
 
 - Opening an address is checked through the launcher seam: the plan's click in a source-built app on Windows, to watch the default browser open, was not made in this session, and no test watches a real browser open on any platform.
-- **A share link's audit line names no vault**, so a share made from one vault counts as a release of the item at the same path in any other, for the card as for the table's last-used dot. This predates the step and was reported to the founder rather than planned here.
+- **For 1.0.0.** A share link's audit line names no vault: `ShareService.TryAudit` writes `share-created` and `share-revoked` with no `Vault`, and `EntryActivity` counts a line without one as a use in every vault, so a share made from one vault counts as a release of the item at the same path in any other, for the card as for the table's last-used dot. This predates the step. Set `AuditRecord.Vault` to the vault's key, `VaultIdentity.Of(home, vault.Path).Key` (D-0361), passed in from `ShellViewModel.Sharing` and `ShareCommand.Service`. `ShareServiceTests` must find both lines naming the vault's key, and `EntryActivityTests` must not count another vault's share as a use.
 - A bridge from before this step announces nothing, so an item its agents can see shows no card until one receives it.
 - When nothing has been released, granted or asked for, the card's summary names the attached agents whose reach shows it, such as "claude-code can see it · nothing released", where it read None active (`4f19fbdc`; ci 39850506100, app 39850506098).
 - Source only.
