@@ -11,6 +11,12 @@ run-name: ${{ inputs.rehearsal && format('install-desktop rehearsal of app run {
 # A rehearsal installs instead the -dryrun packages of a successful app.yml run at this run's own commit, with
 # the CLI/MCP from that run's archive beside them. Nothing in it is attested, so it is never release evidence;
 # a candidate is tagged only after its rehearsal passes (D-0433).
+#
+# R.1a: in the same installed app, exercise-desktop-acts.sh then performs R.1a's acts, with KeePassXC, Claude Code
+# at install-real-tools.sh's pin and, on Linux, xterm for the app's Run, none of which the app needs, and the job
+# summary carries each act's verdict. dev.yml's acts mode calls this with dev: any successful app run's packages,
+# installed as a rehearsal installs them and acted on with the calling ref's scripts, on one runner or all; it is
+# never evidence of anything (D-0460).
 
 on:
   workflow_dispatch:
@@ -28,6 +34,27 @@ on:
         required: false
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      app_run_id:
+        description: The successful app.yml run whose packages are installed and acted on
+        required: true
+        type: string
+      rehearsal:
+        description: Install the -dryrun packages a branch's app run built
+        required: false
+        type: boolean
+        default: true
+      dev:
+        description: Any app run's packages, acted on with this ref's scripts; never evidence
+        required: false
+        type: boolean
+        default: true
+      runner:
+        description: windows-2025, ubuntu-24.04 or macos-15, or all three
+        required: false
+        type: string
+        default: all
 
 permissions:
   contents: read
@@ -39,26 +66,38 @@ jobs:
     name: install-desktop (${{ matrix.rid }})
     strategy:
       fail-fast: false
+      # Every runner, or for dev.yml the one it names.
       matrix:
-        include:
-          - os: windows-2025
-            rid: win-x64
-            package: msi
-            cli: zip
-          - os: ubuntu-24.04
-            rid: linux-x64
-            package: AppImage
-            cli: tar.gz
-          - os: macos-15
-            rid: osx-arm64
-            package: dmg
-            cli: tar.gz
+        include: >-
+          ${{ fromJSON(
+          inputs.runner == 'windows-2025' && '[{"os":"windows-2025","rid":"win-x64","package":"msi","cli":"zip"}]'
+          || inputs.runner == 'ubuntu-24.04' && '[{"os":"ubuntu-24.04","rid":"linux-x64","package":"AppImage","cli":"tar.gz"}]'
+          || inputs.runner == 'macos-15' && '[{"os":"macos-15","rid":"osx-arm64","package":"dmg","cli":"tar.gz"}]'
+          || '[{"os":"windows-2025","rid":"win-x64","package":"msi","cli":"zip"},{"os":"ubuntu-24.04","rid":"linux-x64","package":"AppImage","cli":"tar.gz"},{"os":"macos-15","rid":"osx-arm64","package":"dmg","cli":"tar.gz"}]'
+          ) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # The install exercise's slowest green job took 2 minutes; the acts' are not known yet, so this is generous until
+    # they are, and then about twice the slowest green.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+
+      - name: Check the dev run's app run succeeded (never evidence)
+        if: inputs.dev
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.app_run_id }}
+        run: |
+          set -euo pipefail
+          case "$RUN_ID" in ''|*[!0-9]*) echo "::error::$RUN_ID is not a run ID"; exit 1 ;; esac
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '[.path, (.conclusion // "none"), .head_sha] | @tsv' | tr -d '\r')"
+          IFS=$'\t' read -r path conclusion sha <<< "$run"
+          [ "$path" = .github/workflows/app.yml ] || { echo "::error::run $RUN_ID is $path, not app.yml"; exit 1; }
+          [ "$conclusion" = success ] || { echo "::error::app run $RUN_ID concluded $conclusion, not success"; exit 1; }
+          echo "app run $RUN_ID built $sha; this dev run acts on it with $GITHUB_SHA's scripts and is never evidence"
 
       - name: Read the candidate version
         id: v
@@ -79,7 +118,7 @@ jobs:
 
       # The harness and the packages then come from one commit.
       - name: Check the rehearsal's app run built this commit
-        if: inputs.rehearsal
+        if: inputs.rehearsal && !inputs.dev
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -209,11 +248,88 @@ jobs:
             bash scripts/exercise-desktop-install.sh "$RID" "$candidate" "$VERSION" "$RUNNER_TEMP/cli" install-desktop
           fi
 
+      # The acts run in the app the install exercise left installed, whatever its checks found; each act says what it
+      # could not reach.
+      - name: Install KeePassXC and a terminal for the acts (Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/apt-install.sh --no-install-recommends keepassxc xterm
+
+      - name: Install KeePassXC for the acts (macOS)
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: brew install --cask keepassxc
+
+      - name: Install KeePassXC for the acts (Windows)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh "$RUNNER_TEMP/keepassxc")" >> "$GITHUB_ENV"
+
+      - name: Install Claude Code where its native installer puts it
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/install-real-tools.sh --claude-code-only "$HOME/.local" >> "$GITHUB_PATH"
+
+      # The scripts job checks it on Linux; here it runs on the bash that classifies the acts, macOS's 3.2 among them.
+      - name: Self-test the acts' classifier on this runner
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: bash scripts/exercise-desktop-acts.sh --selftest
+
+      - name: Perform R.1a's acts in the installed app
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version || steps.rv.outputs.version }}
+          REHEARSAL: ${{ inputs.rehearsal && inputs.app_run_id || '' }}
+          APP_RUN_ID: ${{ inputs.app_run_id }}
+          RID: ${{ matrix.rid }}
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          PACKAGE_COMMIT="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APP_RUN_ID" --jq .head_sha | tr -d '\r')"
+          export PACKAGE_COMMIT
+          candidate="$RUNNER_TEMP/candidate/keypaste-app-$VERSION-$RID-internal-unsigned.$PACKAGE"
+          if [ "$RUNNER_OS" = Linux ]; then
+            dbus-run-session -- bash scripts/exercise-desktop-acts.sh "$RID" "$candidate" install-desktop "$RUNNER_TEMP/cli" acts
+          else
+            bash scripts/exercise-desktop-acts.sh "$RID" "$candidate" install-desktop "$RUNNER_TEMP/cli" acts
+          fi
+
+      - name: Write the acts' verdicts to the job summary
+        if: always()
+        shell: bash
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          if [ -s acts/verdicts.jsonl ]; then
+            bash scripts/exercise-desktop-acts.sh --summary acts >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The acts left no verdicts on $RID." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: ${{ inputs.rehearsal && 'install-desktop-rehearsal' || 'install-desktop' }}-${{ matrix.rid }}
+          name: ${{ inputs.dev && 'install-desktop-dev' || inputs.rehearsal && 'install-desktop-rehearsal' || 'install-desktop' }}-${{ matrix.rid }}
           path: install-desktop/
           if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: ${{ inputs.dev && 'acts-dev' || inputs.rehearsal && 'acts-rehearsal' || 'acts' }}-${{ matrix.rid }}
+          path: acts/
+          if-no-files-found: warn
           retention-days: 30
 
