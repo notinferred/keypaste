@@ -739,8 +739,35 @@ readonly KPXC_ARGON2D='Argon2d (KDBX 4 – recommended)'
 # mac_kpxc <pid> <verb> [args...]: the macOS driver acting in KeePassXC's window for the vault.
 mac_kpxc() { (export DRIVE_WINDOW="$KPXC_WINDOW"; mac_osascript 120 "$MAC_DRIVER" "$@"); }
 
-# mac_kpxc_choose <pid> <combo box> <Up|Down>: opens the combo box and takes the item above or below the one it shows.
-mac_kpxc_choose() { mac_kpxc "$1" click "$2" && mac_kpxc "$1" key "$3" && mac_kpxc "$1" key Return; }
+# mac_kpxc_choose <pid> <combo box> <Up|Down> <item>: opens the combo box, takes the item above or below the one it
+# shows, and checks that the box shows <item>. Its list opens as a window with no title, and the keys are sent only
+# once it has, since a Return the dialog takes instead presses OK.
+mac_kpxc_choose() {
+  local pid="$1" shown i
+  for i in 1 2 3; do
+    mac_kpxc "$pid" click "$2" || return 1
+    mac_kpxc_listed "$pid" && break
+    [ "$i" != 3 ] || { echo "the list of '$2' did not open after three clicks"; return 1; }
+  done
+  mac_kpxc "$pid" key "$3" && mac_kpxc "$pid" key Return || return 1
+  # A combo box comes before the items of its list in the tree, so the first element named <item> is the box only when
+  # the box shows it.
+  shown="$(mac_kpxc "$pid" find "$4")" || { echo "$shown"; return 1; }
+  case "$shown" in
+    *' as AXComboBox') echo "$shown" ;;
+    *) echo "'$2' does not show '$4' after it was chosen: $shown"; return 1 ;;
+  esac
+}
+
+# Whether a combo box's list, a KeePassXC window with no title, opens within 5 s.
+mac_kpxc_listed() {
+  local i
+  for i in $(seq 1 10); do
+    if mac_kpxc "$1" windows 2> /dev/null | grep -q '^$'; then return 0; fi
+    sleep 0.5
+  done
+  return 1
+}
 
 mac_keepassxc_kdf() {
   local pid="$1" i
@@ -759,10 +786,12 @@ mac_keepassxc_kdf() {
   mac_kpxc "$pid" menu Database 'Database Security…' || return 1
   mac_kpxc "$pid" invoke 'Encryption Settings' || return 1
   mac_kpxc "$pid" invoke Advanced || return 1
-  mac_kpxc_choose "$pid" 'KDBX 3' Up || return 1
-  mac_kpxc "$pid" find "$KPXC_ARGON2D" || return 1
-  mac_kpxc_choose "$pid" "$KPXC_ARGON2D" Down || return 1
-  mac_kpxc_choose "$pid" 'Argon2id (KDBX 4)' Up || return 1
+  mac_kpxc_choose "$pid" 'KDBX 3' Up 'KDBX 4 (recommended)' || return 1
+  mac_kpxc_choose "$pid" "$KPXC_ARGON2D" Down 'Argon2id (KDBX 4)' || return 1
+  # KeePassXC benchmarks the rounds for a second after each choice of key derivation.
+  sleep 3
+  mac_kpxc_choose "$pid" 'Argon2id (KDBX 4)' Up "$KPXC_ARGON2D" || return 1
+  sleep 3
   mac_kpxc "$pid" invoke OK || return 1
   # KeePassXC saves after every change unless told otherwise; Save Database is asked for once when it has not.
   for i in $(seq 1 60); do
@@ -896,7 +925,7 @@ act_first_run() {
   attempt keepassxc-vault keepassxc_vault || return 1
   attempt keepassxc-recent keepassxc_recent || return 1
   if [ "$PLATFORM" = macos ]; then
-    fact keepassxc_argon2 "$(mac_keepassxc_argon2 2>&1 | tr -d "$CR" | tail -n 12 | tr '\n' ' ')"
+    fact keepassxc_argon2 "$(mac_keepassxc_argon2 2>&1 | tr -d "$CR" | tr '\n' ' ')"
     fact database "$(kx db-info "$VAULT" 2>&1 | tr '\n' ' ')"
   fi
   if [ "$PLATFORM" = linux ]; then attempt accessibility enable_accessibility || return 1; fi

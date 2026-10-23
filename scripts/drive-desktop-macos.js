@@ -12,6 +12,7 @@
 //        osascript -l JavaScript drive-desktop-macos.js - dialog|press <process-name> [button]
 // menu, dialog and press are this driver's own, for the apps beside keypaste that the macOS exercises drive.
 ObjC.import('Foundation');
+ObjC.import('CoreFoundation');
 ObjC.import('AppKit');
 ObjC.import('CoreGraphics');
 ObjC.import('ApplicationServices');
@@ -226,13 +227,29 @@ function press(node, locator) {
 }
 
 // A real pointer click at the element's centre, once the app has brought it into view.
+// Whether the element the screen shows at the point is the node or one of its first descendants.
+function over(pid, node, point) {
+  const out = Ref();
+  if ($.AXUIElementCopyElementAtPosition(application(pid), point.x, point.y, out) !== 0) return false;
+  let hit = ObjC.castRefToObject(out[0]);
+  for (let depth = 0; hit && depth < 8; depth++) {
+    if ($.CFEqual(hit, node.element)) return true;
+    hit = ax.value(hit, 'AXParent');
+  }
+  return false;
+}
+
 function click(pid, node, locator, kind) {
   $.AXUIElementPerformAction(node.element, $('AXScrollToVisible'));
-  delay(0.3);
-  const frame = ax.frame(node.element);
-  if (!frame || frame.width <= 0 || frame.height <= 0) throw new Refused(`'${locator}' has no frame on the screen`);
-  const point = { x: Math.round(frame.x + frame.width / 2), y: Math.round(frame.y + frame.height / 2) };
   front(pid);
+  // A frame can trail a layout that has just changed, so its centre is clicked only once the screen shows the element there.
+  const point = until(5, () => {
+    const frame = ax.frame(node.element);
+    if (!frame || frame.width <= 0 || frame.height <= 0) return null;
+    const centre = { x: Math.round(frame.x + frame.width / 2), y: Math.round(frame.y + frame.height / 2) };
+    return over(pid, node, centre) ? centre : null;
+  });
+  if (!point) throw new Refused(`'${locator}' is not what the screen shows at its centre: ${JSON.stringify(ax.frame(node.element))}`);
   const mouse = MOUSE[kind];
   for (const type of [MOUSE_MOVED, mouse.down, mouse.up]) {
     $.CGEventPost(HID_TAP, $.CGEventCreateMouseEvent(null, type, point, type === MOUSE_MOVED ? 0 : mouse.button));
