@@ -278,9 +278,9 @@ jobs:
           set -euo pipefail
           bash scripts/install-real-tools.sh --claude-code-only "$HOME/.local" >> "$GITHUB_PATH"
 
-      # The scripts job checks it on Linux; here it runs on the bash that classifies the acts, macOS's 3.2 among them.
-      - name: Self-test the acts' classifier on this runner
-        if: ${{ !cancelled() }}
+      # The scripts job checks it under Linux's bash; macOS classifies the acts with its stock 3.2 (D-0398).
+      - name: Self-test the acts' classifier under macOS's bash
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
         shell: bash
         run: bash scripts/exercise-desktop-acts.sh --selftest
 
