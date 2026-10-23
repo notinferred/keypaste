@@ -885,7 +885,14 @@ act_first_run() {
   attempt password drive type "$PASSWORD" || return 1
   if [ "$PLATFORM" = linux ]; then screenshot probe-typed; fact probe_typed_at "$(now_ms)"; fi
   # Timed inside the driver, from Return to the item list, since starting a driver can take longer than an unlock.
-  attempt unlock drive key-wait Return "$ENTRY_FIELD" 120 || { [ "$PLATFORM" != linux ] || fact probe_app "$(ps -eo pid,stat,pcpu,etime,args | grep -i '[k]eypaste' | tr '\n' ';')"; return 1; }
+  attempt unlock drive key-wait Return "$ENTRY_FIELD" 60 || {
+    if [ "$PLATFORM" = linux ]; then
+      fact probe_invoke "$(drive invoke Unlock 2>&1 | tr '\n' ' ')"
+      fact probe_after_invoke "$(drive wait 'Lock now' 60 2>&1 | head -c 600 | tr '\n' ' ')"
+      screenshot probe-invoked
+    fi
+    return 1
+  }
   fact unlock_ms "$(step_detail "$OUT" first-run unlock | sed -n 's/.* \([0-9][0-9]*\) ms after .*/\1/p')"
   attempt unlocked drive find 'Lock now' || return 1
   fact chosen_vault "$(chosen_vault)"
