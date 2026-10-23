@@ -85,6 +85,16 @@ public sealed class NativeArgon2Tests
         Assert.Equal(Managed(Argon2Type.D, _message, parameters), Native(Argon2Type.D, _message, parameters));
     }
 
+    /// <summary>The small derivation <c>keypaste doctor</c> runs binds what an unlock binds, which it then names (D-0525).</summary>
+    [Fact]
+    public void Doctor_s_derivation_names_the_library_KeePassLib_derives_with()
+    {
+        var expected = NativeArgon2.BundledFileName is { } file ? Path.Combine(AppContext.BaseDirectory, file) : SystemLibrary();
+        Assert.SkipWhen(expected is null, "this Linux has no libargon2, so KeePassLib derives in managed code alone");
+
+        Assert.Equal(expected, KeePassInterop.DeriveArgon2Once());
+    }
+
     /// <summary>
     /// KeePassLib's native derivation alone, which must give the key, from the file keypaste carries on Windows and macOS or the
     /// system's libargon2 on Linux. A Linux without one skips, as its KeePassLib derives in managed code alone.

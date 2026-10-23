@@ -3028,6 +3028,24 @@ internal sealed class KeePassInterop : IDisposable
         public byte[] GetResponse(byte[] pbChallenge) => Factor.Respond(pbChallenge);
     }
 
+    /// <summary>
+    /// Derives one small Argon2d key from constant bytes through KeePassLib's own native call, as every unlock and save does,
+    /// and returns the library that call was bound to, or <see langword="null"/> when the key came from KeePassLib's managed
+    /// Argon2 (D-0525).
+    /// </summary>
+    internal static string? DeriveArgon2Once()
+    {
+        Argon2Kdf kdf = new(Argon2Type.D);
+        KdfParameters parameters = kdf.GetDefaultParameters();
+        parameters.SetByteArray(Argon2Kdf.ParamSalt, new byte[32]);
+        parameters.SetUInt64(Argon2Kdf.ParamIterations, 1);
+        parameters.SetUInt64(Argon2Kdf.ParamMemory, 64 * 1024);
+        parameters.SetUInt32(Argon2Kdf.ParamParallelism, 1);
+
+        _ = kdf.Transform(new byte[32], parameters);
+        return NativeArgon2.Bound;
+    }
+
     private static void ApplyKeypasteFormatSettings(PwDatabase database)
     {
         // KDBX4 with Argon2d, at parameters keypaste states rather than inherits. See

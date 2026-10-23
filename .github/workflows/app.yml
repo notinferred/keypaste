@@ -437,6 +437,30 @@ jobs:
             [ -n "$library" ] || { echo "::error::the payload derived Argon2 in managed code: no system libargon2 loaded"; exit 1; }
           fi
 
+      # The NativeAOT keypaste beside it must derive as the app does, which its doctor names (D-0525).
+      - name: Require the bridge's doctor to name the libargon2 it derives with
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="artifacts/app/${{ matrix.rid }}"
+          bin="$out/keypaste"
+          [ "${{ matrix.rid }}" = "win-x64" ] && bin="$out/keypaste.exe"
+          code=0
+          "$bin" doctor --json > "$RUNNER_TEMP/doctor.json" || code=$?
+          [ "$code" -eq 0 ] || [ "$code" -eq 7 ] || { echo "::error::keypaste doctor exited $code"; exit 1; }
+          argon2="$(jq -c '.[] | select(.area == "argon2")' "$RUNNER_TEMP/doctor.json" | tr -d '\r')"
+          echo "$argon2"
+          [ "$(jq -r .status <<<"$argon2")" = ok ] \
+            || { echo "::error::the payload's keypaste derived Argon2 in managed code: $(jq -r .says <<<"$argon2")"; exit 1; }
+          carried="$(bash scripts/build-argon2.sh --name '${{ matrix.rid }}')"
+          where="$(jq -r '.where // ""' <<<"$argon2")"
+          if [ -n "$carried" ]; then
+            case "$where" in
+              *"$carried") ;;
+              *) echo "::error::the payload's keypaste derived Argon2 with ${where:-a system library}, not the $carried it carries"; exit 1 ;;
+            esac
+          fi
+
       - name: Check the version the binary reports
         id: v
         shell: bash

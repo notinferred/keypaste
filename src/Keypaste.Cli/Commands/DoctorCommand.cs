@@ -8,8 +8,8 @@ using Keypaste.Core.Infrastructure;
 namespace Keypaste.Cli.Commands;
 
 /// <summary>
-/// <c>keypaste doctor</c>: says whether this keypaste, the vault, the process holding it, each AI tool's registration,
-/// keypaste's settings files and PATH work together, and what to fix (D-0467).
+/// <c>keypaste doctor</c>: says whether this keypaste and its Argon2, the vault, the process holding it, each AI tool's
+/// registration, keypaste's settings files and PATH work together, and what to fix (D-0467, D-0525).
 /// </summary>
 /// <remarks>
 /// It only reads, through <see cref="HealthCheck"/>. A finding can quote another program or a path from an AI tool's
@@ -121,6 +121,7 @@ internal static class DoctorCommand
     private static string Named(HealthArea area) => area switch
     {
         HealthArea.Versions => "versions",
+        HealthArea.Argon2 => "argon2",
         HealthArea.Vault => "vault",
         HealthArea.Tool => "tool",
         HealthArea.Owner => "owner",
@@ -145,10 +146,10 @@ internal static class DoctorCommand
     {
         writer.WriteLine("usage: keypaste doctor [--vault <path>] [--json]");
         writer.WriteLine();
-        writer.WriteLine("Checks, reading only, that this keypaste, your vault, the keypaste app or");
-        writer.WriteLine("`keypaste approve` holding it, your AI tools' connections, keypaste's settings");
-        writer.WriteLine("files and PATH work together, and says what to fix. It opens no vault, asks");
-        writer.WriteLine("for no password and changes nothing.");
+        writer.WriteLine("Checks, reading only, that this keypaste and its Argon2, your vault, the");
+        writer.WriteLine("keypaste app or `keypaste approve` holding it, your AI tools' connections,");
+        writer.WriteLine("keypaste's settings files and PATH work together, and says what to fix. It");
+        writer.WriteLine("opens no vault, asks for no password and changes nothing.");
         writer.WriteLine();
         writer.WriteLine("  --vault <path>   check this vault instead of the chosen one");
         writer.WriteLine("  --json           one object per finding");
