@@ -172,10 +172,18 @@ def offered():
         if role(element) in QUIET_ROLES:
             continue
         ident = automation_id(element)
-        if not ident and not any(has(element, i) for i in ("Action", "EditableText", "Selection")):
-            continue
-        shown.append(f"{role_name(element)} '{name_of(element)}'" + (f" #{ident}" if ident else ""))
+        if has(element, "Selection"):
+            shown.append(listed(element))
+        elif ident or has(element, "Action") or has(element, "EditableText"):
+            shown.append(f"{role_name(element)} '{name_of(element)}'" + (f" #{ident}" if ident else ""))
     return "the window offers: " + "; ".join(shown[:150])
+
+
+def listed(listing):
+    """A list as AT-SPI reports it: its name, its automation id and how many items it holds."""
+    ident = automation_id(listing)
+    return f"{role_name(listing)} '{name_of(listing)}'" + (f" #{ident}" if ident else "") + \
+        f" of {listing.get_child_count()} items"
 
 
 def missing(locator, what):
@@ -220,9 +228,17 @@ def centre(element):
 
 def action_index(element, wanted):
     for i in range(Atspi.Action.get_n_actions(element)):
-        if Atspi.Action.get_action_name(element, i) == wanted:
+        if Atspi.Action.get_name(element, i) == wanted:
             return i
     return 0
+
+
+def pressable(locator, what):
+    """A control with an action once it is enabled, as a person waits for a button that is armed a moment late."""
+    element = located(locator, lambda e: has(e, "Action"), what=what)
+    if until(30, lambda: True if state(element, Atspi.StateType.ENABLED) else None) is None:
+        raise Refused(f"'{locator}' stayed disabled for 30 s")
+    return element
 
 
 def act(action, args):
@@ -318,9 +334,10 @@ def act(action, args):
         if item is None:
             raise Refused(f"'{args[0]}' is not inside a list item")
         parent = item.get_parent()
-        if not has(parent, "Selection") or not Atspi.Selection.select_child(parent, item.get_index_in_parent()):
+        index = item.get_index_in_parent()
+        if not has(parent, "Selection") or not Atspi.Selection.select_child(parent, index):
             raise Refused(f"the list holding '{args[0]}' refused the selection")
-        return f"selected '{args[0]}'"
+        return f"selected '{args[0]}'\nitem {index + 1} of {listed(parent)}"
 
     if action == "select-nth":
         listing = located(args[0], lambda e: has(e, "Selection"), what=f"no list '{args[0]}'")
@@ -332,15 +349,16 @@ def act(action, args):
         return f"selected item {args[1]} of '{args[0]}'"
 
     if action in ("invoke", "toggle"):
-        button = located(args[0], lambda e: has(e, "Action"), what=f"no button '{args[0]}'")
+        button = pressable(args[0], f"no button '{args[0]}'")
         if not Atspi.Action.do_action(button, 0):
             raise Refused(f"'{args[0]}' refused its action")
         return f"{'invoked' if action == 'invoke' else 'toggled'} '{args[0]}'"
 
     if action == "check":
         wanted = args[1] == "on"
-        box = located(args[0], lambda e: has(e, "Action") and state(e, Atspi.StateType.CHECKABLE),
-                      what=f"no check box '{args[0]}'")
+        box = pressable(args[0], f"no check box '{args[0]}'")
+        if not state(box, Atspi.StateType.CHECKABLE):
+            raise Refused(f"'{args[0]}' is a {role_name(box)}, which has no on or off")
         if state(box, Atspi.StateType.CHECKED) != wanted:
             if not Atspi.Action.do_action(box, action_index(box, "toggle")):
                 raise Refused(f"'{args[0]}' refused its toggle")
