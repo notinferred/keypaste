@@ -22,4 +22,4 @@ Ledger rows from this step, which constrain later work, stay in [DECISIONS](../.
 
 ## Limits and follow-ups
 
-`verify.ps1` first failed on line endings, then passed resumed with `--from scripts`. The Trash screen empties the whole bin behind a second confirmation naming how many items go; the CLI has no verb for it (D-0511) (`d57aa9b7`; ci 39825609882, app 39825609666).
+`verify.ps1` first failed on line endings, then passed resumed with `--from scripts`. The Trash screen empties the whole bin behind a second confirmation naming how many items go; the CLI has no verb for it (D-0511) (`d57aa9b7`; ci 39825609882, app 39825609666). Since 2026-10-23 `verify-keepassxc-workflows.sh` also presses Restore as after a refused restore (D-0512), and KeePassXC reads the entry under its `(restored)` title with its UUID, password and history, and its own entry still under the name.

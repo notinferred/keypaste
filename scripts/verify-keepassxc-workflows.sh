@@ -145,6 +145,16 @@ revisions() {
     END { if (!found) print 0 }' "$dir/revisions.xml"
 }
 
+# The UUID KeePassXC holds for the entry at the path $2 in the vault $1, spelled as uuid spells one.
+uuid_at() { value "$1" "$2" Uuid | tr -d '{}-' | xxd -r -p | base64; }
+
+# The number of revisions KeePassXC holds for the entry at the path $2 in the vault $1.
+revisions_at() {
+  local id
+  id=$(uuid_at "$1" "$2") || die "KeePassXC cannot read the UUID of '$2'"
+  revisions "$1" "$id"
+}
+
 # C.2's notes: two keys, a GitHub token on a line of its own, a PEM block and a sentence. The token
 # is assembled here so no literal token sits in the repository.
 gh_token="ghp_$(printf 'kp2c%.0s' 1 2 3 4 5 6 7 8 9)"
@@ -199,6 +209,13 @@ cat >"$dir/seed.xml" <<EOF
           <UUID>$(uuid occupied)</UUID>
           <String><Key>Title</Key><Value>occupied</Value></String>
           <String><Key>Password</Key><Value ProtectInMemory="True">o-1</Value></String>
+          <History>
+            <Entry>
+              <UUID>$(uuid occupied)</UUID>
+              <String><Key>Title</Key><Value>occupied</Value></String>
+              <String><Key>Password</Key><Value ProtectInMemory="True">o-0</Value></String>
+            </Entry>
+          </History>
         </Entry>
       </Group>
       <Group>
@@ -435,7 +452,7 @@ exercise() {
   intact "$db" archive/database-old
   refused "the app moving onto an occupied name" "$db" app relocate "$db" hosts/cache archive occupied
 
-  step "[$kind] delete and recover: the CLI recycles, the app restores; the app deletes and restores"
+  step "[$kind] delete and recover: the CLI recycles, the app restores; the app deletes and restores; the app restores under another title a name KeePassXC took"
   did "keypaste rm" kp_cli "$db" rm archive/database-old --yes
   listed=$(kx ls "$db" -R -f)
   grep -qx 'Recycle Bin/database-old' <<<"$listed" || die "KeePassXC does not find the entry in its recycle bin"
@@ -449,6 +466,15 @@ exercise() {
   did "keypaste rm" kp_cli "$db" rm archive/occupied --yes
   kx add "$db" archive/occupied -u kpxc >/dev/null || die "KeePassXC could not add an entry"
   refused "the app restoring onto a name KeePassXC took" "$db" app trash-restore "$db" occupied
+  did "the app's restore under another title" app trash-restore-as "$db" occupied
+  expect "$db" "archive/occupied (restored)" Password o-1
+  [ "$(uuid_at "$db" "archive/occupied (restored)")" = "$(uuid occupied)" ] \
+    || die "KeePassXC finds another entry than the deleted one at 'archive/occupied (restored)'"
+  [ "$(revisions_at "$db" "archive/occupied (restored)")" = 1 ] \
+    || die "the restore under another title did not keep exactly the one revision the entry was deleted with"
+  expect "$db" archive/occupied UserName kpxc
+  listed=$(kx ls "$db" -R -f)
+  grep -qx 'Recycle Bin/occupied' <<<"$listed" && die "KeePassXC still finds the restored entry in its recycle bin"
   intact "$db" archive/database-old
 
   step "[$kind] backup: the app restores the backup that holds KeePassXC's bytes, and exports"
@@ -538,13 +564,6 @@ exercise keyfile-only "" "$dir/keyfile-only.keyx"
 # ---------------------------------------------------------------------------------------
 # New items from templates, through the app, on a vault KeePassXC made (N.4).
 # ---------------------------------------------------------------------------------------
-# The number of revisions KeePassXC holds for the entry at the path $2 in the vault $1.
-revisions_at() {
-  local id
-  id=$(value "$1" "$2" Uuid | tr -d '{}-' | xxd -r -p | base64) || die "KeePassXC cannot read the UUID of '$2'"
-  revisions "$1" "$id"
-}
-
 step "templates: the app makes one item from each template, and KeePassXC reads each whole, with no revision"
 db="$dir/templates.kdbx"
 cur_pw=$pw cur_kf= new_pw=
