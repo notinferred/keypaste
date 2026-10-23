@@ -841,10 +841,11 @@ validate_prerelease_path() {
 # definition, and builds it with the tool the definition pins. An undeclared installer is a package
 # nothing else in this file can see (4.7a1, D-0139). A build may live in a script the workflow runs,
 # so those scripts are read with it, except this gate, whose fixtures name every package kind.
-# sign-windows.sh names installers it signs and builds none, and verify-desktop-candidate.sh names
-# the ones it refuses and builds none either - which is what lets release.yml call it (4.7c).
+# sign-windows.sh names installers it signs and builds none, verify-desktop-candidate.sh names
+# the ones it refuses and builds none either - which is what lets release.yml call it (4.7c) - and
+# install-keepassxc.sh installs KeePassXC's own disk image for the gates (D-0526).
 package_code() {
-  local root="$1" workflow="$2" exempt="${3-sign-windows.sh verify-desktop-candidate.sh}" script
+  local root="$1" workflow="$2" exempt="${3-sign-windows.sh verify-desktop-candidate.sh install-keepassxc.sh}" script
   code_of "$root/$workflow"
   for script in $(code_of "$root/$workflow" | grep -oE 'scripts/[A-Za-z0-9._-]+\.sh' | sort -u); do
     case " $(basename "$SELF") $exempt " in *" $(basename "$script") "*) continue ;; esac

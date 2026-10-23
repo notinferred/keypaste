@@ -1,4 +1,5 @@
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -47,6 +48,8 @@ public sealed class AgentActivityViewTests
         var shown = window.GetVisualDescendants().OfType<SelectableTextBlock>().Where(block => block.IsEffectivelyVisible).Select(block => block.Text).ToList();
         Assert.Contains(model.Connection!.Preview, shown);
         Assert.Contains("claude mcp add --scope user --transport stdio keypaste --", model.Connection.Preview, StringComparison.Ordinal);
+        var plan = window.GetVisualDescendants().OfType<SelectableTextBlock>().Single(block => block.Name == "ConnectPlan");
+        Assert.Equal(model.Connection.Preview, ControlAutomationPeer.CreatePeerForElement(plan).GetName());
 
         var settings = window.GetVisualDescendants().OfType<Expander>().Single(expander => expander.IsEffectivelyVisible && expander.DataContext == row);
         Assert.Equal("Settings for Claude Code", AutomationProperties.GetName(settings));

@@ -2,7 +2,7 @@
 # Puts the AI tools keypaste connects on a hosted runner, each at a pinned version, for ci.yml's real-tools job
 # (G.2, D-0438).
 #
-# One owner for every version and digest, as install-keepassxc-windows.sh is for KeePassXC (D-0208). Every
+# One owner for every version and digest, as install-keepassxc.sh is for KeePassXC (D-0208). Every
 # download goes through fetch-pinned-asset.sh against a SHA-256 kept below: the vendor's own where it publishes
 # one (Claude Code's and Devin's release manifests, VS Code's update service), the Homebrew cask's or winget
 # manifest's for Cursor, Cursor's Agent CLI and Claude Desktop, and for Cursor's Linux package, which neither

@@ -138,19 +138,28 @@
             </TextBox.InnerRightContent>
           </TextBox>
 
+          <!-- The idle warning's first line, which a screen reader says once as the warning comes. Avalonia names a
+               TextBlock by its text, so this one, which nobody sees, is live and the ticking one below is not. -->
+          <TextBlock Grid.Column="2"
+                     Text="{Binding CountdownAnnouncement}"
+                     AutomationProperties.LiveSetting="Polite"
+                     Width="1"
+                     Height="1"
+                     Opacity="0"
+                     IsHitTestVisible="False"
+                     HorizontalAlignment="Left"
+                     VerticalAlignment="Top" />
+
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
                       Spacing="6"
                       Margin="0,0,12,0"
                       VerticalAlignment="Center">
 
-            <!-- Muted, never red. An auto-lock is the most normal thing this app does. Its name is the
-                 warning's first line, so a screen reader announces it once while the seconds tick. -->
+            <!-- Muted, never red. An auto-lock is the most normal thing this app does. -->
             <TextBlock Classes="mono sm muted"
                        Text="{Binding Countdown}"
                        IsVisible="{Binding HasCountdown}"
-                       AutomationProperties.Name="{Binding CountdownAnnouncement}"
-                       AutomationProperties.LiveSetting="Polite"
                        VerticalAlignment="Center"
                        Margin="0,0,6,0" />
 
@@ -279,7 +288,7 @@
                   </Grid>
                 </DataTemplate>
                 <DataTemplate DataType="vm:SidebarHeading">
-                  <TextBlock Classes="th" Text="{Binding Label}" AutomationProperties.Name="{Binding Title}" />
+                  <TextBlock Classes="th" Text="{Binding Label}" />
                 </DataTemplate>
                 <DataTemplate DataType="vm:ProjectRow">
                   <Grid ColumnDefinitions="Auto,*,Auto"

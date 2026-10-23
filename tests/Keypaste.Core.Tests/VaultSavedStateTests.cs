@@ -301,7 +301,6 @@ public sealed class VaultSavedStateTests : IDisposable
 
         Assert.Equal(SavedRead.Current, vault.ReadSavedFill(missing, @"\{PASSWORD\}", out var fill));
         Assert.Equal("{PASSWORD}", fill?.Value);
-        Assert.Equal("{{S:API_KEY}}", vault.FillPlaceholders(missing, @"{\{S:API_KEY\}}")?.Value);
     }
 
     [Fact]

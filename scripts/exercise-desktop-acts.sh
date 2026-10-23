@@ -131,7 +131,7 @@ evidence_first_run() {
   if [ -z "$chosen" ]; then contradict 'the app unlocked and chose no vault for agents and the CLI in app.toml'
   elif [ "$(path_key "$chosen" "$platform")" != "$(path_key "$vault" "$platform")" ]; then
     contradict "the app chose $chosen, not KeePassXC's $vault"
-  else pass "KeePassXC's recent databases offered $VAULT_NAME on the first run, and the app unlocked it and chose it: $vault; KeePassXC $(fact_of "$1" first-run keepassxc_closed)"
+  else pass "KeePassXC's recent databases offered $VAULT_NAME on the first run, and the app unlocked it and chose it: $vault"
   fi
 }
 
@@ -641,7 +641,7 @@ keepassxc_vault() {
 # the package carries (D-0522). This KeePassXC keeps its settings in files of its own, so the first run offers only
 # what keepassxc_recent leaves in KeePassXC's recent databases.
 keepassxc_create() {
-  local gui pid main maker="$OUT/keepassxc-maker" wizard='Create a new KeePassXC database…'
+  local gui pid maker="$OUT/keepassxc-maker" wizard='Create a new KeePassXC database…'
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
   mkdir -p "$maker"
   printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$maker/keepassxc.ini"
@@ -655,19 +655,21 @@ keepassxc_create() {
   done
   DRIVE_TREE_DIR="$(native "$OUT")"
   export DRIVE_TREE_DIR
-  # Windows' Save dialog shows UI Automation only bare panes, so its file name is typed as a person types it.
+  # KeePassXC asks where to save the new database as soon as its window closes, its autosave saving a database that has
+  # no file yet; pressing Save Database as well opened a second Save dialog under Qt 6 (F.68). Windows' Save dialog
+  # shows UI Automation only bare panes, so its file name is typed as a person types it.
   # shellcheck disable=SC2154 # kpxc.sh sets pw.
   if kpxc_drive KeePassXC window 60 && kpxc_drive KeePassXC invoke 'Create Database' \
     && kpxc_drive "$wizard" invoke Continue && kpxc_drive "$wizard" invoke Continue \
     && kpxc_drive "$wizard" focus 'Password field' && kpxc_drive "$wizard" type "$pw" \
     && kpxc_drive "$wizard" focus 'Repeat password field' && kpxc_drive "$wizard" type "$pw" \
     && kpxc_drive "$wizard" invoke Done && kpxc_drive 'Weak password' invoke 'Continue with weak password' \
-    && main="$(kpxc_drive KeePassXC windows | tr -d "$CR" | grep -m 1 'KeePassXC$')" && echo "the database is open in '$main'" \
-    && kpxc_drive "$main" invoke 'Save Database' \
+    && kpxc_drive 'Save database as' window 30 \
     && kpxc_drive 'Save database as' key ctrl+a && kpxc_drive 'Save database as' type "$(native "$VAULT")" \
     && kpxc_drive 'Save database as' key Return \
     && wait_for_file "$VAULT" 30; then
-    if kill -0 "$pid" 2> /dev/null; then close_keepassxc "$pid" || return 1; else echo 'KeePassXC ended by itself after saving'; fi
+    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended by itself after saving$(crash_report "$maker/keepassxc.log")"; return 1; }
+    close_keepassxc "$pid" || return 1
     echo "KeePassXC's Create Database window made $VAULT_NAME"
   else
     kill -9 "$pid" 2> /dev/null || true
@@ -762,19 +764,16 @@ keepassxc_recent() {
     return 1
   }
   sleep 2
-  # KeePassXC records a database in LastDatabases as it opens it, and the first run offers what that lists, so a
-  # KeePassXC that ends on its own after that is recorded with what the platform says of it, and the act goes on.
-  if kill -0 "$pid" 2> /dev/null; then
-    close_keepassxc "$pid" || return 1
-    grep -q '^LastOpenedDatabases=' "$local_ini" || { echo "KeePassXC closed without writing LastOpenedDatabases to $local_ini"; return 1; }
-    fact keepassxc_closed 'closed as a person closes it'
-  else
+  if ! kill -0 "$pid" 2> /dev/null; then
     code=0
     wait "$pid" 2> /dev/null || code=$?
-    fact keepassxc_closed "ended by itself, status $code, after it recorded $VAULT_NAME$(crash_report)"
+    echo "KeePassXC ended by itself, status $code, after it listed $VAULT_NAME$(crash_report)"
+    return 1
   fi
+  close_keepassxc "$pid" || return 1
+  grep -q '^LastOpenedDatabases=' "$local_ini" || { echo "KeePassXC closed without writing LastOpenedDatabases to $local_ini"; return 1; }
   fact keepassxc_recent "$(grep '^Last' "$local_ini" | tr '\n' ' ')"
-  echo "KeePassXC opened $VAULT_NAME, leaving it in $local_ini; $(fact_of "$OUT" first-run keepassxc_closed)"
+  echo "KeePassXC opened $VAULT_NAME, leaving it in $local_ini"
 }
 
 # What the platform recorded of KeePassXC ending by itself: Windows' newest crash events and macOS's newest crash
@@ -808,39 +807,46 @@ close_keepassxc() {
     sleep 0.5
   done
   if kill -0 "$1" 2> /dev/null; then
+    echo "KeePassXC did not close within 30 s$(keepassxc_left "$1")"
     kill -9 "$1" 2> /dev/null || true
-    echo 'KeePassXC did not close within 30 s'
     return 1
   fi
   wait "$1" 2> /dev/null || true
 }
 
+# On Windows, the windows a KeePassXC that will not close still shows, with a screenshot of the first.
+keepassxc_left() {
+  local winpid titles
+  [ "$PLATFORM" = windows ] || return 0
+  winpid="$(cat "/proc/$1/winpid" 2> /dev/null)" || return 0
+  titles="$(APP_PID="$winpid" drive windows 2>&1 | tr -d "$CR")"
+  APP_PID="$winpid" screenshot keepassxc-left "$(head -n 1 <<< "$titles")"
+  printf '; it shows: %s' "$(tr '\n' ';' <<< "$titles")"
+}
+
 # macOS: keepassxc-cli makes a database that derives its key with AES-KDF, and R.1a times the libargon2 the package
 # carries, so KeePassXC's own Database Security then changes it to Argon2d, the key derivation KeePassXC gives a new
-# database, as a person can in KeePassXC. KeePassXC 2.7.12 has ended by itself soon after opening a database on this
-# runner, so a session that ends before the change is saved is followed by another, up to three.
+# database, as a person can in KeePassXC.
 mac_keepassxc_argon2() {
-  local gui try pid said code
+  local gui pid said code
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
   export DRIVE_TREE_DIR="$OUT"
-  for try in 1 2 3; do
-    printf '%s\n' "$pw" | "$gui" --pw-stdin "$VAULT" > "$OUT/keepassxc-argon2-$try.log" 2>&1 &
-    pid=$!
-    if said="$(mac_keepassxc_kdf "$pid")"; then
-      close_keepassxc "$pid" || return 1
-      echo "session $try: $said"
-      return 0
-    fi
-    echo "session $try: $said"
-    if kill -0 "$pid" 2> /dev/null; then
-      kill -9 "$pid" 2> /dev/null || true
-      wait "$pid" 2> /dev/null || true
-    else
-      code=0
-      wait "$pid" 2> /dev/null || code=$?
-      echo "session $try: KeePassXC ended by itself, status $code$(crash_report "$OUT/keepassxc-argon2-$try.log")"
-    fi
-  done
+  printf '%s\n' "$pw" | "$gui" --pw-stdin "$VAULT" > "$OUT/keepassxc-argon2.log" 2>&1 &
+  pid=$!
+  if said="$(mac_keepassxc_kdf "$pid")"; then
+    close_keepassxc "$pid" || return 1
+    echo "$said"
+    return 0
+  fi
+  echo "$said"
+  if kill -0 "$pid" 2> /dev/null; then
+    kill -9 "$pid" 2> /dev/null || true
+    wait "$pid" 2> /dev/null || true
+  else
+    code=0
+    wait "$pid" 2> /dev/null || code=$?
+    echo "KeePassXC ended by itself, status $code$(crash_report "$OUT/keepassxc-argon2.log")"
+  fi
   return 1
 }
 
@@ -861,8 +867,9 @@ mac_kpxc_choose() {
   done
   mac_kpxc "$pid" click "$3" || return 1
   shown="$(mac_kpxc "$pid" find "$3")" || { echo "$shown"; return 1; }
+  # Qt 6 makes a combo box an AXMenuButton named by the item it shows.
   case "$shown" in
-    *' as AXComboBox') echo "$shown" ;;
+    *' as AXMenuButton') echo "$shown" ;;
     *) echo "'$2' does not show '$3' after it was chosen: $shown; $(mac_kpxc "$pid" tree "after $3 was chosen")"; return 1 ;;
   esac
 }

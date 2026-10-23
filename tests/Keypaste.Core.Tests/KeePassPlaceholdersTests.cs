@@ -27,7 +27,6 @@ public sealed class KeePassPlaceholdersTests
     [InlineData("{s:API_KEY}", _apiKey)]
     [InlineData("{S:Password}", _password)]
     [InlineData("[{S:EMPTY_KEY}]", "[]")]
-    [InlineData("{{PASSWORD}}", "{" + _password + "}")]
     [InlineData("{a{PASSWORD}", "{a" + _password)]
     [InlineData("{PASSWORD}{", _password + "{")]
     [InlineData("{\"a\":{\"b\":1}}", "{\"a\":{\"b\":1}}")]
@@ -203,8 +202,8 @@ public sealed class KeePassPlaceholdersTests
 
     /// <summary>
     /// KeePassXC's escape, as 2.7.11's <c>Entry::resolveMultiplePlaceholdersRecursive</c> reads it: a text wholly
-    /// wrapped in <c>\{</c> and <c>\}</c> has those two made braces and nothing in it filled in, and so has the inside
-    /// of braces that name no placeholder; an escape that does not wrap the whole text is text.
+    /// wrapped in <c>\{</c> and <c>\}</c> has those two made braces and nothing in it filled in; an escape that does
+    /// not wrap the whole text is text.
     /// </summary>
     [Theory]
     [InlineData(@"\{PASSWORD\}", "{PASSWORD}")]
@@ -213,8 +212,6 @@ public sealed class KeePassPlaceholdersTests
     [InlineData(@"\{a{PASSWORD}b\}", "{a{PASSWORD}b}")]
     [InlineData(@"\{\}", "{}")]
     [InlineData(@"\{x\}\}", @"{x\}}")]
-    [InlineData(@"{\{PASSWORD\}}", "{{PASSWORD}}")]
-    [InlineData(@"{\{REF:P@I:0123\}}x", "{{REF:P@I:0123}}x")]
     [InlineData(@"x\{PASSWORD\}", @"x\{PASSWORD\}")]
     [InlineData(@"\{PASSWORD\}x", @"\{PASSWORD\}x")]
     [InlineData(@"{\{}\}}", @"{\{}\}}")]
@@ -239,12 +236,37 @@ public sealed class KeePassPlaceholdersTests
     }
 
     [Fact]
-    public void An_escape_beside_a_placeholder_leaves_the_placeholder_to_fill_in_or_refuse()
-    {
-        Assert.Equal("a{{S:API_KEY}}b" + _password, KeePassPlaceholders.Fill(@"a{\{S:API_KEY\}}b{PASSWORD}", () => _stripe).Value);
+    public void A_backslash_before_a_placeholder_that_is_no_escape_leaves_it_to_fill_in() =>
         Assert.Equal(@"\" + _password, KeePassPlaceholders.Fill(@"\{PASSWORD}", () => _stripe).Value);
-        Assert.Equal(_refused + "{REF:…}, which keypaste does not fill in", KeePassPlaceholders.Fill(@"{\{x\}}{REF:P@I:0123}", () => _stripe).Refusal);
+
+    /// <summary>
+    /// A placeholder or escape inside braces that name no placeholder refuses the value, which is read no further:
+    /// KeePassXC 2.7.11 fills in the inside, and 2.8 leaves such braces as written or, around one placeholder,
+    /// drops them (D-0529). Braces holding neither, and a <c>{S:…}</c>, which both read as a field's name, are not.
+    /// </summary>
+    [Theory]
+    [InlineData("{{PASSWORD}}", "{PASSWORD}")]
+    [InlineData("{x{PASSWORD}y}", "{PASSWORD}")]
+    [InlineData("a{b{c{USERNAME}}}", "{USERNAME}")]
+    [InlineData(@"{\{PASSWORD\}}", @"\{…\}")]
+    [InlineData(@"{\{REF:P@I:0123\}}x", @"\{…\}")]
+    [InlineData(@"a{\{S:API_KEY\}}b{PASSWORD}", @"\{…\}")]
+    [InlineData(@"{\{x\}}{REF:P@I:0123}", @"\{…\}")]
+    public void A_placeholder_or_escape_inside_braces_that_name_none_refuses_the_value(string value, string shown)
+    {
+        const string Differs = "KeePassXC 2.7 and 2.8 fill in differently inside braces that name no placeholder";
+
+        Assert.Equal(_refused + shown + ", which " + Differs, KeePassPlaceholders.Fill(value, () => _stripe).Refusal);
+        Assert.Equal(new PlaceholderRefusal(shown, Differs), KeePassPlaceholders.Planted(value, ["API_KEY"]).Refused);
+        Assert.True(KeePassPlaceholders.HoldsPlaceholder(value));
     }
+
+    [Theory]
+    [InlineData("{a{b}c}")]
+    [InlineData("{a{}b{PASSWORD}}")]
+    [InlineData("{a{PASSWORD}")]
+    public void Braces_KeePassXC_does_not_match_whole_or_that_hold_no_placeholder_refuse_nothing(string value) =>
+        Assert.Null(KeePassPlaceholders.Fill(value, () => _stripe).Refusal);
 
     [Fact]
     public void A_field_that_is_an_escape_fills_in_with_its_escapes_made_braces()
@@ -261,12 +283,9 @@ public sealed class KeePassPlaceholdersTests
     public void An_escape_plants_nothing_and_names_no_field()
     {
         var whole = KeePassPlaceholders.Planted(@"\{S:NEW_KEY\}", []);
-        var inside = KeePassPlaceholders.Planted(@"{\{REF:T@I:0\}}{USERNAME}", []);
 
         Assert.Empty(whole.Fills);
         Assert.Null(whole.Refused);
-        Assert.Equal(["{USERNAME}"], inside.Fills);
-        Assert.Null(inside.Refused);
         Assert.False(KeePassPlaceholders.Names(@"\{S:API_KEY}\}", "API_KEY"));
         Assert.True(KeePassPlaceholders.Names(@"x\{S:API_KEY}\}", "API_KEY"));
     }

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -240,8 +241,15 @@ public sealed class AgentsFirstLevelTests
 
     private static string Kind(Control control) => $"{control.GetType().Name}/{control.Name}";
 
-    private static string? Said(Control control) =>
-        AutomationProperties.GetName(control) is { Length: > 0 } name ? name : (control as ContentControl)?.Content as string;
+    /// <summary>What a screen reader is told the control is called, or nothing when that is only a type's name.</summary>
+    private static string Said(Control control)
+    {
+        var name = ControlAutomationPeer.CreatePeerForElement(control).GetName();
+
+        return name.StartsWith("Avalonia.", StringComparison.Ordinal) || name.StartsWith("Keypaste.", StringComparison.Ordinal)
+            ? string.Empty
+            : name;
+    }
 
     private static Expander Disclosure(Window window, AgentRow row) =>
         window.GetVisualDescendants().OfType<Expander>().Single(expander => expander.DataContext == row);
