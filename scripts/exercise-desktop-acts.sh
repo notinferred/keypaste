@@ -630,7 +630,7 @@ keepassxc_vault() {
 # db-create derives with AES-KDF, under a scratch configuration so that keepassxc_recent still meets a first run.
 # The window is driven through AT-SPI as the app is, and saved where the acts keep the vault.
 keepassxc_new_database() {
-  local gui scratch pid main title wizard='Create a new KeePassXC database…' save='Save database as'
+  local gui scratch pid wizard='Create a new KeePassXC database…' save='Save database as'
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
   enable_accessibility > /dev/null || { echo 'the accessibility bus did not enable'; return 1; }
   scratch="$(mktemp -d)"
@@ -654,10 +654,8 @@ keepassxc_new_database() {
       echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"
       return 1
     }
-  # The new database's tab names the window, so its title is read rather than known.
-  main="$(timeout 30 xdotool search --sync --pid "$pid" --name ' - KeePassXC$' | head -n 1)" && title="$(xdotool getwindowname "$main")" \
-    && drive --window "$title" invoke 'Save Database' \
-    && drive --window "$save" key ctrl+a \
+  # KeePassXC asks where to save the new database as soon as its window closes.
+  drive --window "$save" key ctrl+a \
     && drive --window "$save" type "$(native "$VAULT")" \
     && drive --window "$save" key Return \
     && wait_for_file "$VAULT" 60 \
@@ -1057,7 +1055,7 @@ act_timing() {
   case "$PLATFORM" in
     windows) fact argon2 "the package carries: $(find "$(dirname "$APP")" -maxdepth 1 -iname '*argon2*' -exec basename {} \; | tr '\n' ' ')" ;;
     macos) fact argon2 "the package carries: $(find "$APP/Contents" -iname '*argon2*' -exec basename {} \; | tr '\n' ' ')" ;;
-    linux) fact argon2 "on Linux the package's own KeePassLib derives the key (D-0522)" ;;
+    linux) fact argon2 "the package carries none; KeePassLib finds the system's by its sonames (D-0522): $(ldconfig -p | grep -o 'libargon2\.so[^ ]*' | sort -u | tr '\n' ' ')" ;;
   esac
   fact database "$(fact_of "$OUT" first-run database)"
 }
