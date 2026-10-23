@@ -677,9 +677,9 @@ crash_report() {
       printf '; Windows recorded: %s' "$(powershell -NoProfile -Command 'Get-WinEvent -FilterHashtable @{LogName = "Application"; ProviderName = "Application Error", "Windows Error Reporting"; StartTime = (Get-Date).AddMinutes(-10)} -MaxEvents 2 -ErrorAction SilentlyContinue | ForEach-Object { $_.ProviderName + ": " + ($_.Message -replace "\s+", " ") }' | tr -d "$CR")"
       ;;
     macos)
-      # ReportCrash writes the report a few seconds after the process ends.
+      # ReportCrash writes the report a few seconds after the process ends, for the user or for the system.
       for _ in $(seq 1 30); do
-        report="$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'KeePassXC*' -newer "${1:-$OUT/keepassxc.log}" \
+        report="$(find "$HOME/Library/Logs/DiagnosticReports" /Library/Logs/DiagnosticReports -maxdepth 1 -name 'KeePassXC*' -newer "${1:-$OUT/keepassxc.log}" \
           -exec stat -f '%m %N' {} + 2> /dev/null | sort -rn | head -n 1 | cut -d ' ' -f 2-)"
         [ -z "$report" ] || break
         sleep 0.5
@@ -750,7 +750,6 @@ mac_kpxc_choose() {
     [ "$i" != 3 ] || { echo "the list of '$2' did not open after three clicks"; return 1; }
   done
   mac_kpxc "$pid" click "$3" || return 1
-  mac_kpxc "$pid" screenshot "$(native "$OUT/keepassxc-chose-$(printf '%s' "$3" | tr -cd 'A-Za-z0-9').png")" || true
   shown="$(mac_kpxc "$pid" find "$3")" || { echo "$shown"; return 1; }
   case "$shown" in
     *' as AXComboBox') echo "$shown" ;;
