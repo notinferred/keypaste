@@ -623,6 +623,10 @@ keepassxc_vault() {
   kx add "$VAULT" "$ENTRY_SCRATCH" -u scratch > /dev/null || { echo "keepassxc-cli add $ENTRY_SCRATCH failed"; return 1; }
   fact keepassxc "$("$cli" --version | tr -d "$CR")"
   fact database "$(kx db-info "$VAULT" 2>&1 | tr '\n' ' ')"
+  if [ "$PLATFORM" = linux ]; then
+    fact probe_argon2 "$(ldconfig -p | grep -i argon2 | tr '\n' ' ')"
+    fact probe_cli "$( { time -p sh -c 'printf "%s\n" "$1" | timeout 120 "$2" ls --flat --vault "$3"; echo "exit $?"' sh "$pw" "$KP" "$(native "$VAULT")"; } 2>&1 | tr '\n' ' ')"
+  fi
   echo "KeePassXC made $VAULT_NAME with $ENTRY_FIELD, $ENTRY_NOTES and $ENTRY_SCRATCH"
 }
 
@@ -880,7 +884,7 @@ act_first_run() {
   attempt password-focus drive focus id:Password || return 1
   attempt password drive type "$PASSWORD" || return 1
   # Timed inside the driver, from Return to the item list, since starting a driver can take longer than an unlock.
-  attempt unlock drive key-wait Return "$ENTRY_FIELD" 120 || return 1
+  attempt unlock drive key-wait Return "$ENTRY_FIELD" 120 || { [ "$PLATFORM" != linux ] || fact probe_app "$(ps -eo pid,stat,pcpu,etime,args | grep -i '[k]eypaste' | tr '\n' ';')"; return 1; }
   fact unlock_ms "$(step_detail "$OUT" first-run unlock | sed -n 's/.* \([0-9][0-9]*\) ms after .*/\1/p')"
   attempt unlocked drive find 'Lock now' || return 1
   fact chosen_vault "$(chosen_vault)"
