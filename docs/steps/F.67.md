@@ -32,6 +32,8 @@ The NativeAOT `keypaste` in each payload of app 39983568251, at `e5613ead`:
 | macos-15, osx-arm64 | ok: "this keypaste derives vault keys with libargon2.1.dylib", at `/Users/runner/work/keypaste/keypaste/artifacts/app/osx-arm64/libargon2.1.dylib` |
 | ubuntu-24.04, linux-x64 | ok: "this keypaste derives vault keys with the system's libargon2.so.1" |
 
+No per-commit job builds linux-arm64, so a probe did, once. Probe 39993800232 ran at `96728d96`, which is `main` at `552005c0` plus only the probe's workflow. On `ubuntu-22.04-arm` it published the NativeAOT `keypaste` for linux-arm64 as release.yml does: an aarch64 ELF with no JIT files beside it, reporting 0.5.0. Its doctor said ok: "this keypaste derives vault keys with the system's libargon2.so.1", the file that image's `libargon2-1:arm64` package installs. The workflow ran only on a push to its own branch and was deleted with that branch.
+
 In ci 39983551797's test jobs, which run JIT builds:
 
 - `HealthCheckTests` holds each wording of the finding.
@@ -44,5 +46,5 @@ In ci 39983551797's test jobs, which run JIT builds:
 
 ## Limits and follow-ups
 
-- No run has executed release.yml's step; it first runs at the next tag. Until then nothing checks linux-arm64's NativeAOT `keypaste`.
+- No run has executed release.yml's step; it first runs at the next tag. Between tags no job builds linux-arm64's NativeAOT `keypaste`; the probe showed it once.
 - app.yml runs doctor on the payload before it is signed, so the `keypaste` in the signed macOS bundle and in a Developer ID-signed CLI archive is not checked. 3.5b's row holds the signed DMG's `--selftest` to the library; the signed `keypaste` has no such check yet.
