@@ -612,14 +612,52 @@ keepassxc_vault() {
   export KP_COMPAT_PASSWORD="$MASTER"
   # shellcheck source=scripts/lib/kpxc.sh
   . "$ROOT/scripts/lib/kpxc.sh"
-  # shellcheck disable=SC2154 # kpxc.sh sets cli and pw.
-  printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$VAULT")" > /dev/null || { echo 'keepassxc-cli db-create failed'; return 1; }
+  if [ "$PLATFORM" = linux ]; then
+    keepassxc_new_database || return 1
+  else
+    # shellcheck disable=SC2154 # kpxc.sh sets cli and pw.
+    printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$VAULT")" > /dev/null || { echo 'keepassxc-cli db-create failed'; return 1; }
+  fi
   kx add "$VAULT" "$ENTRY_FIELD" -u acts --url https://example.test > /dev/null || { echo "keepassxc-cli add $ENTRY_FIELD failed"; return 1; }
   kx add "$VAULT" "$ENTRY_NOTES" --notes "$NOTE_KEY=$NOTE_VALUE" > /dev/null || { echo "keepassxc-cli add $ENTRY_NOTES failed"; return 1; }
   kx add "$VAULT" "$ENTRY_SCRATCH" -u scratch > /dev/null || { echo "keepassxc-cli add $ENTRY_SCRATCH failed"; return 1; }
   fact keepassxc "$("$cli" --version | tr -d "$CR")"
   fact database "$(kx db-info "$VAULT" 2>&1 | tr '\n' ' ')"
-  echo "keepassxc-cli made $VAULT_NAME with $ENTRY_FIELD, $ENTRY_NOTES and $ENTRY_SCRATCH"
+  echo "KeePassXC made $VAULT_NAME with $ENTRY_FIELD, $ENTRY_NOTES and $ENTRY_SCRATCH"
+}
+
+# Linux: KeePassXC makes the vault in its own new-database window, which derives with Argon2d where keepassxc-cli
+# db-create derives with AES-KDF, under a scratch configuration so that keepassxc_recent still meets a first run.
+# The window is driven through AT-SPI as the app is, and saved where the acts keep the vault.
+keepassxc_new_database() {
+  local gui scratch pid main title wizard='Create a new KeePassXC database…' save='Save database as'
+  gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
+  enable_accessibility > /dev/null || { echo 'the accessibility bus did not enable'; return 1; }
+  scratch="$(mktemp -d)"
+  mkdir -p "$scratch/config/keepassxc"
+  printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$scratch/config/keepassxc/keepassxc.ini"
+  XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" "$gui" > "$OUT/keepassxc-new.log" 2>&1 &
+  pid=$!
+  drive --window KeePassXC invoke 'Create new database' \
+    && drive --window "$wizard" invoke Continue \
+    && drive --window "$wizard" invoke Continue \
+    && drive --window "$wizard" click 'Password field' \
+    && drive --window "$wizard" type "$pw" \
+    && drive --window "$wizard" click 'Repeat password field' \
+    && drive --window "$wizard" type "$pw" \
+    && drive --window "$wizard" invoke Done \
+    || { kill -9 "$pid" 2> /dev/null; echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"; return 1; }
+  # The new database's tab names the window, so its title is read rather than known.
+  main="$(timeout 30 xdotool search --sync --pid "$pid" --name ' - KeePassXC$' | head -n 1)" && title="$(xdotool getwindowname "$main")" \
+    && drive --window "$title" invoke 'Save Database' \
+    && drive --window "$save" key ctrl+a \
+    && drive --window "$save" type "$(native "$VAULT")" \
+    && drive --window "$save" key Return \
+    && wait_for_file "$VAULT" 60 \
+    || { screenshot keepassxc-save "$save"; kill -9 "$pid" 2> /dev/null; echo "KeePassXC did not save the new database as $VAULT"; return 1; }
+  close_keepassxc "$pid" || return 1
+  rm -rf "$scratch"
+  echo "KeePassXC's new-database window made $VAULT_NAME"
 }
 
 # KeePassXC opens the database once and closes as a person does, which leaves it in its recent databases where it
@@ -964,7 +1002,8 @@ act_restore() {
   for file in ${BACKUPS[@]+"${BACKUPS[@]}"}; do
     if [ "$(fingerprint "$(native "$file")")" = "$(fact_of "$OUT" restore fingerprint_after)" ]; then fact backup_match "$(basename "$file")"; fi
   done
-  attempt unlock-again unlock_with "$PASSWORD" || return 1
+  # The restored vault opens with the password the check took, without asking for it again.
+  attempt unlocked-again drive wait 'Lock now' 60 || return 1
 }
 
 act_change_access() {
