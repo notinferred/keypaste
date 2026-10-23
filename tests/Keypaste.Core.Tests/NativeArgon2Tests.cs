@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -25,12 +24,11 @@ namespace Keypaste.Core.Tests;
 /// </para>
 /// <para>
 /// Alone in its collection, because a managed derivation turns KeePassLib's process-wide <see cref="NativeLib.AllowNative"/>
-/// off while it runs. The production-cost case prints both derivations' time per pass, which verify.sh shows live, for the
-/// record of each runner.
+/// off while it runs.
 /// </para>
 /// </remarks>
 [Collection(nameof(NativeArgon2Alone))]
-public sealed class NativeArgon2Tests(ITestOutputHelper output)
+public sealed class NativeArgon2Tests
 {
     private static readonly byte[] _message = SHA256.HashData("keypaste native argon2 message"u8);
 
@@ -80,26 +78,11 @@ public sealed class NativeArgon2Tests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void At_the_production_cost_both_derive_one_key_and_each_one_s_time_per_pass_is_printed()
+    public void At_the_production_cost_both_derive_one_key()
     {
         var parameters = Parameters(Argon2Type.D, _salt, KdbxFormat.Argon2Parallelism, KdbxFormat.Argon2Memory, KdbxFormat.Argon2Iterations);
-        var native = TimeSpan.MaxValue;
-        var managed = TimeSpan.MaxValue;
 
-        for (var run = 0; run < 3; run++)
-        {
-            var (nativeKey, nativeTook) = Timed(() => Native(Argon2Type.D, _message, parameters));
-            var (managedKey, managedTook) = Timed(() => Managed(Argon2Type.D, _message, parameters));
-            Assert.Equal(managedKey, nativeKey);
-            native = nativeTook < native ? nativeTook : native;
-            managed = managedTook < managed ? managedTook : managed;
-        }
-
-        var passes = (double)KdbxFormat.Argon2Iterations;
-        output.WriteLine(
-            $"Argon2d at 64 MiB and 2 lanes on {RuntimeInformation.OSDescription} {RuntimeInformation.ProcessArchitecture}: " +
-            $"{CoreInfo.NativeArgon2} {native.TotalMilliseconds / passes:F1} ms per pass, " +
-            $"managed {managed.TotalMilliseconds / passes:F1} ms per pass, managed/native {managed / native:F2}");
+        Assert.Equal(Managed(Argon2Type.D, _message, parameters), Native(Argon2Type.D, _message, parameters));
     }
 
     /// <summary>
@@ -148,13 +131,6 @@ public sealed class NativeArgon2Tests(ITestOutputHelper output)
         }
 
         return null;
-    }
-
-    private static (byte[] Key, TimeSpan Took) Timed(Func<byte[]> derive)
-    {
-        var clock = Stopwatch.StartNew();
-        var key = derive();
-        return (key, clock.Elapsed);
     }
 
     private static byte[] Managed(Argon2Type type, byte[] message, KdfParameters parameters)

@@ -179,10 +179,14 @@ prepare_projects() {
 test_projects() {
   local dir options
   for dir in "${projects[@]}"; do
-    options=(--show-live-output on)
+    options=()
     if [ "$dir" = tests/Keypaste.App.Tests ]; then options+=(--long-running 120); fi
     if [ -n "$filter_class" ]; then options+=(--filter-class "$filter_class"); fi
-    run_tests dotnet test "$(project_file "$dir")" --no-build -c Release -- "${options[@]}"
+    if [ "${#options[@]}" -gt 0 ]; then
+      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release -- "${options[@]}"
+    else
+      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release
+    fi
   done
 }
 
@@ -196,9 +200,8 @@ prepare_desktop() {
   prepare keypaste.app.slnx
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
 }
-# Live output puts NativeArgon2Tests' time per pass in each runner's log.
 test_backend() {
-  run_tests dotnet test keypaste.slnx --no-build -c Release -- --show-live-output on
+  run_tests dotnet test keypaste.slnx --no-build -c Release
 }
 test_desktop() {
   run_tests dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
