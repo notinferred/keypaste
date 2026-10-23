@@ -164,7 +164,7 @@ QUIET_ROLES = {Atspi.Role.LABEL, Atspi.Role.TEXT, Atspi.Role.STATIC, Atspi.Role.
 
 def offered():
     """The window's buttons, fields, lists and named controls, for a refusal; no text's or list item's name. Qt's
-    named containers, such as a password field's, are fillers, and what the window does not show is marked."""
+    named containers, such as a password field's, are fillers. Each is marked hidden, disabled or focused."""
     frame = window()
     if frame is None:
         titles = [name_of(f) for _, f in frames()]
@@ -181,7 +181,11 @@ def offered():
             seen = f"{role_name(element)} '{name_of(element)}'" + (f" #{ident}" if ident else "")
         else:
             continue
-        shown.append(seen if state(element, Atspi.StateType.SHOWING) else f"{seen} (hidden)")
+        marks = [mark for mark, which in (("hidden", Atspi.StateType.SHOWING), ("disabled", Atspi.StateType.ENABLED))
+                 if not state(element, which)]
+        if state(element, Atspi.StateType.FOCUSED):
+            marks.append("focused")
+        shown.append(seen + (f" ({', '.join(marks)})" if marks else ""))
     return "the window offers: " + "; ".join(shown[:150])
 
 
