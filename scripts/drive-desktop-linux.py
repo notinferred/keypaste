@@ -229,6 +229,14 @@ def foreground():
     return wid
 
 
+def keyboard(*keys):
+    """Presses keys as a keyboard does, through XTEST into the window just brought forward. With --window, xdotool
+    presses through XTEST while the window has the focus and releases through XSendEvent once it has lost it, so a
+    Return that closes a dialog stayed held in the X server and swallowed the next Return the app was sent."""
+    foreground()
+    subprocess.run(["xdotool", *keys], check=True, timeout=60)
+
+
 def centre(element):
     box = Atspi.Component.get_extents(element, Atspi.CoordType.SCREEN)
     if box.width <= 0 or box.height <= 0:
@@ -268,19 +276,16 @@ def act(action, args):
         return f"colours={colours} size={size}"
 
     if action == "type":
-        wid = foreground()
-        focus = subprocess.run(["xdotool", "getwindowfocus"], capture_output=True, text=True).stdout.strip()
-        subprocess.run(["xdotool", "type", "--window", wid, "--delay", "40", args[0]], check=True, timeout=60)
-        return f"typed {len(args[0])} characters\nprobe: window {wid} focus {focus}"
+        keyboard("type", "--delay", "40", args[0])
+        return f"typed {len(args[0])} characters"
 
     if action == "key":
-        wid = foreground()
-        subprocess.run(["xdotool", "key", "--window", wid, args[0]], check=True, timeout=10)
+        keyboard("key", args[0])
         return f"sent {args[0]}"
 
     if action == "key-wait":
         chord, locator, seconds = args[0], args[1], int(args[2])
-        wid = foreground()
+        foreground()
         looks = []
 
         def probe():
@@ -289,13 +294,12 @@ def act(action, args):
             looks.append(time.monotonic() - began)
             return found
 
-        focus = subprocess.run(["xdotool", "getwindowfocus"], capture_output=True, text=True).stdout.strip()
         sent = time.monotonic()
-        subprocess.run(["xdotool", "key", "--window", wid, chord], check=True, timeout=10)
+        subprocess.run(["xdotool", "key", chord], check=True, timeout=10)
         element = until(seconds, probe)
         elapsed = round((time.monotonic() - sent) * 1000)
         if element is None:
-            raise missing(locator, f"nothing named '{locator}' appeared within {seconds} s of {chord}; probe: window {wid} focus {focus}")
+            raise missing(locator, f"nothing named '{locator}' appeared within {seconds} s of {chord}")
         fastest, slowest = round(min(looks) * 1000), round(max(looks) * 1000)
         return f"found '{locator}' {elapsed} ms after {chord}\n{len(looks)} looks took {fastest} to {slowest} ms each"
 

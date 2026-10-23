@@ -623,35 +623,7 @@ keepassxc_vault() {
   kx add "$VAULT" "$ENTRY_SCRATCH" -u scratch > /dev/null || { echo "keepassxc-cli add $ENTRY_SCRATCH failed"; return 1; }
   fact keepassxc "$("$cli" --version | tr -d "$CR")"
   fact database "$(kx db-info "$VAULT" 2>&1 | tr '\n' ' ')"
-  if [ "$PLATFORM" = linux ]; then
-    fact probe_argon2 "$(ldconfig -p | grep -i argon2 | tr '\n' ' ')"
-    fact probe_cli "$( { time -p sh -c 'printf "%s\n" "$1" | timeout 120 "$2" ls --flat --vault "$3"; echo "exit $?"' sh "$pw" "$KP" "$(native "$VAULT")"; } 2>&1 | tr '\n' ' ')"
-  fi
   echo "KeePassXC made $VAULT_NAME with $ENTRY_FIELD, $ENTRY_NOTES and $ENTRY_SCRATCH"
-}
-
-# Probe: the keys the X server holds down, by keycode and keysym.
-probe_keys() {
-  fact "probe_keys_$1" "$(python3 -c '
-import ctypes
-x = ctypes.cdll.LoadLibrary("libX11.so.6")
-x.XOpenDisplay.restype = ctypes.c_void_p
-x.XOpenDisplay.argtypes = [ctypes.c_char_p]
-d = x.XOpenDisplay(None)
-keys = (ctypes.c_ubyte * 32)()
-x.XQueryKeymap.argtypes = [ctypes.c_void_p, ctypes.c_ubyte * 32]
-x.XQueryKeymap(d, keys)
-x.XKeycodeToKeysym.argtypes = [ctypes.c_void_p, ctypes.c_ubyte, ctypes.c_int]
-x.XKeycodeToKeysym.restype = ctypes.c_ulong
-x.XKeysymToString.argtypes = [ctypes.c_ulong]
-x.XKeysymToString.restype = ctypes.c_char_p
-down = []
-for code in range(8, 256):
-    if keys[code // 8] & (1 << (code % 8)):
-        sym = x.XKeysymToString(x.XKeycodeToKeysym(d, code, 0))
-        down.append("%d:%s" % (code, sym.decode() if sym else "?"))
-print(" ".join(down) or "none")
-' 2>&1)"
 }
 
 # Linux: KeePassXC makes the vault in its own new-database window, which derives with Argon2d where keepassxc-cli
@@ -682,10 +654,8 @@ keepassxc_new_database() {
       echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"
       return 1
     }
-  probe_keys wizard
   # KeePassXC asks where to save the new database as soon as its window closes.
   drive --window "$save" key ctrl+a \
-    && probe_keys ctrl_a \
     && drive --window "$save" type "$(native "$VAULT")" \
     && drive --window "$save" key Return \
     && wait_for_file "$VAULT" 60 \
@@ -695,9 +665,7 @@ keepassxc_new_database() {
       echo "KeePassXC did not save the new database as $VAULT"
       return 1
     }
-  probe_keys saved
   close_keepassxc "$pid" || return 1
-  probe_keys closed
   rm -rf "$scratch"
   echo "KeePassXC's new-database window made $VAULT_NAME"
 }
@@ -911,22 +879,8 @@ act_first_run() {
   # Choosing the database leaves the focus on its list, so the password field is clicked as a person does.
   attempt password-focus drive focus id:Password || return 1
   attempt password drive type "$PASSWORD" || return 1
-  if [ "$PLATFORM" = linux ]; then screenshot probe-typed; probe_keys typed; fi
   # Timed inside the driver, from Return to the item list, since starting a driver can take longer than an unlock.
-  attempt unlock drive key-wait Return "$ENTRY_FIELD" 60 || {
-    if [ "$PLATFORM" = linux ]; then
-      local wid
-      wid="$(xdotool search --name '^keypaste$' | head -n 1)"
-      fact probe_windows "$(xdotool search --name '^keypaste$' | tr '\n' ' ') focus $(xdotool getwindowfocus) active $(xdotool getactivewindow)"
-      xdotool windowactivate --sync "$wid"
-      sleep 0.5
-      fact probe_focus_after_activate "$(xdotool getwindowfocus) wid $wid"
-      xdotool key --clearmodifiers Return
-      fact probe_after_xtest "$(drive wait 'Lock now' 30 2>&1 | head -c 300 | tr '\n' ' ')"
-      screenshot probe-xtest
-    fi
-    return 1
-  }
+  attempt unlock drive key-wait Return "$ENTRY_FIELD" 120 || return 1
   fact unlock_ms "$(step_detail "$OUT" first-run unlock | sed -n 's/.* \([0-9][0-9]*\) ms after .*/\1/p')"
   attempt unlocked drive find 'Lock now' || return 1
   fact chosen_vault "$(chosen_vault)"
