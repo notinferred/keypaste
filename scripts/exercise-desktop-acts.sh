@@ -22,7 +22,7 @@
 #   approve-deny   its request allowed once in the app's prompt, and a second one denied              connect, field
 #   restore        a revision, an item from Trash and a backup restored                               field
 #   change-access  the master password changed in Settings: the old one refused, the new one unlocks  first-run
-#   lock-refused   Lock, and a request after it refused as vault-locked                               connect
+#   lock-refused   Lock, and a request after it refused as the locked app's no-approver (D-0466)      connect
 #   timing         first-run's unlock and field's save, timed                                         first-run
 # An act passes only on its evidence. It is unreached when one of its steps could not be done, a verb this
 # platform's driver does not implement among them, or an act it needs did not pass; a contradiction when its steps
@@ -242,14 +242,18 @@ evidence_change_access() {
   fi
 }
 
+# D-0466: a request after Lock reaches the locked app's pipe, is recorded denied/no-approver, and tells the agent
+# that the app is open with this vault locked in it; vault-locked is for a request waiting when the lock came (D-0313).
 evidence_lock_refused() {
-  local answer
+  local answer refusal
   answer="$(fact_of "$1" lock-refused audit_answer)"
+  refusal="$(fact_of "$1" lock-refused refusal)"
   if [ "$(fact_of "$1" lock-refused value)" != none ]; then contradict 'a request after the lock received a value'
   elif [ "$(fact_of "$1" lock-refused error)" != true ]; then contradict 'a request after the lock was not refused'
   elif [ "${answer%%/*}" != denied ]; then contradict "the audit log records the request after the lock as ${answer:-nothing}, not a denial"
-  elif [ "${answer#*/}" != vault-locked ]; then contradict "the audit log records the request after the lock as denied by ${answer#*/}, not vault-locked"
-  else pass 'after Lock a request was refused, and the audit log records it as vault-locked'
+  elif [ "${answer#*/}" != no-approver ]; then contradict "the audit log records the request after the lock as denied by ${answer#*/}, not no-approver (D-0466)"
+  elif [[ $refusal != *'this vault is locked in it'* ]]; then contradict "the agent was not told the app holds the vault locked: ${refusal:-nothing}"
+  else pass "after Lock a request was refused, the audit log records it as no-approver and the agent was told the vault is locked in the app (D-0466); the app's windows: $(fact_of "$1" lock-refused windows)"
   fi
 }
 
@@ -1128,7 +1132,8 @@ selftest() {
         '{"act":"change-access","fact":"new_password","value":"opens"}' \
         '{"act":"lock-refused","fact":"error","value":"true"}' \
         '{"act":"lock-refused","fact":"value","value":"none"}' \
-        '{"act":"lock-refused","fact":"audit_answer","value":"denied/vault-locked"}' \
+        '{"act":"lock-refused","fact":"audit_answer","value":"denied/no-approver"}' \
+        '{"act":"lock-refused","fact":"refusal","value":"keypaste: DENIED. Nobody can approve this right now: the keypaste app is open on this computer,\nbut this vault is locked in it, and keypaste releases nothing until it is unlocked"}' \
         '{"act":"timing","fact":"argon2","value":"the package carries: libargon2.dylib"}' \
         '{"act":"run","fact":"finished","value":"true"}'
     } > "$dir/facts.jsonl"
@@ -1205,8 +1210,10 @@ selftest() {
   set_fact trash-kept restore restored_listed false
   passing old-opens
   set_fact old-opens change-access old_password opens
-  passing no-approver
-  set_fact no-approver lock-refused audit_answer denied/no-approver
+  passing vault-locked
+  set_fact vault-locked lock-refused audit_answer denied/vault-locked
+  passing not-told
+  set_fact not-told lock-refused refusal 'keypaste: DENIED. Nobody can approve this right now.'
   passing lock-leaks
   set_fact lock-leaks lock-refused value ab
   passing person
@@ -1253,7 +1260,8 @@ selftest() {
   expect backup-unmatched restore contradiction 'no backup held'
   expect trash-kept restore contradiction 'Trash'
   expect old-opens change-access contradiction 'still opens'
-  expect no-approver lock-refused contradiction 'no-approver, not vault-locked'
+  expect vault-locked lock-refused contradiction 'vault-locked, not no-approver'
+  expect not-told lock-refused contradiction 'not told'
   expect lock-leaks lock-refused contradiction 'received a value'
   expect person notes-flag person 'only a person'
   expect no-save-time timing unreached 'no save'
@@ -1265,7 +1273,7 @@ selftest() {
   expect_run all-pass accepted
   expect_run person accepted
   expect_run driver-gap refused
-  expect_run no-approver refused
+  expect_run vault-locked refused
   expect_run unfinished refused
 
   if [ "$failures" -gt 0 ]; then
