@@ -119,7 +119,7 @@ lowercase() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 # A path as two spellings of it compare: forward slashes, and on Windows without regard to case.
 path_key() {
   local path
-  path="$(printf '%s' "$1" | tr '\\' '/')"
+  path="${1//\\//}"
   if [ "$2" = windows ]; then lowercase "$path"; else printf '%s' "$path"; fi
 }
 
@@ -696,7 +696,7 @@ keepassxc_new_database() {
   XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" "$gui" > "$OUT/keepassxc-new.log" 2>&1 &
   pid=$!
   # Each Continue waits for the page before it to show, and the encryption page keeps KeePassXC's Argon2d.
-  drive --window KeePassXC invoke 'Create new database' \
+  if ! { drive --window KeePassXC invoke 'Create new database' \
     && drive --window "$wizard" invoke Continue \
     && drive --window "$wizard" find 'Decryption time in seconds' \
     && drive --window "$wizard" invoke Continue \
@@ -704,24 +704,22 @@ keepassxc_new_database() {
     && drive --window "$wizard" type "$pw" \
     && drive --window "$wizard" click 'Repeat password field' \
     && drive --window "$wizard" type "$pw" \
-    && drive --window "$wizard" invoke Done \
-    || {
-      screenshot keepassxc-new "$wizard"
-      kill -9 "$pid" 2> /dev/null
-      echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"
-      return 1
-    }
+    && drive --window "$wizard" invoke Done; }; then
+    screenshot keepassxc-new "$wizard"
+    kill -9 "$pid" 2> /dev/null
+    echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"
+    return 1
+  fi
   # KeePassXC asks where to save the new database as soon as its window closes.
-  drive --window "$save" key ctrl+a \
+  if ! { drive --window "$save" key ctrl+a \
     && drive --window "$save" type "$(native "$VAULT")" \
     && drive --window "$save" key Return \
-    && wait_for_file "$VAULT" 60 \
-    || {
-      screenshot keepassxc-save "$save"
-      kill -9 "$pid" 2> /dev/null
-      echo "KeePassXC did not save the new database as $VAULT"
-      return 1
-    }
+    && wait_for_file "$VAULT" 60; }; then
+    screenshot keepassxc-save "$save"
+    kill -9 "$pid" 2> /dev/null
+    echo "KeePassXC did not save the new database as $VAULT"
+    return 1
+  fi
   close_keepassxc "$pid" || return 1
   rm -rf "$scratch"
   echo "KeePassXC's new-database window made $VAULT_NAME"
@@ -849,7 +847,7 @@ mac_keepassxc_argon2() {
 readonly KPXC_ARGON2D='Argon2d (KDBX 4 – recommended)'
 
 # mac_kpxc <pid> <verb> [args...]: the macOS driver acting in KeePassXC's window for the vault.
-mac_kpxc() { (export DRIVE_WINDOW="$KPXC_WINDOW"; mac_osascript 120 "$MAC_DRIVER" "$@"); }
+mac_kpxc() { DRIVE_WINDOW="$KPXC_WINDOW" mac_osascript 120 "$MAC_DRIVER" "$@"; }
 
 # mac_kpxc_choose <pid> <combo box> <item>: clicks the combo box open and clicks the item in its list, as a person does,
 # and checks that the box then shows it. The list opens as a window with no title; its items are the box's own
