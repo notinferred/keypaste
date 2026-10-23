@@ -739,9 +739,9 @@ readonly KPXC_ARGON2D='Argon2d (KDBX 4 – recommended)'
 # mac_kpxc <pid> <verb> [args...]: the macOS driver acting in KeePassXC's window for the vault.
 mac_kpxc() { (export DRIVE_WINDOW="$KPXC_WINDOW"; mac_osascript 120 "$MAC_DRIVER" "$@"); }
 
-# mac_kpxc_choose <pid> <combo box> <Up|Down> <item>: opens the combo box, takes the item above or below the one it
-# shows, and checks that the box shows <item>. Its list opens as a window with no title, and the keys are sent only
-# once it has, since a Return the dialog takes instead presses OK.
+# mac_kpxc_choose <pid> <combo box> <item>: clicks the combo box open and clicks the item in its list, as a person does,
+# and checks that the box then shows it. The list opens as a window with no title; its items are the box's own
+# children in the tree, after the box.
 mac_kpxc_choose() {
   local pid="$1" shown i
   for i in 1 2 3; do
@@ -749,13 +749,12 @@ mac_kpxc_choose() {
     mac_kpxc_listed "$pid" && break
     [ "$i" != 3 ] || { echo "the list of '$2' did not open after three clicks"; return 1; }
   done
-  mac_kpxc "$pid" key "$3" && mac_kpxc "$pid" key Return || return 1
-  # A combo box comes before the items of its list in the tree, so the first element named <item> is the box only when
-  # the box shows it.
-  shown="$(mac_kpxc "$pid" find "$4")" || { echo "$shown"; return 1; }
+  mac_kpxc "$pid" click "$3" || return 1
+  mac_kpxc "$pid" screenshot "$(native "$OUT/keepassxc-chose-$(printf '%s' "$3" | tr -cd 'A-Za-z0-9').png")" || true
+  shown="$(mac_kpxc "$pid" find "$3")" || { echo "$shown"; return 1; }
   case "$shown" in
     *' as AXComboBox') echo "$shown" ;;
-    *) echo "'$2' does not show '$4' after it was chosen: $shown"; return 1 ;;
+    *) echo "'$2' does not show '$3' after it was chosen: $shown; $(mac_kpxc "$pid" tree "after $3 was chosen")"; return 1 ;;
   esac
 }
 
@@ -779,18 +778,17 @@ mac_keepassxc_kdf() {
     sleep 0.5
   done
   [ -n "$KPXC_WINDOW" ] || { echo "no KeePassXC window showed $VAULT_NAME within 30 s: $(mac_kpxc "$pid" windows 2>&1 | tr '\n' ';')"; return 1; }
-  # A Qt combo box is named on macOS by the item it shows, and takes no focus from the accessibility API, so each is
-  # clicked open and its item chosen from the keyboard, as a person can. keepassxc-cli's database is KDBX 3, whose one
-  # key derivation is AES-KDF, so the format becomes KDBX 4 first, whose first is Argon2d. A key derivation chosen from
-  # its list gets KeePassXC's defaults for it and a benchmark of its rounds, so Argon2id and back gives Argon2d those.
+  # A Qt combo box is named on macOS by the item it shows. keepassxc-cli's database is KDBX 3, whose one key derivation
+  # is AES-KDF, so the format becomes KDBX 4 first, whose first is Argon2d. A key derivation chosen from its list gets
+  # KeePassXC's defaults for it and a benchmark of its rounds, so Argon2id and back gives Argon2d those.
   mac_kpxc "$pid" menu Database 'Database Security…' || return 1
   mac_kpxc "$pid" invoke 'Encryption Settings' || return 1
   mac_kpxc "$pid" invoke Advanced || return 1
-  mac_kpxc_choose "$pid" 'KDBX 3' Up 'KDBX 4 (recommended)' || return 1
-  mac_kpxc_choose "$pid" "$KPXC_ARGON2D" Down 'Argon2id (KDBX 4)' || return 1
+  mac_kpxc_choose "$pid" 'KDBX 3' 'KDBX 4 (recommended)' || return 1
+  mac_kpxc_choose "$pid" "$KPXC_ARGON2D" 'Argon2id (KDBX 4)' || return 1
   # KeePassXC benchmarks the rounds for a second after each choice of key derivation.
   sleep 3
-  mac_kpxc_choose "$pid" 'Argon2id (KDBX 4)' Up "$KPXC_ARGON2D" || return 1
+  mac_kpxc_choose "$pid" 'Argon2id (KDBX 4)' "$KPXC_ARGON2D" || return 1
   sleep 3
   mac_kpxc "$pid" invoke OK || return 1
   # KeePassXC saves after every change unless told otherwise; Save Database is asked for once when it has not.

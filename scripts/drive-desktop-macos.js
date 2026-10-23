@@ -9,8 +9,10 @@
 //
 // Usage: osascript -l JavaScript drive-desktop-macos.js <pid> <verb> [args...]
 //        osascript -l JavaScript drive-desktop-macos.js <pid> menu <menu> <item>
+//        osascript -l JavaScript drive-desktop-macos.js <pid> tree <why>
 //        osascript -l JavaScript drive-desktop-macos.js - dialog|press <process-name> [button]
-// menu, dialog and press are this driver's own, for the apps beside keypaste that the macOS exercises drive.
+// menu, tree, dialog and press are this driver's own, for the apps beside keypaste that the macOS exercises drive and
+// for what they see there.
 ObjC.import('Foundation');
 ObjC.import('CoreFoundation');
 ObjC.import('AppKit');
@@ -325,10 +327,10 @@ function describe(node) {
 }
 
 // Writes the app's windows and the acted-in window's tree to DRIVE_TREE_DIR; says where, or nothing.
-function keepTree(pid, verb) {
+function keepTree(pid, why) {
   const folder = environment('DRIVE_TREE_DIR');
   if (!folder || !(pid > 0)) return '';
-  const lines = [`after ${verb} could not be done; the app's windows: ${windowsOf(pid).map(w => JSON.stringify(ax.text(w, 'AXTitle'))).join(', ')}`];
+  const lines = [`${why}; the app's windows: ${windowsOf(pid).map(w => JSON.stringify(ax.text(w, 'AXTitle'))).join(', ')}`];
   const frame = window(pid);
   if (frame) walk(frame, node => { lines.push(attempt(() => describe(node), `${'  '.repeat(node.depth)}unread`)); return false; });
   else lines.push(`no window titled ${JSON.stringify(TITLE)}`);
@@ -504,6 +506,11 @@ function act(pid, action, args) {
       item.click();
       return `chose '${args[1]}' from the ${args[0]} menu`;
     }
+    case 'tree': {
+      const kept = keepTree(pid, args[0] || 'asked for');
+      if (!kept) throw new Refused('DRIVE_TREE_DIR names no folder for the tree');
+      return kept.replace(/^; /, '');
+    }
     case 'dialog':
       return JSON.stringify(dialog(args[0]));
     case 'press': {
@@ -534,7 +541,7 @@ function run(argv) {
       $.exit(2);
     }
     const said = error instanceof Refused ? error.message : `${argv[1]} failed: ${error.message}`;
-    print(said + attempt(() => keepTree(pid, argv[1]), ''));
+    print(said + attempt(() => keepTree(pid, `after ${argv[1]} could not be done`), ''));
     $.exit(1);
   }
   $.exit(0);
