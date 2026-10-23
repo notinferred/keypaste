@@ -38,7 +38,7 @@ Documents fall into four layers that change at different rates. A base document 
 
 ### What a step writes
 
-Finishing a task writes its record as `docs/steps/<ID>.md` from the template in [steps](docs/steps/README.md), removes its row from STEPS, and adds one CHANGELOG entry that links the record when users see a change. DECISIONS, SECURITY and THREATS change when the step makes a decision a later change could undo or changes a guarantee, threat or limit. FEATURES, the guides and README change only where the step made one of their statements false, and the claims `verify-demo.sh` checks stay true at every commit; new capabilities reach them through L.1, which rewrites them for 0.5.0 from CHANGELOG's Unreleased section.
+Finishing a task writes its record as `docs/steps/<ID>.md` from the template in [steps](docs/steps/README.md), removes its row from STEPS, and adds one CHANGELOG entry that links the record when users see a change. DECISIONS, SECURITY and THREATS change when the step makes a decision a later change could undo or changes a guarantee, threat or limit. FEATURES, the guides and README change only where the step made one of their statements false, and the claims `verify-demo.sh` checks stay true at every commit; new capabilities reach them through L.1, which rewrites them for 1.0.0 from CHANGELOG's Unreleased section.
 
 ### Records
 

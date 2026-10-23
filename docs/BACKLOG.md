@@ -7,8 +7,7 @@ These are retained feature ideas, not discarded features or promises for the fir
 | Option | Why it is outside the current product tracks / what would justify it | Previous work IDs |
 |---|---|---|
 | Browser save, update and passkeys | Filling a login (8.1, 8.3a) is committed to T6. Saving or updating from a page and passkeys each need their own origin-verification and interoperable design. | 8.2a/b, 8.3b–e, 8.4a/b, 8.5a/b |
-| Desktop Auto-Type and cross-entry references | Adds window matching, platform input and placeholder semantics; choose a demonstrated app workflow first. Same-entry placeholders fill in since P.3b1; `{REF:}` references to another entry (P.3b2) need their own exposure and audit rules. | P.3b2, P.4a/b |
-| Attachment editing | Preserving attachments does not require an editor; select one for a demonstrated workflow, with size limits and no plaintext temporary files. Custom fields (V.7) and TOTP (9.2a/b) are committed in STEPS. | V.8a/b |
+| Cross-entry references | Same-entry placeholders fill in since P.3b1; `{REF:}` references to another entry (P.3b2) need their own exposure and audit rules. Auto-Type is committed for 1.0.0 (P.4a, P.4b). | P.3b2 |
 | Multiple simultaneous vaults and auto-open | Recent-vault selection already exists. Add concurrent sessions only when needed, with separate locks and exposure scopes. | P.2 |
 | Privacy-preserving breach checks | Local password health is in Recommendations (V.9). A remote check is a separate capability with its own privacy design. | P.8 |
 | Deleting old backups after an access change | Copies taken before a password or keyfile change still open with the old credentials; `access` names them and routine pruning removes them over time. A delete verb is destructive and needs its own refusals and tests; reconsider when a person needs to close that exposure at once. | V.1a2 |
@@ -20,7 +19,7 @@ These are retained feature ideas, not discarded features or promises for the fir
 | SSH and Linux Secret Service | Distinct local protocols and lock-lifecycle obligations; select a named consumer and prove it before exposing vault access. | 9.3a/b, P.5 |
 | Phone and web vault clients | A keypaste phone app is the later option for reaching a cloud vault (D-0408); KeePass phone apps reach a local vault through file sync. Separate interaction, delivery and security boundaries. Third-party KDBX compatibility does not establish a keypaste client; no mobile framework or browser runtime is selected by this backlog. | M.1–M.3, W.1–W.2c |
 | More architectures | The macOS arm64 desktop joins the first desktop release (STEPS T5). Intel macOS, Windows ARM64, a Linux arm64 desktop and musl each need a selected target and native installation evidence. | 3.9a–d |
-| GitHub Release mirrors | Homebrew, Scoop and winget are committed after 0.5.0 (3.7a–c). A mirror is a separate channel, though the MCP Registry's hosting rule may require a copy of one file (G.6c). The current download origin remains authoritative. | — |
+| GitHub Release mirrors | Homebrew, Scoop and winget are committed for 1.0.0, once its bytes are published (3.7a–c). A mirror is a separate channel, though the MCP Registry's hosting rule may require a copy of one file (G.6c). The current download origin remains authoritative. | — |
 | Fleet deployment and service scale | No operated service or fleet requirement establishes these needs today. Measure a real bottleneck or deployment request first. | S.1, S.2, S.4, S.5 |
 
 ## Smaller possibilities

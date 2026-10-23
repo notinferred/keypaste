@@ -8,7 +8,7 @@ A milestone names the tasks it needs by ID. It promises no date, and nothing her
 
 The public release is CLI/MCP `0.3.0` ([RELEASE](docs/RELEASE.md)). The desktop app works from source, with internal, unsigned packages for Windows, macOS and Linux and no public release. [FEATURES](docs/FEATURES.md) owns what works today.
 
-The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md). They ship as `0.5.0`; `0.4.0` is never published (D-0368).
+The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md). They ship as `1.0.0`, the first public desktop release; `0.4.0` and `0.5.0` are never published (D-0530).
 
 [PRODUCT](docs/PRODUCT.md) v1.8 (D-0367) refocuses keypaste on people who already keep their passwords in KeePass and write software:
 
@@ -17,7 +17,7 @@ The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md)
 - the app gets simpler;
 - connecting an agent takes one step.
 
-[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state that follows the first desktop release: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11). v1.11 (D-0416) drops compatibility with keypaste's own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read. v1.12 (D-0430) lets a rule the person set release a value, offers run on every bridge keypaste connects but off until the person turns it on for that agent, lets an agent ask only about its own settings, with a change that gives it more taking effect once the person confirms it, makes the Agent Credential Access Format keypaste's storage format for agent access, and adds to T7 an agent that organizes the vault without seeing its values.
+[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11). v1.11 (D-0416) drops compatibility with keypaste's own releases before 0.5.0, which nobody uses, so the `env/<project>` layout of 0.3 is no longer read. v1.12 (D-0430) lets a rule the person set release a value, offers run on every bridge keypaste connects but off until the person turns it on for that agent, lets an agent ask only about its own settings, with a change that gives it more taking effect once the person confirms it, makes the Agent Credential Access Format keypaste's storage format for agent access, and adds to T7 an agent that organizes the vault without seeing its values. v1.15 (D-0530) makes the first public desktop release 1.0.0, with no release before it, and puts T6, Auto-Type, attachment editing and T7 in it.
 
 ## Track order
 
@@ -34,11 +34,11 @@ The tracks are PRODUCT's, and they are worked in this order:
 9. T9 CI and deploys, with T11 server access by choice alongside;
 10. T10 organizations.
 
-Project environments come before AI requests because what an agent may see is built on project tags. After the first desktop release, T6 is worked alongside T7–T11. T7 comes first among those because it serves one person on one machine and needs no service. T8 starts the relay with a person's own cloud vault and then shares projects with members; T9 and T11 build on shared projects, and T10 on all of them. Within the current milestone, the next task is the first ready one in this order ([CLAUDE.md](CLAUDE.md#planning-and-selection)).
+Project environments come before AI requests because what an agent may see is built on project tags. T6 and T7 are worked before 1.0.0 is published, since it carries both; T7 serves one person on one machine and needs no service. T8–T11 follow 1.0.0: T8 starts the relay with a person's own cloud vault and then shares projects with members; T9 and T11 build on shared projects, and T10 on all of them. Within the current milestone, the next task is the first ready one in this order ([CLAUDE.md](CLAUDE.md#planning-and-selection)).
 
-## 0.5.0: the first release of the new keypaste
+## 1.0.0: the first public release
 
-One version publishes the Windows, macOS and Linux desktop apps, each carrying the CLI, together with the CLI/MCP archives for their four targets.
+One version publishes the Windows, macOS and Linux desktop apps, each carrying the CLI, together with the CLI/MCP archives for their four targets. No release comes before it (D-0530).
 
 | Outcome | Tasks |
 |---|---|
@@ -49,60 +49,24 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | A project runs from the app on macOS, and every desktop install puts the CLI on PATH. | E.1d, G.5 |
 | Development builds only the compile check on the founder's machine (D-0468), CI runs every check in parallel on every run (D-0423) and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, K.6c, F.27, F.28, B.1, B.2, B.3, F.35, F.36, F.37, B.4a, B.4b, F.48, F.66 |
 | Signed, notarized and verified packages for three platforms, with guidance a new user can follow, a guide to running agents safely, and phone apps checked by hand. | F.20, F.32, F.24, F.25, 4.7a2, 3.5b, 4.7e, R.1a, 4.7c2, L.3, R.1b, L.1, R.1 |
+| A KeePassXC user loses nothing they use daily by switching: quick unlock with Windows Hello and Touch ID, TOTP codes, including for agents, never releasing the seed, browser fill starting from the KeePassXC-Browser extension people already have, Auto-Type, attachments, merging a synced file's changes instead of refusing until a reload, importers from Bitwarden, LastPass, 1Password and KeePassXC CSV, local password health, and hardware-key vaults beyond the desktop's unlock. | 4.10a, 4.10b, 9.2a, 9.2b, 8.1, 8.3a, P.4a, P.4b, V.8a, V.8b, 1.4a, 1.4b, 9.1a–9.1f, V.9, P.1 |
+| An agent calls an API with a credential it never holds: the unlocked app attaches it for the hosts its entry names, under a grant the person approved, and writes the audit record. An agent organizes the vault without seeing its values: it sees names and structure, plus note text where the person allows it, and proposes changes such as classifying notes, moving keys into fields or tagging entries for projects, each approved in the app. | X.1, X.17 |
+| The gaps the 2026-10-22 sweep deferred are fixed, each marked **For 1.0.0.** in its step record's limits. | — |
+| Once 1.0.0's bytes are published, the same day: install with Homebrew, Scoop or winget; a Claude Code plugin, a Claude Desktop extension, an MCP Registry listing, a Gemini CLI extension, and Cursor and VS Code install links; a one-prompt setup page on keypaste.com; and the guides on keypaste.com's Astro pages, with a content security policy (D-0401). | 3.7a, 3.7b, 3.7c, G.6a, G.6b, G.6c, G.6d, G.6e, G.7, L.2b |
 
-Two outside inputs gate this release:
+Outside inputs gate this release:
 
 - a Windows signing identity (H-0017);
-- Apple Developer enrollment (3.5a, H-0015).
+- Apple Developer enrollment (3.5a, H-0015);
+- for the reach tasks, the MCP Registry namespace and hosting (H-0022) and the package-manager and plugin-directory submissions (H-0023).
 
-Published version prefixes are immutable. If Apple enrollment lags, the choice at 4.7c2 is to wait, or to ship macOS as `0.5.1`.
-
-N.4, N.7, N.12 and G.4a could move to the next milestone without breaking the journey.
-
-## After 0.5.0: reach
-
-These follow the publication of 0.5.0.
-
-| Outcome | Tasks |
-|---|---|
-| Install with Homebrew, Scoop or winget | 3.7a, 3.7b, 3.7c |
-| A Claude Code plugin, a Claude Desktop extension, an MCP Registry listing, a Gemini CLI extension, and Cursor and VS Code install links | G.6a, G.6b, G.6c, G.6d, G.6e |
-| A one-prompt setup page on keypaste.com | G.7 |
-| The guides moved onto keypaste.com's Astro pages, with a content security policy (D-0401) | L.2b |
+Published version prefixes are immutable. If Apple enrollment lags, the choice at 4.7c2 is to wait, or to ship macOS as `1.0.1`.
 
 keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
-Two outside inputs gate this milestone:
+## After 1.0.0: cloud vault and teams
 
-- the MCP Registry namespace and hosting (H-0022);
-- the package-manager and plugin-directory submissions (H-0023).
-
-## T6: daily driver
-
-This milestone makes sure a KeePassXC user loses nothing they use daily by switching.
-
-| Outcome | Tasks |
-|---|---|
-| Quick unlock with Windows Hello and Touch ID | 4.10a, 4.10b |
-| TOTP codes, including for agents, never releasing the seed | 9.2a, 9.2b |
-| Browser fill, starting from the KeePassXC-Browser extension people already have | 8.1, 8.3a |
-| Merging a synced file's changes instead of refusing until a reload | 1.4a, 1.4b |
-| Importers from Bitwarden, LastPass, 1Password and KeePassXC CSV | 9.1a–9.1f |
-| Local password health in Recommendations | V.9 |
-| Hardware-key vaults beyond the desktop's unlock | P.1 |
-
-## T7: agents without values
-
-This follows the first desktop release and serves one person on one machine.
-
-| Outcome | Tasks |
-|---|---|
-| An agent calls an API with a credential it never holds: the unlocked app attaches it for the hosts its entry names, under a grant the person approved, and writes the audit record | X.1 |
-| An agent organizes the vault without seeing its values: it sees names and structure, plus note text where the person allows it, and proposes changes such as classifying notes, moving keys into fields or tagging entries for projects, each approved in the app | X.17 |
-
-## T8–T11: cloud vault and teams
-
-These follow T7. Local use keeps working without an account or network (PRODUCT §4.1), and no server ever reads a personal vault.
+These follow 1.0.0. Local use keeps working without an account or network (PRODUCT §4.1), and no server ever reads a personal vault.
 
 | Outcome | Tasks |
 |---|---|

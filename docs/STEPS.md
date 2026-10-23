@@ -1,12 +1,12 @@
 # Build plan
 
-This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.12 (D-0430). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
+This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.15 (D-0530). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
 ## K and B — Build infrastructure
 
-These rows serve every track: a development machine builds only the compile check (D-0468), and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
+These rows serve every track: a development machine builds only the compile check (D-0468), and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 1.0.0, the milestone that was 0.5.0 when the founder placed them there on 2026-09-30.
 
 ## T3 — AI requests in the app
 
@@ -15,7 +15,7 @@ Every release still needs a person's answer or a rule they set, and the bridge s
 
 ## T5 — Desktop delivery
 
-The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 0.5.0.
+The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 1.0.0.
 
 Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
@@ -29,19 +29,19 @@ Package managers and agent marketplaces carry a version only after it is publish
   - Terminal must be seen running the launcher of a downloaded bundle macOS opened. On `macos-15` Gatekeeper refuses an unsigned copy's launcher while it is quarantined ([4.7e1](steps/4.7e1.md)).
   - `upgrade-desktop.yml`'s macOS leg runs again on the first signed bundle, to see whether macOS App Management permission stops it replacing `/Applications/keypaste.app` ([4.7e2](steps/4.7e2.md)).
   - `libargon2.1.dylib`, in the bundle's `Contents/MacOS` and beside `keypaste` in the CLI archive, is signed with the same Developer ID and hardened runtime before what loads it: the hardened runtime's library validation refuses a dylib from another team, and keypaste then derives in managed code without failing, so the signed DMG's `--selftest` must still name it (D-0523).
-- [ ] **4.7c2 — Publish and verify the first desktop release as 0.5.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, and 3.5a's Apple credentials.
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a and every T6 and T7 task, P.4a, P.4b, V.8a and V.8b, and the fixes marked for 1.0.0 (D-0530). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, and 3.5a's Apple credentials.
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
   - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
-  - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 0.5.0. This renames CHANGELOG's Unreleased section and sets the version.
+  - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.
   - Verify from anonymous downloads: public hashes, provenance, signatures and notarization, and an upgrade that keeps the vault, `~/.keypaste` and the recent list.
   - Rehearsal certificates, unpublished artifacts and source builds do not pass.
 - [ ] **R.1b — Round-trip a tagged entry through the phone apps (H-0024).** Human. Needs: none.
   - Tag an entry and give it a protected env field in keypaste, edit that entry in KeePassium, Strongbox and KeePassDX, and confirm keypaste still reads the tag, the field and its protection; record each app's version.
 - [ ] **L.1 — Make the released app understandable and reachable.** Needs: 4.7c2, L.3.
-  - README, keypaste.com and the guides lead with the v1.8 positioning and name 0.5.0.
+  - README, keypaste.com and the guides lead with the v1.8 positioning and name 1.0.0.
   - They link its three desktop downloads, hashes and verification steps.
   - They take a new user from the download to a working vault, a project run and a connected agent, as that version behaves.
-  - README's demo GIF and every screenshot are re-rendered from the 0.5.0 binaries.
+  - README's demo GIF and every screenshot are re-rendered from the 1.0.0 binaries.
   - They give the issue route and the private security-reporting route.
   - The launch copy says what keypaste adds over Varlock's KeePass plugin, Strongbox MCP and 1Password Environments, and links the safe-agent guide (L.3).
   - The guides name only the phone apps R.1b's round-trip passed.
@@ -49,7 +49,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - The install blocks move from `keypaste-mcp` to `keypaste mcp`, and `verify-install.sh`'s bridge check moves with them ([F.48](steps/F.48.md)).
   - No announcement, message or signup mail is authorized by this row.
 - [ ] **R.1 — Accept the installed local product.** Needs: 4.7c2, L.1.
-  - Repeat every R.1a act on clean Windows, macOS and Linux desktops, from public 0.5.0 bytes checked against their hashes and provenance.
+  - Repeat every R.1a act on clean Windows, macOS and Linux desktops, from public 1.0.0 bytes checked against their hashes and provenance.
   - The acts are made offline after installation, with no account.
   - `install.yml` passes on the four CLI/MCP targets.
   - RELEASE records Installation-verified only for the targets that passed.
@@ -82,9 +82,9 @@ Package managers and agent marketplaces carry a version only after it is publish
 
 Each row keeps its historical meaning and is expanded when selected.
 
-- [ ] **4.10a — Add Windows quick unlock.** Needs: none. Ships after: 4.7c2.
+- [ ] **4.10a — Add Windows quick unlock.** Needs: none.
   - Resume a locked session with Windows Hello, keeping the full unlock path intact.
-- [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b. Ships after: 4.7c2.
+- [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b.
   - Touch ID, under the same session policy, using the signed app's entitlements.
 - [ ] **8.1 — Install and pair the native messaging host.** Needs: none.
   - Start with a discovery: can keypaste serve the existing KeePassXC-Browser extension's protocol, as KeePassNatMsg does for KeePass 2?
@@ -103,7 +103,17 @@ Each row keeps its historical meaning and is expanded when selected.
 - [ ] **F.69 — Agree with KeePassXC on a `{S:…}` whose name holds braces.** Needs: none.
   - keypaste fills in a placeholder inside such a name, so `{S:a{PASSWORD}b}` leaves keypaste with the password in the middle, where KeePassXC 2.7 and 2.8 read one field named `a{PASSWORD}b` and give its value, or nothing when there is none ([F.68](steps/F.68.md)).
   - Decide whether keypaste reads it as KeePassXC does or refuses it, as it refuses what the two versions give differently (D-0529).
-- [ ] **P.1 — Hardware-key vault unlocking.** Needs: V.1b, U.2. Ships after: R.1.
+- [ ] **V.8a — Expose bounded attachment operations.** Needs: none.
+  - List, add, replace, remove and save attachments in memory, with a size cap and no plaintext temporary files.
+  - KeePassXC reads every change, and an attachment keypaste does not edit is kept byte for byte.
+- [ ] **V.8b — Manage attachments from the app.** Needs: V.8a.
+  - The item shows each attachment's name and size, with add, replace, remove and save; the app never opens or runs an attachment itself.
+- [ ] **P.4a — Implement desktop Auto-Type on Windows and macOS.** Needs: none.
+  - Types an entry's login into another app's window with KeePass's Auto-Type sequences, reading KeePassXC's per-entry sequences and window associations.
+  - It types a password into a window keypaste does not control, so its design, including how a window is matched and what is refused, comes to the founder before any code.
+- [ ] **P.4b — Implement the supported Linux Auto-Type path.** Needs: P.4a.
+  - The Linux sessions where typing into another window is possible, with the others named and refused.
+- [ ] **P.1 — Hardware-key vault unlocking.** Needs: V.1b, U.2.
   - The desktop already unlocks a vault that needs a YubiKey slot and changes the key in Settings (D-0366), but this has not been tried with a physical key.
   - What remains:
     - creating such a vault;
@@ -115,7 +125,7 @@ Each row keeps its historical meaning and is expanded when selected.
 
 ## T7 — Agents without values
 
-PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, v1.10 (D-0408) adds the cloud vault to T8 and adds T11, and v1.12 (D-0430) adds X.17 to T7. Each row carries its purpose until it is selected and detailed.
+PRODUCT v1.9 (D-0400) adds T7–T10, v1.10 (D-0408) adds the cloud vault to T8 and adds T11, v1.12 (D-0430) adds X.17 to T7, and v1.15 (D-0530) puts T7 in 1.0.0, which T8–T11 follow. Each row carries its purpose until it is selected and detailed.
 
 - [ ] **X.1 — Attach approved credentials on the wire.** Needs: none.
   - The process holding the vault proxies an agent's HTTPS requests to the hosts an entry names and attaches the entry's credential under a grant the person approved; the agent holds only a placeholder (PRODUCT §2, §3.2).
