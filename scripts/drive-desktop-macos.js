@@ -26,7 +26,7 @@ const PRESSABLE = /Button|CheckBox|MenuItem|Link|DisclosureTriangle/;
 // Avalonia gives a toggle's state as AXValue: a CheckBox is an AXCheckBox, a ToggleButton or ToggleSwitch an AXButton.
 const TOGGLES = /CheckBox|Button/;
 const NAMES = ['AXTitle', 'AXValue', 'AXDescription'];
-const KEYS = { Return: 36, Tab: 48, Escape: 53, Delete: 117 };
+const KEYS = { Return: 36, Tab: 48, Escape: 53, Delete: 117, Home: 115, End: 119, Left: 123, Right: 124, Down: 125, Up: 126 };
 const MOUSE = { left: { down: 1, up: 2, button: 0 }, right: { down: 3, up: 4, button: 1 } };
 const MOUSE_MOVED = 5;
 const HID_TAP = 0;
@@ -245,17 +245,19 @@ function focused(node) {
   return ax.text(node.element, 'AXFocused') === '1';
 }
 
-// The window's on-screen number: the one of the process's windows whose bounds are the AX window's.
+// The window's on-screen number: the one of the process's windows whose bounds are the AX window's, at any level,
+// since a prompt floats above the others.
 function windowNumber(pid) {
   const listed = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1 | 16, 0))) || [];
-  const own = listed.filter(w => w.kCGWindowOwnerPID === pid && w.kCGWindowLayer === 0);
-  if (!own.length) return null;
+  const every = listed.filter(w => w.kCGWindowOwnerPID === pid);
+  const own = every.filter(w => w.kCGWindowLayer === 0);
+  if (!every.length) return null;
   const frame = attempt(() => ax.frame(window(pid)), null);
-  const same = frame && own.find(w => {
+  const same = frame && every.find(w => {
     const b = w.kCGWindowBounds || {};
     return Math.abs(b.X - frame.x) < 2 && Math.abs(b.Y - frame.y) < 2 && Math.abs(b.Width - frame.width) < 2 && Math.abs(b.Height - frame.height) < 2;
   });
-  return (same || own.find(w => w.kCGWindowName === TITLE) || own[0]).kCGWindowNumber;
+  return (same || every.find(w => w.kCGWindowName === TITLE) || own[0] || every[0]).kCGWindowNumber;
 }
 
 function colours(path) {

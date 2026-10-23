@@ -734,6 +734,8 @@ mac_keepassxc_argon2() {
   return 1
 }
 
+readonly KPXC_ARGON2D='Argon2d (KDBX 4 – recommended)'
+
 # mac_kpxc <pid> <verb> [args...]: the macOS driver acting in KeePassXC's window for the vault.
 mac_kpxc() { (export DRIVE_WINDOW="$KPXC_WINDOW"; mac_osascript 120 "$MAC_DRIVER" "$@"); }
 
@@ -747,19 +749,25 @@ mac_keepassxc_kdf() {
     sleep 0.5
   done
   [ -n "$KPXC_WINDOW" ] || { echo "no KeePassXC window showed $VAULT_NAME within 30 s: $(mac_kpxc "$pid" windows 2>&1 | tr '\n' ';')"; return 1; }
+  # A Qt combo box is named on macOS by the item it shows. keepassxc-cli's database is KDBX 3, whose one key derivation is
+  # AES-KDF, so the format becomes KDBX 4 first, whose first is Argon2d. A key derivation chosen from the keyboard gets
+  # KeePassXC's defaults for it and a benchmark of its rounds, as a person's choice does; Argon2id and back gives
+  # Argon2d that, and KeePassXC's benchmark takes the focus each time.
   mac_kpxc "$pid" menu Database 'Database Security…' || return 1
   mac_kpxc "$pid" invoke 'Encryption Settings' || return 1
   mac_kpxc "$pid" invoke Advanced || return 1
-  # A closed combo box chooses the item whose text starts with what is typed into it.
-  mac_kpxc "$pid" focus 'Key derivation function' || return 1
-  mac_kpxc "$pid" type Argon2d || return 1
-  kdf="$(mac_kpxc "$pid" read 'Key derivation function')" || { echo "$kdf"; return 1; }
-  case "$kdf" in Argon2d*) ;; *) echo "Key derivation function reads '$kdf' after Argon2d was typed"; return 1 ;; esac
+  mac_kpxc "$pid" focus 'KDBX 3' || return 1
+  mac_kpxc "$pid" key Home || return 1
+  mac_kpxc "$pid" focus "$KPXC_ARGON2D" || return 1
+  mac_kpxc "$pid" key Down || return 1
+  mac_kpxc "$pid" focus 'Argon2id (KDBX 4)' || return 1
+  mac_kpxc "$pid" key Up || return 1
+  kdf="$(mac_kpxc "$pid" find "$KPXC_ARGON2D")" || { echo "$kdf"; return 1; }
   mac_kpxc "$pid" invoke OK || return 1
   # KeePassXC saves after every change unless told otherwise; Save Database is asked for once when it has not.
   for i in $(seq 1 60); do
     if kx db-info "$VAULT" 2> /dev/null | grep -q 'KDF: Argon2d'; then
-      echo "KeePassXC's Database Security set $kdf and saved $VAULT_NAME"
+      echo "KeePassXC's Database Security set $KPXC_ARGON2D and saved $VAULT_NAME"
       return 0
     fi
     kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended before it saved the change"; return 1; }
@@ -1034,7 +1042,8 @@ act_restore() {
   for file in ${BACKUPS[@]+"${BACKUPS[@]}"}; do
     if [ "$(fingerprint "$(native "$file")")" = "$(fact_of "$OUT" restore fingerprint_after)" ]; then fact backup_match "$(basename "$file")"; fi
   done
-  attempt unlock-again unlock_with "$PASSWORD" || return 1
+  # The check unlocked the backup with its password, so the restored vault opens without asking again.
+  attempt reopened drive wait 'Lock now' 60 || return 1
 }
 
 act_change_access() {
