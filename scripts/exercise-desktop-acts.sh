@@ -641,7 +641,7 @@ keepassxc_vault() {
 # the package carries (D-0522). This KeePassXC keeps its settings in files of its own, so the first run offers only
 # what keepassxc_recent leaves in KeePassXC's recent databases.
 keepassxc_create() {
-  local gui pid main maker="$OUT/keepassxc-maker" wizard='Create a new KeePassXC database…'
+  local gui pid maker="$OUT/keepassxc-maker" wizard='Create a new KeePassXC database…'
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
   mkdir -p "$maker"
   printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$maker/keepassxc.ini"
@@ -655,15 +655,16 @@ keepassxc_create() {
   done
   DRIVE_TREE_DIR="$(native "$OUT")"
   export DRIVE_TREE_DIR
-  # Windows' Save dialog shows UI Automation only bare panes, so its file name is typed as a person types it.
+  # KeePassXC asks where to save the new database as soon as its window closes, its autosave saving a database that has
+  # no file yet; pressing Save Database as well opened a second Save dialog under Qt 6 (F.68). Windows' Save dialog
+  # shows UI Automation only bare panes, so its file name is typed as a person types it.
   # shellcheck disable=SC2154 # kpxc.sh sets pw.
   if kpxc_drive KeePassXC window 60 && kpxc_drive KeePassXC invoke 'Create Database' \
     && kpxc_drive "$wizard" invoke Continue && kpxc_drive "$wizard" invoke Continue \
     && kpxc_drive "$wizard" focus 'Password field' && kpxc_drive "$wizard" type "$pw" \
     && kpxc_drive "$wizard" focus 'Repeat password field' && kpxc_drive "$wizard" type "$pw" \
     && kpxc_drive "$wizard" invoke Done && kpxc_drive 'Weak password' invoke 'Continue with weak password' \
-    && main="$(kpxc_drive KeePassXC windows | tr -d "$CR" | grep -m 1 'KeePassXC$')" && echo "the database is open in '$main'" \
-    && kpxc_drive "$main" invoke 'Save Database' \
+    && kpxc_drive 'Save database as' window 30 \
     && kpxc_drive 'Save database as' key ctrl+a && kpxc_drive 'Save database as' type "$(native "$VAULT")" \
     && kpxc_drive 'Save database as' key Return \
     && wait_for_file "$VAULT" 30; then
