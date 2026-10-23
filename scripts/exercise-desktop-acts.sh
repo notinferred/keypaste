@@ -883,6 +883,7 @@ act_first_run() {
   # Choosing the database leaves the focus on its list, so the password field is clicked as a person does.
   attempt password-focus drive focus id:Password || return 1
   attempt password drive type "$PASSWORD" || return 1
+  if [ "$PLATFORM" = linux ]; then screenshot probe-typed; fact probe_typed_at "$(now_ms)"; fi
   # Timed inside the driver, from Return to the item list, since starting a driver can take longer than an unlock.
   attempt unlock drive key-wait Return "$ENTRY_FIELD" 120 || { [ "$PLATFORM" != linux ] || fact probe_app "$(ps -eo pid,stat,pcpu,etime,args | grep -i '[k]eypaste' | tr '\n' ';')"; return 1; }
   fact unlock_ms "$(step_detail "$OUT" first-run unlock | sed -n 's/.* \([0-9][0-9]*\) ms after .*/\1/p')"
