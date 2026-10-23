@@ -173,14 +173,14 @@ public sealed class EnvGrantCacheTests
     }
 
     [Fact]
-    public void RevokeLabel_EndsOnlyThatLabelsGrants()
+    public void RevokeAgent_EndsOnlyThatAgentsGrants()
     {
         using var cache = new EnvGrantCache(new ManualClock());
         cache.Store("a", "p", "dev", "npm test", _names, _ttl, cache.Generation, "Claude Code", "claude-code");
         cache.Store("b", "p", "dev", "npm test", _names, _ttl, cache.Generation, "Cursor", "cursor");
         Store(cache, "c");
 
-        cache.RevokeLabel("claude-code");
+        Assert.Equal(1, cache.RevokeAgent(grant => grant.Label == "claude-code"));
 
         Assert.Equal(["b", "c"], cache.InForce().Select(grant => grant.Key).Order(StringComparer.Ordinal));
     }
@@ -216,8 +216,8 @@ public sealed class EnvGrantCacheTests
     }
 
     /// <summary>
-    /// A timed allow answered after Revoke all, or after an edit or a reload ended grants, keeps nothing,
-    /// so the next run is asked again (F03).
+    /// A timed allow answered after Revoke all, after an agent's grants were ended, or after an edit or a
+    /// reload ended grants, keeps nothing, so the next run is asked again (F03, D-0516).
     /// </summary>
     [Fact]
     public void AGrantAskedForBeforeGrantsWereEnded_IsNotKept()
@@ -231,6 +231,10 @@ public sealed class EnvGrantCacheTests
         var beforeAnEdit = cache.Generation;
         cache.RevokeEntries(VaultEdit.Of(new EntryName("personal", "github")));
         Assert.False(cache.Store(_key, "billing", "dev", "npm run deploy", _names, _ttl, beforeAnEdit));
+
+        var beforeAnAgentsEnd = cache.Generation;
+        cache.RevokeAgent(grant => grant.Label == "cursor");
+        Assert.False(cache.Store(_key, "billing", "dev", "npm run deploy", _names, _ttl, beforeAnAgentsEnd));
 
         Assert.Empty(cache.InForce());
         Assert.False(cache.TryUse(_key, _names, out _));

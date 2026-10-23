@@ -938,6 +938,11 @@ public sealed class ApproverHandler
     /// <remarks>No cooldown starts: a revoked grant is a decision withdrawn, not a request refused.</remarks>
     public void Revoke(GrantKey key) => _grants.Revoke(key);
 
+    /// <summary>Ends every grant given to one agent, and keeps none a person is being asked about now (D-0516).</summary>
+    /// <param name="agent">Whether a grant, as <see cref="Activity"/> lists it, was given to the agent.</param>
+    /// <returns>How many grants ended.</returns>
+    public int RevokeAgent(Func<GrantInForce, bool> agent) => _grants.RevokeAgent(agent);
+
     /// <summary>Ends every grant, so each request they would have answered is asked again.</summary>
     public void RevokeAll() => _grants.RevokeEntries(VaultEdit.Everything);
 

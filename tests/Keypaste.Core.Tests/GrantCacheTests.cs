@@ -241,6 +241,33 @@ public sealed class GrantCacheTests
         Assert.Equal(1, cache.Count);
     }
 
+    /// <summary>
+    /// Ending one agent's grants ends only its own, and keeps no timed allow asked about before it, for that
+    /// agent or any other, since the count is the cache's (D-0516).
+    /// </summary>
+    [Fact]
+    public void RevokeAgent_EndsOnlyThatAgentsGrants_AndKeepsNoneAskedBefore()
+    {
+        using var cache = new GrantCache(new ManualClock());
+        Store(cache, Key(connection: "one"));
+        Store(cache, Key(connection: "one", field: "username"), "alice");
+
+        using (var other = new ReleasedField("password", "sk_live_y"))
+        {
+            var cursor = ApprovalPrompt.For("cursor", new EntryName("personal", "bank"), "password", "pay", 300, "cursor");
+            Assert.True(cache.Store(Key(connection: "two"), other, _ttl, cursor, cache.Generation));
+        }
+
+        var asked = cache.Generation;
+
+        Assert.Equal(2, cache.RevokeAgent(grant => grant.Approved.Client == "claude-code"));
+        Assert.Equal("cursor", Assert.Single(cache.InForce()).Approved.Client);
+
+        using var released = new ReleasedField("password", "sk_live_x");
+        Assert.False(cache.Store(Key(connection: "three"), released, _ttl, Approved(), asked));
+        Assert.Single(cache.InForce());
+    }
+
     [Fact]
     public void ReApprovingReplacesTheGrantRatherThanKeepingBoth()
     {

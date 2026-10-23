@@ -117,6 +117,46 @@ public sealed class SessionAuthorityGrantsTests : IDisposable
         Assert.Equal("cursor", Assert.Single(owner.Authority.Activity.Grants).Approved.Client);
     }
 
+    /// <summary>
+    /// <c>grants revoke &lt;agent&gt;</c> while the person is still deciding that agent's request: their timed
+    /// allow releases it once, and the agent holds no grant after its grants were ended (D-0516).
+    /// </summary>
+    [Fact]
+    public async Task Revoke_ByClient_WhileItsRequestIsAsked_LeavesItNoGrant()
+    {
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+        Assert.True((await owner.Authority.AttachAsync(new AttachRequest(VaultPath), "terminal", Token)).Attached);
+        Task<RevokeGrantsReply>? revoked = null;
+        _fixture.Channel.WhileAsking = () =>
+        {
+            _fixture.Channel.WhileAsking = null;
+            revoked = owner.Authority.RevokeGrantsAsync(Revoke([], "claude-code"), "terminal", Token).AsTask();
+        };
+
+        await GrantAsync(client, "claude-code", "env/dev/STRIPE_KEY");
+
+        Assert.Equal(new RevokeGrantsReply(0, string.Empty), await revoked!);
+        Assert.Empty(owner.Authority.Activity.Grants);
+    }
+
+    /// <summary>The same when a stricter setting for the agent ends its grants while the person decides.</summary>
+    [Fact]
+    public async Task RevokeClient_WhileItsRequestIsAsked_LeavesItNoGrant()
+    {
+        await using var owner = Owner.Start(this);
+        await using var client = await owner.AttachAsync();
+        _fixture.Channel.WhileAsking = () =>
+        {
+            _fixture.Channel.WhileAsking = null;
+            owner.Authority.RevokeClient(ApproverFixture.Agent);
+        };
+
+        await GrantAsync(client, "claude-code", "env/dev/STRIPE_KEY");
+
+        Assert.Empty(owner.Authority.Activity.Grants);
+    }
+
     [Fact]
     public async Task Revoke_All()
     {

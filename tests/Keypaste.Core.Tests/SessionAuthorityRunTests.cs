@@ -846,6 +846,25 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Empty(owner.Authority.Activity.EnvGrants);
     }
 
+    /// <summary>A stricter setting that ends the agent's grants while the person decides its run releases the run once and keeps no grant (D-0516).</summary>
+    [Fact]
+    public async Task RevokeClient_WhileItsRunIsAsked_LeavesItNoGrant()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        _fixture.Channel.WhileAsking = () =>
+        {
+            _fixture.Channel.WhileAsking = null;
+            owner.Authority.RevokeClient(_label);
+        };
+
+        var reply = await client.ReleaseRunAsync(Run(), Token);
+
+        Assert.Equal((EnvOutcome.Resolved, 0), (reply!.Set.Outcome, reply.GrantedSeconds));
+        Assert.Empty(owner.Authority.Activity.EnvGrants);
+    }
+
     [Fact]
     public async Task RevokingByTheListedClientName_EndsItsRunGrant()
     {

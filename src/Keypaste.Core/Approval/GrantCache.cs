@@ -93,8 +93,8 @@ public sealed class GrantCache : IDisposable
     }
 
     /// <summary>
-    /// How many times grants were ended for a change, by Revoke all, an edit or a reload: read before a
-    /// person is asked and given to <see cref="Store"/>, which keeps no grant asked for before one.
+    /// How many times grants were ended for a change, by Revoke all, ending an agent's, an edit or a reload:
+    /// read before a person is asked and given to <see cref="Store"/>, which keeps no grant asked for before one.
     /// </summary>
     public long Generation
     {
@@ -166,8 +166,8 @@ public sealed class GrantCache : IDisposable
     /// <remarks>
     /// A cache that has been disposed keeps nothing: its lifetime has ended, and a request decided
     /// across that lock is refused by the owner rather than stored for later (D-0313). Nor does one
-    /// whose grants were ended while the person was asked, so an answer given before Revoke all, an
-    /// edit or a reload leaves no grant after it.
+    /// whose grants were ended while the person was asked, so an answer given before Revoke all, ending
+    /// an agent's grants, an edit or a reload leaves no grant after it.
     /// </remarks>
     public bool Store(GrantKey key, ReleasedField value, TimeSpan ttl, ApprovalPrompt approved, long generation)
     {
@@ -233,6 +233,37 @@ public sealed class GrantCache : IDisposable
             {
                 Forget(key, grant);
             }
+        }
+    }
+
+    /// <summary>Zeroes every grant given to one agent, and keeps none a person is being asked about now.</summary>
+    /// <param name="agent">Whether a grant, as <see cref="InForce"/> lists it, was given to the agent.</param>
+    /// <returns>How many live grants ended.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="agent"/> is null.</exception>
+    /// <remarks>
+    /// It advances <see cref="Generation"/> under the same lock, so no grant stored before it outlives it and
+    /// no timed allow asked about before it is kept after it, for this agent or, since the count is the
+    /// cache's, any other (D-0516).
+    /// </remarks>
+    public int RevokeAgent(Func<GrantInForce, bool> agent)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+
+        lock (_gate)
+        {
+            _generation++;
+
+            var ended = _grants
+                .Where(pair => !pair.Value.Expires.HasExpired(_clock)
+                    && agent(new GrantInForce(pair.Key, pair.Value.Approved, pair.Value.Expires.Remaining(_clock))))
+                .ToList();
+
+            foreach (var (key, grant) in ended)
+            {
+                Forget(key, grant);
+            }
+
+            return ended.Count;
         }
     }
 

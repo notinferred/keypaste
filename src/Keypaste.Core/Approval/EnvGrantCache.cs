@@ -50,8 +50,8 @@ public sealed class EnvGrantCache : IDisposable
     }
 
     /// <summary>
-    /// How many times grants were ended for a change, by Revoke all, an edit or a reload: read before a
-    /// person is asked and given to <see cref="Store"/>, which keeps no grant asked for before one.
+    /// How many times grants were ended for a change, by Revoke all, ending an agent's, an edit or a reload:
+    /// read before a person is asked and given to <see cref="Store"/>, which keeps no grant asked for before one.
     /// </summary>
     public long Generation
     {
@@ -108,8 +108,8 @@ public sealed class EnvGrantCache : IDisposable
     /// <returns>Whether the grant is kept.</returns>
     /// <remarks>
     /// A cache that has been disposed keeps nothing: its lifetime has ended. Nor does one whose grants
-    /// were ended while the person was asked, so an answer given before Revoke all, an edit or a reload
-    /// leaves no grant after it.
+    /// were ended while the person was asked, so an answer given before Revoke all, ending an agent's
+    /// grants, an edit or a reload leaves no grant after it.
     /// </remarks>
     public bool Store(
         string key,
@@ -164,13 +164,7 @@ public sealed class EnvGrantCache : IDisposable
         {
             return _grants
                 .Where(pair => !pair.Value.Expires.HasExpired(_clock))
-                .Select(pair => new EnvGrantInForce(
-                    pair.Key, pair.Value.Project, pair.Value.Profile, pair.Value.Command, pair.Value.Expires.Remaining(_clock))
-                {
-                    Client = pair.Value.Client,
-                    Label = pair.Value.Label,
-                    Entries = [.. pair.Value.Entries.Select(ApprovalPrompt.Shown)],
-                })
+                .Select(pair => Listed(pair.Key, pair.Value))
                 .OrderBy(grant => grant.Remaining)
                 .ToList();
         }
@@ -200,13 +194,33 @@ public sealed class EnvGrantCache : IDisposable
         RevokeWhere((key, _) => key.StartsWith(prefix, StringComparison.Ordinal));
     }
 
-    /// <summary>Ends every grant given to a bridge started with this <c>--client-label</c>.</summary>
-    /// <param name="label">The raw label.</param>
-    public void RevokeLabel(string label)
+    /// <summary>Ends every grant given to one agent, and keeps none a person is being asked about now.</summary>
+    /// <param name="agent">Whether a grant, as <see cref="InForce"/> lists it, was given to the agent.</param>
+    /// <returns>How many live grants ended.</returns>
+    /// <remarks>
+    /// It advances <see cref="Generation"/> under the same lock, so no grant stored before it outlives it and
+    /// no timed allow asked about before it is kept after it, for this agent or, since the count is the
+    /// cache's, any other (D-0516).
+    /// </remarks>
+    public int RevokeAgent(Func<EnvGrantInForce, bool> agent)
     {
-        ArgumentNullException.ThrowIfNull(label);
+        ArgumentNullException.ThrowIfNull(agent);
 
-        RevokeWhere((_, grant) => string.Equals(grant.Label, label, StringComparison.Ordinal));
+        lock (_gate)
+        {
+            _generation++;
+
+            var ended = _grants
+                .Where(pair => !pair.Value.Expires.HasExpired(_clock) && agent(Listed(pair.Key, pair.Value)))
+                .ToList();
+
+            foreach (var (key, grant) in ended)
+            {
+                Forget(key, grant);
+            }
+
+            return ended.Count;
+        }
     }
 
     /// <summary>Ends every grant releasing an entry an edit touched, so no value the vault no longer holds there is served again (D-0318).</summary>
@@ -274,6 +288,14 @@ public sealed class EnvGrantCache : IDisposable
             }
         }
     }
+
+    private EnvGrantInForce Listed(string key, Grant grant) =>
+        new(key, grant.Project, grant.Profile, grant.Command, grant.Expires.Remaining(_clock))
+        {
+            Client = grant.Client,
+            Label = grant.Label,
+            Entries = [.. grant.Entries.Select(ApprovalPrompt.Shown)],
+        };
 
     /// <summary>Forgets the grant a timer was armed for, if it is still the one under that key.</summary>
     private void Expire(string key, Grant armed)

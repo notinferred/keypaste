@@ -188,12 +188,9 @@ public sealed class SessionAuthority : IApproverHandler
 
         var shown = EntryNameSanitizer.Sanitize(label, ApprovalPrompt.MaximumClientLength).Text;
 
-        foreach (var grant in _inner.Activity().Grants.Where(grant => string.Equals(grant.Approved.Label, shown, StringComparison.Ordinal)))
-        {
-            _inner.Revoke(grant.Key);
-        }
-
-        _environments?.Grants?.RevokeLabel(label);
+        RevokeAgent(
+            grant => string.Equals(grant.Approved.Label, shown, StringComparison.Ordinal),
+            grant => string.Equals(grant.Label, label, StringComparison.Ordinal));
     }
 
     /// <summary>Ends one grant of the current session, so the next request it would have answered is asked again.</summary>
@@ -1614,20 +1611,23 @@ public sealed class SessionAuthority : IApproverHandler
             return ValueTask.FromResult(new RevokeGrantsReply(0, refusal.Reason));
         }
 
-        var activity = Activity;
-
         if (request.All)
         {
+            var all = Activity;
             RevokeAll();
-            return ValueTask.FromResult(new RevokeGrantsReply(activity.Grants.Count + activity.EnvGrants.Count, string.Empty));
+            return ValueTask.FromResult(new RevokeGrantsReply(all.Grants.Count + all.EnvGrants.Count, string.Empty));
         }
 
-        var ids = request.Ids.Select(id => id.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
-        bool Named(string id, string client) =>
-            ids.Contains(id) || (request.Client is { } named && string.Equals(client, named, StringComparison.Ordinal));
+        var endedForAgent = request.Client is { } named
+            ? RevokeAgent(
+                grant => string.Equals(grant.Approved.Client, named, StringComparison.Ordinal),
+                grant => string.Equals(grant.Client ?? GrantSummary.EnvClient, named, StringComparison.Ordinal))
+            : 0;
 
-        var ended = activity.Grants.Where(grant => Named(GrantId.Of(grant.Key), grant.Approved.Client)).ToList();
-        var endedEnv = activity.EnvGrants.Where(grant => Named(GrantId.OfEnv(grant.Key), grant.Client ?? GrantSummary.EnvClient)).ToList();
+        var activity = Activity;
+        var ids = request.Ids.Select(id => id.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
+        var ended = activity.Grants.Where(grant => ids.Contains(GrantId.Of(grant.Key))).ToList();
+        var endedEnv = activity.EnvGrants.Where(grant => ids.Contains(GrantId.OfEnv(grant.Key))).ToList();
 
         foreach (var grant in ended)
         {
@@ -1639,7 +1639,7 @@ public sealed class SessionAuthority : IApproverHandler
             RevokeEnvGrant(grant.Key);
         }
 
-        return ValueTask.FromResult(new RevokeGrantsReply(ended.Count + endedEnv.Count, string.Empty));
+        return ValueTask.FromResult(new RevokeGrantsReply(endedForAgent + ended.Count + endedEnv.Count, string.Empty));
     }
 
     /// <inheritdoc/>
@@ -1681,6 +1681,10 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     private SessionLifetime? Live() => _lifetime() is { IsLive: true } lifetime ? lifetime : null;
+
+    /// <summary>Ends every grant one agent holds, credential and run alike, and keeps none a person is being asked about now (D-0516).</summary>
+    private int RevokeAgent(Func<GrantInForce, bool> credential, Func<EnvGrantInForce, bool> run) =>
+        _inner.RevokeAgent(credential) + (_environments?.Grants?.RevokeAgent(run) ?? 0);
 
     /// <summary>Completes once the lifetime has ended, or once nobody is waiting for the answer.</summary>
     private static async Task EndedAsync(SessionLifetime lifetime, CancellationToken cancellationToken)

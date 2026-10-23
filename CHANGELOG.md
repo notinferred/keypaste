@@ -16,7 +16,7 @@ A request for more access or a terminal's edit that Reload took off the screen n
 
 A change to an agent's settings is now saved only in the unlock it was asked in, never in the vault unlocked after a lock, and a lock or Reload just as its confirmation is about to appear keeps the window from appearing.
 
-A timed allow given in the prompt while End all, `keypaste grants revoke --all` or an edit ended the allowances now releases that one request and keeps nothing, so the agent's next request is asked about again rather than served under an allowance given before the end; History records it as allowed once. One answered as Reload ends them keeps nothing either.
+A timed allow given in the prompt while End all, `keypaste grants revoke --all`, `keypaste grants revoke <agent>`, a stricter setting for an agent in the app or an edit ended allowances now releases that one request and keeps nothing, so the agent's next request is asked about again rather than served under an allowance given before the end; History records it as allowed once. One answered as Reload ends them keeps nothing either.
 Locking the app with Lock, `Ctrl/Cmd+L`, the tray or menu bar or `keypaste lock`, or quitting it with a vault open, no longer leaves its window unresponsive while keypaste finishes answering agents. A change a terminal asked the app to save that is still waiting behind another save when the vault locks is now refused as locked and writes nothing, rather than holding up the lock.
 
 The unlock screen's line naming the program that holds a vault, such as `keypaste approve`, now goes within a few seconds of that program letting the vault go, without anything typed or pressed.
