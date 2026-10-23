@@ -934,6 +934,8 @@ act_restore() {
   # It carries the project tag the item has now, so Restore this writes it without first asking about projects (D-0415).
   saved revision_ms restore-revision drive invoke id:RestoreRevision || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
+  # The item takes the whole of Items while its history is open, so the history is closed to bring the list back.
+  attempt history-closed drive invoke 'Hide history' || return 1
   # A deletion: the scratch item deleted, then restored from Trash.
   attempt choose-scratch drive select "$ENTRY_SCRATCH" || return 1
   attempt scratch-actions drive toggle 'More actions' || return 1
