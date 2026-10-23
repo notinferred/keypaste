@@ -535,8 +535,20 @@ app_quit() {
 # The unlock screen's password field is clicked first, as a person does, since the focus may be elsewhere.
 unlock_with() { drive focus id:Password && drive type "$1" && drive key Return && drive wait 'Lock now' 120; }
 
-# The vault the app chose for agents and the CLI: app.toml's vault, unescaped from TOML.
-chosen_vault() { sed -n 's/^vault = "\(.*\)"$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1 | sed 's/\\\\/\\/g'; }
+# The vault the app chose for agents and the CLI: app.toml's vault, without the comment the app writes after it,
+# unescaped from TOML.
+chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1 | sed 's/\\\\/\\/g'; }
+
+# The project's page, from its row in the sidebar. Linux's AT-SPI (Avalonia 12.1) keeps a list's rows as it first
+# listed them, so the row the tag added is not among them there; it is reached as from the keyboard instead: the
+# Items row clicked, End to Agents, the last row, and Up to the project's row above it.
+open_project() {
+  if [ "$PLATFORM" = linux ]; then
+    drive click Items && drive key End && drive key Up && drive wait 'Project directory' 30
+  else
+    drive select "$PROJECT"
+  fi
+}
 
 # --- the vault through the CLI --------------------------------------------------------------------
 
@@ -851,7 +863,7 @@ act_project_run() {
   attempt tag drive set-named id:NewTag "env:$PROJECT" || return 1
   attempt add-tag drive invoke 'Add tag' || return 1
   saved tagged_ms confirm-tag drive invoke 'Add tag[2]' || return 1
-  attempt project drive select "$PROJECT" || return 1
+  attempt project open_project || return 1
   attempt key-row drive find "$FIELD" || return 1
   attempt directory drive set-named 'Project directory' "$(native "$RUN_DIR")" || return 1
   attempt command drive set-named Command "$(child_command)" || return 1
@@ -869,7 +881,7 @@ act_edit_rerun() {
   attempt value drive type "$VALUE2" || return 1
   saved replaced_ms confirm drive invoke 'Replace[2]' || return 1
   fact field_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
-  attempt project drive select "$PROJECT" || return 1
+  attempt project open_project || return 1
   run_child
 }
 
@@ -927,6 +939,8 @@ act_restore() {
   attempt restore-this drive invoke id:RestoreRevision || return 1
   saved revision_ms restore-revision drive invoke Restore || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
+  # The open history takes the whole of Items; hiding it brings the list back.
+  attempt hide-history drive invoke 'Hide history' || return 1
   # A deletion: the scratch item deleted, then restored from Trash.
   attempt choose-scratch drive select "$ENTRY_SCRATCH" || return 1
   attempt scratch-actions drive toggle 'More actions' || return 1
