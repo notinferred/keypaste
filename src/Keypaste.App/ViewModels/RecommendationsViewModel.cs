@@ -48,7 +48,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     /// <param name="session">The session whose vault is checked.</param>
     /// <param name="home">The keypaste home dismissals are kept in.</param>
     /// <param name="open">Shows an item in Items.</param>
-    /// <param name="post">Runs an action on the UI thread; null shows a check's findings on the context that asked for it.</param>
+    /// <param name="post">Runs an action on the UI thread; null shows a check's findings on the context that asked for it, or, with none, checks on the asking thread.</param>
     internal RecommendationsViewModel(AppVaultSession session, string? home, Action<EntryName>? open = null, Action<Action>? post = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -133,6 +133,14 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
             _lost = [];
             _weakReusedExpired = [];
             Show();
+            Checking = Task.CompletedTask;
+            return;
+        }
+
+        // With no UI thread to come back to, a finished scan would be shown on a pool thread while its owner goes on.
+        if (_post is null && SynchronizationContext.Current is null)
+        {
+            Show(generation, vault, Task.FromResult(Scan(_check, vault, _session.Clock.GetUtcNow())));
             Checking = Task.CompletedTask;
             return;
         }
