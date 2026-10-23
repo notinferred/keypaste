@@ -226,13 +226,6 @@ def centre(element):
     return box.x + box.width // 2, box.y + box.height // 2
 
 
-def action_index(element, wanted):
-    for i in range(Atspi.Action.get_n_actions(element)):
-        if Atspi.Action.get_name(element, i) == wanted:
-            return i
-    return 0
-
-
 def pressable(locator, what):
     """A control with an action once it is enabled, as a person waits for a button that is armed a moment late."""
     element = located(locator, lambda e: has(e, "Action"), what=what)
@@ -360,7 +353,8 @@ def act(action, args):
         if not state(box, Atspi.StateType.CHECKABLE):
             raise Refused(f"'{args[0]}' is a {role_name(box)}, which has no on or off")
         if state(box, Atspi.StateType.CHECKED) != wanted:
-            if not Atspi.Action.do_action(box, action_index(box, "toggle")):
+            # A check box's or a switch's one action is its toggle.
+            if not Atspi.Action.do_action(box, 0):
                 raise Refused(f"'{args[0]}' refused its toggle")
         if until(5, lambda: True if state(box, Atspi.StateType.CHECKED) == wanted else None) is None:
             raise Refused(f"'{args[0]}' did not turn {args[1]}")
@@ -371,7 +365,8 @@ def act(action, args):
         x, y = centre(element)
         foreground()
         button = "1" if action == "click" else "3"
-        subprocess.run(["xdotool", "mousemove", "--sync", str(x), str(y), "click", button], check=True, timeout=10)
+        # Not --sync, which waits for a motion that never comes when the pointer is already there.
+        subprocess.run(["xdotool", "mousemove", str(x), str(y), "click", button], check=True, timeout=10)
         return f"{'clicked' if action == 'click' else 'right-clicked'} '{args[0]}' at {x},{y}"
 
     if action == "focus":
