@@ -647,7 +647,7 @@ keepassxc_create() {
     && kpxc_drive "$wizard" focus 'Repeat password field' && kpxc_drive "$wizard" type "$pw" \
     && kpxc_drive "$wizard" invoke Done && kpxc_drive 'Weak password' invoke 'Continue with weak password' \
     && main="$(kpxc_drive KeePassXC windows | tr -d "$CR" | grep -m 1 'KeePassXC$')" && echo "the database is open in '$main'" \
-    && kpxc_drive "$main" key ctrl+s \
+    && kpxc_drive "$main" invoke 'Save Database' \
     && kpxc_drive 'Save database as' set-named 'File name:' "$(native "$VAULT")" && kpxc_drive 'Save database as' invoke Save \
     && wait_for_file "$VAULT" 30; then
     if kill -0 "$pid" 2> /dev/null; then close_keepassxc "$pid" || return 1; else echo 'KeePassXC ended by itself after saving'; fi

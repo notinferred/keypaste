@@ -178,7 +178,9 @@ function Foreground {
     [Keypaste.Native]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
     [void][Keypaste.Native]::SetForegroundWindow($handle)
     if (-not (Until 5 { if ([Keypaste.Native]::GetForegroundWindow() -eq $handle) { $true } })) {
-      Fail "the window '$Title' did not come to the foreground"
+      $front = $null
+      try { $front = $Auto::FromHandle([Keypaste.Native]::GetForegroundWindow()).Current } catch { }
+      Fail "the window '$Title' did not come to the foreground; '$($front.Name)' of process $($front.ProcessId) holds it"
     }
   }
 }
