@@ -517,7 +517,11 @@ app_launch() {
       DRIVE_TREE_DIR="$(native "$OUT")"
       export DRIVE_TREE_DIR
       ;;
-    macos) APP_PID="$(mac_start "$APP" "$log")" || { echo "$APP_PID"; return 1; } ;;
+    macos)
+      # Where the driver keeps the window's tree when a step cannot be done.
+      export DRIVE_TREE_DIR="$OUT"
+      APP_PID="$(mac_start "$APP" "$log")" || { echo "$APP_PID"; return 1; }
+      ;;
     linux)
       "$APP" > "$log" 2>&1 &
       APP_PID=$!
@@ -542,8 +546,9 @@ app_quit() {
 # The unlock screen's password field is clicked first, as a person does, since the focus may be elsewhere.
 unlock_with() { drive focus id:Password && drive type "$1" && drive key Return && drive wait 'Lock now' 120; }
 
-# The vault the app chose for agents and the CLI: app.toml's vault, unescaped from TOML, with the comment after it left out.
-chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1 | sed 's/\\\\/\\/g'; }
+# The vault the app chose for agents and the CLI: app.toml's vault, whose line ends in a comment and whose value holds
+# no quote or backslash (TomlWriter).
+chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1; }
 
 # --- the vault through the CLI --------------------------------------------------------------------
 
@@ -721,7 +726,7 @@ keepassxc_recent() {
 }
 
 # What the platform recorded of KeePassXC ending by itself: Windows' newest crash events and macOS's newest crash
-# report, which is kept with the records; Linux records none.
+# report since the file given, keepassxc.log by default, which is kept with the records; Linux records none.
 crash_report() {
   local report
   case "$PLATFORM" in
@@ -730,8 +735,14 @@ crash_report() {
       printf '; Windows recorded: %s' "$(powershell -NoProfile -Command 'Get-WinEvent -FilterHashtable @{LogName = "Application"; ProviderName = "Application Error", "Windows Error Reporting"; StartTime = (Get-Date).AddMinutes(-10)} -MaxEvents 2 -ErrorAction SilentlyContinue | ForEach-Object { $_.ProviderName + ": " + ($_.Message -replace "\s+", " ") }' | tr -d "$CR")"
       ;;
     macos)
-      report="$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'KeePassXC*' -newer "$VAULT" 2> /dev/null | head -n 1)"
-      [ -n "$report" ] || { printf '; macOS kept no crash report'; return 0; }
+      # ReportCrash writes the report a few seconds after the process ends, for the user or for the system.
+      for _ in $(seq 1 30); do
+        report="$(find "$HOME/Library/Logs/DiagnosticReports" /Library/Logs/DiagnosticReports -maxdepth 1 -name 'KeePassXC*' -newer "${1:-$OUT/keepassxc.log}" \
+          -exec stat -f '%m %N' {} + 2> /dev/null | sort -rn | head -n 1 | cut -d ' ' -f 2-)"
+        [ -z "$report" ] || break
+        sleep 0.5
+      done
+      [ -n "$report" ] || { printf '; macOS kept no crash report within 15 s'; return 0; }
       cp "$report" "$OUT/"
       printf '; macOS kept %s: %s' "$(basename "$report")" "$(grep -o '"exception" *: *{[^}]*}' "$report" | head -n 1)"
       ;;
@@ -750,6 +761,105 @@ close_keepassxc() {
     return 1
   fi
   wait "$1" 2> /dev/null || true
+}
+
+# macOS: keepassxc-cli makes a database that derives its key with AES-KDF, and R.1a times the libargon2 the package
+# carries, so KeePassXC's own Database Security then changes it to Argon2d, the key derivation KeePassXC gives a new
+# database, as a person can in KeePassXC. KeePassXC 2.7.12 has ended by itself soon after opening a database on this
+# runner, so a session that ends before the change is saved is followed by another, up to three.
+mac_keepassxc_argon2() {
+  local gui try pid said code
+  gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
+  export DRIVE_TREE_DIR="$OUT"
+  for try in 1 2 3; do
+    printf '%s\n' "$pw" | "$gui" --pw-stdin "$VAULT" > "$OUT/keepassxc-argon2-$try.log" 2>&1 &
+    pid=$!
+    if said="$(mac_keepassxc_kdf "$pid")"; then
+      close_keepassxc "$pid" || return 1
+      echo "session $try: $said"
+      return 0
+    fi
+    echo "session $try: $said"
+    if kill -0 "$pid" 2> /dev/null; then
+      kill -9 "$pid" 2> /dev/null || true
+      wait "$pid" 2> /dev/null || true
+    else
+      code=0
+      wait "$pid" 2> /dev/null || code=$?
+      echo "session $try: KeePassXC ended by itself, status $code$(crash_report "$OUT/keepassxc-argon2-$try.log")"
+    fi
+  done
+  return 1
+}
+
+readonly KPXC_ARGON2D='Argon2d (KDBX 4 – recommended)'
+
+# mac_kpxc <pid> <verb> [args...]: the macOS driver acting in KeePassXC's window for the vault.
+mac_kpxc() { (export DRIVE_WINDOW="$KPXC_WINDOW"; mac_osascript 120 "$MAC_DRIVER" "$@"); }
+
+# mac_kpxc_choose <pid> <combo box> <item>: clicks the combo box open and clicks the item in its list, as a person does,
+# and checks that the box then shows it. The list opens as a window with no title; its items are the box's own
+# children in the tree, after the box.
+mac_kpxc_choose() {
+  local pid="$1" shown i
+  for i in 1 2 3; do
+    mac_kpxc "$pid" click "$2" || return 1
+    mac_kpxc_listed "$pid" && break
+    [ "$i" != 3 ] || { echo "the list of '$2' did not open after three clicks"; return 1; }
+  done
+  mac_kpxc "$pid" click "$3" || return 1
+  shown="$(mac_kpxc "$pid" find "$3")" || { echo "$shown"; return 1; }
+  case "$shown" in
+    *' as AXComboBox') echo "$shown" ;;
+    *) echo "'$2' does not show '$3' after it was chosen: $shown; $(mac_kpxc "$pid" tree "after $3 was chosen")"; return 1 ;;
+  esac
+}
+
+# Whether a combo box's list, a KeePassXC window with no title, opens within 5 s.
+mac_kpxc_listed() {
+  local i
+  for i in $(seq 1 10); do
+    if mac_kpxc "$1" windows 2> /dev/null | grep -q '^$'; then return 0; fi
+    sleep 0.5
+  done
+  return 1
+}
+
+mac_keepassxc_kdf() {
+  local pid="$1" i
+  KPXC_WINDOW=''
+  for i in $(seq 1 60); do
+    KPXC_WINDOW="$(mac_kpxc "$pid" windows 2> /dev/null | grep -F "$VAULT_NAME" | head -n 1)"
+    [ -z "$KPXC_WINDOW" ] || break
+    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended before a window showed $VAULT_NAME"; return 1; }
+    sleep 0.5
+  done
+  [ -n "$KPXC_WINDOW" ] || { echo "no KeePassXC window showed $VAULT_NAME within 30 s: $(mac_kpxc "$pid" windows 2>&1 | tr '\n' ';')"; return 1; }
+  # A Qt combo box is named on macOS by the item it shows. keepassxc-cli's database is KDBX 3, whose one key derivation
+  # is AES-KDF, so the format becomes KDBX 4 first, whose first is Argon2d. A key derivation chosen from its list gets
+  # KeePassXC's defaults for it and a benchmark of its rounds, so Argon2id and back gives Argon2d those.
+  mac_kpxc "$pid" menu Database 'Database Security…' || return 1
+  mac_kpxc "$pid" invoke 'Encryption Settings' || return 1
+  mac_kpxc "$pid" invoke Advanced || return 1
+  mac_kpxc_choose "$pid" 'KDBX 3' 'KDBX 4 (recommended)' || return 1
+  mac_kpxc_choose "$pid" "$KPXC_ARGON2D" 'Argon2id (KDBX 4)' || return 1
+  # KeePassXC benchmarks the rounds for a second after each choice of key derivation.
+  sleep 3
+  mac_kpxc_choose "$pid" 'Argon2id (KDBX 4)' "$KPXC_ARGON2D" || return 1
+  sleep 3
+  mac_kpxc "$pid" invoke OK || return 1
+  # KeePassXC saves after every change unless told otherwise; Save Database is asked for once when it has not.
+  for i in $(seq 1 60); do
+    if kx db-info "$VAULT" 2> /dev/null | grep -q 'KDF: Argon2d'; then
+      echo "KeePassXC's Database Security set $KPXC_ARGON2D and saved $VAULT_NAME: $(kx db-info "$VAULT" 2>&1 | grep 'KDF')"
+      return 0
+    fi
+    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended before it saved the change"; return 1; }
+    [ "$i" != 20 ] || mac_kpxc "$pid" menu Database 'Save Database' || true
+    sleep 0.5
+  done
+  echo "$VAULT_NAME does not derive with Argon2d 30 s after OK: $(kx db-info "$VAULT" 2>&1 | grep 'KDF')"
+  return 1
 }
 
 # --- the child and its terminal -------------------------------------------------------------------
@@ -869,6 +979,10 @@ audit_answer() {
 act_first_run() {
   attempt keepassxc-vault keepassxc_vault || return 1
   attempt keepassxc-recent keepassxc_recent || return 1
+  if [ "$PLATFORM" = macos ]; then
+    fact keepassxc_argon2 "$(mac_keepassxc_argon2 2>&1 | tr -d "$CR" | tr '\n' ' ')"
+    fact database "$(kx db-info "$VAULT" 2>&1 | tr '\n' ' ')"
+  fi
   if [ "$PLATFORM" = linux ]; then attempt accessibility enable_accessibility || return 1; fi
   attempt launch app_launch || return 1
   attempt window drive window 120 || return 1
@@ -909,6 +1023,7 @@ act_project_run() {
   attempt tag drive set-named id:NewTag "env:$PROJECT" || return 1
   attempt add-tag drive invoke 'Add tag' || return 1
   saved tagged_ms confirm-tag drive invoke 'Add tag[2]' || return 1
+  # The sidebar's Projects is a heading that cannot be chosen; the project is the row beneath it.
   attempt projects drive select "$PROJECT" || return 1
   attempt key-row drive find "$FIELD" || return 1
   attempt directory drive set-named 'Project directory' "$(native "$RUN_DIR")" || return 1
@@ -937,6 +1052,7 @@ act_connect() {
   attempt agents shortcut 2 || return 1
   attempt offered drive wait "Connect $TOOL" 90 || return 1
   attempt connect drive invoke "Connect $TOOL" || return 1
+  # A TextBlock's accessible name is its text, so the plan is found by its automation id.
   attempt plan drive read id:ConnectPlan || return 1
   attempt run-it drive invoke 'Run it' || return 1
   attempt registered wait_registration 60 || return 1
@@ -982,11 +1098,11 @@ act_restore() {
   attempt actions drive toggle 'More actions' || return 1
   attempt history drive invoke id:HistoryToggle || return 1
   attempt revision drive select-nth id:Revisions 1 || return 1
-  # It carries the project tag the item has now, so Restore this writes it without first asking about projects (D-0415).
+  # That revision holds the item's project tags as they are, so Restore this writes it without asking first (D-0415).
   saved revision_ms restore-revision drive invoke id:RestoreRevision || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
-  # The item takes the whole of Items while its history is open, so the history is closed to bring the list back.
-  attempt history-closed drive invoke 'Hide history' || return 1
+  # An open history takes the whole view, so it is closed for the list to show again.
+  attempt hide-history drive invoke 'Hide history' || return 1
   # A deletion: the scratch item deleted, then restored from Trash.
   attempt choose-scratch drive select "$ENTRY_SCRATCH" || return 1
   attempt scratch-actions drive toggle 'More actions' || return 1
@@ -1010,8 +1126,8 @@ act_restore() {
   for file in ${BACKUPS[@]+"${BACKUPS[@]}"}; do
     if [ "$(fingerprint "$(native "$file")")" = "$(fact_of "$OUT" restore fingerprint_after)" ]; then fact backup_match "$(basename "$file")"; fi
   done
-  # The restore hands the backup's password on, so the restored vault opens without another unlock.
-  attempt reopened drive wait 'Lock now' 120 || return 1
+  # The check unlocked the backup with its password, so the restored vault opens without asking again.
+  attempt reopened drive wait 'Lock now' 60 || return 1
 }
 
 act_change_access() {
