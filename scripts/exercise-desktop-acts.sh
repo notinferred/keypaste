@@ -632,9 +632,15 @@ keepassxc_create() {
   printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$maker/keepassxc.ini"
   "$gui" --config "$(native "$maker/keepassxc.ini")" --localconfig "$(native "$maker/keepassxc-local.ini")" > "$maker/keepassxc.log" 2>&1 &
   pid=$!
-  KPXC_PID="$(cat "/proc/$pid/winpid")"
+  # Until Git Bash's fork has started KeePassXC, the process's Windows pid is the fork's.
+  for _ in $(seq 1 120); do
+    KPXC_PID="$(cat "/proc/$pid/winpid" 2> /dev/null || true)"
+    tasklist //FI "PID eq ${KPXC_PID:-0}" //FO CSV //NH 2> /dev/null | grep -qi '"KeePassXC.exe"' && break
+    sleep 0.25
+  done
   DRIVE_TREE_DIR="$(native "$OUT")"
   export DRIVE_TREE_DIR
+  # shellcheck disable=SC2154 # kpxc.sh sets pw.
   if kpxc_drive KeePassXC window 60 && kpxc_drive KeePassXC invoke 'Create Database' \
     && kpxc_drive "$wizard" invoke Continue && kpxc_drive "$wizard" invoke Continue \
     && kpxc_drive "$wizard" focus 'Password field' && kpxc_drive "$wizard" type "$pw" \
