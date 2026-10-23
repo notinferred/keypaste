@@ -75,6 +75,10 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     /// <summary>The title as the list draws it.</summary>
     internal string DisplayTitle => EntryNameSanitizer.Sanitize(Title).Text;
 
+    /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
+    /// <returns>When it was current and its scrubbed title, as the row draws them.</returns>
+    public override string ToString() => $"{When}, {DisplayTitle}";
+
     /// <summary>The username this revision held, as the pane draws it.</summary>
     internal string DisplayUsername =>
         DisplayTextSanitizer.Sanitize(_username, DisplayTextSanitizer.MaximumLength).Text;

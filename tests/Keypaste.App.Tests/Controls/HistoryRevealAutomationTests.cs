@@ -116,6 +116,20 @@ public sealed class HistoryRevealAutomationTests
     });
 
     /// <summary>
+    /// A screen reader names each revision in the list by when it was current and its title.
+    /// </summary>
+    [Fact]
+    public Task Each_revision_in_the_list_is_named_by_its_time_and_title() => HeadlessSession.On(() =>
+    {
+        using var screen = new HistoryScreen();
+
+        var revision = screen.History.Rows[0];
+        var item = screen.Window.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext == revision);
+
+        Assert.Equal($"{revision.When}, github", ControlAutomationPeer.CreatePeerForElement(item).GetName());
+    });
+
+    /// <summary>
     /// Leaving the screen while holding takes the value with it.
     /// </summary>
     /// <remarks>
