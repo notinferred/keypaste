@@ -608,7 +608,7 @@ keepassxc_vault() {
 # KeePassXC opens the database once and closes as a person does, which leaves it in its recent databases where it
 # always keeps them (src/core/Config.cpp), as verify-keepassxc-first-run.sh has it do on a runner.
 keepassxc_recent() {
-  local gui roaming local_ini pid
+  local gui roaming local_ini pid tmp
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
   case "$PLATFORM" in
     windows)
@@ -627,13 +627,17 @@ keepassxc_recent() {
       ;;
   esac
   [ ! -e "$local_ini" ] || { echo "KeePassXC's $local_ini already exists, so the first run would offer what it lists"; return 1; }
-  mkdir -p "$(dirname "$roaming")"
+  mkdir -p "$(dirname "$roaming")" "$OUT/keepassxc-tmp"
   printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$roaming"
-  printf '%s\n' "$pw" | "$gui" --pw-stdin "$(native "$VAULT")" > "$OUT/keepassxc.log" 2>&1 &
+  tmp="$(native "$OUT/keepassxc-tmp")"
+  # Its own user name and temporary folder, as verify-keepassxc-first-run.sh gives it; the last in the pipeline, so
+  # $! is KeePassXC's own process.
+  printf '%s\n' "$pw" | USER="keypaste-acts-$$" USERNAME="keypaste-acts-$$" TMPDIR="$OUT/keepassxc-tmp" TMP="$tmp" TEMP="$tmp" \
+    "$gui" --pw-stdin "$(native "$VAULT")" > "$OUT/keepassxc.log" 2>&1 &
   pid=$!
   for _ in $(seq 1 120); do
     if [ -f "$local_ini" ] && grep -q "LastDatabases=.*$VAULT_NAME" "$local_ini"; then break; fi
-    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC exited before opening $VAULT_NAME: $(cat "$OUT/keepassxc.log")"; return 1; }
+    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC exited before opening $VAULT_NAME: $(cat "$OUT/keepassxc.log")$(crash_report)"; return 1; }
     sleep 0.5
   done
   grep -q "LastDatabases=.*$VAULT_NAME" "$local_ini" 2> /dev/null || {
@@ -642,10 +646,18 @@ keepassxc_recent() {
     return 1
   }
   sleep 2
+  kill -0 "$pid" 2> /dev/null || { echo "KeePassXC opened $VAULT_NAME and exited before it was closed$(crash_report)"; return 1; }
   close_keepassxc "$pid" || return 1
   grep -q '^LastOpenedDatabases=' "$local_ini" || { echo "KeePassXC closed without writing LastOpenedDatabases to $local_ini"; return 1; }
   fact keepassxc_recent "$(grep '^Last' "$local_ini" | tr '\n' ' ')"
   echo "KeePassXC opened $VAULT_NAME and closed, leaving it in $local_ini"
+}
+
+# What Windows recorded of the newest program that crashed, naming its faulting module; nothing elsewhere.
+crash_report() {
+  [ "$PLATFORM" = windows ] || return 0
+  # shellcheck disable=SC2016 # PowerShell expands its own variables, not bash.
+  printf '; Windows recorded: %s' "$(powershell -NoProfile -Command 'Get-WinEvent -FilterHashtable @{LogName = "Application"; ProviderName = "Application Error"} -MaxEvents 1 -ErrorAction SilentlyContinue | ForEach-Object { $_.TimeCreated.ToString("o") + " " + ($_.Message -replace "\s+", " ") }' | tr -d "$CR")"
 }
 
 close_keepassxc() {
