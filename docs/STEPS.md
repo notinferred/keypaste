@@ -39,7 +39,7 @@ Package managers and agent marketplaces carry a version only after it is publish
     5. Connect a client without a vault path, and approve and deny its requests.
     6. Restore a revision, a deletion and a backup.
     7. Change access.
-    8. Lock, and see later releases refused as `vault-locked`.
+    8. Lock, and see a later request refused: recorded `denied` and `no-approver`, and the agent told the vault is locked in the app (D-0466).
   - Each act records the OS and version, the package and its hash, the commit and its audit lines.
   - On the Mac and the PC, time an unlock and a save, which derive with the libargon2 the packages carry there ([F.66](steps/F.66.md), D-0522).
   - An unreached act leaves the row open.

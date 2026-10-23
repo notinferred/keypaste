@@ -9,6 +9,7 @@ Usage: bash scripts/dev.sh [--tools] [--wait]
        bash scripts/dev.sh --class FQN [--os O] [--wait]
        bash scripts/dev.sh --profile P [--os O] [--wait]
        bash scripts/dev.sh --relock
+       bash scripts/dev.sh --acts APP_RUN_ID [--os O] [--wait]
 
 Pushes the current branch and follows GitHub's verdict on it. Needs only git and gh; nothing builds
 on this machine.
@@ -24,7 +25,9 @@ The first failure ends the wait with that job's log; the runs carry on until the
 --class   a fully qualified test class, run through dev.yml in its own project
 --profile one verify.sh profile, backend, integration, desktop or desktop-gates, run through dev.yml, to retry a
           failure only one runner showed
---os      the runner for --class or --profile: linux (default), windows, macos or all
+--acts    install a successful app.yml run's packages, built at any commit, through install-desktop.yml, and do
+          the install exercise and R.1a's acts with this branch's scripts; never evidence
+--os      the runner for --class, --profile or --acts: linux (default), windows, macos or all
 --wait    wait for every job and print each failed one's log, rather than stopping at the first
 --relock  regenerate the lock files of the pushed commit with the CI SDK, build nothing, and write
           the ones that changed into this tree to review and commit
@@ -34,7 +37,7 @@ USAGE
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 die() { echo "dev: $1" >&2; exit 1; }
 
-class='' profile='' os='' relock=false wait_all=false tools=false linux=false
+class='' profile='' os='' acts='' relock=false wait_all=false tools=false linux=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
@@ -42,12 +45,13 @@ while [ "$#" -gt 0 ]; do
     --linux) linux=true ;;
     --tools) tools=true ;;
     --wait) wait_all=true ;;
-    --class|--profile|--os)
+    --class|--profile|--os|--acts)
       [ "$#" -ge 2 ] || bad_usage "$1 needs a value"
       case "$1" in
         --class) class="$2" ;;
         --profile) profile="$2" ;;
         --os) os="$2" ;;
+        --acts) acts="$2" ;;
       esac
       shift
       ;;
@@ -57,7 +61,10 @@ while [ "$#" -gt 0 ]; do
 done
 [ "$linux" = false ] || { [ -z "$class" ] && [ -z "$os" ] && [ "$relock" = false ] && [ "$tools" = false ]; } \
   || bad_usage '--linux is a run of its own; it cannot accompany --class, --os, --relock or --tools'
-[ -z "$os" ] || [ -n "$class" ] || [ -n "$profile" ] || bad_usage '--os chooses the runner for --class or --profile'
+[ -z "$os" ] || [ -n "$class" ] || [ -n "$profile" ] || [ -n "$acts" ] || bad_usage '--os chooses the runner for --class, --profile or --acts'
+[ -z "$acts" ] || { [ -z "$class" ] && [ -z "$profile" ] && [ "$relock" = false ] && [ "$linux" = false ] && [ "$tools" = false ]; } \
+  || bad_usage '--acts is a run of its own; it cannot accompany --class, --profile, --linux, --relock or --tools'
+case "$acts" in *[!0-9]*) bad_usage "--acts takes an app.yml run ID, not $acts" ;; esac
 [ -z "$profile" ] || { [ -z "$class" ] && [ "$relock" = false ] && [ "$linux" = false ] && [ "$tools" = false ]; } \
   || bad_usage '--profile is a run of its own; it cannot accompany --class, --linux, --relock or --tools'
 case "$profile" in ''|backend|integration|desktop|desktop-gates) ;; *) bad_usage "unknown --profile $profile" ;; esac
@@ -75,6 +82,7 @@ mode=''
 [ "$relock" = false ] || mode=relock
 [ "$linux" = false ] || mode=linux
 [ -z "$profile" ] || mode=profile
+[ -z "$acts" ] || mode=acts
 
 branch="$(git symbolic-ref --short -q HEAD)" || die 'HEAD is detached; check out a branch'
 [ "$branch" != main ] || die 'refusing to run on main; work on a branch'
@@ -87,7 +95,11 @@ sha="$(git rev-parse HEAD)"
 runs=()
 if [ -n "$mode" ]; then
   nonce="$(date +%s)-$$"
-  gh workflow run dev.yml --ref "$branch" -f mode="$mode" -f filter_class="$class" -f profile="$profile" -f os="$runner" -f nonce="$nonce"
+  # Only acts mode names app_run, so a branch whose dev.yml predates it still takes the other modes.
+  acts_input=()
+  [ -z "$acts" ] || acts_input=(-f app_run="$acts")
+  gh workflow run dev.yml --ref "$branch" -f mode="$mode" -f filter_class="$class" -f profile="$profile" -f os="$runner" -f nonce="$nonce" \
+    ${acts_input[@]+"${acts_input[@]}"}
   found='' tries=0
   while [ -z "$found" ] && [ "$tries" -lt 30 ]; do
     sleep 3
@@ -122,6 +134,7 @@ else
 fi
 for id in "${runs[@]}"; do gh run view "$id" --json url --jq .url; done
 [ "$linux" = false ] || echo 'linux mode leaves out compat, keepassxc workflows, keepassxc first run, tools and every windows-2025 and macos-15 job, packages included'
+[ -z "$acts" ] || echo "acts mode installs app run $acts's packages, whatever commit built them; each job's summary and its acts-dev-<rid> artifact hold the verdicts, which are never evidence"
 
 # The end of a finished job's log, read while the run goes on, which gh run view refuses. Its colours and
 # other control characters are dropped, and with them the timestamps and the runner's cleanup.

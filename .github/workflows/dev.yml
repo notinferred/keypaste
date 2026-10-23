@@ -3,6 +3,9 @@ name: dev
 # K.6a, K.6c, F.66: runs one test class, one verify.sh profile on one runner, regenerates the lock files, or runs ci.yml's
 # and app.yml's Linux jobs on a pushed branch so the founder's machine never has to; scripts/dev.sh dispatches it. It is never a release gate or integration
 # evidence, so no dev run stands in for a full ci or app run (D-0383, D-0460).
+#
+# R.1a: acts mode installs an existing app.yml run's packages, at any commit, through install-desktop.yml and performs
+# the install exercise and R.1a's acts with this branch's scripts, to iterate on them without a new package build.
 
 on:
   workflow_dispatch:
@@ -19,17 +22,21 @@ on:
         type: choice
         options: [ubuntu-24.04, windows-2025, macos-15, all]
         default: ubuntu-24.04
+      app_run:
+        description: The successful app.yml run whose packages acts mode installs
+        type: string
+        default: ''
       nonce:
         description: Lets scripts/dev.sh find the run it dispatched
         type: string
         default: ''
       mode:
-        description: class runs filter_class, profile runs profile, linux runs ci.yml's and app.yml's Linux jobs, relock regenerates the lock files
+        description: class runs filter_class, profile runs profile, linux runs ci.yml's and app.yml's Linux jobs, relock regenerates the lock files, acts installs app_run's packages and performs R.1a's acts
         type: choice
-        options: [class, profile, linux, relock]
+        options: [class, profile, linux, relock, acts]
         default: class
 
-run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.filter_class }}${{ inputs.profile }} ${{ inputs.os }} ${{ inputs.nonce }}
+run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.filter_class }}${{ inputs.profile }}${{ inputs.app_run }} ${{ inputs.os }} ${{ inputs.nonce }}
 
 permissions:
   contents: read
@@ -187,3 +194,18 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+
+  # install-desktop.yml's install exercise and R.1a's acts on app_run's packages, with this branch's scripts (R.1a).
+  acts:
+    name: acts
+    if: inputs.mode == 'acts'
+    uses: ./.github/workflows/install-desktop.yml
+    with:
+      app_run_id: ${{ inputs.app_run }}
+      rehearsal: true
+      dev: true
+      runner: ${{ inputs.os }}
+    permissions:
+      contents: read
+      actions: read
+      attestations: read

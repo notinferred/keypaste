@@ -237,6 +237,7 @@ selftests=(
   'scripts/verify-clipboard-markers.sh --selftest'
   'scripts/exercise-desktop-install.sh --selftest'
   'scripts/exercise-desktop-upgrade.sh --selftest'
+  'scripts/exercise-desktop-acts.sh --selftest'
 )
 
 check_scripts() {
@@ -307,7 +308,7 @@ profile_workflows() {
   run env MSYS_NO_PATHCONV=1 docker run --rm -v "$root:/repo:ro" -w /repo --entrypoint shellcheck \
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
     scripts/verify.sh scripts/verify-clipboard-markers.sh \
-    scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
+    scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh scripts/exercise-desktop-acts.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh scripts/build-argon2.sh \
     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh \
     scripts/lib/*.sh packaging/macos/keypaste-launch.command
