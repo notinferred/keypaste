@@ -434,17 +434,16 @@ out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/filled.kdbx" -- "$ch
 grep -qF -- '-c1b' "$dir/filled.err" && die "keypaste run printed a value: $(cat "$dir/filled.err")"
 
 step "P.3b1: values using KeePassXC's \\{…\\} escape reach the child as KeePassXC 2.7.11 gives them, nothing in an escape filled in"
-escaped_keys=(ESCAPED_WHOLE ESCAPED_FIELD ESCAPED_GROUP ESCAPED_PART)
+escaped_keys=(ESCAPED_WHOLE ESCAPED_FIELD ESCAPED_PART)
 escape="<Entry><UUID>$(uuid fescape)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Escape</Value></String>"
 escape+='<String><Key>Password</Key><Value ProtectInMemory="True">escape-login-c1b</Value></String>'
 escape+='<String><Key>ESCAPED_WHOLE</Key><Value ProtectInMemory="True">\{PASSWORD\}</Value></String>'
 escape+='<String><Key>ESCAPED_FIELD</Key><Value ProtectInMemory="True">x{S:ESCAPED_WHOLE}y</Value></String>'
-escape+='<String><Key>ESCAPED_GROUP</Key><Value ProtectInMemory="True">{\{S:ESCAPED_WHOLE\}}</Value></String>'
 escape+='<String><Key>ESCAPED_PART</Key><Value ProtectInMemory="True">a\{PASSWORD\}</Value></String></Entry>'
 make_fields escaped "$escape" 'db-c1b' ''
 # What Entry::resolveMultiplePlaceholdersRecursive gives each key from KeePassXC 2.7.11 on, one per line.
-escaped_expected=$'{PASSWORD}\nx{PASSWORD}y\n{{S:ESCAPED_WHOLE}}\na\\{PASSWORD\\}'
-out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/escaped.kdbx" -- "$child" -c 'printf "%s\n" "${ESCAPED_WHOLE-unset}" "${ESCAPED_FIELD-unset}" "${ESCAPED_GROUP-unset}" "${ESCAPED_PART-unset}"' 2>"$dir/escaped.err" | tr -d '\r') \
+escaped_expected=$'{PASSWORD}\nx{PASSWORD}y\na\\{PASSWORD\\}'
+out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/escaped.kdbx" -- "$child" -c 'printf "%s\n" "${ESCAPED_WHOLE-unset}" "${ESCAPED_FIELD-unset}" "${ESCAPED_PART-unset}"' 2>"$dir/escaped.err" | tr -d '\r') \
   || die "keypaste run failed on values using the escape: $(cat "$dir/escaped.err")"
 [ "$out" = "$escaped_expected" ] || die "the child got the escaped values as: ${out}"
 grep -qF -- '-c1b' "$dir/escaped.err" && die "keypaste run printed a value: $(cat "$dir/escaped.err")"
@@ -452,7 +451,8 @@ shown=$(for key in "${escaped_keys[@]}"; do kx show "$dir/escaped.kdbx" services
   || die "keepassxc-cli could not show the escaped values"
 kpxc_version=$("$cli" --version | tr -d '\r')
 [[ $kpxc_version =~ ([0-9]+)\.([0-9]+)\.([0-9]+) ]] || die "keepassxc-cli --version printed no version: ${kpxc_version}"
-if (( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] >= 20711 )); then
+kpxc_number=$((BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3]))
+if ((kpxc_number >= 20711)); then
   [ "$shown" = "$escaped_expected" ] || die "keepassxc-cli ${kpxc_version} shows the escaped values as: ${shown}"
   printf '    keepassxc-cli %s and keypaste give each escaped value alike\n' "$kpxc_version"
 else
@@ -460,6 +460,19 @@ else
     && die "keepassxc-cli ${kpxc_version} reads the \\{…\\} escape, which KeePassXC does only from 2.7.11"
   printf '    keepassxc-cli %s predates the %s escape (2.7.11), so keypaste is held to what 2.7.11 gives\n' "$kpxc_version" '\{…\}'
 fi
+
+step "P.3b1: an escape or placeholder inside braces that name no placeholder is refused, which KeePassXC 2.7.11 and 2.8 give differently"
+differs='which KeePassXC 2.7 and 2.8 fill in differently inside braces that name no placeholder (services/Database)'
+refused nested-escape "DATABASE_URL holds the KeePass placeholder \\{…\\}, ${differs}" '' '{\{PASSWORD\}}' ''
+refused nested-placeholder "DATABASE_URL holds the KeePass placeholder {PASSWORD}, ${differs}" '' 'x{{PASSWORD}}y' ''
+shown=$(kx show "$dir/nested-escape.kdbx" services/Database -a DATABASE_URL) || die "keepassxc-cli could not show the nested escape"
+# 2.7.11 fills in the escape inside, and 2.8 classifies the inside again and leaves the braces as written.
+if ((kpxc_number >= 20800)); then
+  [ "$shown" = '{\{PASSWORD\}}' ] || die "keepassxc-cli ${kpxc_version} shows {\\{PASSWORD\\}} as ${shown}, not as written"
+elif ((kpxc_number >= 20711)); then
+  [ "$shown" = '{{PASSWORD}}' ] || die "keepassxc-cli ${kpxc_version} shows {\\{PASSWORD\\}} as ${shown}, not with its escape made braces"
+fi
+printf '    keepassxc-cli %s shows %s as %s\n' "$kpxc_version" '{\{PASSWORD\}}' "$shown"
 
 step "C.5b: under the default exposure an agent lists the tagged entries with their variables and tags, gets a variable, never a password, and runs billing from services/"
 exposed="$dir/exposed.kdbx"

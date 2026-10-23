@@ -549,8 +549,16 @@ unlock_with() { drive focus id:Password && drive type "$1" && drive key Return &
 # The vault the app chose for agents and the CLI: app.toml's vault, whose line ends in a comment and whose value holds
 # no quote or backslash (TomlWriter).
 chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1; }
-# The project's page, from the row the tag added to the sidebar during the session (F.68).
-open_project() { drive select "$PROJECT"; }
+# The project's page, from its row in the sidebar. Linux's AT-SPI (Avalonia 12.1) keeps a list's rows as it first
+# listed them, so the row the tag added is not among them there; it is reached as from the keyboard instead: the
+# Items row clicked, End to Agents, the last row, and Up to the project's row above it.
+open_project() {
+  if [ "$PLATFORM" = linux ]; then
+    drive click Items && drive key End && drive key Up && drive wait 'Project directory' 30
+  else
+    drive select "$PROJECT"
+  fi
+}
 
 # --- the vault through the CLI --------------------------------------------------------------------
 

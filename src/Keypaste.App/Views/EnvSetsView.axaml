@@ -658,15 +658,15 @@
                     <TextBlock Classes="section" Text="{Binding AddEntryTitle}" />
                     <TextBox Text="{Binding EntryFilter}" PlaceholderText="Find an item by its path" Width="420"
                              HorizontalAlignment="Left" AutomationProperties.Name="Find an item" />
-                    <ctl:AccessibleListBox Name="EntryCandidates" ItemsSource="{Binding EntryCandidates}" SelectedItem="{Binding ChosenEntry}"
-                                           MaxHeight="240" Width="420" HorizontalAlignment="Left"
-                                           AutomationProperties.Name="Items you can add">
+                    <ListBox Name="EntryCandidates" ItemsSource="{Binding EntryCandidates}" SelectedItem="{Binding ChosenEntry}"
+                             MaxHeight="240" Width="420" HorizontalAlignment="Left"
+                             AutomationProperties.Name="Items you can add">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:EnvEntryCandidate">
                           <TextBlock Classes="mono" Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
                         </DataTemplate>
                       </ListBox.ItemTemplate>
-                    </ctl:AccessibleListBox>
+                    </ListBox>
                     <TextBlock Classes="caption" Text="{Binding CandidateNote}" IsVisible="{Binding CandidateNote.Length}" />
                     <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddEntryCommand}"
                             IsVisible="{Binding !IsConfirmingTagChange}" HorizontalAlignment="Left" />

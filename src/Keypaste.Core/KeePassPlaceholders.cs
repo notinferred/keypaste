@@ -10,9 +10,11 @@ namespace Keypaste.Core;
 /// Any other text in braces, such as a JSON value or <c>${HOME}</c>, is text, and so is an unclosed brace.
 /// </para>
 /// <para>
-/// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it (D-0519): a value,
-/// a field filled into one, or the inside of braces naming no placeholder, wholly wrapped in <c>\{</c> and
-/// <c>\}</c>, fills in as itself with those two made braces, and nothing in it is filled in or refused.
+/// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it (D-0519): a value
+/// or a field filled into one, wholly wrapped in <c>\{</c> and <c>\}</c>, fills in as itself with those two made
+/// braces, and nothing in it is filled in or refused. A placeholder or escape inside braces that name no
+/// placeholder, such as <c>{x{PASSWORD}y}</c> or <c>{\{PASSWORD\}}</c>, refuses the value, because KeePassXC 2.7.11
+/// fills in that inside and 2.8 leaves it as written or drops the braces (D-0529).
 /// </para>
 /// <para>
 /// <c>{TITLE}</c>, <c>{USERNAME}</c>, <c>{PASSWORD}</c>, <c>{URL}</c>, <c>{NOTES}</c> and <c>{S:…}</c> fill in
@@ -44,6 +46,7 @@ public static class KeePassPlaceholders
     private const string _loops = "leads back to itself";
     private const string _deep = "nests more than 10 deep";
     private const string _long = "fills it past 1 MiB";
+    private const string _differs = "KeePassXC 2.7 and 2.8 fill in differently inside braces that name no placeholder";
 
     private static readonly char[] _braces = ['{', '}'];
 
@@ -64,6 +67,8 @@ public static class KeePassPlaceholders
     ];
 
     private static readonly string[] _unfilledPrefixes = ["REF:", "URL:", "T-CONV:", "T-REPLACE-RX:"];
+
+    private static readonly Placeholder _escape = new(@"\{…\}", null);
 
     /// <summary>Whether a value holds any placeholder, filled in or not, or an escape: whether it leaves keypaste other than as it is held.</summary>
     /// <param name="value">The value.</param>
@@ -121,7 +126,8 @@ public static class KeePassPlaceholders
         foreach (var placeholder in Scan(value).Select(token => token.Placeholder).OfType<Placeholder>())
         {
             var shown = placeholder.Shown(fields);
-            var refused = placeholder.Field is not { } named ? _notFilled
+            var refused = placeholder.Refused is { } why ? why
+                : placeholder.Field is not { } named ? _notFilled
                 : fields.Value(named) is null ? Unreadable(named, fields)
                 : string.Equals(named, field, StringComparison.Ordinal) ? _loops
                 : null;
@@ -162,9 +168,8 @@ public static class KeePassPlaceholders
     /// converting, is a placeholder keypaste does not fill in, so the value is refused rather than half filled.
     /// </para>
     /// <para>
-    /// A text wholly wrapped in <c>\{</c> and <c>\}</c> is one escape and holds nothing else. Braces whose inside
-    /// is wholly one, such as <c>{\{PASSWORD\}}</c>, are a placeholder KeePassXC does not know, whose inside it
-    /// fills in as it fills in a value, so that inside is an escape too.
+    /// A text wholly wrapped in <c>\{</c> and <c>\}</c> is one escape and holds nothing else. A placeholder or
+    /// escape inside <see cref="Groups"/> refuses the value, whatever it would fill in.
     /// </para>
     /// </remarks>
     private static IEnumerable<Token> Scan(string text)
@@ -175,6 +180,28 @@ public static class KeePassPlaceholders
             yield break;
         }
 
+        var groups = Groups(text);
+        var group = 0;
+
+        foreach (var token in Tokens(text))
+        {
+            while (group < groups.Count && groups[group].Close < token.Open)
+            {
+                group++;
+            }
+
+            yield return group < groups.Count && groups[group].Open < token.Open
+                ? token with { Placeholder = (token.Placeholder ?? _escape) with { Refused = _differs } }
+                : token;
+        }
+    }
+
+    /// <summary>Each placeholder and escape in a text that is not wholly an escape, left to right, wherever it sits.</summary>
+    /// <remarks>
+    /// Braces whose inside is wholly an escape, such as <c>{\{PASSWORD\}}</c>, give that inside as an escape.
+    /// </remarks>
+    private static IEnumerable<Token> Tokens(string text)
+    {
         for (var open = text.IndexOf('{', StringComparison.Ordinal); open >= 0;)
         {
             if (EscapeInside(text, open) is { } close)
@@ -209,6 +236,62 @@ public static class KeePassPlaceholders
 
             open = text.IndexOf('{', next + 1);
         }
+    }
+
+    /// <summary>
+    /// The braces KeePassXC's pattern matches, left to right, that hold another brace and name no placeholder: those
+    /// whose inside 2.7.11 fills in and 2.8 does not. A <c>{S:…}</c> names a field by all its inside in both.
+    /// </summary>
+    /// <remarks>
+    /// The pattern matches from an opening brace to its partner when no pair between them, itself included, is empty,
+    /// and goes on after the partner, or after the opening brace when it does not match. Each brace's partner and
+    /// each empty pair are found once, so a value of a million braces is read in one pass.
+    /// </remarks>
+    private static List<(int Open, int Close)> Groups(string text)
+    {
+        List<(int Open, int Close)> groups = [];
+
+        if (text.IndexOf('{', StringComparison.Ordinal) < 0)
+        {
+            return groups;
+        }
+
+        var partners = new Dictionary<int, int>();
+        var opens = new Stack<int>();
+        var empties = new int[text.Length + 1];
+
+        for (var at = 0; at < text.Length; at++)
+        {
+            empties[at + 1] = empties[at] + (text[at] == '}' && at > 0 && text[at - 1] == '{' ? 1 : 0);
+
+            if (text[at] == '{')
+            {
+                opens.Push(at);
+            }
+            else if (text[at] == '}' && opens.Count > 0)
+            {
+                partners[opens.Pop()] = at;
+            }
+        }
+
+        for (var open = text.IndexOf('{', StringComparison.Ordinal); open >= 0;)
+        {
+            if (partners.TryGetValue(open, out var close) && empties[close + 1] == empties[open + 1])
+            {
+                if (text.IndexOf('{', open + 1, close - open - 1) >= 0 && !text.AsSpan(open + 1).StartsWith(_named, StringComparison.Ordinal))
+                {
+                    groups.Add((open, close));
+                }
+
+                open = text.IndexOf('{', close + 1);
+            }
+            else
+            {
+                open = text.IndexOf('{', open + 1);
+            }
+        }
+
+        return groups;
     }
 
     /// <summary>Whether a text is wholly KeePassXC's escape, starting <c>\{</c> and ending <c>\}</c>.</summary>
@@ -307,7 +390,8 @@ public static class KeePassPlaceholders
     /// <summary>One placeholder as written.</summary>
     /// <param name="Keyword">How it is shown, or null for a <c>{S:…}</c>, whose field is named only when its item has one by that name.</param>
     /// <param name="Field">The field it fills in from, matched exactly, or null when keypaste does not fill it in.</param>
-    private sealed record Placeholder(string? Keyword, string? Field)
+    /// <param name="Refused">Why it refuses the value wherever it sits, or null when that depends on its field.</param>
+    private sealed record Placeholder(string? Keyword, string? Field, string? Refused = null)
     {
         /// <summary>How a refusal or a prompt shows it.</summary>
         /// <param name="fields">The item's fields, or null when they were not read.</param>
@@ -389,6 +473,11 @@ public static class KeePassPlaceholders
 
         private FilledText? Resolve(Placeholder placeholder, int level)
         {
+            if (placeholder.Refused is { } why)
+            {
+                return Refuse(placeholder, why);
+            }
+
             if (placeholder.Field is not { } field)
             {
                 return Refuse(placeholder, _notFilled);

@@ -4,6 +4,12 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The idle warning now gives a screen reader its first line, "Locking in 30 seconds.", once per warning, as an earlier entry said it did; Avalonia had named it by its ticking text, a new name each second ([F.68](docs/steps/F.68.md)).
+
+A value with a KeePass placeholder or escape inside braces that name no placeholder, such as `{x{PASSWORD}y}` or `{\{PASSWORD\}}`, is now refused and named, as `{REF:…}` is, because KeePassXC 2.7.11 fills in that inside and 2.8 does not ([F.68](docs/steps/F.68.md)).
+
+On Linux, the first run now also offers the databases KeePassXC 2.8 last opened, which it keeps in `~/.local/state/keepassxc` rather than `~/.cache/keepassxc` ([F.68](docs/steps/F.68.md)).
+
 `keypaste doctor` now says which Argon2 derives your vault keys: the `argon2.dll` or `libargon2.1.dylib` beside `keypaste` on Windows and macOS, or the system's libargon2 on Linux. When the file is missing or does not work, or Linux has none, it says that unlocking and saving take longer and what to do ([F.67](docs/steps/F.67.md)).
 
 A screen reader now names each revision in an item's History by when it was current and its title, rather than by an internal type name ([R.1a](docs/steps/R.1a.md)).

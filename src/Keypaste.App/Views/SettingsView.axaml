@@ -341,12 +341,12 @@
                   <TextBlock Classes="row-label" Text="Theme" />
                   <TextBlock Classes="caption" Text="System follows the operating system's light or dark setting." />
                 </StackPanel>
-                <ctl:AccessibleListBox Grid.Column="1"
-                                       Name="ThemeChoice"
-                                       Classes="segmented"
-                                       VerticalAlignment="Center"
-                                       ItemsSource="{Binding Themes}"
-                                       SelectedItem="{Binding Theme}" />
+                <ListBox Grid.Column="1"
+                         Name="ThemeChoice"
+                         Classes="segmented"
+                         VerticalAlignment="Center"
+                         ItemsSource="{Binding Themes}"
+                         SelectedItem="{Binding Theme}" />
               </Grid>
             </Border>
           </StackPanel>

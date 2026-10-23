@@ -138,17 +138,17 @@
       <Grid ColumnDefinitions="*,10,*">
         <StackPanel Grid.Column="0" Spacing="6">
           <TextBlock Classes="label" Text="Expires" />
-          <ctl:AccessibleListBox x:Name="Expires"
-                                 Classes="segmented choice"
-                                 ItemsSource="{Binding TtlChoices}"
-                                 SelectedItem="{Binding Ttl}" />
+          <ListBox x:Name="Expires"
+                   Classes="segmented choice"
+                   ItemsSource="{Binding TtlChoices}"
+                   SelectedItem="{Binding Ttl}" />
         </StackPanel>
         <StackPanel Grid.Column="2" Spacing="6">
           <TextBlock Classes="label" Text="Views" />
-          <ctl:AccessibleListBox x:Name="Views"
-                                 Classes="segmented choice"
-                                 ItemsSource="{Binding ViewChoices}"
-                                 SelectedItem="{Binding Views}" />
+          <ListBox x:Name="Views"
+                   Classes="segmented choice"
+                   ItemsSource="{Binding ViewChoices}"
+                   SelectedItem="{Binding Views}" />
         </StackPanel>
       </Grid>
 

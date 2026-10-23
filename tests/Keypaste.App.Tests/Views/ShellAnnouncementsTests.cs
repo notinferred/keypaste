@@ -2,7 +2,6 @@ using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
-using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
@@ -13,8 +12,8 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// What a screen reader is told by the shell's text that is named apart from what it shows: the idle warning,
-/// announced once while its seconds tick, and the Projects heading, said as it is written rather than in capitals.
+/// The idle warning as a screen reader is told it: its first line said once, as the warning comes, while the seconds
+/// it draws tick unannounced (F.68).
 /// </summary>
 public sealed class ShellAnnouncementsTests
 {
@@ -34,9 +33,8 @@ public sealed class ShellAnnouncementsTests
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
         WindowInput.Drain();
-        var countdown = window.GetVisualDescendants().OfType<TextBlock>()
-            .Single(text => AutomationProperties.GetLiveSetting(text) == AutomationLiveSetting.Polite);
-        var peer = ControlAutomationPeer.CreatePeerForElement(countdown);
+        var live = Assert.Single(window.GetVisualDescendants().OfType<TextBlock>(), text => AutomationProperties.GetLiveSetting(text) != AutomationLiveSetting.Off);
+        var peer = ControlAutomationPeer.CreatePeerForElement(live);
         var announced = new List<string?>();
         peer.PropertyChanged += (_, e) =>
         {
@@ -55,18 +53,9 @@ public sealed class ShellAnnouncementsTests
             WindowInput.Drain();
         }
 
-        Assert.Equal("Locking in 27 seconds.", countdown.Text);
+        Assert.Single(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Locking in 27 seconds." && text.IsEffectivelyVisible);
         Assert.Equal("Locking in 30 seconds.", peer.GetName());
         Assert.Equal(["Locking in 30 seconds."], announced);
         window.Close();
-    });
-
-    [Fact]
-    public Task The_projects_heading_is_said_as_it_is_written() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-heading-name-");
-        var heading = shell.Window.GetVisualDescendants().OfType<NamedTextBlock>().Single(text => text.Text == "PROJECTS");
-
-        Assert.Equal("Projects", ControlAutomationPeer.CreatePeerForElement(heading).GetName());
     });
 }

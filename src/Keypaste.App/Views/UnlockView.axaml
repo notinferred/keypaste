@@ -293,11 +293,11 @@
             <!-- With no recent vault, the databases KeePassXC last opened come first (N.2). -->
             <StackPanel Spacing="6" IsVisible="{Binding OffersKeePassXc}">
               <TextBlock Classes="th" Text="KEEPASSXC LAST OPENED" Margin="10,0" />
-              <ctl:AccessibleListBox x:Name="KeePassXcList"
-                                     Classes="recent"
-                                     ItemsSource="{Binding KeePassXc}"
-                                     SelectedItem="{Binding SelectedKeePassXc}"
-                                     MaxHeight="180">
+              <ListBox x:Name="KeePassXcList"
+                       Classes="recent"
+                       ItemsSource="{Binding KeePassXc}"
+                       SelectedItem="{Binding SelectedKeePassXc}"
+                       MaxHeight="180">
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:KeePassXcDatabaseItem">
                     <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Path}">
@@ -310,7 +310,7 @@
                     </Grid>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
-              </ctl:AccessibleListBox>
+              </ListBox>
             </StackPanel>
             <Button Classes="wide" IsVisible="{Binding OffersKeePassXc}" Command="{Binding BrowseCommand}" AutomationProperties.Name="Open another file…">
               <StackPanel Orientation="Horizontal" Spacing="8">
@@ -464,12 +464,12 @@
                     CornerRadius="{DynamicResource KpRadiusButton}"
                     Background="{DynamicResource KpBgPanel}"
                     Padding="4">
-              <ctl:AccessibleListBox x:Name="BackupList"
-                                     Classes="recent"
-                                     ItemsSource="{Binding Rows}"
-                                     SelectedItem="{Binding Selected}"
-                                     IsEnabled="{Binding IsChoosing}"
-                                     MaxHeight="150">
+              <ListBox x:Name="BackupList"
+                       Classes="recent"
+                       ItemsSource="{Binding Rows}"
+                       SelectedItem="{Binding Selected}"
+                       IsEnabled="{Binding IsChoosing}"
+                       MaxHeight="150">
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:BackupRow">
                     <Grid ColumnDefinitions="Auto,*,Auto">
@@ -481,7 +481,7 @@
                     </Grid>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
-              </ctl:AccessibleListBox>
+              </ListBox>
             </Border>
 
             <StackPanel Spacing="8">
@@ -638,11 +638,11 @@
             </MultiBinding>
           </StackPanel.IsVisible>
           <TextBlock Classes="th" Text="RECENT VAULTS" Margin="10,0" />
-          <ctl:AccessibleListBox x:Name="RecentList"
-                                 Classes="recent"
-                                 ItemsSource="{Binding Recent}"
-                                 SelectedItem="{Binding SelectedRecent}"
-                                 MaxHeight="180">
+          <ListBox x:Name="RecentList"
+                   Classes="recent"
+                   ItemsSource="{Binding Recent}"
+                   SelectedItem="{Binding SelectedRecent}"
+                   MaxHeight="180">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:RecentVaultItem">
                 <Grid ColumnDefinitions="Auto,*,Auto" ToolTip.Tip="{Binding Path}">
@@ -658,7 +658,7 @@
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
-          </ctl:AccessibleListBox>
+          </ListBox>
         </StackPanel>
 
       </StackPanel>
