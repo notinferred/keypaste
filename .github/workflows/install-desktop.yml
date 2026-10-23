@@ -256,19 +256,12 @@ jobs:
           set -euo pipefail
           bash scripts/apt-install.sh --no-install-recommends keepassxc xterm
 
-      - name: Install KeePassXC for the acts (macOS)
-        if: ${{ !cancelled() && runner.os == 'macOS' }}
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_CLEANUP: '1'
-        run: brew install --cask keepassxc
-
-      - name: Install KeePassXC for the acts (Windows)
-        if: ${{ !cancelled() && runner.os == 'Windows' }}
+      - name: Install KeePassXC for the acts (Windows and macOS)
+        if: ${{ !cancelled() && runner.os != 'Linux' }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh "$RUNNER_TEMP/keepassxc")" >> "$GITHUB_ENV"
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh "$RUNNER_TEMP/keepassxc")" >> "$GITHUB_ENV"
 
       - name: Install Claude Code where its native installer puts it
         if: ${{ !cancelled() }}

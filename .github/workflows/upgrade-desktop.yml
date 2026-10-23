@@ -217,19 +217,12 @@ jobs:
           set -euo pipefail
           bash scripts/apt-install.sh --no-install-recommends keepassxc
 
-      - name: Install keepassxc-cli (macOS)
-        if: runner.os == 'macOS'
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_CLEANUP: '1'
-        run: brew install --cask keepassxc
-
-      - name: Install keepassxc-cli (Windows)
-        if: runner.os == 'Windows'
+      - name: Install keepassxc-cli (Windows and macOS)
+        if: runner.os == 'Windows' || runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
-          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh "$RUNNER_TEMP")" >> "$GITHUB_ENV"
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh "$RUNNER_TEMP")" >> "$GITHUB_ENV"
 
       - name: Start Xvfb and openbox
         if: runner.os == 'Linux'

@@ -41,15 +41,16 @@ public static class KeePassXcDatabases
 
     private static readonly string[] _keys = [ActiveKey, OpenedKey, RecentKey];
 
-    /// <summary>Where KeePassXC 2.7 keeps its local settings for this user, or null when that cannot be said.</summary>
-    /// <returns>The file's path. It is not checked for existence.</returns>
-    public static string? LocalConfigPath() =>
-        LocalConfigPath(
+    /// <summary>Where the installed KeePassXC keeps its local settings for this user, the newest version's place first.</summary>
+    /// <returns>The files' paths, none when that cannot be said. None is checked for existence.</returns>
+    public static IReadOnlyList<string> InstalledConfigPaths() =>
+        InstalledConfigPaths(
             OperatingSystem.IsWindows() ? KeePassXcPlatform.Windows
                 : OperatingSystem.IsMacOS() ? KeePassXcPlatform.MacOS
                 : KeePassXcPlatform.Linux,
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Environment.GetEnvironmentVariable("XDG_STATE_HOME"),
             Environment.GetEnvironmentVariable("XDG_CACHE_HOME"));
 
     /// <summary>The local settings of each portable KeePassXC running now, then of the installed one.</summary>
@@ -68,10 +69,7 @@ public static class KeePassXcDatabases
             }
         }
 
-        if (LocalConfigPath() is { } installed)
-        {
-            paths.Add(installed);
-        }
+        paths.AddRange(InstalledConfigPaths());
 
         return paths;
     }
@@ -164,25 +162,32 @@ public static class KeePassXcDatabases
         return executables;
     }
 
-    /// <summary>Qt's <c>QStandardPaths</c> locations KeePassXC 2.7's <c>Config</c> puts its local file in.</summary>
-    internal static string? LocalConfigPath(KeePassXcPlatform platform, string? home, string? localAppData, string? xdgCacheHome)
+    /// <summary>
+    /// The locations KeePassXC's <c>Config</c> puts its local file in. On Linux 2.8 keeps it under <c>XDG_STATE_HOME</c>
+    /// and moves 2.7's from <c>XDG_CACHE_HOME</c> there when it first starts, so both are read.
+    /// </summary>
+    internal static IReadOnlyList<string> InstalledConfigPaths(
+        KeePassXcPlatform platform, string? home, string? localAppData, string? xdgStateHome, string? xdgCacheHome)
     {
         switch (platform)
         {
             case KeePassXcPlatform.Windows:
-                return string.IsNullOrEmpty(localAppData) ? null : Path.Combine(localAppData, "KeePassXC", "keepassxc.ini");
+                return string.IsNullOrEmpty(localAppData) ? [] : [Path.Combine(localAppData, "KeePassXC", "keepassxc.ini")];
 
             case KeePassXcPlatform.MacOS:
-                return string.IsNullOrEmpty(home) ? null : Path.Combine(home, "Library", "Caches", "KeePassXC", "keepassxc.ini");
+                return string.IsNullOrEmpty(home) ? [] : [Path.Combine(home, "Library", "Caches", "KeePassXC", "keepassxc.ini")];
 
             default:
-                // Qt ignores a relative XDG_CACHE_HOME, as the XDG specification asks.
-                var cache = xdgCacheHome is { Length: > 0 } && xdgCacheHome[0] == '/'
-                    ? xdgCacheHome
-                    : string.IsNullOrEmpty(home) ? null : Path.Combine(home, ".cache");
-                return cache is null ? null : Path.Combine(cache, "keepassxc", "keepassxc.ini");
+                string?[] folders = [XdgFolder(xdgStateHome, home, ".local", "state"), XdgFolder(xdgCacheHome, home, ".cache")];
+                return [.. folders.OfType<string>().Select(folder => Path.Combine(folder, "keepassxc", "keepassxc.ini"))];
         }
     }
+
+    /// <summary>An XDG base directory: the variable when it is absolute, which is all the specification honours, otherwise its place under home.</summary>
+    private static string? XdgFolder(string? variable, string? home, params string[] fallback) =>
+        variable is { Length: > 0 } && variable[0] == '/' ? variable
+            : string.IsNullOrEmpty(home) ? null
+            : Path.Combine([home, .. fallback]);
 
     /// <summary>The paths the three keys name, in the order they are offered, before any is checked.</summary>
     internal static IReadOnlyList<string> Parse(ReadOnlySpan<byte> bytes)

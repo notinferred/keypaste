@@ -131,7 +131,7 @@ evidence_first_run() {
   if [ -z "$chosen" ]; then contradict 'the app unlocked and chose no vault for agents and the CLI in app.toml'
   elif [ "$(path_key "$chosen" "$platform")" != "$(path_key "$vault" "$platform")" ]; then
     contradict "the app chose $chosen, not KeePassXC's $vault"
-  else pass "KeePassXC's recent databases offered $VAULT_NAME on the first run, and the app unlocked it and chose it: $vault; KeePassXC $(fact_of "$1" first-run keepassxc_closed)"
+  else pass "KeePassXC's recent databases offered $VAULT_NAME on the first run, and the app unlocked it and chose it: $vault"
   fi
 }
 
@@ -549,16 +549,8 @@ unlock_with() { drive focus id:Password && drive type "$1" && drive key Return &
 # The vault the app chose for agents and the CLI: app.toml's vault, whose line ends in a comment and whose value holds
 # no quote or backslash (TomlWriter).
 chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1; }
-# The project's page, from its row in the sidebar. Linux's AT-SPI (Avalonia 12.1) keeps a list's rows as it first
-# listed them, so the row the tag added is not among them there; it is reached as from the keyboard instead: the
-# Items row clicked, End to Agents, the last row, and Up to the project's row above it.
-open_project() {
-  if [ "$PLATFORM" = linux ]; then
-    drive click Items && drive key End && drive key Up && drive wait 'Project directory' 30
-  else
-    drive select "$PROJECT"
-  fi
-}
+# The project's page, from the row the tag added to the sidebar during the session (F.68).
+open_project() { drive select "$PROJECT"; }
 
 # --- the vault through the CLI --------------------------------------------------------------------
 
@@ -667,7 +659,8 @@ keepassxc_create() {
     && kpxc_drive 'Save database as' key ctrl+a && kpxc_drive 'Save database as' type "$(native "$VAULT")" \
     && kpxc_drive 'Save database as' key Return \
     && wait_for_file "$VAULT" 30; then
-    if kill -0 "$pid" 2> /dev/null; then close_keepassxc "$pid" || return 1; else echo 'KeePassXC ended by itself after saving'; fi
+    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended by itself after saving$(crash_report "$maker/keepassxc.log")"; return 1; }
+    close_keepassxc "$pid" || return 1
     echo "KeePassXC's Create Database window made $VAULT_NAME"
   else
     kill -9 "$pid" 2> /dev/null || true
@@ -762,19 +755,16 @@ keepassxc_recent() {
     return 1
   }
   sleep 2
-  # KeePassXC records a database in LastDatabases as it opens it, and the first run offers what that lists, so a
-  # KeePassXC that ends on its own after that is recorded with what the platform says of it, and the act goes on.
-  if kill -0 "$pid" 2> /dev/null; then
-    close_keepassxc "$pid" || return 1
-    grep -q '^LastOpenedDatabases=' "$local_ini" || { echo "KeePassXC closed without writing LastOpenedDatabases to $local_ini"; return 1; }
-    fact keepassxc_closed 'closed as a person closes it'
-  else
+  if ! kill -0 "$pid" 2> /dev/null; then
     code=0
     wait "$pid" 2> /dev/null || code=$?
-    fact keepassxc_closed "ended by itself, status $code, after it recorded $VAULT_NAME$(crash_report)"
+    echo "KeePassXC ended by itself, status $code, after it listed $VAULT_NAME$(crash_report)"
+    return 1
   fi
+  close_keepassxc "$pid" || return 1
+  grep -q '^LastOpenedDatabases=' "$local_ini" || { echo "KeePassXC closed without writing LastOpenedDatabases to $local_ini"; return 1; }
   fact keepassxc_recent "$(grep '^Last' "$local_ini" | tr '\n' ' ')"
-  echo "KeePassXC opened $VAULT_NAME, leaving it in $local_ini; $(fact_of "$OUT" first-run keepassxc_closed)"
+  echo "KeePassXC opened $VAULT_NAME, leaving it in $local_ini"
 }
 
 # What the platform recorded of KeePassXC ending by itself: Windows' newest crash events and macOS's newest crash
@@ -817,30 +807,27 @@ close_keepassxc() {
 
 # macOS: keepassxc-cli makes a database that derives its key with AES-KDF, and R.1a times the libargon2 the package
 # carries, so KeePassXC's own Database Security then changes it to Argon2d, the key derivation KeePassXC gives a new
-# database, as a person can in KeePassXC. KeePassXC 2.7.12 has ended by itself soon after opening a database on this
-# runner, so a session that ends before the change is saved is followed by another, up to three.
+# database, as a person can in KeePassXC.
 mac_keepassxc_argon2() {
-  local gui try pid said code
+  local gui pid said code
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
   export DRIVE_TREE_DIR="$OUT"
-  for try in 1 2 3; do
-    printf '%s\n' "$pw" | "$gui" --pw-stdin "$VAULT" > "$OUT/keepassxc-argon2-$try.log" 2>&1 &
-    pid=$!
-    if said="$(mac_keepassxc_kdf "$pid")"; then
-      close_keepassxc "$pid" || return 1
-      echo "session $try: $said"
-      return 0
-    fi
-    echo "session $try: $said"
-    if kill -0 "$pid" 2> /dev/null; then
-      kill -9 "$pid" 2> /dev/null || true
-      wait "$pid" 2> /dev/null || true
-    else
-      code=0
-      wait "$pid" 2> /dev/null || code=$?
-      echo "session $try: KeePassXC ended by itself, status $code$(crash_report "$OUT/keepassxc-argon2-$try.log")"
-    fi
-  done
+  printf '%s\n' "$pw" | "$gui" --pw-stdin "$VAULT" > "$OUT/keepassxc-argon2.log" 2>&1 &
+  pid=$!
+  if said="$(mac_keepassxc_kdf "$pid")"; then
+    close_keepassxc "$pid" || return 1
+    echo "$said"
+    return 0
+  fi
+  echo "$said"
+  if kill -0 "$pid" 2> /dev/null; then
+    kill -9 "$pid" 2> /dev/null || true
+    wait "$pid" 2> /dev/null || true
+  else
+    code=0
+    wait "$pid" 2> /dev/null || code=$?
+    echo "KeePassXC ended by itself, status $code$(crash_report "$OUT/keepassxc-argon2.log")"
+  fi
   return 1
 }
 

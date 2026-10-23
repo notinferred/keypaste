@@ -146,13 +146,13 @@
 
             <!-- Muted, never red. An auto-lock is the most normal thing this app does. Its name is the
                  warning's first line, so a screen reader announces it once while the seconds tick. -->
-            <TextBlock Classes="mono sm muted"
-                       Text="{Binding Countdown}"
-                       IsVisible="{Binding HasCountdown}"
-                       AutomationProperties.Name="{Binding CountdownAnnouncement}"
-                       AutomationProperties.LiveSetting="Polite"
-                       VerticalAlignment="Center"
-                       Margin="0,0,6,0" />
+            <ctl:NamedTextBlock Classes="mono sm muted"
+                                Text="{Binding Countdown}"
+                                IsVisible="{Binding HasCountdown}"
+                                AutomationProperties.Name="{Binding CountdownAnnouncement}"
+                                AutomationProperties.LiveSetting="Polite"
+                                VerticalAlignment="Center"
+                                Margin="0,0,6,0" />
 
             <StackPanel Orientation="Horizontal"
                         Spacing="6"
@@ -200,12 +200,12 @@
                                Width="104" />
 
             <!-- Trash and Settings, quieter, at the bottom. -->
-            <ListBox Name="FooterNav"
-                     DockPanel.Dock="Bottom"
-                     Classes="nav quiet"
-                     Margin="0,12,0,0"
-                     ItemsSource="{Binding FooterNav}"
-                     SelectedItem="{Binding SelectedFooter}">
+            <ctl:AccessibleListBox Name="FooterNav"
+                                   DockPanel.Dock="Bottom"
+                                   Classes="nav quiet"
+                                   Margin="0,12,0,0"
+                                   ItemsSource="{Binding FooterNav}"
+                                   SelectedItem="{Binding SelectedFooter}">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:NavItem">
                   <Grid ColumnDefinitions="Auto,*,Auto" AutomationProperties.Name="{Binding Title}">
@@ -218,16 +218,16 @@
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>
-            </ListBox>
+            </ctl:AccessibleListBox>
 
             <!-- Items with the vault's group tree under it, the projects, then Agents: one list, so the
                  arrow keys walk the sidebar as it reads, and Left and Right fold a row as in KeePassXC's
                  tree (D-0376). -->
-            <ListBox Name="Nav"
-                     Classes="nav"
-                     ItemsSource="{Binding SidebarRows}"
-                     SelectedItem="{Binding SelectedSidebarRow}"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ctl:AccessibleListBox Name="Nav"
+                                   Classes="nav"
+                                   ItemsSource="{Binding SidebarRows}"
+                                   SelectedItem="{Binding SelectedSidebarRow}"
+                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.DataTemplates>
                 <DataTemplate DataType="vm:NavItem">
                   <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto"
@@ -279,7 +279,7 @@
                   </Grid>
                 </DataTemplate>
                 <DataTemplate DataType="vm:SidebarHeading">
-                  <TextBlock Classes="th" Text="{Binding Label}" AutomationProperties.Name="{Binding Title}" />
+                  <ctl:NamedTextBlock Classes="th" Text="{Binding Label}" AutomationProperties.Name="{Binding Title}" />
                 </DataTemplate>
                 <DataTemplate DataType="vm:ProjectRow">
                   <Grid ColumnDefinitions="Auto,*,Auto"
@@ -302,7 +302,7 @@
                   </Grid>
                 </DataTemplate>
               </ListBox.DataTemplates>
-            </ListBox>
+            </ctl:AccessibleListBox>
 
           </DockPanel>
         </Border>

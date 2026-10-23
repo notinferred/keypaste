@@ -31,9 +31,9 @@ on:
         type: string
         default: ''
       mode:
-        description: class runs filter_class, profile runs profile, linux runs ci.yml's and app.yml's Linux jobs, relock regenerates the lock files, acts installs app_run's packages and performs R.1a's acts, kpxc-probe is F.68's KeePassXC probe
+        description: class runs filter_class, profile runs profile, linux runs ci.yml's and app.yml's Linux jobs, relock regenerates the lock files, acts installs app_run's packages and performs R.1a's acts
         type: choice
-        options: [class, profile, linux, relock, acts, kpxc-probe]
+        options: [class, profile, linux, relock, acts]
         default: class
 
 run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.filter_class }}${{ inputs.profile }}${{ inputs.app_run }} ${{ inputs.os }} ${{ inputs.nonce }}
@@ -209,31 +209,3 @@ jobs:
       contents: read
       actions: read
       attestations: read
-
-  # F.68's probe, removed once its diagnosis closes: how often each KeePassXC version ends by itself when it opens a
-  # vault as R.1a's acts start it.
-  kpxc-probe:
-    name: kpxc-probe (${{ matrix.os }})
-    if: inputs.mode == 'kpxc-probe'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15, windows-2025]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Open a vault in KeePassXC 2.7.12 and 2.8.0
-        shell: bash
-        run: bash scripts/probe-keepassxc-crash.sh 30 2.7.12 2.8.0
-
-      - name: Keep the records
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: kpxc-probe-${{ matrix.os }}
-          path: ${{ runner.temp }}/kpxc-probe/records
-          if-no-files-found: warn

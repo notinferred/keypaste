@@ -380,11 +380,11 @@
             </StackPanel>
           </StackPanel>
 
-          <ListBox Name="Rows"
-                   Classes="rows table"
-                   Padding="6,4"
-                   ItemsSource="{Binding Rows}"
-                   SelectedItem="{Binding Selected}">
+          <ctl:AccessibleListBox Name="Rows"
+                                 Classes="rows table"
+                                 Padding="6,4"
+                                 ItemsSource="{Binding Rows}"
+                                 SelectedItem="{Binding Selected}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:EntryRow">
                 <Grid ColumnDefinitions="28,1.4*,*,*,88,*,104">
@@ -426,7 +426,7 @@
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
-          </ListBox>
+          </ctl:AccessibleListBox>
         </Panel>
       </DockPanel>
 
@@ -466,10 +466,10 @@
 
             <StackPanel Spacing="24" DataContext="{Binding NewItem}" x:DataType="vm:NewItemViewModel">
 
-              <ListBox x:Name="NewItemTemplate"
-                       Classes="templates"
-                       ItemsSource="{Binding Templates}"
-                       SelectedItem="{Binding SelectedTemplate}">
+              <ctl:AccessibleListBox x:Name="NewItemTemplate"
+                                     Classes="templates"
+                                     ItemsSource="{Binding Templates}"
+                                     SelectedItem="{Binding SelectedTemplate}">
                 <ListBox.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal" />
@@ -483,7 +483,7 @@
                     </StackPanel>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
-              </ListBox>
+              </ctl:AccessibleListBox>
 
               <Grid ColumnDefinitions="*,16,*">
                 <StackPanel Grid.Column="0" Spacing="8">
@@ -890,10 +890,10 @@
                                  IsVisible="{Binding History.ShowsEmptyNote}"
                                  Text="{Binding History.EmptyNote}" />
 
-                      <ListBox x:Name="Revisions"
-                               MaxHeight="180"
-                               ItemsSource="{Binding History.Rows}"
-                               SelectedItem="{Binding History.Selected}">
+                      <ctl:AccessibleListBox x:Name="Revisions"
+                                             MaxHeight="180"
+                                             ItemsSource="{Binding History.Rows}"
+                                             SelectedItem="{Binding History.Selected}">
                         <ListBox.ItemTemplate>
                           <DataTemplate x:DataType="vm:EntryRevisionRow">
                             <Grid ColumnDefinitions="Auto,*">
@@ -907,7 +907,7 @@
                             </Grid>
                           </DataTemplate>
                         </ListBox.ItemTemplate>
-                      </ListBox>
+                      </ctl:AccessibleListBox>
 
                       <!-- The chosen revision above the entry as it is now, field by field. Its password
                            can be read only while it is held, and copied as the current one is. -->

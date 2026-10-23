@@ -1,7 +1,9 @@
 using Avalonia.Automation.Peers;
 using Avalonia.Automation.Provider;
+using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Keypaste.App.Navigation;
+using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
@@ -73,6 +75,27 @@ public sealed class AccessibleDriveTests
 
         shell.PressLock();
         AssertNamedByText(shell, "the lock screen");
+    });
+
+    /// <summary>
+    /// A project tagged during the session is a row the sidebar's list says it gained, which is what Linux's AT-SPI
+    /// bridge waits for before it lists the rows again (F.68).
+    /// </summary>
+    [Fact]
+    public Task A_project_tagged_during_the_session_is_announced_as_a_new_sidebar_row() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-rows-");
+        var nav = ControlAutomationPeer.CreatePeerForElement(shell.Named<ListBox>("Nav"));
+        Assert.DoesNotContain(Visible(nav), peer => peer.GetName() == "added");
+        var changed = 0;
+        nav.ChildrenChanged += (_, _) => changed++;
+
+        var tagged = shell.Session.Write(vault => vault.AddTag(new EntryName(string.Empty, "github"), "env:added"), added => added);
+        RenderedShell.Drain();
+
+        Assert.Equal(WriteOutcome.Saved, tagged.Outcome);
+        Assert.True(changed > 0, "the sidebar's list never said its rows changed");
+        Assert.Contains(Visible(nav), peer => peer.GetName() == "added" && peer.GetAutomationControlType() == AutomationControlType.ListItem);
     });
 
     /// <summary>

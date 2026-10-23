@@ -30,7 +30,7 @@ on:
       - 'scripts/exercise-desktop-upgrade.sh'
       - 'scripts/lib/**'
       - 'src/Keypaste.Mcp/**'
-      - 'scripts/install-keepassxc-windows.sh'
+      - 'scripts/install-keepassxc.sh'
       - 'scripts/apt-install.sh'
       - 'src/Keypaste.Cli/**'
       - 'tests/Keypaste.Cli.Tests/**'
@@ -222,7 +222,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
 
       # So these builds derive keys with the library the packages carry (D-0523).
       - name: Build the libargon2 the app and the CLI carry
@@ -268,19 +268,12 @@ jobs:
         run: |
           bash scripts/apt-install.sh --no-install-recommends keepassxc
 
-      - name: Install KeePassXC (macOS)
-        if: runner.os == 'macOS'
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_CLEANUP: '1'
-        run: brew install --cask keepassxc
-
-      - name: Install KeePassXC (Windows)
-        if: runner.os == 'Windows'
+      - name: Install KeePassXC (Windows and macOS)
+        if: runner.os == 'Windows' || runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
-          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc.sh)" >> "$GITHUB_ENV"
 
       - name: Build the libargon2 the app carries
         shell: bash

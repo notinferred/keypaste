@@ -151,16 +151,16 @@ public sealed class KeePassXcDatabasesTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Windows", @"C:\Users\ana", @"C:\Users\ana\AppData\Local", null, @"C:\Users\ana\AppData\Local|KeePassXC|keepassxc.ini")]
-    [InlineData("MacOS", "/Users/ana", "", null, "/Users/ana|Library|Caches|KeePassXC|keepassxc.ini")]
-    [InlineData("Linux", "/home/ana", "", null, "/home/ana|.cache|keepassxc|keepassxc.ini")]
-    [InlineData("Linux", "/home/ana", "", "/tmp/cache", "/tmp/cache|keepassxc|keepassxc.ini")]
-    [InlineData("Linux", "/home/ana", "", "relative/cache", "/home/ana|.cache|keepassxc|keepassxc.ini")]
-    public void KeePassXC_2_7s_local_settings_are_where_it_keeps_them(
-        string platform, string home, string localAppData, string? xdgCacheHome, string expected) =>
+    [InlineData("Windows", @"C:\Users\ana", @"C:\Users\ana\AppData\Local", null, null, @"C:\Users\ana\AppData\Local|KeePassXC|keepassxc.ini")]
+    [InlineData("MacOS", "/Users/ana", "", null, null, "/Users/ana|Library|Caches|KeePassXC|keepassxc.ini")]
+    [InlineData("Linux", "/home/ana", "", null, null, "/home/ana|.local|state|keepassxc|keepassxc.ini;/home/ana|.cache|keepassxc|keepassxc.ini")]
+    [InlineData("Linux", "/home/ana", "", "/tmp/state", "/tmp/cache", "/tmp/state|keepassxc|keepassxc.ini;/tmp/cache|keepassxc|keepassxc.ini")]
+    [InlineData("Linux", "/home/ana", "", "relative/state", "relative/cache", "/home/ana|.local|state|keepassxc|keepassxc.ini;/home/ana|.cache|keepassxc|keepassxc.ini")]
+    public void The_installed_KeePassXCs_local_settings_are_where_2_8_then_2_7_keep_them(
+        string platform, string home, string localAppData, string? xdgStateHome, string? xdgCacheHome, string expected) =>
         Assert.Equal(
-            Path.Combine(expected.Split('|')),
-            KeePassXcDatabases.LocalConfigPath(Enum.Parse<KeePassXcPlatform>(platform), home, localAppData, xdgCacheHome));
+            expected.Split(';').Select(path => Path.Combine(path.Split('|'))),
+            KeePassXcDatabases.InstalledConfigPaths(Enum.Parse<KeePassXcPlatform>(platform), home, localAppData, xdgStateHome, xdgCacheHome));
 
     [Fact]
     public void A_portable_KeePassXC_keeps_its_local_settings_in_config_beside_its_executable()
@@ -195,8 +195,8 @@ public sealed class KeePassXcDatabasesTests : IDisposable
     [Fact]
     public void No_home_means_no_settings_file()
     {
-        Assert.Null(KeePassXcDatabases.LocalConfigPath(KeePassXcPlatform.Windows, "", "", null));
-        Assert.Null(KeePassXcDatabases.LocalConfigPath(KeePassXcPlatform.Linux, "", "", "relative"));
+        Assert.Empty(KeePassXcDatabases.InstalledConfigPaths(KeePassXcPlatform.Windows, "", "", null, null));
+        Assert.Empty(KeePassXcDatabases.InstalledConfigPaths(KeePassXcPlatform.Linux, "", "", "relative", "relative"));
     }
 
     private string Vault(string name)

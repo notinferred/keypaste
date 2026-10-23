@@ -155,11 +155,11 @@
                      FontSize="13" Foreground="{DynamicResource KpTextMuted}" />
         </StackPanel>
 
-        <ListBox Grid.Row="1"
-                 Classes="table-body"
-                 IsVisible="{Binding !IsEmpty}"
-                 ItemsSource="{Binding Rows}"
-                 SelectedItem="{Binding Selected}">
+        <ctl:AccessibleListBox Grid.Row="1"
+                               Classes="table-body"
+                               IsVisible="{Binding !IsEmpty}"
+                               ItemsSource="{Binding Rows}"
+                               SelectedItem="{Binding Selected}">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:TrashRow">
               <Border Classes="table-body-row">
@@ -179,7 +179,7 @@
               </Border>
             </DataTemplate>
           </ListBox.ItemTemplate>
-        </ListBox>
+        </ctl:AccessibleListBox>
       </Grid>
     </Border>
 
