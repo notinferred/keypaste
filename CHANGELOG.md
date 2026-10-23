@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A screen reader now names each revision in an item's History by when it was current and its title, rather than by an internal type name ([R.1a](docs/steps/R.1a.md)).
+
 `keypaste approve`'s credential prompt now names the agent with its bridge's `--client-label` in brackets, as its run prompt and the app's prompt do, so you can tell which configured connection is asking.
 
 `keypaste mcp` now withdraws a request still waiting for your answer when its client closes the bridge's input, as when the client cancels it, so the prompt comes down rather than staying up until it times out; it also stops waiting for the app or `keypaste approve` after 70 seconds, 125 for a credential request, and it never sends a credential request a second time after losing the reply, so you are not asked twice about one you already answered.
