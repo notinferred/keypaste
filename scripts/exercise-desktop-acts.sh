@@ -254,11 +254,14 @@ evidence_lock_refused() {
 }
 
 evidence_timing() {
-  local unlock save low
+  local unlock save low database
   unlock="$(fact_of "$1" first-run unlock_ms)"
   save="$(fact_of "$1" field save_ms)"
   low="$(fact_of "$1" field save_ms_low)"
-  if ! measured "$unlock"; then result=unreached; why='no unlock was timed'
+  database="$(fact_of "$1" first-run database)"
+  # R.1a times the libargon2 the package carries, which a vault deriving its key another way never calls.
+  if [[ $database != *'KDF: Argon2'* ]]; then result=unreached; why="the vault does not derive its key with Argon2: $database"
+  elif ! measured "$unlock"; then result=unreached; why='no unlock was timed'
   elif ! measured "$save" || ! measured "$low"; then result=unreached; why='no save was timed'
   else
     pass "unlock: ${unlock} ms from Return to the item list, timed by the driver; save: ${low} to ${save} ms from Add to the vault file's change, polled every 250 ms; $(fact_of "$1" timing argon2)"
@@ -503,7 +506,9 @@ app_launch() {
   case "$PLATFORM" in
     windows)
       # To a file, not a pipe: the app inherits PowerShell's handles, and an inherited pipe would hold this shell.
-      APP_PID="$(powershell -NoProfile -Command "(Start-Process -FilePath '$(cygpath -w "$APP")' -RedirectStandardOutput '$(cygpath -w "$log.out")' -RedirectStandardError '$(cygpath -w "$log")' -PassThru).Id" | tr -d "$CR")"
+      powershell -NoProfile -Command "(Start-Process -FilePath '$(cygpath -w "$APP")' -RedirectStandardOutput '$(cygpath -w "$log.out")' -RedirectStandardError '$(cygpath -w "$log")' -PassThru).Id" \
+        > "$OUT/app.pid"
+      APP_PID="$(tr -d "$CR" < "$OUT/app.pid")"
       ;;
     macos) APP_PID="$(mac_start "$APP" "$log")" || { echo "$APP_PID"; return 1; } ;;
     linux)
@@ -1086,6 +1091,7 @@ selftest() {
         '{"act":"setup","fact":"note_sha256","value":"c3"}' \
         '{"act":"first-run","fact":"chosen_vault","value":"/home/runner/work/acts/vault/acts.kdbx"}' \
         '{"act":"first-run","fact":"unlock_ms","value":"2100"}' \
+        '{"act":"first-run","fact":"database","value":"Cipher: AES 256-bit KDF: Argon2d (8 rounds, 65536 KB) Recycle bin is enabled."}' \
         '{"act":"field","fact":"save_ms","value":"420"}' \
         '{"act":"field","fact":"save_ms_low","value":"150"}' \
         '{"act":"field","fact":"field_sha256","value":"a1"}' \
@@ -1204,6 +1210,8 @@ selftest() {
   set_fact person notes-flag person 'only a person can judge how the flagged row reads'
   passing no-save-time
   drop_fact no-save-time field save_ms
+  passing aes-kdf
+  set_fact aes-kdf first-run database 'Cipher: AES 256-bit KDF: AES (1000000 rounds)'
   passing skipped
   drop_fact skipped project-run performed
   jq -c 'select(.act != "project-run")' "$work/skipped/steps.jsonl" > "$work/t" && mv "$work/t" "$work/skipped/steps.jsonl"
@@ -1246,6 +1254,8 @@ selftest() {
   expect lock-leaks lock-refused contradiction 'received a value'
   expect person notes-flag person 'only a person'
   expect no-save-time timing unreached 'no save'
+  expect aes-kdf timing unreached 'Argon2'
+  expect aes-kdf first-run pass
   expect skipped project-run unreached 'never attempted'
   expect skipped edit-rerun unreached 'project-run did not pass'
 
