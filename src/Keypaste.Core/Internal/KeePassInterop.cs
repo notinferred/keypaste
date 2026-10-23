@@ -2074,6 +2074,7 @@ internal sealed class KeePassInterop : IDisposable
         found.Group.Entries.Remove(found.Entry);
         found.Entry.PreviousParentGroup = PwUuid.Zero;
         destination.AddEntry(found.Entry, true, true);
+        found.Entry.CreateBackup(_database);
         SetField(found.Entry, PwDefs.TitleField, title);
 
         // Newer so a merge keeps the title; no revision, because a rename overwrites no value.
