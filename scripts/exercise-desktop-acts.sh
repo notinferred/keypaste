@@ -510,7 +510,11 @@ app_launch() {
         > "$OUT/app.pid"
       APP_PID="$(tr -d "$CR" < "$OUT/app.pid")"
       ;;
-    macos) APP_PID="$(mac_start "$APP" "$log")" || { echo "$APP_PID"; return 1; } ;;
+    macos)
+      # Where the driver keeps the window's tree when a step cannot be done.
+      export DRIVE_TREE_DIR="$OUT"
+      APP_PID="$(mac_start "$APP" "$log")" || { echo "$APP_PID"; return 1; }
+      ;;
     linux)
       "$APP" > "$log" 2>&1 &
       APP_PID=$!
