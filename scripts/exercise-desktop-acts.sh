@@ -668,7 +668,7 @@ keepassxc_recent() {
 }
 
 # What the platform recorded of KeePassXC ending by itself: Windows' newest crash events and macOS's newest crash
-# report, which is kept with the records; Linux records none.
+# report since the file given, keepassxc.log by default, which is kept with the records; Linux records none.
 crash_report() {
   local report
   case "$PLATFORM" in
@@ -677,8 +677,14 @@ crash_report() {
       printf '; Windows recorded: %s' "$(powershell -NoProfile -Command 'Get-WinEvent -FilterHashtable @{LogName = "Application"; ProviderName = "Application Error", "Windows Error Reporting"; StartTime = (Get-Date).AddMinutes(-10)} -MaxEvents 2 -ErrorAction SilentlyContinue | ForEach-Object { $_.ProviderName + ": " + ($_.Message -replace "\s+", " ") }' | tr -d "$CR")"
       ;;
     macos)
-      report="$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'KeePassXC*' -newer "$VAULT" 2> /dev/null | head -n 1)"
-      [ -n "$report" ] || { printf '; macOS kept no crash report'; return 0; }
+      # ReportCrash writes the report a few seconds after the process ends.
+      for _ in $(seq 1 30); do
+        report="$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'KeePassXC*' -newer "${1:-$OUT/keepassxc.log}" \
+          -exec stat -f '%m %N' {} + 2> /dev/null | sort -rn | head -n 1 | cut -d ' ' -f 2-)"
+        [ -z "$report" ] || break
+        sleep 0.5
+      done
+      [ -n "$report" ] || { printf '; macOS kept no crash report within 15 s'; return 0; }
       cp "$report" "$OUT/"
       printf '; macOS kept %s: %s' "$(basename "$report")" "$(grep -o '"exception" *: *{[^}]*}' "$report" | head -n 1)"
       ;;
@@ -697,6 +703,71 @@ close_keepassxc() {
     return 1
   fi
   wait "$1" 2> /dev/null || true
+}
+
+# macOS: keepassxc-cli makes a database that derives its key with AES-KDF, and R.1a times the libargon2 the package
+# carries, so KeePassXC's own Database Security then changes it to Argon2d, the key derivation KeePassXC gives a new
+# database, as a person can in KeePassXC. KeePassXC 2.7.12 has ended by itself soon after opening a database on this
+# runner, so a session that ends before the change is saved is followed by another, up to three.
+mac_keepassxc_argon2() {
+  local gui try pid said code
+  gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
+  export DRIVE_TREE_DIR="$OUT"
+  for try in 1 2 3; do
+    printf '%s\n' "$pw" | "$gui" --pw-stdin "$VAULT" > "$OUT/keepassxc-argon2-$try.log" 2>&1 &
+    pid=$!
+    if said="$(mac_keepassxc_kdf "$pid")"; then
+      close_keepassxc "$pid" || return 1
+      echo "session $try: $said"
+      return 0
+    fi
+    echo "session $try: $said"
+    if kill -0 "$pid" 2> /dev/null; then
+      kill -9 "$pid" 2> /dev/null || true
+      wait "$pid" 2> /dev/null || true
+    else
+      code=0
+      wait "$pid" 2> /dev/null || code=$?
+      echo "session $try: KeePassXC ended by itself, status $code$(crash_report "$OUT/keepassxc-argon2-$try.log")"
+    fi
+  done
+  return 1
+}
+
+# mac_kpxc <pid> <verb> [args...]: the macOS driver acting in KeePassXC's window for the vault.
+mac_kpxc() { (export DRIVE_WINDOW="$KPXC_WINDOW"; mac_osascript 120 "$MAC_DRIVER" "$@"); }
+
+mac_keepassxc_kdf() {
+  local pid="$1" kdf i
+  KPXC_WINDOW=''
+  for i in $(seq 1 60); do
+    KPXC_WINDOW="$(mac_kpxc "$pid" windows 2> /dev/null | grep -F "$VAULT_NAME" | head -n 1)"
+    [ -z "$KPXC_WINDOW" ] || break
+    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended before a window showed $VAULT_NAME"; return 1; }
+    sleep 0.5
+  done
+  [ -n "$KPXC_WINDOW" ] || { echo "no KeePassXC window showed $VAULT_NAME within 30 s: $(mac_kpxc "$pid" windows 2>&1 | tr '\n' ';')"; return 1; }
+  mac_kpxc "$pid" menu Database 'Database Security…' || return 1
+  mac_kpxc "$pid" invoke 'Encryption Settings' || return 1
+  mac_kpxc "$pid" invoke Advanced || return 1
+  # A closed combo box chooses the item whose text starts with what is typed into it.
+  mac_kpxc "$pid" focus 'Key derivation function' || return 1
+  mac_kpxc "$pid" type Argon2d || return 1
+  kdf="$(mac_kpxc "$pid" read 'Key derivation function')" || { echo "$kdf"; return 1; }
+  case "$kdf" in Argon2d*) ;; *) echo "Key derivation function reads '$kdf' after Argon2d was typed"; return 1 ;; esac
+  mac_kpxc "$pid" invoke OK || return 1
+  # KeePassXC saves after every change unless told otherwise; Save Database is asked for once when it has not.
+  for i in $(seq 1 60); do
+    if kx db-info "$VAULT" 2> /dev/null | grep -q 'KDF: Argon2d'; then
+      echo "KeePassXC's Database Security set $kdf and saved $VAULT_NAME"
+      return 0
+    fi
+    kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended before it saved the change"; return 1; }
+    [ "$i" != 20 ] || mac_kpxc "$pid" menu Database 'Save Database' || true
+    sleep 0.5
+  done
+  echo "$VAULT_NAME does not derive with Argon2d 30 s after OK: $(kx db-info "$VAULT" 2>&1 | grep 'KDF')"
+  return 1
 }
 
 # --- the child and its terminal -------------------------------------------------------------------
@@ -816,6 +887,10 @@ audit_answer() {
 act_first_run() {
   attempt keepassxc-vault keepassxc_vault || return 1
   attempt keepassxc-recent keepassxc_recent || return 1
+  if [ "$PLATFORM" = macos ]; then
+    fact keepassxc_argon2 "$(mac_keepassxc_argon2 2>&1 | tr -d "$CR" | tail -n 12 | tr '\n' ' ')"
+    fact database "$(kx db-info "$VAULT" 2>&1 | tr '\n' ' ')"
+  fi
   if [ "$PLATFORM" = linux ]; then attempt accessibility enable_accessibility || return 1; fi
   attempt launch app_launch || return 1
   attempt window drive window 120 || return 1
@@ -931,8 +1006,8 @@ act_restore() {
   attempt actions drive toggle 'More actions' || return 1
   attempt history drive invoke id:HistoryToggle || return 1
   attempt revision drive select-nth id:Revisions 1 || return 1
-  attempt restore-this drive invoke id:RestoreRevision || return 1
-  saved revision_ms restore-revision drive invoke Restore || return 1
+  # That revision holds the item's project tags as they are, so Restore this writes it without asking first (D-0415).
+  saved revision_ms restore-revision drive invoke id:RestoreRevision || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
   # An open history takes the whole view, so it is closed for the list to show again.
   attempt hide-history drive invoke 'Hide history' || return 1

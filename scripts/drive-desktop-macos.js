@@ -8,7 +8,9 @@
 // hosted runner grants.
 //
 // Usage: osascript -l JavaScript drive-desktop-macos.js <pid> <verb> [args...]
+//        osascript -l JavaScript drive-desktop-macos.js <pid> menu <menu> <item>
 //        osascript -l JavaScript drive-desktop-macos.js - dialog|press <process-name> [button]
+// menu, dialog and press are this driver's own, for the apps beside keypaste that the macOS exercises drive.
 ObjC.import('Foundation');
 ObjC.import('AppKit');
 ObjC.import('CoreGraphics');
@@ -19,6 +21,7 @@ const TITLE = environment('DRIVE_WINDOW') || 'keypaste';
 const DEPTH = 40;
 const LIMIT = 4000;
 const FIELDS = new Set(['AXTextField', 'AXTextArea']);
+// Button takes in a tab, an AXRadioButton in Avalonia and in Qt, and a combo box's AXPopUpButton.
 const PRESSABLE = /Button|CheckBox|MenuItem|Link|DisclosureTriangle/;
 // Avalonia gives a toggle's state as AXValue: a CheckBox is an AXCheckBox, a ToggleButton or ToggleSwitch an AXButton.
 const TOGGLES = /CheckBox|Button/;
@@ -472,6 +475,15 @@ function act(pid, action, args) {
       const found = located(pid, args[0], settableText);
       if (!found) throw new Refused(`no field named '${args[0]}'`);
       return setText(found.node, args[1], `the field named '${args[0]}'`);
+    }
+    case 'menu': {
+      front(pid);
+      const process = events.processes.whose({ unixId: pid })()[0];
+      const item = process.menuBars[0].menuBarItems.byName(args[0]).menus[0].menuItems.byName(args[1]);
+      if (!attempt(() => item.exists(), false)) throw new Refused(`the ${args[0]} menu holds no '${args[1]}'`);
+      if (!attempt(() => item.enabled(), false)) throw new Refused(`'${args[1]}' in the ${args[0]} menu is disabled`);
+      item.click();
+      return `chose '${args[1]}' from the ${args[0]} menu`;
     }
     case 'dialog':
       return JSON.stringify(dialog(args[0]));
