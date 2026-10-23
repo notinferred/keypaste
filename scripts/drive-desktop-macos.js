@@ -390,7 +390,17 @@ function act(pid, action, args) {
         if (ax.settable(item.element, 'AXSelected')) {
           const status = ax.set(item.element, 'AXSelected', $.NSNumber.numberWithBool(true));
           if (status !== 0) throw new Refused(`the ${item.role} holding '${args[0]}' refused the selection (${status})`);
-          return `selected '${args[0]}' through its ${item.role}`;
+          // Avalonia accepts the selection of a disabled item and does nothing with it; a choice that moves the app on
+          // takes its list away.
+          const outcome = until(5, () => {
+            if (ax.text(item.element, 'AXSelected') === '1') return '';
+            return present(pid, args[0]) ? null : ', and it then left the window';
+          });
+          if (outcome === null) {
+            const disabled = ax.text(item.element, 'AXEnabled') === '0' ? ', which is disabled,' : '';
+            throw new Refused(`the ${item.role} holding '${args[0]}'${disabled} is not selected after it was chosen`);
+          }
+          return `selected '${args[0]}' through its ${item.role}${outcome}`;
         }
       }
       throw new Refused(`nothing holding '${args[0]}' can be selected`);

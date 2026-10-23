@@ -539,8 +539,9 @@ app_quit() {
 # The unlock screen's password field is clicked first, as a person does, since the focus may be elsewhere.
 unlock_with() { drive focus id:Password && drive type "$1" && drive key Return && drive wait 'Lock now' 120; }
 
-# The vault the app chose for agents and the CLI: app.toml's vault, unescaped from TOML.
-chosen_vault() { sed -n 's/^vault = "\(.*\)"$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1 | sed 's/\\\\/\\/g'; }
+# The vault the app chose for agents and the CLI: app.toml's vault, whose line ends in a comment and whose value holds
+# no quote or backslash (TomlWriter).
+chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1; }
 
 # --- the vault through the CLI --------------------------------------------------------------------
 
@@ -855,7 +856,8 @@ act_project_run() {
   attempt tag drive set-named id:NewTag "env:$PROJECT" || return 1
   attempt add-tag drive invoke 'Add tag' || return 1
   saved tagged_ms confirm-tag drive invoke 'Add tag[2]' || return 1
-  attempt projects drive select Projects || return 1
+  # The sidebar's Projects is a heading that cannot be chosen; the project is the row beneath it.
+  attempt projects drive select "$PROJECT" || return 1
   attempt key-row drive find "$FIELD" || return 1
   attempt directory drive set-named 'Project directory' "$(native "$RUN_DIR")" || return 1
   attempt command drive set-named Command "$(child_command)" || return 1
@@ -873,7 +875,7 @@ act_edit_rerun() {
   attempt value drive type "$VALUE2" || return 1
   saved replaced_ms confirm drive invoke 'Replace[2]' || return 1
   fact field_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
-  attempt projects drive select Projects || return 1
+  attempt projects drive select "$PROJECT" || return 1
   run_child
 }
 
@@ -883,7 +885,8 @@ act_connect() {
   attempt agents shortcut 2 || return 1
   attempt offered drive wait "Connect $TOOL" 90 || return 1
   attempt connect drive invoke "Connect $TOOL" || return 1
-  attempt plan drive read 'What Run it will do' || return 1
+  # A TextBlock's accessible name is its text, so the plan is found by its automation id.
+  attempt plan drive read id:ConnectPlan || return 1
   attempt run-it drive invoke 'Run it' || return 1
   attempt registered wait_registration 60 || return 1
   fact registration "$(registration_json)"
@@ -931,6 +934,8 @@ act_restore() {
   attempt restore-this drive invoke id:RestoreRevision || return 1
   saved revision_ms restore-revision drive invoke Restore || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
+  # An open history takes the whole view, so it is closed for the list to show again.
+  attempt hide-history drive invoke 'Hide history' || return 1
   # A deletion: the scratch item deleted, then restored from Trash.
   attempt choose-scratch drive select "$ENTRY_SCRATCH" || return 1
   attempt scratch-actions drive toggle 'More actions' || return 1
