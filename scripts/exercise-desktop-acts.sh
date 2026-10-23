@@ -549,6 +549,16 @@ unlock_with() { drive focus id:Password && drive type "$1" && drive key Return &
 # The vault the app chose for agents and the CLI: app.toml's vault, whose line ends in a comment and whose value holds
 # no quote or backslash (TomlWriter).
 chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1; }
+# The project's page, from its row in the sidebar. Linux's AT-SPI (Avalonia 12.1) keeps a list's rows as it first
+# listed them, so the row the tag added is not among them there; it is reached as from the keyboard instead: the
+# Items row clicked, End to Agents, the last row, and Up to the project's row above it.
+open_project() {
+  if [ "$PLATFORM" = linux ]; then
+    drive click Items && drive key End && drive key Up && drive wait 'Project directory' 30
+  else
+    drive select "$PROJECT"
+  fi
+}
 
 # --- the vault through the CLI --------------------------------------------------------------------
 
@@ -613,11 +623,11 @@ keepassxc_vault() {
   # shellcheck source=scripts/lib/kpxc.sh
   . "$ROOT/scripts/lib/kpxc.sh"
   # shellcheck disable=SC2154 # kpxc.sh sets cli and pw.
-  if [ "$PLATFORM" = windows ]; then
-    keepassxc_create || return 1
-  else
-    printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$VAULT")" > /dev/null || { echo 'keepassxc-cli db-create failed'; return 1; }
-  fi
+  case "$PLATFORM" in
+    windows) keepassxc_create || return 1 ;;
+    linux) keepassxc_new_database || return 1 ;;
+    *) printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$VAULT")" > /dev/null || { echo 'keepassxc-cli db-create failed'; return 1; } ;;
+  esac
   kx add "$VAULT" "$ENTRY_FIELD" -u acts --url https://example.test > /dev/null || { echo "keepassxc-cli add $ENTRY_FIELD failed"; return 1; }
   kx add "$VAULT" "$ENTRY_NOTES" --notes "$NOTE_KEY=$NOTE_VALUE" > /dev/null || { echo "keepassxc-cli add $ENTRY_NOTES failed"; return 1; }
   kx add "$VAULT" "$ENTRY_SCRATCH" -u scratch > /dev/null || { echo "keepassxc-cli add $ENTRY_SCRATCH failed"; return 1; }
@@ -671,6 +681,50 @@ kpxc_drive() {
   local title="$1"
   shift
   APP_PID="$KPXC_PID" drive --window "$title" "$@"
+}
+
+# Linux: KeePassXC makes the vault in its own new-database window, which derives with Argon2d where keepassxc-cli
+# db-create derives with AES-KDF, under a scratch configuration so that keepassxc_recent still meets a first run.
+# The window is driven through AT-SPI as the app is, and saved where the acts keep the vault.
+keepassxc_new_database() {
+  local gui scratch pid wizard='Create a new KeePassXC database…' save='Save database as'
+  gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
+  enable_accessibility > /dev/null || { echo 'the accessibility bus did not enable'; return 1; }
+  scratch="$(mktemp -d)"
+  mkdir -p "$scratch/config/keepassxc"
+  printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$scratch/config/keepassxc/keepassxc.ini"
+  XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" "$gui" > "$OUT/keepassxc-new.log" 2>&1 &
+  pid=$!
+  # Each Continue waits for the page before it to show, and the encryption page keeps KeePassXC's Argon2d.
+  drive --window KeePassXC invoke 'Create new database' \
+    && drive --window "$wizard" invoke Continue \
+    && drive --window "$wizard" find 'Decryption time in seconds' \
+    && drive --window "$wizard" invoke Continue \
+    && drive --window "$wizard" click 'Password field' \
+    && drive --window "$wizard" type "$pw" \
+    && drive --window "$wizard" click 'Repeat password field' \
+    && drive --window "$wizard" type "$pw" \
+    && drive --window "$wizard" invoke Done \
+    || {
+      screenshot keepassxc-new "$wizard"
+      kill -9 "$pid" 2> /dev/null
+      echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"
+      return 1
+    }
+  # KeePassXC asks where to save the new database as soon as its window closes.
+  drive --window "$save" key ctrl+a \
+    && drive --window "$save" type "$(native "$VAULT")" \
+    && drive --window "$save" key Return \
+    && wait_for_file "$VAULT" 60 \
+    || {
+      screenshot keepassxc-save "$save"
+      kill -9 "$pid" 2> /dev/null
+      echo "KeePassXC did not save the new database as $VAULT"
+      return 1
+    }
+  close_keepassxc "$pid" || return 1
+  rm -rf "$scratch"
+  echo "KeePassXC's new-database window made $VAULT_NAME"
 }
 
 # KeePassXC opens the database once and closes as a person does, which leaves it in its recent databases where it
@@ -1023,8 +1077,7 @@ act_project_run() {
   attempt tag drive set-named id:NewTag "env:$PROJECT" || return 1
   attempt add-tag drive invoke 'Add tag' || return 1
   saved tagged_ms confirm-tag drive invoke 'Add tag[2]' || return 1
-  # The sidebar's Projects is a heading that cannot be chosen; the project is the row beneath it.
-  attempt projects drive select "$PROJECT" || return 1
+  attempt project open_project || return 1
   attempt key-row drive find "$FIELD" || return 1
   attempt directory drive set-named 'Project directory' "$(native "$RUN_DIR")" || return 1
   attempt command drive set-named Command "$(child_command)" || return 1
@@ -1042,7 +1095,7 @@ act_edit_rerun() {
   attempt value drive type "$VALUE2" || return 1
   saved replaced_ms confirm drive invoke 'Replace[2]' || return 1
   fact field_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
-  attempt projects drive select "$PROJECT" || return 1
+  attempt project open_project || return 1
   run_child
 }
 
@@ -1169,7 +1222,7 @@ act_timing() {
   case "$PLATFORM" in
     windows) fact argon2 "the package carries: $(find "$(dirname "$APP")" -maxdepth 1 -iname '*argon2*' -exec basename {} \; | tr '\n' ' ')" ;;
     macos) fact argon2 "the package carries: $(find "$APP/Contents" -iname '*argon2*' -exec basename {} \; | tr '\n' ' ')" ;;
-    linux) fact argon2 "on Linux the package's own KeePassLib derives the key (D-0522)" ;;
+    linux) fact argon2 "the package carries none; KeePassLib finds the system's by its sonames (D-0522): $(ldconfig -p | grep -o 'libargon2\.so[^ ]*' | sort -u | tr '\n' ' ')" ;;
   esac
   fact database "$(fact_of "$OUT" first-run database)"
 }

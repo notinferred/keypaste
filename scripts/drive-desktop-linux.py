@@ -2,10 +2,14 @@
 """4.7b, R.1a: drives an installed keypaste desktop app from outside its process through AT-SPI and xdotool (D-0199).
 
 One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb could
-not be done, 2 when this driver does not implement it. DRIVE_WINDOW names the app's window to act in. Needs an X
-display, a session bus with org.a11y.Status enabled, python3-gi with Atspi, xdotool and ImageMagick.
+not be done. DRIVE_WINDOW names the app's window to act in. Needs an X display, a session bus with org.a11y.Status
+enabled, python3-gi with Atspi, xdotool and ImageMagick.
+
+A refusal to find an element also prints what the window offers to act on: its buttons, fields, lists and controls
+with an automation id, by role, name and id, never a text's or a list item's name, which can carry what it shows.
 """
 
+import difflib
 import os
 import re
 import subprocess
@@ -17,15 +21,12 @@ import gi
 gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi, GLib  # noqa: E402
 
-TITLE = os.environ.get("DRIVE_WINDOW") or "keypaste"
-UNIMPLEMENTED = {"windows", "key-wait", "wait", "wait-gone", "read", "select-nth", "check", "click", "right-click", "focus"}
+MAIN = "keypaste"
+TITLE = os.environ.get("DRIVE_WINDOW") or MAIN
+POLL = 0.05
 
 
 class Refused(Exception):
-    pass
-
-
-class Unimplemented(Exception):
     pass
 
 
@@ -37,19 +38,57 @@ def until(seconds, probe):
             return found
         if time.monotonic() >= deadline:
             return None
-        time.sleep(0.25)
+        time.sleep(POLL)
+        forget()
+
+
+def forget():
+    """Drops what libatspi cached of the window, so a poll reads the tree as it is now."""
+    frame = window()
+    if frame is not None:
+        try:
+            frame.clear_cache()
+        except (AttributeError, GLib.Error):
+            pass
+
+
+def child(element, i):
+    try:
+        return element.get_child_at_index(i)
+    except GLib.Error:
+        return None
+
+
+def children(element):
+    try:
+        count = element.get_child_count()
+    except GLib.Error:
+        return
+    for i in range(count):
+        found = child(element, i)
+        if found is not None:
+            yield found
+
+
+def frames():
+    """Each application's top-level windows, as (application, frame)."""
+    desktop = Atspi.get_desktop(0)
+    for app in children(desktop):
+        for frame in children(app):
+            yield app, frame
+
+
+def name_of(element):
+    try:
+        return element.get_name() or ""
+    except GLib.Error:
+        return ""
 
 
 def window():
-    desktop = Atspi.get_desktop(0)
-    for i in range(desktop.get_child_count()):
-        app = desktop.get_child_at_index(i)
-        if app is None:
-            continue
-        for j in range(app.get_child_count()):
-            frame = app.get_child_at_index(j)
-            if frame is not None and frame.get_name() == TITLE:
-                return frame
+    for _, frame in frames():
+        if name_of(frame) == TITLE:
+            return frame
     return None
 
 
@@ -57,21 +96,35 @@ def descendants(root, depth=0):
     if root is None or depth > 60:
         return
     yield root
-    for i in range(root.get_child_count()):
-        yield from descendants(root.get_child_at_index(i), depth + 1)
+    for found in children(root):
+        yield from descendants(found, depth + 1)
 
 
-def named(locator, predicate=lambda e: True):
-    """A name, or id:<automation id>, either with [n] for the nth match in tree order."""
+def parse(locator):
     index = 1
     counted = re.fullmatch(r"(.*)\[(\d+)\]", locator)
     if counted:
         locator, index = counted.group(1), int(counted.group(2))
     if locator.startswith("id:"):
-        raise Unimplemented("the id: locator")
+        return "id", locator[3:], index
+    return "name", locator, index
+
+
+def automation_id(element):
+    try:
+        return element.get_accessible_id() or ""
+    except GLib.Error:
+        return ""
+
+
+def named(locator, predicate=lambda e: True):
+    """A name, or id:<automation id>, either with [n] for the nth match in tree order, among what the window shows:
+    Avalonia lists only what it shows, and Qt lists a wizard's or a stack's hidden pages too."""
+    kind, wanted, index = parse(locator)
     seen = 0
     for element in descendants(window()):
-        if element.get_name() == locator and predicate(element):
+        value = automation_id(element) if kind == "id" else name_of(element)
+        if value == wanted and state(element, Atspi.StateType.SHOWING) and predicate(element):
             seen += 1
             if seen == index:
                 return element
@@ -79,14 +132,93 @@ def named(locator, predicate=lambda e: True):
 
 
 def has(element, interface):
-    return interface in element.get_interfaces()
+    try:
+        return interface in element.get_interfaces()
+    except GLib.Error:
+        return False
+
+
+def role(element):
+    try:
+        return element.get_role()
+    except GLib.Error:
+        return None
+
+
+def role_name(element):
+    try:
+        return element.get_role_name()
+    except GLib.Error:
+        return "unknown"
+
+
+def state(element, which):
+    try:
+        return element.get_state_set().contains(which)
+    except GLib.Error:
+        return False
+
+
+QUIET_ROLES = {Atspi.Role.LABEL, Atspi.Role.TEXT, Atspi.Role.STATIC, Atspi.Role.LIST_ITEM, Atspi.Role.HEADING}
+
+
+def offered():
+    """The window's buttons, fields, lists and named controls, for a refusal; no text's or list item's name. Qt's
+    named containers, such as a password field's, are fillers. Each is marked hidden, disabled or focused."""
+    frame = window()
+    if frame is None:
+        titles = [name_of(f) for _, f in frames()]
+        return f"no window named '{TITLE}'; the desktop shows {titles}"
+    shown = []
+    for element in descendants(frame):
+        ident = automation_id(element)
+        editable = has(element, "EditableText")
+        if role(element) in QUIET_ROLES and not editable:
+            continue
+        if has(element, "Selection"):
+            seen = listed(element)
+        elif ident or editable or has(element, "Action") or (role(element) == Atspi.Role.FILLER and name_of(element)):
+            seen = f"{role_name(element)} '{name_of(element)}'" + (f" #{ident}" if ident else "")
+        else:
+            continue
+        marks = [mark for mark, which in (("hidden", Atspi.StateType.SHOWING), ("disabled", Atspi.StateType.ENABLED))
+                 if not state(element, which)]
+        if state(element, Atspi.StateType.FOCUSED):
+            marks.append("focused")
+        shown.append(seen + (f" ({', '.join(marks)})" if marks else ""))
+    return "the window offers: " + "; ".join(shown[:150])
+
+
+def listed(listing):
+    """A list as AT-SPI reports it: its name, its automation id and how many items it holds."""
+    ident = automation_id(listing)
+    return f"{role_name(listing)} '{name_of(listing)}'" + (f" #{ident}" if ident else "") + \
+        f" of {listing.get_child_count()} items"
+
+
+def missing(locator, what):
+    kind, wanted, _ = parse(locator)
+    near = ""
+    if kind == "name":
+        names = {name_of(e) for e in descendants(window())}
+        close = difflib.get_close_matches(wanted, [n for n in names if 0 < len(n) <= 80], n=5, cutoff=0.75)
+        if close:
+            near = f"; names like it: {close}"
+    return Refused(f"{what}{near}\n{offered()}")
+
+
+def located(locator, predicate=lambda e: True, seconds=30, what=None):
+    element = until(seconds, lambda: named(locator, predicate))
+    if element is None:
+        raise missing(locator, what or f"nothing named '{locator}' appeared within {seconds} s")
+    return element
 
 
 def xwindow():
     ids = subprocess.run(["xdotool", "search", "--sync", "--name", f"^{re.escape(TITLE)}$"],
                          capture_output=True, text=True, timeout=30, check=True).stdout.split()
     if not ids:
-        raise Refused("no X window named keypaste")
+        raise Refused(f"no X window named {TITLE}")
     return ids[0]
 
 
@@ -97,15 +229,42 @@ def foreground():
     return wid
 
 
-def act(action, args):
-    if action in UNIMPLEMENTED:
-        raise Unimplemented(f"the verb {action}")
+def keyboard(*keys):
+    """Presses keys as a keyboard does, through XTEST into the window just brought forward. With --window, xdotool
+    presses through XTEST while the window has the focus and releases through XSendEvent once it has lost it, so a
+    Return that closes a dialog stayed held in the X server and swallowed the next Return the app was sent."""
+    foreground()
+    subprocess.run(["xdotool", *keys], check=True, timeout=60)
 
+
+def centre(element):
+    box = Atspi.Component.get_extents(element, Atspi.CoordType.SCREEN)
+    if box.width <= 0 or box.height <= 0:
+        raise Refused(f"it has no area on the screen: {box.x},{box.y} {box.width}x{box.height}")
+    return box.x + box.width // 2, box.y + box.height // 2
+
+
+def pressable(locator, what):
+    """A control with an action once it is enabled, as a person waits for a button that is armed a moment late."""
+    element = located(locator, lambda e: has(e, "Action"), what=what)
+    if until(30, lambda: True if state(element, Atspi.StateType.ENABLED) else None) is None:
+        raise Refused(f"'{locator}' stayed disabled for 30 s")
+    return element
+
+
+def act(action, args):
     if action == "window":
         frame = until(int(args[0]), window)
         if frame is None:
             raise Refused(f"no accessible window named {TITLE} within {args[0]} s")
-        return f"window '{frame.get_name()}' of {frame.get_application().get_name()}"
+        return f"window '{name_of(frame)}' of {frame.get_application().get_name()}"
+
+    if action == "windows":
+        apps = {app.get_process_id() for app, frame in frames() if name_of(frame).split(":")[0] == MAIN}
+        titles = [name_of(frame) for app, frame in frames() if app.get_process_id() in apps]
+        if not titles:
+            raise Refused("no application shows a window named keypaste")
+        return "\n".join(titles)
 
     if action == "screenshot":
         wid = xwindow()
@@ -117,63 +276,130 @@ def act(action, args):
         return f"colours={colours} size={size}"
 
     if action == "type":
-        wid = foreground()
-        subprocess.run(["xdotool", "type", "--window", wid, "--delay", "40", args[0]], check=True, timeout=60)
+        keyboard("type", "--delay", "40", args[0])
         return f"typed {len(args[0])} characters"
 
     if action == "key":
-        wid = foreground()
-        subprocess.run(["xdotool", "key", "--window", wid, args[0]], check=True, timeout=10)
+        keyboard("key", args[0])
         return f"sent {args[0]}"
 
-    if action == "find":
-        element = until(30, lambda: named(args[0]))
+    if action == "key-wait":
+        chord, locator, seconds = args[0], args[1], int(args[2])
+        foreground()
+        looks = []
+
+        def probe():
+            began = time.monotonic()
+            found = named(locator)
+            looks.append(time.monotonic() - began)
+            return found
+
+        sent = time.monotonic()
+        subprocess.run(["xdotool", "key", chord], check=True, timeout=10)
+        element = until(seconds, probe)
+        elapsed = round((time.monotonic() - sent) * 1000)
         if element is None:
-            raise Refused(f"nothing named '{args[0]}' appeared")
-        return f"found '{args[0]}' as {element.get_role_name()}"
+            raise missing(locator, f"nothing named '{locator}' appeared within {seconds} s of {chord}")
+        fastest, slowest = round(min(looks) * 1000), round(max(looks) * 1000)
+        return f"found '{locator}' {elapsed} ms after {chord}\n{len(looks)} looks took {fastest} to {slowest} ms each"
+
+    if action == "find":
+        element = located(args[0])
+        return f"found '{args[0]}' as {role_name(element)}"
+
+    if action == "wait":
+        element = located(args[0], seconds=int(args[1]))
+        return f"found '{args[0]}' as {role_name(element)}"
+
+    if action == "wait-gone":
+        gone = until(int(args[1]), lambda: True if named(args[0]) is None else None)
+        if gone is None:
+            raise Refused(f"'{args[0]}' was still there after {args[1]} s")
+        return f"gone '{args[0]}'"
 
     if action == "find-prefix":
         def probe():
             for element in descendants(window()):
-                name = element.get_name() or ""
+                name = name_of(element)
                 if name.startswith(args[0]):
                     return name
             return None
         text = until(30, probe)
         if text is None:
-            raise Refused(f"nothing starting '{args[0]}' appeared")
+            raise missing(args[0], f"nothing starting '{args[0]}' appeared")
         return text
 
+    if action == "read":
+        element = located(args[0])
+        if has(element, "Text"):
+            return Atspi.Text.get_text(element, 0, -1)
+        return name_of(element)
+
     if action == "select":
-        element = until(30, lambda: named(args[0], lambda e: not has(e, "Action")))
-        if element is None:
-            raise Refused(f"no text '{args[0]}' to select")
+        element = located(args[0], lambda e: not has(e, "Action"), what=f"no text '{args[0]}' to select")
         item = element
-        while item is not None and item.get_role() != Atspi.Role.LIST_ITEM:
+        while item is not None and role(item) != Atspi.Role.LIST_ITEM:
             item = item.get_parent()
         if item is None:
             raise Refused(f"'{args[0]}' is not inside a list item")
         parent = item.get_parent()
-        if not has(parent, "Selection") or not Atspi.Selection.select_child(parent, item.get_index_in_parent()):
+        index = item.get_index_in_parent()
+        if not has(parent, "Selection") or not Atspi.Selection.select_child(parent, index):
             raise Refused(f"the list holding '{args[0]}' refused the selection")
-        return f"selected '{args[0]}'"
+        return f"selected '{args[0]}'\nitem {index + 1} of {listed(parent)}"
+
+    if action == "select-nth":
+        listing = located(args[0], lambda e: has(e, "Selection"), what=f"no list '{args[0]}'")
+        index = int(args[1]) - 1
+        if not Atspi.Selection.select_child(listing, index):
+            raise Refused(f"'{args[0]}' refused to select item {args[1]} of its {listing.get_child_count()}")
+        if until(5, lambda: True if Atspi.Selection.is_child_selected(listing, index) else None) is None:
+            raise Refused(f"item {args[1]} of '{args[0]}' was not selected")
+        return f"selected item {args[1]} of '{args[0]}'"
 
     if action in ("invoke", "toggle"):
-        button = until(30, lambda: named(args[0], lambda e: has(e, "Action")))
-        if button is None:
-            raise Refused(f"no button '{args[0]}'")
+        button = pressable(args[0], f"no button '{args[0]}'")
         if not Atspi.Action.do_action(button, 0):
             raise Refused(f"'{args[0]}' refused its action")
-        return f"invoked '{args[0]}'"
+        return f"{'invoked' if action == 'invoke' else 'toggled'} '{args[0]}'"
+
+    if action == "check":
+        wanted = args[1] == "on"
+        box = pressable(args[0], f"no check box '{args[0]}'")
+        if not state(box, Atspi.StateType.CHECKABLE):
+            raise Refused(f"'{args[0]}' is a {role_name(box)}, which has no on or off")
+        if state(box, Atspi.StateType.CHECKED) != wanted:
+            # A check box's or a switch's one action is its toggle.
+            if not Atspi.Action.do_action(box, 0):
+                raise Refused(f"'{args[0]}' refused its toggle")
+        if until(5, lambda: True if state(box, Atspi.StateType.CHECKED) == wanted else None) is None:
+            raise Refused(f"'{args[0]}' did not turn {args[1]}")
+        return f"'{args[0]}' is {args[1]}"
+
+    if action in ("click", "right-click"):
+        element = located(args[0])
+        x, y = centre(element)
+        foreground()
+        button = "1" if action == "click" else "3"
+        # Not --sync, which waits for a motion that never comes when the pointer is already there.
+        subprocess.run(["xdotool", "mousemove", str(x), str(y), "click", button], check=True, timeout=10)
+        return f"{'clicked' if action == 'click' else 'right-clicked'} '{args[0]}' at {x},{y}"
+
+    if action == "focus":
+        element = located(args[0])
+        foreground()
+        if not Atspi.Component.grab_focus(element):
+            raise Refused(f"'{args[0]}' refused the focus")
+        if until(5, lambda: True if state(element, Atspi.StateType.FOCUSED) else None) is None:
+            raise Refused(f"'{args[0]}' did not take the focus")
+        return f"focused '{args[0]}'"
 
     if action == "set-after":
-        label = until(30, lambda: named(args[0], lambda e: not has(e, "EditableText")))
-        if label is None:
-            raise Refused(f"no label '{args[0]}'")
+        label = located(args[0], lambda e: not has(e, "EditableText"), what=f"no label '{args[0]}'")
         parent = label.get_parent()
         edit = None
         for i in range(label.get_index_in_parent() + 1, parent.get_child_count()):
-            candidate = parent.get_child_at_index(i)
+            candidate = child(parent, i)
             if candidate is not None and has(candidate, "EditableText"):
                 edit = candidate
                 break
@@ -182,9 +408,7 @@ def act(action, args):
         return set_text(edit, args[1], f"the field after '{args[0]}'")
 
     if action == "set-named":
-        edit = until(30, lambda: named(args[0], lambda e: has(e, "EditableText")))
-        if edit is None:
-            raise Refused(f"no field named '{args[0]}'")
+        edit = located(args[0], lambda e: has(e, "EditableText"), what=f"no field named '{args[0]}'")
         return set_text(edit, args[1], f"the field named '{args[0]}'")
 
     raise Refused(f"no verb named {action}")
@@ -205,9 +429,6 @@ def main():
     try:
         print(act(sys.argv[1], sys.argv[2:]))
         return 0
-    except Unimplemented as what:
-        print(f"{what} not implemented on linux")
-        return 2
     except (Refused, subprocess.SubprocessError, GLib.Error) as error:
         print(error)
         return 1
