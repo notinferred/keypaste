@@ -527,7 +527,8 @@ app_quit() {
   esac
 }
 
-unlock_with() { drive type "$1" && drive key Return && drive wait 'Lock now' 120; }
+# The unlock screen's password field is clicked first, as a person does, since the focus may be elsewhere.
+unlock_with() { drive focus id:Password && drive type "$1" && drive key Return && drive wait 'Lock now' 120; }
 
 # The vault the app chose for agents and the CLI: app.toml's vault, unescaped from TOML.
 chosen_vault() { sed -n 's/^vault = "\(.*\)"$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1 | sed 's/\\\\/\\/g'; }
@@ -783,6 +784,8 @@ act_first_run() {
   attempt window drive window 120 || return 1
   attempt keepassxc-list drive find 'KEEPASSXC LAST OPENED' || return 1
   attempt choose drive select "$VAULT_NAME" || return 1
+  # Choosing the database leaves the focus on its list, so the password field is clicked as a person does.
+  attempt password-focus drive focus id:Password || return 1
   attempt password drive type "$PASSWORD" || return 1
   # Timed inside the driver, from Return to the item list, since starting a driver can take longer than an unlock.
   attempt unlock drive key-wait Return "$ENTRY_FIELD" 120 || return 1
