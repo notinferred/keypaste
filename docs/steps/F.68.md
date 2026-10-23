@@ -66,4 +66,4 @@ D-0526 pins KeePassXC 2.8.0 on Windows and macOS; D-0527 records the idle warnin
 - **2.8.0 not crashing** in 60 starts is evidence, not KeePassXC's diagnosis, which it never made.
 - **2.8 on Linux.** No runner has KeePassXC 2.8 on Linux, where Ubuntu 24.04 ships 2.7.6, so the first run's new location is held by unit tests only.
 - **No screen reader was run.** The idle warning's single announcement rests on its peer's events and on Avalonia's bridges announcing a live element's change of name.
-- **A `{S:…}` whose name holds braces,** such as `{S:a{PASSWORD}b}`, which KeePassXC 2.7 and 2.8 read as one field named `a{PASSWORD}b`, keypaste still fills inside; that divergence predates this step and is unchanged.
+- **A `{S:…}` whose name holds braces,** such as `{S:a{PASSWORD}b}`, which KeePassXC 2.7 and 2.8 read as one field named `a{PASSWORD}b`, keypaste still fills inside; that divergence predates this step and is unchanged, and F.69 holds it.

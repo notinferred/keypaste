@@ -100,6 +100,9 @@ Each row keeps its historical meaning and is expanded when selected.
   - One import contract, with preview, collision decisions and atomic commit, so nothing is dropped silently.
   - Its adapters, each Needs 9.1a: 9.1b (Bitwarden JSON), 9.1c (LastPass CSV), 9.1d1 (1Password 1PUX), 9.1d2 (1Password CSV) and 9.1e (KeePassXC CSV).
   - 9.1f guides import in the desktop.
+- [ ] **F.69 — Agree with KeePassXC on a `{S:…}` whose name holds braces.** Needs: none.
+  - keypaste fills in a placeholder inside such a name, so `{S:a{PASSWORD}b}` leaves keypaste with the password in the middle, where KeePassXC 2.7 and 2.8 read one field named `a{PASSWORD}b` and give its value, or nothing when there is none ([F.68](steps/F.68.md)).
+  - Decide whether keypaste reads it as KeePassXC does or refuses it, as it refuses what the two versions give differently (D-0529).
 - [ ] **P.1 — Hardware-key vault unlocking.** Needs: V.1b, U.2. Ships after: R.1.
   - The desktop already unlocks a vault that needs a YubiKey slot and changes the key in Settings (D-0366), but this has not been tried with a physical key.
   - What remains:
