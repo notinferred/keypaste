@@ -61,12 +61,31 @@ function Until([int]$seconds, [scriptblock]$probe) {
   return $null
 }
 
+$Mine = New-Object System.Windows.Automation.PropertyCondition($Auto::ProcessIdProperty, $AppPid)
+$IsWindow = New-Object System.Windows.Automation.PropertyCondition($Auto::ControlTypeProperty, $Types::Window)
+
+function TopWindows { @($Auto::RootElement.FindAll($Scope::Children, (New-Object System.Windows.Automation.AndCondition($Mine, $IsWindow)))) }
+
+# A dialog its owner holds, such as a wizard, a message box or a file dialog, sits under that window.
 function Window {
-  $condition = New-Object System.Windows.Automation.AndCondition(
-    (New-Object System.Windows.Automation.PropertyCondition($Auto::ProcessIdProperty, $AppPid)),
-    (New-Object System.Windows.Automation.PropertyCondition($Auto::ControlTypeProperty, $Types::Window)),
-    (New-Object System.Windows.Automation.PropertyCondition($Auto::NameProperty, $Title)))
-  $Auto::RootElement.FindFirst($Scope::Children, $condition)
+  $named = New-Object System.Windows.Automation.PropertyCondition($Auto::NameProperty, $Title)
+  $top = $Auto::RootElement.FindFirst($Scope::Children, (New-Object System.Windows.Automation.AndCondition($Mine, $IsWindow, $named)))
+  if ($top) { return $top }
+  foreach ($owner in (TopWindows)) {
+    $owned = $owner.FindFirst($Scope::Descendants, (New-Object System.Windows.Automation.AndCondition($IsWindow, $named)))
+    if ($owned) { return $owned }
+  }
+  return $null
+}
+
+# Whether the keyboard focus is on the element or inside it, as it is in a field a focus proxy hands it to.
+function Holds($element) {
+  $focused = $Auto::FocusedElement
+  for ($i = 0; $focused -and $i -lt 100; $i++) {
+    if ([System.Windows.Automation.Automation]::Compare($focused, $element)) { return $true }
+    $focused = $RawWalker.GetParent($focused)
+  }
+  return $false
 }
 
 function RawDescendants($root, $condition) {
@@ -196,12 +215,12 @@ switch ($Action) {
     Write-Output "window '$($window.Current.Name)' $($window.Current.BoundingRectangle)"
   }
   'windows' {
-    $condition = New-Object System.Windows.Automation.AndCondition(
-      (New-Object System.Windows.Automation.PropertyCondition($Auto::ProcessIdProperty, $AppPid)),
-      (New-Object System.Windows.Automation.PropertyCondition($Auto::ControlTypeProperty, $Types::Window)))
-    $found = @($Auto::RootElement.FindAll($Scope::Children, $condition))
+    $found = TopWindows
     if ($found.Count -eq 0) { Fail "process $AppPid shows no window" }
-    foreach ($window in $found) { Write-Output $window.Current.Name }
+    foreach ($window in $found) {
+      Write-Output $window.Current.Name
+      foreach ($owned in @($window.FindAll($Scope::Descendants, $IsWindow))) { Write-Output $owned.Current.Name }
+    }
   }
   'screenshot' {
     $window = Until 10 { Window }
@@ -359,7 +378,7 @@ switch ($Action) {
     Enabled $element $First
     Foreground
     $element.SetFocus()
-    if (-not (Until 5 { if ($element.Current.HasKeyboardFocus) { $true } })) { Fail "'$First' did not take the keyboard focus" }
+    if (-not (Until 5 { if (Holds $element) { $true } })) { Fail "'$First' did not take the keyboard focus" }
     Write-Output "focused '$First'"
   }
   'set-after' {

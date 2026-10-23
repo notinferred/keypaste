@@ -608,13 +608,56 @@ keepassxc_vault() {
   # shellcheck source=scripts/lib/kpxc.sh
   . "$ROOT/scripts/lib/kpxc.sh"
   # shellcheck disable=SC2154 # kpxc.sh sets cli and pw.
-  printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$VAULT")" > /dev/null || { echo 'keepassxc-cli db-create failed'; return 1; }
+  if [ "$PLATFORM" = windows ]; then
+    keepassxc_create || return 1
+  else
+    printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$VAULT")" > /dev/null || { echo 'keepassxc-cli db-create failed'; return 1; }
+  fi
   kx add "$VAULT" "$ENTRY_FIELD" -u acts --url https://example.test > /dev/null || { echo "keepassxc-cli add $ENTRY_FIELD failed"; return 1; }
   kx add "$VAULT" "$ENTRY_NOTES" --notes "$NOTE_KEY=$NOTE_VALUE" > /dev/null || { echo "keepassxc-cli add $ENTRY_NOTES failed"; return 1; }
   kx add "$VAULT" "$ENTRY_SCRATCH" -u scratch > /dev/null || { echo "keepassxc-cli add $ENTRY_SCRATCH failed"; return 1; }
   fact keepassxc "$("$cli" --version | tr -d "$CR")"
   fact database "$(kx db-info "$VAULT" 2>&1 | tr '\n' ' ')"
-  echo "keepassxc-cli made $VAULT_NAME with $ENTRY_FIELD, $ENTRY_NOTES and $ENTRY_SCRATCH"
+  echo "keepassxc-cli added $ENTRY_FIELD, $ENTRY_NOTES and $ENTRY_SCRATCH to $VAULT_NAME"
+}
+
+# Windows: KeePassXC's own Create Database window makes the vault, as a person makes one, so it derives its key with
+# the Argon2d that window chooses, which keepassxc-cli db-create never does, and the timing act reaches the libargon2
+# the package carries (D-0522). This KeePassXC keeps its settings in files of its own, so the first run offers only
+# what keepassxc_recent leaves in KeePassXC's recent databases.
+keepassxc_create() {
+  local gui pid main maker="$OUT/keepassxc-maker" wizard='Create a new KeePassXC database…'
+  gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
+  mkdir -p "$maker"
+  printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$maker/keepassxc.ini"
+  "$gui" --config "$(native "$maker/keepassxc.ini")" --localconfig "$(native "$maker/keepassxc-local.ini")" > "$maker/keepassxc.log" 2>&1 &
+  pid=$!
+  KPXC_PID="$(cat "/proc/$pid/winpid")"
+  DRIVE_TREE_DIR="$(native "$OUT")"
+  export DRIVE_TREE_DIR
+  if kpxc_drive KeePassXC window 60 && kpxc_drive KeePassXC invoke 'Create Database' \
+    && kpxc_drive "$wizard" invoke Continue && kpxc_drive "$wizard" invoke Continue \
+    && kpxc_drive "$wizard" focus 'Password field' && kpxc_drive "$wizard" type "$pw" \
+    && kpxc_drive "$wizard" focus 'Repeat password field' && kpxc_drive "$wizard" type "$pw" \
+    && kpxc_drive "$wizard" invoke Done && kpxc_drive 'Weak password' invoke 'Continue with weak password' \
+    && main="$(kpxc_drive KeePassXC windows | tr -d "$CR" | grep -m 1 'KeePassXC$')" && echo "the database is open in '$main'" \
+    && kpxc_drive "$main" key ctrl+s \
+    && kpxc_drive 'Save database as' set-named 'File name:' "$(native "$VAULT")" && kpxc_drive 'Save database as' invoke Save \
+    && wait_for_file "$VAULT" 30; then
+    if kill -0 "$pid" 2> /dev/null; then close_keepassxc "$pid" || return 1; else echo 'KeePassXC ended by itself after saving'; fi
+    echo "KeePassXC's Create Database window made $VAULT_NAME"
+  else
+    kill -9 "$pid" 2> /dev/null || true
+    echo "KeePassXC's Create Database window did not make $VAULT_NAME: $(tail -n 5 "$maker/keepassxc.log" | tr -d "$CR")"
+    return 1
+  fi
+}
+
+# kpxc_drive <window title> <verb> [arguments...]: the desktop driver, acting in the KeePassXC keepassxc_create started.
+kpxc_drive() {
+  local title="$1"
+  shift
+  APP_PID="$KPXC_PID" drive --window "$title" "$@"
 }
 
 # KeePassXC opens the database once and closes as a person does, which leaves it in its recent databases where it
