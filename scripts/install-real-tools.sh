@@ -13,7 +13,9 @@
 #
 # Logs go to stderr; each directory to put on PATH is a line on stdout, in the runner's own form.
 #
-# Usage: install-real-tools.sh <dest-dir>
+# Usage: install-real-tools.sh [--claude-code-only] <dest-dir>
+#   --claude-code-only  only Claude Code, into <dest-dir>/bin, as its native installer puts it in ~/.local/bin; the
+#                       desktop acts connect it from the app (R.1a)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -41,7 +43,9 @@ claude-desktop macos    https://downloads.claude.ai/releases/darwin/universal/2.
 claude-desktop windows  https://downloads.claude.ai/releases/win32/x64/2.19675.1/Claude-8613680e2e16d90700c039e084a7883f321ed4e3.msix   07b4935f7a75c5d980b9d63c4d059fdf0aefe68903fe96e65a5c45cd1a106a93
 '
 
-[ $# -eq 1 ] || die 'usage: install-real-tools.sh <dest-dir>'
+only_claude=false
+if [ "${1:-}" = --claude-code-only ]; then only_claude=true; shift; fi
+[ $# -eq 1 ] || die 'usage: install-real-tools.sh [--claude-code-only] <dest-dir>'
 
 case "$(uname -s):$(uname -m)" in
   Linux:x86_64) runner=linux ;;
@@ -74,6 +78,7 @@ claude="$dest/bin/claude"
 fetch claude-code "$claude"
 chmod +x "$claude"
 on_path "$dest/bin"
+[ "$only_claude" = false ] || exit 0
 
 mkdir -p "$dest/devin"
 if [ "$runner" = windows ]; then
