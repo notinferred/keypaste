@@ -638,15 +638,22 @@ keepassxc_new_database() {
   printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$scratch/config/keepassxc/keepassxc.ini"
   XDG_CONFIG_HOME="$scratch/config" XDG_CACHE_HOME="$scratch/cache" "$gui" > "$OUT/keepassxc-new.log" 2>&1 &
   pid=$!
+  # Each Continue waits for the page before it to show, and the encryption page keeps KeePassXC's Argon2d.
   drive --window KeePassXC invoke 'Create new database' \
     && drive --window "$wizard" invoke Continue \
+    && drive --window "$wizard" find 'Decryption time in seconds' \
     && drive --window "$wizard" invoke Continue \
     && drive --window "$wizard" click 'Password field' \
     && drive --window "$wizard" type "$pw" \
     && drive --window "$wizard" click 'Repeat password field' \
     && drive --window "$wizard" type "$pw" \
     && drive --window "$wizard" invoke Done \
-    || { kill -9 "$pid" 2> /dev/null; echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"; return 1; }
+    || {
+      screenshot keepassxc-new "$wizard"
+      kill -9 "$pid" 2> /dev/null
+      echo "KeePassXC's new-database window did not finish: $(cat "$OUT/keepassxc-new.log")"
+      return 1
+    }
   # The new database's tab names the window, so its title is read rather than known.
   main="$(timeout 30 xdotool search --sync --pid "$pid" --name ' - KeePassXC$' | head -n 1)" && title="$(xdotool getwindowname "$main")" \
     && drive --window "$title" invoke 'Save Database' \
@@ -654,7 +661,12 @@ keepassxc_new_database() {
     && drive --window "$save" type "$(native "$VAULT")" \
     && drive --window "$save" key Return \
     && wait_for_file "$VAULT" 60 \
-    || { screenshot keepassxc-save "$save"; kill -9 "$pid" 2> /dev/null; echo "KeePassXC did not save the new database as $VAULT"; return 1; }
+    || {
+      screenshot keepassxc-save "$save"
+      kill -9 "$pid" 2> /dev/null
+      echo "KeePassXC did not save the new database as $VAULT"
+      return 1
+    }
   close_keepassxc "$pid" || return 1
   rm -rf "$scratch"
   echo "KeePassXC's new-database window made $VAULT_NAME"
