@@ -959,7 +959,8 @@ act_restore() {
   for file in ${BACKUPS[@]+"${BACKUPS[@]}"}; do
     if [ "$(fingerprint "$(native "$file")")" = "$(fact_of "$OUT" restore fingerprint_after)" ]; then fact backup_match "$(basename "$file")"; fi
   done
-  attempt unlock-again unlock_with "$PASSWORD" || return 1
+  # The restore hands the backup's password on, so the restored vault opens without another unlock.
+  attempt reopened drive wait 'Lock now' 120 || return 1
 }
 
 act_change_access() {
