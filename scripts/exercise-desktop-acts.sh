@@ -739,8 +739,11 @@ readonly KPXC_ARGON2D='Argon2d (KDBX 4 – recommended)'
 # mac_kpxc <pid> <verb> [args...]: the macOS driver acting in KeePassXC's window for the vault.
 mac_kpxc() { (export DRIVE_WINDOW="$KPXC_WINDOW"; mac_osascript 120 "$MAC_DRIVER" "$@"); }
 
+# mac_kpxc_choose <pid> <combo box> <Up|Down>: opens the combo box and takes the item above or below the one it shows.
+mac_kpxc_choose() { mac_kpxc "$1" click "$2" && mac_kpxc "$1" key "$3" && mac_kpxc "$1" key Return; }
+
 mac_keepassxc_kdf() {
-  local pid="$1" kdf i
+  local pid="$1" i
   KPXC_WINDOW=''
   for i in $(seq 1 60); do
     KPXC_WINDOW="$(mac_kpxc "$pid" windows 2> /dev/null | grep -F "$VAULT_NAME" | head -n 1)"
@@ -749,25 +752,22 @@ mac_keepassxc_kdf() {
     sleep 0.5
   done
   [ -n "$KPXC_WINDOW" ] || { echo "no KeePassXC window showed $VAULT_NAME within 30 s: $(mac_kpxc "$pid" windows 2>&1 | tr '\n' ';')"; return 1; }
-  # A Qt combo box is named on macOS by the item it shows. keepassxc-cli's database is KDBX 3, whose one key derivation is
-  # AES-KDF, so the format becomes KDBX 4 first, whose first is Argon2d. A key derivation chosen from the keyboard gets
-  # KeePassXC's defaults for it and a benchmark of its rounds, as a person's choice does; Argon2id and back gives
-  # Argon2d that, and KeePassXC's benchmark takes the focus each time.
+  # A Qt combo box is named on macOS by the item it shows, and takes no focus from the accessibility API, so each is
+  # clicked open and its item chosen from the keyboard, as a person can. keepassxc-cli's database is KDBX 3, whose one
+  # key derivation is AES-KDF, so the format becomes KDBX 4 first, whose first is Argon2d. A key derivation chosen from
+  # its list gets KeePassXC's defaults for it and a benchmark of its rounds, so Argon2id and back gives Argon2d those.
   mac_kpxc "$pid" menu Database 'Database Security…' || return 1
   mac_kpxc "$pid" invoke 'Encryption Settings' || return 1
   mac_kpxc "$pid" invoke Advanced || return 1
-  mac_kpxc "$pid" focus 'KDBX 3' || return 1
-  mac_kpxc "$pid" key Home || return 1
-  mac_kpxc "$pid" focus "$KPXC_ARGON2D" || return 1
-  mac_kpxc "$pid" key Down || return 1
-  mac_kpxc "$pid" focus 'Argon2id (KDBX 4)' || return 1
-  mac_kpxc "$pid" key Up || return 1
-  kdf="$(mac_kpxc "$pid" find "$KPXC_ARGON2D")" || { echo "$kdf"; return 1; }
+  mac_kpxc_choose "$pid" 'KDBX 3' Up || return 1
+  mac_kpxc "$pid" find "$KPXC_ARGON2D" || return 1
+  mac_kpxc_choose "$pid" "$KPXC_ARGON2D" Down || return 1
+  mac_kpxc_choose "$pid" 'Argon2id (KDBX 4)' Up || return 1
   mac_kpxc "$pid" invoke OK || return 1
   # KeePassXC saves after every change unless told otherwise; Save Database is asked for once when it has not.
   for i in $(seq 1 60); do
     if kx db-info "$VAULT" 2> /dev/null | grep -q 'KDF: Argon2d'; then
-      echo "KeePassXC's Database Security set $KPXC_ARGON2D and saved $VAULT_NAME"
+      echo "KeePassXC's Database Security set $KPXC_ARGON2D and saved $VAULT_NAME: $(kx db-info "$VAULT" 2>&1 | grep 'KDF')"
       return 0
     fi
     kill -0 "$pid" 2> /dev/null || { echo "KeePassXC ended before it saved the change"; return 1; }
