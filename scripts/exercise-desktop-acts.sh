@@ -806,11 +806,21 @@ close_keepassxc() {
     sleep 0.5
   done
   if kill -0 "$1" 2> /dev/null; then
+    echo "KeePassXC did not close within 30 s$(keepassxc_left "$1")"
     kill -9 "$1" 2> /dev/null || true
-    echo 'KeePassXC did not close within 30 s'
     return 1
   fi
   wait "$1" 2> /dev/null || true
+}
+
+# On Windows, the windows a KeePassXC that will not close still shows, with a screenshot of the first.
+keepassxc_left() {
+  local winpid titles
+  [ "$PLATFORM" = windows ] || return 0
+  winpid="$(cat "/proc/$1/winpid" 2> /dev/null)" || return 0
+  titles="$(APP_PID="$winpid" drive windows 2>&1 | tr -d "$CR")"
+  APP_PID="$winpid" screenshot keepassxc-left "$(head -n 1 <<< "$titles")"
+  printf '; it shows: %s' "$(tr '\n' ';' <<< "$titles")"
 }
 
 # macOS: keepassxc-cli makes a database that derives its key with AES-KDF, and R.1a times the libargon2 the package
@@ -856,8 +866,9 @@ mac_kpxc_choose() {
   done
   mac_kpxc "$pid" click "$3" || return 1
   shown="$(mac_kpxc "$pid" find "$3")" || { echo "$shown"; return 1; }
+  # Qt 6 makes a combo box an AXMenuButton named by the item it shows.
   case "$shown" in
-    *' as AXComboBox') echo "$shown" ;;
+    *' as AXMenuButton') echo "$shown" ;;
     *) echo "'$2' does not show '$3' after it was chosen: $shown; $(mac_kpxc "$pid" tree "after $3 was chosen")"; return 1 ;;
   esac
 }
