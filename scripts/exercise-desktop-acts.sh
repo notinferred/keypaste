@@ -131,7 +131,7 @@ evidence_first_run() {
   if [ -z "$chosen" ]; then contradict 'the app unlocked and chose no vault for agents and the CLI in app.toml'
   elif [ "$(path_key "$chosen" "$platform")" != "$(path_key "$vault" "$platform")" ]; then
     contradict "the app chose $chosen, not KeePassXC's $vault"
-  else pass "KeePassXC's recent databases offered $VAULT_NAME on the first run, and the app unlocked it and chose it: $vault"
+  else pass "KeePassXC's recent databases offered $VAULT_NAME on the first run, and the app unlocked it and chose it: $vault; KeePassXC $(fact_of "$1" first-run keepassxc_closed)"
   fi
 }
 
@@ -608,7 +608,7 @@ keepassxc_vault() {
 # KeePassXC opens the database once and closes as a person does, which leaves it in its recent databases where it
 # always keeps them (src/core/Config.cpp), as verify-keepassxc-first-run.sh has it do on a runner.
 keepassxc_recent() {
-  local gui roaming local_ini pid tmp
+  local gui roaming local_ini pid code
   gui="$(keepassxc_app)" || { echo "no KeePassXC app: $gui"; return 1; }
   case "$PLATFORM" in
     windows)
@@ -627,13 +627,9 @@ keepassxc_recent() {
       ;;
   esac
   [ ! -e "$local_ini" ] || { echo "KeePassXC's $local_ini already exists, so the first run would offer what it lists"; return 1; }
-  mkdir -p "$(dirname "$roaming")" "$OUT/keepassxc-tmp"
+  mkdir -p "$(dirname "$roaming")"
   printf '[General]\nSingleInstance=false\nUpdateCheckMessageShown=true\n\n[GUI]\nCheckForUpdates=false\n' > "$roaming"
-  tmp="$(native "$OUT/keepassxc-tmp")"
-  # Its own user name and temporary folder, as verify-keepassxc-first-run.sh gives it; the last in the pipeline, so
-  # $! is KeePassXC's own process.
-  printf '%s\n' "$pw" | USER="keypaste-acts-$$" USERNAME="keypaste-acts-$$" TMPDIR="$OUT/keepassxc-tmp" TMP="$tmp" TEMP="$tmp" \
-    "$gui" --pw-stdin "$(native "$VAULT")" > "$OUT/keepassxc.log" 2>&1 &
+  printf '%s\n' "$pw" | "$gui" --pw-stdin "$(native "$VAULT")" > "$OUT/keepassxc.log" 2>&1 &
   pid=$!
   for _ in $(seq 1 120); do
     if [ -f "$local_ini" ] && grep -q "LastDatabases=.*$VAULT_NAME" "$local_ini"; then break; fi
@@ -646,18 +642,37 @@ keepassxc_recent() {
     return 1
   }
   sleep 2
-  kill -0 "$pid" 2> /dev/null || { echo "KeePassXC opened $VAULT_NAME and exited before it was closed$(crash_report)"; return 1; }
-  close_keepassxc "$pid" || return 1
-  grep -q '^LastOpenedDatabases=' "$local_ini" || { echo "KeePassXC closed without writing LastOpenedDatabases to $local_ini"; return 1; }
+  # KeePassXC records a database in LastDatabases as it opens it, and the first run offers what that lists, so a
+  # KeePassXC that ends on its own after that is recorded with what the platform says of it, and the act goes on.
+  if kill -0 "$pid" 2> /dev/null; then
+    close_keepassxc "$pid" || return 1
+    grep -q '^LastOpenedDatabases=' "$local_ini" || { echo "KeePassXC closed without writing LastOpenedDatabases to $local_ini"; return 1; }
+    fact keepassxc_closed 'closed as a person closes it'
+  else
+    code=0
+    wait "$pid" 2> /dev/null || code=$?
+    fact keepassxc_closed "ended by itself, status $code, after it recorded $VAULT_NAME$(crash_report)"
+  fi
   fact keepassxc_recent "$(grep '^Last' "$local_ini" | tr '\n' ' ')"
-  echo "KeePassXC opened $VAULT_NAME and closed, leaving it in $local_ini"
+  echo "KeePassXC opened $VAULT_NAME, leaving it in $local_ini; $(fact_of "$OUT" first-run keepassxc_closed)"
 }
 
-# What Windows recorded of the newest program that crashed, naming its faulting module; nothing elsewhere.
+# What the platform recorded of KeePassXC ending by itself: Windows' newest crash events and macOS's newest crash
+# report, which is kept with the records; Linux records none.
 crash_report() {
-  [ "$PLATFORM" = windows ] || return 0
-  # shellcheck disable=SC2016 # PowerShell expands its own variables, not bash.
-  printf '; Windows recorded: %s' "$(powershell -NoProfile -Command 'Get-WinEvent -FilterHashtable @{LogName = "Application"; ProviderName = "Application Error"} -MaxEvents 1 -ErrorAction SilentlyContinue | ForEach-Object { $_.TimeCreated.ToString("o") + " " + ($_.Message -replace "\s+", " ") }' | tr -d "$CR")"
+  local report
+  case "$PLATFORM" in
+    windows)
+      # shellcheck disable=SC2016 # PowerShell expands its own variables, not bash.
+      printf '; Windows recorded: %s' "$(powershell -NoProfile -Command 'Get-WinEvent -FilterHashtable @{LogName = "Application"; ProviderName = "Application Error", "Windows Error Reporting"; StartTime = (Get-Date).AddMinutes(-10)} -MaxEvents 2 -ErrorAction SilentlyContinue | ForEach-Object { $_.ProviderName + ": " + ($_.Message -replace "\s+", " ") }' | tr -d "$CR")"
+      ;;
+    macos)
+      report="$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'KeePassXC*' -newer "$VAULT" 2> /dev/null | head -n 1)"
+      [ -n "$report" ] || { printf '; macOS kept no crash report'; return 0; }
+      cp "$report" "$OUT/"
+      printf '; macOS kept %s: %s' "$(basename "$report")" "$(grep -o '"exception" *: *{[^}]*}' "$report" | head -n 1)"
+      ;;
+  esac
 }
 
 close_keepassxc() {
