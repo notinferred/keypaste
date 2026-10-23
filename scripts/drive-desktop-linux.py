@@ -118,12 +118,13 @@ def automation_id(element):
 
 
 def named(locator, predicate=lambda e: True):
-    """A name, or id:<automation id>, either with [n] for the nth match in tree order."""
+    """A name, or id:<automation id>, either with [n] for the nth match in tree order, among what the window shows:
+    Avalonia lists only what it shows, and Qt lists a wizard's or a stack's hidden pages too."""
     kind, wanted, index = parse(locator)
     seen = 0
     for element in descendants(window()):
         value = automation_id(element) if kind == "id" else name_of(element)
-        if value == wanted and predicate(element):
+        if value == wanted and state(element, Atspi.StateType.SHOWING) and predicate(element):
             seen += 1
             if seen == index:
                 return element
@@ -162,20 +163,25 @@ QUIET_ROLES = {Atspi.Role.LABEL, Atspi.Role.TEXT, Atspi.Role.STATIC, Atspi.Role.
 
 
 def offered():
-    """The window's buttons, fields, lists and named controls, for a refusal; no text's or list item's name."""
+    """The window's buttons, fields, lists and named controls, for a refusal; no text's or list item's name. Qt's
+    named containers, such as a password field's, are fillers, and what the window does not show is marked."""
     frame = window()
     if frame is None:
         titles = [name_of(f) for _, f in frames()]
         return f"no window named '{TITLE}'; the desktop shows {titles}"
     shown = []
     for element in descendants(frame):
-        if role(element) in QUIET_ROLES:
-            continue
         ident = automation_id(element)
+        editable = has(element, "EditableText")
+        if role(element) in QUIET_ROLES and not editable:
+            continue
         if has(element, "Selection"):
-            shown.append(listed(element))
-        elif ident or has(element, "Action") or has(element, "EditableText"):
-            shown.append(f"{role_name(element)} '{name_of(element)}'" + (f" #{ident}" if ident else ""))
+            seen = listed(element)
+        elif ident or editable or has(element, "Action") or (role(element) == Atspi.Role.FILLER and name_of(element)):
+            seen = f"{role_name(element)} '{name_of(element)}'" + (f" #{ident}" if ident else "")
+        else:
+            continue
+        shown.append(seen if state(element, Atspi.StateType.SHOWING) else f"{seen} (hidden)")
     return "the window offers: " + "; ".join(shown[:150])
 
 
