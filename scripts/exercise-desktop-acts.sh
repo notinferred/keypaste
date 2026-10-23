@@ -538,8 +538,8 @@ app_quit() {
 # The unlock screen's password field is clicked first, as a person does, since the focus may be elsewhere.
 unlock_with() { drive focus id:Password && drive type "$1" && drive key Return && drive wait 'Lock now' 120; }
 
-# The vault the app chose for agents and the CLI: app.toml's vault, unescaped from TOML.
-chosen_vault() { sed -n 's/^vault = "\(.*\)"$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1 | sed 's/\\\\/\\/g'; }
+# The vault the app chose for agents and the CLI: app.toml's vault, unescaped from TOML, with the comment after it left out.
+chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1 | sed 's/\\\\/\\/g'; }
 
 # --- the vault through the CLI --------------------------------------------------------------------
 
@@ -927,8 +927,8 @@ act_restore() {
   attempt actions drive toggle 'More actions' || return 1
   attempt history drive invoke id:HistoryToggle || return 1
   attempt revision drive select-nth id:Revisions 1 || return 1
-  attempt restore-this drive invoke id:RestoreRevision || return 1
-  saved revision_ms restore-revision drive invoke Restore || return 1
+  # It carries the project tag the item has now, so Restore this writes it without first asking about projects (D-0415).
+  saved revision_ms restore-revision drive invoke id:RestoreRevision || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
   # A deletion: the scratch item deleted, then restored from Trash.
   attempt choose-scratch drive select "$ENTRY_SCRATCH" || return 1
