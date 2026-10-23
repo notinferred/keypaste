@@ -26,6 +26,9 @@ public enum HealthArea
     /// <summary>Whether this keypaste, the one holding the vault, each AI tool's and PATH's are one version.</summary>
     Versions,
 
+    /// <summary>Whether this keypaste derives vault keys with native Argon2 or with KeePassLib's slower managed code.</summary>
+    Argon2,
+
     /// <summary>Whether the vault keypaste would use is there and is a KeePass database.</summary>
     Vault,
 
@@ -90,13 +93,14 @@ public sealed record HealthScope(
 }
 
 /// <summary>
-/// The checks <c>keypaste doctor</c> runs: the versions, the vault, each AI tool's registration, who holds the vault,
-/// the settings files and PATH, each saying what to fix.
+/// The checks <c>keypaste doctor</c> runs: the versions, the Argon2 that derives vault keys, the vault, each AI tool's
+/// registration, who holds the vault, the settings files and PATH, each saying what to fix.
 /// </summary>
 /// <remarks>
 /// It only reads (D-0467). No vault is opened and no password asked for; nothing is written, created or started but
 /// the <c>keypaste</c> each tool registers and the one PATH finds, with <c>--version</c>, and <c>mcp --help</c> with the
-/// registration's arguments; the owner is attached to only to learn whether it answers and its version.
+/// registration's arguments; the owner is attached to only to learn whether it answers and its version. One small key
+/// is derived from constant bytes in this process, to learn which Argon2 KeePassLib uses (D-0525).
 /// </remarks>
 public static class HealthCheck
 {
@@ -108,7 +112,7 @@ public static class HealthCheck
     /// <param name="scope">What to look at.</param>
     /// <param name="runner">Starts the registered keypaste and PATH's, and nothing else.</param>
     /// <param name="cancellationToken">Ends the wait for the owner.</param>
-    /// <returns>The findings: versions, vault, AI tools, owner, settings, then PATH.</returns>
+    /// <returns>The findings: versions, Argon2, vault, AI tools, owner, settings, then PATH.</returns>
     public static async Task<IReadOnlyList<HealthFinding>> RunAsync(HealthScope scope, IProcessRunner runner, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(scope);
@@ -116,12 +120,13 @@ public static class HealthCheck
 
         var vault = VaultReading.Read(scope);
         var asking = OwnerReading.AskAsync(scope, vault.Path, cancellationToken);
+        var argon2 = Argon2Reading.Read();
         var tools = ToolReading.ReadAll(scope, runner);
         var path = PathReading.Read(scope, runner);
         var settings = SettingsReading.ReadAll(scope.Home);
         var owner = await asking.ConfigureAwait(false);
 
-        List<HealthFinding> findings = [.. Versions(CoreInfo.Version, owner, tools, path), .. vault.Findings];
+        List<HealthFinding> findings = [.. Versions(CoreInfo.Version, owner, tools, path), argon2, .. vault.Findings];
 
         if (tools.Count == 0)
         {

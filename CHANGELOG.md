@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`keypaste doctor` now says which Argon2 derives your vault keys: the `argon2.dll` or `libargon2.1.dylib` beside `keypaste` on Windows and macOS, or the system's libargon2 on Linux. When the file is missing or does not work, or Linux has none, it says that unlocking and saving take longer and what to do ([F.67](docs/steps/F.67.md)).
+
 A screen reader now names each revision in an item's History by when it was current and its title, rather than by an internal type name ([R.1a](docs/steps/R.1a.md)).
 
 `keypaste approve`'s credential prompt now names the agent with its bridge's `--client-label` in brackets, as its run prompt and the app's prompt do, so you can tell which configured connection is asking.
@@ -33,7 +35,7 @@ When no agent has received an item, holds an allowance for it or is asking for i
 Saving Settings in the app, choosing a vault with `keypaste use`, and saving a project's directory and command now keep what a newer version of keypaste wrote into `app.toml` and `projects.json`, rather than dropping every key, section or project mapping this version does not read.
 
 keypaste now opens and saves a vault encrypted with Twofish, as KeePassXC can make one, keeping Twofish when it saves; before, such a vault did not open at all. keypaste still makes new vaults with AES-256 and never changes a vault's cipher. The Twofish code is BouncyCastle's, vendored and pinned as [third_party/bouncycastle-twofish/UPSTREAM.md](third_party/bouncycastle-twofish/UPSTREAM.md) records.
-Unlocking a vault and saving it in the app are faster on Windows and macOS, by about 2.3 times on the test runners: the app now derives the vault's key with the Argon2 reference library, which it carries as `argon2.dll` or `libargon2.1.dylib` beside its binary, rather than with slower .NET code. `keypaste` carries the same file and is meant to use it too, which no run has shown yet; keep the file beside `keypaste` when you move it out of the archive, since without it the key is the same and takes longer. Linux uses the system's libargon2 as before.
+Unlocking a vault and saving it in the app are faster on Windows and macOS, by about 2.3 times on the test runners: the app now derives the vault's key with the Argon2 reference library, which it carries as `argon2.dll` or `libargon2.1.dylib` beside its binary, rather than with slower .NET code. `keypaste` carries the same file and derives with it too; keep the file beside `keypaste` when you move it out of the archive, since without it the key is the same and takes longer. Linux uses the system's libargon2 as before.
 
 Tagging an item into a project, in the app or with `keypaste env tag`, now names each of its variables that holds a KeePass placeholder such as `{PASSWORD}`, with the placeholder, before anything is written, because that variable carries the item's own field to whoever gets it.
 

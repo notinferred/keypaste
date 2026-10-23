@@ -17,7 +17,8 @@
 #                      keypaste binds to the argon2.dll it carries (D-0523). A type not found falls
 #                      back to IntPtr.Size at :124, x64; a type found without its property at :118
 #                      reads no architecture, and the NativeAOT keypaste then derives Argon2 in managed
-#                      code: the same key, more slowly. No run yet shows which (F.66).
+#                      code: the same key, more slowly. The NativeAOT win-x64 keypaste reads x64 and
+#                      binds argon2.dll, which keypaste doctor names and app.yml requires (F.67).
 #   IOConnection.cs    HttpWebRequest internals on remote-vault paths. keypaste opens local files
 #                      only; nothing reaches IocStream over HTTP.
 #   XmlUtilEx.cs       XmlSerializer reading a KeePass XML keyfile for KcpKeyFile. It runs in

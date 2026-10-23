@@ -7,6 +7,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Infrastructure;
+using Keypaste.Core.Internal;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
@@ -72,7 +73,9 @@ public sealed class DoctorVerbTests : IDisposable
 
         Assert.Equal(
             Lines(
+            [
                 $"  ✓ versions         {CoreInfo.Version} here",
+                .. Argon2Rows(),
                 "  ✗ vault            no vault is chosen",
                 "                     › open your vault in the keypaste app, or run `keypaste use <path>`",
                 "  · AI tools         no AI tool keypaste connects is installed here",
@@ -81,7 +84,8 @@ public sealed class DoctorVerbTests : IDisposable
                 "  ✗ PATH             a terminal finds no keypaste on PATH",
                 "                     › put the folder holding keypaste on PATH",
                 "",
-                "  2 to fix"),
+                "  2 to fix",
+            ]),
             _harness.Out);
         Assert.Empty(_harness.Err);
         Assert.Empty(_harness.ProcessRunner.Calls);
@@ -97,7 +101,9 @@ public sealed class DoctorVerbTests : IDisposable
 
         Assert.Equal(
             Lines(
+            [
                 $"  ✓ versions         {CoreInfo.Version} here and in each AI tool",
+                .. Argon2Rows(),
                 "  ✓ vault            the chosen vault is a KeePass database",
                 $"                     {_harness.VaultPath}",
                 $"  ✓ cursor           starts keypaste {CoreInfo.Version} from a place upgrades keep",
@@ -108,7 +114,8 @@ public sealed class DoctorVerbTests : IDisposable
                 "  ✓ PATH             a terminal runs this keypaste",
                 $"                     {This}",
                 "",
-                "  nothing to fix"),
+                "  nothing to fix",
+            ]),
             _harness.Out);
         Assert.Equal([$"{This} mcp --help"], _harness.ProcessRunner.Calls);
     }
@@ -129,12 +136,12 @@ public sealed class DoctorVerbTests : IDisposable
                 item => Assert.Equal(["area", "subject", "status", "says", "where", "fix"], item.EnumerateObject().Select(property => property.Name)));
         }
 
-        Assert.Equal(["versions", "vault", "tool", "owner", "settings", "path"], found.Select(finding => finding.Area));
-        Assert.Equal(new Finding("vault", "vault", "ok", "the chosen vault is a KeePass database", _harness.VaultPath, Fix: null), found[1]);
-        Assert.Equal(new Finding("tool", "AI tools", "note", "no AI tool keypaste connects is installed here", Where: null, Fix: null), found[2]);
+        Assert.Equal(["versions", "argon2", "vault", "tool", "owner", "settings", "path"], found.Select(finding => finding.Area));
+        Assert.Equal(new Finding("vault", "vault", "ok", "the chosen vault is a KeePass database", _harness.VaultPath, Fix: null), found[2]);
+        Assert.Equal(new Finding("tool", "AI tools", "note", "no AI tool keypaste connects is installed here", Where: null, Fix: null), found[3]);
         Assert.Equal(
             new Finding("owner", "owner", "note", "nothing holds the vault unlocked; agents are refused", Where: null, "unlock it in the keypaste app, or run `keypaste approve`"),
-            found[3]);
+            found[4]);
     }
 
     [Fact]
@@ -603,6 +610,17 @@ public sealed class DoctorVerbTests : IDisposable
         [.. Directory.GetFileSystemEntries(root, "*", SearchOption.AllDirectories)
             .Select(entry => File.Exists(entry) ? $"{entry} {Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(entry)))}" : entry)
             .Order(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// The argon2 row for the library this process derived with: the file a test build carries beside it on Windows and macOS
+    /// (D-0523), or on Linux the system's, or the note where there is none.
+    /// </summary>
+    private static string[] Argon2Rows() => (NativeArgon2.BundledFileName, CoreInfo.NativeArgon2) switch
+    {
+        ({ } file, _) => [$"  ✓ argon2           this keypaste derives vault keys with {file}", $"                     {Path.Combine(AppContext.BaseDirectory, file)}"],
+        (null, { } system) => [$"  ✓ argon2           this keypaste derives vault keys with the system's {system}"],
+        _ => ["  · argon2           no libargon2 is installed, so unlocking and saving take longer", "                     › install your distribution's libargon2 package"],
+    };
 
     private static string Lines(params string[] lines) => string.Join(Environment.NewLine, lines) + Environment.NewLine;
 

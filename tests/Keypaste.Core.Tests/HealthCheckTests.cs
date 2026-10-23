@@ -14,8 +14,8 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// What <c>keypaste doctor</c>'s checks say: which registrations upgrades keep on each platform, which copies differ in
-/// version, how each settings file is fixed and which <c>keypaste</c> a terminal runs; nothing but a registered
-/// <c>keypaste</c> started as <c>mcp</c> is ever started (D-0467).
+/// version, which Argon2 derives vault keys, how each settings file is fixed and which <c>keypaste</c> a terminal runs;
+/// nothing but a registered <c>keypaste</c> started as <c>mcp</c> is ever started (D-0467, D-0525).
 /// </summary>
 /// <remarks>Every registration is Cursor's, written under a temporary home, and every command is answered by a fake runner.</remarks>
 public sealed class HealthCheckTests : IDisposable
@@ -242,6 +242,42 @@ public sealed class HealthCheckTests : IDisposable
 
         var only = Assert.Single(findings);
         Assert.Equal((HealthArea.Versions, HealthStatus.Fix, says, fix), (only.Area, only.Status, only.Says, only.Fix));
+    }
+
+    [Fact]
+    public void The_library_beside_this_keypaste_that_derived_the_key_is_named_with_its_path()
+    {
+        var carried = Path.Combine(_root, "argon2.dll");
+
+        Assert.Equal(
+            new HealthFinding(HealthArea.Argon2, "argon2", HealthStatus.Ok, "this keypaste derives vault keys with argon2.dll") { Where = carried },
+            Argon2Reading.Finding(carried, carried, present: true));
+    }
+
+    [Fact]
+    public void On_Linux_the_system_s_library_is_named_and_none_is_a_note_saying_what_to_install()
+    {
+        Assert.Equal(
+            new HealthFinding(HealthArea.Argon2, "argon2", HealthStatus.Ok, "this keypaste derives vault keys with the system's libargon2.so.1"),
+            Argon2Reading.Finding("libargon2.so.1", carried: null, present: false));
+        Assert.Equal(
+            new HealthFinding(HealthArea.Argon2, "argon2", HealthStatus.Note, "no libargon2 is installed, so unlocking and saving take longer")
+            {
+                Fix = "install your distribution's libargon2 package",
+            },
+            Argon2Reading.Finding(bound: null, carried: null, present: false));
+    }
+
+    [Theory]
+    [InlineData(false, "libargon2.1.dylib is not beside this keypaste, so unlocking and saving take longer", "keep libargon2.1.dylib beside keypaste")]
+    [InlineData(true, "libargon2.1.dylib beside this keypaste did not work, so unlocking and saving take longer", "reinstall keypaste")]
+    public void A_carried_library_that_derived_nothing_is_a_fix_at_its_path(bool present, string says, string fix)
+    {
+        var carried = Path.Combine(_root, "libargon2.1.dylib");
+
+        Assert.Equal(
+            new HealthFinding(HealthArea.Argon2, "argon2", HealthStatus.Fix, says) { Where = carried, Fix = fix },
+            Argon2Reading.Finding(bound: null, carried, present));
     }
 
     [Fact]
