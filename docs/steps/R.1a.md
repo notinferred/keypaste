@@ -64,7 +64,7 @@ No new row: D-0342 accepts the automation, and D-0466 settles act 8.
 ## Limits and follow-ups
 
 - **KeePassXC 2.7.12 crashed on the runners.** It ended with status 139 at start or soon after opening a database in several macOS 15 and Windows runs, in Qt 5's `QWidgetPrivate::showChildren` as it showed its window. In 39967782112's first macOS attempt it crashed twice, the third session's combo box did not open, and timing was unreached; the rerun passed. [F.68](F.68.md) found it to be KeePassXC #13521 and moved the runners to 2.8.0, which never crashed in its probe, and an act now stops when KeePassXC ends by itself (D-0526).
-- **Linux screen readers.** AT-SPI under Avalonia 12.1 keeps a list's rows as it first listed them, so a project added during a session does not reach a Linux screen reader in the sidebar. The acts reach it by keyboard. [F.68](F.68.md) traced it to Avalonia's AT-SPI bridge and left the fix to Avalonia (D-0527).
+- **Linux screen readers.** AT-SPI under Avalonia 12.1 keeps a list's rows as it first listed them, so a project added during a session does not reach a Linux screen reader in the sidebar. The acts reach it by keyboard. [F.68](F.68.md) traced it to Avalonia's AT-SPI bridge and left the fix to Avalonia: issue #22583, pull request #22585 (D-0527).
 - **The Connect plan's label.** Avalonia 12.1 names a TextBlock by its text and ignores `AutomationProperties.Name="What Run it will do"`, so a screen reader reads the plan itself, which [F.68](F.68.md) keeps as intended and removes the unused name (D-0527).
 - **Fixed on the way.**
   - A screen reader announced each History revision as `Keypaste.App.ViewModels.EntryRevisionRow`. It is now named by its time and title (`dfe3bb5f`; `HistoryRevealAutomationTests`).

@@ -62,7 +62,7 @@ D-0526 pins KeePassXC 2.8.0 on Windows and macOS; D-0527 records the idle warnin
 
 ## Limits and follow-ups
 
-- **Linux list rows** still do not reach a Linux screen reader, which R.1a's limit keeps. A change to Avalonia's `AtSpiNode`, watching the peers between a selection container and its rows, was drafted for a pull request to Avalonia with its description; it is unbuilt, needs a real accessibility bus to check, and was not opened.
+- **Linux list rows** still do not reach a Linux screen reader, which R.1a's limit keeps until an Avalonia release carries the fix. It is Avalonia issue #22583, and pull request #22585 changes `AtSpiNode` to watch the peers between a selection container and its rows; run 40044062009 on the founder's fork showed a row added after the first read reaching an AT-SPI client only with the change, and Avalonia's 201 automation tests passing with it. The TextBlock name is Avalonia issue #22584.
 - **2.8.0 not crashing** in 60 starts is evidence, not KeePassXC's diagnosis, which it never made.
 - **2.8 on Linux.** No runner has KeePassXC 2.8 on Linux, where Ubuntu 24.04 ships 2.7.6, so the first run's new location is held by unit tests only.
 - **No screen reader was run.** The idle warning's single announcement rests on its peer's events and on Avalonia's bridges announcing a live element's change of name.
