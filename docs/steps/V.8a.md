@@ -1,6 +1,6 @@
 # V.8a — Expose bounded attachment operations
 
-Completed 2026-10-24 on `t6`, source only; runs pending.
+Completed 2026-10-24 on `t6` in `28c6e833`, source only. At `803e9cb3`, app 40187228211 passed every job on all three runners on its first attempt, and ci 40187220469 on its second: its first failed one job, test (windows-2025), in `LockedAppEndpointTests`, which F.70 holds, and only that job was rerun.
 
 ## Amendments
 
