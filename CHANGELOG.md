@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`keypaste attachment` lists an item's attachments by name and size, attaches a file of up to 5 MiB, replaces or removes one, keeping what it held in the item's history, and saves one to a new file you name; KeePassXC reads every change, and the attachments you do not touch stay byte for byte. While the app or `keypaste approve` holds the vault, adding, replacing and removing are refused ([V.8a](docs/steps/V.8a.md)).
+
 A value holding a `{S:…}` whose name holds braces, such as `{S:a{PASSWORD}b}`, is now refused and named, as `{REF:…}` is: KeePassXC reads it as one field named `a{PASSWORD}b`, and keypaste releases no field so named, where it had filled in the `{PASSWORD}` inside the name ([F.69](docs/steps/F.69.md)).
 
 The idle warning now gives a screen reader its first line, "Locking in 30 seconds.", once per warning, as an earlier entry said it did; Avalonia had named it by its ticking text, a new name each second ([F.68](docs/steps/F.68.md)).

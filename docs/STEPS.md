@@ -100,9 +100,6 @@ Each row keeps its historical meaning and is expanded when selected.
   - One import contract, with preview, collision decisions and atomic commit, so nothing is dropped silently.
   - Its adapters, each Needs 9.1a: 9.1b (Bitwarden JSON), 9.1c (LastPass CSV), 9.1d1 (1Password 1PUX), 9.1d2 (1Password CSV) and 9.1e (KeePassXC CSV).
   - 9.1f guides import in the desktop.
-- [ ] **V.8a — Expose bounded attachment operations.** Needs: none.
-  - List, add, replace, remove and save attachments in memory, with a size cap and no plaintext temporary files.
-  - KeePassXC reads every change, and an attachment keypaste does not edit is kept byte for byte.
 - [ ] **V.8b — Manage attachments from the app.** Needs: V.8a.
   - The item shows each attachment's name and size, with add, replace, remove and save; the app never opens or runs an attachment itself.
 - [ ] **P.4a — Implement desktop Auto-Type on Windows and macOS.** Needs: none.

@@ -146,6 +146,9 @@ internal static class CliApp
             case "field":
                 return FieldCommand.Execute(args, context);
 
+            case "attachment":
+                return AttachmentCommand.Execute(args, context);
+
             case "grants":
                 return GrantsCommand.Execute(args, context);
 
@@ -198,6 +201,7 @@ internal static class CliApp
             ("show", "show an item's fields and tags; values only with --reveal"),
             ("set", "create or update a secret, or its custom fields"),
             ("field", "list, rename or remove an item's custom fields"),
+            ("attachment", "list, add, replace, remove or save an item's attachments"),
             ("rotate", "replace a secret with a new generated one"),
             ("run", "run a command with secrets in its environment"),
             ("env", "import, export and diff .env environments"),
@@ -235,6 +239,7 @@ internal static class CliApp
         ArgumentNullException.ThrowIfNull(writer);
         ArgumentNullException.ThrowIfNull(style);
 
+        var column = _groups.SelectMany(group => group.Verbs).Max(verb => verb.Verb.Length) + 2;
         string Muted(string text) => style.Paint(writer, Tone.Muted, text);
 
         writer.WriteLine($"keypaste {CoreInfo.Version}{Muted($" {style.Glyph(writer, Mark.Dot)} a simple, local password manager on your KeePass file")}");
@@ -249,7 +254,7 @@ internal static class CliApp
 
             foreach (var (verb, summary) in verbs)
             {
-                writer.WriteLine($"  {style.Paint(writer, Tone.Accent, verb)}{new string(' ', 10 - verb.Length)}{summary}");
+                writer.WriteLine($"  {style.Paint(writer, Tone.Accent, verb)}{new string(' ', column - verb.Length)}{summary}");
             }
         }
 
@@ -258,7 +263,8 @@ internal static class CliApp
         writer.WriteLine($"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}");
         writer.WriteLine($"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine("  --json            machine-readable output from ls, search, show, field ls,");
-        writer.WriteLine("                    env ls, log, grants, doctor, token ls, share ls, clients");
+        writer.WriteLine("                    attachment ls, env ls, log, grants, doctor, token ls,");
+        writer.WriteLine("                    share ls, clients");
         writer.WriteLine("  -h, --help        help for any command");
         writer.WriteLine();
         writer.WriteLine("  version prints the version.");

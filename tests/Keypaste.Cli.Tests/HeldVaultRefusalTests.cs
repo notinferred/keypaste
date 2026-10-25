@@ -29,7 +29,7 @@ public sealed class HeldVaultRefusalTests : IDisposable
     {
         var data = new TheoryData<string, OwnerKind>();
 
-        foreach (var verb in new[] { "add", "set", "rm", "rotate", "field rm", "field mv", "access", "env set", "env rm", "env pull", "env tag", "import" })
+        foreach (var verb in new[] { "add", "set", "rm", "rotate", "field rm", "field mv", "attachment add", "attachment replace", "attachment rm", "access", "env set", "env rm", "env pull", "env tag", "import" })
         {
             data.Add(verb, OwnerKind.DesktopApp);
             data.Add(verb, OwnerKind.TerminalAgent);
@@ -95,6 +95,9 @@ public sealed class HeldVaultRefusalTests : IDisposable
             "rotate" => ["rotate", "Work/github", .. vault],
             "field rm" => ["field", "rm", "Work/github", "KEY", .. vault],
             "field mv" => ["field", "mv", "Work/github", "KEY", "OTHER", .. vault],
+            "attachment add" => ["attachment", "add", "Work/github", Attached(), .. vault],
+            "attachment replace" => ["attachment", "replace", "Work/github", "notes.txt", Attached(), .. vault],
+            "attachment rm" => ["attachment", "rm", "Work/github", "notes.txt", .. vault],
             "env tag" => ["env", "tag", "ci", "Work/github", "--yes", .. vault],
             "access" => ["access", "--password", .. vault],
             "env set" => ["env", "set", "ci", "DEPLOY_KEY=held", .. vault],
@@ -103,6 +106,13 @@ public sealed class HeldVaultRefusalTests : IDisposable
             "import" => ["import", Source(), .. vault],
             _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, null),
         };
+    }
+
+    private string Attached()
+    {
+        var path = Path.Combine(_harness.Directory, "notes.txt");
+        File.WriteAllText(path, "attached while held\n");
+        return path;
     }
 
     private string DotEnv()

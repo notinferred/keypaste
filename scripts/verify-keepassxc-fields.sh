@@ -7,6 +7,9 @@
 # field, which it protects, and changes the plain one. KeePassXC reads both, its XML export marks the
 # new one protected and leaves the changed one plain, and the entry keeps its other field, tag,
 # custom data, attachment and `otp` in a file that is still KDBX 4.0. Setting three fields makes one revision.
+# The shipped CLI adds an attachment, replaces it and removes it, one revision each (V.8a): keepassxc-cli
+# exports each version byte for byte, finds none once it is removed and the history still names it, and
+# keypaste saves the attachment KeePassXC made byte for byte, which every edit keeps.
 # `otp`, `Password` and `password` are refused and the file stays byte-identical with no backup
 # taken, and no listing carries a value. After KeePassXC merges in a version of the entry stamped an
 # hour ahead of the clock, keypaste saves a field twice, each save in a later whole second than the
@@ -213,6 +216,32 @@ grep -qF 'secret=JBSWY3DPEHPK3PXP' <<<"$current" || die "the entry lost its otp 
 rm -f "$dir/blob.out"
 kx attachment-export "$db" "$entry" blob.bin "$(native "$dir/blob.out")" >/dev/null || die "KeePassXC cannot export the attachment"
 cmp -s "$dir/blob.bin" "$dir/blob.out" || die "the attachment is not the bytes KeePassXC attached"
+[ "$(header "$db" | cut -c17-22)" = "000004" ] || die "the vault is no longer KDBX 4.0: $(header "$db")"
+
+step "the shipped CLI adds, replaces and removes an attachment; KeePassXC reads each change and keeps its own byte for byte"
+head -c 2048 /dev/urandom >"$dir/added.bin"
+head -c 3072 /dev/urandom >"$dir/replaced.bin"
+before=$(revisions)
+said=$(kp_with '' attachment add "$entry" "$dir/added.bin" --name notes.bin 2>&1) || die "attachment add failed: ${said}"
+rm -f "$dir/kx.out"
+kx attachment-export "$db" "$entry" notes.bin "$(native "$dir/kx.out")" >/dev/null || die "KeePassXC cannot export the attachment keypaste added"
+cmp -s "$dir/added.bin" "$dir/kx.out" || die "KeePassXC reads other bytes than keypaste attached"
+said=$(kp_with '' attachment replace "$entry" notes.bin "$dir/replaced.bin" 2>&1) || die "attachment replace failed: ${said}"
+rm -f "$dir/kx.out"
+kx attachment-export "$db" "$entry" notes.bin "$(native "$dir/kx.out")" >/dev/null || die "KeePassXC cannot export the attachment keypaste replaced"
+cmp -s "$dir/replaced.bin" "$dir/kx.out" || die "KeePassXC reads other bytes than keypaste replaced the attachment with"
+said=$(kp_with '' attachment rm "$entry" notes.bin 2>&1) || die "attachment rm failed: ${said}"
+rm -f "$dir/kx.out"
+if kx attachment-export "$db" "$entry" notes.bin "$(native "$dir/kx.out")" >/dev/null 2>&1; then
+  die "KeePassXC still exports the attachment keypaste removed"
+fi
+[ "$(revisions)" -eq $((before + 3)) ] || die "adding, replacing and removing made $(( $(revisions) - before )) revisions, not three"
+grep -qF '<Key>notes.bin</Key>' <<<"$(history_xml)" || die "the item's history no longer names the attachment keypaste removed"
+rm -f "$dir/blob.out" "$dir/kp.out"
+kx attachment-export "$db" "$entry" blob.bin "$(native "$dir/blob.out")" >/dev/null || die "KeePassXC cannot export its own attachment"
+cmp -s "$dir/blob.bin" "$dir/blob.out" || die "keypaste's attachment edits changed the attachment KeePassXC made"
+said=$(kp_with '' attachment save "$entry" blob.bin "$dir/kp.out" 2>&1) || die "attachment save failed: ${said}"
+cmp -s "$dir/blob.bin" "$dir/kp.out" || die "keypaste saved other bytes than KeePassXC attached"
 [ "$(header "$db" | cut -c17-22)" = "000004" ] || die "the vault is no longer KDBX 4.0: $(header "$db")"
 
 step "setting three fields at once makes one revision"
@@ -702,4 +731,4 @@ printf 'x' >>"$dir/blob.out"
 cmp -s "$dir/blob.bin" "$dir/blob.out" && die "the attachment comparison cannot see a changed byte"
 [ "$(kp_totp Sha1)" = "$(kx show "$totp_db" totp/Sha256 -t)" ] && die "the TOTP comparison matched two items' codes"
 
-printf '\nFIELDS GATE PASSED: KeePassXC reads the fields keypaste wrote with their protection, keeps its own, keypaste reads what KeePassXC merged, and both give each TOTP the same code.\n'
+printf '\nFIELDS GATE PASSED: KeePassXC reads the fields and attachments keypaste wrote, fields with their protection, keeps its own, keypaste reads what KeePassXC merged, and both give each TOTP the same code.\n'

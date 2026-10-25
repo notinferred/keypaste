@@ -53,6 +53,8 @@ public sealed class SecretHygieneTests
     [InlineData("field", "ls", "secrets/target")]
     [InlineData("field", "ls", "secrets/target", "--json")]
     [InlineData("field", "rm", "secrets/target", "Region")]
+    [InlineData("attachment", "ls", "secrets/target")]
+    [InlineData("attachment", "ls", "secrets/target", "--json")]
     [InlineData("get", "secrets/target", "--field", "API Secret")]
     [InlineData("set", "secrets/target", "--field", "API Secret")]
     [InlineData("set", "secrets/target")]

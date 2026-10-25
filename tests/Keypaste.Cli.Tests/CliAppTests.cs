@@ -72,7 +72,7 @@ public sealed class CliAppTests
 
         Assert.Equal(GroupedHelp, redirected.ToString());
         Assert.DoesNotContain(ConsoleStyleTests.Escape, redirected.ToString(), StringComparison.Ordinal);
-        Assert.Contains("  \u001b[38;5;214mgrants" + Styling.SystemConsoleStyle.Reset + "    list or revoke", terminal.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  \u001b[38;5;214mgrants" + Styling.SystemConsoleStyle.Reset + "      list or revoke", terminal.ToString(), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -131,7 +131,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(26, verbs.Count);
+        Assert.Equal(27, verbs.Count);
 
         foreach (var verb in verbs.Where(verb => !Program.StartsBridge([verb, "--help"])))
         {
@@ -152,42 +152,44 @@ public sealed class CliAppTests
             "  keypaste <command> [flags]",
             "",
             "SECRETS",
-            "  get       copy a secret to the clipboard, or print it with --reveal",
-            "  show      show an item's fields and tags; values only with --reveal",
-            "  set       create or update a secret, or its custom fields",
-            "  field     list, rename or remove an item's custom fields",
-            "  rotate    replace a secret with a new generated one",
-            "  run       run a command with secrets in its environment",
-            "  env       import, export and diff .env environments",
+            "  get         copy a secret to the clipboard, or print it with --reveal",
+            "  show        show an item's fields and tags; values only with --reveal",
+            "  set         create or update a secret, or its custom fields",
+            "  field       list, rename or remove an item's custom fields",
+            "  attachment  list, add, replace, remove or save an item's attachments",
+            "  rotate      replace a secret with a new generated one",
+            "  run         run a command with secrets in its environment",
+            "  env         import, export and diff .env environments",
             "",
             "AGENTS",
-            "  setup     connect this computer's AI tools to your vault",
-            "  mcp       the MCP server your AI tools start",
-            "  approve   approve agents' requests in this terminal",
-            "  clients   show or change what each agent can see and do",
-            "  doctor    check the vault, the AI tools and the app, and say what to fix",
-            "  grants    list or revoke time-boxed access",
-            "  token     create scoped, inject-only tokens",
-            "  log       show the hash-chained activity log",
+            "  setup       connect this computer's AI tools to your vault",
+            "  mcp         the MCP server your AI tools start",
+            "  approve     approve agents' requests in this terminal",
+            "  clients     show or change what each agent can see and do",
+            "  doctor      check the vault, the AI tools and the app, and say what to fix",
+            "  grants      list or revoke time-boxed access",
+            "  token       create scoped, inject-only tokens",
+            "  log         show the hash-chained activity log",
             "",
             "VAULT",
-            "  import    copy in a KeePass database, or keep editing it in place",
-            "  share     create an encrypted, expiring link",
-            "  lock      lock now and pause all agents",
-            "  init      create a new vault",
-            "  use       choose the vault used when no --vault is given",
-            "  add       add an item",
-            "  ls        list groups and items",
-            "  search    find items by title, group, username or URL",
-            "  rm        remove an item",
-            "  generate  print a passphrase (--words N); it is not stored",
-            "  access    change the master password or keyfile",
+            "  import      copy in a KeePass database, or keep editing it in place",
+            "  share       create an encrypted, expiring link",
+            "  lock        lock now and pause all agents",
+            "  init        create a new vault",
+            "  use         choose the vault used when no --vault is given",
+            "  add         add an item",
+            "  ls          list groups and items",
+            "  search      find items by title, group, username or URL",
+            "  rm          remove an item",
+            "  generate    print a passphrase (--words N); it is not stored",
+            "  access      change the master password or keyfile",
             "",
             "FLAGS",
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",
             $"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
             "  --json            machine-readable output from ls, search, show, field ls,",
-            "                    env ls, log, grants, doctor, token ls, share ls, clients",
+            "                    attachment ls, env ls, log, grants, doctor, token ls,",
+            "                    share ls, clients",
             "  -h, --help        help for any command",
             "",
             "  version prints the version.",

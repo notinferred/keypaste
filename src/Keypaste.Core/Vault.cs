@@ -1,5 +1,6 @@
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
+using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Recommendations;
 using Keypaste.Core.Totp;
@@ -710,6 +711,151 @@ public sealed class Vault : IDisposable
         }
 
         return Change(() => _interop.RenameField(name, field, newName) > 0, renamed => renamed ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>The item's attachments by name and size, never by content.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>Its attachments in ordinal order of name, or null when no entry answers to that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public IReadOnlyList<EntryAttachment>? Attachments(EntryName name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadAttachments(name);
+        }
+    }
+
+    /// <summary>Attaches content under a name the item has no attachment by, as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="attachment">The new attachment's name, which <see cref="VaultNameRules.IsValidAttachmentName"/> must accept.</param>
+    /// <param name="content">What it holds, read from its position to its end, at most <see cref="EntryAttachment.MaximumSize"/> bytes.</param>
+    /// <param name="keptInHistory">Whether the item's history keeps the item as it was, false when the vault's history limits drop that revision (D-0533).</param>
+    /// <returns><see langword="true"/> if the entry was found and the attachment added.</returns>
+    /// <remarks>
+    /// The content is read into one buffer that is zeroed once KeePassLib holds its own copy, encrypted in memory, and reaches
+    /// disk only inside the vault (D-0533). The edit names the entry (D-0318); its other attachments are kept as they are.
+    /// </remarks>
+    /// <exception cref="VaultException">
+    /// The name is refused, the item already has an attachment by that name, the content is larger than the cap, or more
+    /// than one entry answers to that name. Nothing is changed.
+    /// </exception>
+    /// <exception cref="IOException">The content could not be read. Nothing is changed.</exception>
+    public bool AddAttachment(EntryName name, string attachment, Stream content, out bool keptInHistory)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(attachment);
+        ArgumentNullException.ThrowIfNull(content);
+
+        if (!VaultNameRules.IsValidAttachmentName(attachment, out string error))
+        {
+            throw Refused(error);
+        }
+
+        return Attach(name, attachment, content, replacing: false, out keptInHistory);
+    }
+
+    /// <summary>Replaces what one attachment holds, keeping its name, as <see cref="AddAttachment"/> adds one. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="attachment">The attachment's name, matched exactly.</param>
+    /// <param name="content">What it holds now, read from its position to its end, at most <see cref="EntryAttachment.MaximumSize"/> bytes.</param>
+    /// <param name="keptInHistory">Whether the item's history keeps the item as it was, what the attachment held included.</param>
+    /// <returns><see langword="true"/> if the entry was found and had that attachment.</returns>
+    /// <exception cref="VaultException">The content is larger than the cap, or more than one entry answers to that name. Nothing is changed.</exception>
+    /// <exception cref="IOException">The content could not be read. Nothing is changed.</exception>
+    public bool ReplaceAttachment(EntryName name, string attachment, Stream content, out bool keptInHistory)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(attachment);
+        ArgumentNullException.ThrowIfNull(content);
+
+        return Attach(name, attachment, content, replacing: true, out keptInHistory);
+    }
+
+    /// <summary>Removes one attachment as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="attachment">The attachment's name, matched exactly.</param>
+    /// <param name="keptInHistory">Whether the item's history keeps the item as it was, the attachment included.</param>
+    /// <returns><see langword="true"/> if the entry was found and had that attachment.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name. Nothing is changed.</exception>
+    public bool RemoveAttachment(EntryName name, string attachment, out bool keptInHistory)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(attachment);
+
+        bool kept = false;
+        bool removed = Change(() => _interop.RemoveAttachment(name, attachment, out kept) > 0, done => done ? VaultEdit.Of(name) : null);
+        keptInHistory = kept;
+        return removed;
+    }
+
+    /// <summary>Writes one attachment's bytes once to a new file where the person chose, readable by its owner alone outside Windows (D-0534).</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="attachment">The attachment's name, matched exactly.</param>
+    /// <param name="destination">Where it goes. Its directory must exist, and nothing may be at the path.</param>
+    /// <param name="failure">What the filesystem said, when the outcome is <see cref="AttachmentSaveOutcome.Failed"/>; empty otherwise.</param>
+    /// <returns>What happened.</returns>
+    /// <remarks>
+    /// PRODUCT §3.4's exception for an attachment the person asks keypaste to save (D-0532), written as
+    /// <see cref="VaultKeyfile.Create"/> writes a key file: staged beside the path and moved into place without replacing
+    /// anything, so a file that arrives meanwhile is kept and the stage is deleted. The bytes are this vault's as it holds
+    /// them, saved or not, and the copy they are read into is zeroed.
+    /// </remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public AttachmentSaveOutcome SaveAttachment(EntryName name, string attachment, string destination, out string failure)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(attachment);
+        ArgumentException.ThrowIfNullOrEmpty(destination);
+
+        failure = string.Empty;
+        var full = System.IO.Path.GetFullPath(destination);
+
+        if (File.Exists(full) || Directory.Exists(full))
+        {
+            return AttachmentSaveOutcome.PathAlreadyExists;
+        }
+
+        byte[]? content;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            content = _interop.ReadAttachment(name, attachment);
+        }
+
+        if (content is null)
+        {
+            return AttachmentSaveOutcome.NotFound;
+        }
+
+        try
+        {
+            using var staged = AtomicFile.Stage(full, content, AtomicFile.OwnerOnly);
+            staged.CommitWithoutReplacing();
+            return AttachmentSaveOutcome.Saved;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (File.Exists(full) || Directory.Exists(full))
+            {
+                return AttachmentSaveOutcome.PathAlreadyExists;
+            }
+
+            failure = ex.Message;
+            return AttachmentSaveOutcome.Failed;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(content);
+        }
     }
 
     /// <summary>The names of the item's other fields whose value holds a <c>{S:…}</c> naming this one, which a rename would leave naming nothing.</summary>
@@ -2601,6 +2747,64 @@ public sealed class Vault : IDisposable
                 return true;
             },
             _ => touched ?? VaultEdit.Of());
+
+    /// <summary>Adds or replaces one attachment with what <paramref name="content"/> holds, under the cap, zeroing the buffer it was read into.</summary>
+    private bool Attach(EntryName name, string attachment, Stream content, bool replacing, out bool keptInHistory)
+    {
+        if (content.CanSeek && content.Length - content.Position > EntryAttachment.MaximumSize)
+        {
+            throw TooLargeToAttach();
+        }
+
+        // One byte past the cap, so content larger than it fills the buffer and is refused rather than cut short.
+        byte[] buffer = new byte[EntryAttachment.MaximumSize + 1];
+
+        try
+        {
+            int length = content.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false);
+
+            if (length > EntryAttachment.MaximumSize)
+            {
+                throw TooLargeToAttach();
+            }
+
+            bool kept = false;
+            bool attached = Change(
+                () =>
+                {
+                    if (_interop.ReadAttachments(name) is not { } current)
+                    {
+                        return false;
+                    }
+
+                    bool present = current.Any(held => string.Equals(held.Name, attachment, StringComparison.Ordinal));
+
+                    if (present && !replacing)
+                    {
+                        throw new VaultException($"This item already has an attachment called {EntryNameSanitizer.Sanitize(attachment).Text}. Replace it instead.");
+                    }
+
+                    if (!present && replacing)
+                    {
+                        return false;
+                    }
+
+                    return _interop.SetAttachment(name, attachment, buffer, length, out kept) > 0;
+                },
+                done => done ? VaultEdit.Of(name) : null);
+
+            keptInHistory = kept;
+            return attached;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(buffer);
+        }
+    }
+
+    /// <summary>Content over <see cref="EntryAttachment.MaximumSize"/>, as a sentence.</summary>
+    private static VaultException TooLargeToAttach() =>
+        new($"That file is larger than {EntryAttachment.MaximumSize / (1024 * 1024)} MiB, the most keypaste attaches.");
 
     /// <summary>Every live entry's lost project memberships, for <see cref="LostProjectTagCheck"/>.</summary>
     internal IReadOnlyList<LostProjectTag> ReadLostProjectTags()

@@ -20,6 +20,7 @@ public sealed partial class PlainWordsTests
         ["env", "ls"], ["env", "set"], ["env", "rm"], ["env", "pull"], ["env", "export"], ["env", "diff"], ["env", "tag"], ["env", "untag"],
         ["token", "create"], ["token", "ls"], ["token", "revoke"], ["token", "bundle"],
         ["field", "ls"], ["field", "mv"], ["field", "rm"],
+        ["attachment", "ls"], ["attachment", "add"], ["attachment", "replace"], ["attachment", "rm"], ["attachment", "save"],
         ["grants", "revoke"],
         ["log", "verify"],
         ["share", "ls"], ["share", "revoke"],

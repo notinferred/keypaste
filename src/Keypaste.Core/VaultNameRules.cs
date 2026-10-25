@@ -1,7 +1,7 @@
 namespace Keypaste.Core;
 
 /// <summary>
-/// The names keypaste is willing to give a group or an entry.
+/// The names keypaste is willing to give a group, an entry or an attachment.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,6 +34,28 @@ public static class VaultNameRules
     /// <exception cref="ArgumentNullException"><paramref name="title"/> is null.</exception>
     public static bool IsValidTitle(string title, out string error) =>
         IsValidName(title, "item title", out error);
+
+    /// <summary>Whether an attachment name is one keypaste is willing to give a new attachment.</summary>
+    /// <param name="name">The name to check.</param>
+    /// <param name="error">A message naming the problem, or empty when the name is valid.</param>
+    /// <returns><see langword="true"/> if the name is valid.</returns>
+    /// <remarks>Also refused are <c>.</c> and <c>..</c>, so every name keypaste gives one is a file name it can be saved under.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    public static bool IsValidAttachmentName(string name, out string error)
+    {
+        if (!IsValidName(name, "attachment name", out error))
+        {
+            return false;
+        }
+
+        if (name is "." or "..")
+        {
+            error = $"the attachment name cannot be '{name}'";
+            return false;
+        }
+
+        return true;
+    }
 
     /// <summary>The shared rule, worded for whatever is being named.</summary>
     /// <param name="name">The name to check.</param>

@@ -122,6 +122,9 @@ public sealed class VaultHistoryTests : IDisposable
     [InlineData(nameof(Vault.RemoveTags))]
     [InlineData(nameof(Vault.RenameEntry))]
     [InlineData(nameof(Vault.RestoreRevision))]
+    [InlineData(nameof(Vault.AddAttachment))]
+    [InlineData(nameof(Vault.ReplaceAttachment))]
+    [InlineData(nameof(Vault.RemoveAttachment))]
     public void AnEditOfAVersionStampedAhead_IsStampedAfterIt(string edit)
     {
         var path = NewVaultPath();
@@ -535,6 +538,7 @@ public sealed class VaultHistoryTests : IDisposable
     {
         EntryName? renamed = null;
         using var check = new NoteKeyCheck();
+        using var content = new MemoryStream([4, 5, 6]);
 
         bool applied = edit switch
         {
@@ -546,6 +550,9 @@ public sealed class VaultHistoryTests : IDisposable
             nameof(Vault.RemoveTags) => vault.RemoveTags(_production, ["kept"]),
             nameof(Vault.RenameEntry) => vault.RenameEntry(_production, "staging", out renamed) == OrganizeOutcome.Renamed,
             nameof(Vault.RestoreRevision) => vault.RestoreRevision(_production, 0),
+            nameof(Vault.AddAttachment) => vault.AddAttachment(_production, "added.bin", content, out _),
+            nameof(Vault.ReplaceAttachment) => vault.ReplaceAttachment(_production, "kept.bin", content, out _),
+            nameof(Vault.RemoveAttachment) => vault.RemoveAttachment(_production, "kept.bin", out _),
             _ => throw new ArgumentOutOfRangeException(nameof(edit), edit, null),
         };
 
@@ -601,6 +608,7 @@ public sealed class VaultHistoryTests : IDisposable
             entry.Strings.Set("TOKEN", new ProtectedString(true, "t0"));
             entry.Strings.Set(PwDefs.NotesField, new ProtectedString(false, "NOTE_KEY=n0"));
             entry.AddTag("kept");
+            entry.Binaries.Set("kept.bin", new ProtectedBinary(false, [1, 2, 3]));
 
             for (var revision = 0; revision <= 3; revision++)
             {
