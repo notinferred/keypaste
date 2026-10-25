@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 
 namespace Keypaste.App.ViewModels;
@@ -17,6 +18,11 @@ namespace Keypaste.App.ViewModels;
 /// <see cref="ImportSource"/>, which goes on cancel, on confirm and on lock.
 /// </para>
 /// <para>
+/// A file that also needs a YubiKey slot is asked through the session's keys, once, by a key of the
+/// dialog's own, so its touch is said here rather than as a save waiting in the shell; the CLI's import
+/// cannot ask one (D-0366).
+/// </para>
+/// <para>
 /// Nothing here names a value: rows carry group paths, titles' counts and problems, and the password
 /// typed for the file stays in a buffer that is cleared once it has been tried.
 /// </para>
@@ -25,7 +31,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 {
     private readonly AppVaultSession _session;
     private readonly KdbxProbe? _probe;
-    private readonly Action<string, string?> _openInPlace;
+    private readonly Action<string, string?, int?> _openInPlace;
     private readonly Action<string> _announce;
     private readonly Func<Task<string?>>? _pickKeyfile;
     private readonly Func<Task>? _chooseAnother;
@@ -36,6 +42,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 
     private ImportSource? _source;
     private string? _keyfilePath;
+    private int? _hardwareKeySlot;
+    private HardwareKey? _asking;
+    private bool _waitingForTouch;
     private string _into = string.Empty;
     private string _message = string.Empty;
     private bool _keepInPlace;
@@ -48,7 +57,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <param name="path">The file to import.</param>
     /// <param name="openInPlace">
     /// Opens a file as the vault, as the unlock screen's open-another-vault flow does: the session
-    /// locks the vault it has and asks for this one's password.
+    /// locks the vault it has and asks for this one's password, with the keyfile and YubiKey slot chosen here.
     /// </param>
     /// <param name="announce">Says what an import did, once it is saved.</param>
     /// <param name="pickKeyfile">Asks which keyfile opens the file; null where nothing can ask.</param>
@@ -58,7 +67,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal KdbxImportViewModel(
         AppVaultSession session,
         string path,
-        Action<string, string?> openInPlace,
+        Action<string, string?, int?> openInPlace,
         Action<string> announce,
         Func<Task<string?>>? pickKeyfile = null,
         Func<Task>? chooseAnother = null,
@@ -94,6 +103,10 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         CancelCommand = new RelayCommand(Dispose);
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy && _source is null && _pickKeyfile is not null);
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _source is null && _keyfilePath is not null);
+        UseHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = 2, () => !_busy && _source is null && OffersHardwareKey && _hardwareKeySlot is null);
+        SwitchSlotCommand = new RelayCommand(() => HardwareKeySlot = _hardwareKeySlot == 1 ? 2 : 1, () => !_busy && _source is null && _hardwareKeySlot is not null);
+        ClearHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = null, () => !_busy && _source is null && _hardwareKeySlot is not null);
+        CancelTouchCommand = new RelayCommand(() => Volatile.Read(ref _asking)?.CancelWait(), () => _waitingForTouch);
         ChooseAnotherCommand = new AsyncRelayCommand(() => _chooseAnother!(), () => _chooseAnother is not null && !_disposed);
 
         DependsOn(nameof(CardDetail), nameof(Source), nameof(EntryCount), nameof(KeyFactors));
@@ -108,6 +121,10 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         DependsOn(nameof(HasMessage), nameof(Message));
         DependsOn(nameof(KeyfileName), nameof(KeyfilePath));
         DependsOn(nameof(HasKeyfile), nameof(KeyfilePath));
+        DependsOn(nameof(UsesHardwareKey), nameof(HardwareKeySlot));
+        DependsOn(nameof(HardwareKeyLabel), nameof(HardwareKeySlot));
+        DependsOn(nameof(OtherSlotLabel), nameof(HardwareKeySlot));
+        DependsOn(nameof(UnlockIsPrimary), nameof(IsWaitingForTouch));
         DependsOn(nameof(KeyFactors), nameof(Source));
         DependsOn(nameof(EntryCount), nameof(Source));
         DependsOn(nameof(IsDecrypted), nameof(Source));
@@ -120,6 +137,10 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         DependsOn(ConfirmCommand, nameof(CanConfirm));
         DependsOn(ChooseKeyfileCommand, nameof(Busy), nameof(Source));
         DependsOn(ClearKeyfileCommand, nameof(Busy), nameof(Source), nameof(KeyfilePath));
+        DependsOn(UseHardwareKeyCommand, nameof(Busy), nameof(Source), nameof(HardwareKeySlot));
+        DependsOn(SwitchSlotCommand, nameof(Busy), nameof(Source), nameof(HardwareKeySlot));
+        DependsOn(ClearHardwareKeyCommand, nameof(Busy), nameof(Source), nameof(HardwareKeySlot));
+        DependsOn(CancelTouchCommand, nameof(IsWaitingForTouch));
         DependsOn(ChooseAnotherCommand, nameof(Disposed));
 
         _session.Locked += OnLocked;
@@ -190,6 +211,44 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 
     /// <summary>Asks for the file's keyfile.</summary>
     internal AsyncRelayCommand ChooseKeyfileCommand { get; }
+
+    /// <summary>Whether this session reaches YubiKeys, so the dialog offers one.</summary>
+    internal bool OffersHardwareKey => _session.HardwareKeys is not null;
+
+    /// <summary>The YubiKey slot the file needs as well, or <see langword="null"/>.</summary>
+    internal int? HardwareKeySlot
+    {
+        get => _hardwareKeySlot;
+        private set => Set(ref _hardwareKeySlot, value);
+    }
+
+    internal bool UsesHardwareKey => _hardwareKeySlot is not null;
+
+    internal string HardwareKeyLabel => _hardwareKeySlot is { } slot ? $"YubiKey, slot {slot}" : string.Empty;
+
+    internal string OtherSlotLabel => _hardwareKeySlot == 1 ? "Use slot 2" : "Use slot 1";
+
+    /// <summary>Asks for a YubiKey as well, in slot 2 until another is chosen.</summary>
+    internal RelayCommand UseHardwareKeyCommand { get; }
+
+    /// <summary>Moves between the YubiKey's two slots.</summary>
+    internal RelayCommand SwitchSlotCommand { get; }
+
+    /// <summary>Stops asking for a YubiKey.</summary>
+    internal RelayCommand ClearHardwareKeyCommand { get; }
+
+    /// <summary>Whether the YubiKey waits to be touched, when its waiting dot is the dialog's one amber element.</summary>
+    internal bool IsWaitingForTouch
+    {
+        get => _waitingForTouch;
+        private set => Set(ref _waitingForTouch, value);
+    }
+
+    /// <summary>Whether Unlock is the amber action, which it is except while the YubiKey waits.</summary>
+    internal bool UnlockIsPrimary => !_waitingForTouch;
+
+    /// <summary>Stops waiting for the YubiKey, so nothing is opened.</summary>
+    internal RelayCommand CancelTouchCommand { get; }
 
     /// <summary>Stops using a keyfile, including one found beside the file.</summary>
     internal RelayCommand ClearKeyfileCommand { get; }
@@ -372,10 +431,19 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         Busy = true;
         Message = string.Empty;
         var keyfile = _keyfilePath;
+        var slot = _hardwareKeySlot;
+        using var key = slot is { } chosen && _session.HardwareKeys is { } keys ? new HardwareKey(keys, chosen) : null;
+
+        if (key is not null)
+        {
+            key.WaitingForTouch += OnWaitingForTouch;
+            Volatile.Write(ref _asking, key);
+        }
 
         try
         {
-            var opened = await Task.Run(() => KdbxImport.Open(probe.Path, _password.Value, keyfile)).ConfigureAwait(true);
+            // The key answers the file's one challenge here; a source is never saved, so nothing asks it again.
+            var opened = await Task.Run(() => KdbxImport.Open(probe.Path, _password.Value, keyfile, key)).ConfigureAwait(true);
 
             if (_disposed || !_session.IsUnlocked)
             {
@@ -388,9 +456,11 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
         catch (InvalidMasterPasswordException)
         {
-            Message = keyfile is null
-                ? $"That password does not open {FileName}."
-                : $"That password and key file do not open {FileName}.";
+            Message = WrongFactors(keyfile is not null, slot is not null);
+        }
+        catch (HardwareKeyException ex)
+        {
+            Message = ExplainHardwareKey(ex, slot);
         }
         catch (VaultException ex)
         {
@@ -398,8 +468,47 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
         finally
         {
+            if (key is not null)
+            {
+                Interlocked.CompareExchange(ref _asking, null, key);
+                key.WaitingForTouch -= OnWaitingForTouch;
+            }
+
             ClearPassword();
             Busy = false;
+        }
+    }
+
+    /// <summary>The refusal of a password, worded for the factors that went with it, since which one was wrong is not knowable (D-0284).</summary>
+    private string WrongFactors(bool withKeyfile, bool withHardwareKey) => (withKeyfile, withHardwareKey) switch
+    {
+        (false, false) => $"That password does not open {FileName}.",
+        (true, false) => $"That password and key file do not open {FileName}.",
+        (false, true) => $"That password and YubiKey do not open {FileName}. If it uses the other slot, switch to it.",
+        (true, true) => $"That password, key file and YubiKey do not open {FileName}. If it uses the other slot, switch to it.",
+    };
+
+    /// <summary>Why the YubiKey gave no answer, naming this file where the unlock screen names its vault.</summary>
+    private string ExplainHardwareKey(HardwareKeyException failure, int? slot) => failure.Failure switch
+    {
+        HardwareKeyFailure.NotFound => "No YubiKey found. Plug it in and unlock again.",
+        HardwareKeyFailure.MoreThanOne => $"More than one YubiKey is plugged in. Leave only the one {FileName} uses.",
+        HardwareKeyFailure.SlotNotConfigured =>
+            $"That YubiKey's slot {slot} isn't set up for challenge-response. If {FileName} uses the other slot, switch to it.",
+        HardwareKeyFailure.TimedOut => "The YubiKey wasn't touched in time. Unlock again and touch it when it flashes.",
+        HardwareKeyFailure.Cancelled => "Stopped waiting for the YubiKey. Nothing was opened.",
+        _ => DisplayTextSanitizer.Sanitize(failure.Message).Text,
+    };
+
+    private void OnWaitingForTouch(object? sender, bool waiting)
+    {
+        if (_post is { } post)
+        {
+            post(() => IsWaitingForTouch = waiting && !_disposed);
+        }
+        else
+        {
+            IsWaitingForTouch = waiting && !_disposed;
         }
     }
 
@@ -413,6 +522,8 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 
         Disposed = true;
         _session.Locked -= OnLocked;
+        Volatile.Read(ref _asking)?.CancelWait();
+        IsWaitingForTouch = false;
         _source?.Dispose();
         Source = null;
         _password.Dispose();
@@ -451,8 +562,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         if (_keepInPlace)
         {
             var keyfile = _keyfilePath;
+            var slot = _hardwareKeySlot;
             Dispose();
-            _openInPlace(probe.Path, keyfile);
+            _openInPlace(probe.Path, keyfile, slot);
             return;
         }
 

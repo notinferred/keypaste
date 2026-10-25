@@ -132,9 +132,10 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>Opens another vault to copy from. Nothing on the returned instance saves.</summary>
     /// <remarks>The caller owns <paramref name="utf8Password"/> and is responsible for zeroing it.</remarks>
     /// <exception cref="InvalidMasterPasswordException">The factors do not open the vault.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
     /// <exception cref="VaultException">The vault could not be read.</exception>
-    internal static KeePassInterop OpenReadOnly(string path, byte[] utf8Password, string? keyfilePath) =>
-        new(OpenDatabase(path, utf8Password, keyfilePath)) { _readOnly = true };
+    internal static KeePassInterop OpenReadOnly(string path, byte[] utf8Password, string? keyfilePath, HardwareKey? hardwareKey = null) =>
+        new(OpenDatabase(path, utf8Password, keyfilePath, hardwareKey)) { _readOnly = true };
 
     /// <summary>The factors this vault was opened with, for <see cref="Reopen"/>.</summary>
     internal KeyCopy CopyKey()
@@ -3972,7 +3973,11 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>The key factors this vault was opened with.</summary>
     internal IReadOnlyList<string> KeyFactors =>
-        [.. KeyHasPassword ? ["password"] : Array.Empty<string>(), .. KeyfilePath is null ? [] : new[] { "key file" }];
+        [
+            .. KeyHasPassword ? ["password"] : Array.Empty<string>(),
+            .. KeyfilePath is null ? [] : new[] { "key file" },
+            .. HardwareKey is null ? [] : new[] { "YubiKey" },
+        ];
 
     /// <summary>Copies groups and entries of another vault into this one, all of them or none.</summary>
     /// <param name="source">The vault copied from, which is not changed.</param>

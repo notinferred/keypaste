@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The app's Import KeePass database dialog now opens a file that also needs a YubiKey: Use a YubiKey asks slot 2 unless you choose slot 1, the dialog says Touch your YubiKey while the key waits, with a Cancel, and names a missing key, an empty slot and a touch that never came. Keeping the file in place hands its slot to the unlock screen. `keypaste import` still cannot ask a hardware key ([P.1a](docs/steps/P.1a.md)).
+
 On Windows, the app now unlocks a vault again with Windows Hello after you lock it, it locks when idle or minimized, or you close it into the tray, as KeePassXC 2.8 does. After each unlock with the master password, Windows Hello asks to keep it, and the unlock screen then offers Unlock with Windows Hello above the master password, which stays. `keypaste lock`, opening another vault, a changed password or keyfile and quitting still need the master password, nothing is written to disk, and a vault that needs a YubiKey asks for its touch again ([4.10a](docs/steps/4.10a.md)).
 
 An item in the app now lists its attachments by name and size, with Add attachment, which attaches a file of up to 5 MiB under the file's name, and Replace, Remove and Save on each one. Save writes a copy, unencrypted, only to a new file you choose and never over one, and the app never opens or runs an attachment. When the vault's history size limit means history cannot keep the item as it was, the item says what is gone ([V.8b](docs/steps/V.8b.md)).

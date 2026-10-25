@@ -185,15 +185,11 @@ Each row keeps its historical meaning and is expanded when selected. Designs the
 - [ ] **P.4b2 — The global shortcut on X11.** Needs: P.4a4, P.4b1.
   - `XGrabKey` registers P.4a4's shortcut.
   - Accepted when the Linux job presses it with xdotool and types through the chooser.
-- [ ] **P.1 — Hardware-key vault unlocking.** Needs: V.1b, U.2.
-  - The desktop already unlocks a vault that needs a YubiKey slot and changes the key in Settings (D-0366), but this has not been tried with a physical key.
-  - What remains:
-    - creating such a vault;
-    - the CLI reaching such a vault through the app while the app holds it, and the app's KDBX import taking the key; standalone verbs and `keypaste approve` refuse it, naming the app (D-0514);
-    - real-device unlock, save and reopen with KeePassXC interoperability;
-    - missing-key and wrong-key refusal;
-    - documented spare-key and lost-key limits.
-  - OS quick unlock and browser passkeys are separate features.
+- [ ] **P.1b — Check hardware-key vaults with a physical YubiKey (H-0026).** Human. Needs: none.
+  - [P.1a](steps/P.1a.md) built what code can do: create, unlock, save, change and import such a vault in the app, and reach it from the CLI only through the app (D-0366, D-0514), all against a software key.
+  - On Windows, macOS and Linux, with the app built from P.1a, make the [desktop guide](desktop.md)'s check 52 with a YubiKey 5 and a second key holding the same secret, then create a vault with the key, and import a KeePassXC database that needs it.
+  - Check the refusals with the physical key: another key, the other slot, no key and two keys plugged in are each named, and the spare-key and lost-key limits hold as Settings states them, which PRODUCT §2 asks to be verified before support is advertised.
+  - Record the platform, the key's model and firmware, the KeePassXC version and the app's commit in P.1a's limits. No CI runner has a YubiKey, so only a person can make these acts (T-37). OS quick unlock and browser passkeys are separate features.
 
 ## T7 — Agents without values
 

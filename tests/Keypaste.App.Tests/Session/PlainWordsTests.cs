@@ -233,7 +233,7 @@ public sealed partial class PlainWordsTests
         }
 
         var unreadable = fixture.ImposterPath;
-        using (var refused = new KdbxImportViewModel(vaultSession, unreadable, (_, _) => { }, _ => { }, chooseAnother: () => Task.CompletedTask))
+        using (var refused = new KdbxImportViewModel(vaultSession, unreadable, (_, _, _) => { }, _ => { }, chooseAnother: () => Task.CompletedTask))
         {
             said.AddRange(Seen(new KdbxImportView { DataContext = refused }, "the import dialog, a file it can't read"));
         }
@@ -241,7 +241,7 @@ public sealed partial class PlainWordsTests
         var source = Path.Combine(fixture.Home, "foreign.kdbx");
         KeePassInterop.WriteForeignUnchecked(source, Encoding.UTF8.GetBytes("import-source"), null, "Argon2id", "ChaCha20");
         using var import = new KdbxImportViewModel(
-            vaultSession, source, (_, _) => { }, _ => { }, pickKeyfile: () => Task.FromResult<string?>(null), chooseAnother: () => Task.CompletedTask);
+            vaultSession, source, (_, _, _) => { }, _ => { }, pickKeyfile: () => Task.FromResult<string?>(null), chooseAnother: () => Task.CompletedTask);
         var dialog = Show(new KdbxImportView { DataContext = import });
         said.AddRange(Shown(dialog, "the import dialog, locked"));
 

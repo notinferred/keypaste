@@ -2,6 +2,7 @@ using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
@@ -26,9 +27,9 @@ internal sealed class UnlockedOwner : IAsyncDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _running;
 
-    private UnlockedOwner(CliHarness harness, string pipe, string master, ApprovalAnswer answer)
+    private UnlockedOwner(CliHarness harness, string pipe, string master, ApprovalAnswer answer, HardwareKey? hardwareKey)
     {
-        _vault = Vault.Open(harness.VaultPath, master);
+        _vault = Vault.Open(harness.VaultPath, master, null, hardwareKey);
         Lifetime.Own(_launches);
         Channel = new ScriptedChannel(answer);
         _gate = new ApprovalGate(Channel, TimeProvider.System, ApprovalLimits.Default);
@@ -73,8 +74,9 @@ internal sealed class UnlockedOwner : IAsyncDisposable
 
     internal SessionLifetime Lifetime { get; } = new();
 
-    internal static UnlockedOwner Start(CliHarness harness, string pipe, string master, ApprovalAnswer answer) =>
-        new(harness, pipe, master, answer);
+    /// <summary>Holds the harness's vault on <paramref name="pipe"/>; a vault that also needs <paramref name="hardwareKey"/> has it asked by every save the owner makes, as the app's saves do, and the caller disposes it after the owner.</summary>
+    internal static UnlockedOwner Start(CliHarness harness, string pipe, string master, ApprovalAnswer answer, HardwareKey? hardwareKey = null) =>
+        new(harness, pipe, master, answer, hardwareKey);
 
     /// <summary>The command the run Terminal starts for a Run in the app sends: Terminal's fixed script around the person's command, the only one the owner issues a pass for.</summary>
     internal static string[] InTerminal(string command) => ["/bin/sh", "-c", TerminalLaunch.RunScript, "keypaste", command];

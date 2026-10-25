@@ -1,12 +1,14 @@
 using Keypaste.Core.HardwareKeys;
+using Keypaste.Core.Import;
+using Keypaste.Core.Internal;
 using Xunit;
 
 namespace Keypaste.Core.Tests.HardwareKeys;
 
 /// <summary>
 /// A vault protected by a hardware key opens only with its password and the right response, fails
-/// closed when the key is wrong, missing or silent, asks the key on every save, and gains or loses
-/// the factor only through an access change.
+/// closed when the key is wrong, missing or silent, asks the key on every attempt to write, and gains or
+/// loses the factor only through an access change.
 /// </summary>
 public sealed class HardwareKeyVaultTests : IDisposable
 {
@@ -143,21 +145,26 @@ public sealed class HardwareKeyVaultTests : IDisposable
         Assert.Equal(bytes, File.ReadAllBytes(path));
     }
 
+    /// <remarks>
+    /// Windows can refuse a write for a moment and the save tries again, asking the key again, so this counts the
+    /// attempts rather than assuming one (F.53).
+    /// </remarks>
     [Fact]
-    public void Adding_a_hardware_key_makes_it_required_and_asks_it_once()
+    public void Adding_a_hardware_key_makes_it_required_and_asks_it_once_per_attempt()
     {
         var path = PasswordVault("vault.kdbx");
         var device = new SoftwareYubiKey(_secret);
         using var key = new HardwareKey(device, 2);
+        var attempts = 0;
 
         VaultAccessResult result;
         using (var vault = Vault.Open(path, _master))
         {
-            result = vault.ChangeAccess(Attach(key), [], []);
+            result = vault.ChangeAccess(Attach(key), [], [], _ => attempts++);
         }
 
         Assert.Equal(VaultAccessOutcome.Changed, result.Outcome);
-        Assert.Single(device.Challenges);
+        Assert.Equal(attempts, device.Challenges.Count);
         Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
 
         using var fresh = new HardwareKey(new SoftwareYubiKey(_secret), 2);
@@ -167,6 +174,70 @@ public sealed class HardwareKeyVaultTests : IDisposable
         // The copy the change kept is the vault as it was, under the password alone.
         using var kept = Vault.Open(result.Kept!.Path, _master);
         Assert.Single(kept.ReadEntries());
+    }
+
+    /// <summary>
+    /// A write refused for a moment after the key has answered is tried again, and the retry asks the key again,
+    /// because the challenge is the KDF seed each attempt draws (F.53).
+    /// </summary>
+    /// <remarks>
+    /// What ci 37627277189 saw on <c>windows-2025</c>, the key asked twice by one access change, made to happen
+    /// every run. A throw from the attempt hook itself lands before the vault is serialised and asks nothing, so the
+    /// refusal is staged where the write meets it, as <see cref="RefusedWrite"/> says.
+    /// </remarks>
+    [Fact]
+    public void A_write_refused_after_the_key_answered_asks_it_again_on_the_retry()
+    {
+        var path = PasswordVault("vault.kdbx");
+        var device = new SoftwareYubiKey(_secret);
+        using var key = new HardwareKey(device, 2);
+        var askedBefore = new List<int>();
+
+        VaultAccessResult result;
+        using (var vault = Vault.Open(path, _master))
+        using (var refused = RefusedWrite.Stage(path))
+        {
+            if (refused is null)
+            {
+                Assert.Skip("This volume has no transactions, or this Windows allows a move onto a name a transaction holds, so no write can be refused here.");
+                return;
+            }
+
+            result = vault.ChangeAccess(Attach(key), [], [], attempt =>
+            {
+                askedBefore.Add(device.Challenges.Count);
+                if (attempt == 2)
+                {
+                    refused.Lift();
+                }
+            });
+        }
+
+        Assert.Equal(VaultAccessOutcome.Changed, result.Outcome);
+        Assert.Equal([0, 1], askedBefore);
+        Assert.Equal(2, device.Challenges.Count);
+        Assert.NotEqual(device.Challenges[0], device.Challenges[1]);
+        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
+
+        using var fresh = new HardwareKey(new SoftwareYubiKey(_secret), 2);
+        using var opened = Vault.Open(path, _master, null, fresh);
+        Assert.Single(opened.ReadEntries());
+    }
+
+    [Fact]
+    public void A_file_imported_from_opens_only_with_its_hardware_key_asked_once_and_names_it()
+    {
+        var path = HardwareKeyVault("source.kdbx", new SoftwareYubiKey(_secret));
+        var device = new SoftwareYubiKey(_secret);
+
+        Assert.Throws<InvalidMasterPasswordException>(() => KdbxImport.Open(path, _master, null));
+
+        using var key = new HardwareKey(device, 2);
+        using var source = KdbxImport.Open(path, _master, null, key);
+
+        Assert.Equal(["password", "YubiKey"], source.KeyFactors);
+        Assert.Equal(1, source.EntryCount);
+        Assert.Single(device.Challenges);
     }
 
     [Fact]
@@ -328,6 +399,78 @@ public sealed class HardwareKeyVaultTests : IDisposable
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;
+    }
+
+    /// <summary>
+    /// Refuses the vault's writes, after each has serialised the vault and asked its key, until lifted.
+    /// </summary>
+    /// <remarks>
+    /// Off Windows a write's temporary file is <c>&lt;vault&gt;.tmp</c>, and a directory there refuses it. On Windows the
+    /// write goes through Transactional NTFS, whose temporary name is random, so another transaction holds the vault's
+    /// own name instead, the refusal F.7 measured (D-0119), which a volume without transactions cannot stage.
+    /// </remarks>
+    private sealed class RefusedWrite : IDisposable
+    {
+        private readonly string? _directory;
+        private readonly HeldTransactedName? _held;
+
+        private RefusedWrite(string? directory, HeldTransactedName? held)
+        {
+            _directory = directory;
+            _held = held;
+        }
+
+        /// <summary>Starts refusing writes to <paramref name="vault"/>, or null where this machine cannot.</summary>
+        internal static RefusedWrite? Stage(string vault)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                var directory = vault + KeePassInterop.StrandedTemporarySuffix;
+                Directory.CreateDirectory(directory);
+                return new RefusedWrite(directory, null);
+            }
+
+            var held = HeldTransactedName.TryHold(vault);
+            try
+            {
+                if (held is null || !HeldTransactedName.ReproducesTheRefusal(vault))
+                {
+                    return null;
+                }
+
+                var staged = new RefusedWrite(null, held);
+                held = null;
+                return staged;
+            }
+            finally
+            {
+                held?.Dispose();
+            }
+        }
+
+        /// <summary>Lets the next write through, leaving the vault as it was.</summary>
+        internal void Lift()
+        {
+            if (_directory is not null && Directory.Exists(_directory))
+            {
+                Directory.Delete(_directory);
+            }
+
+            if (OperatingSystem.IsWindows())
+            {
+                _held?.RollBack();
+            }
+        }
+
+        public void Dispose()
+        {
+            Lift();
+
+            if (OperatingSystem.IsWindows())
+            {
+                _held?.Dispose();
+            }
+        }
     }
 
     /// <summary>A key that runs another program's save the first time it is asked, during the key derivation.</summary>

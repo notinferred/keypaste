@@ -716,9 +716,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         return true;
     }
 
-    /// <summary>Offers a file the import dialog handed over to keep editing in place, with the keyfile it opens with.</summary>
+    /// <summary>Offers a file the import dialog handed over to keep editing in place, with the keyfile and YubiKey slot it opens with.</summary>
     /// <returns><see langword="true"/> when it is a KDBX vault and is now selected.</returns>
-    internal bool Offer(string path, string? keyfile)
+    internal bool Offer(string path, string? keyfile, int? hardwareKeySlot = null)
     {
         if (!Offer(path))
         {
@@ -728,6 +728,11 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         if (keyfile is not null)
         {
             KeyfilePath = System.IO.Path.GetFullPath(keyfile);
+        }
+
+        if (hardwareKeySlot is not null && OffersHardwareKey)
+        {
+            HardwareKeySlot = hardwareKeySlot;
         }
 
         _handOffPath = _selectedPath;

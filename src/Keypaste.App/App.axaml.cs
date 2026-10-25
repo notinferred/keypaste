@@ -46,7 +46,7 @@ internal sealed partial class App : Application, IDisposable
     private IActivatableLifetime? _activatable;
     private IDisposable? _reopen;
     private LockedNotice? _lockedNotice;
-    private (string Path, string? Keyfile)? _openNext;
+    private (string Path, string? Keyfile, int? HardwareKeySlot)? _openNext;
     private int _unlockScreens;
     private bool _shuttingDown;
     private bool _quitting;
@@ -479,9 +479,9 @@ internal sealed partial class App : Application, IDisposable
     };
 
     /// <summary>Keeps an imported file in place: locks the open vault and puts that file on the unlock screen.</summary>
-    private void OpenInPlace(string path, string? keyfile)
+    private void OpenInPlace(string path, string? keyfile, int? hardwareKeySlot)
     {
-        _openNext = (path, keyfile);
+        _openNext = (path, keyfile, hardwareKeySlot);
         _ = _session?.LockAsync(VaultLockReason.Manual);
     }
 
@@ -521,7 +521,7 @@ internal sealed partial class App : Application, IDisposable
 
         if (next is { } file)
         {
-            _unlock.Offer(file.Path, file.Keyfile);
+            _unlock.Offer(file.Path, file.Keyfile, file.HardwareKeySlot);
         }
 
         _lockedNotice?.Watch(_unlock);

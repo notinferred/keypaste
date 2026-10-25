@@ -28,7 +28,7 @@ public sealed class ImportDialogKeyboardTests
         using var fixture = new TempVault();
         using var session = Open(fixture);
         var announced = new List<string>();
-        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, announced.Add);
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _, _) => { }, announced.Add);
         var window = Show(import);
 
         foreach (var c in _sourcePassword)
@@ -52,7 +52,7 @@ public sealed class ImportDialogKeyboardTests
     {
         using var fixture = new TempVault();
         using var session = Open(fixture);
-        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, _ => { });
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _, _) => { }, _ => { });
         var closed = false;
         import.Closed += (_, _) => closed = true;
         var outside = new Button { Content = "Behind" };
@@ -71,7 +71,7 @@ public sealed class ImportDialogKeyboardTests
     {
         using var fixture = new TempVault();
         using var session = Open(fixture);
-        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, _ => { });
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _, _) => { }, _ => { });
         var closed = false;
         import.Closed += (_, _) => closed = true;
         var window = Show(import);
@@ -93,7 +93,7 @@ public sealed class ImportDialogKeyboardTests
         using var fixture = new TempVault();
         using var session = Open(fixture);
         var clipboard = new FakeClipboard();
-        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, _ => { }, paste: clipboard.TryPasteIntoAsync);
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _, _) => { }, _ => { }, paste: clipboard.TryPasteIntoAsync);
         var window = Show(import);
         var field = PasswordField(window);
         clipboard.Plant(_sourcePassword + "\n");
@@ -118,7 +118,7 @@ public sealed class ImportDialogKeyboardTests
         using var fixture = new TempVault();
         using var session = Open(fixture);
         var clipboard = new FakeClipboard();
-        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, _ => { }, paste: clipboard.TryPasteIntoAsync);
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _, _) => { }, _ => { }, paste: clipboard.TryPasteIntoAsync);
         var window = Show(import);
         clipboard.Plant("import\tsource");
 

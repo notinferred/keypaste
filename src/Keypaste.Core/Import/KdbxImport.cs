@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Internal;
 
 namespace Keypaste.Core.Import;
@@ -79,10 +80,12 @@ public static class KdbxImport
     /// <param name="path">The file.</param>
     /// <param name="password">Its password; empty with a keyfile is a keyfile-only file.</param>
     /// <param name="keyfilePath">Its keyfile, or null.</param>
+    /// <param name="hardwareKey">The hardware key it also needs, asked once while it opens and never again, or null.</param>
     /// <returns>The unlocked source, which holds its key until disposed.</returns>
     /// <exception cref="InvalidMasterPasswordException">The factors do not open it.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
     /// <exception cref="VaultException">It is not a readable KDBX file.</exception>
-    public static ImportSource Open(string path, ReadOnlySpan<char> password, string? keyfilePath)
+    public static ImportSource Open(string path, ReadOnlySpan<char> password, string? keyfilePath, HardwareKey? hardwareKey = null)
     {
         if (!TryProbe(path, out var probe, out var error))
         {
@@ -98,7 +101,7 @@ public static class KdbxImport
         try
         {
             Encoding.UTF8.GetBytes(password, utf8);
-            return new ImportSource(KeePassInterop.OpenReadOnly(probe.Path, utf8, keyfilePath), probe);
+            return new ImportSource(KeePassInterop.OpenReadOnly(probe.Path, utf8, keyfilePath, hardwareKey), probe);
         }
         finally
         {

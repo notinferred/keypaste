@@ -211,7 +211,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         var asked = 0;
 
         using var import = new KdbxImportViewModel(
-            _session, notes, (_, _) => { }, _announced.Add, chooseAnother: () => { asked++; return Task.CompletedTask; });
+            _session, notes, (_, _, _) => { }, _announced.Add, chooseAnother: () => { asked++; return Task.CompletedTask; });
 
         Assert.True(import.IsUnreadable);
         Assert.Equal("notes.kdbx", import.FileName);
@@ -238,7 +238,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
     }
 
     private KdbxImportViewModel NewImport() =>
-        new(_session, _source, (path, keyfile) => _opened.Add((path, keyfile)), _announced.Add);
+        new(_session, _source, (path, keyfile, _) => _opened.Add((path, keyfile)), _announced.Add);
 
     private static async Task Unlock(KdbxImportViewModel import)
     {

@@ -219,7 +219,7 @@ public sealed class ShellImportTests : IDisposable
 
     private ShellViewModel NewShell() =>
         new(_session, _vault.Home, null, clipboard: _clipboard, clock: new ManualClock(AppClock.Start), picker: _picker,
-            openInPlace: (path, keyfile) => _opened.Add((path, keyfile)));
+            openInPlace: (path, keyfile, _) => _opened.Add((path, keyfile)));
 
     private static async Task Unlock(KdbxImportViewModel import)
     {

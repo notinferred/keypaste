@@ -45,7 +45,7 @@ public sealed class ImportSource : IDisposable
     /// <summary>How many projects the file's entries are tagged into (<see cref="ProjectCatalog"/>).</summary>
     public int ProjectCount { get; }
 
-    /// <summary>What unlocked it: <c>password</c>, <c>key file</c>, or both.</summary>
+    /// <summary>What unlocked it: <c>password</c>, <c>key file</c> and <c>YubiKey</c>, each that it needed, in that order.</summary>
     public IReadOnlyList<string> KeyFactors { get; }
 
     /// <summary>How many entries are never copied.</summary>

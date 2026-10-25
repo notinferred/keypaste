@@ -88,7 +88,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string? _vaultChanged;
     private string? _reloadFailure;
     private int _ticks;
-    private readonly Action<string, string?>? _openInPlace;
+    private readonly Action<string, string?, int?>? _openInPlace;
     private KdbxImportViewModel? _import;
     private GroupRow? _groupMenu;
     private bool _waitingForTouch;
@@ -105,7 +105,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         DesktopPreferences? preferences = null,
         string? notice = null,
         IVaultFilePicker? picker = null,
-        Action<string, string?>? openInPlace = null,
+        Action<string, string?, int?>? openInPlace = null,
         IWebLauncher? web = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -563,7 +563,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         var import = new KdbxImportViewModel(
             _session,
             path,
-            _openInPlace ?? ((_, _) => _session.Lock(VaultLockReason.Manual)),
+            _openInPlace ?? ((_, _, _) => _session.Lock(VaultLockReason.Manual)),
             Imported,
             _picker is null ? null : _picker.PickKeyfileAsync,
             _picker is null ? null : PickImportAsync,

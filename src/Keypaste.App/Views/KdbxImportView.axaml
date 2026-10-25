@@ -245,6 +245,37 @@
             <Button Classes="link" Content="Remove" IsVisible="{Binding HasKeyfile}" Command="{Binding ClearKeyfileCommand}" />
           </StackPanel>
         </Grid>
+        <!-- A YubiKey slot the file needs as well, as the unlock screen asks one. -->
+        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding OffersHardwareKey}">
+          <ctl:KpIcon Grid.Column="0" Icon="usb" Size="14" Margin="0,0,8,0"
+                      Foreground="{DynamicResource KpTextMuted}" />
+          <TextBlock Grid.Column="1"
+                     Classes="mono secondary"
+                     FontSize="12"
+                     Text="{Binding HardwareKeyLabel}"
+                     IsVisible="{Binding UsesHardwareKey}"
+                     VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1"
+                     Classes="muted"
+                     FontSize="12"
+                     Text="No YubiKey"
+                     IsVisible="{Binding !UsesHardwareKey}"
+                     VerticalAlignment="Center" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12">
+            <Button Classes="link" Content="Use a YubiKey" IsVisible="{Binding !UsesHardwareKey}" Command="{Binding UseHardwareKeyCommand}" />
+            <Button Classes="link" Content="{Binding OtherSlotLabel}" IsVisible="{Binding UsesHardwareKey}" Command="{Binding SwitchSlotCommand}" />
+            <Button Classes="link" Content="Remove" IsVisible="{Binding UsesHardwareKey}" Command="{Binding ClearHardwareKeyCommand}"
+                    AutomationProperties.Name="Unlock without a YubiKey" />
+          </StackPanel>
+        </Grid>
+        <!-- Waiting is an amber dot with its halo, the dialog's one amber element while it shows (BRAND). -->
+        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsWaitingForTouch}">
+          <Border Classes="dot waiting" VerticalAlignment="Center" />
+          <TextBlock Text="Touch your YubiKey" FontSize="13" VerticalAlignment="Center"
+                     Foreground="{DynamicResource KpTextPrimary}" />
+          <Button Classes="link" Content="Cancel" Command="{Binding CancelTouchCommand}"
+                  AutomationProperties.Name="Stop waiting for the YubiKey" />
+        </StackPanel>
       </StackPanel>
 
       <!-- Where each group of the file lands in the open vault. -->
@@ -334,7 +365,8 @@
                 IsVisible="{Binding CanChooseAnother}"
                 Content="Choose another file…"
                 Command="{Binding ChooseAnotherCommand}" />
-        <Button Classes="primary dialog-action"
+        <Button Classes="dialog-action"
+                Classes.primary="{Binding UnlockIsPrimary}"
                 IsVisible="{Binding NeedsUnlock}"
                 Content="{Binding UnlockText}"
                 Command="{Binding UnlockCommand}" />

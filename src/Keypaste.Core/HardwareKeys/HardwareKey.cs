@@ -6,10 +6,10 @@ namespace Keypaste.Core.HardwareKeys;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every open and every save of a vault that uses it asks the key once, because the challenge is
-/// the vault's KDF seed and a save draws a new one. The last answer is held until
-/// <see cref="Dispose"/>, so checking the bytes just written, and opening them again after an
-/// access change, ask nothing more of the key: a slot that needs a touch is touched once per save.
+/// Every open and every attempt to write a vault that uses it asks the key once, because the
+/// challenge is the vault's KDF seed and each attempt draws a new one: a save retried after a
+/// transient refusal asks again. The last answer is held until <see cref="Dispose"/>, so checking
+/// the bytes just written, and opening them again after an access change, ask nothing more of the key.
 /// </para>
 /// <para>
 /// The caller owns this and disposes it after the vaults that use it.
