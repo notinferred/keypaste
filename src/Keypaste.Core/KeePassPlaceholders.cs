@@ -8,6 +8,9 @@ namespace Keypaste.Core;
 /// <para>
 /// Keywords and prefixes match in any case, as in KeePass 2; a <c>{S:…}</c> field's name matches exactly.
 /// Any other text in braces, such as a JSON value or <c>${HOME}</c>, is text, and so is an unclosed brace.
+/// A <c>{S:</c> whose braces KeePassXC's pattern matches names one field by all of its inside, braces included,
+/// as KeePassXC reads it: <c>{S:a{PASSWORD}b}</c> names <c>a{PASSWORD}b</c>, and nothing in the name fills in
+/// (D-0531).
 /// </para>
 /// <para>
 /// KeePassXC's escape, which it reads from 2.7.11 on, is honoured where KeePassXC honours it (D-0519): a value
@@ -166,6 +169,8 @@ public static class KeePassPlaceholders
     /// placeholder leaves the opening brace as text, and the scan goes on after it. A conversion or reference
     /// that another brace opens inside, such as <c>{T-CONV:/{USERNAME}/Upper/}</c>, which KeePass fills in before
     /// converting, is a placeholder keypaste does not fill in, so the value is refused rather than half filled.
+    /// A <c>{S:</c> runs to the brace KeePassXC's pattern pairs with its own, and is text up to the next brace when
+    /// the pattern pairs it with none.
     /// </para>
     /// <para>
     /// A text wholly wrapped in <c>\{</c> and <c>\}</c> is one escape and holds nothing else. A placeholder or
@@ -174,16 +179,22 @@ public static class KeePassPlaceholders
     /// </remarks>
     private static IEnumerable<Token> Scan(string text)
     {
+        if (text.IndexOf('{', StringComparison.Ordinal) < 0)
+        {
+            yield break;
+        }
+
         if (Escaped(text))
         {
             yield return new Token(0, text.Length - 1, null);
             yield break;
         }
 
-        var groups = Groups(text);
+        var matched = new MatchedBraces(text);
+        var groups = Groups(text, matched);
         var group = 0;
 
-        foreach (var token in Tokens(text))
+        foreach (var token in Tokens(text, matched))
         {
             while (group < groups.Count && groups[group].Close < token.Open)
             {
@@ -200,14 +211,21 @@ public static class KeePassPlaceholders
     /// <remarks>
     /// Braces whose inside is wholly an escape, such as <c>{\{PASSWORD\}}</c>, give that inside as an escape.
     /// </remarks>
-    private static IEnumerable<Token> Tokens(string text)
+    private static IEnumerable<Token> Tokens(string text, MatchedBraces matched)
     {
         for (var open = text.IndexOf('{', StringComparison.Ordinal); open >= 0;)
         {
-            if (EscapeInside(text, open) is { } close)
+            if (EscapeInside(text, open, matched) is { } close)
             {
                 yield return new Token(open + 1, close - 1, null);
                 open = text.IndexOf('{', close + 1);
+                continue;
+            }
+
+            if (Named(text, open) && matched.Close(open) is { } end)
+            {
+                yield return new Token(open, end, new Placeholder(null, text[(open + 1 + _named.Length)..end]));
+                open = text.IndexOf('{', end + 1);
                 continue;
             }
 
@@ -242,43 +260,16 @@ public static class KeePassPlaceholders
     /// The braces KeePassXC's pattern matches, left to right, that hold another brace and name no placeholder: those
     /// whose inside 2.7.11 fills in and 2.8 does not. A <c>{S:…}</c> names a field by all its inside in both.
     /// </summary>
-    /// <remarks>
-    /// The pattern matches from an opening brace to its partner when no pair between them, itself included, is empty,
-    /// and goes on after the partner, or after the opening brace when it does not match. Each brace's partner and
-    /// each empty pair are found once, so a value of a million braces is read in one pass.
-    /// </remarks>
-    private static List<(int Open, int Close)> Groups(string text)
+    /// <remarks>The pattern goes on after the partner of a brace it matches from, or after a brace it does not.</remarks>
+    private static List<(int Open, int Close)> Groups(string text, MatchedBraces matched)
     {
         List<(int Open, int Close)> groups = [];
 
-        if (text.IndexOf('{', StringComparison.Ordinal) < 0)
-        {
-            return groups;
-        }
-
-        var partners = new Dictionary<int, int>();
-        var opens = new Stack<int>();
-        var empties = new int[text.Length + 1];
-
-        for (var at = 0; at < text.Length; at++)
-        {
-            empties[at + 1] = empties[at] + (text[at] == '}' && at > 0 && text[at - 1] == '{' ? 1 : 0);
-
-            if (text[at] == '{')
-            {
-                opens.Push(at);
-            }
-            else if (text[at] == '}' && opens.Count > 0)
-            {
-                partners[opens.Pop()] = at;
-            }
-        }
-
         for (var open = text.IndexOf('{', StringComparison.Ordinal); open >= 0;)
         {
-            if (partners.TryGetValue(open, out var close) && empties[close + 1] == empties[open + 1])
+            if (matched.Close(open) is { } close)
             {
-                if (text.IndexOf('{', open + 1, close - open - 1) >= 0 && !text.AsSpan(open + 1).StartsWith(_named, StringComparison.Ordinal))
+                if (text.IndexOf('{', open + 1, close - open - 1) >= 0 && !Named(text, open))
                 {
                     groups.Add((open, close));
                 }
@@ -298,43 +289,16 @@ public static class KeePassPlaceholders
     private static bool Escaped(string text) =>
         text.StartsWith(_escapeOpen, StringComparison.Ordinal) && text.EndsWith(_escapeClose, StringComparison.Ordinal);
 
-    /// <summary>
-    /// Where the braces opening at <paramref name="open"/> close when their inside is wholly an escape, matched as
-    /// KeePassXC's pattern matches braces, every pair balanced and none empty; null when they do not.
-    /// </summary>
-    private static int? EscapeInside(string text, int open)
-    {
-        if (!text.AsSpan(open + 1).StartsWith(_escapeOpen, StringComparison.Ordinal))
-        {
-            return null;
-        }
+    /// <summary>Where the braces opening at <paramref name="open"/> close when KeePassXC's pattern matches them and their inside is wholly an escape; null when not.</summary>
+    private static int? EscapeInside(string text, int open, MatchedBraces matched) =>
+        text.AsSpan(open + 1).StartsWith(_escapeOpen, StringComparison.Ordinal)
+        && matched.Close(open) is { } close
+        && Escaped(text[(open + 1)..close])
+            ? close
+            : null;
 
-        var depth = 0;
-        var empty = true;
-
-        for (var at = open; at < text.Length; at++)
-        {
-            if (text[at] == '{')
-            {
-                depth++;
-                empty = true;
-            }
-            else if (text[at] != '}')
-            {
-                empty = false;
-            }
-            else if (empty)
-            {
-                return null;
-            }
-            else if (--depth == 0)
-            {
-                return Escaped(text[(open + 1)..at]) ? at : null;
-            }
-        }
-
-        return null;
-    }
+    /// <summary>Whether the brace at <paramref name="open"/> starts <c>{S:</c>, which KeePassXC reads in capitals only, as a field's name.</summary>
+    private static bool Named(string text, int open) => text.AsSpan(open + 1).StartsWith(_named, StringComparison.Ordinal);
 
     /// <summary>The placeholder the text between two braces names, or null when it is text.</summary>
     /// <remarks>
@@ -386,6 +350,41 @@ public static class KeePassPlaceholders
     /// inside it; or, with no placeholder, an escape from its backslash to its closing brace.
     /// </summary>
     private readonly record struct Token(int Open, int Close, Placeholder? Placeholder);
+
+    /// <summary>
+    /// Where KeePassXC's pattern, from 2.7.10 on, matches each opening brace of a text to: its partner, when every
+    /// pair between them, itself included, is balanced and none is empty.
+    /// </summary>
+    /// <remarks>Each brace's partner and each empty pair are found once, so a value of a million braces is read in one pass.</remarks>
+    private sealed class MatchedBraces
+    {
+        private readonly Dictionary<int, int> _partners = [];
+        private readonly int[] _empties;
+
+        internal MatchedBraces(string text)
+        {
+            var opens = new Stack<int>();
+            _empties = new int[text.Length + 1];
+
+            for (var at = 0; at < text.Length; at++)
+            {
+                _empties[at + 1] = _empties[at] + (text[at] == '}' && at > 0 && text[at - 1] == '{' ? 1 : 0);
+
+                if (text[at] == '{')
+                {
+                    opens.Push(at);
+                }
+                else if (text[at] == '}' && opens.Count > 0)
+                {
+                    _partners[opens.Pop()] = at;
+                }
+            }
+        }
+
+        /// <summary>Where the pattern matching from the brace at <paramref name="open"/> closes, or null when it does not match there.</summary>
+        internal int? Close(int open) =>
+            _partners.TryGetValue(open, out var close) && _empties[close + 1] == _empties[open + 1] ? close : null;
+    }
 
     /// <summary>One placeholder as written.</summary>
     /// <param name="Keyword">How it is shown, or null for a <c>{S:…}</c>, whose field is named only when its item has one by that name.</param>

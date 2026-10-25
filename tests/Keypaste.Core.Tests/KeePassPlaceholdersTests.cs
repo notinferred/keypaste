@@ -242,12 +242,15 @@ public sealed class KeePassPlaceholdersTests
     /// <summary>
     /// A placeholder or escape inside braces that name no placeholder refuses the value, which is read no further:
     /// KeePassXC 2.7.11 fills in the inside, and 2.8 leaves such braces as written or, around one placeholder,
-    /// drops them (D-0529). Braces holding neither, and a <c>{S:…}</c>, which both read as a field's name, are not.
+    /// drops them (D-0529). Braces holding neither, and a <c>{S:…}</c>, which both read as a field's name, are not;
+    /// a <c>{s:…}</c>, which KeePassXC reads as no placeholder, is.
     /// </summary>
     [Theory]
     [InlineData("{{PASSWORD}}", "{PASSWORD}")]
     [InlineData("{x{PASSWORD}y}", "{PASSWORD}")]
     [InlineData("a{b{c{USERNAME}}}", "{USERNAME}")]
+    [InlineData("{s:a{PASSWORD}b}", "{PASSWORD}")]
+    [InlineData("{x{S:a{b}c}y}", "{S:…}")]
     [InlineData(@"{\{PASSWORD\}}", @"\{…\}")]
     [InlineData(@"{\{REF:P@I:0123\}}x", @"\{…\}")]
     [InlineData(@"a{\{S:API_KEY\}}b{PASSWORD}", @"\{…\}")]
@@ -267,6 +270,54 @@ public sealed class KeePassPlaceholdersTests
     [InlineData("{a{PASSWORD}")]
     public void Braces_KeePassXC_does_not_match_whole_or_that_hold_no_placeholder_refuse_nothing(string value) =>
         Assert.Null(KeePassPlaceholders.Fill(value, () => _stripe).Refusal);
+
+    /// <summary>
+    /// A <c>{S:…}</c> names one field by all of its inside, up to the brace KeePassXC's pattern pairs with its own, as
+    /// KeePassXC 2.7.11 and 2.8 read it, so nothing in the name fills in, and a field the item lacks refuses the value
+    /// (D-0531).
+    /// </summary>
+    [Theory]
+    [InlineData("{S:a{PASSWORD}b}")]
+    [InlineData("x{S:a{b}c}y")]
+    [InlineData("{S:{S:API_KEY}}")]
+    [InlineData("{S:a{x{PASSWORD}y}b}")]
+    [InlineData(@"{S:\{PASSWORD\}}")]
+    public void A_named_field_whose_name_holds_braces_is_one_field_and_one_the_item_lacks_refuses_the_value(string value)
+    {
+        var planted = KeePassPlaceholders.Planted(value, ["API_KEY"]);
+
+        Assert.Equal(_refused + "{S:…}, which names no field of its item", KeePassPlaceholders.Fill(value, () => _stripe).Refusal);
+        Assert.Equal(new PlaceholderRefusal("{S:…}", "names no field of its item"), planted.Refused);
+        Assert.Empty(planted.Fills);
+        Assert.False(KeePassPlaceholders.Names(value, "API_KEY"));
+    }
+
+    [Fact]
+    public void A_field_whose_name_holds_braces_is_named_and_never_released()
+    {
+        const string Value = "{S:a{PASSWORD}b}";
+        var fields = Fields(new VaultEntry { Title = "Braced", Password = _password }, ("a{PASSWORD}b", "braced-value"));
+
+        var fill = KeePassPlaceholders.Fill(Value, () => fields);
+
+        Assert.Equal(_refused + "{S:a PASSWORD b}, which names a field keypaste never releases", fill.Refusal);
+        Assert.Equal(
+            new PlaceholderRefusal("{S:a PASSWORD b}", "names a field keypaste never releases"),
+            KeePassPlaceholders.Planted(Value, ["a{PASSWORD}b"]).Refused);
+        Assert.True(KeePassPlaceholders.Names(Value, "a{PASSWORD}b"));
+    }
+
+    /// <summary>
+    /// A <c>{S:</c> ends at the brace KeePassXC's pattern pairs with its own, and one it pairs with none, or only around
+    /// an empty pair, is text up to the next brace, from which KeePassXC 2.7.11 and 2.8 read on (D-0531).
+    /// </summary>
+    [Theory]
+    [InlineData("{S:API_KEY}b}", _apiKey + "b}")]
+    [InlineData("{S:a{PASSWORD}", "{S:a" + _password)]
+    [InlineData("{S:a{b}", "{S:a{b}")]
+    [InlineData("{S:a{}{PASSWORD}b}", "{S:a{}" + _password + "b}")]
+    public void A_named_field_ends_where_KeePassXC_pairs_its_brace_and_an_unpaired_one_is_text(string value, string filled) =>
+        Assert.Equal(filled, KeePassPlaceholders.Fill(value, () => _stripe).Value);
 
     [Fact]
     public void A_field_that_is_an_escape_fills_in_with_its_escapes_made_braces()

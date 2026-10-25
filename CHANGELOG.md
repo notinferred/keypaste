@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A value holding a `{S:…}` whose name holds braces, such as `{S:a{PASSWORD}b}`, is now refused and named, as `{REF:…}` is: KeePassXC reads it as one field named `a{PASSWORD}b`, and keypaste releases no field so named, where it had filled in the `{PASSWORD}` inside the name ([F.69](docs/steps/F.69.md)).
+
 The idle warning now gives a screen reader its first line, "Locking in 30 seconds.", once per warning, as an earlier entry said it did; Avalonia had named it by its ticking text, a new name each second ([F.68](docs/steps/F.68.md)).
 
 A value with a KeePass placeholder or escape inside braces that name no placeholder, such as `{x{PASSWORD}y}` or `{\{PASSWORD\}}`, is now refused and named, as `{REF:…}` is, because KeePassXC 2.7.11 fills in that inside and 2.8 does not ([F.68](docs/steps/F.68.md)).

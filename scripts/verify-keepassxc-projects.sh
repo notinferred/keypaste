@@ -27,7 +27,10 @@
 # custom PASSWORD field each start nothing and name their entries, and a value holding {PASSWORD}
 # reaches the child filled in from its own entry, exactly as KeePassXC shows it (P.3b1). Values using
 # KeePassXC's \{…\} escape, whole, through {S:…}, inside braces and in part, reach the child as
-# KeePassXC 2.7.11 gives them, compared with keepassxc-cli itself from 2.7.11 on (D-0519).
+# KeePassXC 2.7.11 gives them, compared with keepassxc-cli itself from 2.7.11 on (D-0519). A {S:…}
+# whose name holds braces is refused, with a field so named or without, where keepassxc-cli from
+# 2.7.11 on shows that one field's value or nothing, and a {S: that KeePassXC's pattern pairs with
+# no brace reaches the child as text, as keepassxc-cli shows it (D-0531).
 # `run --session` through a real `keypaste approve`, and through the app's own prompt window held by
 # tests/Keypaste.AppDriver on an untouched copy, gets the same set after a prompt naming the source
 # entries, and the staging set is asked once only. A scoped token's run of the dev set is audited
@@ -473,6 +476,44 @@ elif ((kpxc_number >= 20711)); then
   [ "$shown" = '{{PASSWORD}}' ] || die "keepassxc-cli ${kpxc_version} shows {\\{PASSWORD\\}} as ${shown}, not with its escape made braces"
 fi
 printf '    keepassxc-cli %s shows %s as %s\n' "$kpxc_version" '{\{PASSWORD\}}' "$shown"
+
+step "F.69: a {S:…} whose name holds braces names one field, as KeePassXC reads it, and is refused, since keypaste releases no field so named"
+braced_field='<String><Key>a{PASSWORD}b</Key><Value ProtectInMemory="True">braced-c1b</Value></String>'
+refused braced-name 'DATABASE_URL holds the KeePass placeholder {S:a PASSWORD b}, which names a field keypaste never releases (services/Database)' \
+  '' '{S:a{PASSWORD}b}' "$braced_field"
+refused braced-missing 'DATABASE_URL holds the KeePass placeholder {S:…}, which names no field of its item (services/Database)' \
+  '' '{S:a{PASSWORD}b}' ''
+braced=$(kx show "$dir/braced-name.kdbx" services/Database -a DATABASE_URL) || die "keepassxc-cli could not show the braced name"
+missing=$(kx show "$dir/braced-missing.kdbx" services/Database -a DATABASE_URL) || die "keepassxc-cli could not show the braced name with no field"
+if ((kpxc_number >= 20711)); then
+  [ "$braced" = braced-c1b ] || die "keepassxc-cli ${kpxc_version} shows {S:a{PASSWORD}b} as ${braced}, not as the field a{PASSWORD}b"
+  [ -z "$missing" ] || die "keepassxc-cli ${kpxc_version} shows {S:a{PASSWORD}b} with no such field as ${missing}, not empty"
+fi
+printf '    keepassxc-cli %s shows {S:a{PASSWORD}b} as "%s", and with no such field as "%s"\n' "$kpxc_version" "$braced" "$missing"
+
+step "F.69: a {S: whose brace KeePassXC pairs ends there, and one it pairs with none is text, reaching the child as KeePassXC gives it"
+unpaired_keys=(UNPAIRED_TAIL UNPAIRED_OPEN UNPAIRED_EMPTY)
+unpaired="<Entry><UUID>$(uuid funpaired)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Unpaired</Value></String>"
+unpaired+='<String><Key>Password</Key><Value ProtectInMemory="True">unpaired-login-c1b</Value></String>'
+unpaired+='<String><Key>UNPAIRED_KEY</Key><Value ProtectInMemory="True">key-c1b</Value></String>'
+unpaired+='<String><Key>UNPAIRED_TAIL</Key><Value ProtectInMemory="True">{S:UNPAIRED_KEY}b}</Value></String>'
+unpaired+='<String><Key>UNPAIRED_OPEN</Key><Value ProtectInMemory="True">{S:a{PASSWORD}</Value></String>'
+unpaired+='<String><Key>UNPAIRED_EMPTY</Key><Value ProtectInMemory="True">{S:a{}{PASSWORD}b}</Value></String></Entry>'
+make_fields unpaired "$unpaired" 'db-c1b' ''
+# What KeePassXC 2.7.11 and 2.8 give each key, one per line.
+unpaired_expected=$'key-c1bb}\n{S:aunpaired-login-c1b\n{S:a{}unpaired-login-c1bb}'
+out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/unpaired.kdbx" -- "$child" -c 'printf "%s\n" "${UNPAIRED_TAIL-unset}" "${UNPAIRED_OPEN-unset}" "${UNPAIRED_EMPTY-unset}"' 2>"$dir/unpaired.err" | tr -d '\r') \
+  || die "keypaste run failed on the unpaired values: $(cat "$dir/unpaired.err")"
+[ "$out" = "$unpaired_expected" ] || die "the child got the unpaired values as: ${out}"
+grep -qF -- '-c1b' "$dir/unpaired.err" && die "keypaste run printed a value: $(cat "$dir/unpaired.err")"
+shown=$(for key in "${unpaired_keys[@]}"; do kx show "$dir/unpaired.kdbx" services/Unpaired -a "$key" || exit 1; done) \
+  || die "keepassxc-cli could not show the unpaired values"
+if ((kpxc_number >= 20711)); then
+  [ "$shown" = "$unpaired_expected" ] || die "keepassxc-cli ${kpxc_version} shows the unpaired values as: ${shown}"
+  printf '    keepassxc-cli %s and keypaste give each unpaired value alike\n' "$kpxc_version"
+else
+  printf '    keepassxc-cli %s pairs braces as KeePassXC did before 2.7.10, so keypaste is held to what 2.7.11 and 2.8 give\n' "$kpxc_version"
+fi
 
 step "C.5b: under the default exposure an agent lists the tagged entries with their variables and tags, gets a variable, never a password, and runs billing from services/"
 exposed="$dir/exposed.kdbx"
@@ -1291,4 +1332,4 @@ out=$(printf '%s\n' "$pw" | OLD_KEY=old-c1b "$kp" run billing --vault "$fields" 
   || die "keypaste run with OLD_KEY inherited failed: $(cat "$dir/run.err")"
 [ "$out" = "$dev_set" ] && die "a child holding OLD_KEY still matched the dev set — the run comparisons cannot see OLD_KEY"
 
-printf '\n%s\n' "PROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, a value's {PASSWORD} reaches a child as KeePassXC fills it in and one using KeePassXC's escape as 2.7.11 reads it, a tag KeePassXC dropped with another change is flagged and restored, and agents' settings survive KeePassXC's saves and merge into one entry per agent, the newer record whole."
+printf '\n%s\n' "PROJECTS GATE PASSED: KeePassXC and keypaste agree on project tags, a protected tag makes a real agent ask every time, an untagged entry under env/ is neither a variable nor protected, a value's {PASSWORD} reaches a child as KeePassXC fills it in and one using KeePassXC's escape as 2.7.11 reads it, a {S:…} whose name holds braces is refused as the one field KeePassXC reads, a tag KeePassXC dropped with another change is flagged and restored, and agents' settings survive KeePassXC's saves and merge into one entry per agent, the newer record whole."
