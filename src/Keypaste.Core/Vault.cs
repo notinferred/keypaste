@@ -290,6 +290,44 @@ public sealed class Vault : IDisposable
         return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path));
     }
 
+    /// <summary>Opens an existing vault with the parts of the key another open of it exported, as the desktop's quick unlock does (D-0550).</summary>
+    /// <param name="path">The vault file.</param>
+    /// <param name="parts">The parts, which stay the caller's; no keyfile is read.</param>
+    /// <param name="hardwareKey">
+    /// The hardware key in the slot <paramref name="parts"/> names, asked now and on every save of the returned vault,
+    /// or <see langword="null"/> when they name none.
+    /// </param>
+    /// <exception cref="ArgumentException"><paramref name="hardwareKey"/> is not in the slot <paramref name="parts"/> names.</exception>
+    /// <exception cref="InvalidMasterPasswordException">The parts no longer open the vault: its key was changed.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer, so nothing was opened.</exception>
+    public static Vault Open(string path, VaultKeyParts parts, HardwareKey? hardwareKey)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentNullException.ThrowIfNull(parts);
+
+        if (hardwareKey?.Slot != parts.HardwareKeySlot)
+        {
+            throw new ArgumentException("The hardware key is not in the slot the key's parts name.", nameof(hardwareKey));
+        }
+
+        var stamp = SourceSnapshot.Digest(path);
+        var interop = KeePassInterop.Open(path, parts, hardwareKey);
+        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path));
+    }
+
+    /// <summary>The parts this vault's key is made of, for <see cref="Open(string, VaultKeyParts, HardwareKey?)"/>.</summary>
+    /// <returns>A copy, which the caller disposes, zeroing it.</returns>
+    /// <exception cref="VaultException">This vault's access was changed, so its key is no longer the one it opened with.</exception>
+    public VaultKeyParts ExportKeyParts()
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfRekeyed();
+            return _interop.ExportKeyParts();
+        }
+    }
+
     /// <summary>Adds an entry, creating any groups <see cref="VaultEntry.GroupPath"/> names that do
     /// not exist yet. Call <see cref="Save"/> to persist it.</summary>
     /// <remarks>

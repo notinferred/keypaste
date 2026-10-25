@@ -9,6 +9,7 @@ on:
       - 'src/Keypaste.App/**'
       - 'src/Keypaste.Mvvm/**'
       - 'tests/Keypaste.App.Tests/**'
+      - 'tests/Keypaste.App.Windows.Tests/**'
       - 'tests/Keypaste.MinimizeObserver/**'
       - 'tests/Keypaste.Consistency.Tests/**'
       - 'tests/Keypaste.AppDriver/**'
@@ -378,7 +379,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(-c Release -r '${{ matrix.rid }}' --self-contained
+          # The Windows package is the app's Windows target, which reaches Windows Hello (D-0549).
+          framework=net10.0
+          if [ '${{ matrix.rid }}' = win-x64 ]; then framework=net10.0-windows10.0.19041.0; fi
+          args=(-c Release -r '${{ matrix.rid }}' -f "$framework" --self-contained
             --no-restore -o 'artifacts/app/${{ matrix.rid }}')
           if [ -n "${{ steps.suffix.outputs.suffix }}" ]; then
             args+=('-p:VersionSuffix=${{ steps.suffix.outputs.suffix }}')

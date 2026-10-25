@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database.
 
 ## KeePassLib
 
@@ -67,6 +67,12 @@ The icons are vendored as SVG at `third_party/lucide/icons/`. [lucide-to-axaml.p
 Copyright (c) Yubico AB. Licensed under the Apache License, Version 2.0; the full text is at <https://www.apache.org/licenses/LICENSE-2.0> and in each package as `LICENSE.txt`.
 
 The desktop app references `Yubico.YubiKey` 1.18.0 from NuGet, with its `Yubico.Core` and `Yubico.NativeShims` packages, to ask a YubiKey for HMAC-SHA1 challenge-response ([Directory.Packages.props](Directory.Packages.props), D-0366). They are not vendored or modified, and the CLI and the MCP bridge do not contain them. `Yubico.NativeShims` is a native library that statically contains OpenSSL's libcrypto, which is also Apache-2.0. Apache-2.0 code may be combined into a GPLv3 work, and so into this AGPL-3.0-only distribution; the SDK remains under Apache-2.0.
+
+## Windows SDK projection for .NET
+
+Copyright (c) Microsoft Corporation. Licensed under the MIT License; the text is at <https://github.com/microsoft/CsWinRT/blob/master/LICENSE>.
+
+The desktop app's Windows target, which only its Windows package carries, references the targeting pack `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57 that the .NET SDK supplies, and so ships `Microsoft.Windows.SDK.NET.dll` and C#/WinRT's `WinRT.Runtime.dll`, to reach Windows Hello (D-0549). They are not vendored or modified, and the CLI, the MCP bridge and the Linux and macOS packages do not contain them.
 
 ## KeePassXC test database
 

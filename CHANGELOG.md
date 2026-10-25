@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+On Windows, the app now unlocks a vault again with Windows Hello after you lock it, it locks when idle or minimized, or you close it into the tray, as KeePassXC 2.8 does. After each unlock with the master password, Windows Hello asks to keep it, and the unlock screen then offers Unlock with Windows Hello above the master password, which stays. `keypaste lock`, opening another vault, a changed password or keyfile and quitting still need the master password, nothing is written to disk, and a vault that needs a YubiKey asks for its touch again ([4.10a](docs/steps/4.10a.md)).
+
 An item in the app now lists its attachments by name and size, with Add attachment, which attaches a file of up to 5 MiB under the file's name, and Replace, Remove and Save on each one. Save writes a copy, unencrypted, only to a new file you choose and never over one, and the app never opens or runs an attachment. When the vault's history size limit means history cannot keep the item as it was, the item says what is gone ([V.8b](docs/steps/V.8b.md)).
 
 `keypaste attachment` lists an item's attachments by name and size, attaches a file of up to 5 MiB, replaces or removes one, keeping what it held in the item's history, and saves one to a new file you name; KeePassXC reads every change, and the attachments you do not touch stay byte for byte. While the app or `keypaste approve` holds the vault, adding, replacing and removing are refused ([V.8a](docs/steps/V.8a.md)).

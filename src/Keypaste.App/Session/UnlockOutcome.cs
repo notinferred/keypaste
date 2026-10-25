@@ -39,4 +39,10 @@ internal enum UnlockOutcome
 
     /// <summary>The hardware key gave no response; <see cref="AppVaultSession.LastHardwareKeyFailure"/> says why.</summary>
     HardwareKeyFailed = 7,
+
+    /// <summary>A quick unlock gave no key back; <see cref="AppVaultSession.LastQuickUnlock"/> says why.</summary>
+    QuickUnlockRefused = 8,
+
+    /// <summary>The key a quick unlock kept no longer opens the vault, whose key was changed, so the copy was dropped.</summary>
+    KeyChanged = 9,
 }

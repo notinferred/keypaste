@@ -448,6 +448,46 @@ public sealed class VaultAccessTests : IDisposable
         Assert.Empty(cancelled.Except(raised));
     }
 
+    /// <summary>V.1b's limit, done in 4.10a: a reopen that fails after the change was written locks with its own reason and says why.</summary>
+    [Fact]
+    public async Task A_reopen_that_fails_after_a_committed_password_change_locks_says_why_and_the_new_password_opens_it()
+    {
+        VaultLockReason? reason = null;
+        using var session = new AppVaultSession(_clock, home: _home)
+        {
+            ReopenAfterAccessChange = (_, _, _, _) => throw new VaultException("The vault did not open again."),
+        };
+        session.Locked += (_, locked) => reason = locked;
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(_vaultPath, master.Value));
+        }
+
+        AccessChangeResult result;
+        using (var current = TempVault.Secret(_master))
+        using (var next = TempVault.Secret(_later))
+        {
+            result = session.ChangeAccess(current.Value, new VaultAccessChange(true, AccessKeyfileChange.Keep), next.Value, next.Value);
+        }
+
+        Assert.Equal(AccessChangeOutcome.ChangedAndLocked, result.Outcome);
+        var raised = Assert.NotNull(reason);
+        Assert.Equal(VaultLockReason.AccessChanged, raised);
+        Assert.False(session.IsUnlocked);
+        AssertRefused(_vaultPath, _master, null);
+        AssertOpens(_vaultPath, _later, null);
+
+        // The unlock screen the app shows after that lock.
+        var landed = 0;
+        using var unlock = new UnlockViewModel(session, _home, _picker, () => landed++, message: App.LockMessage(raised), lockedBy: raised);
+        Assert.Equal(App.AccessChangedMessage, unlock.Message);
+
+        Type(unlock, _later);
+        await unlock.UnlockAsync();
+        Assert.Equal(1, landed);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private AppVaultSession Unlocked(string password, string? keyfile = null)

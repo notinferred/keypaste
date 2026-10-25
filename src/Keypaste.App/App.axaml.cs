@@ -315,11 +315,15 @@ internal sealed partial class App : Application, IDisposable
             clock,
             preferences.IdleTimeout,
             KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)),
-            HardwareKeys());
+            HardwareKeys(),
+            QuickUnlockSigner());
     }
 
     /// <summary>What reaches hardware keys; the connected YubiKeys unless a test gives another.</summary>
     internal Func<IChallengeResponseDevice> HardwareKeys { get; init; } = () => new YubiKeyHardware();
+
+    /// <summary>What a quick unlock asks; Windows Hello in the Windows build on Windows and none elsewhere, unless a test gives another.</summary>
+    internal Func<IQuickUnlockSigner?> QuickUnlockSigner { get; init; } = QuickUnlockSigners.ForThisMachine;
 
     /// <summary>
     /// Arms the minimize-lock setting against a window.
@@ -461,18 +465,18 @@ internal sealed partial class App : Application, IDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
-            ShowUnlock(
-                Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
-                reason switch
-                {
-                    VaultLockReason.AccessChanged => AccessChangedMessage,
-                    VaultLockReason.ReloadRefused => ReloadRefusedMessage,
-                    _ => null,
-                },
-                reason);
+            ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable), LockMessage(reason), reason);
             _tray?.Refresh();
         });
     }
+
+    /// <summary>What the unlock screen says after a lock for <paramref name="reason"/>, or null where its lock note is enough.</summary>
+    internal static string? LockMessage(VaultLockReason reason) => reason switch
+    {
+        VaultLockReason.AccessChanged => AccessChangedMessage,
+        VaultLockReason.ReloadRefused => ReloadRefusedMessage,
+        _ => null,
+    };
 
     /// <summary>Keeps an imported file in place: locks the open vault and puts that file on the unlock screen.</summary>
     private void OpenInPlace(string path, string? keyfile)

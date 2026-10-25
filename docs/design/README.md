@@ -130,6 +130,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - **Lock screen**: full-window with a 16px hairline grid background.
   - The "k." icon 56px tall, "acme.kdbx is locked", "Enter its master password to open it." It says nothing of agents (N.2).
   - Focused password field with an amber caret, amber "Unlock" button, the key-file line, then "More options", which reveals "Unlock with a YubiKey too"; a vault that last opened with a YubiKey shows it directly. While the key waits for a touch, its waiting dot is the amber element and Unlock is secondary.
+  - On Windows, a vault Windows Hello can open again: "Unlock it with Windows Hello or its master password." under the heading, and an amber "Unlock with Windows Hello" (15px fingerprint icon) above the password field, with Unlock secondary (D-0553).
   - With no vault selected, the welcome: "Open a vault", then, when KeePassXC has opened databases here, a KEEPASSXC LAST OPENED list (table-heading style, rows as the recent list's, file name in mono with the path in a tooltip) above "Open another file…" and "Create a new vault…", neither amber; with nothing from KeePassXC, the amber "Open a vault…" and "Create a new vault…".
 - **Toast**, bottom-right 20px: `#24262A`, border `#3A3D43`, radius 10, green check icon, auto-dismisses after 2.8s. A copy's toast says "<field> copied." with "Clears in 20s" (muted) and a Clear now link, behind a clipboard-check icon.
 

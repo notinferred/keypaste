@@ -74,6 +74,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private string? _handOffPath;
     private string _owner = string.Empty;
     private bool _busy;
+    private bool _resumable;
+    private bool _keepingQuickUnlock;
     private bool _creating;
     private bool _restoreOnly;
     private bool _hasBackups;
@@ -106,6 +108,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _paste = paste;
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => CanUnlock);
+        ResumeCommand = new AsyncRelayCommand(ResumeAsync, () => !_busy && OffersQuickUnlock);
         BrowseCommand = new AsyncRelayCommand(BrowseAsync, () => !_busy && IsOpening);
         StartCreateCommand = new AsyncRelayCommand(StartCreateAsync, () => !_busy);
         CreateCommand = new AsyncRelayCommand(CreateAsync, () => CanCreate);
@@ -123,7 +126,11 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         DependsOn(nameof(Heading), nameof(SelectedPath), nameof(IsRestoreOnly), nameof(SelectedName), nameof(IsHandOff));
         DependsOn(nameof(IsHandOff), nameof(SelectedPath));
-        DependsOn(nameof(Subtitle), nameof(IsHandOff));
+        DependsOn(nameof(Subtitle), nameof(IsHandOff), nameof(OffersQuickUnlock));
+        DependsOn(nameof(OffersQuickUnlock), nameof(Resumable), nameof(IsOpening), nameof(IsRestoreOnly), nameof(SelectedPath));
+        DependsOn(nameof(QuickUnlockIsPrimary), nameof(OffersQuickUnlock), nameof(IsWaitingForTouch));
+        DependsOn(nameof(UnlockIsPrimary), nameof(OffersQuickUnlock), nameof(IsWaitingForTouch));
+        DependsOn(ResumeCommand, nameof(Busy), nameof(OffersQuickUnlock));
         DependsOn(nameof(WelcomeSubtitle), nameof(OffersKeePassXc));
         DependsOn(nameof(OffersKeePassXc), nameof(SelectedPath), nameof(KeePassXc));
         DependsOn(nameof(OffersOpenFirst), nameof(SelectedPath), nameof(KeePassXc));
@@ -201,7 +208,40 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The line under the heading while a vault is selected.</summary>
     internal string Subtitle => IsHandOff
         ? "Enter its master password to keep editing it in place."
+        : OffersQuickUnlock ? $"Unlock it with {QuickUnlockName} or its master password."
         : "Enter its master password to open it.";
+
+    /// <summary>What the person knows the quick unlock as, such as "Windows Hello", or empty where the app offers none.</summary>
+    internal string QuickUnlockName => _session.QuickUnlock?.Name ?? string.Empty;
+
+    /// <summary>What the screen says while Windows Hello asks, after a password unlock, to keep this unlock for a quick one.</summary>
+    internal string KeepingNote => $"Confirm with {QuickUnlockName} so it can unlock this vault after a lock.";
+
+    /// <summary>Whether the selected vault has a quick unlock copy, so the screen offers to unlock it without its password.</summary>
+    internal bool Resumable
+    {
+        get => _resumable;
+        private set => Set(ref _resumable, value);
+    }
+
+    /// <summary>Whether the screen offers its quick unlock, beside the master password, which always stays.</summary>
+    internal bool OffersQuickUnlock => _resumable && IsOpening && !_restoreOnly && _selectedPath is not null;
+
+    /// <summary>Whether the quick unlock is the screen's amber action, which it is unless a YubiKey waits for a touch.</summary>
+    internal bool QuickUnlockIsPrimary => OffersQuickUnlock && !_waitingForTouch;
+
+    /// <summary>Whether Unlock is the screen's amber action: not while the quick unlock is offered or a YubiKey waits.</summary>
+    internal bool UnlockIsPrimary => !OffersQuickUnlock && !_waitingForTouch;
+
+    /// <summary>Opens the selected vault without its password, once the person answers Windows Hello.</summary>
+    internal AsyncRelayCommand ResumeCommand { get; }
+
+    /// <summary>Whether Windows Hello is asking, after a password unlock, to keep it for a quick unlock.</summary>
+    internal bool IsKeepingQuickUnlock
+    {
+        get => _keepingQuickUnlock;
+        private set => Set(ref _keepingQuickUnlock, value);
+    }
 
     /// <summary>The line under the heading with no vault selected.</summary>
     internal string WelcomeSubtitle => OffersKeePassXc
@@ -720,11 +760,12 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         return true;
     }
 
-    /// <summary>Reads what the selection is: whether anything can be unlocked, and whether it has backups.</summary>
+    /// <summary>Reads what the selection is: whether anything can be unlocked, whether it has backups, and whether Windows Hello can open it.</summary>
     private void Look()
     {
         HasBackups = _selectedPath is { } path && VaultBackups.List(path).Count > 0;
         IsRestoreOnly = _selectedPath is { } selected && !(File.Exists(selected) && KdbxHeader.IsVaultFile(selected));
+        Resumable = _session.CanResume(_selectedPath);
     }
 
     /// <summary>Drops a restore that is waiting on a confirmation, as a minimize does to an open vault.</summary>
@@ -774,8 +815,103 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         Notice = Describe(report);
         Remember(path, keyfile, slot);
-        _unlocked();
+        await LandAsync().ConfigureAwait(true);
     }
+
+    /// <summary>
+    /// After a password unlock, has Windows Hello asked whether to keep this unlock for a quick one, as KeePassXC asks
+    /// after each (D-0552), then hands the shell the vault, which is open whatever the answer.
+    /// </summary>
+    /// <remarks>
+    /// A screen replaced meanwhile still hands it over while the unlock is the session's own, so the app locks a vault
+    /// nobody is looking at, but not once a lock and another unlock have followed it.
+    /// </remarks>
+    private async Task LandAsync()
+    {
+        var unlock = _session.SessionId;
+
+        if (_session.QuickUnlock is not null && !_disposed)
+        {
+            IsKeepingQuickUnlock = true;
+
+            try
+            {
+                await Task.Run(_session.KeepForQuickUnlock).ConfigureAwait(true);
+            }
+            finally
+            {
+                IsKeepingQuickUnlock = false;
+            }
+        }
+
+        if (!_disposed || _session.SessionId == unlock)
+        {
+            _unlocked();
+        }
+    }
+
+    /// <summary>Opens the selected vault from its quick unlock copy, once the person answers Windows Hello.</summary>
+    /// <remarks><c>internal</c> for the reason <see cref="UnlockAsync"/> is.</remarks>
+    internal async Task ResumeAsync()
+    {
+        if (_disposed || _selectedPath is not { } path || !OffersQuickUnlock)
+        {
+            return;
+        }
+
+        Busy = true;
+        Message = string.Empty;
+        Owner = string.Empty;
+
+        try
+        {
+            var outcome = await Task.Run(() => _session.TryResume(path)).ConfigureAwait(true);
+
+            if (outcome == UnlockOutcome.Opened)
+            {
+                var keyfile = _session.Unlocked?.KeyfilePath;
+                Remember(path, keyfile, _session.HardwareKeySlot);
+                ResetPassword();
+                Notice = FragileNotice(keyfile);
+                _unlocked();
+                return;
+            }
+
+            Resumable = _session.CanResume(path);
+
+            if (ExplainResume(outcome) is { } refusal)
+            {
+                Fail(refusal);
+            }
+
+            if (outcome == UnlockOutcome.HeldElsewhere)
+            {
+                ShowOwner();
+            }
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>Why a quick unlock opened nothing, or null when the person cancelled it and knows.</summary>
+    private string? ExplainResume(UnlockOutcome outcome) => outcome switch
+    {
+        UnlockOutcome.HeldElsewhere => HeldElsewhere(),
+        UnlockOutcome.HardwareKeyFailed => ExplainHardwareKey(_session.LastHardwareKeyFailure, _hardwareKeySlot),
+        UnlockOutcome.KeyChanged =>
+            $"This vault's password or keyfile was changed after it locked, so {QuickUnlockName} can't unlock it. Unlock it with the new ones.",
+        UnlockOutcome.QuickUnlockRefused => _session.LastQuickUnlock switch
+        {
+            QuickUnlockOutcome.Cancelled => null,
+            QuickUnlockOutcome.Unavailable => $"{QuickUnlockName} isn't available right now. Enter the master password to unlock.",
+            QuickUnlockOutcome.Unreadable or QuickUnlockOutcome.None =>
+                $"{QuickUnlockName} can't unlock this vault any more. Enter the master password; {QuickUnlockName} is offered again after that.",
+            _ => $"{QuickUnlockName} didn't unlock this vault. Try again, or enter the master password.",
+        },
+        _ => Explain(outcome),
+    };
 
     private static string Describe(VaultRestoreReport report)
     {
@@ -848,7 +984,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Remember(path, keyfile, slot);
                 ResetPassword();
                 Notice = FragileNotice(keyfile);
-                _unlocked();
+                await LandAsync().ConfigureAwait(true);
                 return;
             }
 

@@ -86,8 +86,10 @@ Package managers and agent marketplaces carry a version only after it is publish
 
 Each row keeps its historical meaning and is expanded when selected. Designs the founder approved on 2026-10-24 split 8.1 and 8.3a (D-0548), 1.4b (D-0537 to D-0546), and P.4a and P.4b (D-0547) into the children below, which keep their parents' IDs; a parent closes when all its children have.
 
-- [ ] **4.10a — Add Windows quick unlock.** Needs: none.
-  - Resume a locked session with Windows Hello, keeping the full unlock path intact.
+- [ ] **4.10c — Check Windows quick unlock on a machine with Windows Hello (H-0025).** Human. Needs: none.
+  - On a Windows 10 or 11 machine with Windows Hello set up, run the app's Windows package built from 4.10a: unlock with the master password and answer Windows Hello, the first time making keypaste's key; lock with `Ctrl/Cmd+L` and resume with Unlock with Windows Hello.
+  - Check the prompt comes in front of the app each time, a cancelled prompt opens nothing and says nothing, the PIN instead of a face or finger opens it, `keypaste lock` then asks for the master password, and a vault that needs a YubiKey resumed with Windows Hello asks for its touch.
+  - Record the Windows version, the Windows Hello method and the app's commit in [4.10a](steps/4.10a.md)'s limits. No CI runner has Windows Hello set up, so only a person can make these acts (T-44).
 - [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b.
   - Touch ID, under the same session policy, using the signed app's entitlements.
 - [ ] **8.1b — Seal and open NaCl boxes with libsodium.** Needs: none.

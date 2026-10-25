@@ -20,6 +20,9 @@ die() { echo "::error::$*" >&2; exit 1; }
 rid="$1" out="$2"
 shift 2
 case "$rid" in win-x64 | linux-x64 | osx-arm64) ;; *) die "$rid has no desktop package to upgrade" ;; esac
+# The Windows package is the app's Windows target, as app.yml publishes it (D-0549).
+framework=net10.0
+if [ "$rid" = win-x64 ]; then framework=net10.0-windows10.0.19041.0; fi
 
 mkdir -p "$out"
 # Each candidate carries the libargon2 its release package does (D-0522).
@@ -33,7 +36,7 @@ for prefix in "$@"; do
   published="$ROOT/artifacts/app/$rid"
   stage="$ROOT/artifacts/stage"
   rm -rf "$published" "$stage"
-  dotnet publish "$ROOT/src/Keypaste.App/Keypaste.App.csproj" -c Release -r "$rid" --self-contained \
+  dotnet publish "$ROOT/src/Keypaste.App/Keypaste.App.csproj" -c Release -r "$rid" -f "$framework" --self-contained \
     --no-restore -o "$published" -p:VersionPrefix="$prefix" -p:VersionSuffix="$SUFFIX" >&2
 
   "$ROOT/scripts/publish-desktop-bridge.sh" "$rid" "$published" -p:VersionPrefix="$prefix" -p:VersionSuffix="$SUFFIX" >&2

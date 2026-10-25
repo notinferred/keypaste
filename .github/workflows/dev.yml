@@ -87,6 +87,7 @@ jobs:
             Keypaste.Cli.Tests.*) profile=backend project=tests/Keypaste.Cli.Tests ;;
             Keypaste.Mcp.Tests.*) profile=backend project=tests/Keypaste.Mcp.Tests ;;
             Keypaste.App.Tests.*) profile=desktop project=tests/Keypaste.App.Tests ;;
+            Keypaste.App.Windows.Tests.*) profile=desktop project=tests/Keypaste.App.Windows.Tests ;;
             Keypaste.Consistency.Tests.*) profile=desktop project=tests/Keypaste.Consistency.Tests ;;
             *) echo "::error::filter_class must begin with a test project's namespace, such as Keypaste.Core.Tests."; exit 1 ;;
           esac

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -5,6 +6,7 @@ using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using Keypaste.App.Navigation;
+using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.Tests.Views;
 using Keypaste.App.ViewModels;
@@ -12,6 +14,9 @@ using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Internal;
+using Keypaste.Core.Tests;
+using Keypaste.Core.Tests.HardwareKeys;
 using Keypaste.Mvvm;
 using Xunit;
 
@@ -154,6 +159,135 @@ public sealed partial class PlainWordsTests
 
         Assert.Empty(Offending(said));
     });
+
+    /// <summary>
+    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the welcome with and without KeePassXC's
+    /// databases, the lock screen with More options open, with Windows Hello offered, and after an access change, the create
+    /// form, and each step of the KeePass database import dialog.
+    /// </summary>
+    [Fact]
+    public Task TheUnlockScreensAndTheImportDialog_HoldNoneOfTheRetiredWords() => HeadlessSession.On(async () =>
+    {
+        var said = new List<(string Where, string Text)>();
+        var picker = new FakeVaultFilePicker();
+
+        using (var empty = new TempHome())
+        {
+            var database = Path.Combine(empty.Path, "work.kdbx");
+            using (var created = Vault.Create(database, TempVault.Password))
+            {
+                created.Save();
+            }
+
+            var ini = Path.Combine(empty.Path, "keepassxc.ini");
+            File.WriteAllText(ini, $"[General]\nLastDatabases={database.Replace(@"\", @"\\", StringComparison.Ordinal)}\n");
+
+            using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: empty.Path);
+            using (var welcome = new UnlockViewModel(session, empty.Path, picker, () => { }))
+            {
+                said.AddRange(Seen(new UnlockView { DataContext = welcome }, "the welcome"));
+            }
+
+            using var listed = new UnlockViewModel(session, empty.Path, picker, () => { }, keePassXcConfigs: () => [ini]);
+            said.AddRange(Seen(new UnlockView { DataContext = listed }, "the welcome listing KeePassXC's databases"));
+        }
+
+        using var fixture = new TempVault();
+        fixture.RememberSelf();
+        using var vaultSession = new AppVaultSession(
+            new ManualClock(AppClock.Start), home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]), quickUnlock: new FakeQuickUnlockSigner());
+
+        using (var locked = new UnlockViewModel(vaultSession, fixture.Home, picker, () => { }, lockedBy: VaultLockReason.Idle))
+        {
+            locked.ShowMoreOptionsCommand.Execute(null);
+            said.AddRange(Seen(new UnlockView { DataContext = locked }, "the lock screen, More options open"));
+
+            picker.NewPath = Path.Combine(fixture.Home, "created.kdbx");
+            await locked.StartCreateAsync();
+            said.AddRange(Seen(new UnlockView { DataContext = locked }, "the create form"));
+        }
+
+        using (var changed = new UnlockViewModel(
+            vaultSession, fixture.Home, picker, () => { }, message: App.LockMessage(VaultLockReason.AccessChanged), lockedBy: VaultLockReason.AccessChanged))
+        {
+            said.AddRange(Seen(new UnlockView { DataContext = changed }, "the lock screen after an access change"));
+        }
+
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, vaultSession.TryUnlock(fixture.Path_, master.Value));
+        }
+
+        Assert.Equal(QuickUnlockOutcome.Done, vaultSession.KeepForQuickUnlock());
+        vaultSession.Lock(VaultLockReason.Manual);
+
+        using (var resumable = new UnlockViewModel(vaultSession, fixture.Home, picker, () => { }, lockedBy: VaultLockReason.Manual))
+        {
+            Assert.True(resumable.OffersQuickUnlock);
+            said.AddRange(Seen(new UnlockView { DataContext = resumable }, "the lock screen offering Windows Hello"));
+        }
+
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, vaultSession.TryUnlock(fixture.Path_, master.Value));
+        }
+
+        var unreadable = fixture.ImposterPath;
+        using (var refused = new KdbxImportViewModel(vaultSession, unreadable, (_, _) => { }, _ => { }, chooseAnother: () => Task.CompletedTask))
+        {
+            said.AddRange(Seen(new KdbxImportView { DataContext = refused }, "the import dialog, a file it can't read"));
+        }
+
+        var source = Path.Combine(fixture.Home, "foreign.kdbx");
+        KeePassInterop.WriteForeignUnchecked(source, Encoding.UTF8.GetBytes("import-source"), null, "Argon2id", "ChaCha20");
+        using var import = new KdbxImportViewModel(
+            vaultSession, source, (_, _) => { }, _ => { }, pickKeyfile: () => Task.FromResult<string?>(null), chooseAnother: () => Task.CompletedTask);
+        var dialog = Show(new KdbxImportView { DataContext = import });
+        said.AddRange(Shown(dialog, "the import dialog, locked"));
+
+        foreach (var c in "not-the-password")
+        {
+            import.TypePassword(c);
+        }
+
+        await import.UnlockAsync();
+        RenderedShell.Drain();
+        said.AddRange(Shown(dialog, "the import dialog, a wrong password"));
+
+        foreach (var c in "import-source")
+        {
+            import.TypePassword(c);
+        }
+
+        await import.UnlockAsync();
+        RenderedShell.Drain();
+        Assert.True(import.IsDecrypted, import.Message);
+        said.AddRange(Shown(dialog, "the import dialog, its groups"));
+
+        import.KeepEditingInPlace = true;
+        RenderedShell.Drain();
+        said.AddRange(Shown(dialog, "the import dialog, kept in place"));
+        dialog.Close();
+
+        Assert.Empty(Offending(said));
+    });
+
+    private static Window Show(Control content)
+    {
+        var window = new Window { Width = 900, Height = 1000, Content = content };
+        window.Show();
+        RenderedShell.Drain();
+        return window;
+    }
+
+    /// <summary>What a screen shows and says, read once from a window of its own.</summary>
+    private static List<(string Where, string Text)> Seen(Control content, string where)
+    {
+        var window = Show(content);
+        List<(string Where, string Text)> said = [.. Shown(window, where)];
+        window.Close();
+        return said;
+    }
 
     private static IEnumerable<(string Name, Window Window)> Prompts()
     {

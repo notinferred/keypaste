@@ -305,7 +305,7 @@ public sealed class MaskedInputAutomationTests
         "Unlock", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
         "Unlock without a YubiKey", "Open a vault…", "Create a new vault…", "Add a key file", "Create a key file", "No key file",
         "Add a YubiKey", "No YubiKey", "That backup's key file", "Open another vault", "New vault", "Restore a backup", "More options",
-        "Open another file…",
+        "Open another file…", "Unlock with Windows Hello",
     ];
 
     /// <summary>The restore field takes a pasted master password as the unlock field does, and shows only its length.</summary>

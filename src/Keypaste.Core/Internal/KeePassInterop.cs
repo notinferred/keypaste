@@ -44,10 +44,19 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The common-password list in KeePassLib's estimator, which every estimate in this process shares, loaded once before the first rating (D-0499).</summary>
     private static readonly Lazy<bool> _commonPasswords = new(LoadCommonPasswords, LazyThreadSafetyMode.ExecutionAndPublication);
 
+    /// <summary>The name of the part a quick unlock's key carries for the master password's SHA-256 (D-0550).</summary>
+    private const string _passwordPart = "keypaste.password";
+
+    /// <summary>The name of the part a quick unlock's key carries for the keyfile's key.</summary>
+    private const string _keyfilePart = "keypaste.keyfile";
+
     private readonly PwDatabase _database;
     private bool _disposed;
     private bool _readOnly;
     private byte[]? _written;
+
+    /// <summary>The keyfile a vault opened from <see cref="VaultKeyParts"/> was first opened with, which its key no longer names.</summary>
+    private string? _partsKeyfilePath;
 
     // KdfPool fills its static list without synchronization; the runtime runs this once and holds concurrent first callers until it returns (F.11).
     // Nothing reaches KeePassLib's native Argon2 before this has handed it keypaste's library (D-0523).
@@ -96,6 +105,30 @@ internal sealed class KeePassInterop : IDisposable
         return new KeePassInterop(database);
     }
 
+    /// <summary>Opens an existing vault with the parts of a key another instance exported.</summary>
+    /// <param name="path">The vault file.</param>
+    /// <param name="parts">The parts, rebuilt in the order a password unlock adds them, so the composite key is the same.</param>
+    /// <param name="hardwareKey">The hardware key <paramref name="parts"/> names the slot of, asked now, or <see langword="null"/>.</param>
+    /// <exception cref="InvalidMasterPasswordException">The parts do not open the vault.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
+    /// <exception cref="VaultException">The vault could not be read.</exception>
+    internal static KeePassInterop Open(string path, VaultKeyParts parts, HardwareKey? hardwareKey)
+    {
+        var key = BuildKey(parts, hardwareKey);
+        var database = OpenDatabase(path, () => key, parts.Keyfile is not null, hardwareKey is not null);
+        ApplyWriteSafety(database);
+        return new KeePassInterop(database) { _partsKeyfilePath = parts.KeyfilePath };
+    }
+
+    /// <summary>The parts this vault's key is made of, read from the key it opened with.</summary>
+    internal VaultKeyParts ExportKeyParts()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var key = _database.MasterKey;
+        return new VaultKeyParts(PasswordPart(key)?.KeyData.ReadData(), KeyfilePart(key)?.KeyData.ReadData(), KeyfilePath, HardwareKey?.Slot);
+    }
+
     /// <summary>Opens another vault to copy from. Nothing on the returned instance saves.</summary>
     /// <remarks>The caller owns <paramref name="utf8Password"/> and is responsible for zeroing it.</remarks>
     /// <exception cref="InvalidMasterPasswordException">The factors do not open the vault.</exception>
@@ -116,7 +149,7 @@ internal sealed class KeePassInterop : IDisposable
             key.AddUserKey(component);
         }
 
-        return new KeyCopy(key, KeyfilePath is not null, HardwareKey is not null);
+        return new KeyCopy(key, KeyfilePath is not null, HardwareKey is not null) { PartsKeyfilePath = _partsKeyfilePath };
     }
 
     /// <summary>Opens the vault at <paramref name="path"/> again with a key another instance copied.</summary>
@@ -127,7 +160,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         var database = OpenDatabase(path, () => key.Key, key.HasKeyfile, key.HasHardwareKey);
         ApplyWriteSafety(database);
-        return new KeePassInterop(database);
+        return new KeePassInterop(database) { _partsKeyfilePath = key.PartsKeyfilePath };
     }
 
     private static PwDatabase OpenDatabase(
@@ -243,10 +276,23 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>Whether the vault's key includes a master password.</summary>
-    internal bool KeyHasPassword => _database.MasterKey.ContainsType(typeof(KcpPassword));
+    internal bool KeyHasPassword => PasswordPart(_database.MasterKey) is not null;
 
     /// <summary>The keyfile the vault's key includes, or <see langword="null"/>.</summary>
-    internal string? KeyfilePath => (_database.MasterKey.GetUserKey(typeof(KcpKeyFile)) as KcpKeyFile)?.Path;
+    internal string? KeyfilePath => KeyfilePart(_database.MasterKey) switch
+    {
+        KcpKeyFile keyfile => keyfile.Path,
+        KcpCustomKey => _partsKeyfilePath,
+        _ => null,
+    };
+
+    /// <summary>The key's master password, typed or rebuilt from <see cref="VaultKeyParts"/>, or null.</summary>
+    private static IUserKey? PasswordPart(CompositeKey key) =>
+        key.GetUserKey(typeof(KcpPassword)) ?? key.UserKeys.FirstOrDefault(part => part is KcpCustomKey { Name: _passwordPart });
+
+    /// <summary>The key's keyfile, read from its file or rebuilt from <see cref="VaultKeyParts"/>, or null.</summary>
+    private static IUserKey? KeyfilePart(CompositeKey key) =>
+        key.GetUserKey(typeof(KcpKeyFile)) ?? key.UserKeys.FirstOrDefault(part => part is KcpCustomKey { Name: _keyfilePart });
 
     /// <summary>The hardware key the vault's key includes, or <see langword="null"/>.</summary>
     internal HardwareKey? HardwareKey =>
@@ -269,7 +315,7 @@ internal sealed class KeePassInterop : IDisposable
 
         var current = _database.MasterKey;
         var password = utf8NewPassword is null
-            ? current.GetUserKey(typeof(KcpPassword))
+            ? PasswordPart(current)
             : new KcpPassword(utf8NewPassword, false);
 
         CompositeKey next = new();
@@ -282,7 +328,7 @@ internal sealed class KeePassInterop : IDisposable
 
         if (keyfilePath is not null)
         {
-            next.AddUserKey(keepCurrentKeyfile ? current.GetUserKey(typeof(KcpKeyFile)) : ReadKeyfile(keyfilePath));
+            next.AddUserKey(keepCurrentKeyfile ? KeyfilePart(current)! : ReadKeyfile(keyfilePath));
             verify.AddUserKey(ReadKeyfile(keyfilePath));
         }
 
@@ -3100,6 +3146,33 @@ internal sealed class KeePassInterop : IDisposable
         return key;
     }
 
+    /// <summary>The composite key <see cref="ExportKeyParts"/> read, rebuilt from its parts as KeePassXC's quick unlock rebuilds one.</summary>
+    /// <remarks>
+    /// <c>CompositeKey</c> hashes each part's data in the order added, so custom keys holding the password's SHA-256
+    /// and the keyfile's key, unhashed, give the key the password and keyfile gave.
+    /// </remarks>
+    private static CompositeKey BuildKey(VaultKeyParts parts, HardwareKey? hardwareKey)
+    {
+        CompositeKey key = new();
+
+        if (parts.Password is { } password)
+        {
+            key.AddUserKey(new KcpCustomKey(_passwordPart, password, false));
+        }
+
+        if (parts.Keyfile is { } keyfile)
+        {
+            key.AddUserKey(new KcpCustomKey(_keyfilePart, keyfile, false));
+        }
+
+        if (hardwareKey is not null)
+        {
+            key.AddUserKey(new ChallengeResponseKey(hardwareKey));
+        }
+
+        return key;
+    }
+
     /// <summary>A hardware key as KeePassLib takes one: no key data of its own, only an answer to the file's challenge.</summary>
     /// <remarks>
     /// The vendored <c>CompositeKey</c> folds the SHA-256 of the answer into the key where KeePassXC
@@ -3154,7 +3227,7 @@ internal sealed class KeePassInterop : IDisposable
     /// truncate a vault that was previously readable.
     /// </summary>
     /// <remarks>
-    /// This must be applied on the <see cref="Open"/> path as well as <see cref="Create"/>, and
+    /// This must be applied on the <see cref="Open(string, byte[], string?, HardwareKey?)"/> paths as well as <see cref="Create"/>, and
     /// separately from <see cref="ApplyKeypasteFormatSettings"/>. KeePassLib defaults the flag to
     /// <see langword="false"/> and <c>PwDatabase.Close()</c> — which <c>Open()</c> calls first —
     /// resets it, so an open-modify-save cycle would otherwise write in place. The format settings
@@ -4364,5 +4437,8 @@ internal sealed class KeePassInterop : IDisposable
         internal bool HasKeyfile { get; }
 
         internal bool HasHardwareKey { get; }
+
+        /// <summary>The keyfile a key rebuilt from <see cref="VaultKeyParts"/> was first opened with, or null.</summary>
+        internal string? PartsKeyfilePath { get; init; }
     }
 }

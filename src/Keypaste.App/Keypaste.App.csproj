@@ -7,6 +7,13 @@
     <RootNamespace>Keypaste.App</RootNamespace>
     <AssemblyName>keypaste-app</AssemblyName>
 
+    <!-- The Windows package is the Windows target, which reaches Windows Hello through the Windows SDK's
+         WinRT projection; Linux and macOS are the plain one (D-0549). Targeting is enabled so every
+         machine builds both. -->
+    <TargetFramework></TargetFramework>
+    <TargetFrameworks>net10.0;net10.0-windows10.0.19041.0</TargetFrameworks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
     <!--
       Compiled bindings are not a style preference. They are Avalonia's stated prerequisite for
       NativeAOT, and they turn a mistyped binding path into a build error rather than a silently
@@ -62,6 +69,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
+    <InternalsVisibleTo Include="Keypaste.App.Windows.Tests" />
     <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
     <InternalsVisibleTo Include="Keypaste.MinimizeObserver" />
     <InternalsVisibleTo Include="Keypaste.AppDriver" />

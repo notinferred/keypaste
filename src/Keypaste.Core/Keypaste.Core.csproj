@@ -92,8 +92,9 @@
          which only a NativeAOT build does and no test runs as. VaultKeyfile.SimulateXmlFallback is
          that one seam (D-0294). -->
     <InternalsVisibleTo Include="Keypaste.Cli.Tests" />
-    <!-- Its vaults take TestKeyDerivation's token cost like every other test project's (D-0469). -->
+    <!-- Their vaults take TestKeyDerivation's token cost like every other test project's (D-0469). -->
     <InternalsVisibleTo Include="Keypaste.Mcp.Tests" />
+    <InternalsVisibleTo Include="Keypaste.App.Windows.Tests" />
   </ItemGroup>
 
 </Project>

@@ -43,7 +43,10 @@ require jq
 
 CLI="$(keypaste_bin)"
 DRV="$(app_driver)"
-APP="$(resolve KEYPASTE_APP artifacts/bin/Keypaste.App/release/keypaste-app)"
+# The app as its package ships it: the Windows target on Windows, the plain one elsewhere (D-0549).
+APP_TARGET=net10.0
+if command -v cygpath >/dev/null 2>&1; then APP_TARGET=net10.0-windows10.0.19041.0; fi
+APP="$(resolve KEYPASTE_APP "artifacts/bin/Keypaste.App/release_$APP_TARGET/keypaste-app")"
 
 WORK="$(mktemp -d)"
 mkdir -p "$WORK/home"

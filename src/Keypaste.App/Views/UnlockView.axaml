@@ -191,6 +191,19 @@
           </StackPanel>
 
           <StackPanel Spacing="18" IsVisible="{Binding HasSelection}">
+            <!-- A vault Windows Hello can open again makes it the screen's one amber action; the password stays below it (D-0550). -->
+            <Button x:Name="QuickUnlock"
+                    Classes="wide"
+                    Classes.primary="{Binding QuickUnlockIsPrimary}"
+                    IsVisible="{Binding OffersQuickUnlock}"
+                    Command="{Binding ResumeCommand}"
+                    AutomationProperties.Name="Unlock with Windows Hello">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="fingerprint" Size="15" />
+                <TextBlock Text="Unlock with Windows Hello" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+
             <StackPanel Spacing="8">
               <ctl:MaskedInput x:Name="Password"
                                Theme="{StaticResource LockField}"
@@ -203,7 +216,7 @@
 
             <!-- While a YubiKey waits for a touch, its waiting dot is the screen's one amber element. -->
             <Button Classes="wide"
-                    Classes.primary="{Binding !IsWaitingForTouch}"
+                    Classes.primary="{Binding UnlockIsPrimary}"
                     IsDefault="True"
                     Command="{Binding UnlockCommand}"
                     AutomationProperties.Name="Unlock">
@@ -212,6 +225,10 @@
                 <TextBlock Text="Unlocking…" IsVisible="{Binding Busy}" />
               </Panel>
             </Button>
+
+            <TextBlock Classes="lock-note"
+                       Text="{Binding KeepingNote}"
+                       IsVisible="{Binding IsKeepingQuickUnlock}" />
 
             <Panel HorizontalAlignment="Center" IsEnabled="{Binding CanTypePassword}">
               <Button Classes="quiet"

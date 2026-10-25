@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The app's Windows target, which only its Windows package ships; Keypaste.App.Tests tests the plain one (D-0549). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.App.Windows.Tests</RootNamespace>
+    <AssemblyName>Keypaste.App.Windows.Tests</AssemblyName>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Keypaste.App/Keypaste.App.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Every vault these tests create takes a token Argon2 cost (D-0469). -->
+    <Compile Include="../Keypaste.Core.Tests/CheapKeyDerivation.cs" Link="CheapKeyDerivation.cs" />
+    <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
+  </ItemGroup>
+
+</Project>

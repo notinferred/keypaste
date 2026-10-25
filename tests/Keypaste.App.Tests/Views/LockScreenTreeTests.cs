@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
+using Keypaste.App.Tests.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -87,6 +88,36 @@ public sealed class LockScreenTreeTests
         Assert.Contains("YubiKey, slot 2", names);
         Assert.Contains("Unlock without a YubiKey", names);
         Assert.DoesNotContain("More options", names);
+    });
+
+    /// <summary>A vault Windows Hello can open again names it on the screen, beside the password, as its one amber action (D-0553).</summary>
+    [Fact]
+    public Task A_vault_Windows_Hello_can_resume_offers_it_as_the_one_amber_action_beside_the_password() => HeadlessSession.On(() =>
+    {
+        using var fixture = new TempVault();
+        fixture.RememberSelf();
+
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, quickUnlock: new FakeQuickUnlockSigner());
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));
+        }
+
+        Assert.Equal(QuickUnlockOutcome.Done, session.KeepForQuickUnlock());
+        session.Lock(VaultLockReason.Manual);
+
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { }, lockedBy: VaultLockReason.Manual);
+        var window = Show(model);
+
+        var names = Names(window);
+        Assert.Contains("Unlock with Windows Hello", names);
+        Assert.Contains("Unlock", names);
+        Assert.DoesNotContain(names, name => name.Contains("agent", StringComparison.OrdinalIgnoreCase));
+
+        // Off the password field, whose focused caret is amber too.
+        var quick = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "QuickUnlock");
+        quick.Focus();
+        AmberElements.AssertOne(window, quick, "the lock screen offering Windows Hello");
     });
 
     private static Window Show(UnlockViewModel model)

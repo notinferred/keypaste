@@ -92,8 +92,13 @@ internal sealed class AppVaultSession : IDisposable
     /// <param name="idleTimeout">How long the app may sit untouched, or null for the default.</param>
     /// <param name="home">keypaste's home, where the vault's claim is kept; null resolves it as the app does.</param>
     /// <param name="hardwareKeys">What reaches hardware keys, or null where none can be reached.</param>
+    /// <param name="quickUnlock">What a quick unlock asks, Windows Hello, or null where the app offers none.</param>
     internal AppVaultSession(
-        TimeProvider clock, TimeSpan? idleTimeout = null, string? home = null, IChallengeResponseDevice? hardwareKeys = null)
+        TimeProvider clock,
+        TimeSpan? idleTimeout = null,
+        string? home = null,
+        IChallengeResponseDevice? hardwareKeys = null,
+        IQuickUnlockSigner? quickUnlock = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
@@ -101,11 +106,32 @@ internal sealed class AppVaultSession : IDisposable
         _idleTimeout = Clamp(idleTimeout ?? DefaultIdleTimeout);
         _home = home ?? KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
         HardwareKeys = hardwareKeys;
+        QuickUnlock = quickUnlock is null ? null : new QuickUnlockCopies(quickUnlock);
         Environments = new SessionEnvResolver(() => Lifetime, UnlockedFor, clock);
     }
 
     /// <summary>What reaches hardware keys, or null where none can be reached.</summary>
     internal IChallengeResponseDevice? HardwareKeys { get; }
+
+    /// <summary>The copies a quick unlock opens a locked vault from, or null where the app offers none (D-0550).</summary>
+    internal QuickUnlockCopies? QuickUnlock { get; }
+
+    /// <summary>What a refused quick unlock came to, when <see cref="TryResume"/> answered <see cref="UnlockOutcome.QuickUnlockRefused"/>.</summary>
+    internal QuickUnlockOutcome? LastQuickUnlock { get; private set; }
+
+    /// <summary>Opens a vault with a password, keyfile and hardware key, as <see cref="Vault.Open(string, ReadOnlySpan{char}, string?, HardwareKey?)"/> does.</summary>
+    internal delegate Vault VaultOpener(string path, ReadOnlySpan<char> password, string? keyfilePath, HardwareKey? hardwareKey);
+
+    /// <summary>What opens the vault again under its new factors after an access change; <see cref="Vault.Open(string, ReadOnlySpan{char}, string?, HardwareKey?)"/> unless a test gives another.</summary>
+    internal VaultOpener ReopenAfterAccessChange { get; init; } = Vault.Open;
+
+    /// <summary>Whether a lock for <paramref name="reason"/> leaves the vault's quick unlock copy, so it can be resumed without its password (D-0551).</summary>
+    /// <remarks>
+    /// A person's own locks and the idle lock do. A lock another program asked for, a vault replaced, a key that
+    /// changed and quitting force the full unlock.
+    /// </remarks>
+    internal static bool AllowsQuickResume(VaultLockReason reason) =>
+        reason is VaultLockReason.Idle or VaultLockReason.Manual or VaultLockReason.Minimized or VaultLockReason.Closed;
 
     /// <summary>Raised with <see langword="true"/> when a hardware key this session asked waits to be touched, and <see langword="false"/> when it stops.</summary>
     /// <remarks>Raised on whichever thread asked or answered, which may be the UI thread pumping a save.</remarks>
@@ -495,24 +521,180 @@ internal sealed class AppVaultSession : IDisposable
         }
         catch (VaultException ex)
         {
-            hardwareKey?.Dispose();
-            Release(claim);
-
-            switch (ex)
-            {
-                case InvalidMasterPasswordException:
-                    return UnlockOutcome.WrongPassword;
-                case UnreadableKeyfileException:
-                    return UnlockOutcome.KeyfileUnusable;
-                case HardwareKeyException failed:
-                    LastHardwareKeyFailure = failed;
-                    return UnlockOutcome.HardwareKeyFailed;
-                default:
-                    return UnlockOutcome.Failed;
-            }
+            return Refused(ex, hardwareKey, claim);
         }
 
         return Adopt(opened, claim, hardwareKey);
+    }
+
+    /// <summary>Gives back what an open that threw took, and says why it was refused.</summary>
+    private UnlockOutcome Refused(VaultException ex, HardwareKey? hardwareKey, VaultClaim claim)
+    {
+        hardwareKey?.Dispose();
+        Release(claim);
+
+        switch (ex)
+        {
+            case InvalidMasterPasswordException:
+                return UnlockOutcome.WrongPassword;
+            case UnreadableKeyfileException:
+                return UnlockOutcome.KeyfileUnusable;
+            case HardwareKeyException failed:
+                LastHardwareKeyFailure = failed;
+                return UnlockOutcome.HardwareKeyFailed;
+            default:
+                return UnlockOutcome.Failed;
+        }
+    }
+
+    /// <summary>Whether the vault at <paramref name="path"/> has a quick unlock copy, so <see cref="TryResume"/> can open it.</summary>
+    internal bool CanResume(string? path) =>
+        QuickUnlock is { } copies && !string.IsNullOrEmpty(path) && copies.Has(VaultIdentity.Of(_home, path));
+
+    /// <summary>Opens a locked vault again from its quick unlock copy, once the person answers Windows Hello (D-0550).</summary>
+    /// <param name="path">The <c>.kdbx</c> file.</param>
+    /// <returns>What happened; <see cref="LastQuickUnlock"/> says why for <see cref="UnlockOutcome.QuickUnlockRefused"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// The vault's claim is taken first, as an unlock takes it before the password is read, so a vault another process
+    /// holds is refused without asking anything and keeps its copy (D-0309).
+    /// </para>
+    /// <para>
+    /// The key is rebuilt from the copy's parts and the file opened as a password unlock opens it: the key derivation
+    /// runs again, a hardware key is asked and touched again (T-37), and a file another program saved is simply read.
+    /// Parts that no longer open the file, because its key was changed, drop the copy. Blocks while the person answers.
+    /// </para>
+    /// </remarks>
+    internal UnlockOutcome TryResume(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        LastHardwareKeyFailure = null;
+        LastQuickUnlock = null;
+
+        if (!File.Exists(path))
+        {
+            return UnlockOutcome.NotFound;
+        }
+
+        if (!KdbxHeader.IsVaultFile(path))
+        {
+            return UnlockOutcome.NotAKdbx;
+        }
+
+        if (QuickUnlock is not { } copies || !copies.Has(VaultIdentity.Of(_home, path)))
+        {
+            LastQuickUnlock = QuickUnlockOutcome.None;
+            return UnlockOutcome.QuickUnlockRefused;
+        }
+
+        if (!TryClaim(path, out var claim))
+        {
+            return UnlockOutcome.HeldElsewhere;
+        }
+
+        var vault = claim.Vault;
+
+        var opening = copies.Open(vault, out var kept);
+
+        if (opening != QuickUnlockOutcome.Done || kept is null)
+        {
+            kept?.Dispose();
+            Release(claim);
+            LastQuickUnlock = opening;
+            return UnlockOutcome.QuickUnlockRefused;
+        }
+
+        using var parts = kept;
+
+        if (parts.HardwareKeySlot is not null && HardwareKeys is null)
+        {
+            Release(claim);
+            LastHardwareKeyFailure = new HardwareKeyException(
+                HardwareKeyFailure.Unavailable, "This build of keypaste can't reach hardware keys.");
+            return UnlockOutcome.HardwareKeyFailed;
+        }
+
+        // Owned by the vault's session from Adopt on, and disposed by Refused otherwise.
+#pragma warning disable CA2000
+        var hardwareKey = parts.HardwareKeySlot is { } slot ? NewHardwareKey(slot) : null;
+        Vault opened;
+
+        try
+        {
+            opened = Vault.Open(path, parts, hardwareKey);
+        }
+        catch (VaultException ex)
+        {
+            if (Refused(ex, hardwareKey, claim) is not UnlockOutcome.WrongPassword and var outcome)
+            {
+                return outcome;
+            }
+
+            copies.Forget(vault);
+            return UnlockOutcome.KeyChanged;
+        }
+#pragma warning restore CA2000
+
+        return Adopt(opened, claim, hardwareKey);
+    }
+
+    /// <summary>
+    /// After a password unlock, asks the person through Windows Hello to keep this unlock's key parts sealed, so a lock
+    /// that allows it can be resumed without the password (D-0550).
+    /// </summary>
+    /// <returns>What came of it; <see cref="QuickUnlockOutcome.Unavailable"/> where the app offers no quick unlock.</returns>
+    /// <remarks>
+    /// Blocks while the person answers, so it runs off the UI thread. A lock that forces the full unlock while the person
+    /// is being asked leaves nothing kept, because the vault is forgotten after its parts were read.
+    /// </remarks>
+    internal QuickUnlockOutcome KeepForQuickUnlock()
+    {
+        if (QuickUnlock is not { } copies)
+        {
+            return QuickUnlockOutcome.Unavailable;
+        }
+
+        Vault? vault;
+        VaultIdentity? identity;
+        long generation;
+
+        lock (_gate)
+        {
+            vault = _vault;
+            identity = _claim?.Vault;
+            generation = identity is null ? 0 : copies.Generation(identity);
+        }
+
+        if (vault is null || identity is null)
+        {
+            return QuickUnlockOutcome.None;
+        }
+
+        VaultKeyParts parts;
+
+        try
+        {
+            parts = vault.ExportKeyParts();
+        }
+        catch (Exception e) when (e is ObjectDisposedException or VaultException)
+        {
+            return QuickUnlockOutcome.None;
+        }
+
+        using (parts)
+        {
+            return copies.Keep(identity, parts, generation);
+        }
+    }
+
+    /// <summary>Drops the quick unlock copy of <paramref name="vault"/>, so only its full unlock opens it next.</summary>
+    private void ForgetQuickUnlock(VaultIdentity? vault)
+    {
+        if (vault is not null)
+        {
+            QuickUnlock?.Forget(vault);
+        }
     }
 
     /// <summary>Takes the claim on a vault, or reuses the one this session already holds on it.</summary>
@@ -644,6 +826,7 @@ internal sealed class AppVaultSession : IDisposable
                     ended = _lifetime;
                     previous = _vault;
                     replaced = VaultLockReason.Replaced;
+                    ForgetQuickUnlock(_claim?.Vault);
                 }
 
                 if (!ReferenceEquals(claim, _claim))
@@ -811,10 +994,17 @@ internal sealed class AppVaultSession : IDisposable
 
         var attached = change.HardwareKeyChange == AccessHardwareKeyChange.Attach ? change.HardwareKey : null;
         var adopted = false;
+        var identity = Identity;
 
         try
         {
             return Rekey(current, change, newPassword, confirmation, attached, out adopted);
+        }
+        catch (VaultAccessUnconfirmedException)
+        {
+            // The change was written, so the parts a quick unlock kept are the old key's.
+            ForgetQuickUnlock(identity);
+            throw;
         }
         finally
         {
@@ -859,6 +1049,8 @@ internal sealed class AppVaultSession : IDisposable
             return new AccessChangeResult(AccessChangeOutcome.Refused, result);
         }
 
+        ForgetQuickUnlock(Identity);
+
         var keyfileAfter = change.Keyfile switch
         {
             AccessKeyfileChange.Attach => Path.GetFullPath(change.KeyfilePath!),
@@ -878,7 +1070,7 @@ internal sealed class AppVaultSession : IDisposable
         {
             // Owned by the session once swapped in; Swap disposes it when it is not.
 #pragma warning disable CA2000
-            reopened = Vault.Open(vault.Path, change.SetPassword ? newPassword : current, keyfileAfter, hardwareKeyAfter);
+            reopened = ReopenAfterAccessChange(vault.Path, change.SetPassword ? newPassword : current, keyfileAfter, hardwareKeyAfter);
 #pragma warning restore CA2000
         }
         catch (VaultException)
@@ -1191,6 +1383,13 @@ internal sealed class AppVaultSession : IDisposable
             ForgetUnsaved();
             _timer?.Dispose();
             _timer = null;
+
+            // Under the gate, after the vault is detached, so a keep that read its parts before this stores nothing.
+            if (!AllowsQuickResume(reason))
+            {
+                ForgetQuickUnlock(_claim?.Vault);
+            }
+
             _claim?.Dispose();
             _claim = null;
             _warned = false;
@@ -1262,6 +1461,7 @@ internal sealed class AppVaultSession : IDisposable
         }
 
         Lock(VaultLockReason.Shutdown);
+        QuickUnlock?.Dispose();
     }
 
     private void MarkActivity()

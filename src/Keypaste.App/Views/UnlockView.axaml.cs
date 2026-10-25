@@ -20,7 +20,8 @@ internal sealed partial class UnlockView : UserControl
         password.CharacterTyped += (_, c) => Model?.Type(c);
         password.BackspacePressed += (_, _) => Model?.Backspace();
         password.ClearRequested += (_, _) => Model?.ClearPassword();
-        password.Submitted += (_, _) => Run(Model?.UnlockCommand);
+        // Enter on an empty field asks Windows Hello where it can unlock the vault, so the keyboard path stays launch, Enter.
+        password.Submitted += (_, _) => Run(Model is { MaskedLength: 0, OffersQuickUnlock: true } model ? model.ResumeCommand : Model?.UnlockCommand);
         password.Pasting = () => Model?.PasteAsync() ?? Task.CompletedTask;
 
         var created = this.FindControl<MaskedInput>("NewPassword")!;
