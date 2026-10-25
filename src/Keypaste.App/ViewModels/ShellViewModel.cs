@@ -867,7 +867,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post);
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker);
 
         if (_search.Length > 0)
         {

@@ -32,6 +32,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private readonly EntryActivitySource? _activity;
     private readonly IWebLauncher? _web;
     private readonly Action<Action>? _post;
+    private readonly IVaultFilePicker? _picker;
     private IReadOnlyList<GroupNode> _groups = [];
     private GroupNode? _selectedGroup;
     private EntryName? _selection;
@@ -61,7 +62,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         ClipboardCountdown clipboard,
         EntryActivitySource? activity = null,
         IWebLauncher? web = null,
-        Action<Action>? post = null)
+        Action<Action>? post = null,
+        IVaultFilePicker? picker = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -71,6 +73,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _activity = activity;
         _web = web;
         _post = post;
+        _picker = picker;
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
@@ -803,7 +806,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
 
         Error = null;
-        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post);
+        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker);
     }
 
     /// <summary>Reads the list again and lands on the entry a restore left behind.</summary>

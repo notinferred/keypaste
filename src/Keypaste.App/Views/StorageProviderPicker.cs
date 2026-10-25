@@ -116,6 +116,32 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         return file?.TryGetLocalPath();
     }
 
+    public async Task<string?> PickAttachmentAsync()
+    {
+        // No type filter: an attachment can be any file.
+        var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Choose a file to attach",
+            AllowMultiple = false,
+        }).ConfigureAwait(true);
+
+        return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<string?> PickAttachmentDestinationAsync(string suggestedName)
+    {
+        // No overwrite prompt, for PickNewAsync's reason: a saved attachment never replaces a file, and where a
+        // platform's dialog asks anyway, the screen explains why nothing was replaced.
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save a copy of the attachment",
+            SuggestedFileName = suggestedName,
+            ShowOverwritePrompt = false,
+        }).ConfigureAwait(true);
+
+        return file?.TryGetLocalPath();
+    }
+
     public async Task<string?> PickFolderAsync()
     {
         var picked = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions

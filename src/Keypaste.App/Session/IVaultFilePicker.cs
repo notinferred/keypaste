@@ -57,4 +57,16 @@ internal interface IVaultFilePicker
     /// <param name="directory">Where the dialog opens, when the project has a mapped directory.</param>
     /// <remarks>The dialog asks before replacing a file; what it writes holds references and never a value.</remarks>
     Task<string?> PickReferenceFileAsync(string suggestedName, string? directory) => Task.FromResult<string?>(null);
+
+    /// <summary>Asks which file to attach to an item. Null when the person cancelled.</summary>
+    /// <remarks>Read, never written, opened in another program or run.</remarks>
+    Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
+    /// <summary>Asks where a saved copy of an attachment should go. Null when the person cancelled.</summary>
+    /// <param name="suggestedName">The file name the dialog starts with, already safe to be one.</param>
+    /// <remarks>
+    /// The dialog does not offer to replace a file: <see cref="Keypaste.Core.Vault.SaveAttachment"/> writes only where
+    /// nothing is (D-0534).
+    /// </remarks>
+    Task<string?> PickAttachmentDestinationAsync(string suggestedName) => Task.FromResult<string?>(null);
 }

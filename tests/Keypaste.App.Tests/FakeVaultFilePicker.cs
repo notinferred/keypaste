@@ -97,4 +97,37 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
     internal string? ReferencePath { get; set; }
 
     public Task<string?> PickReferenceFileAsync(string suggestedName, string? directory) => Task.FromResult(ReferencePath);
+
+    /// <summary>What <see cref="PickAttachmentAsync"/> answers. Null is a cancelled picker.</summary>
+    internal string? AttachmentPath { get; set; }
+
+    /// <summary>How many times the attach picker was opened.</summary>
+    internal int AttachmentCalls { get; private set; }
+
+    /// <summary>What happens while either attachment picker is open, such as a lock.</summary>
+    internal Action? WhileAttachmentPickerOpen { get; set; }
+
+    public Task<string?> PickAttachmentAsync()
+    {
+        AttachmentCalls++;
+        WhileAttachmentPickerOpen?.Invoke();
+        return Task.FromResult(AttachmentPath);
+    }
+
+    /// <summary>What <see cref="PickAttachmentDestinationAsync"/> answers. Null is a cancelled picker.</summary>
+    internal string? AttachmentDestination { get; set; }
+
+    /// <summary>How many times the save-attachment picker was opened.</summary>
+    internal int AttachmentDestinationCalls { get; private set; }
+
+    /// <summary>The name the save-attachment picker was last asked to start with.</summary>
+    internal string? SuggestedAttachmentName { get; private set; }
+
+    public Task<string?> PickAttachmentDestinationAsync(string suggestedName)
+    {
+        AttachmentDestinationCalls++;
+        SuggestedAttachmentName = suggestedName;
+        WhileAttachmentPickerOpen?.Invoke();
+        return Task.FromResult(AttachmentDestination);
+    }
 }

@@ -100,8 +100,6 @@ Each row keeps its historical meaning and is expanded when selected.
   - One import contract, with preview, collision decisions and atomic commit, so nothing is dropped silently.
   - Its adapters, each Needs 9.1a: 9.1b (Bitwarden JSON), 9.1c (LastPass CSV), 9.1d1 (1Password 1PUX), 9.1d2 (1Password CSV) and 9.1e (KeePassXC CSV).
   - 9.1f guides import in the desktop.
-- [ ] **V.8b — Manage attachments from the app.** Needs: V.8a.
-  - The item shows each attachment's name and size, with add, replace, remove and save; the app never opens or runs an attachment itself.
 - [ ] **P.4a — Implement desktop Auto-Type on Windows and macOS.** Needs: none.
   - Types an entry's login into another app's window with KeePass's Auto-Type sequences, reading KeePassXC's per-entry sequences and window associations.
   - It types a password into a window keypaste does not control, so its design, including how a window is matched and what is refused, comes to the founder before any code.

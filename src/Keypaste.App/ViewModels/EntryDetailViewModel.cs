@@ -88,7 +88,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Action<string?> report,
         Action<EntryName> restored,
         IWebLauncher? web = null,
-        Action<Action>? post = null)
+        Action<Action>? post = null,
+        IVaultFilePicker? picker = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -119,6 +120,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ReplacementFieldValue = new SecretField(clipboard);
         _restored = restored;
         History = new EntryHistoryViewModel(session, clipboard, this, Restored);
+        Attachments = new EntryAttachmentsViewModel(session, Name, picker, report, History.Refresh);
 
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
@@ -866,6 +868,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// </remarks>
     internal EntryHistoryViewModel History { get; }
 
+    /// <summary>The item's attachments by name and size, and the way to add, replace, remove and save them (V.8b).</summary>
+    internal EntryAttachmentsViewModel Attachments { get; }
+
     internal bool IsEditing
     {
         get => _isEditing;
@@ -927,6 +932,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         PasswordLength = entry.Password.Length;
         Kind = EntryKinds.Of(entry);
         ReadFieldsAndTags();
+        Attachments.Read();
     }
 
     /// <inheritdoc/>
@@ -996,6 +1002,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         NewFieldValue.Dispose();
         ReplacementFieldValue.Dispose();
         History.Dispose();
+        Attachments.Dispose();
 
         Raise(nameof(Reference));
         Raise(nameof(KdbxEntry));

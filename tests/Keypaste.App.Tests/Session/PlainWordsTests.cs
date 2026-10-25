@@ -37,7 +37,11 @@ public sealed partial class PlainWordsTests
     [Fact]
     public Task EveryScreen_HoldsNoneOfTheRetiredWords() => HeadlessSession.On(() =>
     {
-        using var shell = new RenderedShell("keypaste-plain-");
+        using var shell = new RenderedShell("keypaste-plain-", vault =>
+        {
+            using var key = new MemoryStream("ssh-ed25519 AAAA"u8.ToArray());
+            Assert.True(vault.AddAttachment(new EntryName(string.Empty, "github"), "deploy-key.pub", key, out _));
+        });
         var said = new List<(string Where, string Text)>();
 
         var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -51,6 +55,7 @@ public sealed partial class PlainWordsTests
 
         var detail = items.Detail!;
         var field = detail.Fields[0];
+        var attachment = detail.Attachments.Rows[0];
 
         foreach (var (state, open, close) in new (string, IRelayCommand, IRelayCommand)[]
         {
@@ -60,6 +65,7 @@ public sealed partial class PlainWordsTests
             ("an item's replace-field form", field.ReplaceCommand, detail.CancelReplaceFieldCommand),
             ("an item's remove-field confirmation", field.RemoveCommand, detail.CancelRemoveFieldCommand),
             ("an item's rename-field form", field.RenameCommand, detail.CancelRenameFieldCommand),
+            ("an item's remove-attachment confirmation", attachment.RemoveCommand, detail.Attachments.CancelRemoveCommand),
         })
         {
             Assert.True(open.CanExecute(null), state);
