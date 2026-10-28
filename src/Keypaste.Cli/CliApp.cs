@@ -219,7 +219,7 @@ internal static class CliApp
         ]),
         ("VAULT",
         [
-            ("import", "copy in a KeePass database, or keep editing it in place"),
+            ("import", "copy in an export or a KeePass database, or edit it in place"),
             ("share", "create an encrypted, expiring link"),
             ("lock", "lock now and pause all agents"),
             ("init", "create a new vault"),

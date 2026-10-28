@@ -93,6 +93,9 @@ public sealed class ExportItem
     /// <summary>Its TOTP as KeePassXC's <c>otp</c> field holds one, an <c>otpauth://totp/</c> URI or KeeOTP's <c>key=</c> form, or empty; it lands in <c>otp</c> when keypaste reads it as written.</summary>
     public string Totp { get; init; } = string.Empty;
 
+    /// <summary>Its passkeys; the first lands in KeePassXC's <c>KPEX_PASSKEY_*</c> fields, since KeePassXC keeps one per item.</summary>
+    public IReadOnlyList<ExportPasskey> Passkeys { get; init; } = [];
+
     /// <summary>Its files.</summary>
     public IReadOnlyList<ExportAttachment> Attachments { get; init; } = [];
 
@@ -122,6 +125,19 @@ public sealed record ExportField(string Name, string Value, bool Protect = true)
     /// <summary>The name only, so a log line or a debugger never shows the value.</summary>
     /// <returns>The name.</returns>
     public override string ToString() => Name;
+}
+
+/// <summary>One passkey of an exported item, in the form KeePassXC keeps one in its <c>KPEX_PASSKEY_*</c> fields.</summary>
+/// <param name="CredentialId">The credential id's bytes in base64url without padding.</param>
+/// <param name="PrivateKeyPem">The PKCS #8 private key in base64 between <c>-----BEGIN PRIVATE KEY-----</c> and <c>-----END PRIVATE KEY-----</c>.</param>
+/// <param name="RelyingParty">The relying party's id, the site's domain.</param>
+/// <param name="Username">The user name the site gave it.</param>
+/// <param name="UserHandle">The user handle the site gave it, in base64url.</param>
+public sealed record ExportPasskey(string CredentialId, string PrivateKeyPem, string RelyingParty, string Username, string UserHandle)
+{
+    /// <summary>Never a value.</summary>
+    /// <returns><c>passkey</c>.</returns>
+    public override string ToString() => "passkey";
 }
 
 /// <summary>One file of an exported item, whose bytes the <see cref="ExportSource"/> holding it zeroes when disposed.</summary>

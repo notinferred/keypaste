@@ -10,7 +10,14 @@
 # (D-0416), and nothing from the recycle bin came across. The source file's bytes never change, a dry
 # run writes nothing, and an import into keypaste's reserved group is refused writing nothing.
 #
-# NEGATIVE CONTROL: a corrupted expectation must fail the comparison every check here rests on.
+# The shipped CLI then imports a Bitwarden export holding a bare base32 secret, an otpauth URI and a
+# steam:// secret, three web addresses and a passkey (9.1b). keepassxc-cli show --totp gives each item
+# the code keypaste gives it from the `otp` keypaste wrote, read within one 30-second period, and reads
+# the first address as the URL, the others as KP2A_URL_1 and KP2A_URL_2, and the passkey's five
+# KPEX_PASSKEY_* attributes as KeePassXC's own Bitwarden import writes that passkey.
+#
+# NEGATIVE CONTROL: a corrupted expectation, a changed byte and two items' codes must each fail the
+# comparison the checks here rest on.
 #
 # Usage:  scripts/verify-keepassxc-import.sh <work-directory>
 # Env:    KP_COMPAT_PASSWORD   master password for both vaults       (required)
@@ -145,11 +152,86 @@ step "the source file was never written"
 [ "$(bytes "$src")" = "$source_hash" ] || die "keypaste import changed the source file"
 kx ls "$src" -R -f | grep -qx 'Banking/checking' || die "KeePassXC no longer reads the source"
 
+step "keypaste imports a Bitwarden export, and KeePassXC computes each TOTP and reads each web address and the passkey keypaste wrote"
+cat >"$dir/bitwarden.json" <<'EOF'
+{
+  "encrypted": false,
+  "folders": [ { "id": "folder-work", "name": "Work" } ],
+  "items": [
+    {
+      "id": "item-sha1", "folderId": "folder-work", "type": 1, "name": "Sha1",
+      "login": {
+        "uris": [
+          { "match": null, "uri": "https://one.import.example" },
+          { "match": null, "uri": "https://two.import.example" },
+          { "match": null, "uri": "https://three.import.example" }
+        ],
+        "username": "import-bw-user", "password": "import-bw-pw", "totp": "gezd gnbv gy3t qojq gezd gnbv gy3t qojq",
+        "fido2Credentials": [
+          {
+            "credentialId": "a3e15f8b-27c1-42ae-90cf-a615ad87854f", "keyType": "public-key", "keyAlgorithm": "ECDSA", "keyCurve": "P-256",
+            "keyValue": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgmr4GQQjerojFuf0ZouOuUllMvAwxZSZAfB6gwDYcLiehRANCAAT0WR5zVSp6ieusvjkLkzaGc7fjGBmwpiuLPxR_d-ZjqMI9L2DKh-takp6wGt2x0n4jzr1KA352NZg0vjZX9CHh",
+            "rpId": "webauthn.io", "userHandle": "aTFtdmFnOHYtS2dxVEJ0by1rSFpLWGg0enlTVC1iUVJReDZ5czJXa3c2aw", "userName": "KPXC_BITWARDEN",
+            "counter": "0", "rpName": "webauthn.io", "userDisplayName": "KPXC_BITWARDEN", "discoverable": "true"
+          }
+        ]
+      }
+    },
+    {
+      "id": "item-sha256", "folderId": "folder-work", "type": 1, "name": "Sha256",
+      "login": { "totp": "otpauth://totp/Sha256?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA&algorithm=SHA256&digits=8" }
+    },
+    {
+      "id": "item-steam", "folderId": "folder-work", "type": 1, "name": "Steam",
+      "login": { "totp": "steam://JBSWY3DPEHPK3PXP" }
+    }
+  ]
+}
+EOF
+said=$(printf '%s\n' "$pw" | "$kp" import "$dir/bitwarden.json" --vault "$target" --into bitwarden 2>&1) \
+  || die "keypaste import of the Bitwarden export failed: ${said}"
+{ grep -qF '3 items' <<<"$said" && grep -qF 'copied into bitwarden' <<<"$said"; } || die "the Bitwarden import did not report the copy: ${said}"
+
+# keypaste's current code for bitwarden/Work/$1.
+kp_totp() { printf '%s\n' "$pw" | "$kp" get "bitwarden/Work/$1" totp --reveal --vault "$target" 2>"$dir/totp.err" | tr -d '\r'; }
+
+# Both codes for bitwarden/Work/$1, read back to back inside one 30-second period; a pair read across a period's end is read once more.
+same_totp() {
+  local title=$1 start ours theirs
+  for _ in 1 2; do
+    start=$(date +%s)
+    ours=$(kp_totp "$title") || die "keypaste get bitwarden/Work/${title} totp failed: $(cat "$dir/totp.err")"
+    theirs=$(kx show "$target" "bitwarden/Work/$title" -t) || die "keepassxc-cli show --totp failed for bitwarden/Work/${title}"
+    if [ $((start / 30)) -eq $(($(date +%s) / 30)) ]; then
+      if [ -z "$ours" ] || [ "$ours" != "$theirs" ]; then
+        die "keypaste gives bitwarden/Work/${title} the code '${ours}' where KeePassXC gives '${theirs}'"
+      fi
+      printf '    %s: both give the same %s-character code\n' "$title" "${#ours}"
+      return 0
+    fi
+  done
+  die "keypaste's and KeePassXC's codes for bitwarden/Work/${title} could not be read within one period twice running"
+}
+for title in Sha1 Sha256 Steam; do
+  same_totp "$title"
+done
+
+# The passkey is KeePassXC's own Bitwarden test passkey, read as its testBitwardenPasskey expects its own import to write it.
+pem='-----BEGIN PRIVATE KEY-----MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgmr4GQQjerojFuf0ZouOuUllMvAwxZSZAfB6gwDYcLiehRANCAAT0WR5zVSp6ieusvjkLkzaGc7fjGBmwpiuLPxR/d+ZjqMI9L2DKh+takp6wGt2x0n4jzr1KA352NZg0vjZX9CHh-----END PRIVATE KEY-----'
+for pair in 'URL https://one.import.example' 'KP2A_URL_1 https://two.import.example' 'KP2A_URL_2 https://three.import.example' 'Password import-bw-pw' \
+  'KPEX_PASSKEY_CREDENTIAL_ID o-FfiyfBQq6Qz6YVrYeFTw' "KPEX_PASSKEY_PRIVATE_KEY_PEM ${pem}" 'KPEX_PASSKEY_RELYING_PARTY webauthn.io' \
+  'KPEX_PASSKEY_USERNAME KPXC_BITWARDEN' 'KPEX_PASSKEY_USER_HANDLE aTFtdmFnOHYtS2dxVEJ0by1rSFpLWGg0enlTVC1iUVJReDZ5czJXa3c2aw'; do
+  read -r field wanted <<<"$pair"
+  value=$(kx show "$target" bitwarden/Work/Sha1 -a "$field") || die "KeePassXC cannot read ${field} of the imported item"
+  [ "$value" = "$wanted" ] || die "KeePassXC reads ${field} of the imported item as '${value}'"
+done
+
 step "NEGATIVE CONTROL: the comparisons must be able to fail"
+[ "$(kp_totp Sha1)" = "$(kx show "$target" bitwarden/Work/Steam -t)" ] && die "the TOTP comparison matched two items' codes"
 if [ "$attribute" = 'import-attribute-value-CORRUPTED' ]; then
   die "a deliberately corrupted expectation still matched — this gate is not gating"
 fi
 printf 'x' >>"$dir/statement.out"
 cmp -s "$dir/statement.bin" "$dir/statement.out" && die "the attachment comparison cannot see a changed byte"
 
-printf '\nIMPORT GATE PASSED: KeePassXC reads what keypaste copied, with its attribute, attachment and history, and the source is untouched.\n'
+printf '\nIMPORT GATE PASSED: KeePassXC reads what keypaste copied, with its attribute, attachment and history, the source is untouched, and KeePassXC computes the TOTPs and reads the web addresses keypaste wrote from a Bitwarden export.\n'

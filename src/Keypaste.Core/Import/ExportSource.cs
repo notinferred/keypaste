@@ -22,6 +22,9 @@ public sealed class ExportSource : IDisposable
     /// <summary>Keepass2Android's name for an item's further web addresses, numbered from 1, which KeePassXC reads in any field whose name starts <c>KP2A_URL</c>.</summary>
     private const string _moreUrlsField = "KP2A_URL_";
 
+    /// <summary>The tag KeePassXC gives an item it adds a passkey to.</summary>
+    private const string _passkeyTag = "Passkey";
+
     private readonly ExportContents _contents;
     private bool _disposed;
 
@@ -282,6 +285,28 @@ public sealed class ExportSource : IDisposable
             {
                 fields.Add(new FieldWrite(TotpSpec.OtpField, item.Totp, Protect: true));
             }
+        }
+
+        if (item.Passkeys.Count > 0)
+        {
+            var passkey = item.Passkeys[0];
+
+            // KeePassXC's own names, read by its browser integration and its passkey export, all protected (D-0369).
+            fields.Add(new FieldWrite("KPEX_PASSKEY_CREDENTIAL_ID", passkey.CredentialId, Protect: true));
+            fields.Add(new FieldWrite("KPEX_PASSKEY_PRIVATE_KEY_PEM", passkey.PrivateKeyPem, Protect: true));
+            fields.Add(new FieldWrite("KPEX_PASSKEY_RELYING_PARTY", passkey.RelyingParty, Protect: true));
+            fields.Add(new FieldWrite("KPEX_PASSKEY_USERNAME", passkey.Username, Protect: true));
+            fields.Add(new FieldWrite("KPEX_PASSKEY_USER_HANDLE", passkey.UserHandle, Protect: true));
+
+            if (!tags.Contains(_passkeyTag, StringComparer.Ordinal))
+            {
+                tags.Add(_passkeyTag);
+            }
+        }
+
+        for (var more = 1; more < item.Passkeys.Count; more++)
+        {
+            losses.Add(($"passkey {more + 1}", "KeePassXC keeps one passkey per item, so only the item's first lands"));
         }
 
         losses.AddRange(item.Omitted.Select(omitted => (omitted.Part, omitted.Reason)));

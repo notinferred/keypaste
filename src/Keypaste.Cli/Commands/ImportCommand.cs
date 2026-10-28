@@ -55,7 +55,7 @@ internal static class ImportCommand
 
         if (line.Operands.Count != 1)
         {
-            context.Stderr.WriteLine("keypaste import: expected exactly one KeePass database file");
+            context.Stderr.WriteLine("keypaste import: expected exactly one KeePass database or export file");
             return CliApp.ExitUsageError;
         }
 
@@ -344,7 +344,7 @@ internal static class ImportCommand
     /// <summary>The glyph where the writer's encoding carries it, otherwise its ASCII stand-in.</summary>
     private static void WriteHelp(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste import <file.kdbx> [--into <group>] [--dry-run] [--in-place]");
+        writer.WriteLine("usage: keypaste import <file> [--into <group>] [--dry-run] [--in-place] [--skip-existing]");
         writer.WriteLine("                       [--source-keyfile <path|none>] [--vault <path>] [--keyfile <path>]");
         writer.WriteLine("       keypaste import <export> [--into <group>] [--dry-run] [--skip-existing]");
         writer.WriteLine("                       [--vault <path>] [--keyfile <path>]");

@@ -19,7 +19,7 @@ public sealed class ExportImportTests : IDisposable
     private static readonly string[] _values =
     [
         "export-pw-github", "export-pw-bank", "export-user-bank", "https://bank.example/one", "https://bank.example/two",
-        "export-notes-bank", "export-pin-bank", "export-standard-field", "export-otp-field", "export-pin-twice",
+        "export-notes-bank", "export-pin-bank", "export-standard-field", "export-otp-field", "export-pin-twice", "export-passkey-id", "export-passkey-key", "export-passkey-handle", "export-passkey-two",
         "otpauth://totp/bank?secret=JBSWY3DPEHPK3PXP", "export-old-pw-bank", "export-pw-slash", "export-pw-bank-two",
         "export-pw-stale", "export-old-pw-stale", "KRSXG5CTMVRXEZLU",
     ];
@@ -75,7 +75,8 @@ public sealed class ExportImportTests : IDisposable
                 new ExportLoss(1, "Bank", "tag a,b", "a tag cannot contain ',' or ';', which separate tags"),
                 new ExportLoss(1, "Bank", "attachment big.bin", "it is larger than 5 MiB, the most keypaste attaches"),
                 new ExportLoss(1, "Bank", "attachment a/b", "the attachment name cannot contain '/'"),
-                new ExportLoss(1, "Bank", "passkey", "keypaste holds no passkeys"),
+                new ExportLoss(1, "Bank", "passkey 2", "KeePassXC keeps one passkey per item, so only the item's first lands"),
+                new ExportLoss(1, "Bank", "archived", "the fake format keeps an archive"),
                 new ExportLoss(4, "Stale", "TOTP", "The otp field holds a counter-based HOTP, which keypaste does not compute."),
             ],
             plan.Losses);
@@ -164,7 +165,11 @@ public sealed class ExportImportTests : IDisposable
             var entry = reopened.Find(bank)!;
             Assert.Equal(("export-user-bank", "export-pw-bank", "https://bank.example/one", "export-notes-bank"), (entry.Username, entry.Password, entry.Url, entry.Notes));
             Assert.Equal(
-                [new EntryField("KP2A_URL_1", false, true), new EntryField("PIN", true, false), new EntryField("Plain", false, false), new EntryField("otp", true, true)],
+                [
+                    new EntryField("KP2A_URL_1", false, true), new EntryField("KPEX_PASSKEY_CREDENTIAL_ID", true, true), new EntryField("KPEX_PASSKEY_PRIVATE_KEY_PEM", true, true),
+                    new EntryField("KPEX_PASSKEY_RELYING_PARTY", true, true), new EntryField("KPEX_PASSKEY_USERNAME", true, true), new EntryField("KPEX_PASSKEY_USER_HANDLE", true, true),
+                    new EntryField("PIN", true, false), new EntryField("Plain", false, false), new EntryField("otp", true, true),
+                ],
                 reopened.Fields(bank));
             Assert.Equal("export-pin-bank", reopened.ReadField(bank, "PIN"));
             Assert.Equal("https://bank.example/two", reopened.ReadField(bank, "KP2A_URL_1"));
@@ -175,7 +180,11 @@ public sealed class ExportImportTests : IDisposable
                 Assert.Equal((6, TimeSpan.FromSeconds(30)), (totp!.Digits, totp.Period));
             }
 
-            Assert.Equal(["env:payroll", "finance"], reopened.Tags(bank)!.Order(StringComparer.Ordinal));
+            Assert.Equal(
+                ("export-passkey-id", "-----BEGIN PRIVATE KEY-----export-passkey-key-----END PRIVATE KEY-----", "bank.example", "export-user-bank", "export-passkey-handle"),
+                (reopened.ReadField(bank, "KPEX_PASSKEY_CREDENTIAL_ID"), reopened.ReadField(bank, "KPEX_PASSKEY_PRIVATE_KEY_PEM"), reopened.ReadField(bank, "KPEX_PASSKEY_RELYING_PARTY"),
+                    reopened.ReadField(bank, "KPEX_PASSKEY_USERNAME"), reopened.ReadField(bank, "KPEX_PASSKEY_USER_HANDLE")));
+            Assert.Equal(["Passkey", "env:payroll", "finance"], reopened.Tags(bank)!.Order(StringComparer.Ordinal));
             Assert.Equal([new EntryAttachment("statement.txt", _statement.Length)], reopened.Attachments(bank));
 
             var revision = Assert.Single(reopened.ReadHistory(bank)!);
@@ -400,7 +409,12 @@ public sealed class ExportImportTests : IDisposable
                 new ExportAttachment("a/b", [1, 2, 3]),
             ],
             History = [new ExportVersion(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero), "export-user-bank", "export-old-pw-bank", "https://bank.example/one", string.Empty)],
-            Omitted = [new ExportOmission("passkey", "keypaste holds no passkeys")],
+            Passkeys =
+            [
+                new ExportPasskey("export-passkey-id", "-----BEGIN PRIVATE KEY-----export-passkey-key-----END PRIVATE KEY-----", "bank.example", "export-user-bank", "export-passkey-handle"),
+                new ExportPasskey("export-passkey-two", "-----BEGIN PRIVATE KEY-----export-passkey-two-----END PRIVATE KEY-----", "bank.example", "export-user-bank", "export-passkey-two"),
+            ],
+            Omitted = [new ExportOmission("archived", "the fake format keeps an archive")],
             Created = new DateTimeOffset(2024, 1, 2, 3, 4, 5, TimeSpan.Zero),
             Modified = new DateTimeOffset(2025, 6, 7, 8, 9, 10, TimeSpan.Zero),
         },
