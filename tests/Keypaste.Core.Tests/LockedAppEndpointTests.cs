@@ -95,11 +95,12 @@ public sealed class LockedAppEndpointTests : IDisposable
         // connection reaches the app already gone, 1 in 200 times in F.66's probe.
         const int bridges = 300;
         var heard = 0;
-        using var endpoint = LockedAppEndpoint.Listen(_name, () => Interlocked.Increment(ref heard), _ => { });
+        string? unreachable = null;
+        using var endpoint = LockedAppEndpoint.Listen(_name, () => Interlocked.Increment(ref heard), why => unreachable = why);
 
         for (var i = 0; i < bridges; i++)
         {
-            Assert.True(await LockedAppEndpoint.TellAsync(_name, Token), $"bridge {i} did not reach the app");
+            Assert.True(await LockedAppEndpoint.TellAsync(_name, Token), $"bridge {i} did not reach the app; the app stopped listening: {unreachable ?? "no"}");
         }
 
         var started = Stopwatch.GetTimestamp();
@@ -110,6 +111,21 @@ public sealed class LockedAppEndpointTests : IDisposable
 
         Assert.Equal(bridges, Volatile.Read(ref heard));
         Assert.Equal(bridges, endpoint.Requests);
+        Assert.Null(unreachable);
+    }
+
+    [Fact]
+    public async Task AListenerThatHangsUpAtOnce_FailsNoBridge()
+    {
+        // On Windows the runtime checks who made the pipe after connecting, which a listener that has hung up fails: 178 of 200 times in F.70's probe.
+        const int bridges = 50;
+        using var listener = new HangsUpAtOnce(_name);
+
+        for (var i = 0; i < bridges; i++)
+        {
+            var thrown = await Record.ExceptionAsync(() => LockedAppEndpoint.TellAsync(_name, Token));
+            Assert.True(thrown is null, $"bridge {i} failed rather than being told no: {thrown}");
+        }
     }
 
     [Fact]
@@ -212,5 +228,55 @@ public sealed class LockedAppEndpointTests : IDisposable
     private sealed class Removed(string directory) : IDisposable
     {
         public void Dispose() => Directory.Delete(directory);
+    }
+
+    // A listener of this user that hangs up on each connection as soon as it arrives, which no keypaste app does.
+    private sealed class HangsUpAtOnce : IDisposable
+    {
+        private readonly string _name;
+        private readonly Thread _serving;
+        private volatile bool _stopping;
+
+        public HangsUpAtOnce(string name)
+        {
+            _name = name;
+            _serving = new Thread(Serve) { IsBackground = true };
+            _serving.Start();
+        }
+
+        public void Dispose()
+        {
+            _stopping = true;
+            using var wake = new NamedPipeClientStream(".", _name, PipeDirection.InOut, PipeOptions.None);
+
+            try
+            {
+                wake.Connect(1000);
+            }
+            catch (Exception ex) when (ex is TimeoutException or IOException)
+            {
+                // Nothing is waiting to be woken.
+            }
+
+            _serving.Join(_wait);
+        }
+
+        private void Serve()
+        {
+            while (!_stopping)
+            {
+                using var pipe = new NamedPipeServerStream(_name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
+
+                try
+                {
+                    pipe.WaitForConnection();
+                    pipe.Disconnect();
+                }
+                catch (Exception ex) when (ex is IOException or SocketException)
+                {
+                    // The bridge hung up first.
+                }
+            }
+        }
     }
 }

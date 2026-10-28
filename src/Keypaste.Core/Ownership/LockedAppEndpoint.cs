@@ -79,7 +79,8 @@ public sealed class LockedAppEndpoint : IDisposable
     /// <param name="cancellationToken">Cancelled before the connection, it stops the call from being made.</param>
     /// <returns>
     /// Whether an app was reached. False, and never an exception, when nothing listens, the runtime refuses
-    /// the endpoint, or <paramref name="cancellationToken"/> was cancelled first.
+    /// the endpoint, the listener hangs up before the runtime has checked who made it, or
+    /// <paramref name="cancellationToken"/> was cancelled first.
     /// </returns>
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <remarks>
@@ -119,7 +120,8 @@ public sealed class LockedAppEndpoint : IDisposable
         {
             pipe.Connect(_connectBound);
         }
-        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException or SocketException)
+        // InvalidOperationException: on Windows the listener hung up before the runtime's check of who made the pipe, so that is not known (F.70).
+        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException or SocketException or InvalidOperationException)
         {
             return false;
         }

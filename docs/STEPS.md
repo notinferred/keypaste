@@ -12,10 +12,6 @@ These rows serve every track: a development machine builds only the compile chec
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.70 — Hear every bridge that knocks at a locked app on Windows.** Needs: none.
-  - In ci 40187220469 at `803e9cb3`, job test (windows-2025), `LockedAppEndpointTests.BridgesInQuickSuccession_AreEachHeard` failed in 507 ms with "bridge 247 did not reach the app" (`LockedAppEndpointTests.cs:102`); the rerun of that job passed, which does not close it. Nothing the run's branch changed touches `Core/Ownership/`, and the class passed on all three runners in F.66's dev run 39513707064.
-  - Diagnose the mechanism first, keep the regression and repair its cause; say whether a real bridge could go unheard, so that the person is not told an agent found the app locked (D-0466).
-
 
 ## T5 — Desktop delivery
 
