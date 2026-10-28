@@ -10,7 +10,8 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste import</c> of another password manager's export, over a fake reader: the preview names where each item
-/// lands and what does not, <c>--skip-existing</c> skips what the vault already has, and nothing printed is a value.
+/// lands and what does not, <c>--skip-existing</c> skips what the vault already has, and nothing printed is a value; and
+/// a LastPass export through the readers keypaste ships.
 /// </summary>
 public sealed class ImportExportVerbTests : IDisposable
 {
@@ -105,6 +106,27 @@ public sealed class ImportExportVerbTests : IDisposable
         Assert.Equal(CliApp.ExitUsageError, _cli.Run("import", kdbx, "--vault", _cli.VaultPath, "--skip-existing"));
         Assert.Contains("--skip-existing is for another password manager's export", _cli.Err, StringComparison.Ordinal);
         Assert.Empty(_cli.Prompt.PromptsSeen);
+    }
+
+    [Fact]
+    public void A_LastPass_export_is_copied_in_through_the_readers_keypaste_ships()
+    {
+        _cli.ExportReaders = ExportImport.Readers;
+        var export = Path.Combine(_cli.Directory, "lastpass_export.csv");
+        File.WriteAllText(export, "url,username,password,totp,extra,name,grouping,fav\r\nhttps://example.com,ada,lp-pw-example,,lp-notes-example,Example,Work,1\r\n");
+
+        _cli.Prompt.Enqueue(_master);
+        var exit = _cli.Run("import", export, "--vault", _cli.VaultPath, "--into", "imported");
+
+        _cli.AssertExit(CliApp.ExitSuccess, exit);
+        Assert.Contains("  lastpass_export.csv · LastPass CSV · 1 item", _cli.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("lp-pw-example", _cli.Out + _cli.Err, StringComparison.Ordinal);
+
+        using var vault = Vault.Open(_cli.VaultPath, _master);
+        var name = new EntryName("imported/Work", "Example");
+        var item = vault.Find(name)!;
+        Assert.Equal(("ada", "lp-pw-example", "https://example.com", "lp-notes-example"), (item.Username, item.Password, item.Url, item.Notes));
+        Assert.Equal(["Favorite"], vault.Tags(name));
     }
 
     [Fact]

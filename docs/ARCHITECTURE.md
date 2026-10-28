@@ -69,7 +69,7 @@ On macOS a Run confirmed in the app runs: `App/ViewModels/ProjectLaunchViewModel
 | What `keypaste doctor` checks, reading only: whether the copies of keypaste are one version, which Argon2 derives vault keys, from one small derivation (D-0525), the vault's header, each AI tool's registration and whether it survives an upgrade, whether the vault's owner answers, the settings files and PATH, each finding saying what to fix (D-0467) | `Health/` (`HealthCheck.cs`, and one reader per check: `Argon2Reading.cs`, `VaultReading.cs`, `ToolReading.cs`, `OwnerReading.cs`, `SettingsReading.cs`, `PathReading.cs`) |
 | Last used and in use per entry, from audit lines, the owner's release ledger and live grants | `Activity/` |
 | Running another program and capturing what it printed | `Processes/` |
-| Pieces that know nothing about vaults and use no other Keypaste namespace (`InfrastructureBoundaryTests`): the strict TOML reader and the writer that writes only what it reads, newline-delimited frames, the argument parser, replacing a file in one rename and ordering release versions | `Infrastructure/` (`Toml.cs`, `TomlWriter.cs`, `MessageFramer.cs`, `CommandLine.cs`, `AtomicFile.cs`, `SemanticVersion.cs`) |
+| Pieces that know nothing about vaults and use no other Keypaste namespace (`InfrastructureBoundaryTests`): the strict TOML reader and the writer that writes only what it reads, the strict CSV reader the CSV export readers share, newline-delimited frames, the argument parser, replacing a file in one rename and ordering release versions | `Infrastructure/` (`Toml.cs`, `TomlWriter.cs`, `Csv.cs`, `MessageFramer.cs`, `CommandLine.cs`, `AtomicFile.cs`, `SemanticVersion.cs`) |
 
 ## Tests, gates and delivery
 

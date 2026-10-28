@@ -346,14 +346,22 @@ internal static class ImportCommand
     {
         writer.WriteLine("usage: keypaste import <file.kdbx> [--into <group>] [--dry-run] [--in-place]");
         writer.WriteLine("                       [--source-keyfile <path|none>] [--vault <path>] [--keyfile <path>]");
+        writer.WriteLine("       keypaste import <export> [--into <group>] [--dry-run] [--skip-existing]");
+        writer.WriteLine("                       [--vault <path>] [--keyfile <path>]");
         writer.WriteLine();
         writer.WriteLine("  copies every item of another KeePass file into your vault, with its fields, attachments");
         writer.WriteLine("  and history, under a group named after the file. The file itself is never changed. Its");
         writer.WriteLine("  recycle bin is left behind. With no vault configured, or --in-place, the file is kept");
         writer.WriteLine("  where it is and remembered as a vault to open.");
         writer.WriteLine();
+        writer.WriteLine("  Another password manager's export is copied into your vault the same way, all of it or");
+        writer.WriteLine("  nothing, and every part of it that cannot be copied is named with why. Exports it reads:");
+        writer.WriteLine($"  {string.Join(", ", ExportImport.Readers.Select(reader => reader.Format))}.");
+        writer.WriteLine();
         writer.WriteLine("  --into <group>            the group to copy into (default: the file's name)");
-        writer.WriteLine("  --dry-run                 show where each group would land, and write nothing");
+        writer.WriteLine("  --dry-run                 show where everything would land, and write nothing");
+        writer.WriteLine("  --skip-existing           skip an exported item whose name your vault already has, rather");
+        writer.WriteLine("                            than keeping both");
         writer.WriteLine("  --in-place                keep editing the file where it is instead of copying it");
         writer.WriteLine("  --source-keyfile <path>   the file's keyfile; a <name>.keyx or <name>.key beside it is used");
         writer.WriteLine("                            unless this says none");
