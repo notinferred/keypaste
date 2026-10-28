@@ -50,6 +50,7 @@ On macOS a Run confirmed in the app runs: `App/ViewModels/ProjectLaunchViewModel
 | An item's TOTP: reading KeePassXC's `otp` URI or KeePass 2's `TimeOtp-*` fields and computing RFC 6238 codes, the decoded seed held only there and zeroed on disposal (D-0477) | `Totp/` (`TotpSpec.cs`), read through `Vault.ReadTotp` |
 | Scoped tokens and token bundles | `Tokens/` |
 | Share links: sealing, the keypaste.com client and the vault's records | `Sharing/` |
+| Crash reports: the scrubber, the only code that reads an exception for a report or writes one, the outbox in `~/.keypaste/crash-reports/` that keeps only what the scrubber wrote, and the sender to keypaste.com's `/api/crash`, which only the desktop app is to start (D-0558 to D-0560) | `CrashReports/` (`CrashScrubber.cs`, `CrashOutbox.cs`, `CrashSender.cs`) |
 | Probing a KDBX header and copying another vault in (`KeePassInterop` does the clone and attach) | `Import/` |
 | Starting a program with an env set: the environment merge, the platform's terminal and the launchers, and on macOS the request files Terminal's launcher reads (`TerminalRequests.cs`); for `run`, resolving the program, containing the child, capturing its output and scrubbing the values from it | `Launch/` (`RunProgram.cs`, `ChildContainment.cs`, `CapturedLaunch.cs`, `OutputScrubber.cs`) |
 | Where a project runs on this machine (`projects.json`), and which project a directory is | `Projects/` |

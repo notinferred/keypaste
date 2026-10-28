@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "name": "a crash, with an inner exception and a frame off the allowlist",
+      "report": "{\"schema\":1,\"kind\":\"crash\",\"site\":null,\"version\":\"1.0.0\",\"build\":\"0787be6e2871203c8b2f4e80155a49f0a78ae1cb\",\"os\":\"macos\",\"os_version\":\"15.7.1\",\"arch\":\"arm64\",\"runtime\":\"10.0.10\",\"uptime\":\"<10m\",\"screen\":\"agents\",\"occurred_on\":\"2026-10-28\",\"count\":1,\"exception\":{\"type\":\"System.InvalidOperationException\",\"hresult\":-2146233079,\"omitted\":0,\"frames\":[{\"asm\":\"Keypaste.Core\",\"type\":\"Keypaste.Core.Ownership.SessionAuthority+<ReleaseAsync>d__41\",\"method\":\"MoveNext\",\"il\":212},{\"asm\":\"System.Private.CoreLib\",\"type\":\"System.Runtime.ExceptionServices.ExceptionDispatchInfo\",\"method\":\"Throw\",\"il\":17},{\"asm\":\"[external]\",\"type\":\"[external]\",\"method\":\"[external]\",\"il\":12}],\"inner\":[{\"type\":\"System.IO.IOException\",\"hresult\":-2146232800,\"omitted\":0,\"frames\":[{\"asm\":\"Keypaste.Core\",\"type\":\"Keypaste.Core.Infrastructure.AtomicFile\",\"method\":\"Stage\",\"il\":88}]}]}}"
+    },
+    {
+      "name": "an unexpected exception a catch-everything block caught, merged three times",
+      "report": "{\"schema\":1,\"kind\":\"unexpected\",\"site\":\"LockedNotice.Show\",\"version\":\"1.0.0\",\"build\":null,\"os\":\"windows\",\"os_version\":\"10.0.26100\",\"arch\":\"x64\",\"runtime\":\"10.0.10\",\"uptime\":\"<1m\",\"screen\":\"[unnamed]\",\"occurred_on\":\"2026-10-28\",\"count\":3,\"exception\":{\"type\":\"System.UnauthorizedAccessException\",\"hresult\":-2147024891,\"omitted\":2,\"frames\":[{\"asm\":\"keypaste-app\",\"type\":\"Keypaste.App.Session.LockedNotice\",\"method\":\"Show\",\"il\":-1},{\"asm\":\"Avalonia.Base\",\"type\":\"Avalonia.Threading.Dispatcher\",\"method\":\"[unnamed]\",\"il\":40}],\"inner\":[]}}"
+    },
+    {
+      "name": "an app that ended with no hook running",
+      "report": "{\"schema\":1,\"kind\":\"ended-unexpectedly\",\"site\":null,\"version\":\"1.0.0\",\"build\":\"0787be6e2871203c8b2f4e80155a49f0a78ae1cb\",\"os\":\"linux\",\"os_version\":\"6.8.0\",\"arch\":\"x64\",\"runtime\":\"10.0.10\",\"uptime\":null,\"screen\":null,\"occurred_on\":\"2026-10-27\",\"count\":1,\"exception\":null}"
+    }
+  ]
+}

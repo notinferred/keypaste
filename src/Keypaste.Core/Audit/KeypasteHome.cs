@@ -81,6 +81,14 @@ public static class KeypasteHome
     public static string RecommendationsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), RecommendationsFileName);
 
+    /// <summary>The desktop app's crash reports waiting to be sent.</summary>
+    public const string CrashReportsDirectoryName = "crash-reports";
+
+    /// <summary>Resolves the folder of crash reports waiting to be sent. The folder is not created.</summary>
+    /// <remarks>It holds only what <see cref="CrashReports.CrashScrubber"/> wrote, never a name, path or value (D-0559).</remarks>
+    public static string CrashReportsPath(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), CrashReportsDirectoryName);
+
     /// <summary>This computer's ceilings on each agent, keyed by each bridge's <c>--client-label</c>.</summary>
     public const string ClientsFileName = "clients.toml";
 
