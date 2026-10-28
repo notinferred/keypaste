@@ -44,17 +44,8 @@ internal sealed class LastPassCsvReader : IExportReader
 
     public ExportContents Read(ReadOnlySpan<byte> file)
     {
-        if (!Csv.TryRead(file, out var records, out var error))
-        {
-            throw new ExportFormatException(error);
-        }
-
-        if (records.Count == 0)
-        {
-            throw new ExportFormatException("it is empty");
-        }
-
-        var columns = Columns(records[0].Fields);
+        var records = CsvExport.Records(file);
+        var columns = CsvExport.Columns(records[0].Fields, _required, StringComparer.Ordinal);
         List<ExportItem> items = [];
         List<ExportOmission> unread = [];
 
@@ -62,49 +53,21 @@ internal sealed class LastPassCsvReader : IExportReader
         {
             string Cell(string column) => columns.TryGetValue(column, out var index) ? record.Fields[index] : string.Empty;
 
-            if (record.Fields.All(field => field.Length == 0))
+            if (CsvExport.Empty(record) is { } empty)
             {
-                unread.Add(new ExportOmission(record.ToString(), "it holds nothing"));
+                unread.Add(empty);
             }
             else if (Cell("url") == _emptyFolderUrl)
             {
-                unread.Add(new ExportOmission(Named("folder", Cell("grouping")), "LastPass lists an empty folder this way, and an import makes a group only for an item in it"));
+                unread.Add(new ExportOmission(CsvExport.Named("folder", Cell("grouping")), "LastPass lists an empty folder this way, and an import makes a group only for an item in it"));
             }
             else
             {
-                List<ExportOmission> omitted =
-                [
-                    .. columns
-                        .Where(column => !_read.Contains(column.Key) && record.Fields[column.Value].Length > 0)
-                        .OrderBy(column => column.Value)
-                        .Select(column => new ExportOmission(Named("column", column.Key), "keypaste does not read this column of a LastPass export")),
-                ];
-
-                items.Add(Item(Cell, omitted));
+                items.Add(Item(Cell, CsvExport.UnreadColumns(columns, record, _read, "LastPass")));
             }
         }
 
         return new ExportContents(items, unread);
-    }
-
-    private static Dictionary<string, int> Columns(IReadOnlyList<string> header)
-    {
-        Dictionary<string, int> columns = new(StringComparer.Ordinal);
-
-        for (var index = 0; index < header.Count; index++)
-        {
-            if (!columns.TryAdd(header[index], index))
-            {
-                throw new ExportFormatException($"its header names the {header[index]} column twice");
-            }
-        }
-
-        if (_required.FirstOrDefault(column => !columns.ContainsKey(column)) is { } missing)
-        {
-            throw new ExportFormatException($"its header has no {missing} column");
-        }
-
-        return columns;
     }
 
     private static ExportItem Item(Func<string, string> cell, List<ExportOmission> omitted)
@@ -175,7 +138,7 @@ internal sealed class LastPassCsvReader : IExportReader
             Notes = notes,
             Fields = fields,
             Tags = tags,
-            Totp = Totp(cell("totp"), title, username),
+            Totp = CsvExport.Totp(cell("totp"), title, username),
             Omitted = omitted,
         };
     }
@@ -215,12 +178,4 @@ internal sealed class LastPassCsvReader : IExportReader
 
     private static string[] Folder(string grouping) =>
         grouping is "" or _noFolder ? [] : grouping.Split('\\', StringSplitOptions.RemoveEmptyEntries);
-
-    /// <summary>The TOTP as the <c>otp</c> field holds one: a link as written, and a bare secret, as LastPass keeps one, in the link KeePassXC's importers make of it (D-0574).</summary>
-    private static string Totp(string totp, string title, string username) =>
-        string.IsNullOrWhiteSpace(totp) ? string.Empty
-        : totp.StartsWith("otpauth://", StringComparison.Ordinal) ? totp
-        : $"otpauth://totp/{Uri.EscapeDataString(title)}:{Uri.EscapeDataString(username)}?secret={Uri.EscapeDataString(totp)}";
-
-    private static string Named(string kind, string name) => name.Length == 0 ? $"a {kind} with no name" : $"{kind} {name}";
 }

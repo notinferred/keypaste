@@ -98,7 +98,7 @@ public static class ExportImport
     public const int StartBytes = 4096;
 
     /// <summary>The formats keypaste reads, each by its own reader; the first that recognizes a file reads it.</summary>
-    public static IReadOnlyList<IExportReader> Readers { get; } = [new BitwardenJsonReader(), new LastPassCsvReader()];
+    public static IReadOnlyList<IExportReader> Readers { get; } = [new BitwardenJsonReader(), new LastPassCsvReader(), new OnePasswordCsvReader()];
 
     /// <summary>Reads an export with the first of <paramref name="readers"/> that recognizes it.</summary>
     /// <param name="path">The file.</param>
