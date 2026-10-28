@@ -1,6 +1,6 @@
 # P.1a — Import a YubiKey vault in the app, and reach one from the CLI through the app
 
-Completed 2026-10-28 on `t6`, source only; runs pending.
+Completed 2026-10-28 on `t6` in `5993396d` on `t6`, source only. At `dfe09d12`, ci 40749069944 passed every job on all three runners on its first attempt, and app 40749086048 on its second: its first cancelled desktop gates (macos-15) at its 17-minute timeout with no log kept, which F.72 holds, and only that job was rerun.
 
 ## Amendments
 

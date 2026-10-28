@@ -1,6 +1,6 @@
 # F.70 — Hear every bridge that knocks at a locked app on Windows
 
-Completed 2026-10-28 on `f70`, source only; runs pending.
+Completed 2026-10-28 on `f70` in `3fdd983a` on `t6`, source only. At `dfe09d12`, ci 40749069944 passed every job on all three runners on its first attempt, and app 40749086048 on its second: its first cancelled desktop gates (macos-15) at its 17-minute timeout with no log kept, which F.72 holds, and only that job was rerun.
 
 ## Amendments
 

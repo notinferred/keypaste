@@ -12,6 +12,9 @@ These rows serve every track: a development machine builds only the compile chec
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
+- [ ] **F.72 — Find what hangs the macOS desktop gates since `t6`'s second batch.** Needs: none.
+  - At `dfe09d12`, desktop gates (macos-15) was cancelled at its timeout twice in a row with no log kept, app 40749086048's first attempt at 1053 s and dev run 40751958140 at 901 s, after about 40 runs that never hung; the gates had passed in 457 s at `42ef9de5`, which differs only in a label and a path list. Three probes on a branch then passed, in 440 s, 393 s and 422 s: 40754396801 streamed each gate through `tee` under `bash -x` with three-minute caps, 40757177371 kept the files with the caps and a heartbeat, and 40758266185 ran the gates as they are with timestamps and a watchdog that would have printed the processes and logs; no gate took over 65 s.
+  - Candidates are what that batch changed on macOS: 4.10a's unlock and lock paths, P.1a's import, and F.70's accept loop, which on Unix now hangs up after each answer. Catch a hang with the watchdog probe, keep its regression and repair the cause.
 - [ ] **F.71 — Explain the knocks a Windows locked app still misses with a spare pipe waiting.** Needs: none.
   - After F.70's repair `LockedAppEndpointTests.BridgesInQuickSuccession_AreEachHeard` still timed out on windows-2025, twice in about 19,000 knocks, once at bridge 187 in dev run 40190674348; F.70's probes ruled out a spare failing to accept and a stopped listener ([F.70](steps/F.70.md)).
   - Diagnose the mechanism, keep its regression and repair the cause.
