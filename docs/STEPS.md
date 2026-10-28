@@ -165,8 +165,6 @@ Each row keeps its historical meaning and is expanded when selected. Designs the
 - [ ] **1.4b5 — Keep a revoked token revoked through any merge.** Needs: 1.4b1.
   - Revoking writes the newer revoked version and purges it once the token has expired, a tombstoned UUID reads as revoked, and the merge applies the token rule (D-0544).
   - Accepted when `TokenStoreTests` cover a merge in either direction and a KeePassXC merge of an older copy; G8 passes in `verify-keepassxc-merge.sh` once an owner merges (1.4b3 or 1.4b4): a token is revoked, KeePassXC merges in a copy still holding it, and after keypaste's merge `keypaste run --token` is refused and recorded; and T-32 states what remains.
-- [ ] **9.1d1 — Import 1Password 1PUX.** Needs: 9.1a.
-  - The 1PUX reader, with the attachments it holds.
 - [ ] **9.1f — Guide import in the desktop.** Needs: 9.1a.
   - Choosing the file, the preview, each collision's decision and a report of what was imported and what was not, so a new user migrates without a terminal.
 - [ ] **P.4a1 — Resolve Auto-Type sequences in Core.** Needs: none.
