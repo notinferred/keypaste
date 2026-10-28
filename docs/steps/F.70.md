@@ -59,7 +59,7 @@ D-0555 in [DECISIONS](../../DECISIONS.md). T-10 and T-29 in [THREATS](../../THRE
 - **Two timeouts are unexplained.** With the repair, `BridgesInQuickSuccession_AreEachHeard` and the burst probe timed out twice in about 19,000 back-to-back knocks on Windows: bridge 187 in 40190674348, and knock 1.230 in 40191988078.
   - In the second, knock 229 reached the app in 0.33 ms, and the listener then recorded nothing for 207 ms, while knock 230 found no instance to connect to.
   - The spare made 0.54 ms before it should have taken that knock, as 40193150535's rotation shows a spare does.
-  - The diagnosis stays open. The next experiment is to replace the bridge's `Connect` in an in-class probe with raw `CreateFile` and `WaitNamedPipe` calls, recording each attempt's error and time, and to repeat the bursts until a timeout recurs. That would show whether the pipe read as busy or as absent while the spare existed.
+  - The diagnosis stays open. The next experiment is to replace the bridge's `Connect` in an in-class probe with raw `CreateFile` and `WaitNamedPipe` calls, recording each attempt's error and time, and to repeat the bursts until a timeout recurs. That would show whether the pipe read as busy or as absent while the spare existed. [F.71](../STEPS.md) holds it.
   - The batch's full run can therefore still fail that test on Windows. It needs a STEPS row of its own.
 - `AppClaim.Ask` catches no `InvalidOperationException` either. Whether a second start can meet one is not known, because the app answers it only after writing its reply.
 - Source only.

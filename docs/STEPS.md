@@ -1,6 +1,6 @@
 # Build plan
 
-This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.16 (D-0532). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
+This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.17 (D-0556). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -11,6 +11,10 @@ These rows serve every track: a development machine builds only the compile chec
 ## T3 — AI requests in the app
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
+
+- [ ] **F.71 — Explain the knocks a Windows locked app still misses with a spare pipe waiting.** Needs: none.
+  - After F.70's repair `LockedAppEndpointTests.BridgesInQuickSuccession_AreEachHeard` still timed out on windows-2025, twice in about 19,000 knocks, once at bridge 187 in dev run 40190674348; F.70's probes ruled out a spare failing to accept and a stopped listener ([F.70](steps/F.70.md)).
+  - Diagnose the mechanism, keep its regression and repair the cause.
 
 
 ## T5 — Desktop delivery
@@ -29,7 +33,23 @@ Package managers and agent marketplaces carry a version only after it is publish
   - Terminal must be seen running the launcher of a downloaded bundle macOS opened. On `macos-15` Gatekeeper refuses an unsigned copy's launcher while it is quarantined ([4.7e1](steps/4.7e1.md)).
   - `upgrade-desktop.yml`'s macOS leg runs again on the first signed bundle, to see whether macOS App Management permission stops it replacing `/Applications/keypaste.app` ([4.7e2](steps/4.7e2.md)).
   - `libargon2.1.dylib`, in the bundle's `Contents/MacOS` and beside `keypaste` in the CLI archive, is signed with the same Developer ID and hardened runtime before what loads it: the hardened runtime's library validation refuses a dylib from another team, and keypaste then derives in managed code without failing, so the signed DMG's `--selftest` must still name it (D-0523).
-- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a and every T6 and T7 task, P.4a, P.4b, V.8a and V.8b, and the fixes marked for 1.0.0 (D-0530). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, and 3.5a's Apple credentials.
+- [ ] **4.11a — Build a crash report that cannot carry vault data.** Needs: none.
+  - `Core/CrashReports/` holds the report, its scrubber, an on-disk queue of scrubbed reports only, capped, and the sender, which never blocks the app and gives up quietly offline (PRODUCT §4.1, D-0556).
+  - A report holds the version, OS and architecture, the error's type and its stack as method names with IL offsets, how long the app had run in a coarse bucket and which screen was open; never an exception message, a secret, an entry, vault or agent name, a file path, an environment variable, a value or the audit log, and no install ID.
+  - It rewrites D-0515's "nothing writes a crash record" and THREATS T-9 for what leaves.
+  - Acceptance: scrubbing, shape, source-rule, queue and sender tests pass on three runners, each against a control that catches its mutation.
+- [ ] **4.11b — Receive crash reports at keypaste.com, switched off.** Needs: 4.11a. Input for switching on: H-0028.
+  - A Worker route `/api/crash` stores reports in Cloudflare D1 for 90 days, rate-limited, with Workers invocation logs off; a `CRASH_ENABLED` flag keeps it answering 503 on `main` until H-0028; no third-party service.
+  - The site's node tests join CI; `verify-site-endpoint.sh` and `site/README.md` follow.
+  - Acceptance: the node tests pass in CI; after deploy the live route answers 503; after H-0028 a probe report is stored and read back.
+- [ ] **4.11c — Report the app's crashes, with the terms at first run and Settings' switch.** Needs: 4.11a, 4.11b. Input: H-0027.
+  - Hooks for crashes on the UI thread and in background tasks, unobserved tasks, the named catch-all sites and an unclean exit found by a run marker, the last labelled a weak signal; after a UI-thread exception the app writes the report, locks, clears the clipboard and quits.
+  - First run shows the terms as a notice with Continue, and two equal choices, Send crash reports and Don't send; Settings has the switch and lists waiting reports. Only `app.yml` packages carry the endpoint; the CLI, `keypaste approve` and the bridge send nothing (T-9).
+  - Acceptance: `verify-crash-report.sh` passes on three runners, with the switch-off and offline variants, and the installed-package act passes.
+- [ ] **H-0027 — Approve the terms of use.** Human. Needs: none.
+  - The founder or a lawyer approves the draft of 2026-10-28, filling in the legal entity, governing law and place of establishment, and decides whether the first-run choice satisfies EU consent law.
+- [ ] **H-0028 — Make the crash-report database and switch the route on.** Human. Needs: 4.11b.
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, every T6 and T7 task but a person's check on real hardware (D-0557), P.4a, P.4b, V.8a and V.8b, 4.11a to 4.11c, and the fixes marked for 1.0.0 (D-0530). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
   - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.
