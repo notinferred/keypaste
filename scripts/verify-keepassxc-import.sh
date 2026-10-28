@@ -10,14 +10,20 @@
 # (D-0416), and nothing from the recycle bin came across. The source file's bytes never change, a dry
 # run writes nothing, and an import into keypaste's reserved group is refused writing nothing.
 #
+# KeePassXC then exports a second vault as CSV, holding an item in its root group, one in a subgroup
+# with a TOTP, an icon and its own times, and one it deleted into its recycle bin (9.1e). The shipped
+# CLI imports the CSV, leaving the recycled item behind and naming it and the icon as not imported,
+# and KeePassXC's CSV export of the target gives each other item the row the source's gave it, below
+# the import's group, but for the icon.
+#
 # The shipped CLI then imports a Bitwarden export holding a bare base32 secret, an otpauth URI and a
 # steam:// secret, three web addresses and a passkey (9.1b). keepassxc-cli show --totp gives each item
 # the code keypaste gives it from the `otp` keypaste wrote, read within one 30-second period, and reads
 # the first address as the URL, the others as KP2A_URL_1 and KP2A_URL_2, and the passkey's five
 # KPEX_PASSKEY_* attributes as KeePassXC's own Bitwarden import writes that passkey.
 #
-# NEGATIVE CONTROL: a corrupted expectation, a changed byte and two items' codes must each fail the
-# comparison the checks here rest on.
+# NEGATIVE CONTROL: a corrupted expectation, a changed byte, a changed CSV field and two items' codes
+# must each fail the comparison the checks here rest on.
 #
 # Usage:  scripts/verify-keepassxc-import.sh <work-directory>
 # Env:    KP_COMPAT_PASSWORD   master password for both vaults       (required)
@@ -148,6 +154,94 @@ xml=$(kx export "$target" -f xml) || die "KeePassXC cannot export the target"
 history=$(awk '/<History>/{inside=1} inside' <<<"$xml")
 grep -qF '>import-pw-1<' <<<"$history" || die "the copied entry lost its history"
 
+step "keypaste imports KeePassXC's CSV export, and KeePassXC reads back each item's fields, TOTP and times"
+csv_src="$dir/csv.kdbx"
+cat >"$dir/csv-seed.xml" <<EOF
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta><Generator>verify-keepassxc-import</Generator><DatabaseName>csv</DatabaseName></Meta>
+  <Root>
+    <Group>
+      <UUID>$(uuid csvroot)</UUID><Name>Root</Name>
+      <Entry>
+        <UUID>$(uuid csvtop)</UUID>
+        <Times><CreationTime>2021-02-03T04:05:06Z</CreationTime><LastModificationTime>2022-03-04T05:06:07Z</LastModificationTime></Times>
+        <String><Key>Title</Key><Value>csv-top</Value></String>
+        <String><Key>Password</Key><Value ProtectInMemory="True">csv-pw-top</Value></String>
+      </Entry>
+      <Entry>
+        <UUID>$(uuid csvdoomed)</UUID>
+        <String><Key>Title</Key><Value>csv-doomed</Value></String>
+        <String><Key>Password</Key><Value ProtectInMemory="True">csv-pw-doomed</Value></String>
+      </Entry>
+      <Group>
+        <UUID>$(uuid csvwork)</UUID><Name>Work</Name>
+        <Group>
+          <UUID>$(uuid csvdev)</UUID><Name>Dev</Name>
+          <Entry>
+            <UUID>$(uuid csvsite)</UUID>
+            <IconID>12</IconID>
+            <Times><CreationTime>2023-04-05T06:07:08Z</CreationTime><LastModificationTime>2024-05-06T07:08:09Z</LastModificationTime></Times>
+            <String><Key>Title</Key><Value>csv-site</Value></String>
+            <String><Key>UserName</Key><Value>csv-user</Value></String>
+            <String><Key>Password</Key><Value ProtectInMemory="True">csv-pw-site</Value></String>
+            <String><Key>URL</Key><Value>https://csv.import.example</Value></String>
+            <String><Key>Notes</Key><Value>csv-notes</Value></String>
+            <String><Key>otp</Key><Value ProtectInMemory="True">otpauth://totp/csv-site:csv-user?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&amp;period=30&amp;digits=8</Value></String>
+          </Entry>
+        </Group>
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>
+EOF
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/csv-seed.xml")" "$(native "$csv_src")" \
+  || die "keepassxc-cli could not import the CSV seed XML"
+kx rm "$csv_src" csv-doomed >/dev/null || die "keepassxc-cli could not recycle csv-doomed"
+kx export "$csv_src" -f csv >"$dir/keepassxc.csv" || die "keepassxc-cli could not export the vault as CSV"
+grep -qF '"Root/Recycle Bin","csv-doomed",' "$dir/keepassxc.csv" \
+  || die "KeePassXC's CSV does not hold csv-doomed in its recycle bin: $(cat "$dir/keepassxc.csv")"
+
+# The row of a KeePassXC CSV export, on stdin, whose Title is $1, without its Group column.
+row_of() { grep -F ",\"$1\"," | sed 's/^"[^"]*",//'; }
+# A row without its Icon column, the seventh once the Group column is gone.
+sans_icon() { awk 'BEGIN { FS = OFS = "\",\"" } { $7 = ""; print }'; }
+
+grep -qF '"Root/Work/Dev","csv-site",' "$dir/keepassxc.csv" \
+  || die "KeePassXC's CSV does not put csv-site in Root/Work/Dev: $(cat "$dir/keepassxc.csv")"
+exported_site=$(row_of csv-site <"$dir/keepassxc.csv") || die "KeePassXC's CSV holds no csv-site"
+case "$exported_site" in
+  *'"otpauth://totp/'*'"12","2024-05-06T07:08:09Z","2023-04-05T06:07:08Z"') ;;
+  *) die "KeePassXC's CSV does not hold the TOTP, icon and times the seed gave csv-site: ${exported_site}" ;;
+esac
+
+said=$(printf '%s\n' "$pw" | "$kp" import "$dir/keepassxc.csv" --vault "$target" --into kpxc-csv 2>&1) \
+  || die "keypaste import of the KeePassXC CSV failed: ${said}"
+{ grep -qF 'KeePassXC CSV' <<<"$said" && grep -qF '2 items' <<<"$said" && grep -qF 'copied into kpxc-csv' <<<"$said"; } \
+  || die "the CSV import did not report the copy: ${said}"
+grep -qF 'Work/Dev/csv-site: icon' <<<"$said" || die "the CSV import did not name the icon as not imported: ${said}"
+grep -qF 'item Recycle Bin/csv-doomed' <<<"$said" || die "the CSV import did not name the recycled item as not imported: ${said}"
+
+tree=$(kx ls "$target" -R -f) || die "KeePassXC cannot open the target after the CSV import"
+grep -qx 'kpxc-csv/csv-top' <<<"$tree" || die "KeePassXC does not see csv-top in the import's group. Its tree: ${tree}"
+grep -qx 'kpxc-csv/Work/Dev/csv-site' <<<"$tree" || die "KeePassXC does not see kpxc-csv/Work/Dev/csv-site. Its tree: ${tree}"
+grep -q '^kpxc-csv/Root' <<<"$tree" && die "the CSV's root group was copied as a group. Its tree: ${tree}"
+grep -q 'csv-doomed' <<<"$tree" && die "the CSV's recycled item was copied. Its tree: ${tree}"
+
+kx export "$target" -f csv >"$dir/copied.csv" || die "keepassxc-cli could not export the target as CSV"
+for title in csv-top csv-site; do
+  exported=$(row_of "$title" <"$dir/keepassxc.csv") || die "KeePassXC's CSV holds no ${title}"
+  copied=$(row_of "$title" <"$dir/copied.csv") || die "KeePassXC's CSV export of the target holds no ${title}"
+  [ "$(sans_icon <<<"$copied")" = "$(sans_icon <<<"$exported")" ] \
+    || die "KeePassXC reads ${title} back as ${copied} where its export held ${exported}"
+  printf '    %s: KeePassXC reads back the row it exported\n' "$title"
+done
+copied_site=$(row_of csv-site <"$dir/copied.csv")
+case "$copied_site" in
+  *'"0","2024-05-06T07:08:09Z","2023-04-05T06:07:08Z"') ;;
+  *) die "the copied csv-site does not hold the default icon and the export's times: ${copied_site}" ;;
+esac
+
 step "the source file was never written"
 [ "$(bytes "$src")" = "$source_hash" ] || die "keypaste import changed the source file"
 kx ls "$src" -R -f | grep -qx 'Banking/checking' || die "KeePassXC no longer reads the source"
@@ -231,6 +325,8 @@ step "NEGATIVE CONTROL: the comparisons must be able to fail"
 if [ "$attribute" = 'import-attribute-value-CORRUPTED' ]; then
   die "a deliberately corrupted expectation still matched — this gate is not gating"
 fi
+[ "$(sans_icon <<<"$copied_site")" = "$(sans_icon <<<"${copied_site/csv-user/csv-userX}")" ] \
+  && die "the CSV row comparison cannot see a changed field"
 printf 'x' >>"$dir/statement.out"
 cmp -s "$dir/statement.bin" "$dir/statement.out" && die "the attachment comparison cannot see a changed byte"
 
