@@ -2684,12 +2684,16 @@ internal sealed class KeePassInterop : IDisposable
     // KeePassXC's merge keeps one version of an entry per whole second, so each edit takes a later second than every version it keeps (D-0387).
     private static void MarkEdited(PwEntry entry)
     {
-        long second = entry.History
-            .Select(revision => revision.LastModificationTime)
-            .Append(entry.LastModificationTime)
-            .Max().Ticks / TimeSpan.TicksPerSecond;
+        DateTime previous = entry.LastModificationTime;
 
         entry.Touch(true);
+        StampAfter(entry, entry.History.Select(revision => revision.LastModificationTime).Append(previous));
+    }
+
+    /// <summary>Moves an entry's modification time to the second after the latest of <paramref name="times"/>, unless it is already later.</summary>
+    private static void StampAfter(PwEntry entry, IEnumerable<DateTime> times)
+    {
+        long second = times.Max().Ticks / TimeSpan.TicksPerSecond;
 
         if (entry.LastModificationTime.Ticks / TimeSpan.TicksPerSecond <= second
             && second < DateTime.MaxValue.Ticks / TimeSpan.TicksPerSecond)
@@ -4066,6 +4070,89 @@ internal sealed class KeePassInterop : IDisposable
             {
                 Name(child, ChildPath(path, child.Name), names);
             }
+        }
+    }
+
+    /// <summary>Adds the items an export import built, every one whole before any joins the vault, in groups made as a copy makes them.</summary>
+    /// <param name="entries">The items, every name already checked.</param>
+    /// <returns>The name of every item added.</returns>
+    /// <remarks>
+    /// Each takes a new UUID. Its earlier versions are its history, oldest first, with its UUID and their own times, and it
+    /// is stamped a later second than every one (D-0387). Attachments are copied, protected in memory, from the export's bytes.
+    /// </remarks>
+    internal IReadOnlyList<EntryName> AddImported(IReadOnlyList<ImportedEntry> entries)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<(string GroupPath, PwEntry Entry)> built = [];
+
+        foreach (ImportedEntry imported in entries)
+        {
+            PwEntry entry = new(true, true);
+            SetStandardFields(entry, imported.Name.Title, imported.Username, imported.Password, imported.Url, imported.Notes);
+
+            foreach (FieldWrite field in imported.Fields)
+            {
+                entry.Strings.Set(field.Name, new ProtectedString(field.Protect ?? true, field.Value!));
+            }
+
+            foreach (string tag in imported.Tags)
+            {
+                entry.AddTag(tag);
+            }
+
+            foreach (ExportAttachment attachment in imported.Attachments)
+            {
+                entry.Binaries.Set(attachment.Name, new ProtectedBinary(true, attachment.Bytes));
+            }
+
+            if (imported.Created is { } created)
+            {
+                entry.CreationTime = created.UtcDateTime;
+            }
+
+            foreach (ExportVersion version in imported.History.OrderBy(version => version.Modified))
+            {
+                PwEntry revision = new(false, false) { Uuid = entry.Uuid, CreationTime = entry.CreationTime };
+                SetStandardFields(revision, imported.Name.Title, version.Username, version.Password, version.Url, version.Notes);
+                revision.LastModificationTime = version.Modified.UtcDateTime;
+                revision.LastAccessTime = version.Modified.UtcDateTime;
+                entry.History.Add(revision);
+            }
+
+            if (imported.Modified is { } modified)
+            {
+                entry.LastModificationTime = modified.UtcDateTime;
+                entry.LastAccessTime = modified.UtcDateTime;
+
+                if (entry.History.UCount > 0)
+                {
+                    StampAfter(entry, entry.History.Select(revision => revision.LastModificationTime));
+                }
+            }
+            else
+            {
+                MarkEdited(entry);
+            }
+
+            built.Add((imported.Name.GroupPath, entry));
+        }
+
+        foreach (var (groupPath, entry) in built)
+        {
+            EnsureImportGroup(groupPath).AddEntry(entry, true);
+        }
+
+        _database.Modified = true;
+        return [.. entries.Select(imported => imported.Name)];
+
+        static void SetStandardFields(PwEntry entry, string title, string username, string password, string url, string notes)
+        {
+            SetField(entry, PwDefs.TitleField, title);
+            SetField(entry, PwDefs.UserNameField, username);
+            SetField(entry, PwDefs.PasswordField, password);
+            SetField(entry, PwDefs.UrlField, url);
+            SetField(entry, PwDefs.NotesField, notes);
         }
     }
 

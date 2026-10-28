@@ -3,6 +3,7 @@ using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Import;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Processes;
 
@@ -66,6 +67,9 @@ internal sealed class CliContext
 
     /// <summary>The AppImage this <c>keypaste</c> runs from, whose link <c>setup</c> registers instead; null outside one.</summary>
     internal Func<McpAppImage?> AppImage { get; init; } = () => null;
+
+    /// <summary>The readers <c>import</c> asks about a file that is not a KeePass database.</summary>
+    internal IReadOnlyList<IExportReader> ExportReaders { get; init; } = ExportImport.Readers;
 
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>

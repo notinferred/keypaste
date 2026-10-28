@@ -2035,6 +2035,17 @@ public sealed class Vault : IDisposable
             copied.Count, _interop.ReadGroupPaths().Count - groupsBefore, copied.Count(shared.Contains), edit);
     }
 
+    /// <summary>Adds the items an export import built, each whole, in one change with no history item of their own. Call <see cref="Save"/> to persist them.</summary>
+    /// <param name="entries">The items; <see cref="ExportSource.Plan"/> has checked every name.</param>
+    /// <returns>The name of every item added.</returns>
+    internal IReadOnlyList<EntryName> AddImported(IReadOnlyList<ImportedEntry> entries)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        return Change(() => _interop.AddImported(entries), names => VaultEdit.Of(names));
+    }
+
     /// <summary>Sets an entry's expiry. A test seam; KeePassXC is what writes expiry.</summary>
     internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires) =>
         Change(() => _interop.SetExpiryUnchecked(name, expires), VaultEdit.Of(name));

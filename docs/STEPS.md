@@ -165,10 +165,18 @@ Each row keeps its historical meaning and is expanded when selected. Designs the
 - [ ] **1.4b5 — Keep a revoked token revoked through any merge.** Needs: 1.4b1.
   - Revoking writes the newer revoked version and purges it once the token has expired, a tombstoned UUID reads as revoked, and the merge applies the token rule (D-0544).
   - Accepted when `TokenStoreTests` cover a merge in either direction and a KeePassXC merge of an older copy; G8 passes in `verify-keepassxc-merge.sh` once an owner merges (1.4b3 or 1.4b4): a token is revoked, KeePassXC merges in a copy still holding it, and after keypaste's merge `keypaste run --token` is refused and recorded; and T-32 states what remains.
-- [ ] **9.1a — Define a loss-aware import pipeline.** Needs: V.7a.
-  - One import contract, with preview, collision decisions and atomic commit, so nothing is dropped silently.
-  - Its adapters, each Needs 9.1a: 9.1b (Bitwarden JSON), 9.1c (LastPass CSV), 9.1d1 (1Password 1PUX), 9.1d2 (1Password CSV) and 9.1e (KeePassXC CSV).
-  - 9.1f guides import in the desktop.
+- [ ] **9.1b — Import Bitwarden JSON.** Needs: 9.1a.
+  - The supported Bitwarden export forms as one `IExportReader` of [9.1a](steps/9.1a.md)'s contract, registered in `ExportImport.Readers`. The first reader to ship also gives `keypaste import --help` its export lines and adds the CHANGELOG entry.
+- [ ] **9.1c — Import LastPass CSV.** Needs: 9.1a.
+  - The LastPass CSV reader, quoted multiline fields and folders included.
+- [ ] **9.1d1 — Import 1Password 1PUX.** Needs: 9.1a.
+  - The 1PUX reader, with the attachments it holds.
+- [ ] **9.1d2 — Import 1Password CSV.** Needs: 9.1a.
+  - The documented 1Password CSV subset.
+- [ ] **9.1e — Import KeePassXC CSV.** Needs: 9.1a.
+  - KeePassXC's CSV export as a reader.
+- [ ] **9.1f — Guide import in the desktop.** Needs: 9.1a.
+  - Choosing the file, the preview, each collision's decision and a report of what was imported and what was not, so a new user migrates without a terminal.
 - [ ] **P.4a1 — Resolve Auto-Type sequences in Core.** Needs: none.
   - `KeePassInterop` reads an item's `AutoType` `Enabled`, on when absent, `DataTransferObfuscation`, `DefaultSequence` and window associations, and a group's `EnableAutoType` and `DefaultAutoTypeSequence`; edits keep them as now. KeePassXC 2.8's rules decide: an item types only when its own setting is on, the nearest group that says on or off says on, and the walk up to the first group holding a sequence meets no group that says off; its sequence is its own, else the nearest group's, else `{USERNAME}{TAB}{PASSWORD}{ENTER}`, shortened to `{PASSWORD}{ENTER}` when the username is empty and `{USERNAME}{ENTER}` when the password is. Recycled items and keypaste's reserved groups are never offered, and an expired item types, marked expired.
   - A window pattern that starts and ends with `//`, four characters or more, is a regular expression searched in the title ignoring case, run by .NET's `Regex` under a match timeout; any other matches the whole title ignoring case, `*` matching any run of characters. Placeholders in a pattern fill in first under D-0465. A pattern that cannot be filled, does not compile or times out matches nothing, and the chooser names its item.

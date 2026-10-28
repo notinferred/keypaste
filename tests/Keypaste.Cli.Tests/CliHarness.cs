@@ -7,6 +7,7 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Import;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Processes;
 
@@ -71,6 +72,9 @@ internal sealed class CliHarness : IDisposable
     /// <summary>Whether stdout is to be taken for a terminal; by default it is redirected.</summary>
     internal bool StdoutIsTerminal { get; set; }
 
+    /// <summary>The readers <c>import</c> asks about a file that is not a KeePass database; by default the shipped ones.</summary>
+    internal IReadOnlyList<IExportReader> ExportReaders { get; set; } = ExportImport.Readers;
+
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
@@ -91,6 +95,7 @@ internal sealed class CliHarness : IDisposable
         ProcessPath = ProcessPath ?? Path.Combine(Directory, McpServerLocator.ExecutableName),
         AppImage = () => AppImage,
         StdoutIsTerminal = StdoutIsTerminal,
+        ExportReaders = ExportReaders,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>

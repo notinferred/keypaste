@@ -19,6 +19,10 @@ namespace Keypaste.Cli.Commands;
 /// an agent holds is refused before anybody types, and is saved only when no row is blocked. A dry
 /// run saves nothing and takes no claim.
 /// </para>
+/// <para>
+/// A file that is no KeePass database goes to <see cref="ImportFromExport"/> when a reader recognizes it as
+/// another password manager's export.
+/// </para>
 /// </remarks>
 internal static class ImportCommand
 {
@@ -32,6 +36,7 @@ internal static class ImportCommand
         new("dry-run", TakesValue: false),
         new("in-place", TakesValue: false),
         new("source-keyfile", TakesValue: true),
+        new(ImportFromExport.SkipExistingOption, TakesValue: false),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -75,8 +80,19 @@ internal static class ImportCommand
 
         if (!KdbxImport.TryProbe(source, out var probe, out var probeError))
         {
+            if (ImportFromExport.Execute(source, line, hasTarget ? target : null, into, context) is { } exported)
+            {
+                return exported;
+            }
+
             context.Stderr.WriteLine($"keypaste import: {probeError}");
             return CliApp.ExitInternalError;
+        }
+
+        if (line.HasFlag(ImportFromExport.SkipExistingOption))
+        {
+            context.Stderr.WriteLine("keypaste import: --skip-existing is for another password manager's export; a KeePass file's items are all copied");
+            return CliApp.ExitUsageError;
         }
 
         if (!TrySourceKeyfile(line, probe, context, out var keyfile))

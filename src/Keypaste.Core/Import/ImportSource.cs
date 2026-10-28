@@ -79,7 +79,7 @@ public sealed class ImportSource : IDisposable
         ArgumentNullException.ThrowIfNull(target);
 
         var groups = target.ReadGroupPaths(includeReserved: true).ToHashSet(StringComparer.Ordinal);
-        var intoGroup = into ?? DefaultInto(groups);
+        var intoGroup = into ?? DefaultInto(Probe.FileName, groups);
         List<ImportRow> rows = [];
 
         foreach (var (unit, index) in _units.Select((unit, index) => (unit, index)))
@@ -323,9 +323,10 @@ public sealed class ImportSource : IDisposable
 
     private static int Raw(ImportNode node) => node.Titles.Count + node.Children.Sum(Raw);
 
-    private string DefaultInto(HashSet<string> groups)
+    /// <summary>The group a whole import collects under by default: the file's name, made a group name, with <c> (2)</c>, <c> (3)</c> … while taken.</summary>
+    internal static string DefaultInto(string fileName, IReadOnlySet<string> groups)
     {
-        var stem = Path.GetFileNameWithoutExtension(Probe.FileName).TrimStart('.');
+        var stem = Path.GetFileNameWithoutExtension(fileName).TrimStart('.');
         var name = new string([.. stem.Select(c => c is '/' or '\\' || char.IsControl(c) ? '-' : c)]).Trim();
         if (!VaultNameRules.IsValidGroupName(name, out _))
         {
@@ -347,7 +348,8 @@ public sealed class ImportSource : IDisposable
             || ReservedGroups.IsReserved(group);
     }
 
-    private static string? RefuseDestination(string destination, Dictionary<string, int> groupCounts)
+    /// <summary>Why nothing may be imported into a group path, or null: empty, keypaste's own, a name keypaste refuses, the recycle bin's name, or a prefix naming two groups.</summary>
+    internal static string? RefuseDestination(string destination, IReadOnlyDictionary<string, int> groupCounts)
     {
         if (destination.Length == 0)
         {
