@@ -1,4 +1,4 @@
-// keypaste.com's server-side code: the signup form's one INSERT, and share links in share.js.
+// keypaste.com's server-side code: the signup form's one INSERT, share links in share.js and crash reports in crash.js.
 //
 // Static assets win by default, so this Worker is reached for /subscribe, /api/* and /s/* (declared
 // in wrangler.jsonc under assets.run_worker_first) and for nothing else that exists on disk.
@@ -12,6 +12,7 @@
 // The role behind it can INSERT into one table and cannot SELECT from it, so nothing reachable from
 // here can read the list back. See DECISIONS.md D-0036 and site/README.md.
 import postgres from "postgres";
+import { handleCrash, isCrashRoute, sweepCrashes } from "./crash.js";
 import { handleShare, isShareRoute, readCapped, sweepShares } from "./share.js";
 
 const ORIGINS = new Set(["https://keypaste.com", "https://www.keypaste.com"]);
@@ -23,6 +24,10 @@ export default {
 
     if (isShareRoute(url.pathname)) {
       return handleShare(request, env, ctx);
+    }
+
+    if (isCrashRoute(url.pathname)) {
+      return handleCrash(request, env);
     }
 
     if (url.pathname !== "/subscribe") {
@@ -50,6 +55,7 @@ export default {
 
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(sweepShares(env, ctx));
+    ctx.waitUntil(sweepCrashes(env));
   },
 };
 

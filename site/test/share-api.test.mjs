@@ -290,9 +290,9 @@ test("the sweep deletes expired shares", async () => {
   const { id } = await (await create()).json();
   memory.get(id).expires_at = Date.now() - 1;
 
-  let pending;
-  await worker.scheduled({}, enabled, { waitUntil: (promise) => (pending = promise) });
-  await pending;
+  const pending = [];
+  await worker.scheduled({}, enabled, { waitUntil: (promise) => pending.push(promise) });
+  await Promise.all(pending);
 
   assert.equal(memory.has(id), false);
 });

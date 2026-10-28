@@ -313,7 +313,7 @@ profile_workflows() {
     scripts/verify.sh scripts/verify-clipboard-markers.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh scripts/exercise-desktop-acts.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh scripts/build-argon2.sh \
-    scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh \
+    scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh scripts/crash-reports.sh \
     scripts/lib/*.sh packaging/macos/keypaste-launch.command
 }
 

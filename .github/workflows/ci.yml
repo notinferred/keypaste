@@ -35,7 +35,6 @@ on:
       - '.claude/**'
       - 'site/README.md'
       - 'site/schema.sql'
-      - 'site/test/*.mjs'
       - 'site/public/_headers'
       - 'site/public/brand.css'
       - 'site/public/favicon.svg'
@@ -110,6 +109,15 @@ jobs:
       - name: Verify the release destination check fails closed against the real aws CLI
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
+
+      # The share and crash routes against stand-ins for their databases, offline (D-0589).
+      - name: Run the site's node tests
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          npm ci --prefix site --omit=dev --ignore-scripts --no-audit --no-fund
+          npm test --prefix site
 
       # Packed and checked only; nothing uploads or publishes the bundle (G.6b).
       - name: Pack and check the Claude Desktop extension

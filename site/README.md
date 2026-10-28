@@ -1,6 +1,6 @@
 # keypaste.com
 
-keypaste.com is a static home page, the content pages, one form endpoint and the share-link routes. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` holds the home and thanks pages, the share viewer, the fonts and `brand.css`; `web/` is the Astro and Starlight project whose Markdown pages build into `dist/` together with an unchanged copy of `public/` ([Content pages](#content-pages), D-0402). `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages. The content pages run Starlight's scripts and draw their diagrams in the browser, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
+keypaste.com is a static home page, the content pages, one form endpoint, the share-link routes and a crash-report route that stays off until H-0028. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` holds the home and thanks pages, the share viewer, the fonts and `brand.css`; `web/` is the Astro and Starlight project whose Markdown pages build into `dist/` together with an unchanged copy of `public/` ([Content pages](#content-pages), D-0402). `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js` and `/api/crash` to `src/crash.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages. The content pages run Starlight's scripts and draw their diagrams in the browser, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
 
 Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The product is local first. A free cloud vault keypaste cannot read, team projects over an end-to-end relay and server access a team project chooses are planned for after the first desktop release ([ROADMAP](../ROADMAP.md)).
 
@@ -117,7 +117,7 @@ Use an environment variable for a local connection string, keeping credentials o
 CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://..." npx wrangler dev
 ```
 
-[verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh) checks honeypot redirection, invalid-form refusals, origin and size limits, route behavior and the absence of scripts. These cases complete before opening the database connection and can run after deployment.
+[verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh) checks honeypot redirection, invalid-form refusals, origin and size limits, route behavior, the absence of scripts and the crash route's refusals, or its 503 while it is off. These cases complete before opening a database connection and can run after deployment.
 
 Use a dedicated test address for checks that write rows. Verify valid submissions and duplicate suppression, restricted insert-only grants, CA and SSL settings, browser operation with JavaScript disabled, and absence of analytics or third-party assets. Reading the inserted row requires a separate authorized database role; the Worker role cannot verify it.
 
@@ -157,10 +157,73 @@ npx wrangler dev --config .wrangler/wrangler.json --ip 127.0.0.1 --port 8787 --l
 
 The share routes use `SHARE_DB` whenever it is bound, so the memory store is reached only without it, and only for `localhost` and `127.0.0.1`; `--local-upstream` keeps the request URL on `127.0.0.1` instead of the routed `keypaste.com`. [verify-keepassxc-fields.sh](../scripts/verify-keepassxc-fields.sh) runs the Worker this way in CI. With a local Postgres, run `npx wrangler dev` on `wrangler.jsonc` itself, with `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_SHARE_DB` and `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` set.
 
-`npm test` runs the share API and cryptography tests on Node 20 or later; `test/share-vector.json` holds vectors the .NET core sealed, which the viewer's code must open.
+`npm test` runs the share and crash route tests and the share cryptography tests on Node 22.13 or later, which the crash tests' stand-in for D1 needs for `node:sqlite`, and ci's checks job runs them (D-0589). `test/share-vector.json` holds vectors the .NET core sealed, which the viewer's code must open.
+
+## Crash reports
+
+`src/crash.js` takes the desktop app's crash reports at `POST /api/crash`, one report a request, and nothing on the site reads them back (D-0586). A report is taken only when its bytes are exactly what `CrashScrubber` writes (D-0558): the same fields in the same order, compact, and every value inside the scrubber's grammar, so an exception message, a path or any field the app does not write is refused. `test/crash-vector.json` holds reports the .NET core wrote, which the route must take.
+
+| Answer | When |
+|---|---|
+| 204 | The report is stored, or added to its row |
+| 400 | The body is not JSON, is not byte for byte a report the scrubber writes, or could pass 16 KiB with a merged count |
+| 403 | An `Origin` other than keypaste.com's; the app sends none |
+| 405 | A method other than `POST` |
+| 413 | A body over 16 KiB |
+| 429 | More than 10 reports a minute from one address, counted by the `CRASH_LIMIT` binding, with `retry-after: 60` |
+| 503 | The route is off, with `retry-after: 86400`; 200 new rows were already made today, with a `retry-after` until midnight UTC; or D1 failed |
+
+The app takes a report off its outbox on 204, 400 and 413, and keeps it otherwise (D-0560).
+
+D1 holds the reports in one table, made by `crash-schema.sql` (D-0587). A row is one failure on one version, OS and architecture: `fingerprint` is the SHA-256 of the report's kind, catch site, exception type and first eight frames' names, `report` is the first such report exactly as it was sent, `failures` adds up every such report's count, and `first_seen_on` and `last_seen_on` are the Worker's UTC dates of the first and the latest. A repeat always adds to its row, and at most 200 new rows are made a day. No address, header or time of day is stored. The cron deletes a row 90 days after it was last seen, and D1's Time Travel can restore a deleted row for up to 30 days on the paid plan and 7 on the free one. Workers invocation logs are off for the whole Worker, so Workers Logs keeps no record of each request to this route, the share routes or `/subscribe`; the Worker's own console lines are still kept, and they name an error, never a report, a share or an address.
+
+The route answers 503 until `wrangler.jsonc` binds `CRASH_DB` and sets `CRASH_ENABLED` to `"1"` (D-0588). Neither is there before H-0028 makes the database: Wrangler 4.45 and later creates a D1 database on deploy for a binding with no `database_id`, and Cloudflare's documentation does not say what a binding to a missing database does, so the binding arrives in the same commit as its database's ID.
+
+### Switching crash reports on (H-0028)
+
+Run these from `site/` after `npm ci`, signed in to keypaste's Cloudflare account with `npx wrangler login`.
+
+1. Create the database in Cloudflare's default location, with no `--location` or `--jurisdiction`, so it is not held in the EU (D-0588); neither can change later. If Wrangler offers to add a binding, decline: step 2 adds it under the name the Worker reads.
+
+   ```sh
+   npx wrangler d1 create keypaste-crash
+   ```
+
+2. In `wrangler.jsonc`, add the binding with the `database_id` the command printed, add `CRASH_ENABLED` to `vars`, and remove the comment above `vars` that says crash reports stay off:
+
+   ```jsonc
+   "d1_databases": [
+     { "binding": "CRASH_DB", "database_name": "keypaste-crash", "database_id": "<database_id>" }
+   ],
+   "vars": {
+     "SHARE_ENABLED": "1",
+     "CRASH_ENABLED": "1"
+   },
+   ```
+
+3. Apply the schema, then list what it made, which is `crash`, `crash_first_seen_on` and `crash_last_seen_on`:
+
+   ```sh
+   npx wrangler d1 execute keypaste-crash --remote --file crash-schema.sql
+   npx wrangler d1 execute keypaste-crash --remote --command "select name from sqlite_schema where name like 'crash%' order by name"
+   ```
+
+4. Commit `wrangler.jsonc`, with this section saying when the route was switched on, and integrate it on `main`; Cloudflare's Git integration deploys it.
+
+5. After the deploy, run `../scripts/verify-site-endpoint.sh`, which reads `CRASH_ENABLED` from `wrangler.jsonc` and so now expects the 400, 403, 405 and 413 refusals. Then send one probe report under a version no build has, read it back and delete it. The POST prints `204`, and the select shows one row whose `report` is the probe.
+
+   ```sh
+   probe="$(jq -c '.cases[2].report | fromjson | .version = "0.0.0-probe"' test/crash-vector.json)"
+   curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://keypaste.com/api/crash \
+     -H 'content-type: application/json' --data-raw "$probe"
+   npx wrangler d1 execute keypaste-crash --remote --command "select * from crash where version = '0.0.0-probe'"
+   npx wrangler d1 execute keypaste-crash --remote --command "delete from crash where version = '0.0.0-probe'"
+   ```
+
+[crash-reports.sh](../scripts/crash-reports.sh) reads the reports through the same pinned Wrangler, after `npm ci` here and `npx wrangler login`, and only selects. With no argument it groups the rows last seen in 90 days by fingerprint, the most frequent first, with their versions, platforms, kind, catch site, exception type and top frame; `--days N` and `--version V` narrow that, and `--show <fingerprint>` prints that failure's rows with each first report.
 
 ## Unimplemented features
 
 The handler stores signup requests without sending confirmation mail; existing rows are unconfirmed. Double opt-in and list verification are optional work in [BACKLOG](../docs/BACKLOG.md), not prerequisites for the local desktop release. No mail may be sent to the list before the promised consent flow exists and each recipient has confirmed.
 
-The signup handler has no rate limiter. Verify an applicable Cloudflare rule before relying on one; it has honeypot, body, content-type and origin checks. The share routes use the `SHARE_CREATE_LIMIT` and `SHARE_OPEN_LIMIT` rate-limiting bindings. Turnstile and managed challenges are absent because they introduce scripts. The site has no automated database-verification job.
+The signup handler has no rate limiter. Verify an applicable Cloudflare rule before relying on one; it has honeypot, body, content-type and origin checks. The share routes use the `SHARE_CREATE_LIMIT` and `SHARE_OPEN_LIMIT` rate-limiting bindings, and the crash route uses `CRASH_LIMIT`. Turnstile and managed challenges are absent because they introduce scripts. The site has no automated database-verification job.

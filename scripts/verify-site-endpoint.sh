@@ -14,16 +14,24 @@
 # the separate by-hand list in site/README.md and must never be added here - this one is meant to be
 # safe to repeat, and a check that quietly accumulates rows in a production table is not.
 #
+# /api/crash follows the same rule: no request below is a report the route would store, so each is refused before D1 is
+# touched. Whether the route should be on is read from site/wrangler.jsonc, which sets CRASH_ENABLED only once H-0028
+# has made the database: off, it must answer 503; on, it must refuse what is not a report.
+#
 # What it deliberately does NOT cover, and what stays by hand:
 #   - a valid address is stored          writes a row, and the role cannot SELECT it back
 #   - the same address twice adds one    same
 #   - the database role's grants         needs an admin credential this job must never hold
+#   - a crash report is stored           writes a row; site/README.md's H-0028 probe sends one and deletes it
 #
 # Usage:  scripts/verify-site-endpoint.sh [base-url]      (default: https://keypaste.com)
 set -euo pipefail
 
 readonly BASE="${1:-https://keypaste.com}"
 readonly SUBSCRIBE="$BASE/subscribe"
+readonly CRASH="$BASE/api/crash"
+WRANGLER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/site/wrangler.jsonc"
+readonly WRANGLER
 
 failures=0
 
@@ -35,11 +43,12 @@ pass() { echo "  ok   $*"; }
 # because an error page is HTML with newlines in it and a `%{http_code}` suffix on that is a parsing
 # problem nobody needs.
 body="$(mktemp)"
-trap 'rm -f "$body"' EXIT
+headers="$(mktemp)"
+trap 'rm -f "$body" "$headers"' EXIT
 
 request() {
   local method="$1" url="$2"; shift 2
-  curl -sS -o "$body" -w '%{http_code}' -X "$method" --max-time 30 "$@" "$url" 2>/dev/null || echo 000
+  curl -sS -o "$body" -D "$headers" -w '%{http_code}' -X "$method" --max-time 30 "$@" "$url" 2>/dev/null || echo 000
 }
 
 # Expects a status, and the beginning of what the page should say. The reason text is asserted and
@@ -112,8 +121,36 @@ expect "a filled honeypot is thanked and not stored" 303 "" \
   "$(request POST "$SUBSCRIBE" -H 'content-type: application/x-www-form-urlencoded' \
        --data-raw 'website=a-bot-filled-this&email=honeypot@example.com')"
 
+# --- /api/crash. Nothing below is a report the route takes, so nothing is stored. ---
+
+[ -f "$WRANGLER" ] || die "no $WRANGLER to say whether /api/crash should be on"
+if grep -qE '"CRASH_ENABLED": *"1"' "$WRANGLER"; then
+  expect "a crash report that is not one is refused" 400 "the body is not a report keypaste writes" \
+    "$(request POST "$CRASH" -H 'content-type: application/json' --data-raw '{"schema":1}')"
+
+  expect "a crash report that is not JSON is refused" 400 "the body must be JSON" \
+    "$(request POST "$CRASH" -H 'content-type: text/plain' --data-raw '{}')"
+
+  expect "a crash report from another origin is refused" 403 "forbidden" \
+    "$(request POST "$CRASH" -H 'origin: https://not-keypaste.example' -H 'content-type: application/json' --data-raw '{}')"
+
+  expect "an oversized crash report is refused" 413 "too large" \
+    "$(request POST "$CRASH" -H 'content-type: application/json' --data-raw "$(head -c 17000 /dev/zero | tr '\0' x)")"
+
+  expect "GET /api/crash is refused" 405 "only POST is answered" "$(request GET "$CRASH")"
+else
+  expect "the crash route is switched off" 503 "crash reports are not being taken" \
+    "$(request POST "$CRASH" -H 'content-type: application/json' --data-raw '{}')"
+
+  if grep -qi '^retry-after: 86400' "$headers"; then
+    pass "the switched-off crash route asks for a day before the next report"
+  else
+    fail "the switched-off crash route does not answer retry-after: 86400"
+  fi
+fi
+
 if [ "$failures" -ne 0 ]; then
   die "$BASE answered $failures check(s) wrongly"
 fi
 
-echo "ok: $BASE refuses every submission it should, and stores nothing on the way"
+echo "ok: $BASE refuses every submission and crash report it should, and stores nothing on the way"
