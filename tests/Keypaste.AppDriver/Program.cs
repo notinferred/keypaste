@@ -7,6 +7,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.AutoType;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Recent;
@@ -54,6 +55,11 @@ namespace Keypaste.AppDriver;
 /// </para>
 /// <para>
 /// <c>launch</c> starts the app itself through <c>keypaste-app</c>'s own start, as <see cref="AppLaunch"/> says.
+/// </para>
+/// <para>
+/// <c>autotype</c> unlocks as the unlock screen does and prints, for each item and window title, the sequence the
+/// unlocked session's Auto-Type plan would type and where it comes from, or why it types nothing; it types nothing
+/// and prints no value (P.4a1).
 /// </para>
 /// <para>
 /// <c>twofish-create</c> is no act of the app's: it writes the Twofish vault the workflows gate starts from, which
@@ -104,6 +110,8 @@ internal static class Program
         "       tag-restore <vault> <entry-path> <tag>\n" +
         "       tags-dismiss <vault> <entry-path> <tag>\n" +
         "       tags-again <vault> <entry-path> <tag>\n" +
+        "       autotype <vault> <entry-path> <window-title> [<entry-path> <window-title>]...\n" +
+        "            (prints the sequence each item would type into a window of that title, typing nothing)\n" +
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt] [--terminal-bundle <keypaste.app>]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
@@ -185,6 +193,8 @@ internal static class Program
                 ["tag-restore", var vault, var entry, var tag] => await driver.RestoreLostTagAsync(vault, entry, tag).ConfigureAwait(true),
                 ["tags-dismiss", var vault, var entry, var tag] => await driver.DismissLostTagAsync(vault, entry, tag).ConfigureAwait(true),
                 ["tags-again", var vault, var entry, var tag] => await driver.ReviewLostTagAgainAsync(vault, entry, tag).ConfigureAwait(true),
+                ["autotype", var vault, .. var pairs] when pairs.Length > 0 && pairs.Length % 2 == 0 =>
+                    await driver.ReportAutoTypeAsync(vault, pairs).ConfigureAwait(true),
                 ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
                 ["twofish-create", var vault] => TwofishVault.Create(vault),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
@@ -277,6 +287,48 @@ internal sealed class Driver(string home)
         using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
         return await UnlockAsync(unlock, session, vault).ConfigureAwait(true) ?? Did("opened");
+    }
+
+    /// <summary>
+    /// Prints, a line for each item and window title, where the sequence Auto-Type would type comes from and the sequence
+    /// as the vault holds it, or why it types nothing, then a line for each window pattern that matched nothing.
+    /// </summary>
+    internal async Task<int> ReportAutoTypeAsync(string vault, string[] pairs)
+    {
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
+        using var unlock = Screen(session);
+
+        if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
+        {
+            return refused;
+        }
+
+        var unlocked = session.Unlocked ?? throw new DriverException("the session holds no vault once unlocked");
+
+        for (var i = 0; i < pairs.Length; i += 2)
+        {
+            var (entry, title) = (pairs[i], pairs[i + 1]);
+            using var plan = unlocked.PlanAutoType(EntryName.Parse(entry), title, TimeProvider.System)
+                ?? throw new DriverException($"Auto-Type offers no item '{entry}'");
+            var said = $"{entry} \"{title}\":";
+            var from = plan.Source switch
+            {
+                null => null,
+                AutoTypeSource.Association => $"association {plan.Association}",
+                var source => source.Value.ToString().ToLowerInvariant(),
+            };
+
+            Console.Out.WriteLine(from is null
+                ? $"{said} off: {plan.Refusal}"
+                : $"{said} {from}{(plan.Expired ? " expired" : string.Empty)} {plan.Sequence}{(plan.CanType ? string.Empty : $" refused: {plan.Refusal}")}");
+
+            foreach (var unmatched in plan.UnmatchedPatterns)
+            {
+                Console.Out.WriteLine($"{said} unmatched: {unmatched}");
+            }
+        }
+
+        return 0;
     }
 
     /// <summary>Prints the databases the first run offers from KeePassXC, one path a line, as the welcome lists them (N.2).</summary>

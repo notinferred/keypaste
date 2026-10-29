@@ -6,8 +6,10 @@
 # KeePassXC imports one KeePass XML document three times: behind a password, behind a password and
 # an XML keyfile, and behind the keyfile alone. The document carries what keypaste does not model —
 # meta, group and entry CustomData, unprotected and protected custom strings, KeePassXC's own otp,
-# tags, an auto-type association and a revision KeePassXC wrote — and KeePassXC then attaches a binary
-# and a text file.
+# tags, auto-type settings (a group's sequence, a group that turns it off, an item's sequence and window
+# associations, one a regular expression and one holding a placeholder) and a revision KeePassXC wrote —
+# and KeePassXC then attaches a binary and a text file. The app reports the sequence keypaste would type
+# for a set of window titles, typing nothing, when KeePassXC has made each vault and after the last save.
 # Each vault is AES-KDF and KDBX 4.0, as KeePassXC writes them.
 #
 # On each vault: open, edit, restore a revision, set and remove custom fields and tag and untag from
@@ -77,7 +79,8 @@ expect() {
   [ "$got" = "$want" ] || die "KeePassXC reads $field '$got' of '$entry', not '$want'"
 }
 
-markers=(kp94-meta-value kp94-group-value kp94-entry-value kp94-plain-value kp94-secret-value kp94-window kp94-tag KP7BOTPJBSWY3DPE)
+markers=(kp94-meta-value kp94-group-value kp94-entry-value kp94-plain-value kp94-secret-value kp94-window kp94-tag KP7BOTPJBSWY3DPE
+  kp4a1-group kp4a1-item kp4a1-regex kp4a1-placeholder kp4a1-title)
 
 # Whether KeePassXC still sees everything keypaste does not model, on the entry at $2.
 check_intact() {
@@ -89,6 +92,8 @@ check_intact() {
   for marker in "${markers[@]}"; do
     grep -qF "$marker" "$xml.current" || { echo "KeePassXC no longer finds $marker outside history in $db"; return 1; }
   done
+  grep -qi '>false<' <<<"$(awk '/<Name>review<\/Name>/{group=1} group && /<EnableAutoType>/{print; exit}' "$xml.current")" \
+    || { echo "KeePassXC no longer reads Auto-Type as off for the review group in $db"; return 1; }
   for name in blob.bin note.txt; do
     rm -f "$dir/attachment.out"
     kx attachment-export "$db" "$entry" "$name" "$(native "$dir/attachment.out")" >/dev/null 2>&1 \
@@ -132,6 +137,27 @@ refused() {
 
 did() { local what=$1; shift; "$@" >"$dir/did.out" 2>&1 || die "$what failed: $(cat "$dir/did.out")"; }
 
+# The sequence the app would type into each window, read from the settings KeePassXC imported, typing nothing (P.4a1).
+autotype_report() {
+  local db=$1 got want
+  want=$(cat <<'WANT'
+servers/database "kp94-window": association 1 {PASSWORD}{ENTER}
+servers/database "KP94-WINDOW": association 1 {PASSWORD}{ENTER}
+servers/database "kp4a1-regex 42": association 2 {USERNAME}{ENTER}
+servers/database "Sign in: database kp4a1-placeholder - Browser": association 3 {C:kp4a1-title}{PASSWORD}{ENTER}
+servers/database "another window": group {USERNAME}{TAB}{PASSWORD}{C:kp4a1-group}{ENTER}
+servers/cache "another window": item {C:kp4a1-item}{PASSWORD}{ENTER}
+review/plain "another window": off: Auto-Type is off for a group this item is in.
+archive/occupied "another window": default {PASSWORD}{ENTER}
+WANT
+  )
+  got=$(app autotype "$db" servers/database kp94-window servers/database KP94-WINDOW servers/database "kp4a1-regex 42" \
+    servers/database "Sign in: database kp4a1-placeholder - Browser" servers/database "another window" \
+    servers/cache "another window" review/plain "another window" archive/occupied "another window" 2>&1 | tr -d '\r') \
+    || die "the app's Auto-Type report failed: $got"
+  [ "$got" = "$want" ] || die "the app reports other sequences than KeePassXC's settings give: $got"
+}
+
 # The number of revisions KeePassXC holds for the entry with the UUID $2 in the vault $1.
 # The export goes to a file first: awk stops reading once it has counted, and under pipefail the
 # rest of a large export written into a closed pipe fails the gate (F.26).
@@ -173,6 +199,7 @@ cat >"$dir/seed.xml" <<EOF
       <UUID>$(uuid root)</UUID><Name>Root</Name>
       <Group>
         <UUID>$(uuid servers)</UUID><Name>servers</Name>
+        <DefaultAutoTypeSequence>{USERNAME}{TAB}{PASSWORD}{C:kp4a1-group}{ENTER}</DefaultAutoTypeSequence>
         <CustomData><Item><Key>kp94.group</Key><Value>kp94-group-value</Value></Item></CustomData>
         <Entry>
           <UUID>$(uuid database)</UUID>
@@ -187,6 +214,8 @@ cat >"$dir/seed.xml" <<EOF
           <String><Key>otp</Key><Value ProtectInMemory="True">otpauth://totp/kp94?secret=KP7BOTPJBSWY3DPE&amp;issuer=kp94</Value></String>
           <AutoType><Enabled>True</Enabled><DataTransferObfuscation>0</DataTransferObfuscation>
             <Association><Window>kp94-window</Window><KeystrokeSequence>{PASSWORD}{ENTER}</KeystrokeSequence></Association>
+            <Association><Window>//^kp4a1-regex [0-9]+//</Window><KeystrokeSequence>{USERNAME}{ENTER}</KeystrokeSequence></Association>
+            <Association><Window>*{TITLE} kp4a1-placeholder*</Window><KeystrokeSequence>{C:kp4a1-title}{PASSWORD}{ENTER}</KeystrokeSequence></Association>
           </AutoType>
           <CustomData><Item><Key>kp94.entry</Key><Value>kp94-entry-value</Value></Item></CustomData>
           <History>
@@ -201,6 +230,7 @@ cat >"$dir/seed.xml" <<EOF
           <UUID>$(uuid cache)</UUID>
           <String><Key>Title</Key><Value>cache</Value></String>
           <String><Key>Password</Key><Value ProtectInMemory="True">c-1</Value></String>
+          <AutoType><Enabled>True</Enabled><DataTransferObfuscation>0</DataTransferObfuscation><DefaultSequence>{C:kp4a1-item}{PASSWORD}{ENTER}</DefaultSequence></AutoType>
         </Entry>
       </Group>
       <Group>
@@ -219,7 +249,7 @@ cat >"$dir/seed.xml" <<EOF
         </Entry>
       </Group>
       <Group>
-        <UUID>$(uuid review)</UUID><Name>review</Name>
+        <UUID>$(uuid review)</UUID><Name>review</Name><EnableAutoType>false</EnableAutoType>
         <Entry>
           <UUID>$(uuid stripe)</UUID>
           <String><Key>Title</Key><Value>stripe</Value></String>
@@ -303,6 +333,10 @@ exercise() {
   [ "$(header "$db" | cut -c17-22)" = "000004" ] || die "KeePassXC did not make KDBX 4.0"
   cp "$db" "$original"
   intact "$db" servers/database
+
+  step "[$kind] auto-type: the app reports the sequence it would type into each window, typing nothing"
+  autotype_report "$db"
+  cmp -s "$db" "$original" || die "the app's Auto-Type report wrote to the vault"
 
   step "[$kind] open: the CLI lists it and the app unlocks it"
   listed=$(kp_cli "$db" ls | tr -d '\r') || die "keypaste ls cannot open the $kind vault"
@@ -538,6 +572,9 @@ exercise() {
   opens_only "$db"
   intact "$db" servers/database
   new_pw=
+
+  step "[$kind] auto-type: after keypaste's saves the app reports the same sequences"
+  autotype_report "$db"
 }
 
 # The vault opens with the current factors and not with the password or keyfile it had before.

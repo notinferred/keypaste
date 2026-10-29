@@ -39,6 +39,8 @@ These are retained feature ideas, not discarded features or promises for the fir
 | Upstream interoperability fixes | Contribute a reproducible format defect when one is found; keep required attribution and interoperability evidence. |
 | Attachment edits from a terminal while the app or `keypaste approve` holds the vault | `keypaste attachment add`, `replace` and `rm` are refused then (D-0535): D-0464's terminal edit carries at most 64 KiB, and the app's own screen edits attachments (V.8b). Reconsider when a person needs them from a terminal while the vault is unlocked; the request would carry up to 5 MiB of plaintext over the pipe and needs its own prompt and limit. |
 | A native Wayland backend for the Linux app | The app runs under X11 or XWayland, so a Wayland desktop without XWayland cannot start it; it stays so by founder decision 2026-10-22. Reconsider when Avalonia ships a stable Wayland backend. |
+| `{PICKCHARS}` in Auto-Type | A sequence holding it is refused (D-0604): KeePassXC types the characters a person picks from a field, and keypaste has no picker. Reconsider when a sign-in that asks for chosen characters of a password is named; the picker draws a secret's characters and needs its own drawing and refusal rules. |
+| Editing Auto-Type settings | keypaste reads the sequences, window associations and switches KeePass and KeePassXC write and writes none (D-0605). Reconsider when someone who sets up items in keypaste needs one; a new writer needs its own KeePassXC gate. |
 
 ## Investigation candidates
 

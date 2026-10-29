@@ -1,3 +1,4 @@
+using Keypaste.Core.AutoType;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 using Keypaste.Core.Infrastructure;
@@ -564,6 +565,49 @@ public sealed class Vault : IDisposable
         return _interop.ReadCustomFields(name, TotpSpec.IsSourceField) is { } fields
             ? TotpSpec.Read(fields, out refusal)
             : null;
+    }
+
+    /// <summary>
+    /// What an Auto-Type of one item into a window with this title would type, resolved whole from the vault as it is
+    /// now: the sequence KeePass's and KeePassXC's settings choose for the title, every field it names filled in as
+    /// D-0465 fills a value, or why it types nothing (D-0604 to D-0607).
+    /// </summary>
+    /// <param name="name">The item.</param>
+    /// <param name="windowTitle">The title of the window it would type into, as the platform reports it.</param>
+    /// <param name="clock">The clock, for whether the item has expired.</param>
+    /// <returns>
+    /// The plan, which the caller disposes when typing ends; null when no item answers to that name or the item is
+    /// in one of keypaste's own groups, which Auto-Type never offers. A recycled item answers to no name.
+    /// </returns>
+    /// <remarks>Nothing is typed here; only the person, in the unlocked app, types a plan (D-0547).</remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public AutoTypePlan? PlanAutoType(EntryName name, string windowTitle, TimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(windowTitle);
+        ArgumentNullException.ThrowIfNull(clock);
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (ReservedGroups.IsReserved(name.GroupPath) || _interop.ReadAutoType(name) is not { } settings)
+            {
+                return null;
+            }
+
+            var item = new AutoTypeItem(
+                field => _interop.HasField(name, field),
+                field => _interop.ReadStoredField(name, field),
+                value => Filled(value, () => _interop.ReadPlaceholderFields(name))!,
+                (out string? refusal) =>
+                {
+                    refusal = null;
+                    return _interop.ReadCustomFields(name, TotpSpec.IsSourceField) is { } fields ? TotpSpec.Read(fields, out refusal) : null;
+                });
+
+            return AutoTypePlan.Resolve(settings, windowTitle, clock.GetUtcNow(), item, WindowPattern.Timeout);
+        }
     }
 
     /// <summary>Whether the item may have a TOTP: a field one is read from holds anything, judged by length so no value is read.</summary>
@@ -2049,6 +2093,14 @@ public sealed class Vault : IDisposable
     /// <summary>Sets an entry's expiry. A test seam; KeePassXC is what writes expiry.</summary>
     internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires) =>
         Change(() => _interop.SetExpiryUnchecked(name, expires), VaultEdit.Of(name));
+
+    /// <summary>Sets an entry's Auto-Type settings. A test seam; keypaste writes none (D-0605), and KeePass and KeePassXC are what write them.</summary>
+    internal void SetAutoTypeUnchecked(EntryName name, bool enabled, bool obfuscated, string sequence, IReadOnlyList<(string Window, string Sequence)> associations) =>
+        Change(() => _interop.SetAutoTypeUnchecked(name, enabled, obfuscated, sequence, associations), VaultEdit.Of(name));
+
+    /// <summary>Sets a group's Auto-Type settings. A test seam; keypaste writes none (D-0605), and KeePass and KeePassXC are what write them.</summary>
+    internal void SetGroupAutoTypeUnchecked(string groupPath, bool? enabled, string sequence) =>
+        Change(() => _interop.SetGroupAutoTypeUnchecked(groupPath, enabled, sequence));
 
     /// <summary>Sets custom fields without <see cref="FieldNameRules"/>. A test seam; KeePassXC is what writes its own attributes, such as <c>otp</c>.</summary>
     internal void SetFieldsUnchecked(EntryName name, IReadOnlyList<FieldWrite> writes) =>

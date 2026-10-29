@@ -1076,6 +1076,68 @@ internal sealed class KeePassInterop : IDisposable
         return Locate(name) is { } found && Totp.TotpSpec.MayHold(field => found.Entry.Strings.Get(field) is { IsEmpty: false });
     }
 
+    /// <summary>
+    /// The Auto-Type settings of the one entry with this name and of each group above it, as KeePass 2 and KeePassXC
+    /// keep them, with whether its username and password hold anything, judged by length so no value is read; or null
+    /// when there is no such entry.
+    /// </summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal AutoType.AutoTypeSettings? ReadAutoType(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return null;
+        }
+
+        PwEntry entry = found.Entry;
+        List<AutoType.GroupAutoType> groups = [];
+
+        for (PwGroup? group = found.Group; group is not null; group = group.ParentGroup)
+        {
+            groups.Add(new AutoType.GroupAutoType(group.EnableAutoType, group.DefaultAutoTypeSequence));
+        }
+
+        return new AutoType.AutoTypeSettings(
+            entry.AutoType.Enabled,
+            entry.AutoType.ObfuscationOptions != KeePassLib.Collections.AutoTypeObfuscationOptions.None,
+            entry.AutoType.DefaultSequence,
+            [.. entry.AutoType.Associations.Select(association => new AutoType.AutoTypeAssociation(association.WindowName, association.Sequence))],
+            groups,
+            entry.Strings.Get(PwDefs.UserNameField) is { IsEmpty: false },
+            entry.Strings.Get(PwDefs.PasswordField) is { IsEmpty: false },
+            entry.Expires ? new DateTimeOffset(TimeUtil.ToUtc(entry.ExpiryTime, true)) : null);
+    }
+
+    /// <summary>Whether the one entry with this name has a field of this name, standard or custom, matched exactly.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal bool HasField(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found && (PwDefs.IsStandardField(field) || found.Entry.Strings.Exists(field));
+    }
+
+    /// <summary>
+    /// One field's stored value on the one entry with this name, standard or custom, matched exactly, and left protected in
+    /// the open database; a standard field the entry does not hold is empty. Null when there is no such entry or custom field.
+    /// </summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal string? ReadStoredField(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return null;
+        }
+
+        return found.Entry.Strings.Get(field) is { } value ? Uncached(value)
+            : PwDefs.IsStandardField(field) ? string.Empty
+            : null;
+    }
+
     /// <summary>A copy of the value that leaves it protected in the open database, where <see cref="ProtectedString.ReadString"/> would keep the plaintext for as long as the database stays open.</summary>
     private static string Uncached(ProtectedString value)
     {
@@ -1752,6 +1814,41 @@ internal sealed class KeePassInterop : IDisposable
 
         found.Entry.Expires = expires is not null;
         found.Entry.ExpiryTime = expires?.UtcDateTime ?? found.Entry.ExpiryTime;
+    }
+
+    /// <summary>Sets an entry's Auto-Type settings, which only KeePass and KeePassXC write, for a fixture to hold them.</summary>
+    internal void SetAutoTypeUnchecked(EntryName name, bool enabled, bool obfuscated, string sequence, IReadOnlyList<(string Window, string Sequence)> associations)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            throw new VaultException($"'{name.Title}' is not in this vault.");
+        }
+
+        var config = new KeePassLib.Collections.AutoTypeConfig
+        {
+            Enabled = enabled,
+            ObfuscationOptions = obfuscated ? KeePassLib.Collections.AutoTypeObfuscationOptions.UseClipboard : KeePassLib.Collections.AutoTypeObfuscationOptions.None,
+            DefaultSequence = sequence,
+        };
+
+        foreach (var (window, keys) in associations)
+        {
+            config.Add(new KeePassLib.Collections.AutoTypeAssociation(window, keys));
+        }
+
+        found.Entry.AutoType = config;
+    }
+
+    /// <summary>Sets a group's Auto-Type settings, which only KeePass and KeePassXC write, for a fixture to hold them.</summary>
+    internal void SetGroupAutoTypeUnchecked(string groupPath, bool? enabled, string sequence)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var group = LocateGroup(groupPath)?.Group ?? throw new VaultException($"'{groupPath}' is not a group in this vault.");
+        group.EnableAutoType = enabled;
+        group.DefaultAutoTypeSequence = sequence;
     }
 
     /// <summary>
