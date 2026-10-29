@@ -237,6 +237,7 @@ check_desktop_gates() {
 selftests=(
   'scripts/verify-release-destination.sh'
   'scripts/verify-release-preflight.sh'
+  'scripts/require-public-suffix-fresh.sh --selftest'
   'scripts/verify-green-gates.sh'
   'scripts/verify-release-matrix.sh'
   'scripts/verify-site-disclosure.sh --selftest'

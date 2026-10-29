@@ -34,6 +34,11 @@ third_party/eff-large-wordlist/UPSTREAM.md text eol=lf
 third_party/seclists-common-passwords/**          -text
 third_party/seclists-common-passwords/UPSTREAM.md text eol=lf
 
+# The Public Suffix List and its tests are kept as update-public-suffix.sh writes them from upstream's bytes, and the
+# release check reads the list's VERSION line; the licence beside them is upstream's text.
+third_party/publicsuffix/**          -text
+third_party/publicsuffix/UPSTREAM.md text eol=lf
+
 *.kdbx   binary
 *.png    binary
 *.gif    binary

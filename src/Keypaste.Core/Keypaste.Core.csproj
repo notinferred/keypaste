@@ -47,6 +47,12 @@
     -->
     <EmbeddedResource Include="../../third_party/seclists-common-passwords/10k-most-common.txt.gz"
                       LogicalName="Keypaste.Core.10k-most-common.txt.gz" />
+    <!--
+      Mozilla's Public Suffix List, its internationalised rules written as A-labels, from which browser fill takes a host's
+      registrable domain (D-0615). Provenance and licence: third_party/publicsuffix/UPSTREAM.md.
+    -->
+    <EmbeddedResource Include="../../third_party/publicsuffix/public_suffix_list.dat"
+                      LogicalName="Keypaste.Core.public_suffix_list.dat" />
   </ItemGroup>
 
   <!--

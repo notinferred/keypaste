@@ -115,6 +115,11 @@ jobs:
         shell: bash
         run: scripts/require-changelog-section.sh "${{ steps.v.outputs.version }}"
 
+      - name: Check the vendored Public Suffix List is at most 60 days old
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: scripts/require-public-suffix-fresh.sh
+
       # Check the publisher's credentials on dispatch before paying for the platform builds.
       - name: Check the publish credentials reach the bucket this release goes to
         shell: bash

@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database.
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, Mozilla's Public Suffix List, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database.
 
 ## KeePassLib
 
@@ -53,6 +53,12 @@ Copyright (c) 2018 Daniel Miessler. Licensed under the MIT License; the full tex
 The [upstream file](https://github.com/danielmiessler/SecLists/blob/913b327317496d062bcc7cace524aaad8a693be2/Passwords/Common-Credentials/10k-most-common.txt) is SecLists' `Passwords/Common-Credentials/10k-most-common.txt` at commit `913b3273`. It is vendored gzipped at `third_party/seclists-common-passwords/`; [UPSTREAM.md](third_party/seclists-common-passwords/UPSTREAM.md) records provenance and how the compressed file is made from upstream's bytes.
 
 keypaste reads it as data: `Keypaste.Core.Recommendations.CommonPasswords` embeds the file, verifies the SHA-256 of what it decompresses to at first use, and KeePassLib's password estimate rates each password against it for Settings › Recommendations. The list is not code and its contents are not modified. The combined distribution is AGPL-3.0-only; the list remains available under the MIT License.
+
+## Public Suffix List
+
+Mozilla's Public Suffix List, by the Mozilla Foundation and the list's contributors. Licensed under the Mozilla Public License, Version 2.0; the full text is in `third_party/publicsuffix/LICENSE`.
+
+The [upstream list](https://publicsuffix.org/list/) is vendored at `third_party/publicsuffix/` with each internationalised rule written as its A-labels and nothing else changed; [UPSTREAM.md](third_party/publicsuffix/UPSTREAM.md) records its version, commit and SHA-256 and how the change is made. keypaste reads it as data: `Keypaste.Core` embeds the file, and browser fill takes each host's registrable domain from it. MPL-2.0 is a file-level licence: the vendored file remains under MPL-2.0, its source form is that directory, published with keypaste's source, and MPL-2.0 §3.3 permits distributing it within this AGPL-3.0-only work. The tests also read the list's `test_psl.txt`, dedicated to the public domain under CC0 1.0, which no shipped binary contains.
 
 ## Instrument Sans
 
