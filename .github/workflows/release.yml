@@ -206,6 +206,11 @@ jobs:
         shell: bash
         run: bash scripts/build-argon2.sh '${{ matrix.rid }}'
 
+      # Linked into keypaste, which a publish without it refuses (D-0612).
+      - name: Build the libsodium keypaste links
+        shell: bash
+        run: bash scripts/build-libsodium.sh '${{ matrix.rid }}'
+
       # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
@@ -234,6 +239,9 @@ jobs:
             [ "$(basename "$stray")" = argon2.dll ] && continue
             [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not an AOT binary"; exit 1; }
           done
+          for stray in artifacts/release/${{ matrix.rid }}/libsodium*; do
+            [ -e "$stray" ] && { echo "::error::$stray exists beside keypaste, which links libsodium"; exit 1; }
+          done
           printed="$("$KEYPASTE_BIN" --version 2>/dev/null || "$KEYPASTE_BIN.exe" --version)"
           [ "$printed" = "$VERSION" ] \
             || { echo "::error::binary reports '$printed', tag says '$VERSION'"; exit 1; }
@@ -260,6 +268,15 @@ jobs:
               *) echo "::error::keypaste derived Argon2 with ${where:-a system library}, not the $carried beside it"; exit 1 ;;
             esac
           fi
+
+      # The NaCl box gives its known answers with the libsodium linked into it (D-0613).
+      - name: Require keypaste's NaCl box to give its known answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="$KEYPASTE_BIN"
+          [ -f "$bin.exe" ] && bin="$bin.exe"
+          "$bin" --selftest
 
       - name: Verify run injects a variable and writes nothing to disk
         shell: bash

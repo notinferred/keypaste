@@ -86,6 +86,7 @@ jobs:
             Keypaste.Core.Tests.*) profile=backend project=tests/Keypaste.Core.Tests ;;
             Keypaste.Cli.Tests.*) profile=backend project=tests/Keypaste.Cli.Tests ;;
             Keypaste.Mcp.Tests.*) profile=backend project=tests/Keypaste.Mcp.Tests ;;
+            Keypaste.Browser.Tests.*) profile=backend project=tests/Keypaste.Browser.Tests ;;
             Keypaste.App.Tests.*) profile=desktop project=tests/Keypaste.App.Tests ;;
             Keypaste.App.Windows.Tests.*) profile=desktop project=tests/Keypaste.App.Windows.Tests ;;
             Keypaste.Consistency.Tests.*) profile=desktop project=tests/Keypaste.Consistency.Tests ;;

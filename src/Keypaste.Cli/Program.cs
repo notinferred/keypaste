@@ -1,3 +1,4 @@
+using Keypaste.Browser;
 using Keypaste.Cli.Output;
 using Keypaste.Core.Clients;
 using Keypaste.Mcp;
@@ -6,11 +7,19 @@ namespace Keypaste.Cli;
 
 internal static class Program
 {
+    /// <summary>The argument that runs the NaCl box's known answers in this binary and exits (D-0613).</summary>
+    internal const string SelfTestFlag = "--selftest";
+
     private static async Task<int> Main(string[] args)
     {
         if (StartsBridge(args))
         {
             return await BridgeEntry.RunAsync(args[1..]).ConfigureAwait(false);
+        }
+
+        if (args is [SelfTestFlag])
+        {
+            return BrowserEntry.SelfTest(StandardStreams.Output(), StandardStreams.Error());
         }
 
         return CliApp.Run(args, StandardStreams.Output(), StandardStreams.Error());

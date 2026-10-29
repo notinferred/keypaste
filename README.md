@@ -379,9 +379,10 @@ Do not pass `-r` to restore. It narrows the runtime identifier set and conflicts
 
 ### Building a native binary yourself
 
-NativeAOT binaries must be built on their target operating system. Per O-0005, Linux needs `clang` and `zlib1g-dev`, macOS needs Xcode command line tools, and Windows needs MSVC C++ build tools with `vswhere.exe` discoverable.
+NativeAOT binaries must be built on their target operating system. Per O-0005, Linux needs `clang` and `zlib1g-dev`, macOS needs Xcode command line tools, and Windows needs MSVC C++ build tools with `vswhere.exe` discoverable. `keypaste` links libsodium, which `scripts/build-libsodium.sh` builds first from its signed release; it also needs curl, OpenSSL 3, and `make` outside Windows.
 
 ```sh
+bash scripts/build-libsodium.sh
 dotnet restore keypaste.slnx --locked-mode
 dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out
 dotnet publish src/Keypaste.Mcp -c Release -r linux-x64 --no-restore -o out

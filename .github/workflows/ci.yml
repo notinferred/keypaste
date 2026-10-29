@@ -332,6 +332,11 @@ jobs:
         shell: bash
         run: bash scripts/build-argon2.sh linux-x64
 
+      # Linked into keypaste, which a publish without it refuses (D-0612).
+      - name: Build the libsodium keypaste links
+        shell: bash
+        run: bash scripts/build-libsodium.sh linux-x64
+
       # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
@@ -355,8 +360,13 @@ jobs:
           for stray in artifacts/release/linux-x64/*.dll artifacts/release/linux-x64/*.runtimeconfig.json; do
             [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not AOT"; exit 1; }
           done
+          for stray in artifacts/release/linux-x64/libsodium*; do
+            [ -e "$stray" ] && { echo "::error::$stray exists beside keypaste, which links libsodium"; exit 1; }
+          done
           "$KEYPASTE_BIN" --version
           file "$KEYPASTE_BIN"
+          # The NaCl box gives its known answers with the libsodium linked into it (D-0613).
+          "$KEYPASTE_BIN" --selftest
 
       - name: Verify run injects a variable and writes nothing to disk
         shell: bash

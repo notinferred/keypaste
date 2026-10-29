@@ -43,6 +43,8 @@ and --filter-class runs one test class in each.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
 On Windows and macOS each profile that builds, but compile, first builds the libargon2 the app and the
 CLI carry with scripts/build-argon2.sh, which needs curl and Visual Studio's C compiler or Xcode's clang.
+backend, run whole or with tests/Keypaste.Browser.Tests, first builds the libsodium those tests load with
+scripts/build-libsodium.sh, which needs curl, OpenSSL 3, and make with a C compiler or Visual Studio's.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
 (or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP), and Node 22 with npm and
 curl for the site's Worker. Native AOT, packaging, other operating systems and live install checks stay in CI.
@@ -166,11 +168,17 @@ runtime_helpers() {
   esac
 }
 
+# The shared libsodium Keypaste.Browser's tests load (D-0612), built only where they run.
+build_libsodium() {
+  run bash scripts/build-libsodium.sh
+}
+
 prepare_projects() {
   local dir helper project targets=()
   for dir in "${projects[@]}"; do
     targets+=("$dir")
     for helper in $(runtime_helpers "$dir"); do targets+=("$helper"); done
+    if [ "$dir" = tests/Keypaste.Browser.Tests ]; then build_libsodium; fi
   done
   build_argon2
   for project in "${targets[@]}"; do run dotnet restore "$(project_file "$project")" --locked-mode; done
@@ -192,6 +200,7 @@ test_projects() {
 
 prepare_backend() {
   build_argon2
+  if [ "${1:-}" = with-libsodium ]; then build_libsodium; fi
   prepare keypaste.slnx
 }
 # The consistency project builds the CLI the desktop gates start beside the app.
@@ -313,7 +322,7 @@ profile_workflows() {
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
     scripts/verify.sh scripts/verify-clipboard-markers.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh scripts/exercise-desktop-acts.sh \
-    scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh scripts/build-argon2.sh \
+    scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-macos-cli-link.sh scripts/install-keepassxc.sh scripts/fetch-pinned-asset.sh scripts/apt-install.sh scripts/build-argon2.sh scripts/build-libsodium.sh \
     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/install-real-tools.sh scripts/verify-real-tools.sh scripts/build-claude-desktop-extension.sh scripts/crash-reports.sh \
     scripts/lib/*.sh packaging/macos/keypaste-launch.command
 }
@@ -363,7 +372,13 @@ check_integration() {
 backend_prepared=false
 profile_backend() {
   if [ "$phase" != test-only ]; then
-    if [ "${#projects[@]}" -gt 0 ]; then prepare_projects; else prepare_backend; fi
+    if [ "${#projects[@]}" -gt 0 ]; then
+      prepare_projects
+    elif [ "$phase" = all ]; then
+      prepare_backend with-libsodium
+    else
+      prepare_backend
+    fi
   fi
   backend_prepared=true
   if [ -n "$log_dir" ]; then : > "$log_dir/backend.prepared"; fi

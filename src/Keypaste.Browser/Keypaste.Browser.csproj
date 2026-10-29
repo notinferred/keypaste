@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Keypaste.Browser</RootNamespace>
+    <!-- A RID-specific publish of Keypaste.Cli reaches this project through ProjectReference, as it reaches Keypaste.Core. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- No PackageReference: libsodium is built from its signed release by scripts/build-libsodium.sh (D-0611, D-0612). -->
+
+  <!--
+    The shared libsodium a build that runs in the .NET runtime loads, the tests' included. It flows into the output of every
+    project that references this one and never into a publish: the NativeAOT keypaste links the static archive instead
+    (Keypaste.Cli.csproj).
+  -->
+  <PropertyGroup>
+    <KeypasteSodiumRid>$(RuntimeIdentifier)</KeypasteSodiumRid>
+    <KeypasteSodiumRid Condition="'$(KeypasteSodiumRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</KeypasteSodiumRid>
+    <KeypasteSodiumDir>$(ArtifactsPath)/native/$(KeypasteSodiumRid)/</KeypasteSodiumDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(KeypasteSodiumDir)libsodium.dll" Condition="Exists('$(KeypasteSodiumDir)libsodium.dll')"
+          Link="libsodium.dll" Visible="false" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <None Include="$(KeypasteSodiumDir)libsodium.dylib" Condition="Exists('$(KeypasteSodiumDir)libsodium.dylib')"
+          Link="libsodium.dylib" Visible="false" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <None Include="$(KeypasteSodiumDir)libsodium.so" Condition="Exists('$(KeypasteSodiumDir)libsodium.so')"
+          Link="libsodium.so" Visible="false" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Security.Cryptography" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keypaste.Browser.Tests" />
+  </ItemGroup>
+
+</Project>

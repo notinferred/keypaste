@@ -38,11 +38,32 @@
   <ItemGroup>
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
     <ProjectReference Include="../Keypaste.Mcp/Keypaste.Mcp.csproj" />
+    <ProjectReference Include="../Keypaste.Browser/Keypaste.Browser.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <TrimmerRootDescriptor Include="KeyfileTrimRoots.xml" />
   </ItemGroup>
+
+  <!--
+    The libsodium Keypaste.Browser calls, which scripts/build-libsodium.sh builds from its signed release, is linked into the
+    NativeAOT keypaste: its calls are bound at link time and no copy of it is ever loaded (D-0612). A publish without the
+    archive stops before compiling rather than linking a box that cannot open.
+  -->
+  <PropertyGroup>
+    <KeypasteSodiumArchive>$(ArtifactsPath)/native/$(RuntimeIdentifier)/libsodium.a</KeypasteSodiumArchive>
+    <KeypasteSodiumArchive Condition="$(RuntimeIdentifier.StartsWith('win-'))">$(ArtifactsPath)/native/$(RuntimeIdentifier)/libsodium.lib</KeypasteSodiumArchive>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <DirectPInvoke Include="libsodium" />
+    <NativeLibrary Include="$(KeypasteSodiumArchive)" />
+  </ItemGroup>
+
+  <Target Name="RequireLinkedLibsodium" BeforeTargets="PrepareForPublish" Condition="'$(PublishAot)' == 'true'">
+    <Error Condition="!Exists('$(KeypasteSodiumArchive)')"
+           Text="keypaste links libsodium, and $(KeypasteSodiumArchive) is missing: run scripts/build-libsodium.sh $(RuntimeIdentifier) first" />
+  </Target>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.Cli.Tests" />

@@ -147,9 +147,13 @@
       "keypaste": {
         "type": "Project",
         "dependencies": {
-          "Keypaste.Core": "[0.4.0, )",
-          "Keypaste.Mcp": "[0.4.0, )"
+          "Keypaste.Browser": "[0.5.0, )",
+          "Keypaste.Core": "[0.5.0, )",
+          "Keypaste.Mcp": "[0.5.0, )"
         }
+      },
+      "keypaste.browser": {
+        "type": "Project"
       },
       "keypaste.core": {
         "type": "Project",
@@ -160,7 +164,7 @@
       "keypaste.mcp": {
         "type": "Project",
         "dependencies": {
-          "Keypaste.Core": "[0.4.0, )",
+          "Keypaste.Core": "[0.5.0, )",
           "ModelContextProtocol.Core": "[1.4.1, )"
         }
       },

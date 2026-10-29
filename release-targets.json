@@ -232,7 +232,8 @@
   },
   "shared_projects": [
     "src/Keypaste.Core/Keypaste.Core.csproj",
-    "src/Keypaste.Mcp/Keypaste.Mcp.csproj"
+    "src/Keypaste.Mcp/Keypaste.Mcp.csproj",
+    "src/Keypaste.Browser/Keypaste.Browser.csproj"
   ],
   "source_only": [
     "osx-x64",

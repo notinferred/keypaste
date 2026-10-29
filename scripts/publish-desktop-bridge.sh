@@ -2,7 +2,8 @@
 # Adds the NativeAOT keypaste CLI to a published desktop payload, so a client the app connects has a bridge
 # to start from the installed package (2.6a). It is the same project release.yml publishes for the CLI/MCP
 # archives, built from this commit into a directory of its own and copied in alone, so no symbol file or
-# second runtime lands beside the app. The copy must then answer mcp --help.
+# second runtime lands beside the app. The copy must then answer mcp --help, and its NaCl box, whose libsodium it links,
+# must give its known answers (D-0613).
 #
 # Extra arguments are passed to `dotnet publish`, such as the version properties the app was built with.
 #
@@ -25,6 +26,7 @@ case "$rid" in win-*) name=keypaste.exe ;; esac
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+"$ROOT/scripts/build-libsodium.sh" "$rid" >&2
 # Restored for every RID, then published for one: narrowing the restore invalidates the lock file (D-0040).
 dotnet restore "$ROOT/src/Keypaste.Cli/Keypaste.Cli.csproj" --locked-mode >&2
 dotnet publish "$ROOT/src/Keypaste.Cli/Keypaste.Cli.csproj" -c Release -r "$rid" --no-restore -o "$work" "$@" >&2
@@ -32,4 +34,6 @@ dotnet publish "$ROOT/src/Keypaste.Cli/Keypaste.Cli.csproj" -c Release -r "$rid"
 [ -f "$work/$name" ] || die "publishing keypaste for $rid left no $name"
 cp "$work/$name" "$payload/$name"
 case "$("$payload/$name" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the copied $name does not answer mcp --help" ;; esac
+selftest="$("$payload/$name" --selftest 2>&1)" || die "the copied $name failed its selftest: $selftest"
+echo "$selftest" >&2
 echo "$payload/$name"
