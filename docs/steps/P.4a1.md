@@ -1,6 +1,6 @@
 # P.4a1 — Resolve Auto-Type sequences in Core
 
-Completed 2026-10-29 on `t6-autotype`, source only; runs pending.
+Completed 2026-10-29 on `t6-autotype` in `1e04352e` on `t6`, source only. At `34564a1a`, ci 40909948638 passed every job on all three runners on its first attempt, and app 40909966048 on its second: its first failed desktop tests (macos-15) in `DrawnMaskTests`, which F.73 holds, and only that job was rerun.
 
 ## Amendments
 
