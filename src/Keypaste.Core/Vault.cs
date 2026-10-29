@@ -28,12 +28,19 @@ public sealed class Vault : IDisposable
     private bool _rekeyed;
     private VaultBackup? _lastKept;
 
+    /// <summary>The key this unlock's base digests content with, zeroed on disposal (D-0599).</summary>
+    private readonly byte[] _baseKey = RandomNumberGenerator.GetBytes(32);
+
+    /// <summary>What this vault keeps of the file as it last read or wrote it, for a merge's lineage (D-0538, D-0599).</summary>
+    private KeePassInterop.MergeBase _base;
+
     private Vault(KeePassInterop interop, string path, byte[]? stamp)
     {
         _interop = interop;
         Path = path;
         _stamp = stamp;
         _savedAt = _stamp is null ? null : WrittenAt(path);
+        _base = interop.TakeBase(_baseKey);
     }
 
     /// <summary>The path of the file backing this vault.</summary>
@@ -147,6 +154,47 @@ public sealed class Vault : IDisposable
 
         var stamp = SourceSnapshot.Digest(Path) ?? throw new VaultException($"Could not read '{Path}'.");
         return new Vault(KeePassInterop.Reopen(Path, key), Path, stamp);
+    }
+
+    /// <summary>Merges this open copy into <paramref name="file"/>, a fresh open of the file another program saved, as D-0537 to D-0541 say, leaving this copy as it was.</summary>
+    /// <param name="file">
+    /// The file's copy, opened with this vault's key, which becomes the merged copy: unsaved when the merge took anything from this one,
+    /// and saved under the stale-write check against the file it was opened from.
+    /// </param>
+    /// <param name="report">What the merge did, by name and never by value, when it merged.</param>
+    /// <returns>Whether it merged, or why not; a refusal changes neither copy.</returns>
+    /// <exception cref="ArgumentException"><paramref name="file"/> is this vault.</exception>
+    /// <remarks>Lineage comes from the base this vault took of its file when it opened it and at each save since (D-0538).</remarks>
+    internal VaultMergeOutcome MergeInto(Vault file, out VaultMergeReport? report)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+
+        if (ReferenceEquals(file, this))
+        {
+            throw new ArgumentException("A vault merges into another open of its file.", nameof(file));
+        }
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfRekeyed();
+
+            lock (file._state)
+            {
+                ObjectDisposedException.ThrowIf(file._disposed, file);
+                file.ThrowIfRekeyed();
+
+                var outcome = file._interop.MergeFrom(_interop, _base, out report);
+
+                if (report is { TookFromOpenCopy: true })
+                {
+                    file._pending = true;
+                    file._changes++;
+                }
+
+                return outcome;
+            }
+        }
     }
 
     /// <summary>When the entry with this name was created and last modified, and when it expires.</summary>
@@ -2734,6 +2782,7 @@ public sealed class Vault : IDisposable
             {
                 _stamp = stamp;
                 _savedAt = WrittenAt(Path);
+                _base = _interop.TakeBase(_baseKey);
                 _pending = false;
                 _changes++;
                 _writing = false;
@@ -2800,6 +2849,7 @@ public sealed class Vault : IDisposable
             }
 
             _interop.Dispose();
+            CryptographicOperations.ZeroMemory(_baseKey);
             _disposed = true;
         }
     }

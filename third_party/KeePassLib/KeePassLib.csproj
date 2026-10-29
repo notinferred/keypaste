@@ -52,10 +52,14 @@
                          plugin, so a Twofish vault KeePassXC wrote opens and saves keeping its
                          cipher. Its block cipher, mode and padding are BouncyCastle's, compiled
                          in from ../bouncycastle-twofish below.
+      KEYPASTE_KEPT_VERSIONS
+                         spares, in the history trimming every load and save runs, a version
+                         keypaste's merge marked as moved there, until the entry's next backup,
+                         so a version a merge displaced survives the vault's history limits.
 
-      All six are grep-able markers. Every site they guard is listed in UPSTREAM.md.
+      All seven are grep-able markers. Every site they guard is listed in UPSTREAM.md.
     -->
-    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE;KEYPASTE_ATOMIC_REPLACE;KEYPASTE_TWOFISH</DefineConstants>
+    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE;KEYPASTE_ATOMIC_REPLACE;KEYPASTE_TWOFISH;KEYPASTE_KEPT_VERSIONS</DefineConstants>
 
     <!--
       docs/PRODUCT.md §3.9: dependencies on the secret path are minimised. This project has

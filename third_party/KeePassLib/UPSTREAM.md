@@ -78,6 +78,15 @@ KeePass reads and writes Twofish only through its TwofishCipher plugin, so upstr
 | `Cryptography/Cipher/CipherPool.cs` | `GlobalPool` adds `TwofishCipherEngine` after AES and ChaCha20 |
 | `KeePassLib.csproj` | Defines the guard and compiles `../bouncycastle-twofish/src/**/*.cs` |
 
+### `KEYPASTE_KEPT_VERSIONS`
+
+`KdbxFile` trims every entry's history to the vault's `HistoryMaxItems` and `HistoryMaxSize` each time it reads or writes a file (`MaintainBackups` in `KdbxFile.Read.cs` and `KdbxFile.Write.cs`), so a version keypaste's merge moves into an entry's history would be dropped by the merged copy's own save whenever that version alone exceeds the limits, as with history off or a version larger than the size limit. keypaste keeps it (D-0601): its merge marks each such version with the entry custom data item `KEYPASTE_KEPT_BY_MERGE`, and this guard makes history maintenance remove the oldest unmarked version and stop when only marked ones are left over the limits. The next backup of the entry, which every edit makes first, removes the marks, so the vault's own trimming meets those versions at the entry's next edit. Without a marked version the trimming is upstream's.
+
+| File | Change |
+|---|---|
+| `PwEntry.cs` | Adds `KeptVersionKey`; `RemoveOldestBackup` skips a marked version and says whether it removed one, and `MaintainBackups` stops when it removed none; `CreateBackup` removes the marks from the entry's history before it backs the entry up |
+| `KeePassLib.csproj` | Defines the guard |
+
 ### Files excluded from compilation
 
 | Path | Reason |

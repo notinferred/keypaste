@@ -576,6 +576,11 @@ namespace KeePassLib
 		/// </summary>
 		public void CreateBackup(PwDatabase pwHistMntcSettings)
 		{
+#if KEYPASTE_KEPT_VERSIONS
+			// An edit hands every version a merge kept back to history maintenance
+			foreach(PwEntry pe in m_lHistory) pe.m_dCustomData.Remove(KeptVersionKey);
+#endif
+
 			PwEntry peCopy = CloneDeep();
 			peCopy.m_lHistory.Clear();
 
@@ -661,7 +666,11 @@ namespace KeePassLib
 			{
 				while(m_lHistory.UCount > (uint)nMaxItems)
 				{
+#if KEYPASTE_KEPT_VERSIONS
+					if(!RemoveOldestBackup()) break;
+#else
 					RemoveOldestBackup();
+#endif
 					bDeleted = true;
 				}
 			}
@@ -676,7 +685,11 @@ namespace KeePassLib
 
 					if(uHistSize > (ulong)lMaxSize)
 					{
+#if KEYPASTE_KEPT_VERSIONS
+						if(!RemoveOldestBackup()) break;
+#else
 						RemoveOldestBackup();
+#endif
 						bDeleted = true;
 					}
 					else break;
@@ -686,7 +699,17 @@ namespace KeePassLib
 			return bDeleted;
 		}
 
+#if KEYPASTE_KEPT_VERSIONS
+		/// <summary>
+		/// Entry custom data marking a history version keypaste's merge moved
+		/// there, which history maintenance spares until the entry's next backup.
+		/// </summary>
+		public const string KeptVersionKey = "KEYPASTE_KEPT_BY_MERGE";
+
+		private bool RemoveOldestBackup()
+#else
 		private void RemoveOldestBackup()
+#endif
 		{
 			DateTime dtMin = TimeUtil.SafeMaxValueUtc;
 			uint idxRemove = uint.MaxValue;
@@ -694,6 +717,9 @@ namespace KeePassLib
 			for(uint u = 0; u < m_lHistory.UCount; ++u)
 			{
 				PwEntry pe = m_lHistory.GetAt(u);
+#if KEYPASTE_KEPT_VERSIONS
+				if(pe.m_dCustomData.Exists(KeptVersionKey)) continue;
+#endif
 				if(TimeUtil.Compare(pe.LastModificationTime, dtMin, true) < 0)
 				{
 					idxRemove = u;
@@ -701,7 +727,13 @@ namespace KeePassLib
 				}
 			}
 
+#if KEYPASTE_KEPT_VERSIONS
+			if(idxRemove == uint.MaxValue) return false;
+			m_lHistory.RemoveAt(idxRemove);
+			return true;
+#else
 			if(idxRemove != uint.MaxValue) m_lHistory.RemoveAt(idxRemove);
+#endif
 		}
 
 		// Cf. AutoType.GetEnabledText
