@@ -238,6 +238,35 @@ public sealed class ImportSource : IDisposable
                 .Select(row => new ImportPiece(_units[row.Index].Id, _units[row.Index].Scope, row.Destination))]);
     }
 
+    /// <summary>Copies every included row into <paramref name="target"/> and saves it, all of it or none, as an export's import commits (D-0567).</summary>
+    /// <param name="target">The vault imported into.</param>
+    /// <param name="plan">The plan, as the person confirmed it.</param>
+    /// <param name="save">Writes the vault, as the caller saves; when it throws, everything this copied is taken back out of the open vault.</param>
+    /// <returns>What was copied.</returns>
+    /// <exception cref="VaultException"><see cref="Check"/> finds a problem that blocks, or copying failed. Nothing was imported.</exception>
+    /// <exception cref="Exception">Whatever <paramref name="save"/> threw, once everything was taken back.</exception>
+    public ImportResult Commit(Vault target, ImportPlan plan, Action<Vault> save)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(save);
+
+        var checkpoint = target.Checkpoint();
+
+        try
+        {
+            var result = ApplyTo(target, plan);
+            save(target);
+            return result;
+        }
+        catch
+        {
+            ExportSource.TakeBack(target, checkpoint);
+            throw;
+        }
+    }
+
     /// <summary>Releases the source's key and decrypted contents.</summary>
     public void Dispose()
     {

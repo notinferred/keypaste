@@ -1121,6 +1121,47 @@ internal sealed class AppVaultSession : IDisposable
         return WriteTo(() => UnlockedFor(lifetime) is { } vault ? (vault, lifetime.Ended) : null, edit, changed);
     }
 
+    /// <summary>
+    /// Runs an edit that saves for itself, through the save <see cref="Write{T}(Func{Vault, T}, Func{T, bool})"/> makes,
+    /// so it can take itself back out of the open vault when that save fails, as an export's import does (D-0567).
+    /// </summary>
+    /// <typeparam name="T">What the edit returns.</typeparam>
+    /// <param name="edit">The edit, given the open vault and the save to call once it has changed it.</param>
+    /// <returns>
+    /// <see cref="WriteOutcome.Saved"/> once the edit returned; otherwise what stopped it, with nothing left unwritten,
+    /// since the edit took its change back before throwing.
+    /// </returns>
+    internal WriteResult<T> WriteWhole<T>(Func<Vault, Action<Vault>, T> edit)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+
+        if (UnlockedNow() is not { } opened)
+        {
+            return new WriteResult<T>(WriteOutcome.Locked);
+        }
+
+        try
+        {
+            return new WriteResult<T>(WriteOutcome.Saved, edit(opened.Vault, vault => vault.SaveUnlessCancelled(opened.Locked)));
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            return new WriteResult<T>(WriteOutcome.ChangedOnDisk);
+        }
+        catch (VaultException e)
+        {
+            return new WriteResult<T>(WriteOutcome.Failed, Reason: e.Message);
+        }
+        catch (ObjectDisposedException) when (!ReferenceEquals(UnlockedNow()?.Vault, opened.Vault))
+        {
+            return new WriteResult<T>(WriteOutcome.Locked);
+        }
+        catch (OperationCanceledException) when (opened.Locked.IsCancellationRequested)
+        {
+            return new WriteResult<T>(WriteOutcome.Locked);
+        }
+    }
+
     /// <summary>The open vault and what its lifetime's end cancels, or null when locked.</summary>
     private (Vault Vault, CancellationToken Locked)? UnlockedNow()
     {

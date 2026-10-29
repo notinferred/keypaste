@@ -577,6 +577,41 @@ public sealed class ScreenRenderer
             Assert.True(shell.Import!.IsUnreadable);
             Save(window, output, "99-import-unreadable");
             shell.Import!.CancelCommand.Execute(null);
+
+            var export = Path.Combine(demo.Home, "bitwarden_export.json");
+            File.WriteAllText(export, """
+                {
+                  "encrypted": false,
+                  "folders": [ { "id": "folder-personal", "name": "Personal" } ],
+                  "items": [
+                    {
+                      "id": "item-github", "type": 1, "name": "github",
+                      "login": { "username": "maya@acme.dev", "password": "demo-bw-gh", "totp": "JBSWY3DPEHPK3PXP", "uris": [ { "match": null, "uri": "https://github.com" } ] }
+                    },
+                    {
+                      "id": "item-fastmail", "folderId": "folder-personal", "type": 1, "name": "fastmail",
+                      "fields": [ { "name": "Password", "value": "demo-bw-old", "type": 1, "linkedId": null } ],
+                      "login": { "username": "maya@fastmail.com", "password": "demo-bw-mail" }
+                    },
+                    {
+                      "id": "item-visa", "folderId": "folder-personal", "type": 3, "name": "Visa",
+                      "card": { "cardholderName": "Maya Ortiz", "brand": "Visa", "number": "4111111111111111", "expMonth": "4", "expYear": "2030", "code": "123" }
+                    },
+                    { "id": "item-router", "type": 1, "name": "old router", "deletedDate": "2025-01-01T00:00:00.000Z", "login": { "password": "demo-bw-router" } }
+                  ]
+                }
+                """);
+            shell.OpenImport(export);
+            var exported = shell.ExportImport!;
+            Wait(exported.ReadAsync());
+            exported.Into = "Work";
+            Assert.True(exported.HasHeld);
+            Save(window, output, "9a-export-preview");
+
+            exported.ConfirmCommand.Execute(null);
+            Assert.True(exported.IsImported, exported.Message);
+            Save(window, output, "9b-export-imported");
+            exported.CancelCommand.Execute(null);
             window.Close();
         }
 

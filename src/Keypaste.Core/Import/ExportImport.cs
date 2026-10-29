@@ -100,6 +100,28 @@ public static class ExportImport
     /// <summary>The formats keypaste reads, each by its own reader; the first that recognizes a file reads it.</summary>
     public static IReadOnlyList<IExportReader> Readers { get; } = [new BitwardenJsonReader(), new OnePassword1PuxReader(), new LastPassCsvReader(), new OnePasswordCsvReader(), new KeePassXcCsvReader()];
 
+    /// <summary>The first of <paramref name="readers"/> that recognizes a file, judged as <see cref="Open"/> judges it, reading only its start.</summary>
+    /// <param name="path">The file.</param>
+    /// <param name="readers">The readers to ask, in order.</param>
+    /// <returns>The reader, or null when none recognizes the file or it cannot be read.</returns>
+    public static IExportReader? Recognize(string path, IReadOnlyList<IExportReader> readers)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentNullException.ThrowIfNull(readers);
+
+        var full = Path.GetFullPath(path);
+
+        try
+        {
+            using var stream = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return Recognized(stream, Path.GetFileName(full), readers);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Reads an export with the first of <paramref name="readers"/> that recognizes it.</summary>
     /// <param name="path">The file.</param>
     /// <param name="readers">The readers to ask, in order.</param>

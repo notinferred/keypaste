@@ -64,6 +64,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <param name="chooseAnother">Asks for another file when this one cannot be read; null where nothing can ask.</param>
     /// <param name="paste">Reads the clipboard into a buffer under D-0225's rule, as for the master-password fields; null where nothing can paste.</param>
     /// <param name="post">Runs an action on the UI thread, where a lock, which may run on another, closes the dialog; null closes it where the lock runs.</param>
+    /// <param name="exportFormats">The exports the import also reads, which a file that is no KeePass database is named as none of; null where only KeePass files are offered.</param>
     internal KdbxImportViewModel(
         AppVaultSession session,
         string path,
@@ -72,7 +73,8 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         Func<Task<string?>>? pickKeyfile = null,
         Func<Task>? chooseAnother = null,
         Func<SecretBuffer, Task<PasteOutcome>>? paste = null,
-        Action<Action>? post = null)
+        Action<Action>? post = null,
+        IReadOnlyList<string>? exportFormats = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(path);
@@ -95,7 +97,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
         else
         {
-            _message = WhyUnreadable(path, error);
+            _message = exportFormats is { Count: > 0 }
+                ? $"{WhyUnreadable(path, error)} Nor is it an export keypaste reads: {ExportImportViewModel.Either(exportFormats)}."
+                : WhyUnreadable(path, error);
         }
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => !_busy && _probe is not null && _source is null);
@@ -574,33 +578,28 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
 
         var plan = Plan();
-        var write = _session.Write(vault => source.ApplyTo(vault, plan), _ => true);
 
-        switch (write)
+        // The commit saves for itself and takes its copies back when the save fails, so the open vault
+        // never holds an import its file does not, and Confirm can be pressed again (D-0567).
+        var write = _session.WriteWhole((vault, save) => source.Commit(vault, plan, save));
+
+        switch (write.Outcome)
         {
-            case { Outcome: WriteOutcome.Locked }:
+            case WriteOutcome.Locked:
                 return;
-            case { Outcome: WriteOutcome.ChangedOnDisk, Unwritten: false }:
-                Message = write.Problem("import again")!;
-                return;
-            case { Outcome: WriteOutcome.Failed, Unwritten: false }:
-                Message = DisplayTextSanitizer.Sanitize(write.Reason!).Text;
-                Check();
-                return;
-            case { Outcome: WriteOutcome.ChangedOnDisk }:
-                _announce(write.Problem("import again")!);
-                break;
-            case { Outcome: WriteOutcome.Failed }:
-                // The copies are already in the open vault, so the dialog closes rather than offer a
-                // second Confirm that would copy them again.
-                _announce($"Copied {Entries(write.Value!.Entries)} from {FileName}, but they are not saved: {DisplayTextSanitizer.Sanitize(write.Reason!).Text}");
-                break;
-            default:
+            case WriteOutcome.Saved:
                 _announce($"Imported {Entries(write.Value!.Entries)} from {FileName}");
-                break;
+                Dispose();
+                return;
+            case WriteOutcome.ChangedOnDisk:
+                Message = $"{write.Problem("import again")} Nothing was imported.";
+                return;
+            default:
+                var reason = DisplayTextSanitizer.Sanitize(write.Reason!).Text;
+                Check();
+                Message = reason.StartsWith("Nothing was imported", StringComparison.Ordinal) ? reason : $"{reason} Nothing was imported.";
+                return;
         }
-
-        Dispose();
     }
 
     /// <summary>Lays every row out as the default plan puts it, under <paramref name="into"/> or the file's name.</summary>

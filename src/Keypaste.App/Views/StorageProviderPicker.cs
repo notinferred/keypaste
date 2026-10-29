@@ -16,6 +16,9 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
     private static readonly FilePickerFileType _vault =
         new("KeePass vault") { Patterns = ["*.kdbx"] };
 
+    private static readonly FilePickerFileType _importable =
+        new("KeePass database or export") { Patterns = ["*.kdbx", "*.json", "*.1pux", "*.csv"] };
+
     private static readonly FilePickerFileType _keyfile =
         new("KeePass keyfile") { Patterns = ["*.keyx"] };
 
@@ -26,6 +29,19 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
             Title = "Open a keypaste vault",
             AllowMultiple = false,
             FileTypeFilter = [_vault],
+        }).ConfigureAwait(true);
+
+        return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<string?> PickImportAsync()
+    {
+        // All files as well: an export keeps whatever name its app or the person gave it.
+        var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import from another app",
+            AllowMultiple = false,
+            FileTypeFilter = [_importable, FilePickerFileTypes.All],
         }).ConfigureAwait(true);
 
         return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;

@@ -450,9 +450,12 @@
       <views:ShareDialogView DataContext="{Binding Share}" />
     </Border>
 
-    <!-- The KDBX import dialog, modal over the whole window. -->
-    <Border Classes="backdrop" IsVisible="{Binding HasImport}" Padding="24">
+    <!-- The import dialogs, modal over the whole window: a KeePass database's, or another app's export's. -->
+    <Border Classes="backdrop" IsVisible="{Binding HasKdbxImport}" Padding="24">
       <views:KdbxImportView DataContext="{Binding Import}" />
+    </Border>
+    <Border Classes="backdrop" IsVisible="{Binding HasExportImport}" Padding="24">
+      <views:ExportImportView DataContext="{Binding ExportImport}" />
     </Border>
 
     <!-- A save waiting for the YubiKey. Modal, so nothing else is edited while the save is half done. -->

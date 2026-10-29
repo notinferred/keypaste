@@ -108,12 +108,16 @@ public sealed class KdbxImportViewModelTests : IDisposable
         Assert.NotNull(reopened.Find(new EntryName(string.Empty, "example")));
     }
 
-    /// <summary>The copies are in the open vault once applied, so a failed save must not leave a Confirm that copies them again.</summary>
+    /// <summary>
+    /// The commit saves for itself, so a save another program's write refuses takes every copy back out of the open vault:
+    /// the vault is as it was, the dialog stays open saying nothing was imported, and a later save writes no copy (D-0567).
+    /// </summary>
     [Fact]
-    public async Task ASaveThatFailsAfterTheCopy_ClosesTheDialog_SoNothingIsCopiedTwice()
+    public async Task ASaveThatFails_LeavesTheVaultAsItWas_AndKeepsTheDialogOpen()
     {
         using var import = NewImport();
         await Unlock(import);
+        var before = _session.Unlocked!.Search(string.Empty).Select(match => match.Name).ToList();
 
         using (var other = Vault.Open(_vault.Path_, TempVault.Password))
         {
@@ -123,10 +127,14 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
         import.ConfirmCommand.Execute(null);
 
-        Assert.False(import.CanConfirm);
-        Assert.False(import.IsDecrypted);
-        Assert.Contains(_announced, line => line.Contains("Reload to see it", StringComparison.Ordinal));
-        Assert.Single(_session.Unlocked!.Search(string.Empty), match => match.Name == new EntryName("foreign/Banking", "Checking"));
+        Assert.Equal(before, _session.Unlocked!.Search(string.Empty).Select(match => match.Name));
+        Assert.DoesNotContain(_session.Unlocked!.ReadGroupPaths(includeReserved: true), group => group.StartsWith("foreign", StringComparison.Ordinal));
+        Assert.Empty(_announced);
+        Assert.True(import.IsDecrypted);
+        Assert.True(import.CanConfirm);
+        Assert.Contains("Reload to see it", import.Message, StringComparison.Ordinal);
+        Assert.EndsWith("Nothing was imported.", import.Message, StringComparison.Ordinal);
+        Assert.True(import.HasTrailingMessage);
     }
 
     [Fact]

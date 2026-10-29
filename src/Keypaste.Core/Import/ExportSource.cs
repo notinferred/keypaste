@@ -181,7 +181,8 @@ public sealed class ExportSource : IDisposable
         }
     }
 
-    private static void TakeBack(Vault vault, VaultCheckpoint checkpoint)
+    /// <summary>Puts the vault back as the checkpoint found it, unless a lock has already disposed it.</summary>
+    internal static void TakeBack(Vault vault, VaultCheckpoint checkpoint)
     {
         try
         {

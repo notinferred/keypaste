@@ -8,6 +8,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.Tests.Controls;
+using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -164,6 +165,47 @@ public sealed class ImportDialogKeyboardTests
         window.Close();
     });
 
+    /// <summary>
+    /// The export dialog keeps the keyboard as the KeePass database one does: once read, its import button has focus and is
+    /// the one amber element, Enter imports, the report's Done takes focus and the amber, and Esc closes it, saying what it did.
+    /// </summary>
+    [Fact]
+    public Task The_export_dialog_imports_on_Enter_moves_to_Done_and_closes_on_Escape() => HeadlessSession.On(() =>
+    {
+        using var fixture = new TempVault();
+        using var session = Open(fixture);
+        var announced = new List<string>();
+        var path = Path.Combine(fixture.Home, "keepassxc.csv");
+        File.WriteAllText(path, "\"Group\",\"Title\",\"Username\",\"Password\",\"URL\",\"Notes\"\n\"Root\",\"site\",\"maya\",\"kpxc-pw-site\",\"\",\"\"\n");
+        using var import = new ExportImportViewModel(session, path, announced.Add);
+        var window = Show(new ExportImportView { DataContext = import });
+
+        Drain(import.ReadAsync());
+
+        var confirm = Named(window, "ExportConfirm");
+        Assert.True(confirm.IsFocused);
+        AmberElements.AssertOne(window, confirm, "the export dialog's preview");
+
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        window.KeyReleaseQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.True(import.IsImported, import.Message);
+        var done = Named(window, "ExportDone");
+        Assert.True(done.IsFocused);
+        AmberElements.AssertOne(window, done, "the export dialog's report");
+        Assert.Empty(announced);
+
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.Equal(["Imported 1 item from keepassxc.csv"], announced);
+        window.Close();
+    });
+
+    private static Button Named(Window window, string name) =>
+        window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == name);
+
     private static AppVaultSession Open(TempVault fixture)
     {
         var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
@@ -190,6 +232,15 @@ public sealed class ImportDialogKeyboardTests
 
         panel.Children.Add(new KdbxImportView { DataContext = import });
         var window = new Window { Content = panel };
+        window.Show();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        return window;
+    }
+
+    /// <summary>Tall enough for the export dialog's report, so its Done is drawn.</summary>
+    private static Window Show(ExportImportView view)
+    {
+        var window = new Window { Width = 900, Height = 1000, Content = view };
         window.Show();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         return window;

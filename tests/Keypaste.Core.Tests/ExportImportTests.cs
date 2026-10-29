@@ -308,6 +308,18 @@ public sealed class ExportImportTests : IDisposable
         using var opened = ExportImport.Open(path, [reader]);
 
         Assert.Null(opened);
+        Assert.Null(ExportImport.Recognize(path, [reader]));
+        Assert.Equal(0, reader.Reads);
+    }
+
+    [Fact]
+    public void Recognizing_a_file_reads_only_its_start_and_a_missing_one_is_none()
+    {
+        var path = Write("export.fake");
+        var reader = new FakeExportReader(() => new ExportContents([], []));
+
+        Assert.Same(reader, ExportImport.Recognize(path, [reader]));
+        Assert.Null(ExportImport.Recognize(Path.Combine(_exports, "missing.fake"), [reader]));
         Assert.Equal(0, reader.Reads);
     }
 

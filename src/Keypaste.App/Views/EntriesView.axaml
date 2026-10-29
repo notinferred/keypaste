@@ -225,10 +225,10 @@
               <Button x:Name="ImportKdbx"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Import KeePass database">
+                      AutomationProperties.Name="Import from another app">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <ctl:KpIcon Icon="file-input" Size="14" />
-                  <TextBlock Text="Import KeePass database" VerticalAlignment="Center" />
+                  <TextBlock Text="Import from another app" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -367,15 +367,15 @@
                   <TextBlock Text="New item" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
-              <!-- The first run: a new vault is empty, and a KeePass user's first act may be to bring theirs in. -->
+              <!-- The first run: a new vault is empty, and a person's first act may be to bring their items in from another app. -->
               <Button x:Name="ImportFromEmpty"
                       Classes="sm"
                       IsVisible="{Binding ListEmptyOffersImport}"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
-                      AutomationProperties.Name="Import KeePass database">
+                      AutomationProperties.Name="Import from another app">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="file-input" Size="13" />
-                  <TextBlock Text="Import KeePass database" VerticalAlignment="Center" />
+                  <TextBlock Text="Import from another app" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
             </StackPanel>

@@ -40,6 +40,9 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
         return Task.FromResult(ExistingPath);
     }
 
+    /// <summary>The import picker answers as the open picker does and counts in <see cref="ExistingCalls"/>, so a test names the file once.</summary>
+    public Task<string?> PickImportAsync() => PickExistingAsync();
+
     public Task<string?> PickNewAsync()
     {
         NewCalls++;

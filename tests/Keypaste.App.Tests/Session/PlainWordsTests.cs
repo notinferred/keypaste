@@ -163,7 +163,7 @@ public sealed partial class PlainWordsTests
     /// <summary>
     /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the welcome with and without KeePassXC's
     /// databases, the lock screen with More options open, with Windows Hello offered, and after an access change, the create
-    /// form, and each step of the KeePass database import dialog.
+    /// form, each step of the KeePass database import dialog, and each of the export import dialog's (9.1f).
     /// </summary>
     [Fact]
     public Task TheUnlockScreensAndTheImportDialog_HoldNoneOfTheRetiredWords() => HeadlessSession.On(async () =>
@@ -268,6 +268,56 @@ public sealed partial class PlainWordsTests
         RenderedShell.Drain();
         said.AddRange(Shown(dialog, "the import dialog, kept in place"));
         dialog.Close();
+
+        var export = Path.Combine(fixture.Home, "bitwarden_export.json");
+        File.WriteAllText(export, """
+            {
+              "encrypted": false,
+              "folders": [ { "id": "folder-work", "name": "Work" } ],
+              "items": [
+                {
+                  "id": "item-github", "folderId": "folder-work", "type": 1, "name": "GitHub",
+                  "fields": [ { "name": "Password", "value": "plain-field", "type": 0, "linkedId": null } ], "login": { "password": "plain-pw" }
+                },
+                { "id": "item-old", "type": 1, "name": "Old", "deletedDate": "2025-01-01T00:00:00.000Z", "login": { "password": "plain-pw-old" } }
+              ]
+            }
+            """);
+        vaultSession.Unlocked!.AddEntry(new VaultEntry { GroupPath = "imported/Work", Title = "GitHub", Password = "plain-pw-held" });
+
+        using (var exported = new ExportImportViewModel(vaultSession, export, _ => { }))
+        {
+            var exportDialog = Show(new ExportImportView { DataContext = exported });
+            await exported.ReadAsync();
+            exported.Into = "imported";
+            RenderedShell.Drain();
+            said.AddRange(Shown(exportDialog, "the export dialog, its preview"));
+
+            exported.SkipHeld = true;
+            RenderedShell.Drain();
+            said.AddRange(Shown(exportDialog, "the export dialog, skipping the names the vault has"));
+
+            exported.Into = string.Empty;
+            RenderedShell.Drain();
+            said.AddRange(Shown(exportDialog, "the export dialog, a group it refuses"));
+
+            exported.Into = "imported";
+            exported.KeepHeld = true;
+            exported.ConfirmCommand.Execute(null);
+            RenderedShell.Drain();
+            Assert.True(exported.IsImported, exported.Message);
+            said.AddRange(Shown(exportDialog, "the export dialog, its report"));
+            exportDialog.Close();
+        }
+
+        File.WriteAllText(export, """{ "encrypted": true, "passwordProtected": true }""");
+
+        using (var encrypted = new ExportImportViewModel(vaultSession, export, _ => { }, chooseAnother: () => Task.CompletedTask))
+        {
+            await encrypted.ReadAsync();
+            Assert.True(encrypted.IsUnreadable);
+            said.AddRange(Seen(new ExportImportView { DataContext = encrypted }, "the export dialog, an encrypted export"));
+        }
 
         Assert.Empty(Offending(said));
     });

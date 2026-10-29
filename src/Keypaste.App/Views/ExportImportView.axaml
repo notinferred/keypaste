@@ -1,0 +1,268 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.ExportImportView"
+             x:DataType="vm:ExportImportViewModel">
+
+  <!-- The export import dialog, drawn over the shell on the modal backdrop as the KeePass database's is: the file,
+       where each item lands and what does not, the choice for names the vault already has, and after the import what
+       it did and that the file is to be deleted. -->
+
+  <UserControl.Styles>
+    <Style Selector="Button.dialog-action">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Button.dialog-action.primary">
+      <Setter Property="Padding" Value="14,0" />
+    </Style>
+
+    <Style Selector="Border.map-row">
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="ContentPresenter:nth-last-child(1) > Border.map-row">
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Classes="dialog"
+          KeyboardNavigation.TabNavigation="Cycle"
+          Width="520"
+          MaxWidth="520"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Center">
+    <StackPanel Spacing="16">
+
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
+        <TextBlock Grid.Column="1" Classes="dialog-title" Text="Import another app's export" VerticalAlignment="Center" />
+        <Button Grid.Column="2"
+                Classes="icon ghost sm"
+                ToolTip.Tip="Close"
+                Command="{Binding CancelCommand}"
+                AutomationProperties.Name="Close">
+          <ctl:KpIcon Icon="x" Size="15" />
+        </Button>
+      </Grid>
+
+      <!-- The file card, on a dashed hairline. -->
+      <Panel>
+        <Rectangle RadiusX="10" RadiusY="10"
+                   Stroke="{DynamicResource KpBorderStrong}"
+                   StrokeThickness="1"
+                   StrokeDashArray="4,3" />
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="14">
+          <ctl:KpIcon Grid.Column="0" Icon="file-code" Size="22" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
+          <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Classes="mono lg" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FilePath}" />
+            <TextBlock FontSize="12"
+                       Classes="muted"
+                       Text="{Binding CardDetail}"
+                       TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding !IsUnreadable}" />
+            <TextBlock FontSize="12"
+                       Classes="danger"
+                       Text="{Binding Message}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding IsUnreadable}" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
+                      IsVisible="{Binding IsPreviewing}">
+            <ctl:KpIcon Icon="lock-open" Size="13" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock FontSize="12" Classes="muted" Text="Not encrypted" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
+                      IsVisible="{Binding IsImported}">
+            <ctl:KpIcon Icon="circle-check" Size="13" Foreground="{DynamicResource KpOk}" />
+            <TextBlock FontSize="12" Classes="ok" Text="Imported" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0" VerticalAlignment="Center"
+                      IsVisible="{Binding IsUnreadable}">
+            <ctl:KpIcon Icon="alert-triangle" Size="13" Foreground="{DynamicResource KpDanger}" />
+            <TextBlock FontSize="12" Classes="danger" Text="Can't read" VerticalAlignment="Center" />
+          </StackPanel>
+        </Grid>
+      </Panel>
+
+      <!-- The preview: the group it lands under, the choice for names the vault already has, and every item's row. -->
+      <StackPanel Spacing="16" IsVisible="{Binding IsPreviewing}">
+        <StackPanel Spacing="8">
+          <TextBlock Classes="label" Text="Copy into this group" />
+          <TextBox x:Name="ExportInto"
+                   Classes="mono"
+                   FontSize="12"
+                   Text="{Binding Into}"
+                   AutomationProperties.Name="Group to copy into" />
+        </StackPanel>
+
+        <StackPanel Spacing="8" IsVisible="{Binding HasHeld}">
+          <TextBlock Classes="label" Text="{Binding HeldLabel}" />
+          <Border Classes="segmented inset">
+            <StackPanel Orientation="Horizontal">
+              <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="Keep both" IsChecked="{Binding KeepHeld}" />
+              <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="Skip them" IsChecked="{Binding SkipHeld}" />
+            </StackPanel>
+          </Border>
+          <TextBlock Classes="caption"
+                     TextWrapping="Wrap"
+                     Text="Keep both lands each beside yours under a numbered name, such as GitHub (2). Nothing in your vault is replaced." />
+        </StackPanel>
+
+        <StackPanel Spacing="8">
+          <TextBlock Classes="label" Text="Where each item lands" />
+          <Border BorderBrush="{DynamicResource KpBorderDefault}"
+                  BorderThickness="1"
+                  CornerRadius="{DynamicResource KpRadiusButton}"
+                  ClipToBounds="True">
+            <ScrollViewer MaxHeight="200" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <ItemsControl x:Name="ExportRows" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ExportPreviewRow">
+                    <Border Classes="map-row">
+                      <Grid ColumnDefinitions="*,20,*" RowDefinitions="Auto,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Classes="mono secondary"
+                                   FontSize="12"
+                                   Text="{Binding Item}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Item}"
+                                   VerticalAlignment="Center" />
+                        <ctl:KpIcon Grid.Column="1"
+                                    Icon="arrow-right"
+                                    Size="12"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{DynamicResource KpTextMuted}" />
+                        <TextBlock Grid.Column="2"
+                                   Classes="mono"
+                                   Classes.muted="{Binding Skipped}"
+                                   FontSize="12"
+                                   Text="{Binding Lands}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Lands}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="0"
+                                   Grid.ColumnSpan="3"
+                                   Margin="0,4,0,0"
+                                   FontSize="11.5"
+                                   TextWrapping="Wrap"
+                                   Classes="muted"
+                                   Text="{Binding Note}"
+                                   IsVisible="{Binding HasNote}" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- After the import: what it did. -->
+      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsImported}">
+        <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" />
+        <TextBlock FontSize="13.5"
+                   FontWeight="Medium"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource KpTextPrimary}"
+                   Text="{Binding ImportedText}"
+                   VerticalAlignment="Center" />
+      </StackPanel>
+
+      <!-- Everything that does not land, before and after the import, each with why. -->
+      <StackPanel Spacing="8" IsVisible="{Binding HasNotImported}">
+        <TextBlock Classes="label" Text="{Binding NotImportedLabel}" />
+        <Border BorderBrush="{DynamicResource KpBorderDefault}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource KpRadiusButton}"
+                ClipToBounds="True">
+          <ScrollViewer MaxHeight="160" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="ExportNotImported" ItemsSource="{Binding NotImported}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ExportLossRow">
+                  <Border Classes="map-row">
+                    <StackPanel Spacing="2">
+                      <TextBlock Classes="mono secondary"
+                                 FontSize="12"
+                                 Text="{Binding Item}"
+                                 TextTrimming="CharacterEllipsis"
+                                 IsVisible="{Binding HasItem}" />
+                      <TextBlock FontSize="12" Classes="muted" TextWrapping="Wrap" Text="{Binding What}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+      </StackPanel>
+
+      <!-- The export is plaintext on disk, and keypaste leaves it there (D-0592). -->
+      <Border Classes="card" Padding="14" IsVisible="{Binding IsImported}">
+        <Grid ColumnDefinitions="Auto,*">
+          <ctl:KpIcon Grid.Column="0" Icon="trash-2" Size="15" Margin="0,1,10,0" VerticalAlignment="Top"
+                      Foreground="{DynamicResource KpTextMuted}" />
+          <StackPanel Grid.Column="1" Spacing="6">
+            <TextBlock FontSize="13"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource KpTextPrimary}"
+                       Text="{Binding FileName, StringFormat='Delete {0} now'}" />
+            <TextBlock FontSize="12.5"
+                       Classes="secondary"
+                       TextWrapping="Wrap"
+                       Text="It holds your passwords unencrypted, and keypaste does not delete it for you. Delete it, then empty the trash. Deleting does not overwrite the disk blocks it used: on an SSD, a copy-on-write file system or a volume with snapshots or backups, its contents can outlive it, as can a copy a sync service or backup made." />
+            <TextBlock Classes="mono muted" FontSize="12" TextWrapping="Wrap" Text="{Binding FilePath}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <TextBlock Classes="danger"
+                 FontSize="12.5"
+                 TextWrapping="Wrap"
+                 Text="{Binding Message}"
+                 IsVisible="{Binding HasTrailingMessage}" />
+
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button x:Name="ExportCancel"
+                Classes="ghost dialog-action"
+                Content="Cancel"
+                IsVisible="{Binding !IsImported}"
+                Command="{Binding CancelCommand}" />
+        <Button x:Name="ExportChooseAnother"
+                Classes="dialog-action"
+                IsVisible="{Binding CanChooseAnother}"
+                Content="Choose another file…"
+                Command="{Binding ChooseAnotherCommand}" />
+        <Button x:Name="ExportConfirm"
+                Classes="primary dialog-action"
+                IsVisible="{Binding IsPreviewing}"
+                Content="{Binding ConfirmText}"
+                Command="{Binding ConfirmCommand}" />
+        <Button x:Name="ExportDone"
+                Classes="primary dialog-action"
+                IsVisible="{Binding IsImported}"
+                Content="Done"
+                Command="{Binding CancelCommand}" />
+      </StackPanel>
+
+    </StackPanel>
+  </Border>
+
+</UserControl>

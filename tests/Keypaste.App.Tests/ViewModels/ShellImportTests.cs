@@ -195,6 +195,74 @@ public sealed class ShellImportTests : IDisposable
         Assert.Equal(0, shell.Import.PasswordLength);
     }
 
+    /// <summary>One entry point takes either kind of file: an export opens the export dialog, and a file that is neither names what the import reads (D-0590).</summary>
+    [Fact]
+    public async Task An_export_opens_the_export_dialog_and_a_file_that_is_neither_names_what_the_import_reads()
+    {
+        using var shell = NewShell();
+        _picker.ExistingPath = KeePassXcExport();
+
+        await shell.ImportCommand.ExecuteAsync();
+
+        var export = Assert.IsType<ExportImportViewModel>(shell.ExportImport);
+        Assert.Null(shell.Import);
+        Assert.True(shell.HasImport);
+        Assert.True(shell.HasExportImport);
+        Assert.False(shell.HasKdbxImport);
+        Assert.False(shell.ImportCommand.CanExecute(null));
+        await export.ReadAsync();
+        Assert.Equal("KeePassXC CSV · 1 item", export.CardDetail);
+
+        var notes = Path.Combine(_vault.Home, "notes.txt");
+        await File.WriteAllTextAsync(notes, "neither a vault nor an export", TestContext.Current.CancellationToken);
+        shell.OpenImport(notes);
+
+        Assert.Null(shell.ExportImport);
+        Assert.Null(export.Source);
+        var refused = Assert.IsType<KdbxImportViewModel>(shell.Import);
+        Assert.True(refused.IsUnreadable);
+        Assert.Equal(
+            "This file is not a KeePass database. Nor is it an export keypaste reads: Bitwarden JSON, 1Password 1PUX, LastPass CSV, 1Password CSV or KeePassXC CSV.",
+            refused.Message);
+    }
+
+    [Fact]
+    public async Task An_export_imported_stays_open_to_report_and_Done_closes_it_saying_what_it_copied()
+    {
+        using var shell = NewShell();
+        shell.OpenImport(KeePassXcExport());
+        var export = shell.ExportImport!;
+        await export.ReadAsync();
+
+        export.ConfirmCommand.Execute(null);
+
+        Assert.True(export.IsImported, export.Message);
+        Assert.True(shell.HasImport);
+        Assert.Null(shell.Toast);
+        Assert.NotNull(_session.Unlocked!.Find(new EntryName("keepassxc", "site")));
+
+        export.CancelCommand.Execute(null);
+
+        Assert.False(shell.HasImport);
+        Assert.Equal("Imported 1 item from keepassxc.csv", shell.Toast);
+        Assert.True(shell.ImportCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Locking_drops_the_export_dialog()
+    {
+        using var shell = NewShell();
+        shell.OpenImport(KeePassXcExport());
+        var export = shell.ExportImport!;
+        await export.ReadAsync();
+
+        _session.Lock(VaultLockReason.Idle);
+
+        Assert.Null(shell.ExportImport);
+        Assert.Null(export.Source);
+        Assert.Null(shell.Toast);
+    }
+
     [Fact]
     public Task Search_and_page_chords_do_nothing_behind_the_import_dialog() => HeadlessSession.On(() =>
     {
@@ -216,6 +284,14 @@ public sealed class ShellImportTests : IDisposable
         Assert.True(shell.HasImport);
         window.Close();
     });
+
+    /// <summary>A CSV as KeePassXC exports one, its root group's one item.</summary>
+    private string KeePassXcExport()
+    {
+        var path = Path.Combine(_vault.Home, "keepassxc.csv");
+        File.WriteAllText(path, "\"Group\",\"Title\",\"Username\",\"Password\",\"URL\",\"Notes\"\n\"Root\",\"site\",\"maya\",\"kpxc-pw-site\",\"\",\"\"\n");
+        return path;
+    }
 
     private ShellViewModel NewShell() =>
         new(_session, _vault.Home, null, clipboard: _clipboard, clock: new ManualClock(AppClock.Start), picker: _picker,

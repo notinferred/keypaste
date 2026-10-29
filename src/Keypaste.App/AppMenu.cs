@@ -10,7 +10,7 @@ namespace Keypaste.App;
 /// </remarks>
 internal static class AppMenu
 {
-    internal const string ImportHeader = "Import KeePass database…";
+    internal const string ImportHeader = "Import from another app…";
 
     internal static NativeMenu Build(Func<ShellViewModel?> shell)
     {

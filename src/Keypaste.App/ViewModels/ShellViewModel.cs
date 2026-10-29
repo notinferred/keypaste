@@ -90,6 +90,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private int _ticks;
     private readonly Action<string, string?, int?>? _openInPlace;
     private KdbxImportViewModel? _import;
+    private ExportImportViewModel? _exportImport;
     private GroupRow? _groupMenu;
     private bool _waitingForTouch;
     private bool _disposed;
@@ -141,7 +142,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && _share is null);
         CloseShareCommand = new RelayCommand(CloseShare);
         ClearScopeCommand = new RelayCommand(() => (Content as EntriesViewModel)?.ClearScopeCommand.Execute(null));
-        ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && _import is null);
+        ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && !HasImport);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
         NewGroupInsideCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginCreateGroupCommand));
         RenameGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginRenameGroupCommand));
@@ -155,8 +156,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         DependsOn(nameof(HasProjects), nameof(Projects));
         DependsOn(nameof(HasShare), nameof(Share));
         DependsOn(ShareCommand, nameof(Share));
-        DependsOn(nameof(HasImport), nameof(Import));
-        DependsOn(ImportCommand, nameof(Import));
+        DependsOn(nameof(HasKdbxImport), nameof(Import));
+        DependsOn(nameof(HasExportImport), nameof(ExportImport));
+        DependsOn(nameof(HasImport), nameof(Import), nameof(ExportImport));
+        DependsOn(ImportCommand, nameof(HasImport));
         DependsOn(nameof(VaultStatusOk), nameof(VaultStatusTone));
         DependsOn(nameof(VaultStatusAccent), nameof(VaultStatusTone));
         DependsOn(nameof(VaultStatusDanger), nameof(VaultStatusTone));
@@ -536,19 +539,35 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     internal bool HasShare => _share is not null;
 
-    /// <summary>Asks which KDBX file to import, then shows the import dialog over the shell.</summary>
+    /// <summary>Asks which file to import, a KeePass database or another app's export, then shows its dialog over the shell.</summary>
     internal AsyncRelayCommand ImportCommand { get; }
 
-    /// <summary>The KDBX import dialog while it is open, or null.</summary>
+    /// <summary>The KeePass database import dialog while it is open, or null.</summary>
     internal KdbxImportViewModel? Import
     {
         get => _import;
         private set => Set(ref _import, value);
     }
 
-    internal bool HasImport => _import is not null;
+    /// <summary>The export import dialog while it is open, or null.</summary>
+    internal ExportImportViewModel? ExportImport
+    {
+        get => _exportImport;
+        private set => Set(ref _exportImport, value);
+    }
 
-    /// <summary>Shows the import dialog for <paramref name="path"/>, replacing one already open.</summary>
+    internal bool HasKdbxImport => _import is not null;
+
+    internal bool HasExportImport => _exportImport is not null;
+
+    /// <summary>Whether either import dialog is open.</summary>
+    internal bool HasImport => _import is not null || _exportImport is not null;
+
+    /// <summary>
+    /// Shows the import dialog for <paramref name="path"/>, replacing one already open: the KeePass database dialog for a file
+    /// whose KeePass header reads, the export dialog for one an export reader recognizes, and otherwise the KeePass database
+    /// dialog's refusal, naming the exports it is not either (D-0590).
+    /// </summary>
     internal void OpenImport(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -559,6 +578,26 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
 
         _import?.Dispose();
+        _exportImport?.Dispose();
+
+        var readers = Core.Import.ExportImport.Readers;
+
+        if (!Core.Import.KdbxImport.TryProbe(path, out _, out _) && Core.Import.ExportImport.Recognize(path, readers) is not null)
+        {
+            var export = new ExportImportViewModel(_session, path, Imported, readers, _picker is null ? null : PickImportAsync, _post);
+
+            export.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(ExportImport, export))
+                {
+                    ExportImport = null;
+                }
+            };
+
+            ExportImport = export;
+            _ = export.ReadAsync();
+            return;
+        }
 
         var import = new KdbxImportViewModel(
             _session,
@@ -568,7 +607,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             _picker is null ? null : _picker.PickKeyfileAsync,
             _picker is null ? null : PickImportAsync,
             Clipboard.TryPasteIntoAsync,
-            _post);
+            _post,
+            [.. readers.Select(reader => reader.Format)]);
 
         import.Closed += (_, _) =>
         {
@@ -581,16 +621,21 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Import = import;
     }
 
-    /// <summary>Says what an import copied, and rebuilds the screen so it lists the new entries.</summary>
+    /// <summary>Says what an import copied, and rebuilds the screen so it lists the new items.</summary>
     private void Imported(string message)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         ShowToast(message);
         Show(_current);
     }
 
     private async Task PickImportAsync()
     {
-        if (_picker is not null && await _picker.PickExistingAsync().ConfigureAwait(true) is { } path)
+        if (_picker is not null && await _picker.PickImportAsync().ConfigureAwait(true) is { } path)
         {
             OpenImport(path);
         }
@@ -1519,6 +1564,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         EntryActivity?.Dispose();
         _import?.Dispose();
         Import = null;
+        _exportImport?.Dispose();
+        ExportImport = null;
         GroupMenu = null;
         Notice = null;
         Toast = null;

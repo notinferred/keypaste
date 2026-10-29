@@ -45,6 +45,10 @@ internal interface IVaultFilePicker
     /// </remarks>
     Task<string?> PickNewKeyfileAsync(string suggestedName) => Task.FromResult<string?>(null);
 
+    /// <summary>Asks which file to import into the open vault: a KeePass database or another app's export. Null when the person cancelled.</summary>
+    /// <remarks>Read, never written or deleted.</remarks>
+    Task<string?> PickImportAsync() => Task.FromResult<string?>(null);
+
     /// <summary>Asks which <c>.env</c> file to import. Null when the person cancelled.</summary>
     /// <remarks>Read, never written or deleted: the app leaves the file where it was.</remarks>
     Task<string?> PickDotEnvAsync();
