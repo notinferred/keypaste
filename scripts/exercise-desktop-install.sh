@@ -416,6 +416,10 @@ first_session() {
   launch first > /dev/null
   act window drive window 120 || return 0
   act screenshot drive screenshot "$(native "$OUT/first-window.png")" || return 0
+  # A fresh home shows the terms, then the crash-report choice, before the unlock screen (4.11c).
+  act terms drive invoke Continue || return 0
+  act crash-choice drive invoke "Don't send" || return 0
+  act password-focus drive focus id:Password || return 0
   unlock unlocked || return 0
 
   case "$(platform)" in

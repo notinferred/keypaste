@@ -217,6 +217,7 @@ check_desktop_gates() {
   integration_script scripts/verify-connect-client.sh
   integration_script scripts/verify-run-session.sh
   integration_script scripts/verify-held-saves.sh
+  integration_script scripts/verify-crash-report.sh
   # The macOS install and upgrade legs run under the stock bash 3.2 (D-0398).
   if [ "$(uname -s)" = Darwin ]; then
     run /bin/bash scripts/exercise-desktop-install.sh --selftest

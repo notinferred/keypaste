@@ -26,6 +26,7 @@ on:
       - 'scripts/verify-connect-client.sh'
       - 'scripts/verify-run-session.sh'
       - 'scripts/verify-held-saves.sh'
+      - 'scripts/verify-crash-report.sh'
       - 'scripts/verify-clipboard-markers.sh'
       - 'scripts/exercise-desktop-install.sh'
       - 'scripts/exercise-desktop-upgrade.sh'
@@ -46,6 +47,7 @@ on:
       - 'tests/Keypaste.Core.Tests/HardwareKeys/SoftwareYubiKey.cs'
       - 'tests/Keypaste.Core.Tests/ManualClock.cs'
       - 'tests/Keypaste.Core.Tests/FakeShareServer.cs'
+      - 'tests/Keypaste.Core.Tests/FakeCrashServer.cs'
       - 'tests/Keypaste.Core.Tests/CheapKeyDerivation.cs'
       - 'tests/Keypaste.Core.Tests/ProjectVariables.cs'
       - 'tests/Keypaste.Core.Tests/ScriptedBridgeChannels.cs'
@@ -382,8 +384,9 @@ jobs:
           # The Windows package is the app's Windows target, which reaches Windows Hello (D-0549).
           framework=net10.0
           if [ '${{ matrix.rid }}' = win-x64 ]; then framework=net10.0-windows10.0.19041.0; fi
+          # Only these packages name where crash reports go; a source build sends none (D-0598).
           args=(-c Release -r '${{ matrix.rid }}' -f "$framework" --self-contained
-            --no-restore -o 'artifacts/app/${{ matrix.rid }}')
+            --no-restore -o 'artifacts/app/${{ matrix.rid }}' -p:KeypasteCrashEndpoint=https://keypaste.com)
           if [ -n "${{ steps.suffix.outputs.suffix }}" ]; then
             args+=('-p:VersionSuffix=${{ steps.suffix.outputs.suffix }}')
           fi

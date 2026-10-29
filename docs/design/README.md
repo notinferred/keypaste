@@ -101,7 +101,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 
 **Scoped tokens** (Settings › Advanced): a table with columns NAME, TOKEN, SCOPE, MODE (outlined chip), EXPIRES. "New token" is the screen's primary, and the form's Create token, then the minted token's Copy, take its place while shown.
 
-**Diagnostics** (Settings › Advanced): the vault, keypaste's home, `KEYPASTE_HOME` and the version, labels muted 12, values mono 12.
+**Diagnostics** (Settings › Advanced): the vault, keypaste's home, `KEYPASTE_HOME` and the version, labels muted 12, values mono 12. Below, a Crash reports card (16px muted bug, 13/600 heading): a caption counting the reports waiting, or saying the switch is off, and each report as its exact JSON (mono 12, secondary, selectable, wrapping) with a ghost sm Delete at its right, rows split by hairlines (D-0594).
 
 **5. Sharing**: Settings › Advanced › Share links is the share list (what, recipient · rule, status dot, Revoke or Remove) with "Check status". The "New share link" form is the Share… dialog an item's ⋯ menu opens, titled "Share <item>":
 - What (one of the item's fields) and Recipient.
@@ -109,7 +109,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - "Require a passphrase, sent separately" checkbox.
 - Primary button "Create and copy link".
 
-**Settings**: h1 "Settings" over "Saved on this machine, and in force as soon as you change them.", max-width 760, cards 20 apart (radius 10, panel fill, a 16px muted icon and a 13/600 heading, rows 20/14 split by hairlines): Recommendations, Security, Startup, Appearance, Vault access, Backups, Export, Agents and the CLI, Recent vaults, then one row, "Advanced" with its caption and Open, which opens Settings › Advanced (D-0507). No amber.
+**Settings**: h1 "Settings" over "Saved on this machine, and in force as soon as you change them.", max-width 760, cards 20 apart (radius 10, panel fill, a 16px muted icon and a 13/600 heading, rows 20/14 split by hairlines): Recommendations, Security, Startup, Appearance, Vault access, Backups, Export, Agents and the CLI, Recent vaults, Crash reports (a bug icon, the Send crash reports switch and its caption), then one row, "Advanced" with its caption and Open, which opens Settings › Advanced (D-0507). No amber.
 
 **Settings › Advanced**: h1 "Advanced" over "What the everyday screens leave out, each on a screen of its own.", then one card with a row each for Activity log, Share links, Scoped tokens and Diagnostics: the name (13.5/500), a caption, and Open, which opens that screen under Advanced.
 
@@ -137,6 +137,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - Focused password field with an amber caret, amber "Unlock" button, the key-file line, then "More options", which reveals "Unlock with a YubiKey too"; a vault that last opened with a YubiKey shows it directly. While the key waits for a touch, its waiting dot is the amber element and Unlock is secondary.
   - On Windows, a vault Windows Hello can open again: "Unlock it with Windows Hello or its master password." under the heading, and an amber "Unlock with Windows Hello" (15px fingerprint icon) above the password field, with Unlock secondary (D-0553).
   - With no vault selected, the welcome: "Open a vault", then, when KeePassXC has opened databases here, a KEEPASSXC LAST OPENED list (table-heading style, rows as the recent list's, file name in mono with the path in a tooltip) above "Open another file…" and "Create a new vault…", neither amber; with nothing from KeePassXC, the amber "Open a vault…" and "Create a new vault…".
+- **First run** (D-0594), full-window before the welcome, a 520px column under the 56px mark: "Before you start" (22/600) over a 13px secondary line, the terms of use in a 300px filled card that scrolls (title 14/600, its dated line muted 12, headings 13/600, paragraphs 12.5 secondary), and the amber Continue, wide, which has the focus; then "Crash reports", what a report holds and never holds, a muted line that Settings changes it, and Send crash reports and Don't send side by side, equal and secondary, neither the default.
 - **Toast**, bottom-right 20px: `#24262A`, border `#3A3D43`, radius 10, green check icon, auto-dismisses after 2.8s. A copy's toast says "<field> copied." with "Clears in 20s" (muted) and a Clear now link, behind a clipboard-check icon.
 
 ## CLI (`keypaste CLI.dc.html`)

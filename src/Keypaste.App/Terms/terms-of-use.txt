@@ -1,0 +1,29 @@
+// The terms of use the app shows at first run, the one copy of them (D-0597). A line starting // is not shown, a line
+// starting ## is a heading, and every other line is a paragraph. The version is the date on the second shown line, and a
+// new date shows the terms again before anything is sent under them.
+// DRAFT pending H-0027: not legal advice and not reviewed. The founder or a lawyer approves it before 1.0.0, filling in
+// each bracketed item: the legal entity, the limitation of liability and the governing law.
+keypaste terms of use
+Draft version 2026-10-28
+## What these terms cover
+keypaste is a password manager for KeePass files. [legal name] ("keypaste", "we") publishes it. These terms cover the services we run at keypaste.com, which are share links and crash reports, and what the keypaste app sends us.
+## The software and its licence
+keypaste is free software under the GNU Affero General Public License, version 3 (AGPL-3.0). You don't have to accept these terms to run, study, change or share it, and nothing here limits the rights the licence gives you. Where these terms and the licence differ about the software, the licence applies.
+## Your vault stays yours
+Your vault is a file stored where you choose. We never receive your vault, your master password or your key file. Because we never have them, we can't recover them. Keep backups.
+## Crash reports
+If the keypaste desktop app stops working or hits an error it didn't expect, it sends us a crash report so we can find and fix the bug. It does this only if you chose Send crash reports when you first opened it, or turned it on later in Settings. Reports are sent automatically, with no further question.
+A report holds: keypaste's version and build; your operating system, its version number and your processor type; the .NET version; roughly how long the app had been running; which part of the app was open; the date; the type of error; and the names of keypaste's code functions involved, with their positions in the code.
+A report never holds: anything from your vault, including passwords, notes, fields and item or group names; your master password or key file; error messages; file names or paths; environment variables; agent or app names; your activity log; your user or computer name; or any identifier for you or your installation.
+Reports from the CLI and the MCP bridge are never sent. A report waits on your computer until it can be sent, and you can see it under Settings › Advanced › Diagnostics. To stop reports, turn off Send crash reports in Settings. While it's off, nothing is collected or sent, and reports waiting to be sent are deleted.
+Reports travel over HTTPS to keypaste.com, which runs on Cloudflare. Cloudflare sees your IP address to deliver the request. We don't store your IP address. We keep reports for 90 days. Cloudflare's backups can hold them for up to 30 more. Only keypaste's maintainers read them, and we don't sell or share them. A report holds no identifier, so we can't find your particular report. If you ask, we can delete every report for a given version.
+## Share links
+keypaste share encrypts a value on your computer before uploading it. keypaste.com stores only the encrypted value, which it can't open, along with how many views are left, when the link expires, and a fingerprint of the code that cancels it. A link opens 1 to 10 times within 5 minutes to 7 days. It is deleted after the last view, about 30 minutes after it expires, or when you cancel it. Anyone who has a link can open it, so send links privately and use a passphrase for anything sensitive. We may switch sharing off at any time, and a live link can't be opened while it's off. Don't use share links for malware or for anything you have no right to share. We can't see what a link contains, but we may delete a link that is reported to us.
+## No warranty
+keypaste and its services are provided as they are, without warranty of any kind, to the extent the law allows. The licence's own disclaimer (AGPL-3.0 §§15–16) covers the software. Services can change or stop.
+## Limitation of liability
+[To be written by counsel.]
+## Changes to these terms
+We post changes at keypaste.com/terms with a new date. If a change affects crash reports, the app shows it to you before sending anything under the new terms.
+## Contact
+Questions: contact@keypaste.com. Security vulnerabilities: security@keypaste.com. Governing law: [to be decided].

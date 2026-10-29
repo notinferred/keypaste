@@ -76,7 +76,7 @@
               <StackPanel Grid.Column="0" Spacing="4">
                 <TextBlock Classes="row-label" Text="Diagnostics" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="The vault, the folder and the version this app is using." />
+                           Text="The vault, the folder and the version this app is using, and the crash reports waiting to be sent." />
               </StackPanel>
               <Button Grid.Column="1" Name="OpenDiagnostics" Classes="sm" Content="Open" VerticalAlignment="Center"
                       AutomationProperties.Name="Open diagnostics"

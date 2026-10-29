@@ -62,6 +62,9 @@ public sealed record SessionServerOptions
 
     /// <summary>Told of each terminal's edit once it is saved, or null.</summary>
     public Action<EditDone>? Edited { get; init; }
+
+    /// <summary>Told of an exception no rule expected while a request was decided, or null (<see cref="SessionAuthority.Unexpected"/>).</summary>
+    public Action<Exception>? Unexpected { get; init; }
 }
 
 /// <summary>
@@ -149,7 +152,10 @@ public sealed class SessionServer : IDisposable
                 new SessionEnvironments(gate, options.UnlockedFor, options.Clock, envGrants, options.Narrate, launches),
                 options.LockNow,
                 options.Clock,
-                editor);
+                editor)
+            {
+                Unexpected = options.Unexpected,
+            };
 
             return new SessionServer(authority, gate, grants, envGrants, options.WatchEdits, options.UnwatchEdits);
         }

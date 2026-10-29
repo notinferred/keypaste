@@ -57,6 +57,7 @@ internal sealed class SessionHost : IDisposable
     private readonly Action? _requestLock;
     private readonly string? _launchName;
     private readonly HourlyLimit _hourly;
+    private readonly Action<Exception>? _unexpected;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
     private bool _disposed;
@@ -66,12 +67,14 @@ internal sealed class SessionHost : IDisposable
     /// <param name="approvals">Where a person is asked, per unlock.</param>
     /// <param name="requestLock">What <c>keypaste lock</c> runs, or null to refuse it.</param>
     /// <param name="servesLaunches">Whether each unlock is also served on a launch endpoint for the run Terminal starts (D-0451).</param>
+    /// <param name="unexpected">Told of an exception the owner refused a request for as one it could not complete (D-0596), or null.</param>
     internal SessionHost(
         AppVaultSession session,
         string? approverOverride,
         Func<IApprovalChannel> approvals,
         Action? requestLock = null,
-        bool servesLaunches = false)
+        bool servesLaunches = false,
+        Action<Exception>? unexpected = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(approvals);
@@ -80,6 +83,7 @@ internal sealed class SessionHost : IDisposable
         _approverOverride = approverOverride;
         _approvals = approvals;
         _requestLock = requestLock;
+        _unexpected = unexpected;
         _launchName = servesLaunches ? LaunchEndpoint.NewName() : null;
 
         // One for the app's life, so locking and unlocking again does not refill an hourly limit.
@@ -417,7 +421,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done));
+            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), _unexpected);
             _hosted = hosted;
             Endpoint = hosted.Endpoint;
             Failure = hosted.Failure;
@@ -561,7 +565,8 @@ internal sealed class SessionHost : IDisposable
             HourlyLimit hourly,
             string? approverOverride,
             string? launchName,
-            Action<EditDone> edited)
+            Action<EditDone> edited,
+            Action<Exception>? unexpected)
         {
             AuditOpener? audit = new(KeypasteHome.AuditPath(session.Home));
             SessionServer? server = null;
@@ -593,6 +598,7 @@ internal sealed class SessionHost : IDisposable
                     WriteEdit = (asked, edit) => Saved(session.WriteFor(asked, edit, changed => changed)),
                     ClientsPath = KeypasteHome.ClientsPath(session.Home),
                     Edited = edited,
+                    Unexpected = unexpected,
                 });
 
                 string? launchFailure = null;

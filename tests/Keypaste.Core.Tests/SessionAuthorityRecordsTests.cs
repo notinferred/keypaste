@@ -420,13 +420,17 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Assert.Empty(owner.Authority.Released);
     }
 
-    /// <summary>A failure while the owner decides is answered as a failure and recorded, rather than dropping the connection unrecorded (law 3.7).</summary>
+    /// <summary>
+    /// A failure while the owner decides is answered as a failure and recorded, rather than dropping the connection unrecorded
+    /// (law 3.7), and the exception is told to the owner's <see cref="SessionAuthority.Unexpected"/>, which the app reports (D-0596).
+    /// </summary>
     [Fact]
-    public async Task AFailureWhileDeciding_IsRecordedAsFailed()
+    public async Task AFailureWhileDeciding_IsRecordedAsFailed_AndToldAsUnexpected()
     {
+        var told = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
         _fixture.Source.During = () => throw new InvalidOperationException("the disk went away");
-        await using var owner = Owner.Start(this);
+        await using var owner = Owner.Start(this, unexpected: told.Enqueue);
         await using var client = await AttachedAsync(owner);
 
         var reply = await client.RequestAsync(Credential(), Token);
@@ -437,6 +441,22 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
         Assert.True(reply.Recorded);
         Assert.Equal("failed", line.GetProperty("method").GetString());
         Assert.Equal("the request could not be completed", line.GetProperty("reason").GetString());
+        Assert.IsType<InvalidOperationException>(Assert.Single(told));
+    }
+
+    /// <summary>A refusal a rule makes, here a person's denial, is no unexpected exception and tells nothing.</summary>
+    [Fact]
+    public async Task ADenial_TellsNothingUnexpected()
+    {
+        var told = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this, unexpected: told.Enqueue);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.RequestAsync(Credential(), Token);
+
+        Assert.Equal(AuditDecision.Denied, reply?.Decision);
+        Assert.Empty(told);
     }
 
     /// <summary>A peer that hangs up while the person is being asked leaves one line, cancelled, though nobody reads its reply.</summary>
@@ -515,7 +535,11 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
 
         internal SessionAuthority Authority { get; }
 
-        internal static Owner Start(SessionAuthorityRecordsTests test, ApproverFixture? fixture = null, Func<AuditLog?>? audit = null)
+        internal static Owner Start(
+            SessionAuthorityRecordsTests test,
+            ApproverFixture? fixture = null,
+            Func<AuditLog?>? audit = null,
+            Action<Exception>? unexpected = null)
         {
             var used = fixture ?? test._fixture;
             var authority = new SessionAuthority(
@@ -528,7 +552,10 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
                     lifetime => ReferenceEquals(lifetime, test._lifetime) && lifetime.IsLive ? test._vault : null,
                     used.Clock,
                     Narrate: test._narration.Add),
-                clock: used.Clock);
+                clock: used.Clock)
+            {
+                Unexpected = unexpected,
+            };
 
             return new Owner("keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), authority);
         }

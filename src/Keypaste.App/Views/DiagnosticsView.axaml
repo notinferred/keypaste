@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.DiagnosticsView"
              x:DataType="vm:DiagnosticsViewModel">
 
@@ -35,6 +36,30 @@
           <TextBlock Grid.Row="3" Grid.Column="0" Classes="fact" Text="Version" />
           <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="fact-value" Text="{Binding Version}" />
         </Grid>
+      </Border>
+
+      <!-- The crash reports waiting, each as the exact JSON a request would carry, with Delete (D-0594). -->
+      <Border Name="CrashReportsCard" Classes="card filled" Padding="20,16" IsVisible="{Binding HasCrashReports}">
+        <StackPanel Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ctl:KpIcon Icon="bug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Classes="section" Text="Crash reports" />
+          </StackPanel>
+          <TextBlock Name="CrashReportsSummary" Classes="caption" TextWrapping="Wrap" Text="{Binding ReportsSummary}" />
+          <ItemsControl Name="CrashReportRows" ItemsSource="{Binding Reports}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CrashReportRow">
+                <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,0,0,12">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                    <SelectableTextBlock Grid.Column="0" Classes="fact-value" Text="{Binding Json}" />
+                    <Button Grid.Column="1" Classes="sm ghost" Content="Delete" VerticalAlignment="Top"
+                            Command="{Binding DeleteCommand}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
       </Border>
     </StackPanel>
   </ScrollViewer>

@@ -235,6 +235,31 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>The app's crash reports, whose switch this screen shows; null where the app composed none.</summary>
+    internal CrashReporting? Crashes { get; init; }
+
+    internal bool HasCrashReports => Crashes is not null;
+
+    /// <summary>Whether crash reports are sent, as chosen at first run; turning it off deletes the reports waiting (D-0594).</summary>
+    internal bool SendCrashReports
+    {
+        get => Crashes?.IsOn == true;
+        set
+        {
+            if (Crashes is not { } crashes || value == crashes.IsOn)
+            {
+                return;
+            }
+
+            var saved = crashes.Choose(value);
+
+            // The next preference this screen writes starts from the choice, not from what it read when it opened.
+            _settings = _preferences.Current;
+            Raise();
+            Message = saved ? string.Empty : "That preference could not be saved, so it will not survive a restart.";
+        }
+    }
+
     /// <summary>The entry that opens the app at login, or null where Settings offers none.</summary>
     internal ILoginItem? Login { get; init; }
 

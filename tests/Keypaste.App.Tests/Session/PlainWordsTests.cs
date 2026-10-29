@@ -7,6 +7,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
+using Keypaste.App.Terms;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.Tests.Views;
 using Keypaste.App.ViewModels;
@@ -161,15 +162,24 @@ public sealed partial class PlainWordsTests
     });
 
     /// <summary>
-    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the welcome with and without KeePassXC's
-    /// databases, the lock screen with More options open, with Windows Hello offered, and after an access change, the create
-    /// form, each step of the KeePass database import dialog, and each of the export import dialog's (9.1f).
+    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the first run's terms and crash-report
+    /// choice (4.11c), the welcome with and without KeePassXC's databases, the lock screen with More options open, with
+    /// Windows Hello offered, and after an access change, the create form, each step of the KeePass database import dialog,
+    /// and each of the export import dialog's (9.1f).
     /// </summary>
     [Fact]
     public Task TheUnlockScreensAndTheImportDialog_HoldNoneOfTheRetiredWords() => HeadlessSession.On(async () =>
     {
         var said = new List<(string Where, string Text)>();
         var picker = new FakeVaultFilePicker();
+
+        var firstRun = new FirstRunViewModel(TermsOfUse.Carried, _ => true, () => { });
+        var notice = Show(new FirstRunView { DataContext = firstRun });
+        said.AddRange(Shown(notice, "the first run's terms"));
+        firstRun.ContinueCommand.Execute(null);
+        RenderedShell.Drain();
+        said.AddRange(Shown(notice, "the first run's crash-report choice"));
+        notice.Close();
 
         using (var empty = new TempHome())
         {

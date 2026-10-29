@@ -179,6 +179,73 @@ public sealed class CrashOutboxTests : IDisposable
         Assert.Empty(outbox.Waiting());
     }
 
+    /// <summary>The run marker names only the version and when the run started, owner-only, and a tidy of the reports leaves it (D-0595).</summary>
+    [Fact]
+    public void The_run_marker_holds_the_version_and_the_start_and_outlives_a_tidy()
+    {
+        var outbox = new CrashOutbox(Folder, _clock);
+
+        Assert.True(outbox.MarkRunning());
+        outbox.Add(Report("agents"));
+        _ = outbox.Waiting();
+
+        var marker = Path.Combine(Folder, CrashOutbox.RunMarkerName);
+        Assert.Equal($"{CoreInfo.Version} {CrashFixtures.At:O}", File.ReadAllText(marker));
+
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(marker));
+        }
+
+        Assert.True(outbox.ClearRunning());
+        Assert.False(File.Exists(marker));
+        Assert.Single(outbox.Waiting());
+        Assert.True(outbox.ClearRunning());
+    }
+
+    [Fact]
+    public void A_marker_this_version_left_is_taken_as_a_run_that_ended_unexpectedly_on_the_day_it_started()
+    {
+        var outbox = new CrashOutbox(Folder, _clock);
+        Assert.True(outbox.MarkRunning());
+
+        _clock.Advance(TimeSpan.FromDays(2));
+        var ended = outbox.TakeEndedRun();
+
+        Assert.NotNull(ended);
+        Assert.Contains("\"kind\":\"ended-unexpectedly\"", ended.Text, StringComparison.Ordinal);
+        Assert.Contains("\"occurred_on\":\"2026-10-28\"", ended.Text, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(Folder, CrashOutbox.RunMarkerName)));
+        Assert.Null(outbox.TakeEndedRun());
+    }
+
+    [Theory]
+    [InlineData("0.0.1 2026-10-28T09:30:00.0000000+00:00")]
+    [InlineData("{version}")]
+    [InlineData("{version} yesterday")]
+    [InlineData("")]
+    public void A_marker_of_another_version_or_that_does_not_read_is_taken_and_reports_nothing(string text)
+    {
+        Directory.CreateDirectory(Folder);
+        var marker = Path.Combine(Folder, CrashOutbox.RunMarkerName);
+        File.WriteAllText(marker, text.Replace("{version}", CoreInfo.Version, StringComparison.Ordinal));
+
+        Assert.Null(new CrashOutbox(Folder, _clock).TakeEndedRun());
+        Assert.False(File.Exists(marker));
+    }
+
+    [Fact]
+    public void Clearing_takes_the_marker_with_the_folder()
+    {
+        var outbox = new CrashOutbox(Folder, _clock);
+        Assert.True(outbox.MarkRunning());
+
+        Assert.True(outbox.Clear());
+
+        Assert.Null(outbox.TakeEndedRun());
+        Assert.False(Directory.Exists(Folder));
+    }
+
     private static Exception Thrown() => CrashFixtures.Thrown(() => throw new InvalidOperationException());
 
     private static CrashReport Report(string screen) => CrashScrubber.Crash(Thrown(), CrashFixtures.Context with { Screen = screen });

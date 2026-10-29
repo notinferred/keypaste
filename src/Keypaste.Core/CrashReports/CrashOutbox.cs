@@ -1,3 +1,4 @@
+using System.Globalization;
 using Keypaste.Core.Infrastructure;
 
 namespace Keypaste.Core.CrashReports;
@@ -11,6 +12,10 @@ namespace Keypaste.Core.CrashReports;
 /// into one with a count. At most <see cref="MaximumReports"/> files and <see cref="MaximumBytes"/> are kept, the oldest
 /// dropped first, and a report from more than <see cref="MaximumDays"/> days ago is dropped. Files are owner-only outside
 /// Windows. Nothing here throws for want of a disk: a report that cannot be kept is lost.
+/// <para>
+/// The folder also holds the run marker, which names only the version and when the run started: a start that finds it
+/// knows the run before ended with nothing able to report it, and makes it an <c>ended-unexpectedly</c> report (D-0595).
+/// </para>
 /// </remarks>
 public sealed class CrashOutbox
 {
@@ -23,6 +28,10 @@ public sealed class CrashOutbox
     /// <summary>How many days before today a report may have happened and still be kept.</summary>
     public const int MaximumDays = 30;
 
+    /// <summary>The run marker's name in the folder.</summary>
+    public const string RunMarkerName = "running";
+
+    private const int _markerBytes = 128;
     private const string _extension = ".json";
     private const UnixFileMode _ownerOnlyFolder = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
 
@@ -134,6 +143,79 @@ public sealed class CrashOutbox
             }
         }
     }
+
+    /// <summary>Marks this run as started, so a later start can tell it ended with nothing able to report it.</summary>
+    /// <returns>Whether the marker was written.</returns>
+    public bool MarkRunning()
+    {
+        lock (_gate)
+        {
+            try
+            {
+                CreateFolder();
+                AtomicFile.Write(MarkerPath, Encoding.UTF8.GetBytes(CoreInfo.Version + " " + _clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture)));
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+    }
+
+    /// <summary>Removes the run marker, as a run that ends cleanly or has written its crash's report does.</summary>
+    /// <returns>Whether no marker is left.</returns>
+    public bool ClearRunning()
+    {
+        lock (_gate)
+        {
+            try
+            {
+                File.Delete(MarkerPath);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return !File.Exists(MarkerPath);
+            }
+        }
+    }
+
+    /// <summary>Takes the marker an earlier run left, which means that run ended with nothing able to report it.</summary>
+    /// <returns>
+    /// An <c>ended-unexpectedly</c> report dated when that run started, or null when no run left one, when it was another
+    /// version's, whose report would name the wrong one, or when it cannot be read.
+    /// </returns>
+    public CrashReport? TakeEndedRun()
+    {
+        lock (_gate)
+        {
+            try
+            {
+                var marker = new FileInfo(MarkerPath);
+
+                if (!marker.Exists)
+                {
+                    return null;
+                }
+
+                var text = marker.Length <= _markerBytes ? File.ReadAllText(MarkerPath, Encoding.UTF8) : string.Empty;
+                File.Delete(MarkerPath);
+
+                return text.Split(' ') is [var version, var started]
+                    && version == CoreInfo.Version
+                    && DateTimeOffset.TryParseExact(started, "O", CultureInfo.InvariantCulture, DateTimeStyles.None, out var at)
+                        ? CrashScrubber.EndedUnexpectedly(new CrashContext(at, Uptime: null, Screen: null))
+                        : null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+    }
+
+    private string MarkerPath => Path.Combine(Folder, RunMarkerName);
 
     private List<CrashReport> Tidy(string? keep)
     {

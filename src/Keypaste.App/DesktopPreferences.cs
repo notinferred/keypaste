@@ -35,11 +35,15 @@ internal sealed class DesktopPreferences
     internal DesktopPreferences(string? home)
     {
         _path = KeypasteHome.SettingsPath(home);
-        Current = AppSettings.Load(_path);
+        Readable = AppSettings.TryLoad(_path, out var current);
+        Current = current;
     }
 
     /// <summary>What the app is running as.</summary>
     internal AppSettings Current { get; private set; }
+
+    /// <summary>Whether <c>app.toml</c> was absent or read whole at launch, so a first-run answer written to it clobbers no hand edit.</summary>
+    internal bool Readable { get; }
 
     /// <summary>The idle timeout in the shape the session takes it.</summary>
     /// <remarks>

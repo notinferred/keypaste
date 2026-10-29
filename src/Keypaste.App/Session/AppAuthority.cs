@@ -34,16 +34,24 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
     /// <param name="approvals">Where a person is asked, per unlock: launch passes <see cref="WindowApprovalChannel"/> (D-0326).</param>
     /// <param name="requestLock">What <c>keypaste lock</c> runs: launch passes <see cref="RequestLock"/>; null refuses it.</param>
+    /// <param name="unexpected">Keeps a report of an exception a catch-everything block caught at a site it names, or null (D-0596).</param>
     internal AppAuthority(
         AppVaultSession session,
         string? approverOverride,
         Func<IApprovalChannel> approvals,
-        Action? requestLock = null)
+        Action? requestLock = null,
+        Action<Exception, string>? unexpected = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         Session = session;
-        _host = new SessionHost(session, approverOverride, approvals, requestLock, servesLaunches: OperatingSystem.IsMacOS());
+        _host = new SessionHost(
+            session,
+            approverOverride,
+            approvals,
+            requestLock,
+            servesLaunches: OperatingSystem.IsMacOS(),
+            unexpected: unexpected is null ? null : exception => unexpected(exception, CrashReporting.OwnerSite));
     }
 
     /// <summary>What <c>keypaste lock</c> does to the app: locks the session as requested, started from the thread <paramref name="post"/> runs it on and run off it.</summary>

@@ -54,9 +54,10 @@ internal static class Program
             {
                 var preferences = new DesktopPreferences(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
                 var hidden = App.StartsHidden(LoginItems.StartsInBackground(args), preferences);
+                using var crashes = StartCrashReports(preferences);
 
                 return Configured(
-                    () => new App { Claim = claim, Preferences = preferences, DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null },
+                    () => new App { Claim = claim, Preferences = preferences, Crashes = crashes, DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null },
                     showsInDock: !hidden).StartWithClassicDesktopLifetime(args);
             },
             Console.Error,
@@ -114,6 +115,20 @@ internal static class Program
         {
             claim?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// The crash reports of a run under the home's claim, as every start of the app composes them: the process's hooks set,
+    /// an earlier run that ended unreported found by its marker, and the sender started while the person chose to send
+    /// (D-0595). Disposing it at the run's end removes the marker.
+    /// </summary>
+    /// <param name="preferences">The <c>app.toml</c> the run is composed from.</param>
+    internal static CrashReporting StartCrashReports(DesktopPreferences preferences)
+    {
+        var crashes = CrashReporting.ForThisProcess(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable), preferences);
+        crashes.Hook();
+        crashes.Start();
+        return crashes;
     }
 
     /// <summary>

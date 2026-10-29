@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:terms="using:Keypaste.App.Terms"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.FirstRunView"
+             x:DataType="vm:FirstRunViewModel"
+             Background="{DynamicResource KpBgApp}">
+
+  <!-- The first run, before the welcome (D-0594): the terms as a notice with Continue, never "I agree", then the
+       crash-report choice as two equal buttons with no default, so Enter answers nothing. -->
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.first-title">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="-0.66" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="TextBlock.first-text">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="LineHeight" Value="19.5" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="TextBlock.terms-heading">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,8,0,0" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector=":is(TextBlock).terms-text">
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="LineHeight" Value="18.75" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="Button.wide">
+      <Setter Property="Height" Value="38" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="13.5" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Width="520"
+                Margin="24,48,24,32"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="18">
+
+      <ctl:BrandMark Width="56" HorizontalAlignment="Center" />
+
+      <StackPanel Spacing="18" IsVisible="{Binding IsReading}">
+        <StackPanel Spacing="6">
+          <TextBlock Classes="first-title" Text="Before you start" />
+          <TextBlock Classes="first-text"
+                     Text="keypaste keeps your vault on this computer and never sends it anywhere. keypaste.com runs two services, share links and crash reports, which these terms cover. Running keypaste needs no agreement: its licence already lets you." />
+        </StackPanel>
+
+        <Border Classes="card filled" Height="300">
+          <ScrollViewer Name="TermsText" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,16" Spacing="6">
+              <TextBlock Classes="terms-heading" Margin="0" FontSize="14" Text="{Binding Terms.Title}" />
+              <TextBlock Classes="muted" FontSize="12" Text="{Binding Terms.Status}" />
+              <ItemsControl ItemsSource="{Binding Terms.Sections}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="terms:TermsSection">
+                    <StackPanel Spacing="6" Margin="0,0,0,4">
+                      <TextBlock Classes="terms-heading" Text="{Binding Heading}" />
+                      <ItemsControl ItemsSource="{Binding Paragraphs}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <SelectableTextBlock Classes="terms-text" Text="{Binding}" Margin="0,0,0,6" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+
+        <Button Name="Continue"
+                Classes="wide primary"
+                Content="Continue"
+                Command="{Binding ContinueCommand}" />
+      </StackPanel>
+
+      <StackPanel Spacing="18" IsVisible="{Binding IsChoosing}">
+        <StackPanel Spacing="6">
+          <TextBlock Classes="first-title" Text="Crash reports" />
+          <TextBlock Classes="first-text"
+                     Text="If keypaste stops working, it can send keypaste a crash report: the version, your system, and where in keypaste's code the failure happened. A report never holds anything from your vault, a file name or path, or anything that identifies you." />
+          <TextBlock Classes="first-text"
+                     Foreground="{DynamicResource KpTextMuted}"
+                     FontSize="12.5"
+                     Text="You can change this in Settings at any time, and see the reports waiting to be sent under Settings › Advanced › Diagnostics." />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+          <Button Grid.Column="0"
+                  Name="SendCrashReports"
+                  Classes="wide"
+                  Content="Send crash reports"
+                  Command="{Binding SendCommand}" />
+          <Button Grid.Column="1"
+                  Name="DontSend"
+                  Classes="wide"
+                  Content="Don't send"
+                  Command="{Binding DontSendCommand}" />
+        </Grid>
+      </StackPanel>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

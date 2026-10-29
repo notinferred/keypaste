@@ -885,19 +885,24 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         (Content as IDisposable)?.Dispose();
 
+        if (_crashes is not null)
+        {
+            _crashes.Screen = CrashReporting.ScreenOf(destination.Kind);
+        }
+
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { Login = LoginItem, CliLink = CliLink },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { Login = LoginItem, CliLink = CliLink, Crashes = _crashes },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),
             DestinationKind.Trash => new TrashViewModel(_session),
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowToast),
-            DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home),
+            DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes),
             DestinationKind.Advanced => new AdvancedViewModel(_session, kind => Current = Destinations.Of(kind)),
             _ => null,
         };
@@ -970,6 +975,22 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>What Run and Open terminal start a project's terminal with; the platform's own, answered by <see cref="Authority"/>, unless given.</summary>
     internal ProjectLaunching? Launching { get; init; }
 
+    /// <summary>The app's crash reports, which Settings switches and Diagnostics lists, told each screen's name; none where the app composed none.</summary>
+    internal CrashReporting? Crashes
+    {
+        get => _crashes;
+        init
+        {
+            _crashes = value;
+
+            if (value is not null)
+            {
+                value.Screen = CrashReporting.ScreenOf(_current.Kind);
+            }
+        }
+    }
+
+    private readonly CrashReporting? _crashes;
     private HttpMessageHandler? _ownShareTransport;
 
     private SharingViewModel Sharing(string? what = null, Action? cancel = null)

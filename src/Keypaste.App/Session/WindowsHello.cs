@@ -10,12 +10,13 @@ namespace Keypaste.App.Session;
 internal static class QuickUnlockSigners
 {
     /// <summary>Windows Hello in the app's Windows build on Windows 10 2004 or later, and nothing elsewhere (D-0549).</summary>
-    internal static IQuickUnlockSigner? ForThisMachine()
+    /// <param name="unexpected">Keeps a report of a failure Windows Hello does not report as an outcome, at the site it names, or null (D-0596).</param>
+    internal static IQuickUnlockSigner? ForThisMachine(Action<Exception, string>? unexpected = null)
     {
 #if WINDOWS
         if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
         {
-            return new WindowsHello();
+            return new WindowsHello(unexpected);
         }
 #endif
         return null;
@@ -37,7 +38,7 @@ internal static class QuickUnlockSigners
 /// for its window every half second, four times, and puts it in front, as KeePassXC's <c>queueSecurityPromptFocus</c> does.
 /// </para>
 /// </remarks>
-internal sealed class WindowsHello : IQuickUnlockSigner
+internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQuickUnlockSigner
 {
     private const string _keyName = "keypaste";
     private const string _promptWindowClass = "Credential Dialog Xaml Host";
@@ -84,8 +85,9 @@ internal sealed class WindowsHello : IQuickUnlockSigner
             CryptographicBuffer.CopyToByteArray(signed.Result, out signature);
             return SignOutcome.Signed;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            unexpected?.Invoke(ex, CrashReporting.WindowsHelloSite);
             return SignOutcome.Failed;
         }
     }

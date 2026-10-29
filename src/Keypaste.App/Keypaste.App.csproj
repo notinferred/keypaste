@@ -47,6 +47,12 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />
+    <EmbeddedResource Include="Terms/terms-of-use.txt" LogicalName="Keypaste.App.Terms.terms-of-use.txt" />
+  </ItemGroup>
+
+  <!-- Only app.yml's packages name where crash reports go; a source build sends none (D-0598). -->
+  <ItemGroup Condition="'$(KeypasteCrashEndpoint)' != ''">
+    <AssemblyMetadata Include="KeypasteCrashEndpoint" Value="$(KeypasteCrashEndpoint)" />
   </ItemGroup>
 
   <ItemGroup>

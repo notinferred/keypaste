@@ -499,7 +499,9 @@ stop_app() {
 link_from_settings() {
   if [ "$PLATFORM" = linux ]; then act accessibility enable_accessibility || return 0; fi
   start_app "$APP" lower || true
+  # A fresh home shows the terms, then the crash-report choice, before the unlock screen (4.11c).
   { act window drive window 120 \
+    && act terms drive invoke Continue && act crash-choice drive invoke "Don't send" && act password-focus drive focus id:Password \
     && act unlocked drive type "$MASTER" && act unlocked-enter drive key Return && act unlocked drive find 'Lock now' \
     && act settings shortcut 4 && link_cli; } || true
   stop_app

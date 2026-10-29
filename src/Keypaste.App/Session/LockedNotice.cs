@@ -25,6 +25,7 @@ internal sealed class LockedNotice : IDisposable
     private readonly Action _open;
     private readonly TimeProvider _clock;
     private readonly Action<string> _unreachable;
+    private readonly Action<Exception, string>? _unexpected;
 
     // Read and written on the UI thread only.
     private readonly Dictionary<string, LockedAppEndpoint> _listening = new(StringComparer.Ordinal);
@@ -38,7 +39,8 @@ internal sealed class LockedNotice : IDisposable
     /// <param name="open">Shows the main window.</param>
     /// <param name="clock">The clock a notice's arming delay runs on.</param>
     /// <param name="unreachable">Told why, when a vault's endpoint cannot be bound and no bridge can reach this app for it.</param>
-    internal LockedNotice(AppVaultSession session, Action open, TimeProvider clock, Action<string> unreachable)
+    /// <param name="unexpected">Keeps a report of a notice that could not be shown, at the site it names, or null (D-0596).</param>
+    internal LockedNotice(AppVaultSession session, Action open, TimeProvider clock, Action<string> unreachable, Action<Exception, string>? unexpected = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(open);
@@ -49,6 +51,7 @@ internal sealed class LockedNotice : IDisposable
         _open = open;
         _clock = clock;
         _unreachable = unreachable;
+        _unexpected = unexpected;
         _session.Opened += OnOpened;
     }
 
@@ -205,9 +208,10 @@ internal sealed class LockedNotice : IDisposable
             Showing = notice;
             Shown?.Invoke(this, notice);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // A notice that cannot be shown changes nothing: the agent was still refused, and told the app is locked.
+            _unexpected?.Invoke(ex, CrashReporting.LockedNoticeSite);
         }
     }
 

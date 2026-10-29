@@ -85,7 +85,10 @@ public static class KeypasteHome
     public const string CrashReportsDirectoryName = "crash-reports";
 
     /// <summary>Resolves the folder of crash reports waiting to be sent. The folder is not created.</summary>
-    /// <remarks>It holds only what <see cref="CrashReports.CrashScrubber"/> wrote, never a name, path or value (D-0559).</remarks>
+    /// <remarks>
+    /// It holds only what <see cref="CrashReports.CrashScrubber"/> wrote and the run marker, which names the version and
+    /// when the run started, never a name, path or value (D-0559, D-0595).
+    /// </remarks>
     public static string CrashReportsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), CrashReportsDirectoryName);
 

@@ -83,10 +83,12 @@ public sealed record AppSettings
     /// <inheritdoc cref="IdleTimeoutKey"/>
     internal const string StayInTrayKey = "stay_in_tray";
     internal const string VaultKey = "vault";
+    internal const string CrashReportsKey = "crash_reports";
+    internal const string TermsKey = "terms";
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
 
-    private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey];
+    private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
 
     private static readonly string[] _header =
     [
@@ -136,6 +138,13 @@ public sealed record AppSettings
     /// <summary>The vault agents and the CLI use when no <c>--vault</c> or <c>KEYPASTE_VAULT</c> names one, or null.</summary>
     /// <remarks>A full path and never anything read from the vault (D-0389).</remarks>
     public string? Vault { get; init; }
+
+    /// <summary>Whether the person chose to send the desktop app's crash reports; null until they answer.</summary>
+    /// <remarks>Only <c>1</c> in a file that reads whole turns them on, since every failure to read gives <see cref="Default"/> (D-0594).</remarks>
+    public bool? SendCrashReports { get; init; }
+
+    /// <summary>The version of the terms of use the person was shown when they chose, or null.</summary>
+    public string? TermsShown { get; init; }
 
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
@@ -254,6 +263,16 @@ public sealed record AppSettings
         if (settings.Vault is { } vault && CanRecord(vault))
         {
             writer.Text(VaultKey, RecentVaults.Portable(vault), _vaultComment);
+        }
+
+        if (settings.SendCrashReports is { } crashReports)
+        {
+            writer.Number(CrashReportsKey, crashReports ? 1 : 0, "1 sends the app's crash reports to keypaste.com");
+        }
+
+        if (settings.TermsShown is { } terms && writer.CanWrite(TermsKey, terms))
+        {
+            writer.Text(TermsKey, terms, "the terms of use shown when that was chosen");
         }
 
         if (!TryKeep(writer, Existing(path)))
@@ -380,6 +399,10 @@ public sealed record AppSettings
         Vault = table.TryGet(VaultKey, out var vault) && vault.Value.Kind == TomlValueKind.Text
             ? ChosenVault.FullPath(vault.Value.Text)
             : null,
+        SendCrashReports = table.TryGet(CrashReportsKey, out var crashReports) && crashReports.Value.Kind == TomlValueKind.Number
+            ? crashReports.Value.Number == 1
+            : null,
+        TermsShown = table.TryGet(TermsKey, out var terms) && terms.Value.Kind == TomlValueKind.Text ? terms.Value.Text : null,
     };
 
     /// <summary>

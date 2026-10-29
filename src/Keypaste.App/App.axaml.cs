@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using Keypaste.App.Clipboard;
 using Keypaste.App.HardwareKeys;
 using Keypaste.App.Session;
+using Keypaste.App.Terms;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Approval;
@@ -46,10 +47,12 @@ internal sealed partial class App : Application, IDisposable
     private IActivatableLifetime? _activatable;
     private IDisposable? _reopen;
     private LockedNotice? _lockedNotice;
+    private FirstRunViewModel? _firstRun;
     private (string Path, string? Keyfile, int? HardwareKeySlot)? _openNext;
     private int _unlockScreens;
     private bool _shuttingDown;
     private bool _quitting;
+    private bool _crashed;
     private Core.Settings.AppTheme _theme = Core.Settings.AppTheme.System;
     private PlatformThemeVariant _platformTheme = PlatformThemeVariant.Dark;
 
@@ -58,6 +61,13 @@ internal sealed partial class App : Application, IDisposable
     public override void OnFrameworkInitializationCompleted()
     {
         FollowPlatformTheme();
+
+        // Only the app's start composes crash reports, and before anything can throw on the UI thread its exception is
+        // made to lock, clear and quit (D-0595); a test that launches the app in the shared test process sets no hook.
+        if (Crashes is not null)
+        {
+            Dispatcher.UIThread.UnhandledException += OnUnhandledException;
+        }
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -88,12 +98,13 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings),
-            AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)));
+            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings, Unexpected),
+            AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)),
+            Unexpected);
 
         _window = new MainWindow();
         _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
-        _shortcuts = Bind(_window, _session, () => _unlock, () => _shell);
+        _shortcuts = Bind(_window, _session, () => _firstRun is null ? _unlock : null, () => _shell);
         _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
 
         // A Mac user looks for an import under File (D-0374); elsewhere it is on Items' "+".
@@ -107,7 +118,8 @@ internal sealed partial class App : Application, IDisposable
             _session,
             OpenWindow,
             TimeProvider.System,
-            reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"));
+            reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"),
+            Unexpected);
 
         ShowUnlock(home);
 
@@ -173,6 +185,21 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>Shows the Dock icon while the main window is open and hides it while the app is only in the menu bar; set on macOS alone, and by a test.</summary>
     internal Action<bool>? DockIcon { get; init; }
+
+    /// <summary>
+    /// The crash reports of the process the app's start runs, which also shows the first run's terms and choice; none for an
+    /// app a test or the previewer composes, which then shows neither and leaves an exception on the UI thread to the runtime.
+    /// </summary>
+    internal CrashReporting? Crashes { get; init; }
+
+    /// <summary>How a window's clipboard is reached; the platform's unless a test or the driver gives another.</summary>
+    internal Func<TopLevel, IAppClipboard> Clipboards { get; init; } = window => new AvaloniaClipboard(window);
+
+    /// <summary>The exit code of a run a UI-thread exception ended.</summary>
+    internal const int CrashExitCode = 70;
+
+    /// <summary>How a run a UI-thread exception ended stops, given its exit code; the lifetime's own shutdown unless a test, whose shared dispatcher it would end, gives another.</summary>
+    internal Action<int>? Ending { get; init; }
 
     /// <summary>Whether a start opens no window: one at login while the app stays in the menu bar or tray.</summary>
     /// <param name="background">Whether it is a start at login.</param>
@@ -316,14 +343,19 @@ internal sealed partial class App : Application, IDisposable
             preferences.IdleTimeout,
             KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)),
             HardwareKeys(),
-            QuickUnlockSigner());
+            QuickUnlockSigner is { } signer ? signer() : QuickUnlockSigners.ForThisMachine(Unexpected));
     }
 
     /// <summary>What reaches hardware keys; the connected YubiKeys unless a test gives another.</summary>
     internal Func<IChallengeResponseDevice> HardwareKeys { get; init; } = () => new YubiKeyHardware();
 
     /// <summary>What a quick unlock asks; Windows Hello in the Windows build on Windows and none elsewhere, unless a test gives another.</summary>
-    internal Func<IQuickUnlockSigner?> QuickUnlockSigner { get; init; } = QuickUnlockSigners.ForThisMachine;
+    internal Func<IQuickUnlockSigner?>? QuickUnlockSigner { get; init; }
+
+    /// <summary>Keeps a report of an exception a catch-everything block caught, when crash reports are composed and on.</summary>
+    /// <param name="exception">The exception.</param>
+    /// <param name="site">The block, one of <see cref="CrashReporting"/>'s site names.</param>
+    internal void Unexpected(Exception exception, string site) => Crashes?.Unexpected(exception, site);
 
     /// <summary>
     /// Arms the minimize-lock setting against a window.
@@ -465,8 +497,73 @@ internal sealed partial class App : Application, IDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
+            // An app ending after a crash builds no screen it is about to take down.
+            if (_crashed)
+            {
+                return;
+            }
+
             ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable), LockMessage(reason), reason);
             _tray?.Refresh();
+        });
+    }
+
+    private void OnUnhandledException(object? sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        e.Handled = true;
+        EndAfterCrash(e.Exception);
+    }
+
+    /// <summary>
+    /// What an exception nothing on the UI thread caught does (D-0595): its report is kept while reports are on, then the
+    /// vault locks, the clipboard is given back and the app quits with <see cref="CrashExitCode"/>, so neither a copied
+    /// secret nor the exception's message, which the runtime would print, outlives it.
+    /// </summary>
+    /// <remarks><c>internal</c> so a test runs it as the dispatcher's hook does; a second exception while it ends is only reported.</remarks>
+    internal void EndAfterCrash(Exception exception)
+    {
+        Crashes?.Crash(exception);
+
+        if (_crashed)
+        {
+            return;
+        }
+
+        _crashed = true;
+        _quitting = true;
+        StopAnswering();
+
+        var session = _session;
+        var clipboard = _shell?.Clipboard;
+        var desktop = _desktop ?? ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                if (session is not null)
+                {
+                    await session.LockAsync(VaultLockReason.Shutdown).ConfigureAwait(true);
+                }
+
+                if (clipboard is not null)
+                {
+                    await clipboard.CloseAsync().ConfigureAwait(true);
+                }
+
+                await QuitAsync().ConfigureAwait(true);
+            }
+            finally
+            {
+                if (Ending is { } ending)
+                {
+                    ending(CrashExitCode);
+                }
+                else
+                {
+                    desktop?.Shutdown(CrashExitCode);
+                }
+            }
         });
     }
 
@@ -517,7 +614,7 @@ internal sealed partial class App : Application, IDisposable
             message,
             next is null ? reason : null,
             KeePassXcConfigs,
-            new AvaloniaClipboard(_window).TryPasteIntoAsync);
+            Clipboards(_window).TryPasteIntoAsync);
 
         if (next is { } file)
         {
@@ -526,8 +623,36 @@ internal sealed partial class App : Application, IDisposable
 
         _lockedNotice?.Watch(_unlock);
 
-        _window.FindControl<ContentControl>("Root")!.Content =
-            new UnlockView { DataContext = _unlock };
+        // The first run's terms and choice come before the welcome, with the unlock screen built behind them (D-0594).
+        if (_firstRun is null && Crashes is { AwaitsAnswer: true } crashes)
+        {
+            _firstRun = new FirstRunViewModel(TermsOfUse.Carried, crashes.Choose, ShowUnlockScreen);
+            crashes.Screen = "first-run";
+            _window.FindControl<ContentControl>("Root")!.Content = new FirstRunView { DataContext = _firstRun };
+            return;
+        }
+
+        if (_firstRun is null)
+        {
+            ShowUnlockScreen();
+        }
+    }
+
+    private void ShowUnlockScreen()
+    {
+        if (_window is null || _unlock is null)
+        {
+            return;
+        }
+
+        _firstRun = null;
+
+        if (Crashes is { } crashes)
+        {
+            crashes.Screen = "unlock";
+        }
+
+        _window.FindControl<ContentControl>("Root")!.Content = new UnlockView { DataContext = _unlock };
     }
 
     private void OnUnlocked(int screen)
@@ -550,7 +675,7 @@ internal sealed partial class App : Application, IDisposable
             Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
             _authority,
             ApplyTheme,
-            new AvaloniaClipboard(_window),
+            Clipboards(_window),
             TimeProvider.System,
             action => Dispatcher.UIThread.Post(action),
             _preferences,
@@ -564,6 +689,7 @@ internal sealed partial class App : Application, IDisposable
             CliLink = CliLinkFor(),
             Tools = ClientConnector.ForThisProcess,
             Launching = LaunchingFor(_authority),
+            Crashes = Crashes,
         };
 
         _window.FindControl<ContentControl>("Root")!.Content =
@@ -644,6 +770,12 @@ internal sealed partial class App : Application, IDisposable
         }
 
         StopAnswering();
+
+        // An app ending after a crash keeps its hook until the process ends, so nothing further reaches the runtime.
+        if (Crashes is not null && !_crashed)
+        {
+            Dispatcher.UIThread.UnhandledException -= OnUnhandledException;
+        }
 
         if (_preferences is not null)
         {

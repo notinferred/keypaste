@@ -117,6 +117,10 @@ public sealed class SessionAuthority : IApproverHandler
         _clock = clock ?? TimeProvider.System;
     }
 
+    /// <summary>Told of an exception no rule expected, which the request it ended is refused for; it must not throw.</summary>
+    /// <remarks>The desktop app reports it as a crash report's catch site (D-0596); <c>keypaste approve</c> sets none.</remarks>
+    public Action<Exception>? Unexpected { get; init; }
+
     /// <summary>The session a request attaching now would be answered under, or null while the vault is locked.</summary>
     /// <remarks>Read the way every request reads it, so a status built on it says what an agent would meet.</remarks>
     public string? Serving => Live()?.Id;
@@ -1263,8 +1267,9 @@ public sealed class SessionAuthority : IApproverHandler
 
             return refused(AuditMethod.Cancelled, "the request was withdrawn before it was answered");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Unexpected?.Invoke(ex);
             return refused(AuditMethod.Failed, "the request could not be completed");
         }
     }

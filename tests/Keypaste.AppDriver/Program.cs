@@ -59,6 +59,10 @@ namespace Keypaste.AppDriver;
 /// <c>twofish-create</c> is no act of the app's: it writes the Twofish vault the workflows gate starts from, which
 /// <c>keepassxc-cli</c> cannot make, as <see cref="TwofishVault"/> says.
 /// </para>
+/// <para>
+/// <c>crash-endpoint</c> is no act of the app's either: it stands in for keypaste.com's crash route on loopback, as
+/// <see cref="CrashEndpoint"/> says.
+/// </para>
 /// </remarks>
 internal static class Program
 {
@@ -111,7 +115,10 @@ internal static class Program
         "       twofish-create <vault>\n" +
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
-        "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed)\n" +
+        "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed;\n" +
+        "             first-run send | dont-send; unlock <vault>; copy <title>; lock; crash <text>)\n" +
+        "       crash-endpoint <folder> [--silent]\n" +
+        "            (answers crash reports on loopback 204 and keeps each in <folder>, or never answers, until standard input closes)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password, entry password or field value.";
 
@@ -183,6 +190,8 @@ internal static class Program
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 ["launch"] => AppLaunch.Run(KeypasteHome.Resolve(home), []),
                 ["launch", "--background"] => AppLaunch.Run(KeypasteHome.Resolve(home), ["--background"]),
+                ["crash-endpoint", var folder] => CrashEndpoint.Run(folder, silent: false),
+                ["crash-endpoint", var folder, "--silent"] => CrashEndpoint.Run(folder, silent: true),
                 _ => Usage(),
             };
         }

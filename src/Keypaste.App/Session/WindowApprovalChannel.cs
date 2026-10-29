@@ -29,7 +29,12 @@ namespace Keypaste.App.Session;
 /// <param name="clock">The clock the arming delay and the countdown run on.</param>
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
 /// <param name="openSettings">What the Always for notice's Open settings does with the agent's name, or null to offer Close alone.</param>
-internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerWindow, Action<string>? openSettings = null) : IApprovalChannel
+/// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null (D-0596).</param>
+internal sealed class WindowApprovalChannel(
+    TimeProvider clock,
+    TimeSpan answerWindow,
+    Action<string>? openSettings = null,
+    Action<Exception, string>? unexpected = null) : IApprovalChannel
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -115,9 +120,10 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
                 window.Show();
                 Shown?.Invoke(this, window);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // A notice that cannot be shown changes nothing: the release stands, and the change's line says why it did not.
+                unexpected?.Invoke(ex, CrashReporting.AlwaysForNoticeSite);
             }
         });
     }
@@ -172,11 +178,12 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
                 Shown?.Invoke(this, window);
                 _ = ArmAsync(request, cancellationToken);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // A prompt that cannot be shown is a failure to ask, and a failure to ask is a no.
                 request.Fail();
                 TakeDown();
+                unexpected?.Invoke(ex, CrashReporting.PromptSite);
             }
         });
 

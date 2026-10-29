@@ -830,6 +830,13 @@ public sealed class ScreenRenderer
         window.FindControl<ContentControl>("Root")!.Content = new UnlockView { DataContext = unlock };
         window.Show();
         Save(window, output, "00-unlock");
+
+        // The first run, before the welcome: the terms, then the crash-report choice (4.11c).
+        var firstRun = new FirstRunViewModel(Terms.TermsOfUse.Carried, _ => true, () => { });
+        window.FindControl<ContentControl>("Root")!.Content = new FirstRunView { DataContext = firstRun };
+        Save(window, output, "00a-first-run-terms");
+        firstRun.ContinueCommand.Execute(null);
+        Save(window, output, "00b-first-run-choice");
         window.Close();
     }
 

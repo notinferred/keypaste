@@ -93,6 +93,38 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Equal(stays, AppSettings.Load(SettingsFile).StayInTray);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void The_crash_report_choice_and_its_terms_round_trip_and_are_absent_until_made(bool send)
+    {
+        AppSettings.Save(SettingsFile, AppSettings.Default);
+
+        Assert.DoesNotContain("crash_reports", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+        Assert.Null(AppSettings.Load(SettingsFile).SendCrashReports);
+        Assert.Null(AppSettings.Load(SettingsFile).TermsShown);
+
+        AppSettings.Save(SettingsFile, AppSettings.Default with { SendCrashReports = send, TermsShown = "2026-10-28" });
+
+        var text = File.ReadAllText(SettingsFile);
+        Assert.Contains($"crash_reports = {(send ? 1 : 0)}", text, StringComparison.Ordinal);
+        Assert.Contains("terms = \"2026-10-28\"", text, StringComparison.Ordinal);
+        Assert.Equal((send, "2026-10-28"), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsShown));
+    }
+
+    /// <summary>Only 1 sends crash reports: any other number is a no, and a value that is not a number is no answer (D-0594).</summary>
+    [Theory]
+    [InlineData("crash_reports = 1", true)]
+    [InlineData("crash_reports = 0", false)]
+    [InlineData("crash_reports = 2", false)]
+    [InlineData("crash_reports = \"1\"", null)]
+    public void Only_a_one_sends_crash_reports(string line, bool? send)
+    {
+        File.WriteAllText(SettingsFile, $"[[settings]]\n{line}\n");
+
+        Assert.Equal(send, AppSettings.Load(SettingsFile).SendCrashReports);
+    }
+
     /// <summary>
     /// The reason the flag is a number: the reader refuses <c>true</c> and <c>false</c> so that a
     /// policy file cannot say yes in a shape keypaste had to guess at.
