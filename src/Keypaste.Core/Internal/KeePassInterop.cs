@@ -4395,7 +4395,9 @@ internal sealed class KeePassInterop : IDisposable
             bool onlyMine = !equal && known is not null && Same(theirDigest, known.Digest);
 
             // The file descends from the base when the base's version is in its history: its change is taken whatever the stamps say (D-0538).
-            bool onlyTheirs = !equal && !onlyMine && known is not null && Same(myDigest, known.Digest) && HeldIn(history, known.Digest);
+            // So is a later file whose version differs only in place and stamps, as KeePassXC stamps an entry it recycles and keeps no version (D-0674).
+            bool onlyTheirs = !equal && !onlyMine && known is not null && Same(myDigest, known.Digest)
+                && (HeldIn(history, known.Digest) || (Second(theirs.LastModificationTime) > Second(mine.LastModificationTime) && SameContent(mine, theirs)));
             bool byTime = !equal && !onlyMine && !onlyTheirs;
             bool tie = byTime && Second(mine.LastModificationTime) == Second(theirs.LastModificationTime);
             bool mineCurrent = onlyMine || (byTime && Second(mine.LastModificationTime) >= Second(theirs.LastModificationTime));
@@ -4497,6 +4499,12 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         private bool Changed(PwEntry entry, BaseRecord known) => !Same(_digests.Of(entry), known.Digest) || Moved(entry, known);
+
+        private static bool SameContent(PwEntry mine, PwEntry theirs) =>
+            mine.EqualsEntry(
+                theirs,
+                PwCompareOptions.IgnoreParentGroup | PwCompareOptions.IgnoreTimes | PwCompareOptions.IgnoreHistory | PwCompareOptions.NullEmptyEquivStd,
+                MemProtCmpMode.Full);
 
         private static void Add(PwEntry entry, PwGroup group) => group.AddEntry(entry, true, false);
 

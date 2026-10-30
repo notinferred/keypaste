@@ -422,6 +422,63 @@ public sealed class VaultMergeTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// An item this copy did not change is the file's whole when the file's is stamped later, though the file kept no version of it, as
+    /// KeePassXC stamps an item it recycles: no conflict, nothing added to its history and nothing taken from this copy (D-0674).
+    /// </summary>
+    [Fact]
+    public void AnItemOnlyTheFileChanged_WithoutKeepingAVersion_IsTheFilesWhole()
+    {
+        Seed(database => Recycle(database, AddEntry(Group(database, _work), "binned", _seeded)), "stripe");
+        using var open = Vault.Open(VaultPath, _password);
+        InFile(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            var from = entry.ParentGroup;
+            MoveTo(entry, database.RootGroup.FindGroup(database.RecycleBinUuid, true)!, _later);
+            entry.PreviousParentGroup = from.Uuid;
+            entry.LastModificationTime = _later;
+        });
+
+        var report = Merge(open);
+
+        Read(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            Assert.Equal(database.RecycleBinUuid, entry.ParentGroup.Uuid);
+            Assert.Empty(entry.History);
+        });
+        Assert.Empty(report.Conflicts);
+        Assert.False(report.TookFromOpenCopy);
+    }
+
+    /// <summary>
+    /// A later save from a copy forked before this copy saved its change keeps that change in history, though this copy holds nothing
+    /// unsaved: its content differs from the file's, so the file's version does not stand for it (D-0538, D-0674).
+    /// </summary>
+    [Fact]
+    public void ALaterSaveFromAForkTakenBeforeThisCopysSave_KeepsThisCopysChangeInHistory()
+    {
+        Seed("stripe");
+        var fork = Path.Combine(_directory, "fork.kdbx");
+        File.Copy(VaultPath, fork);
+        using var open = Vault.Open(VaultPath, _password);
+        Update(open, "stripe", "mine");
+        open.Save();
+        InFile(fork, database => Edit(database, "stripe", _later, entry => SetPassword(entry, "theirs")));
+        File.Copy(fork, FilePath, overwrite: true);
+
+        var report = Merge(open);
+
+        Read(FilePath, database =>
+        {
+            var entry = Entry(database, "stripe");
+            Assert.Equal("theirs", Password(entry));
+            Assert.Contains("mine", HistoryPasswords(entry));
+        });
+        Assert.Single(report.Conflicts);
+    }
+
     /// <summary>Recycling is a move, so the item ends in the bin with the other copy's edit (D-0540).</summary>
     [Fact]
     public void ARecycledEntry_KeepsTheOtherCopysEdit()
