@@ -1,12 +1,37 @@
 # Build plan
 
-This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.18 (D-0632). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
+This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.19 (D-0667). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
 ## K and B — Build infrastructure
 
-These rows serve every track: a development machine builds only the compile check (D-0468), and CI runs every check in parallel on every run (D-0423). ROADMAP places them in 1.0.0, the milestone that was 0.5.0 when the founder placed them there on 2026-09-30.
+These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672): they move architecture rules into the compiler, tests onto the founder's machine and hand-written code onto established libraries in the order PRODUCT §4.9 sets (D-0670, D-0671).
+
+- [ ] **K.7 — Hold the architecture rules in the compiler.** Needs: none.
+  - Microsoft's `BannedApiAnalyzers` and project references express what the source-scanning rule tests hold today, such as only `Internal/KeePassInterop.cs` touching KeePassLib, one file reading the clipboard, only `Keypaste.Browser` calling libsodium and the CLI and bridge reaching no app type; ArchUnitNET holds the namespace rules an analyzer cannot (D-0670).
+  - Accepted when each rule fails the local compile check on a deliberate violation, the `*Rules*Tests` and `*Boundary*Tests` classes it replaces are deleted, and each one that stays says why.
+- [ ] **K.8 — Run test classes on the founder's machine.** Needs: none.
+  - `verify.sh` gains a local mode that runs one test project or class with the pinned SDK and leaves nothing running, which CLAUDE.md names (D-0671).
+  - Accepted when a Core, a CLI and an App test class run on the founder's Mac with the same result as the same class on CI.
+- [ ] **B.5 — Cache NuGet restores in CI.** Needs: none.
+  - Locked-mode restores are cached by their lock files' hash, an exception to D-0423's "nothing cached" for restores only (D-0671).
+  - Accepted when a second run restores from the cache, a changed lock file restores fresh, and both runs' job times are recorded.
+- [ ] **B.6 — Repeat no green branch run on `main`.** Needs: none.
+  - A push run on `main` whose commit already has green dispatched `ci` and `app` runs ends at once, naming them, while `require-green-gates.sh` still finds a full green run for a release tag (D-0403).
+  - Accepted when an integration push of a verified commit spends under a minute per workflow and an unverified commit still runs every job.
+- [ ] **K.9 — Declare retries and timeouts as resilience policies.** Needs: none.
+  - Microsoft.Extensions.Resilience replaces the hand-rolled retry and delay loops a policy can express, such as the vault's save retries, pipe connects and the crash sender, with time still injected for tests.
+  - Accepted when the replaced sites' tests pass unchanged on the three runners and the loops are gone.
+- [ ] **K.10 — Parse the CLI with System.CommandLine.** Needs: none.
+  - Each verb's arguments and help come from System.CommandLine, and `Infrastructure/CommandLine.cs` goes once nothing uses it; the help keeps what `verify-demo.sh` checks.
+  - Accepted when the CLI tests and the published transcripts pass unchanged.
+- [ ] **K.11 — Test parsers by property and outputs by snapshot.** Needs: none.
+  - CsCheck properties replace example suites wherever a property states the rule, for TOML, CSV, placeholders, the Public Suffix List matcher and the merge, and Verify snapshots hold help text and listings.
+  - Accepted when each property suite catches every mutation its example suite caught, and the examples it replaces are deleted.
+- [ ] **K.12 — Move the view models onto CommunityToolkit.Mvvm.** Needs: none.
+  - Its source-generated properties and commands replace `Keypaste.Mvvm`'s base, `DependsOn` becoming its `NotifyPropertyChangedFor`.
+  - Accepted when the App tests pass on the three runners and `Keypaste.Mvvm` is removed.
 
 ## T3 — AI requests in the app
 
@@ -47,7 +72,7 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **H-0028 — Make the crash-report database and switch the route on.** Human. Needs: 4.11b.
   - Follow [Switching crash reports on](../site/README.md#switching-crash-reports-on-h-0028) in `site/README.md`: create the D1 database, add its `CRASH_DB` binding and `CRASH_ENABLED` to `wrangler.jsonc`, apply `crash-schema.sql`, and integrate that one commit ([4.11b](steps/4.11b.md)).
   - Acceptance: before it, `verify-site-endpoint.sh` sees the deployed route answer 503; after its deploy, the script sees the route's refusals, and a probe report is stored, read back with `wrangler d1 execute` and deleted.
-- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, every T6 and T7 task but a person's check on real hardware (D-0557), V.8a and V.8b, 4.11a to 4.11c, and the fixes marked for 1.0.0 (D-0530). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12, B.5 and B.6 (D-0672), every T6 task but a person's check on real hardware (D-0557) and 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
   - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.
@@ -150,7 +175,7 @@ Each row keeps its historical meaning and is expanded when selected. Designs the
 
 ## T7 — Agents without values
 
-PRODUCT v1.9 (D-0400) adds T7–T10, v1.10 (D-0408) adds the cloud vault to T8 and adds T11, v1.12 (D-0430) adds X.17 to T7, and v1.15 (D-0530) puts T7 in 1.0.0, which T8–T11 follow. Each row carries its purpose until it is selected and detailed.
+PRODUCT v1.9 (D-0400) adds T7–T10, v1.10 (D-0408) adds the cloud vault to T8 and adds T11, v1.12 (D-0430) adds X.17 to T7, v1.15 (D-0530) put T7 in 1.0.0, and v1.19 (D-0669) moves it after 1.0.0, which T8–T11 follow too. Each row carries its purpose until it is selected and detailed.
 
 - [ ] **X.1 — Attach approved credentials on the wire.** Needs: none.
   - The process holding the vault proxies an agent's HTTPS requests to the hosts an entry names and attaches the entry's credential under a grant the person approved; the agent holds only a placeholder (PRODUCT §2, §3.2).
