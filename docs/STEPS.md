@@ -12,6 +12,9 @@ These rows serve every track: a development machine builds only the compile chec
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
+- [ ] **F.74 — Find why KeePassXC 2.8.0 exits at the macOS first-run gate.** Needs: none.
+  - In app 40984082285 at `28a95a73`, keepassxc first run (macos-15) failed with "FIRST-RUN GATE FAILED: KeePassXC exited before opening the vaults", its last output a Qt font-alias warning; the rerun of that job passed, which does not close it. Nothing that run's batch changed touches first run or how the gate starts KeePassXC. [F.68](steps/F.68.md) recorded 2.8.0 not crashing in 60 starts as evidence, not KeePassXC's diagnosis.
+  - Capture KeePassXC's exit status and crash report on the runner when it exits early, so the next occurrence names the cause, then repair the gate or report upstream.
 - [ ] **F.73 — Find why a masked field's window surface differed on macOS.** Needs: none.
   - In app 40909966048 at `34564a1a`, desktop tests (macos-15), `DrawnMaskTests.A_shell_field_leaves_the_window_surface_the_same_for_any_value(name: "AccessConfirmPassword")` failed once: the window's property dump for two typed values differed at position 11822, past an `ItemsControl`'s `ItemCount` and `ItemsPanel`, around its `ItemsSource` (`DrawnMaskTests.cs:168`); the rerun of that job passed, which does not close it. Nothing that run's batch changed is in the app. [F.17](steps/F.17.md) closed an earlier exposure in the same field.
   - Diagnose what changes in the surface between the two values, keep its regression and repair the cause, whether the test reads a surface still settling or the field leaks its value's shape.
