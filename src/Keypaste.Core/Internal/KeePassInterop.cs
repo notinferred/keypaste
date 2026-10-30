@@ -139,7 +139,7 @@ internal sealed class KeePassInterop : IDisposable
     internal static KeePassInterop OpenReadOnly(string path, byte[] utf8Password, string? keyfilePath, HardwareKey? hardwareKey = null) =>
         new(OpenDatabase(path, utf8Password, keyfilePath, hardwareKey)) { _readOnly = true };
 
-    /// <summary>The factors this vault was opened with, for <see cref="Reopen"/>.</summary>
+    /// <summary>The factors this vault was opened with, for <see cref="Reopen(string, KeyCopy)"/> and <see cref="Reopen(string, byte[], KeyCopy)"/>.</summary>
     internal KeyCopy CopyKey()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -166,6 +166,20 @@ internal sealed class KeePassInterop : IDisposable
         return new KeePassInterop(database) { _partsKeyfilePath = key.PartsKeyfilePath };
     }
 
+    /// <summary>Opens bytes read from the vault at <paramref name="path"/> with a key another instance copied, as <see cref="Reopen(string, KeyCopy)"/> opens the file.</summary>
+    /// <param name="path">The file the bytes were read from, which a save writes.</param>
+    /// <param name="bytes">The file's bytes, read once by the caller, which digested them.</param>
+    /// <param name="key">The key.</param>
+    /// <exception cref="InvalidMasterPasswordException">The key no longer opens the vault.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
+    /// <exception cref="VaultException">The bytes are not a whole KeePass database.</exception>
+    internal static KeePassInterop Reopen(string path, byte[] bytes, KeyCopy key)
+    {
+        var database = OpenDatabase(path, () => key.Key, key.HasKeyfile, key.HasHardwareKey, bytes);
+        ApplyWriteSafety(database);
+        return new KeePassInterop(database) { _partsKeyfilePath = key.PartsKeyfilePath };
+    }
+
     private static PwDatabase OpenDatabase(
         string path, byte[] utf8Password, string? keyfilePath, HardwareKey? hardwareKey = null) =>
         OpenDatabase(
@@ -174,12 +188,22 @@ internal sealed class KeePassInterop : IDisposable
             !string.IsNullOrEmpty(keyfilePath),
             hardwareKey is not null);
 
-    private static PwDatabase OpenDatabase(string path, Func<CompositeKey> key, bool hasKeyfile, bool hasHardwareKey)
+    private static PwDatabase OpenDatabase(string path, Func<CompositeKey> key, bool hasKeyfile, bool hasHardwareKey, byte[]? bytes = null)
     {
         PwDatabase database = new();
         try
         {
-            database.Open(IOConnectionInfo.FromPath(path), key(), null);
+            if (bytes is null)
+            {
+                database.Open(IOConnectionInfo.FromPath(path), key(), null);
+            }
+            else
+            {
+                // PwDatabase.Open's load, over the bytes the caller read and digested rather than a second read of the file.
+                database.New(IOConnectionInfo.FromPath(path), key());
+                new KdbxFile(database).Load(new MemoryStream(bytes, writable: false), KeePassLib.Serialization.KdbxFormat.Default, null);
+                database.Modified = false;
+            }
         }
         catch (InvalidCompositeKeyException ex)
         {

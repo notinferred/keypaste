@@ -15,7 +15,7 @@ namespace Keypaste.Core.Ownership;
 /// </para>
 /// <para>
 /// A lock while the person is being asked withdraws the question, and a lock after it commits
-/// nothing: either way no value leaves. A reload does the same while keeping the lifetime (D-0412).
+/// nothing: either way no value leaves. A reload or a merge does the same while keeping the lifetime (D-0412, D-0542).
 /// </para>
 /// </remarks>
 public sealed class SessionEnvResolver
@@ -125,7 +125,7 @@ public sealed class SessionEnvResolver
             catch (OperationCanceledException) when (withdrawn.IsCancellationRequested)
             {
                 return !lifetime.IsLive ? Locked(project, profile)
-                    : waiting.IsCancellationRequested ? Reloaded(project, profile)
+                    : waiting.IsCancellationRequested ? Withdrawn(lifetime, project, profile)
                     : EnvResolved.Refused(preview.Project, EnvOutcome.Declined, profile: preview.Profile);
             }
 
@@ -148,7 +148,7 @@ public sealed class SessionEnvResolver
         }
 
         return lifetime.TryCommitAfter(waiting) ? resolved
-            : lifetime.IsLive ? Reloaded(project, profile)
+            : lifetime.IsLive ? Withdrawn(lifetime, project, profile)
             : Locked(project, profile);
     }
 
@@ -173,6 +173,6 @@ public sealed class SessionEnvResolver
     private static EnvResolved Locked(string project, string profile) =>
         EnvResolved.Refused(project, EnvOutcome.Locked, profile: profile);
 
-    private static EnvResolved Reloaded(string project, string profile) =>
-        EnvResolved.Refused(project, EnvOutcome.ChangedWhileAsked, profile: profile, refusal: "the vault was reloaded from its file before the set was released");
+    private static EnvResolved Withdrawn(SessionLifetime lifetime, string project, string profile) =>
+        EnvResolved.Refused(project, EnvOutcome.ChangedWhileAsked, profile: profile, refusal: $"{lifetime.WithdrawnBecause} before the set was released");
 }

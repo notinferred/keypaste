@@ -16,7 +16,7 @@ public enum AuditDecision
 /// <see cref="Prompt"/> with <see cref="AuditDecision.Denied"/> means a person said no, and only
 /// <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got to it.
 /// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="GrantCache"/>, <see cref="Automatic"/>,
-/// <see cref="Token"/> and <see cref="Narrowing"/> ever accompany <see cref="AuditDecision.Granted"/>.
+/// <see cref="Token"/>, <see cref="Narrowing"/> and <see cref="Merged"/> ever accompany <see cref="AuditDecision.Granted"/>.
 /// <see cref="Automatic"/> is the one release no person saw, so it must never be logged as
 /// <see cref="Prompt"/> or <see cref="GrantCache"/>, which both claim a person acted.
 /// Adding a member means adding a case to <c>AuditLog.Wire</c>.
@@ -96,8 +96,8 @@ public enum AuditMethod
     /// nothing from it (D-0317).</summary>
     /// <remarks>
     /// Somebody else wrote the file, which lasts until a person reloads it, or a change made in the
-    /// owner has not been saved yet, or a reload replaced the copy a request was waiting on, which
-    /// withdrew it (D-0412). The reason says which.
+    /// owner has not been saved yet, or a reload or a merge replaced the copy a request was waiting on, which
+    /// withdrew it (D-0412, D-0542). The reason says which.
     /// </remarks>
     VaultChanged = 18,
 
@@ -132,6 +132,10 @@ public enum AuditMethod
     /// item, so the field cools down as a refusal's does. The reason names the placeholder, never a value.
     /// </remarks>
     Unfillable = 27,
+
+    /// <summary>The vault's holder merged another program's save with the changes its copy held and saved the result (D-0545).</summary>
+    /// <remarks>Released nothing and was asked of nobody: the line names the items the merge decided between, never a value.</remarks>
+    Merged = 28,
 }
 
 /// <summary>Who asked.</summary>

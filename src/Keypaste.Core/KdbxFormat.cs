@@ -75,21 +75,23 @@ public readonly record struct KdbxHeader
             }
         }
 
-        uint signature1 = BinaryPrimitives.ReadUInt32LittleEndian(prefix[..4]);
-        uint signature2 = BinaryPrimitives.ReadUInt32LittleEndian(prefix[4..8]);
-
-        if (signature1 != KdbxFormat.FileSignature1 || signature2 != KdbxFormat.FileSignature2)
-        {
-            throw new VaultException(
-                $"'{path}' is not a KeePass database (signature {signature1:X8} {signature2:X8}).");
-        }
-
-        return new KdbxHeader
-        {
-            FormatMinorVersion = BinaryPrimitives.ReadUInt16LittleEndian(prefix[8..10]),
-            FormatMajorVersion = BinaryPrimitives.ReadUInt16LittleEndian(prefix[10..12]),
-        };
+        return Of(prefix) ?? throw new VaultException(
+            $"'{path}' is not a KeePass database (signature {BinaryPrimitives.ReadUInt32LittleEndian(prefix[..4]):X8} {BinaryPrimitives.ReadUInt32LittleEndian(prefix[4..8]):X8}).");
     }
+
+    /// <summary>The header at the start of a file's bytes, read without decrypting anything.</summary>
+    /// <param name="bytes">The file's bytes, or at least their first twelve.</param>
+    /// <returns>The format version, or null when the bytes are shorter than a header or carry no KDBX signature.</returns>
+    internal static KdbxHeader? Of(ReadOnlySpan<byte> bytes) =>
+        bytes.Length >= 12
+        && BinaryPrimitives.ReadUInt32LittleEndian(bytes[..4]) == KdbxFormat.FileSignature1
+        && BinaryPrimitives.ReadUInt32LittleEndian(bytes[4..8]) == KdbxFormat.FileSignature2
+            ? new KdbxHeader
+            {
+                FormatMinorVersion = BinaryPrimitives.ReadUInt16LittleEndian(bytes[8..10]),
+                FormatMajorVersion = BinaryPrimitives.ReadUInt16LittleEndian(bytes[10..12]),
+            }
+            : null;
 
     /// <summary>Whether the file at <paramref name="path"/> carries the KDBX signature.</summary>
     /// <param name="path">Path of the file to inspect.</param>

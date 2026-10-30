@@ -678,6 +678,67 @@ public sealed class SessionAuthority : IApproverHandler
             withdrawn.Token).ConfigureAwait(false));
     }
 
+    /// <summary>
+    /// Merges another program's save with the open vault for this owner, as D-0542 and D-0543 say: withdraws every grant and every
+    /// request waiting on a person, merges and saves, puts the merged copy in place in the same session, and records a merge it saved.
+    /// </summary>
+    /// <param name="open">The vault the live session serves, whose file another program saved.</param>
+    /// <param name="swap">
+    /// Puts the merged copy in place of <paramref name="open"/> in the same session, and answers false when the session locked or moved
+    /// on meanwhile; the caller holds its edit gate across this call and owns a copy it puts in place.
+    /// </param>
+    /// <param name="surface">The owner, as the merge's line records it, such as <c>keypaste app</c>.</param>
+    /// <returns>What became of the merge; after a refusal agents stay refused, the open copy still differing from its file (D-0317).</returns>
+    /// <remarks>
+    /// Agents are refused from the detection to the merged copy's save, because the open copy no longer matches its file. The
+    /// withdrawal at the start ends every grant, counted as a reload's is (D-0516), and answers each request waiting on a person as
+    /// the vault having been merged; afterwards a request is answered from the merged copy and asked again unless Automatic. A merge
+    /// the owner saved is recorded on one line naming items and agents, never a value (D-0545); one that took nothing writes none.
+    /// </remarks>
+    public VaultMergeSave Merge(Vault open, Func<Vault, bool> swap, string surface) =>
+        Merge(open, swap, surface, vault => vault.MergeAnotherSave());
+
+    /// <summary><see cref="Merge(Vault, Func{Vault, bool}, string)"/> with the merge given, so a test can act inside it.</summary>
+    internal VaultMergeSave Merge(Vault open, Func<Vault, bool> swap, string surface, Func<Vault, VaultMergeSave> merge)
+    {
+        ArgumentNullException.ThrowIfNull(open);
+        ArgumentNullException.ThrowIfNull(swap);
+        ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(merge);
+
+        if (Live() is not { } lifetime)
+        {
+            return new VaultMergeSave(VaultMergeSaveOutcome.Locked, "The vault is locked.");
+        }
+
+        lifetime.Withdraw(SessionWithdrawal.Merge);
+
+        VaultMergeSave merged;
+
+        try
+        {
+            merged = merge(open);
+        }
+        catch (ObjectDisposedException) when (!lifetime.IsLive)
+        {
+            return new VaultMergeSave(VaultMergeSaveOutcome.Locked, "The vault was locked during the merge.");
+        }
+
+        if (merged is { Outcome: VaultMergeSaveOutcome.Saved, Report: { } report })
+        {
+            var line = RequestRecords.Merge(AuditClient.Of(surface, CoreInfo.Version, null), report, lifetime.Id, _vault.Key);
+            merged = merged with { Recorded = _recorder.Recorded(line) };
+        }
+
+        if (merged.Copy is { } copy && !(ReferenceEquals(Live(), lifetime) && swap(copy)))
+        {
+            copy.Dispose();
+            merged = merged with { Outcome = VaultMergeSaveOutcome.Locked, Reason = "The vault was locked before the merged copy was in place.", Copy = null };
+        }
+
+        return merged;
+    }
+
     /// <summary>One agent's settings as the person's own screen shows them.</summary>
     /// <param name="agent">The agent's name, or <see cref="AgentNames.Any"/>.</param>
     /// <param name="settings">Its settings, when a session is live and they could be read.</param>
@@ -1274,13 +1335,13 @@ public sealed class SessionAuthority : IApproverHandler
         }
     }
 
-    /// <summary>What a request the owner withdrew is refused as: the lock that ended its lifetime, or a reload that kept it (D-0412).</summary>
+    /// <summary>What a request the owner withdrew is refused as: the lock that ended its lifetime, or a reload or a merge that kept it (D-0412, D-0542).</summary>
     /// <param name="lifetime">The lifetime it was admitted to.</param>
     /// <param name="before">What the withdrawal came before, such as "anybody answered".</param>
     /// <returns>The method and reason its line records.</returns>
     private static (AuditMethod Method, string Reason) WithdrawnBy(SessionLifetime lifetime, string before) =>
         lifetime.IsLive
-            ? (AuditMethod.VaultChanged, $"the vault was reloaded from its file before {before}")
+            ? (AuditMethod.VaultChanged, $"{lifetime.WithdrawnBecause} before {before}")
             : (AuditMethod.VaultLocked, $"the vault was locked before {before}");
 
     /// <summary>The method a set refused for this outcome is recorded under, when nobody declined it.</summary>

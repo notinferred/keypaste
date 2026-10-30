@@ -22,6 +22,9 @@ public static class AuditTools
 
     /// <summary>A terminal's edit to the vault's items, which the vault's holder asked about and saved (D-0464).</summary>
     public const string Edit = "terminal_edit";
+
+    /// <summary>Another program's save merged with the vault's holder's copy and saved by that holder (D-0545).</summary>
+    public const string Merge = "vault_merge";
 }
 
 /// <summary>The audit line of each kind of agent request, built here for every process that writes one.</summary>
@@ -289,6 +292,78 @@ public static class RequestRecords
             Vault = vault,
         };
     }
+
+    /// <summary>The line for a merge of another program's save that the vault's holder saved.</summary>
+    /// <param name="client">The holder that merged, as <c>keypaste app</c> or <c>keypaste approve</c>.</param>
+    /// <param name="report">What the merge did, by name and never by value.</param>
+    /// <param name="session">The unlocked session the merged copy serves.</param>
+    /// <param name="vault">The vault's identity key.</param>
+    /// <returns>
+    /// The record to append: its entries the items changed in both copies and those kept against a deletion, as many as the line holds,
+    /// and its reason how many of each and the agents whose settings changed, by name.
+    /// </returns>
+    public static AuditRecord Merge(AuditClient client, VaultMergeReport report, string? session, string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(report);
+
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        List<string> named = [];
+        var length = 2;
+
+        foreach (var item in report.Conflicts.Select(conflict => conflict.Item).Concat(report.Kept.Select(kept => kept.Item)))
+        {
+            var shown = ApprovalPrompt.Shown(item);
+
+            // As the line writes it: escaped, quoted and followed by a comma.
+            var cost = System.Text.Json.JsonEncodedText.Encode(shown).EncodedUtf8Bytes.Length + 3;
+
+            if (length + cost <= _mergeEntriesBytes && seen.Add(shown))
+            {
+                named.Add(shown);
+                length += cost;
+            }
+        }
+
+        List<string> said = [];
+
+        if (report.Conflicts.Count > 0)
+        {
+            said.Add($"{Count(report.Conflicts.Count, "item")} changed in both copies");
+        }
+
+        if (report.Kept.Count > 0)
+        {
+            said.Add($"{Count(report.Kept.Count, "item")} kept against a deletion");
+        }
+
+        if (report.Agents.Count > 0)
+        {
+            said.Add($"the settings of {string.Join(", ", report.Agents.Select(agent => EntryNameSanitizer.Sanitize(agent, AuditClient.MaximumTextLength).Text))} changed");
+        }
+
+        var reason = said.Count == 0
+            ? "merged another program's save with the changes this copy held, and saved it"
+            : $"merged another program's save with the changes this copy held, and saved it: {string.Join("; ", said)}";
+
+        return new AuditRecord
+        {
+            Tool = AuditTools.Merge,
+            Client = client,
+            Decision = AuditDecision.Granted,
+            Method = AuditMethod.Merged,
+            Reason = EntryNameSanitizer.SanitizeProse(reason, _mergeReasonLength).Text,
+            Session = session,
+            Vault = vault,
+            Entries = named,
+        };
+    }
+
+    /// <summary>The most bytes a merge line's entries take, so the line fits whatever the merge named.</summary>
+    private const int _mergeEntriesBytes = AuditLog.MaximumRecordBytes / 2;
+
+    /// <summary>The longest reason a merge line keeps, the agents it names cut short past it.</summary>
+    private const int _mergeReasonLength = 4096;
 
     private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 

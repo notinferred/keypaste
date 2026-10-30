@@ -95,10 +95,11 @@ public sealed class EntryActivity
 
         foreach (var entry in audit)
         {
-            // A terminal's edit names its item but releases nothing, so it is never a use.
+            // A terminal's edit and a merge name items but release nothing, so neither is a use.
             if (!entry.Granted
                 || entry.At is not { } at
                 || string.Equals(entry.Tool, AuditTools.Edit, StringComparison.Ordinal)
+                || string.Equals(entry.Tool, AuditTools.Merge, StringComparison.Ordinal)
                 || (entry.Vault.Length > 0 && !string.Equals(entry.Vault, vaultKey, StringComparison.Ordinal)))
             {
                 continue;

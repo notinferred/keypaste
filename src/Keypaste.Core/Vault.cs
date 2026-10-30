@@ -197,6 +197,151 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>How many times one detection of another program's save starts its merge again for a save that landed before the merged copy's.</summary>
+    internal const int MergeAttempts = 3;
+
+    /// <summary>Merges another program's save of this vault's file with this open copy and saves the result, as D-0543 says, leaving this copy as it was.</summary>
+    /// <returns>
+    /// The merged copy and what the merge did, saved over the file unless it took nothing from this copy; or why there is none,
+    /// the file and this copy then as they were.
+    /// </returns>
+    /// <exception cref="VaultException">This vault has never been saved, or its access was changed, so it is opened again instead.</exception>
+    /// <remarks>
+    /// <para>
+    /// The caller holds its edit gate across this call, so no edit of this copy is left out of the merge, and puts the merged copy
+    /// in this one's place in the same session. The file's bytes are read once per attempt, digested and parsed with this unlock's
+    /// key, a hardware key asked again since its answer depends on the file, so the copy merged is the one the save's stale-write
+    /// check holds the file to (D-0119).
+    /// </para>
+    /// <para>
+    /// The merged copy's save keeps the file it replaces whatever the backup floor says. A save landing before it discards the
+    /// merged copy and starts again from the file's new bytes, at most <see cref="MergeAttempts"/> times.
+    /// </para>
+    /// </remarks>
+    public VaultMergeSave MergeAnotherSave() => MergeAnotherSave(waitBetweenAttempts: null);
+
+    /// <summary><see cref="MergeAnotherSave()"/>, with <see cref="SaveWaiting"/>'s seams on each merged copy's save.</summary>
+    /// <param name="waitBetweenAttempts">Called instead of sleeping between a merged copy's save attempts.</param>
+    /// <param name="duringAttempt">Called inside each of a merged copy's save attempts, before any work.</param>
+    internal VaultMergeSave MergeAnotherSave(Action<int>? waitBetweenAttempts, Action<int>? duringAttempt = null)
+    {
+        KeePassInterop.KeyCopy key;
+        byte[] stamp;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfRekeyed();
+            stamp = _stamp ?? throw new VaultException("This vault has not been saved yet, so there is no file to merge.");
+            key = _interop.CopyKey();
+        }
+
+        for (var attempt = 1; attempt <= MergeAttempts; attempt++)
+        {
+            byte[] bytes;
+
+            try
+            {
+                bytes = File.ReadAllBytes(Path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.Unreadable, $"Could not read '{Path}': {ex.Message}");
+            }
+
+            var digest = SHA256.HashData(bytes);
+
+            if (CryptographicOperations.FixedTimeEquals(digest, stamp))
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.Unchanged, "The vault file holds what keypaste last read or wrote.");
+            }
+
+            // From the bytes, since a parsed copy keeps no format version (D-0541).
+            if (KdbxHeader.Of(bytes) is not { } header)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.Unreadable, $"'{Path}' is not a KeePass database.");
+            }
+
+            if (header.FormatMajorVersion < 4)
+            {
+                return new VaultMergeSave(
+                    VaultMergeSaveOutcome.BelowKdbx4,
+                    $"'{Path}' was saved as KDBX {header.FormatMajorVersion}.{header.FormatMinorVersion}, which keypaste does not merge; save it as KDBX 4 in KeePassXC.");
+            }
+
+            Vault file;
+
+            try
+            {
+                // Disposed below unless it leaves as the result's copy, a lifetime CA2000 cannot follow.
+#pragma warning disable CA2000
+                file = new Vault(KeePassInterop.Reopen(Path, bytes, key), Path, digest);
+#pragma warning restore CA2000
+            }
+            catch (InvalidMasterPasswordException ex)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.KeyRefused, ex.Message);
+            }
+            catch (HardwareKeyException ex)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.HardwareKeyUnanswered, ex.Message);
+            }
+            catch (VaultException ex)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.Unreadable, ex.Message);
+            }
+
+            var handedOver = false;
+
+            try
+            {
+                var merged = MergeInto(file, out var report);
+
+                if (merged != VaultMergeOutcome.Merged)
+                {
+                    return merged == VaultMergeOutcome.AnotherVault
+                        ? new VaultMergeSave(VaultMergeSaveOutcome.AnotherVault, $"'{Path}' now holds another vault, so keypaste did not merge it.")
+                        : new VaultMergeSave(VaultMergeSaveOutcome.DuplicateUuids, "A copy of the vault holds two objects under one UUID, so keypaste did not merge it.");
+                }
+
+                if (!report!.TookFromOpenCopy)
+                {
+                    handedOver = true;
+                    return new VaultMergeSave(VaultMergeSaveOutcome.Updated, string.Empty) { Copy = file, Report = report };
+                }
+
+                file.Commit(
+                    file.HasFileChangedSinceOpen, waitBetweenAttempts, KeePassInterop.SaveAttempts, duringAttempt, backUp: true, applyFloor: false);
+
+                handedOver = true;
+                return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Copy = file, Report = report, Kept = file._lastKept };
+            }
+            catch (VaultChangedOnDiskException)
+            {
+                // Another save landed after the bytes were read: merge again with what it wrote.
+            }
+            catch (HardwareKeyException ex)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.HardwareKeyUnanswered, ex.Message);
+            }
+            catch (VaultException ex)
+            {
+                return new VaultMergeSave(VaultMergeSaveOutcome.SaveFailed, ex.Message);
+            }
+            finally
+            {
+                if (!handedOver)
+                {
+                    file.Dispose();
+                }
+            }
+        }
+
+        return new VaultMergeSave(
+            VaultMergeSaveOutcome.ChangedAgain,
+            $"Another program saved '{Path}' again each time keypaste merged it, so keypaste waits for its next save.");
+    }
+
     /// <summary>When the entry with this name was created and last modified, and when it expires.</summary>
     /// <param name="name">The entry.</param>
     /// <returns>Its times, or null when no entry answers to that name.</returns>

@@ -98,6 +98,11 @@ internal sealed class RequestRecorder(Func<AuditLog?> audit)
     internal EditReply Recorded(EditReply reply, AuditRecord record) =>
         reply with { Recorded = TryAppend(record) };
 
+    /// <summary>Writes the line of something the owner did that released nothing and answers nobody, such as a merge it saved.</summary>
+    /// <param name="record">Its line.</param>
+    /// <returns>Whether it was written.</returns>
+    internal bool Recorded(AuditRecord record) => TryAppend(record);
+
     private bool TryAppend(AuditRecord record)
     {
         try

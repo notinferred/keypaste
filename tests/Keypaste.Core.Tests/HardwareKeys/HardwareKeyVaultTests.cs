@@ -56,6 +56,67 @@ public sealed class HardwareKeyVaultTests : IDisposable
         Assert.Equal("external", Assert.Single(reloaded.ReadEntries()).Password);
     }
 
+    /// <summary>A merge parses the file another writer saved with this unlock's key, asking the key again about that file, and asks it once more to save (D-0543).</summary>
+    [Fact]
+    public void A_merge_asks_the_key_about_the_file_another_writer_saved()
+    {
+        var device = new SoftwareYubiKey(_secret);
+        var path = HardwareKeyVault("vault.kdbx", device);
+        using var key = new HardwareKey(device, 2);
+        using var vault = Vault.Open(path, _master, null, key);
+        vault.AddEntry(new VaultEntry { Title = "MINE", Password = "mine", GroupPath = "env/demo" });
+
+        using (var writerKey = new HardwareKey(device, 2))
+        using (var writer = Vault.Open(path, _master, null, writerKey))
+        {
+            writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
+            writer.Save();
+        }
+
+        var asked = device.Challenges.Count;
+
+        var merged = vault.MergeAnotherSave();
+        using var copy = merged.Copy;
+
+        Assert.Equal(VaultMergeSaveOutcome.Saved, merged.Outcome);
+        Assert.True(device.Challenges.Count >= asked + 2, $"asked {device.Challenges.Count - asked} time(s) to read and save the merge");
+
+        using var readerKey = new HardwareKey(new SoftwareYubiKey(_secret), 2);
+        using var reopened = Vault.Open(path, _master, null, readerKey);
+        Assert.Equal(
+            [("MINE", "mine"), ("TOKEN", "external")],
+            reopened.ReadEntries().Select(entry => (entry.Title, entry.Password)).Order());
+    }
+
+    /// <summary>A key that is not there when the merge reads the file merges nothing, and the merge is tried again at the next change (D-0543).</summary>
+    [Fact]
+    public void A_merge_the_key_does_not_answer_changes_nothing()
+    {
+        var device = new SoftwareYubiKey(_secret);
+        var path = HardwareKeyVault("vault.kdbx", device);
+        using var key = new HardwareKey(device, 2);
+        using var vault = Vault.Open(path, _master, null, key);
+        vault.AddEntry(new VaultEntry { Title = "MINE", Password = "mine", GroupPath = "env/demo" });
+
+        using (var writerKey = new HardwareKey(device, 2))
+        using (var writer = Vault.Open(path, _master, null, writerKey))
+        {
+            writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
+            writer.Save();
+        }
+
+        var bytes = File.ReadAllBytes(path);
+        device.Connected = false;
+
+        var merged = vault.MergeAnotherSave();
+
+        Assert.Equal(VaultMergeSaveOutcome.HardwareKeyUnanswered, merged.Outcome);
+        Assert.Null(merged.Copy);
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+        Assert.Equal("value", vault.Find(new EntryName("env/demo", "TOKEN"))?.Password);
+        Assert.Equal(2, vault.ReadEntries().Count);
+    }
+
     [Fact]
     public void Another_keys_secret_is_refused()
     {

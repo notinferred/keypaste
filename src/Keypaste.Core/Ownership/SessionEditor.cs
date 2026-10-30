@@ -184,11 +184,11 @@ public sealed class SessionEditor
         return new EditReply(AuditDecision.Granted, AuditMethod.Prompt, "a person allowed it, and the vault holds it") { Done = done };
     }
 
-    /// <summary>The refusal of an edit a lock or a reload withdrew before it was saved (D-0412).</summary>
-    /// <remarks>Told apart by the lifetime, since a reload replaces the wait before it cancels the one it replaced.</remarks>
+    /// <summary>The refusal of an edit a lock, a reload or a merge withdrew before it was saved (D-0412, D-0542).</summary>
+    /// <remarks>Told apart by the lifetime, since a reload or a merge replaces the wait before it cancels the one it replaced.</remarks>
     private static EditReply Withdrawn(SessionLifetime lifetime) =>
         lifetime.IsLive
-            ? Refused(AuditMethod.VaultChanged, "the vault was reloaded from its file before this was saved")
+            ? Refused(AuditMethod.VaultChanged, $"{lifetime.WithdrawnBecause} before this was saved")
             : Refused(AuditMethod.VaultLocked, "the vault was locked before this was saved");
 
     /// <summary>Takes an edit back out of the vault it was made in, unless the vault was locked meanwhile and took the edit with it.</summary>

@@ -689,6 +689,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Narrowing => "narrowing",
         AuditMethod.Unchanged => "unchanged",
         AuditMethod.Unfillable => "unfillable",
+        AuditMethod.Merged => "merged",
         _ => "unknown",
     };
 

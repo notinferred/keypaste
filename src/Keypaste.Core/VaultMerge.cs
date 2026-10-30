@@ -13,6 +13,67 @@ public enum VaultMergeOutcome
     DuplicateUuids = 2,
 }
 
+/// <summary>What became of a merge of another program's save with the open vault and the merged copy's save (D-0543).</summary>
+public enum VaultMergeSaveOutcome
+{
+    /// <summary>The merged copy took something from the open copy and was saved over the file, which was kept as a backup.</summary>
+    Saved = 0,
+
+    /// <summary>The merged copy took nothing from the open copy, so it is the file's copy and nothing was written.</summary>
+    Updated = 1,
+
+    /// <summary>The file holds what the open copy last read or wrote, so there was nothing to merge.</summary>
+    Unchanged = 2,
+
+    /// <summary>The unlock's key no longer opens the file: another program changed what unlocks it.</summary>
+    KeyRefused = 3,
+
+    /// <summary>The hardware key was not connected or not touched; the merge is tried again at the next change.</summary>
+    HardwareKeyUnanswered = 4,
+
+    /// <summary>The file is missing, unreadable, not KDBX, truncated or fails its HMAC; the merge is tried again at the next change.</summary>
+    Unreadable = 5,
+
+    /// <summary>The file is below KDBX 4, which keypaste does not merge (D-0541).</summary>
+    BelowKdbx4 = 6,
+
+    /// <summary>The file's root group is not the open vault's, so it holds another vault and is not merged (D-0543).</summary>
+    AnotherVault = 7,
+
+    /// <summary>A copy holds two objects under one UUID, which KeePass's format forbids, so it is not merged (D-0541).</summary>
+    DuplicateUuids = 8,
+
+    /// <summary>Another save landed before each of the merged copy's saves, as often as one detection allows; the merge waits for the next change.</summary>
+    ChangedAgain = 9,
+
+    /// <summary>The merged copy could not be saved.</summary>
+    SaveFailed = 10,
+
+    /// <summary>The session ended before the merged copy was in its place, so nothing is served from it.</summary>
+    Locked = 11,
+}
+
+/// <summary>What a merge of another program's save with the open vault gave, or why it gave no merged copy (D-0543).</summary>
+/// <param name="Outcome">What became of it.</param>
+/// <param name="Reason">Why there is no merged copy, as a sentence; empty when there is one.</param>
+public sealed record VaultMergeSave(VaultMergeSaveOutcome Outcome, string Reason)
+{
+    /// <summary>
+    /// The merged copy when <see cref="Outcome"/> is <see cref="VaultMergeSaveOutcome.Saved"/> or <see cref="VaultMergeSaveOutcome.Updated"/>,
+    /// which the caller puts in the open copy's place and then owns; otherwise null.
+    /// </summary>
+    public Vault? Copy { get; init; }
+
+    /// <summary>What the merge did, by name and never by value, once it merged.</summary>
+    public VaultMergeReport? Report { get; init; }
+
+    /// <summary>The file the merged copy's save replaced, kept whatever the backup floor says (D-0543).</summary>
+    public VaultBackup? Kept { get; init; }
+
+    /// <summary>Whether the owner's audit line of a merge it saved was written (D-0545).</summary>
+    public bool Recorded { get; init; }
+}
+
 /// <summary>What a merge of the open vault with another program's save did, by name and never by value, for the notice and the audit line (D-0542, D-0545, D-0603).</summary>
 /// <param name="TookFromOpenCopy">Whether the merged copy holds anything the file does not, so it must be saved; otherwise it is the file as it is (D-0543).</param>
 /// <param name="Conflicts">Each item both copies changed, the version not current kept in its history.</param>
