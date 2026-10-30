@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Keypaste.Core.Infrastructure;
+namespace Keypaste.Infrastructure;
 
 /// <summary>A release's version, ordered by Semantic Versioning 2.0's precedence.</summary>
 /// <remarks>Build metadata is refused rather than ignored, because the versions compared are the ones a release prints, which carry none.</remarks>

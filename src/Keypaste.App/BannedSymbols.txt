@@ -1,0 +1,24 @@
+// The clipboard is read in one place, which hashes it at once (D-0011).
+M:Avalonia.Input.Platform.ClipboardExtensions.TryGetTextAsync(Avalonia.Input.Platform.IClipboard);only AvaloniaClipboard reads the clipboard
+
+// The app hands another program only a web address, through one launcher (D-0534).
+T:Avalonia.Platform.Storage.ILauncher;only PlatformWebLauncher hands an address to another program
+T:Avalonia.Platform.Storage.LauncherExtensions;the app opens no file or folder in another program
+M:System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo);only OpenerProcess starts a program
+M:System.Diagnostics.Process.Start(System.String);only OpenerProcess starts a program
+M:System.Diagnostics.Process.Start(System.String,System.String);only OpenerProcess starts a program
+M:System.Diagnostics.Process.Start(System.String,System.Collections.Generic.IEnumerable{System.String});only OpenerProcess starts a program
+M:System.Diagnostics.Process.Start(System.String,System.String,System.Security.SecureString,System.String);only OpenerProcess starts a program
+M:System.Diagnostics.Process.Start(System.String,System.String,System.String,System.Security.SecureString,System.String);only OpenerProcess starts a program
+T:System.Diagnostics.ProcessStartInfo;only OpenerProcess starts a program
+T:Keypaste.App.Views.OpenerProcess;only PlatformWebLauncher hands an address to another program
+M:Keypaste.App.Session.IWebLauncher.OpenAsync(System.Uri);a web address is opened only where a person asked for one
+
+// Only the item pane's two attachment files reach an attachment (D-0534).
+M:Keypaste.Core.Vault.Attachments(Keypaste.Core.EntryName);only the item pane's attachment files reach an attachment
+M:Keypaste.Core.Vault.AddAttachment(Keypaste.Core.EntryName,System.String,System.IO.Stream,System.Boolean@);only the item pane's attachment files reach an attachment
+M:Keypaste.Core.Vault.ReplaceAttachment(Keypaste.Core.EntryName,System.String,System.IO.Stream,System.Boolean@);only the item pane's attachment files reach an attachment
+M:Keypaste.Core.Vault.RemoveAttachment(Keypaste.Core.EntryName,System.String,System.Boolean@);only the item pane's attachment files reach an attachment
+M:Keypaste.Core.Vault.SaveAttachment(Keypaste.Core.EntryName,System.String,System.String,System.String@);only the item pane's attachment files reach an attachment
+T:Keypaste.Core.EntryAttachment;only the item pane's attachment files reach an attachment
+T:Keypaste.Core.AttachmentSaveOutcome;only the item pane's attachment files reach an attachment

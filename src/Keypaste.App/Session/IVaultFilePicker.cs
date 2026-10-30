@@ -69,7 +69,7 @@ internal interface IVaultFilePicker
     /// <summary>Asks where a saved copy of an attachment should go. Null when the person cancelled.</summary>
     /// <param name="suggestedName">The file name the dialog starts with, already safe to be one.</param>
     /// <remarks>
-    /// The dialog does not offer to replace a file: <see cref="Keypaste.Core.Vault.SaveAttachment"/> writes only where
+    /// The dialog does not offer to replace a file: <c>Vault.SaveAttachment</c> writes only where
     /// nothing is (D-0534).
     /// </remarks>
     Task<string?> PickAttachmentDestinationAsync(string suggestedName) => Task.FromResult<string?>(null);

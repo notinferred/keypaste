@@ -46,17 +46,10 @@ public sealed class KeyDerivationCostTests : IDisposable
         Assert.Equal(KdbxFormat.Argon2Parallelism, parameters.GetUInt32(Argon2Kdf.ParamParallelism, 0));
     }
 
+    /// <summary>Core's <c>BannedSymbols.txt</c> keeps every shipped file but its own switch from reaching it.</summary>
     [Fact]
-    public void Only_test_assemblies_turn_the_token_cost_on()
-    {
-        var source = Path.Combine(VendoredWordList.RepoRoot(), "src");
-        var setters = Directory.EnumerateFiles(source, "*.cs", SearchOption.AllDirectories)
-            .Where(file => File.ReadAllText(file).Contains("TestKeyDerivation.Cheap", StringComparison.Ordinal))
-            .ToArray();
-
-        Assert.Empty(setters);
+    public void This_test_assembly_turns_the_token_cost_on() =>
         Assert.True(TestKeyDerivation.Cheap, "this assembly's module initializer did not turn the token cost on");
-    }
 
     private KdfParameters CreatedWith(Func<IDisposable?> scope)
     {

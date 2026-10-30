@@ -1,5 +1,5 @@
 using Keypaste.Core.Clients;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Linking;
 

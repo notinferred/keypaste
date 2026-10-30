@@ -1,4 +1,4 @@
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Import;
 

@@ -1,10 +1,10 @@
 using Keypaste.Core.AutoType;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Recommendations;
 using Keypaste.Core.Totp;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core;
 

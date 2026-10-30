@@ -5,6 +5,10 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
+  <ItemGroup Label="Build-time analyzers">
+    <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
@@ -13,7 +17,7 @@
        ModelContextProtocol, which costs four transitive packages on net10.0 instead of about twelve
        and brings no generic host. Justified in DECISIONS.md D-0019 for the bridge and D-0419 for its
        place in the keypaste binary, as docs/PRODUCT.md law 3.9 requires. Keypaste.Core — the vault and
-       crypto path — still has none. -->
+       crypto path — still has no runtime package. -->
   <ItemGroup Label="MCP bridge">
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
   </ItemGroup>
@@ -26,7 +30,7 @@
        What Avalonia is trusted with: rendering the window and delivering the keystrokes of the
        master password. What it is NOT trusted with: it never touches the KDBX file, never derives
        a key, never reads the audit log and never opens a socket. Keypaste.Core still has no
-       PackageReference at all, and that is the line that matters.
+       runtime package, and that is the line that matters.
 
        Avalonia.Diagnostics is deliberately absent. It has no 12.x release, and a runtime
        visual-tree inspector attached to a process holding an unlocked vault is not something to
@@ -55,7 +59,7 @@
 
        The CLI does not reference it: its NativeAOT publish would statically link the shim and
        OpenSSL and, on Linux, require libpcsclite at start-up for every user. Keypaste.Core still has
-       no PackageReference. -->
+       no runtime package. -->
   <ItemGroup Label="Desktop hardware keys">
     <PackageVersion Include="Yubico.YubiKey" Version="1.18.0" />
   </ItemGroup>

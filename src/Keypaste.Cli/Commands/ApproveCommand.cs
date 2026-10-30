@@ -6,10 +6,10 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Browser;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

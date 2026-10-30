@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
-namespace Keypaste.Core.Infrastructure;
+namespace Keypaste.Infrastructure;
 
 /// <summary>Which of the three shapes a <see cref="TomlValue"/> holds.</summary>
 public enum TomlValueKind

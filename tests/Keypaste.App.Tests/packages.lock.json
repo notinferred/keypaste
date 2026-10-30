@@ -488,16 +488,20 @@
           "Avalonia.Desktop": "[12.1.0, )",
           "Avalonia.Fonts.Inter": "[12.1.0, )",
           "Avalonia.Themes.Fluent": "[12.1.0, )",
-          "Keypaste.Core": "[0.4.0, )",
-          "Keypaste.Mvvm": "[0.4.0, )",
+          "Keypaste.Core": "[0.5.0, )",
+          "Keypaste.Mvvm": "[0.5.0, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
       },
       "keypaste.core": {
         "type": "Project",
         "dependencies": {
-          "KeePassLib": "[1.0.0, )"
+          "KeePassLib": "[1.0.0, )",
+          "Keypaste.Infrastructure": "[0.5.0, )"
         }
+      },
+      "keypaste.infrastructure": {
+        "type": "Project"
       },
       "keypaste.mvvm": {
         "type": "Project"

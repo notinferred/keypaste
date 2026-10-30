@@ -3,11 +3,15 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a's rules about where crash-report code may be, which only a look at the source can hold: only the scrubber reads an
-/// exception or builds a report's text, nothing in the crash code reaches a message, a path, a name or the environment,
-/// only the sender names the route, and the CLI and the bridge name none of it (D-0558, THREATS.md T-9).
+/// 4.11a's rules about where crash-report code may be: only the scrubber reads an exception or builds a report's text,
+/// nothing in the crash code reaches a message, a path, a name or the environment, and only the sender names the route
+/// (D-0558, THREATS.md T-9).
 /// </summary>
-/// <remarks>A text scan, in which a name in a comment counts too. The last test is the control: each rule finds its mutation.</remarks>
+/// <remarks>
+/// The CLI's and the bridge's <c>BannedSymbols</c> lists keep them from naming crash code. These rules are about single files
+/// inside one folder, and a ban list covers a whole project, so they are read from the source, in which a name in a comment
+/// counts too. The last test is the control: each rule finds its mutation.
+/// </remarks>
 public sealed class CrashSourceRulesTests
 {
     private const string _scrubber = "CrashScrubber.cs";
@@ -26,8 +30,6 @@ public sealed class CrashSourceRulesTests
     private static readonly string[] _scrubbing =
         ["new CrashReport(", "Utf8JsonWriter", "StackTrace", "StackFrame", "DiagnosticMethodInfo", "InnerException", "HResult"];
 
-    private static readonly string[] _crashCode = ["CrashReport", "CrashScrubber", "CrashOutbox", "CrashSender", "CrashContext"];
-
     [Fact]
     public void Nothing_in_the_crash_code_reaches_a_message_a_path_a_name_or_the_environment() =>
         Assert.Empty(CrashCode().SelectMany(source => Found(source, _unscrubbed)));
@@ -41,10 +43,6 @@ public sealed class CrashSourceRulesTests
 
     [Fact]
     public void Only_the_sender_names_the_route() => Assert.Equal([_sender], Containing(Sources("src"), _route));
-
-    [Fact]
-    public void The_cli_and_the_bridge_name_no_crash_code() =>
-        Assert.Empty(Sources("src", "Keypaste.Cli").Concat(Sources("src", "Keypaste.Mcp")).SelectMany(source => Found(source, _crashCode)));
 
     [Fact]
     public void Each_rule_finds_its_mutation()
@@ -61,10 +59,6 @@ public sealed class CrashSourceRulesTests
         Assert.All(_scrubbing, needle => Assert.NotEmpty(Found(outbox with { Text = outbox.Text + needle }, _scrubbing)));
         Assert.NotEmpty(Found(outbox with { Text = outbox.Text + "var message = exception.Message;" }, _unscrubbed));
         Assert.Equal(["CrashOutbox.cs", _sender], Containing([outbox with { Text = outbox.Text + _route }, .. Sources("src")], _route).Order(StringComparer.Ordinal));
-
-        var cli = Sources("src", "Keypaste.Cli").Single(source => source.Name == "Program.cs");
-        Assert.True(Sources("src", "Keypaste.Cli").Count >= 10 && Sources("src", "Keypaste.Mcp").Count >= 10);
-        Assert.NotEmpty(Found(cli with { Text = "using Keypaste.Core.CrashReports;\n" + cli.Text }, _crashCode));
     }
 
     private static List<Source> CrashCode() => Sources("src", "Keypaste.Core", "CrashReports");

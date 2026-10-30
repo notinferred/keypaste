@@ -8,9 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672): they move architecture rules into the compiler, tests onto the founder's machine and hand-written code onto established libraries in the order PRODUCT §4.9 sets (D-0670, D-0671).
 
-- [ ] **K.7 — Hold the architecture rules in the compiler.** Needs: none.
-  - Microsoft's `BannedApiAnalyzers` and project references express what the source-scanning rule tests hold today, such as only `Internal/KeePassInterop.cs` touching KeePassLib, one file reading the clipboard, only `Keypaste.Browser` calling libsodium and the CLI and bridge reaching no app type; ArchUnitNET holds the namespace rules an analyzer cannot (D-0670).
-  - Accepted when each rule fails the local compile check on a deliberate violation, the `*Rules*Tests` and `*Boundary*Tests` classes it replaces are deleted, and each one that stays says why.
 - [ ] **K.8 — Run test classes on the founder's machine.** Needs: none.
   - `verify.sh` gains a local mode that runs one test project or class with the pinned SDK and leaves nothing running, which CLAUDE.md names (D-0671).
   - Accepted when a Core, a CLI and an App test class run on the founder's Mac with the same result as the same class on CI.
@@ -24,7 +21,7 @@ These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672
   - Microsoft.Extensions.Resilience replaces the hand-rolled retry and delay loops a policy can express, such as the vault's save retries, pipe connects and the crash sender, with time still injected for tests.
   - Accepted when the replaced sites' tests pass unchanged on the three runners and the loops are gone.
 - [ ] **K.10 — Parse the CLI with System.CommandLine.** Needs: none.
-  - Each verb's arguments and help come from System.CommandLine, and `Infrastructure/CommandLine.cs` goes once nothing uses it; the help keeps what `verify-demo.sh` checks.
+  - Each verb's arguments and help come from System.CommandLine, and `Keypaste.Infrastructure/CommandLine.cs` goes once nothing uses it; the help keeps what `verify-demo.sh` checks.
   - Accepted when the CLI tests and the published transcripts pass unchanged.
 - [ ] **K.11 — Test parsers by property and outputs by snapshot.** Needs: none.
   - CsCheck properties replace example suites wherever a property states the rule, for TOML, CSV, placeholders, the Public Suffix List matcher and the merge, and Verify snapshots hold help text and listings.

@@ -37,7 +37,7 @@ internal static class SelfTest
             var path = Path.Combine(scratch.FullName, "selftest.kdbx");
 
             // Through VaultCreation, like every other vault this app makes. It is the one creation
-            // path in the whole binary, which is what lets TheAppSharesTheWriterTests forbid
+            // path in the whole binary, which is what lets the app's banned-symbol list forbid
             // Vault.Create here outright rather than exempt this file from the rule.
             // The vault's ownership arrives here and leaves in the using below; CA2000 cannot see
             // a lifetime that crosses an out parameter.

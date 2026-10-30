@@ -1,6 +1,6 @@
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ownership;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;

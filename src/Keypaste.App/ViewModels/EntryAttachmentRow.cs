@@ -1,3 +1,4 @@
+#pragma warning disable RS0030 // One of the item pane's two attachment files (D-0534).
 using System.Buffers;
 using Keypaste.Core;
 

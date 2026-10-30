@@ -1,0 +1,1 @@
+N:Keypaste.Core.CrashReports;only the desktop app reports crashes (D-0558, T-9)

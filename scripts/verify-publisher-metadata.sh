@@ -143,6 +143,7 @@ for dir in "$@"; do
     check_program "$dir" "$name"
   done
   check_library "$dir/Keypaste.Core.dll"
+  check_library "$dir/Keypaste.Infrastructure.dll"
   check_library "$dir/Keypaste.Mvvm.dll"
   check_vendored "$dir/KeePassLib.dll"
 

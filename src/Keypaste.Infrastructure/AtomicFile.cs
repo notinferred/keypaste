@@ -1,4 +1,4 @@
-namespace Keypaste.Core.Infrastructure;
+namespace Keypaste.Infrastructure;
 
 /// <summary>
 /// Replaces a file in one rename, so whoever reads it finds the old contents or the new and never part of either.

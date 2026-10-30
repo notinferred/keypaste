@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Keypaste.Core.Infrastructure;
+namespace Keypaste.Infrastructure;
 
 /// <summary>
 /// Writes the subset of TOML that <see cref="Toml"/> reads, and nothing it would refuse or read back as something else.

@@ -5,7 +5,7 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Editing;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
 

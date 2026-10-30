@@ -1,15 +1,17 @@
+extern alias KeePass;
+
 using System.Buffers;
 using System.ComponentModel;
-using KeePassLib;
-using KeePassLib.Collections;
-using KeePassLib.Cryptography;
-using KeePassLib.Cryptography.Cipher;
-using KeePassLib.Cryptography.KeyDerivation;
-using KeePassLib.Interfaces;
-using KeePassLib.Keys;
-using KeePassLib.Security;
-using KeePassLib.Serialization;
-using KeePassLib.Utility;
+using KeePass::KeePassLib;
+using KeePass::KeePassLib.Collections;
+using KeePass::KeePassLib.Cryptography;
+using KeePass::KeePassLib.Cryptography.Cipher;
+using KeePass::KeePassLib.Cryptography.KeyDerivation;
+using KeePass::KeePassLib.Interfaces;
+using KeePass::KeePassLib.Keys;
+using KeePass::KeePassLib.Security;
+using KeePass::KeePassLib.Serialization;
+using KeePass::KeePassLib.Utility;
 using Keypaste.Core.Agents;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
@@ -201,7 +203,7 @@ internal sealed class KeePassInterop : IDisposable
             {
                 // PwDatabase.Open's load, over the bytes the caller read and digested rather than a second read of the file.
                 database.New(IOConnectionInfo.FromPath(path), key());
-                new KdbxFile(database).Load(new MemoryStream(bytes, writable: false), KeePassLib.Serialization.KdbxFormat.Default, null);
+                new KdbxFile(database).Load(new MemoryStream(bytes, writable: false), KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
                 database.Modified = false;
             }
         }
@@ -447,7 +449,7 @@ internal sealed class KeePassInterop : IDisposable
             try
             {
                 check.MasterKey = Reread(change.Verify);
-                new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePassLib.Serialization.KdbxFormat.Default, null);
+                new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
             }
             catch (Exception ex)
             {
@@ -496,7 +498,7 @@ internal sealed class KeePassInterop : IDisposable
         try
         {
             // KdbxFile.Save closes the stream it is given; the buffer survives the close.
-            new KdbxFile(_database).Save(buffer, null, KeePassLib.Serialization.KdbxFormat.Default, null);
+            new KdbxFile(_database).Save(buffer, null, KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
             return buffer.ToArray();
         }
         finally
@@ -1166,7 +1168,7 @@ internal sealed class KeePassInterop : IDisposable
 
         return new AutoType.AutoTypeSettings(
             entry.AutoType.Enabled,
-            entry.AutoType.ObfuscationOptions != KeePassLib.Collections.AutoTypeObfuscationOptions.None,
+            entry.AutoType.ObfuscationOptions != KeePass::KeePassLib.Collections.AutoTypeObfuscationOptions.None,
             entry.AutoType.DefaultSequence,
             [.. entry.AutoType.Associations.Select(association => new AutoType.AutoTypeAssociation(association.WindowName, association.Sequence))],
             groups,
@@ -1891,16 +1893,16 @@ internal sealed class KeePassInterop : IDisposable
             throw new VaultException($"'{name.Title}' is not in this vault.");
         }
 
-        var config = new KeePassLib.Collections.AutoTypeConfig
+        var config = new KeePass::KeePassLib.Collections.AutoTypeConfig
         {
             Enabled = enabled,
-            ObfuscationOptions = obfuscated ? KeePassLib.Collections.AutoTypeObfuscationOptions.UseClipboard : KeePassLib.Collections.AutoTypeObfuscationOptions.None,
+            ObfuscationOptions = obfuscated ? KeePass::KeePassLib.Collections.AutoTypeObfuscationOptions.UseClipboard : KeePass::KeePassLib.Collections.AutoTypeObfuscationOptions.None,
             DefaultSequence = sequence,
         };
 
         foreach (var (window, keys) in associations)
         {
-            config.Add(new KeePassLib.Collections.AutoTypeAssociation(window, keys));
+            config.Add(new KeePass::KeePassLib.Collections.AutoTypeAssociation(window, keys));
         }
 
         found.Entry.AutoType = config;

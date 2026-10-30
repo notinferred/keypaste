@@ -26,6 +26,8 @@ These are retained feature ideas, not discarded features or promises for the fir
 
 | Idea | Boundary for reconsideration |
 |---|---|
+| A read-only vault for verbs that never save | `VaultSession.Open` could hand its callback a vault with no save, so a save without the vault's claim would not compile and `SavingVerbSourceRulesTests`' tracer could go ([K.7](steps/K.7.md)). Reconsider when Core's `Vault` API is next reshaped; it changes the type about 16 verbs and Core's helpers take. |
+| The crash-report code in its own project | Its rules about single files (`CrashSourceRulesTests`) could become one project's ban list if `Core/CrashReports/` stood alone; Core's settings and home name it today ([K.7](steps/K.7.md)). Reconsider if those rules grow or a false pass is found. |
 | A clean inherited environment | `run --no-inherit` may solve specific tool needs; `env diff` and `--json` output already exist. Avoid silently skipping unusable values. |
 | Shell/direnv integration or stopping launched programs on lock | Ordinary environments are copied into processes. Any convenience must state descendant exposure and cannot promise to revoke delivered credentials. |
 | Secret rotation reminders and deliberate history removal | Reminders do not rotate a provider credential; purging a leaked value is explicit and cannot erase existing copies or backups. |

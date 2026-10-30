@@ -1,8 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Projects;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

@@ -6,8 +6,8 @@ using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Tokens;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

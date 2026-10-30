@@ -254,7 +254,9 @@ internal sealed class CrashReporting : IDisposable
             return;
         }
 
+#pragma warning disable RS0030 // The crash client's transport.
         _handler = _transport();
+#pragma warning restore RS0030
         _sending = new CancellationTokenSource();
 
         // Its first await is the 30-second wait, and every await after it leaves the calling thread, the UI's included.
@@ -266,7 +268,9 @@ internal sealed class CrashReporting : IDisposable
         _sending?.Cancel();
         _sending?.Dispose();
         _sending = null;
+#pragma warning disable RS0030 // The crash client's transport.
         _handler?.Dispose();
+#pragma warning restore RS0030
         _handler = null;
     }
 

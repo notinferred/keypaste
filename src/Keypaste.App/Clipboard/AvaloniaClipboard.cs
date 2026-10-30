@@ -37,8 +37,8 @@ namespace Keypaste.App.Clipboard;
 /// neither hands it on: <see cref="TryReadHashAsync"/>, where the auto-clear equality guard has no
 /// ownership API to use instead, hashes it at once; and <see cref="TryPasteIntoAsync"/>, where the
 /// characters go straight into the caller's buffer through <see cref="SecretInput.Accept"/>. Both
-/// drop the reference in the method that made it. A test greps this app's sources and fails if
-/// <c>TryGetTextAsync</c> appears in any other file.
+/// drop the reference in the method that made it. The app's <c>BannedSymbols.txt</c> refuses
+/// <c>TryGetTextAsync</c> anywhere else.
 /// </para>
 /// </remarks>
 internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
@@ -48,7 +48,7 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
     /// <para>
     /// The Windows names are the registered clipboard format names, spelled exactly. KeePassXC
     /// shipped one of these with a trailing space for three releases (O-0008), which is the kind of
-    /// defect no review catches in a string literal — <c>ClipboardSourceRulesTests</c> is why this
+    /// defect no review catches in a string literal — <c>SecretMarkerTests</c> is why this
     /// one will not last three releases. Four zero bytes are the documented "no" for
     /// CanIncludeInClipboardHistory and CanUploadToCloudClipboard, a DWORD of zero; the
     /// monitor-processing format is read for presence rather than content.
@@ -132,7 +132,9 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
 
         try
         {
+#pragma warning disable RS0030 // Read only to hash it at once.
             var text = await clipboard.TryGetTextAsync().ConfigureAwait(true);
+#pragma warning restore RS0030
             return text is null ? null : SHA256.HashData(Encoding.UTF8.GetBytes(text));
         }
         catch (Exception e) when (e is PlatformNotSupportedException or InvalidOperationException or TimeoutException)
@@ -156,7 +158,9 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
 
         try
         {
+#pragma warning disable RS0030 // Read only into the caller's buffer.
             var text = await clipboard.TryGetTextAsync().ConfigureAwait(true);
+#pragma warning restore RS0030
             return text is null ? PasteOutcome.Empty : SecretInput.Accept(text, destination);
         }
         catch (Exception e) when (e is PlatformNotSupportedException or InvalidOperationException or TimeoutException)

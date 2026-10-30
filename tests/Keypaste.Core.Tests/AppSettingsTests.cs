@@ -1,5 +1,5 @@
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Settings;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Core.Tests;

@@ -1,5 +1,5 @@
 using System.IO.Pipes;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
 

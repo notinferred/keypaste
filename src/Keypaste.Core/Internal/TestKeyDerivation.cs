@@ -20,7 +20,9 @@ internal static class TestKeyDerivation
     internal static bool Cheap { get; set; }
 
     /// <summary>Whether a vault this flow creates now takes the token cost.</summary>
+#pragma warning disable RS0030 // The one read of the switch it bans everywhere else.
     internal static bool Applies => Cheap && !_production.Value;
+#pragma warning restore RS0030
 
     /// <summary>Gives vaults this async flow creates the production cost until disposed.</summary>
     internal static IDisposable Production()

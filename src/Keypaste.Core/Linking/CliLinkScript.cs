@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Linking;
 

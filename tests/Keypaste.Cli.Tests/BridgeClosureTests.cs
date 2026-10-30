@@ -14,7 +14,7 @@ namespace Keypaste.Cli.Tests;
 /// <remarks>
 /// A module initializer runs when its module loads, at startup under NativeAOT, whether or not anything
 /// uses the module; a static constructor runs only when its type is first used, which no CLI file but
-/// <c>Program.cs</c> can do (<see cref="CliDispatchSourceRulesTests"/>). The closure is read from the CLI's
+/// <c>Program.cs</c> can do (the CLI's <c>BannedSymbols.txt</c>). The closure is read from the CLI's
 /// lock file, from the bridge's project down, so a package added to it is checked without editing this test.
 /// </remarks>
 public sealed class BridgeClosureTests

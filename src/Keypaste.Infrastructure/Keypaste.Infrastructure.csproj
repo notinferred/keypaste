@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Keypaste.Infrastructure</RootNamespace>
+    <AssemblyName>Keypaste.Infrastructure</AssemblyName>
+    <Description>keypaste's pieces that know nothing of a vault: TOML, CSV, framing, atomic files and versions.</Description>
+    <!-- A RID-specific publish reaches this project through ProjectReference, as it reaches Keypaste.Core. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.Security.Cryptography" />
+    <Using Include="System.Text" />
+  </ItemGroup>
+
+</Project>

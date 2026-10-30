@@ -1,7 +1,7 @@
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

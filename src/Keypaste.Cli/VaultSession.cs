@@ -1,8 +1,8 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli;
 

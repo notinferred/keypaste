@@ -3,11 +3,11 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Tokens;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

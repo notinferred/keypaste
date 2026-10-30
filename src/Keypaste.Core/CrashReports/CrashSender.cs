@@ -1,3 +1,4 @@
+#pragma warning disable RS0030 // The crash client: one of the two routes to the network.
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;

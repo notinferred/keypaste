@@ -14,7 +14,9 @@ internal static class Program
     {
         if (StartsBridge(args))
         {
+#pragma warning disable RS0030 // The one hand-off to the bridge.
             return await BridgeEntry.RunAsync(args[1..]).ConfigureAwait(false);
+#pragma warning restore RS0030
         }
 
         if (BrowserEntry.StartsRelay(args))

@@ -14,18 +14,17 @@
     <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
-  <!-- No PackageReference. Deliberate: see Directory.Packages.props. -->
-
   <ItemGroup>
     <!--
       Vendored KDBX4 implementation. Not a NuGet package: no maintained, adopted KDBX4
       package for .NET exists (DECISIONS.md D-0007). Provenance, licence, and the complete
       list of local modifications: third_party/KeePassLib/UPSTREAM.md.
 
-      Only Internal/KeePassInterop.cs may reference it. Everything else in this assembly
-      speaks in keypaste's own types.
+      Only Internal/KeePassInterop.cs, which declares the alias, may reference it. Everything else in
+      this assembly speaks in keypaste's own types.
     -->
-    <ProjectReference Include="../../third_party/KeePassLib/KeePassLib.csproj" />
+    <ProjectReference Include="../../third_party/KeePassLib/KeePassLib.csproj" Aliases="KeePass" />
+    <ProjectReference Include="../Keypaste.Infrastructure/Keypaste.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

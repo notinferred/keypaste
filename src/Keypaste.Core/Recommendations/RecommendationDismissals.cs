@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Recommendations;
 

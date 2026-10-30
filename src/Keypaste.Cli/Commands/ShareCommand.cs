@@ -5,8 +5,8 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Sharing;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

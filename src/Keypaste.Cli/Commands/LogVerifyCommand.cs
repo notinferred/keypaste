@@ -1,5 +1,5 @@
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

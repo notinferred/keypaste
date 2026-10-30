@@ -1,7 +1,7 @@
 using Keypaste.Cli.Commands;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Tests;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;

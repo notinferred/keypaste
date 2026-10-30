@@ -16,6 +16,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Keypaste.Core/Keypaste.Core.csproj" />
+    <Project Path="src/Keypaste.Infrastructure/Keypaste.Infrastructure.csproj" />
     <Project Path="src/Keypaste.App/Keypaste.App.csproj" />
     <Project Path="src/Keypaste.Mvvm/Keypaste.Mvvm.csproj" />
   </Folder>

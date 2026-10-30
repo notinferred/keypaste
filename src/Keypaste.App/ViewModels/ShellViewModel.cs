@@ -1007,10 +1007,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private SharingViewModel Sharing(string? what = null, Action? cancel = null)
     {
         var resolved = ShareEndpoint.TryResolve(null, Environment.GetEnvironmentVariable(ShareEndpoint.EnvironmentVariable), out var endpoint, out _);
+#pragma warning disable RS0030 // The shell makes the share service's client.
         var transport = ShareTransport ?? (_ownShareTransport ??= ShareClient.CreateTransport());
+#pragma warning restore RS0030
         var auditPath = Core.Audit.KeypasteHome.AuditPath(Home);
         var service = new ShareService(
+#pragma warning disable RS0030 // The shell makes the share service's client.
             new ShareClient(transport, endpoint ?? ShareEndpoint.Default),
+#pragma warning restore RS0030
             _clock,
             () => Core.Audit.AuditLog.TryOpen(auditPath, _clock, out var log, out _) ? log : null);
 
@@ -1721,7 +1725,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Projects = [];
         (Content as IDisposable)?.Dispose();
         Content = null;
+#pragma warning disable RS0030 // The share service's client's transport.
         _ownShareTransport?.Dispose();
+#pragma warning restore RS0030
 
         // A secret on the clipboard is derived from an open vault, so it does not survive the lock
         // either. Disposing clears it, conditionally — a clipboard the user has changed since is

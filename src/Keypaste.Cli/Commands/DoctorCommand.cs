@@ -3,7 +3,7 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Health;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

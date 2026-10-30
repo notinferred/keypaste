@@ -1,5 +1,5 @@
 using System.Globalization;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.CrashReports;
 

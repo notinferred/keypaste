@@ -45,6 +45,12 @@
           "Avalonia": "12.1.0"
         }
       },
+      "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
+        "type": "Direct",
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "Kcobt3pnOdO0A+6CKiMHZdTEluJpsfxiV20axtZdmfBQnDmiWTKPJADlgAfdTuKNAnVarrkJa0UEGwuOo91muw=="
+      },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
         "requested": "[10.0.10, )",
@@ -419,8 +425,12 @@
       "keypaste.core": {
         "type": "Project",
         "dependencies": {
-          "KeePassLib": "[1.0.0, )"
+          "KeePassLib": "[1.0.0, )",
+          "Keypaste.Infrastructure": "[0.5.0, )"
         }
+      },
+      "keypaste.infrastructure": {
+        "type": "Project"
       },
       "keypaste.mvvm": {
         "type": "Project"
@@ -669,6 +679,12 @@
         "dependencies": {
           "Avalonia": "12.1.0"
         }
+      },
+      "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
+        "type": "Direct",
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "Kcobt3pnOdO0A+6CKiMHZdTEluJpsfxiV20axtZdmfBQnDmiWTKPJADlgAfdTuKNAnVarrkJa0UEGwuOo91muw=="
       },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
@@ -1032,8 +1048,12 @@
       "keypaste.core": {
         "type": "Project",
         "dependencies": {
-          "KeePassLib": "[1.0.0, )"
+          "KeePassLib": "[1.0.0, )",
+          "Keypaste.Infrastructure": "[0.5.0, )"
         }
+      },
+      "keypaste.infrastructure": {
+        "type": "Project"
       },
       "keypaste.mvvm": {
         "type": "Project"

@@ -1,0 +1,15 @@
+// keypaste's core and app reach the network only through the share and crash clients, so recommendations and browser matching stay local (V.9, D-0615).
+N:System.Net.Http;only the share and crash clients reach the network
+N:System.Net.WebSockets;only the share and crash clients reach the network
+N:System.Net.Quic;only the share and crash clients reach the network
+N:System.Net.Mail;only the share and crash clients reach the network
+N:System.Net.NetworkInformation;only the share and crash clients reach the network
+T:System.Net.Sockets.Socket;only the share and crash clients reach the network
+T:System.Net.Sockets.TcpClient;only the share and crash clients reach the network
+T:System.Net.Sockets.TcpListener;only the share and crash clients reach the network
+T:System.Net.Sockets.UdpClient;only the share and crash clients reach the network
+T:System.Net.Sockets.NetworkStream;only the share and crash clients reach the network
+T:System.Net.Dns;only the share and crash clients reach the network
+T:System.Net.WebRequest;only the share and crash clients reach the network
+T:System.Net.WebClient;only the share and crash clients reach the network
+T:Keypaste.Core.Sharing.ShareClient;only the share service and the shell that makes it reach the share server

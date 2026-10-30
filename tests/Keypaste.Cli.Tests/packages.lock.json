@@ -161,8 +161,12 @@
       "keypaste.core": {
         "type": "Project",
         "dependencies": {
-          "KeePassLib": "[1.0.0, )"
+          "KeePassLib": "[1.0.0, )",
+          "Keypaste.Infrastructure": "[0.5.0, )"
         }
+      },
+      "keypaste.infrastructure": {
+        "type": "Project"
       },
       "keypaste.mcp": {
         "type": "Project",

@@ -9,6 +9,6 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <!-- No PackageReference: Directory.Packages.props says why CommunityToolkit.Mvvm is absent. -->
+  <!-- No runtime package: Directory.Packages.props says why CommunityToolkit.Mvvm is absent. -->
 
 </Project>

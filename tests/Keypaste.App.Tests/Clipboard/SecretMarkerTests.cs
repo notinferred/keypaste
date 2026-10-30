@@ -60,4 +60,36 @@ public sealed class SecretMarkerTests
         Assert.Equal([DataFormat.Text], item.Formats);
         window.Close();
     });
+
+    /// <summary>
+    /// The secret markers' format names, the Windows clipboard-exclusion names among them, are spelled exactly, with nothing
+    /// around them.
+    /// </summary>
+    /// <remarks>
+    /// O-0008 records KeePassXC shipping one of these names with a trailing space for three releases, 2.7.10 to 2.7.12, which
+    /// silently turned the opt-out off while the code looked right. Whether anything honours them needs a real Windows session
+    /// or a pasteboard manager, which docs/desktop.md's manual checklist and <c>verify-clipboard-markers.sh</c> hold.
+    /// </remarks>
+    [Fact]
+    public void The_secret_marker_names_carry_no_stray_whitespace()
+    {
+        var names = AvaloniaClipboard.SecretMarkers.Select(marker => marker.Name).ToList();
+
+        Assert.Equal(
+            [
+                "ExcludeClipboardContentFromMonitorProcessing",
+                "CanIncludeInClipboardHistory",
+                "CanUploadToCloudClipboard",
+                "org.nspasteboard.ConcealedType",
+                "org.nspasteboard.TransientType",
+                "x-kde-passwordManagerHint",
+            ],
+            names);
+
+        foreach (var name in names)
+        {
+            Assert.Equal(name.Trim(), name);
+            Assert.DoesNotContain(' ', name);
+        }
+    }
 }

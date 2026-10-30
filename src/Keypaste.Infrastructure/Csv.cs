@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Keypaste.Core.Infrastructure;
+namespace Keypaste.Infrastructure;
 
 /// <summary>One record of a CSV file: one line, or several when a quoted field holds a line break.</summary>
 /// <param name="Line">The line it starts on, counted from 1.</param>

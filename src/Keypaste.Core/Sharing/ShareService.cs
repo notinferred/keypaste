@@ -1,3 +1,4 @@
+#pragma warning disable RS0030 // The share service drives the share client.
 using System.Buffers.Text;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;

@@ -1,0 +1,3 @@
+// The relay writes no audit line (D-0548, D-0624).
+T:Keypaste.Core.Audit.AuditLog;the relay writes no audit line
+T:Keypaste.Core.Audit.RequestRecords;the relay writes no audit line

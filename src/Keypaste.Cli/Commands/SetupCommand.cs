@@ -1,8 +1,8 @@
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Settings;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

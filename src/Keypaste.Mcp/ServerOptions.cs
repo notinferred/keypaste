@@ -2,9 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Mcp;
 

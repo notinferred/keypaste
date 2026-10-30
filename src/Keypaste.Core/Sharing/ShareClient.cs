@@ -1,3 +1,4 @@
+#pragma warning disable RS0030 // The share client: one of the two routes to the network.
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;

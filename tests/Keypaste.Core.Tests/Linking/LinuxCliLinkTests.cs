@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Linking;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Core.Tests.Linking;

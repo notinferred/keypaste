@@ -6,11 +6,11 @@ using System.Text.Json.Nodes;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;

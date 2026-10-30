@@ -5,6 +5,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
+/// <summary>Build invariants of <c>.github/workflows</c>, which no compiler reads.</summary>
 public sealed class WorkflowRulesTests
 {
     [Fact]

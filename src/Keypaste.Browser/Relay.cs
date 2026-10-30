@@ -3,9 +3,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
+using Keypaste.Infrastructure;
 using static Keypaste.Browser.ExtensionProtocol;
 
 namespace Keypaste.Browser;

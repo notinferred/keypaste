@@ -1,6 +1,6 @@
 using Keypaste.Core.Clients;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Processes;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Health;
 

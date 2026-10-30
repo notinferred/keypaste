@@ -1,0 +1,8 @@
+// The bridge and the browser relay hold no vault: they cannot open, create or unlock one, take no master password or keyfile and read no TOTP seed (D-0418, D-0480, D-0548, T-8).
+T:Keypaste.Core.Vault;the bridge and the relay hold no vault
+T:Keypaste.Core.VaultCreation;the bridge and the relay hold no vault
+T:Keypaste.Core.VaultKeyfile;the bridge and the relay take no keyfile
+T:Keypaste.Core.Approval.VaultCredentialSource;the bridge and the relay hold no vault
+T:Keypaste.Core.Approval.VaultEntryNameLister;the bridge and the relay hold no vault
+T:Keypaste.Core.SecretInput;the bridge and the relay take no master password
+T:Keypaste.Core.Totp.TotpSpec;only the vault's owner reads a TOTP seed

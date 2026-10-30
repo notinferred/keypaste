@@ -10,7 +10,8 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 /// <remarks>
 /// A text scan of <c>DoctorCommand.cs</c>, <c>StatusCommand.cs</c> and every file of the core's <c>Health</c> folder, in
-/// which a name in a comment counts too. The holder's requests are read from <c>ApproverClient</c> itself, so a request added there is forbidden here
+/// which a name in a comment counts too: the rule covers some files of two projects whose others write, and a ban list
+/// covers a whole project. The holder's requests are read from <c>ApproverClient</c> itself, so a request added there is forbidden here
 /// without this list changing.
 /// </remarks>
 public sealed partial class DoctorSourceRulesTests

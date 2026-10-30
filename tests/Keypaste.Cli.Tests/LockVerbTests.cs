@@ -1,7 +1,7 @@
 using System.IO.Pipes;
 using System.Security.Cryptography;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;

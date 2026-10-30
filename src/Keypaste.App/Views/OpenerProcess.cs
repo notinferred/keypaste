@@ -1,3 +1,4 @@
+#pragma warning disable RS0030 // The one program the app starts: the platform's opener, handed a web address.
 using System.ComponentModel;
 using System.Diagnostics;
 using Keypaste.App.Session;

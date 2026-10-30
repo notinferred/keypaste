@@ -2,7 +2,7 @@ using System.Globalization;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

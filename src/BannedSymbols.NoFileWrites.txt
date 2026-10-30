@@ -1,0 +1,18 @@
+// The app writes no file itself, so every vault it writes comes from the writer the KeePassXC gate covers (PRODUCT §4.6).
+M:System.IO.File.WriteAllBytes(System.String,System.Byte[]);the app writes files only through Core
+M:System.IO.File.WriteAllBytes(System.String,System.ReadOnlySpan{System.Byte});the app writes files only through Core
+M:System.IO.File.WriteAllText(System.String,System.String);the app writes files only through Core
+M:System.IO.File.WriteAllText(System.String,System.String,System.Text.Encoding);the app writes files only through Core
+M:System.IO.File.WriteAllText(System.String,System.ReadOnlySpan{System.Char});the app writes files only through Core
+M:System.IO.File.WriteAllText(System.String,System.ReadOnlySpan{System.Char},System.Text.Encoding);the app writes files only through Core
+M:System.IO.File.Create(System.String);the app writes files only through Core
+M:System.IO.File.Create(System.String,System.Int32);the app writes files only through Core
+M:System.IO.File.Create(System.String,System.Int32,System.IO.FileOptions);the app writes files only through Core
+M:System.IO.File.Copy(System.String,System.String);the app writes files only through Core
+M:System.IO.File.Copy(System.String,System.String,System.Boolean);the app writes files only through Core
+M:System.IO.File.Move(System.String,System.String);the app writes files only through Core
+M:System.IO.File.Move(System.String,System.String,System.Boolean);the app writes files only through Core
+M:System.IO.Directory.CreateDirectory(System.String);the app writes files only through Core
+M:System.IO.Directory.CreateDirectory(System.String,System.IO.UnixFileMode);the app writes files only through Core
+T:System.IO.FileStream;the app writes files only through Core
+M:Keypaste.Core.Vault.Create(System.String,System.ReadOnlySpan{System.Char});the app creates a vault only through VaultCreation, as keypaste init does

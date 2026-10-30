@@ -4,9 +4,9 @@ using System.Text.Json;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Core.Tests;

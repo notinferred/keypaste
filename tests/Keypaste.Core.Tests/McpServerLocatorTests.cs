@@ -1,11 +1,11 @@
 using System.Text;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Linking;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Processes;
+using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Core.Tests;

@@ -1,6 +1,6 @@
 using Keypaste.Cli.Output;
 using Keypaste.Core;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 

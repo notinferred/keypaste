@@ -12,7 +12,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// vault written wherever the person says.
 /// </summary>
 /// <remarks>
-/// The app moves no bytes (<c>TheAppSharesTheWriterTests</c>), so what is asserted here is that the
+/// The app moves no bytes (its <c>BannedSymbols</c> lists), so what is asserted here is that the
 /// button reaches <see cref="Vault.ExportTo"/> and reports what it said. Each "nothing was written"
 /// asserts first that the picker was reached, for <see cref="FakeVaultFilePicker"/>'s reason.
 /// </remarks>

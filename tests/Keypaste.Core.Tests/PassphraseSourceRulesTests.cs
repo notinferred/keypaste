@@ -15,7 +15,8 @@ namespace Keypaste.Core.Tests;
 /// </para>
 /// <para>
 /// So the rule this asserts is the one that was meant: on the generation path, the only <c>%</c>
-/// in code is inside that character set. Comment lines are skipped, because prose explaining the
+/// in code is inside that character set. It is read from the source because <c>%</c> on integers
+/// is the compiler's own operator, with no symbol a ban list can name. Comment lines are skipped, because prose explaining the
 /// rule necessarily names the operator — which is how the first draft of this test failed.
 /// </para>
 /// <para>

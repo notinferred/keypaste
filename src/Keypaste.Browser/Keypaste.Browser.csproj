@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <!-- No PackageReference: libsodium is built from its signed release by scripts/build-libsodium.sh (D-0611, D-0612). -->
+  <!-- No runtime package: libsodium is built from its signed release by scripts/build-libsodium.sh (D-0611, D-0612). -->
 
   <ItemGroup>
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />

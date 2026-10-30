@@ -1,8 +1,8 @@
 using Keypaste.Cli.Prompting;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Settings;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli;
 

@@ -1,7 +1,7 @@
 using Keypaste.Core.Audit;
-using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli;
 

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Security.Principal;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Ipc;
 

@@ -370,7 +370,9 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             return;
         }
 
+#pragma warning disable RS0030 // The install link the person asked to open.
         if (!await _web.OpenAsync(new Uri(link)).ConfigureAwait(true))
+#pragma warning restore RS0030
         {
             Message = $"Your system didn't open the link. Copy it and paste it into your browser, which hands it to {Client.DisplayName}.";
         }

@@ -1,3 +1,4 @@
+#pragma warning disable RS0030 // One of the item pane's two attachment files (D-0534).
 using Keypaste.App.Session;
 using Keypaste.Core;
 
@@ -12,7 +13,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// Nothing here opens or runs an attachment or the file one was saved to, reaches a launcher or starts a process
-/// (D-0534); <c>AttachmentSourceRulesTests</c> holds that.
+/// (D-0534); the app's <c>BannedSymbols.txt</c> and <c>AttachmentSourceRulesTests</c> hold that.
 /// </para>
 /// </remarks>
 internal sealed class EntryAttachmentsViewModel : ObservableObject, IDisposable

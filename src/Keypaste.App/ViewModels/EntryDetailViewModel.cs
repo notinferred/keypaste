@@ -1073,7 +1073,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             return;
         }
 
+#pragma warning disable RS0030 // The item's web address, which the person asked to open.
         if (_web is null || !await _web.OpenAsync(address).ConfigureAwait(true))
+#pragma warning restore RS0030
         {
             Report($"Your system didn't open {DisplayUrl}. Copy it and paste it into your browser.");
         }

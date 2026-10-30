@@ -2,7 +2,7 @@ using System.Globalization;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Import;
-using Keypaste.Core.Infrastructure;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
