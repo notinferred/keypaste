@@ -161,6 +161,7 @@ internal sealed record LogRow
                 "remove" => "Removed a pairing",
                 _ => entry.Granted ? "Paired a browser" : "Asked to pair",
             },
+            "vault_merge" => "Merged another program's save",
             "token bundle" => "Bundled",
             "" => _none,
             var tool when tool.EndsWith("_credential", StringComparison.Ordinal) => "Requested",
@@ -238,6 +239,7 @@ internal sealed record LogRow
             // Released by a policy.toml rule, in a line written before agents had modes.
             "policy" => ("By rule", LogTone.Ok),
             "narrowing" => ("Narrowed", LogTone.Muted),
+            "merged" => ("Merged", LogTone.Muted),
             "token" => ("Token", LogTone.Info),
             "share-created" => ("Link", LogTone.Muted),
             "share-revoked" => ("Revoked", LogTone.Muted),

@@ -1026,7 +1026,8 @@ public sealed class ApproverHandler
     /// <returns>The refusal's reason.</returns>
     /// <remarks>
     /// A file somebody else wrote zeroes every grant: each holds a value from the copy that is now
-    /// stale, and that copy is not served again until a person reloads the vault (D-0317).
+    /// stale, which is not served again; the owner serves its merge with that file once saved, or what
+    /// a person reloads (D-0542, D-0640).
     /// </remarks>
     private string Stale(CredentialFailure failure, string what)
     {
@@ -1093,7 +1094,7 @@ public sealed class ApproverHandler
         CredentialFailure.NoSuchField => "the field asked for is not one keypaste releases",
         CredentialFailure.Empty => "the item has nothing in that field",
         CredentialFailure.ChangedOnDisk =>
-            "another program changed the vault file since keypaste read it; nothing is released until a person reloads the vault",
+            "another program changed the vault file since keypaste read it; nothing is released until keypaste merges that save or a person reloads the vault",
         CredentialFailure.Unsaved => "the vault has a change that is not saved yet",
         CredentialFailure.Unfilled => "the item's field holds a KeePass placeholder keypaste does not fill in",
         CredentialFailure.NoCode => "the item has no TOTP keypaste can compute",

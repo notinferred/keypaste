@@ -378,7 +378,7 @@ public sealed class SessionBrowsers : IBrowserRequests
         var (method, why) = check switch
         {
             PairingCheck.Unsaved => (AuditMethod.VaultChanged, "the vault holds a change not saved yet, so no pairing is proven until it is"),
-            PairingCheck.ChangedOnDisk => (AuditMethod.VaultChanged, "another program changed the vault since it was opened here; reload it first"),
+            PairingCheck.ChangedOnDisk => (AuditMethod.VaultChanged, "another program changed the vault since it was opened here; no pairing is proven until keypaste merges that save or a person reloads the vault"),
             PairingCheck.Unreadable => (AuditMethod.Failed, "the vault's file could not be read to compare"),
             _ => (AuditMethod.NotPaired, "the vault holds no pairing of that name for this browser and key"),
         };

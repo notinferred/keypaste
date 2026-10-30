@@ -27,11 +27,18 @@ internal enum WriteOutcome
 /// <param name="Reason">The core's message, when <paramref name="Outcome"/> is <see cref="WriteOutcome.Failed"/>.</param>
 internal sealed record WriteResult<T>(WriteOutcome Outcome, T? Value = default, bool Unwritten = false, string? Reason = null)
 {
+    /// <summary>
+    /// Whether another program's save, which refused this edit's save, has since been merged with the open vault without the
+    /// edit, so the vault matches its file again and the edit can simply be made again (D-0542).
+    /// </summary>
+    internal bool Merged { get; init; }
+
     /// <summary>What a screen says when the write did not go through, or null when it did.</summary>
     /// <param name="redo">What to do again once the vault is reloaded, as the screen words it, such as "delete this again".</param>
     internal string? Problem(string redo) => Outcome switch
     {
         WriteOutcome.Locked => "The vault is locked.",
+        WriteOutcome.ChangedOnDisk when Merged => $"Another program saved this vault meanwhile, and keypaste has merged its save. Now {redo}.",
         WriteOutcome.ChangedOnDisk => $"Something else changed this vault since you opened it. Reload to see it, then {redo}.",
         WriteOutcome.Failed => Reason,
         _ => null,

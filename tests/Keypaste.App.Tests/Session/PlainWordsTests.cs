@@ -408,6 +408,31 @@ public sealed partial class PlainWordsTests
         yield return ("the not-paired notice", new PairingNoticeWindow(new PairingNotice(Core.Browser.BrowserIdentity.FirefoxAddOns), () => { }));
     }
 
+    /// <summary>What the shell says of a merge of another program's save, saved with each kind of item named or refused for each reason, holds none of the words (D-0542).</summary>
+    [Fact]
+    public void TheMergeNotices_HoldNoneOfTheRetiredWords()
+    {
+        var item = new EntryName("env/billing", "STRIPE_KEY");
+        var report = new VaultMergeReport(
+            true,
+            [new MergeConflict(item, true), new MergeConflict(item, false)],
+            [new MergeKeptItem(item, true, true), new MergeKeptItem(item, true, false), new MergeKeptItem(item, false, true), new MergeKeptItem(item, false, false)],
+            [new MergeRenamedGroup("env/billing", "billing-old")],
+            ["claude-code", "cursor"]);
+        var carried = new[] { item, new EntryName(ReservedGroups.Agents, "claude-code") };
+        var said = new List<(string Where, string Text)>
+        {
+            ("a saved merge", MergeNotice.Saved("billing.kdbx", new MergeResult(VaultMergeSaveOutcome.Saved, string.Empty, report, carried, true, DateTimeOffset.UnixEpoch))),
+        };
+
+        foreach (var outcome in Enum.GetValues<VaultMergeSaveOutcome>())
+        {
+            said.Add(($"a merge refused as {outcome}", MergeNotice.Refused(new MergeResult(outcome, "the disk is full.", null, [], false, DateTimeOffset.UnixEpoch))));
+        }
+
+        Assert.Empty(Offending(said));
+    }
+
     private static IEnumerable<(string Where, string Text)> Shown(Control root, string where)
     {
         foreach (var control in root.GetVisualDescendants().OfType<Control>().Prepend(root).Where(control => control.IsEffectivelyVisible))

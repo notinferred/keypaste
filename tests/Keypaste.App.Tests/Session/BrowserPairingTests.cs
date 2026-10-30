@@ -7,6 +7,7 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
@@ -129,6 +130,35 @@ public sealed partial class BrowserPairingTests
         Assert.Empty(browserFill.Rows);
         Assert.StartsWith("Removed the pairing work laptop.", browserFill.Message, StringComparison.Ordinal);
         Assert.Equal(BrowserOutcome.NotPaired, (await link.CheckAsync(Check(app, "work laptop"), Token))?.Outcome);
+    });
+
+    /// <summary>
+    /// A confirmation on screen when the desktop merges another program's save is withdrawn with what else waited on the person: its
+    /// window closes, the browser is refused, and no pairing is saved (D-0542, D-0634).
+    /// </summary>
+    [Fact]
+    public Task A_confirmation_waiting_when_another_programs_save_is_merged_is_withdrawn_and_pairs_nothing() => HeadlessSession.On(async () =>
+    {
+        await using var app = await PromptedApp.StartAsync();
+        using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
+        browserFill.PairCommand.Execute(null);
+        await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
+        var pairing = link.PairAsync(Pair(app), Token).AsTask();
+        var window = Assert.IsType<PairingWindow>(await app.PromptAsync());
+
+        using (var other = Core.Vault.Open(app.Vault, TempVault.Password))
+        {
+            other.AddEntry(new VaultEntry { GroupPath = "services", Title = "Fly", Password = "external" });
+            other.Save();
+        }
+
+        Assert.True((await Task.Run(() => app.Authority.Session.Merge(), Token))?.Merged);
+        await PromptedApp.WithdrawnAsync(window);
+
+        var reply = await pairing.WaitAsync(_wait, Token);
+        Assert.Equal(BrowserOutcome.Refused, reply?.Outcome);
+        Assert.EndsWith("before the pairing was saved", reply!.Reason, StringComparison.Ordinal);
+        Assert.Empty(new BrowserFillViewModel(app.Authority, app.Clock).Rows);
     });
 
     /// <summary>The card says nothing in the words D-0457 retired and names every control by its words.</summary>

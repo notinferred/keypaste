@@ -176,7 +176,7 @@ If you cannot recover access, rotate each credential at its provider.
 
 keypaste has no built-in sync. You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. A cloud vault synced end to end and a relay for team projects are planned ([ROADMAP](../ROADMAP.md)) and not yet built.
 
-One caveat: keypaste does not merge concurrent vault edits today. If two machines edit offline, the sync tool may leave conflicting copies or overwrite one version. KDBX itself does not prohibit merging; the missing feature is in keypaste. Keep every conflicting copy, edit in one place at a time, and let synchronization finish before switching machines.
+One caveat: the published `v0.3.0` does not merge concurrent vault edits. In source, the desktop app merges a save the sync tool delivers with the copy it holds open, by whole item versions, keeping the older of two changes to one item in its history and naming in its notice what both changed; the CLI and `keypaste approve` still refuse to save over a file another program changed. If two machines edit offline, the sync tool may also leave conflicting copies, which keypaste does not merge with each other: keep every conflicting copy, edit in one place at a time where you can, and let synchronization finish before switching machines.
 
 ### Can my teammate use the same vault?
 

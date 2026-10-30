@@ -87,6 +87,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string _vaultStatusDetail = string.Empty;
     private string? _vaultChanged;
     private string? _reloadFailure;
+    private Task _merging = Task.CompletedTask;
+    private bool _isMerging;
+    private DateTimeOffset? _updatedAt;
+    private bool _noticeNamesAConflict;
     private int _ticks;
     private readonly Action<string, string?, int?>? _openInPlace;
     private KdbxImportViewModel? _import;
@@ -132,7 +136,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             post);
 
         LockCommand = new AsyncRelayCommand(() => _session.LockAsync(VaultLockReason.Manual));
-        DismissNoticeCommand = new RelayCommand(() => Notice = null);
+        DismissNoticeCommand = new RelayCommand(DismissNotice);
         ReloadCommand = new RelayCommand(Reload);
         DismissToastCommand = new RelayCommand(() => Toast = null);
         OpenProjectCommand = new RelayCommand<string>(OpenProject);
@@ -186,6 +190,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.Edited += OnEdited;
         _session.WaitingForTouch += OnWaitingForTouch;
         _session.Saved += OnSaved;
+        _session.Merged += OnMerged;
 
         if (authority is not null)
         {
@@ -219,7 +224,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _fileWatch = WatchVaultFile();
     }
 
-    /// <summary>What the restore that opened this vault did, until it is dismissed or the vault locks.</summary>
+    /// <summary>
+    /// What the restore that opened this vault did, or what a merge of another program's save carried and named, until it is
+    /// dismissed or the vault locks; a later merge's notice follows one naming a conflict rather than replacing it (D-0542).
+    /// </summary>
     /// <remarks>
     /// Said after the fact as well as before it, because only afterwards is it known whether the
     /// replaced file was kept, was already kept, or was never there.
@@ -234,7 +242,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     internal RelayCommand DismissNoticeCommand { get; }
 
-    /// <summary>What the notice says while the file holds another program's save, or null.</summary>
+    /// <summary>What the notice says while the file holds another program's save that keypaste did not merge, or null.</summary>
     internal string? VaultChanged
     {
         get => _vaultChanged;
@@ -243,8 +251,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     internal bool HasVaultChanged => _vaultChanged is not null;
 
-    /// <summary>Opens what the file holds now in place of the open copy (D-0412).</summary>
+    /// <summary>Opens what the file holds now in place of the open copy (D-0412), offered once a merge was refused (D-0543).</summary>
     internal RelayCommand ReloadCommand { get; }
+
+    /// <summary>The merge of another program's save the poll or the folder watch started, or a completed task when none runs.</summary>
+    internal Task Merging => _merging;
 
     /// <summary>Whether a save is waiting for the vault's YubiKey to be touched.</summary>
     internal bool IsWaitingForTouch
@@ -1363,6 +1374,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
+        if (_isMerging)
+        {
+            ShowMerging();
+            return;
+        }
+
         VaultSaveState state;
 
         try
@@ -1376,15 +1393,21 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         (VaultStatus, VaultStatusTone) = state.Status switch
         {
+            VaultSaveStatus.Saved when _updatedAt is { } updated =>
+                ($"{VaultName} · updated {updated.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture)}", StatusTone.Ok),
             VaultSaveStatus.Saved => ($"{VaultName} · saved", StatusTone.Ok),
             VaultSaveStatus.Unsaved => ($"{VaultName} · unsaved changes", StatusTone.Accent),
             VaultSaveStatus.ChangedOnDisk => ($"{VaultName} · changed on disk", StatusTone.Danger),
             _ => ($"{VaultName} · file unreadable", StatusTone.Danger),
         };
 
-        VaultStatusDetail = state.SavedAt is { } saved
-            ? $"Saved {saved.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {VaultPath}"
-            : VaultPath;
+        VaultStatusDetail = (state.Status, _updatedAt, state.SavedAt) switch
+        {
+            (VaultSaveStatus.Saved, { } updated, _) =>
+                $"Updated from another program's save at {updated.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {VaultPath}",
+            (_, _, { } saved) => $"Saved {saved.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {VaultPath}",
+            _ => VaultPath,
+        };
 
         if (state.Status != VaultSaveStatus.ChangedOnDisk)
         {
@@ -1393,10 +1416,112 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // The poll and the folder watch merge another program's save; Reload is offered for one keypaste did not merge (D-0542, D-0543).
+        if (_session.MergeRefusal() is { } refused)
+        {
+            VaultChanged = string.Concat(
+                $"Another program saved {VaultName}, and keypaste could not merge it: {MergeNotice.Refused(refused)}. Agents are refused until you reload it.",
+                state.Unwritten ? Discarded() : string.Empty,
+                _reloadFailure is { } failed ? $" Reloading failed: {failed}" : string.Empty);
+            return;
+        }
+
+        if (_session.Merges)
+        {
+            StartMerge();
+            return;
+        }
+
         VaultChanged = string.Concat(
             $"Another program saved {VaultName}. Agents are refused until you reload it.",
             state.Unwritten ? Discarded() : string.Empty,
             _reloadFailure is { } failure ? $" Reloading failed: {failure}" : string.Empty);
+    }
+
+    /// <summary>Merges another program's save on a thread of its own, the title bar saying so meanwhile (D-0542).</summary>
+    private void StartMerge()
+    {
+        if (_isMerging)
+        {
+            return;
+        }
+
+        _isMerging = true;
+        ShowMerging();
+        _merging = AppVaultSession.OnItsOwnThread(() =>
+        {
+            _session.Merge();
+            Post(() =>
+            {
+                _isMerging = false;
+                ReadVaultStatus();
+            });
+        });
+    }
+
+    private void ShowMerging()
+    {
+        VaultStatus = $"{VaultName} · merging";
+        VaultStatusTone = StatusTone.Accent;
+        VaultStatusDetail = $"Merging another program's save · {VaultPath}";
+        VaultChanged = null;
+    }
+
+    private void OnMerged(object? sender, MergeResult merged) => Post(() => ShowMerged(merged));
+
+    /// <summary>
+    /// Says what a merge did and shows the merged copy on the screen open now, leaving an item being edited as typed, so
+    /// its next save writes by name to the merged copy (D-0639); a refusal is said by the banner the status reads.
+    /// </summary>
+    private void ShowMerged(MergeResult merged)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (merged.Merged)
+        {
+            _reloadFailure = null;
+            _updatedAt = merged.Outcome == VaultMergeSaveOutcome.Updated ? merged.At : null;
+
+            if (merged.Outcome == VaultMergeSaveOutcome.Saved)
+            {
+                var said = MergeNotice.Saved(VaultName, merged);
+                Notice = _noticeNamesAConflict && Notice is { } standing ? $"{standing} {said}" : said;
+                _noticeNamesAConflict |= MergeNotice.NamesAConflict(merged);
+            }
+
+            Count();
+
+            switch (Content)
+            {
+                case EntriesViewModel { Detail.IsEditing: true }:
+                    break;
+
+                case EntriesViewModel entries:
+                    entries.Reload();
+                    break;
+
+                case EnvSetsViewModel env:
+                    env.Reload();
+                    break;
+
+                default:
+                    Show(_current);
+                    break;
+            }
+
+            Recommendations.Check();
+        }
+
+        ReadVaultStatus();
+    }
+
+    private void DismissNotice()
+    {
+        Notice = null;
+        _noticeNamesAConflict = false;
     }
 
     /// <summary>What reloading would discard, naming the items changed here since the last save and never a value (D-0412).</summary>
@@ -1450,6 +1575,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     {
         if (!_disposed)
         {
+            _updatedAt = null;
             ReadVaultStatus();
             Recommendations.Check();
         }
@@ -1482,6 +1608,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private void OnEdited(object? sender, VaultEdit edit) => Post(() =>
     {
+        _updatedAt = null;
         Count();
         ReadVaultStatus();
     });
@@ -1568,6 +1695,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.Edited -= OnEdited;
         _session.WaitingForTouch -= OnWaitingForTouch;
         _session.Saved -= OnSaved;
+        _session.Merged -= OnMerged;
 
         if (Authority is not null)
         {

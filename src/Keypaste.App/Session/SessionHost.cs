@@ -490,6 +490,9 @@ internal sealed class SessionHost : IDisposable
 
             var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _pairingUses, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), _unexpected);
             _hosted = hosted;
+
+            // The authority answering agents merges another program's save, so its withdrawal and its line are the merge's (D-0622).
+            _session.MergeThrough(lifetime, hosted.Merge);
             Endpoint = hosted.Endpoint;
             Failure = hosted.Failure;
             LaunchFailure = hosted.LaunchFailure;
@@ -508,6 +511,12 @@ internal sealed class SessionHost : IDisposable
     {
         var hosted = _hosted;
         _hosted = null;
+
+        if (hosted is not null)
+        {
+            _session.MergeThrough(hosted.Lifetime, null);
+        }
+
         Endpoint = null;
         Failure = null;
         LaunchFailure = null;
@@ -541,9 +550,10 @@ internal sealed class SessionHost : IDisposable
         private readonly Task? _agents;
         private readonly Task? _launching;
 
-        private Hosted(SessionServer server, AuditOpener audit, IApprovalChannel channel, string? endpoint, string? failure, LaunchEndpoint? launches, string? launchFailure)
+        private Hosted(SessionServer server, SessionLifetime lifetime, AuditOpener audit, IApprovalChannel channel, string? endpoint, string? failure, LaunchEndpoint? launches, string? launchFailure)
         {
             _server = server;
+            Lifetime = lifetime;
             _audit = audit;
             _channel = channel;
             _launches = launches;
@@ -553,6 +563,9 @@ internal sealed class SessionHost : IDisposable
             _agents = endpoint is null ? null : server.RunAsync(_stop.Token);
             _launching = launches?.RunAsync(_stop.Token);
         }
+
+        /// <summary>The unlock this answers for.</summary>
+        internal SessionLifetime Lifetime { get; }
 
         /// <summary>The vault's endpoint, or null when it could not be bound.</summary>
         internal string? Endpoint { get; }
@@ -625,6 +638,8 @@ internal sealed class SessionHost : IDisposable
 
         internal bool RecordRun(Core.EnvResolved set, string lifetimeId) => _server.Authority.RecordAppRun(set, lifetimeId);
 
+        internal Core.VaultMergeSave Merge(Core.Vault open, Func<Core.Vault, bool> swap) => _server.Authority.Merge(open, swap, Surface);
+
         /// <summary>Builds the unlock's authority, then binds its launch endpoint when it has one and the vault's endpoint, each reporting why it could not be bound.</summary>
         internal static Hosted Start(
             VaultIdentity vault,
@@ -690,7 +705,7 @@ internal sealed class SessionHost : IDisposable
                 }
 
                 var (endpoint, failure) = BindForAgents(server, approverOverride, vault);
-                var hosted = new Hosted(server, audit, channel, endpoint, failure, launches, launchFailure);
+                var hosted = new Hosted(server, lifetime, audit, channel, endpoint, failure, launches, launchFailure);
                 audit = null;
                 server = null;
                 launches = null;

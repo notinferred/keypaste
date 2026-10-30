@@ -342,7 +342,7 @@
                      Margin="18,14,18,0" />
 
           <StackPanel Grid.Row="2">
-            <!-- Stays until a reload: agents are refused while the open copy is not what the file holds (D-0412). -->
+            <!-- Another program's save keypaste did not merge: agents are refused until a reload (D-0412, D-0543). -->
             <Border IsVisible="{Binding HasVaultChanged}"
                     CornerRadius="{DynamicResource KpRadiusCard}"
                     Background="{DynamicResource KpDangerTint}"
@@ -366,7 +366,7 @@
               </Grid>
             </Border>
 
-            <!-- Said once on opening: what a restore did, a fragile keyfile, or that this vault was just chosen. Quiet. -->
+            <!-- What a restore did, a fragile keyfile, that this vault was just chosen, or what a merge saved and named (D-0542). Quiet. -->
             <Border IsVisible="{Binding HasNotice}"
                     Classes="card"
                     BorderBrush="{DynamicResource KpBorderSubtle}"

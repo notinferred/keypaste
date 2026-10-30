@@ -100,6 +100,7 @@ Anyone who can open the vault can change a record there, in KeePassXC for exampl
 | `run-off` | A command from an agent whose settings do not let it run commands, refused before anything was looked up. |
 | `narrowing` | A change to an agent's settings that gave it nothing more, applied at once. |
 | `prompt` | With a change to settings, a widening you confirmed or refused. |
+| `merged` | On a `vault_merge` line, the desktop app merged another program's save with its own changes and saved it; the line names each agent whose settings the merge changed, and the merged settings apply from that save. |
 
 A change to settings is recorded under the tool `access_change`, naming the agent and the change. History in the app shows an Automatic release as Automatic, and a change to settings as Changed settings when it was made and Asked to change settings when it was not. A line written by `v0.3.0` keeps its `policy` or `policy-limit`.
 

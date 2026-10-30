@@ -12,8 +12,9 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// The titlebar says whether the file holds what is open, and the MCP card counts the distinct
-/// clients attached to the live session (D-0361); Lock gives the window back before the endpoint has stopped.
+/// The titlebar says whether the file holds what is open, another program's save is merged and named in the notice or,
+/// refused, offered for Reload, and the MCP card counts the distinct clients attached to the live session (D-0361, D-0542);
+/// Lock gives the window back before the endpoint has stopped.
 /// </summary>
 public sealed class ShellStatusTests
 {
@@ -460,6 +461,197 @@ public sealed class ShellStatusTests
 
         Assert.False(shell.HasCountdown);
         Assert.True(session.IsUnlocked);
+    }
+
+    /// <summary>
+    /// The app's edit whose save another program's refused is merged with that save and saved once, and the notice names it
+    /// as saved, never by value (D-0542).
+    /// </summary>
+    [Fact]
+    public async Task AnotherProgramsSave_IsMergedWithTheEditItRefused_AndTheNoticeNamesIt()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        var session = authority.Session;
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
+        var name = Path.GetFileName(fixture.Path_);
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+        var write = session.Write(
+            vault =>
+            {
+                vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "secret-mine" });
+                return true;
+            },
+            added => added);
+        await shell.Merging.WaitAsync(_connect, Token);
+
+        Assert.Equal(WriteOutcome.Saved, write.Outcome);
+        Assert.False(write.Unwritten);
+        Assert.False(shell.HasVaultChanged);
+        Assert.Equal($"{name} · saved", shell.VaultStatus);
+        Assert.Equal(
+            $"Another program saved {name}, and keypaste merged it with your changes and saved. Your change to env/app/MINE is saved.",
+            shell.Notice);
+        Assert.DoesNotContain("secret-", shell.Notice, StringComparison.Ordinal);
+
+        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        Assert.NotNull(file.Find("env/app/ELSEWHERE"));
+        Assert.Equal("secret-mine", file.Find("env/app/MINE")!.Password);
+    }
+
+    /// <summary>
+    /// An item both programs changed is named in the notice, which a later merge adds to and which stays until it is
+    /// dismissed, while the item's History holds the other program's version (D-0542).
+    /// </summary>
+    [Fact]
+    public async Task AConflict_StaysInTheNoticeUntilDismissed()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        var session = authority.Session;
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
+        var name = Path.GetFileName(fixture.Path_);
+
+        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            Assert.True(other.UpdateEntry(other.Find("example")! with { Password = "theirs-example" }));
+            other.Save();
+        }
+
+        var write = session.Write(vault => vault.UpdateEntry(vault.Find("example")! with { Password = "mine-example" }), changed => changed);
+        await shell.Merging.WaitAsync(_connect, Token);
+
+        Assert.Equal(WriteOutcome.Saved, write.Outcome);
+        var conflict = $"Another program saved {name}, and keypaste merged it with your changes and saved. Your change to example is saved. " +
+            "You and the other program both changed example. Your version is current; the other program's is in its history.";
+        Assert.Equal(conflict, shell.Notice);
+        Assert.Contains(
+            session.Unlocked!.ReadHistory(new EntryName(string.Empty, "example"))!,
+            revision => revision.Fields.Password == "theirs-example");
+
+        SaveElsewhere(fixture, "LATER");
+        await MergedByThePoll(shell, clock);
+
+        Assert.StartsWith($"{name} · updated ", shell.VaultStatus, StringComparison.Ordinal);
+        Assert.Equal(conflict, shell.Notice);
+
+        SaveElsewhere(fixture, "LATEST");
+        Assert.Equal(WriteOutcome.Saved, session.Write(vault => vault.UpdateEntry(vault.Find("env/app/LATER")! with { Password = "mine-later" }), changed => changed).Outcome);
+        await shell.Merging.WaitAsync(_connect, Token);
+
+        Assert.StartsWith(conflict + " Another program saved", shell.Notice, StringComparison.Ordinal);
+        Assert.EndsWith("Your change to env/app/LATER is saved.", shell.Notice, StringComparison.Ordinal);
+
+        shell.DismissNoticeCommand.Execute(null);
+
+        Assert.False(shell.HasNotice);
+    }
+
+    /// <summary>
+    /// A file that now holds another vault is not merged: the notice says why and offers Reload, the poll does not merge the
+    /// same bytes again, and Reload opens what the file holds (D-0543).
+    /// </summary>
+    [Fact]
+    public async Task AFileHoldingAnotherVault_IsNotMerged_AndReloadIsOffered()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        var session = authority.Session;
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
+        var name = Path.GetFileName(fixture.Path_);
+        var merges = 0;
+        session.Merged += (_, _) => Interlocked.Increment(ref merges);
+
+        var other = Path.Combine(fixture.Home, "other.kdbx");
+
+        using (var vault = Vault.Create(other, TempVault.Password))
+        {
+            vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "OTHER", Password = "o" });
+            vault.Save();
+        }
+
+        File.Copy(other, fixture.Path_, overwrite: true);
+        await MergedByThePoll(shell, clock);
+
+        Assert.Equal(
+            $"Another program saved {name}, and keypaste could not merge it: the file now holds another vault. Agents are refused until you reload it.",
+            shell.VaultChanged);
+        Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
+        Assert.Equal(1, merges);
+
+        for (var tick = 0; tick < 5; tick++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        await shell.Merging.WaitAsync(_connect, Token);
+        Assert.Equal(1, merges);
+
+        shell.ReloadCommand.Execute(null);
+
+        Assert.False(shell.HasVaultChanged);
+        Assert.NotNull(session.Unlocked!.Find("env/app/OTHER"));
+    }
+
+    /// <summary>An item open for editing when the poll merges another program's save is left as typed, and its save writes into the merged copy (D-0542).</summary>
+    [Fact]
+    public async Task AnItemOpenForEditing_IsLeftAsTyped_AndItsSaveWritesToTheMergedCopy()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        var session = authority.Session;
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
+        var name = Path.GetFileName(fixture.Path_);
+
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == "example");
+        var detail = entries.Detail!;
+        detail.EditCommand.Execute(null);
+        detail.DraftNotes = "typed before the merge";
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+        await MergedByThePoll(shell, clock);
+
+        Assert.StartsWith($"{name} · updated ", shell.VaultStatus, StringComparison.Ordinal);
+        Assert.Same(entries, shell.Content);
+        Assert.Same(detail, entries.Detail);
+        Assert.True(detail.IsEditing);
+        Assert.Equal("typed before the merge", detail.DraftNotes);
+
+        detail.SaveCommand.Execute(null);
+        Assert.False(detail.IsEditing, entries.Error);
+
+        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        Assert.Equal("typed before the merge", file.Find("example")!.Notes);
+        Assert.NotNull(file.Find("env/app/ELSEWHERE"));
+    }
+
+    /// <summary>Advances the clock a second at a time until the poll or the folder watch has started a merge, then waits for it.</summary>
+    private static async Task MergedByThePoll(ShellViewModel shell, ManualClock clock)
+    {
+        for (var tick = 0; tick < 5 && shell.Merging.IsCompleted; tick++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        await shell.Merging.WaitAsync(_connect, Token);
     }
 
     private static void Unlock(AppVaultSession session, TempVault fixture)

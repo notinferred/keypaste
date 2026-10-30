@@ -211,7 +211,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 18
+    timeout-minutes: 38
     env:
       # KeePassXC's Windows console encoding can alter a non-ASCII master password.
       KP_COMPAT_PASSWORD: ci-master-pw
@@ -306,6 +306,12 @@ jobs:
       - name: Verify opening a keyfile-protected vault through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
+
+      # The app driver holds each vault while KeePassXC saves it, and keypaste merges every save (1.4b3).
+      - name: Verify the app merges KeePassXC's saves through real KeePassXC
+        shell: bash
+        timeout-minutes: 20
+        run: bash scripts/verify-keepassxc-merge.sh artifacts/compat/merge
 
   aot:
     name: aot publish (linux-x64)

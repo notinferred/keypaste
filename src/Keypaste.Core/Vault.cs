@@ -156,6 +156,22 @@ public sealed class Vault : IDisposable
         return new Vault(KeePassInterop.Reopen(Path, key), Path, stamp);
     }
 
+    /// <summary>
+    /// Writes this open copy, a change no save wrote included, to a new file under its key, so the merge gate can have KeePassXC merge
+    /// the same copy keypaste merges (<c>scripts/verify-keepassxc-merge.sh</c>, D-0641); the vault, its file and its base are left as they were.
+    /// </summary>
+    /// <param name="path">A path nothing occupies.</param>
+    internal void WriteCopyTo(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _interop.WriteCopy(path);
+        }
+    }
+
     /// <summary>Merges this open copy into <paramref name="file"/>, a fresh open of the file another program saved, as D-0537 to D-0541 say, leaving this copy as it was.</summary>
     /// <param name="file">
     /// The file's copy, opened with this vault's key, which becomes the merged copy: unsaved when the merge took anything from this one,

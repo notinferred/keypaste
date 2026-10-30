@@ -226,7 +226,8 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `exposure` | A listing, naming only what the agent can see. |
 | `no-approver` | In `v0.3.0`, nobody was running `keypaste agent`; in source, nothing held the vault unlocked. |
 | `no-session` | In source: the request did not reach the current session of the process holding this server's vault — the bridge had no vault named or chosen, the process that answered holds another vault, or the vault was locked or unlocked again between attaching and asking. Nothing was considered. |
-| `vault-changed` | In source: the process holding the vault had a copy that no longer matched its file. Another program saved the file, which lasts until the person reloads the vault, or a change made in keypaste was still being saved; or the person reloaded the vault while the request waited for an answer, which withdrew it. Nothing was read. |
+| `vault-changed` | In source: the process holding the vault had a copy that no longer matched its file. Another program saved the file, which lasts until the desktop app has merged that save, or until the person reloads a file it would not merge or restarts `keypaste approve`; or a change made in keypaste was still being saved; or the vault was reloaded or merged while the request waited for an answer, which withdrew it. Nothing was read. |
+| `merged` | In source, on a `vault_merge` line: the desktop app merged another program's save with changes its copy held and saved the result, naming the items both changed and those kept against a deletion, and the agents whose settings the merge changed, never a value. |
 | `out-of-scope` | The entry was outside exposure or absent. A shared response prevents existence checks outside exposure. |
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or a request for the same field was refused a moment ago, and on an `access_change` line any request for more from an agent or a terminal was refused or went unanswered a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered, or, on an `access_change` line, a lock or a reload took the confirmation down first. Nobody decided anything. |
@@ -356,7 +357,7 @@ Can it see my entry names? Only the ones it can see, the least of its settings a
 
 Can it change my vault? The current MCP surface only lists names and requests values; it cannot add, edit or delete entries. Desktop and CLI editing are separate workflows.
 
-Will it see my desktop edits immediately? No. The current terminal approver holds its own snapshot. Stop and reopen it after changing the file to read the saved values. In source, the desktop serves its own saved edits at once, and an approver or desktop whose file another program changed refuses as `vault-changed` until it is reopened.
+Will it see my desktop edits immediately? No. The current terminal approver holds its own snapshot. Stop and reopen it after changing the file to read the saved values. In source, the desktop serves its own saved edits at once and merges another program's save, refusing as `vault-changed` until the merged copy is saved, and an approver whose file another program changed refuses until it is reopened.
 
 The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [D-0023](decisions-archive.md) records this design.
 

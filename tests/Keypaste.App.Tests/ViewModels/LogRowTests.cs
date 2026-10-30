@@ -68,6 +68,27 @@ public sealed class LogRowTests
         Assert.True(row.Denied);
     }
 
+    /// <summary>A merge the app saved reads as the app merging another program's save, naming what it merged, and is no agent's request (D-0619).</summary>
+    [Fact]
+    public void A_merge_reads_as_the_app_merging_another_programs_save()
+    {
+        var row = Row(Entry("vault_merge", "granted", "merged") with
+        {
+            Client = "keypaste app",
+            Name = string.Empty,
+            Entries = ["env/billing/STRIPE_KEY"],
+            Reason = "merged another program's save with the changes this copy held, and saved it: 1 item changed in both copies",
+        });
+
+        Assert.Equal("Merged another program's save", row.Action);
+        Assert.Equal("Merged", row.Result);
+        Assert.Equal(LogTone.Muted, row.Tone);
+        Assert.Equal("keypaste app", row.Actor);
+        Assert.Equal("STRIPE_KEY", row.Secrets);
+        Assert.Equal("env/billing", row.Where);
+        Assert.False(row.Denied);
+    }
+
     /// <summary>Nobody refused a prompt nobody answered, so it is not drawn as a person's refusal, though it was one.</summary>
     [Fact]
     public void A_prompt_nobody_answered_is_a_muted_refusal()

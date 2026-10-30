@@ -468,6 +468,26 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
+    /// <summary>Writes this copy, unsaved changes included, to a new file under its key and header, leaving the vault's own file and state as they were.</summary>
+    /// <param name="path">A path nothing occupies.</param>
+    internal void WriteCopy(string path)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var bytes = Serialize();
+
+        try
+        {
+            using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+            file.Write(bytes);
+            file.Flush(flushToDisk: true);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
     /// <summary>The vault as KDBX bytes, written to memory, where closing KeePassLib's streams cannot fail.</summary>
     private byte[] Serialize()
     {

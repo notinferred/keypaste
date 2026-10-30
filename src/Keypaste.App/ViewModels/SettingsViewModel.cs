@@ -498,6 +498,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
             {
                 WriteOutcome.NothingToSave when write.Value => $"An encrypted copy is at {destination}. It opens with this vault's master password.",
                 WriteOutcome.NothingToSave or WriteOutcome.Locked => "The vault locked before the copy was made. Nothing was written.",
+                WriteOutcome.ChangedOnDisk when write.Merged => write.Problem("export again")!,
                 WriteOutcome.ChangedOnDisk => "The vault file changed since it was unlocked. Reload to see it, then export.",
                 _ => write.Reason!,
             };

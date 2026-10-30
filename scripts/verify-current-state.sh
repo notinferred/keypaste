@@ -6,16 +6,19 @@
 # One bridge keeps one connection, so a grant it was given can be reused. A password edited in the app
 # is the next value released and is asked about again; an entry moved out of the exposure is refused,
 # and moving it back asks again rather than serving the old grant. A save by another program between
-# two requests makes the second refuse as vault-changed, the listing too, the file keeps that program's
-# bytes even when the app then tries to save, the app's shell says so with Reload, and nothing is released
-# until a person reloads, which answers in the same session and asks again (N.16, D-0412).
+# two requests makes the second refuse as vault-changed, the listing too, until the app merges it: the
+# app's edit that save refused is merged with it and saved once, recorded, and the next request is
+# answered from the merged copy in the same session, asked again. A file holding another vault is not
+# merged: the shell says so with Reload, nothing is released, and the reload answers in the same session
+# and asks again (N.16, D-0412, D-0542, D-0543).
 # The other program is the CLI under another KEYPASTE_HOME, which does not see this home's claim (T-29):
 # under this home, a verb that saves is refused while the app holds the vault (N.10).
 # Deletes, group renames and access changes run over a real pipe in CurrentStateTests.
 #
 # NEGATIVE CONTROL: this fails if an old value is released after an edit, a grant outlives the change
-# to its entry, anything is released or listed after an external save before a reload, the app writes
-# over the external save, shows no notice of it, or reloads into another session or without asking again. These checks must never be skipped or soft-passed.
+# to its entry, anything is released or listed after an external save before it is merged or reloaded,
+# the app loses the external save or its own edit, writes over a file it would not merge, shows no notice
+# of it, or merges or reloads into another session or without asking again. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-current-master-pw'
@@ -159,7 +162,7 @@ request 14 "$ENTRY"
 released 14 "$V2" prompt "the request after the entry moved back"
 asked 3 "the request after the entry moved back"
 
-# ---------------------- another program saves: refused, the file kept, and nothing until a reload
+# ------------- another program saves: refused until the app merges it, and a file it will not merge reloaded
 printf '%s\n%s\n' "$MASTER" "$V3" | KEYPASTE_HOME="$OTHER_HOME" "$CLI" set "$ENTRY" --vault "$VAULT" >/dev/null \
   || die "another program could not save the vault the app holds"
 EXTERNAL="$(digest)"
@@ -171,27 +174,51 @@ tail -n 1 "$AUDIT" | jq -e '.reason | contains("another program changed the vaul
   || die "the refusal's audit line does not say the file changed"
 call 16 list_entry_names '{}'
 denied 16 vault-changed "the listing after another program saved" list_entry_names
-
-line="$(act "edit $ENTRY")"
-case "$line" in refused:*) ;; *) die "the app saved over the other program's write: $line" ;; esac
-[ "$(digest)" = "$EXTERNAL" ] || die "the vault file no longer holds the other program's bytes"
-request 17 "$ENTRY"
-denied 17 vault-changed "the request after the app's refused save"
 asked 3 "the requests after another program saved"
 
+# The app's edit of another item is refused by that save, merged with it, and saved once (D-0542).
+act "edit personal/KEEP" >/dev/null
+wait_for '^saved personal/KEEP' "$HOLD_OUT"
+grep -q '^merged saved: Another program saved vault.kdbx, and keypaste merged it with your changes and saved. Your change to personal/KEEP is saved' "$HOLD_OUT" \
+  || die "the app did not merge the other program's save with its edit: $(grep '^merged ' "$HOLD_OUT" || true)"
+[ "$(digest)" != "$EXTERNAL" ] || die "the merged copy was not saved"
+jq -e -s --arg s "$FIRST" 'map(select(.tool == "vault_merge")) | length == 1 and .[0].method == "merged" and .[0].session == $s' "$AUDIT" >/dev/null \
+  || die "the merge was not recorded once by session $FIRST"
+[ "$(act notice)" = "notice none" ] || die "the app still refuses agents after merging"
+
+request 17 "$ENTRY"
+released 17 "$V3" prompt "the request after the merge"
+tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" '.session == $s' >/dev/null || die "the merge did not keep session $FIRST"
+asked 4 "the request after the merge"
+
+# A file holding another vault is not merged: refused with the notice and Reload, which serves it in the same session (D-0543).
+OTHER="$(native "$WORK/other.kdbx")"
+printf '%s\n%s\n' "$MASTER" "$MASTER" | KEYPASTE_HOME="$OTHER_HOME" "$CLI" init "$OTHER" >/dev/null || die "could not create the other vault"
+printf '%s\n%s\n' "$MASTER" "$V1" | KEYPASTE_HOME="$OTHER_HOME" "$CLI" add "$ENTRY" --vault "$OTHER" >/dev/null \
+  || die "could not store the other vault's credential"
+agent_settings "$CLI" "$OTHER" "$MASTER" 'ci-probe --see env/**' || die "could not save ci-probe's settings in the other vault"
+cp "$WORK/other.kdbx" "$WORK/vault.kdbx"
+REPLACED="$(digest)"
+
+act merge >/dev/null
+wait_for '^merge end' "$HOLD_OUT" 1
+grep -q '^merged refused AnotherVault: the file now holds another vault' "$HOLD_OUT" || die "the app did not refuse to merge another vault"
 line="$(act notice)"
-case "$line" in "notice Another program saved"*) ;; *) die "the app showed no notice of the other program's save: $line" ;; esac
-case "$line" in *"was not saved, and reloading discards it."*) ;; *) die "the notice did not say the refused edit is discarded: $line" ;; esac
+[ "$line" = "notice Another program saved vault.kdbx, and keypaste could not merge it: the file now holds another vault. Agents are refused until you reload it." ] \
+  || die "the app showed no notice of the vault it would not merge: $line"
+request 18 "$ENTRY"
+denied 18 vault-changed "the request while the app refused to merge"
+[ "$(digest)" = "$REPLACED" ] || die "the app wrote over a file it would not merge"
 
 line="$(act reload)"
 [ "$line" = "reloaded" ] || die "the app did not reload: $line"
 [ "$(act notice)" = "notice none" ] || die "the notice outlived the reload"
 
-request 18 "$ENTRY"
-released 18 "$V3" prompt "the request after reloading"
+request 19 "$ENTRY"
+released 19 "$V1" prompt "the request after reloading"
 tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" '.session == $s' >/dev/null || die "reloading did not keep session $FIRST"
-asked 4 "the request after reloading"
-[ "$(digest)" = "$EXTERNAL" ] || die "the vault file changed without anyone saving it"
+asked 5 "the request after reloading"
+[ "$(digest)" = "$REPLACED" ] || die "the vault file changed without anyone saving it"
 
 exec 8>&-
 exec 7>&-
@@ -199,4 +226,5 @@ wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
 echo "ok: an edit in the app was the next value released and was asked about again, a moved entry's grant"
-echo "    was gone, and another program's save was refused as vault-changed with its bytes kept until the app reloaded it"
+echo "    was gone, another program's save was refused as vault-changed until the app merged it with its own edit,"
+echo "    and a file holding another vault was refused until the app reloaded it"

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
@@ -36,6 +37,11 @@ namespace Keypaste.App.Session;
 /// grants they were given (D-0313); a reload withdraws them too, keeping the lifetime (D-0412).
 /// </para>
 /// <para>
+/// <b>Another program's save is merged through the owner serving the unlock</b> (D-0542, D-0622, D-0638). Every write, reload,
+/// access change and merge holds one edit gate, so an edit made during a merge waits and then applies by name to the
+/// merged copy, and a save refused because the file changed merges at once. A lock never waits for that gate.
+/// </para>
+/// <para>
 /// <b>It names no Avalonia type, and must not.</b> Everything below is testable with a
 /// <see cref="TimeProvider"/> and no application, no window and no display — which is where the
 /// security assertions live (docs/PRODUCT.md law 4.5). A dispatcher timer would have been fewer lines and
@@ -68,6 +74,7 @@ internal sealed class AppVaultSession : IDisposable
     internal static readonly TimeSpan HolderCheck = TimeSpan.FromSeconds(3);
 
     private readonly Lock _gate = new();
+    private readonly Lock _editGate = new();
     private readonly Lock _claiming = new();
     private readonly Lock _unsavedGate = new();
     private readonly List<EntryName> _unsaved = [];
@@ -79,6 +86,9 @@ internal sealed class AppVaultSession : IDisposable
     private HardwareKey? _waitingKey;
     private VaultClaim? _claim;
     private SessionLifetime? _lifetime;
+    private OwnerMerge? _ownerMerge;
+    private MergeResult? _refusal;
+    private byte[]? _refusedDigest;
     private ITimer? _timer;
     private ITimer? _holderWatch;
     private string? _heldPath;
@@ -213,6 +223,61 @@ internal sealed class AppVaultSession : IDisposable
     /// <summary>Raised after the open vault has been saved, forwarded from whichever vault is open.</summary>
     /// <remarks>Subscribing here rather than to a vault keeps working after an access change replaces it.</remarks>
     internal event EventHandler? Saved;
+
+    /// <summary>
+    /// Merges another program's save for the owner serving one unlock, as <see cref="SessionAuthority.Merge(Vault, Func{Vault, bool}, string)"/>
+    /// does: withdrawing, merging and saving, recording a saved merge and handing the merged copy to <c>swap</c> (D-0622).
+    /// </summary>
+    internal delegate VaultMergeSave OwnerMerge(Vault open, Func<Vault, bool> swap);
+
+    /// <summary>Raised after each merge of another program's save, on the thread that merged, once the merged copy is in place; a lock the merge calls for follows it.</summary>
+    internal event EventHandler<MergeResult>? Merged;
+
+    /// <summary>Whether another program's save is merged here, through an owner serving this unlock; otherwise it is only refused, until a reload.</summary>
+    internal bool Merges
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _vault is not null && _ownerMerge is not null;
+            }
+        }
+    }
+
+    /// <summary>Has <paramref name="merge"/> merge another program's save for <paramref name="lifetime"/>'s unlock, until it ends; null stops it.</summary>
+    /// <param name="lifetime">The unlock the owner serves; a lifetime no longer current is ignored.</param>
+    /// <param name="merge">The owner's merge.</param>
+    internal void MergeThrough(SessionLifetime lifetime, OwnerMerge? merge)
+    {
+        ArgumentNullException.ThrowIfNull(lifetime);
+
+        lock (_gate)
+        {
+            if (ReferenceEquals(lifetime, _lifetime))
+            {
+                _ownerMerge = merge;
+            }
+        }
+    }
+
+    /// <summary>The last merge's refusal, while the file still holds the bytes it refused; null otherwise.</summary>
+    /// <remarks>Hashes the file, as the status line's comparison does. The watch and the poll merge again only once this is null (D-0543).</remarks>
+    internal MergeResult? MergeRefusal()
+    {
+        string? path;
+        MergeResult? refusal;
+        byte[]? digest;
+
+        lock (_gate)
+        {
+            path = _vault?.Path;
+            refusal = _refusal;
+            digest = _refusedDigest;
+        }
+
+        return refusal is not null && path is not null && Same(digest, SourceSnapshot.Digest(path)) ? refusal : null;
+    }
 
     /// <summary>keypaste's home, where the vault's claim is kept.</summary>
     internal string Home => _home;
@@ -848,6 +913,8 @@ internal sealed class AppVaultSession : IDisposable
                 _hardwareKey = hardwareKey;
                 _claim = claim;
                 _lifetime = new SessionLifetime();
+                _ownerMerge = null;
+                ForgetRefusal();
                 _warned = false;
                 MarkActivity();
                 Rearm();
@@ -994,11 +1061,15 @@ internal sealed class AppVaultSession : IDisposable
 
         var attached = change.HardwareKeyChange == AccessHardwareKeyChange.Attach ? change.HardwareKey : null;
         var adopted = false;
+        var lockNow = false;
         var identity = Identity;
 
         try
         {
-            return Rekey(current, change, newPassword, confirmation, attached, out adopted);
+            lock (_editGate)
+            {
+                return Rekey(current, change, newPassword, confirmation, attached, out adopted, out lockNow);
+            }
         }
         catch (VaultAccessUnconfirmedException)
         {
@@ -1012,6 +1083,12 @@ internal sealed class AppVaultSession : IDisposable
             {
                 attached?.Dispose();
             }
+
+            // Outside the edit gate: a lock stops what answers agents, which may be waiting for that gate to write.
+            if (lockNow)
+            {
+                Lock(VaultLockReason.AccessChanged);
+            }
         }
     }
 
@@ -1021,9 +1098,11 @@ internal sealed class AppVaultSession : IDisposable
         ReadOnlySpan<char> newPassword,
         ReadOnlySpan<char> confirmation,
         HardwareKey? attached,
-        out bool adopted)
+        out bool adopted,
+        out bool lockNow)
     {
         adopted = false;
+        lockNow = false;
 
         if (Unlocked is not { } vault)
         {
@@ -1075,7 +1154,7 @@ internal sealed class AppVaultSession : IDisposable
         }
         catch (VaultException)
         {
-            Lock(VaultLockReason.AccessChanged);
+            lockNow = true;
             return new AccessChangeResult(AccessChangeOutcome.ChangedAndLocked, result);
         }
 
@@ -1095,18 +1174,20 @@ internal sealed class AppVaultSession : IDisposable
     /// <returns>What happened. Only an exception that is not a <see cref="VaultException"/> leaves this, and nothing is saved then.</returns>
     /// <remarks>
     /// <para>
-    /// A save that fails leaves the edit in the open vault, as the change the titlebar reports unsaved and
-    /// a reload discards (D-0412). A caller whose edit must not reach a later save undoes it when
+    /// A save refused because another program saved the file merges that save with the open vault, which holds the
+    /// edit, and is answered as saved once the merged copy is (D-0542). A save that fails otherwise, or whose merge
+    /// is refused, leaves the edit in the open vault, as the change the titlebar reports unsaved and a reload
+    /// discards (D-0412). A caller whose edit must not reach a later save undoes it when
     /// <see cref="WriteResult{T}.Unwritten"/> is set.
     /// </para>
     /// <para>
-    /// Outside <c>_gate</c>, because a save can wait for a hardware key's touch or behind another save in this
-    /// process, and <see cref="Lock(VaultLockReason)"/> cancels either wait, so the save writes nothing and is
-    /// answered as locked.
+    /// Under the edit gate and outside <c>_gate</c>, because a save can wait for a hardware key's touch or behind
+    /// another save in this process, and <see cref="Lock(VaultLockReason)"/> cancels either wait, so the save writes
+    /// nothing and is answered as locked.
     /// </para>
     /// </remarks>
     internal WriteResult<T> Write<T>(Func<Vault, T> edit, Func<T, bool> changed) =>
-        WriteTo(UnlockedNow, edit, changed);
+        WriteMerging(UnlockedNow, edit, changed, lockApart: false);
 
     /// <summary>Runs one edit against the vault <paramref name="lifetime"/> unlocked and saves it, as <see cref="Write{T}(Func{Vault, T}, Func{T, bool})"/> does.</summary>
     /// <typeparam name="T">What the edit returns.</typeparam>
@@ -1118,7 +1199,8 @@ internal sealed class AppVaultSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(lifetime);
 
-        return WriteTo(() => UnlockedFor(lifetime) is { } vault ? (vault, lifetime.Ended) : null, edit, changed);
+        // A connection's write: a lock stops the endpoint, which waits for this very connection to end (D-0392).
+        return WriteMerging(() => UnlockedFor(lifetime) is { } vault ? (vault, lifetime.Ended) : null, edit, changed, lockApart: true);
     }
 
     /// <summary>
@@ -1129,12 +1211,28 @@ internal sealed class AppVaultSession : IDisposable
     /// <param name="edit">The edit, given the open vault and the save to call once it has changed it.</param>
     /// <returns>
     /// <see cref="WriteOutcome.Saved"/> once the edit returned; otherwise what stopped it, with nothing left unwritten,
-    /// since the edit took its change back before throwing.
+    /// since the edit took its change back before throwing. A save refused because another program saved the file
+    /// merges that save, without the edit, and says so in <see cref="WriteResult{T}.Merged"/>.
     /// </returns>
     internal WriteResult<T> WriteWhole<T>(Func<Vault, Action<Vault>, T> edit)
     {
         ArgumentNullException.ThrowIfNull(edit);
 
+        WriteResult<T> written;
+        Merging merging;
+
+        lock (_editGate)
+        {
+            written = WriteWholeNow(edit);
+            merging = written.Outcome == WriteOutcome.ChangedOnDisk ? MergeNow(again: true) : Merging.None;
+        }
+
+        Finish(merging);
+        return merging.Result is { Merged: true } ? written with { Merged = true } : written;
+    }
+
+    private WriteResult<T> WriteWholeNow<T>(Func<Vault, Action<Vault>, T> edit)
+    {
         if (UnlockedNow() is not { } opened)
         {
             return new WriteResult<T>(WriteOutcome.Locked);
@@ -1171,11 +1269,36 @@ internal sealed class AppVaultSession : IDisposable
         }
     }
 
-    private static WriteResult<T> WriteTo<T>(Func<(Vault Vault, CancellationToken Locked)?> open, Func<Vault, T> edit, Func<T, bool> changed)
+    /// <summary>Writes under the edit gate, and merges another program's save when it refused the save, answering a merged edit as saved.</summary>
+    private WriteResult<T> WriteMerging<T>(Func<(Vault Vault, CancellationToken Locked)?> open, Func<Vault, T> edit, Func<T, bool> changed, bool lockApart)
     {
         ArgumentNullException.ThrowIfNull(edit);
         ArgumentNullException.ThrowIfNull(changed);
 
+        WriteResult<T> written;
+        Merging merging;
+
+        lock (_editGate)
+        {
+            written = WriteTo(open, edit, changed);
+            merging = written.Outcome == WriteOutcome.ChangedOnDisk ? MergeNow(again: true) : Merging.None;
+        }
+
+        Finish(merging, lockApart);
+
+        if (merging.Result is not { Merged: true })
+        {
+            return written;
+        }
+
+        // The open vault held the edit, so the merged copy's save wrote it; an edit that never changed the vault was not written.
+        return written.Unwritten
+            ? written with { Outcome = WriteOutcome.Saved, Unwritten = false }
+            : written with { Merged = true };
+    }
+
+    private static WriteResult<T> WriteTo<T>(Func<(Vault Vault, CancellationToken Locked)?> open, Func<Vault, T> edit, Func<T, bool> changed)
+    {
         if (open() is not { } opened)
         {
             return new WriteResult<T>(WriteOutcome.Locked);
@@ -1225,7 +1348,7 @@ internal sealed class AppVaultSession : IDisposable
     /// stays, so connected agents are not cut off, and every grant they hold is withdrawn, as after an
     /// access change (D-0318), with every request still waiting on a person, as a lock withdraws them,
     /// so an agent asks again. A change the open copy holds that no save wrote is discarded; nothing
-    /// is merged.
+    /// is merged. The app offers it only once a merge was refused (D-0543).
     /// </para>
     /// <para>
     /// When the key no longer opens the file, another program changed what unlocks it, and the
@@ -1234,6 +1357,26 @@ internal sealed class AppVaultSession : IDisposable
     /// </remarks>
     internal ReloadResult Reload()
     {
+        ReloadResult result;
+        bool keyRefused;
+
+        lock (_editGate)
+        {
+            result = ReloadNow(out keyRefused);
+        }
+
+        // Outside the edit gate, as every lock this session asks for itself.
+        if (keyRefused)
+        {
+            Lock(VaultLockReason.ReloadRefused);
+        }
+
+        return result;
+    }
+
+    private ReloadResult ReloadNow(out bool keyRefused)
+    {
+        keyRefused = false;
         Vault? vault;
         HardwareKey? hardwareKey;
         SessionLifetime? lifetime;
@@ -1260,7 +1403,7 @@ internal sealed class AppVaultSession : IDisposable
         }
         catch (InvalidMasterPasswordException)
         {
-            Lock(VaultLockReason.ReloadRefused);
+            keyRefused = true;
             return new ReloadResult(ReloadOutcome.Locked);
         }
         catch (VaultException e)
@@ -1282,6 +1425,156 @@ internal sealed class AppVaultSession : IDisposable
             : new ReloadResult(ReloadOutcome.Locked);
     }
 
+    /// <summary>Merges another program's save with the open vault, as the folder watch's settle and the poll ask (D-0542).</summary>
+    /// <returns>
+    /// What became of it, or the standing refusal when the file still holds the bytes the last merge refused, which is not
+    /// tried again until it changes (D-0543); null when nothing serving this unlock merges, it is locked, or the file holds
+    /// what the open vault last read or wrote.
+    /// </returns>
+    /// <remarks>
+    /// Blocks for a key derivation, and a hardware key's touch, so the shell runs it on a thread of its own. It waits for a
+    /// write, reload or access change in progress, and an edit made meanwhile waits for it and applies to the merged copy.
+    /// </remarks>
+    internal MergeResult? Merge()
+    {
+        Merging merging;
+
+        lock (_editGate)
+        {
+            merging = MergeNow(again: false);
+        }
+
+        Finish(merging);
+        return merging.Result;
+    }
+
+    /// <summary>Merges through the owner serving this unlock. Called under the edit gate.</summary>
+    /// <param name="again">Whether to merge a file whose bytes the last merge refused, as a refused save does.</param>
+    private Merging MergeNow(bool again)
+    {
+        Vault? vault;
+        HardwareKey? hardwareKey;
+        OwnerMerge? merge;
+
+        lock (_gate)
+        {
+            vault = _vault;
+            hardwareKey = _hardwareKey;
+            merge = _ownerMerge;
+        }
+
+        if (vault is null || merge is null)
+        {
+            return Merging.None;
+        }
+
+        var digest = SourceSnapshot.Digest(vault.Path);
+
+        lock (_gate)
+        {
+            if (!again && _refusal is { } standing && Same(_refusedDigest, digest))
+            {
+                return new Merging(standing, Attempted: false, KeyRefused: false);
+            }
+        }
+
+        // A merge withdraws every grant and prompt before it reads the file, so one asked twice for one save must find nothing to do.
+        try
+        {
+            if (vault.SaveState().Status is not (VaultSaveStatus.ChangedOnDisk or VaultSaveStatus.Unreadable))
+            {
+                return Merging.None;
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            return Merging.None;
+        }
+
+        var carried = Unsaved;
+        VaultMergeSave merged;
+
+        try
+        {
+            merged = merge(vault, copy => Swap(vault, copy, hardwareKey));
+        }
+        catch (VaultException e)
+        {
+            merged = new VaultMergeSave(VaultMergeSaveOutcome.SaveFailed, e.Message);
+        }
+        catch (ObjectDisposedException)
+        {
+            merged = new VaultMergeSave(VaultMergeSaveOutcome.Locked, "The vault was locked during the merge.");
+        }
+
+        var result = new MergeResult(
+            merged.Outcome,
+            merged.Reason,
+            merged.Report,
+            merged.Outcome == VaultMergeSaveOutcome.Saved ? carried : [],
+            merged.Recorded,
+            _clock.GetUtcNow());
+
+        lock (_gate)
+        {
+            if (result.Refused && ReferenceEquals(_vault, vault))
+            {
+                _refusal = result;
+                _refusedDigest = digest;
+            }
+            else if (result.Outcome == VaultMergeSaveOutcome.Unchanged)
+            {
+                ForgetRefusal();
+            }
+        }
+
+        return new Merging(result, Attempted: true, KeyRefused: merged.Outcome == VaultMergeSaveOutcome.KeyRefused);
+    }
+
+    /// <summary>Says what a merge came to, then locks when the unlock's key no longer opens the file (D-0543). Called outside the edit gate.</summary>
+    /// <param name="merging">What the merge came to.</param>
+    /// <param name="lockApart">Whether to lock on a thread of its own and return at once, for a caller the lock waits for.</param>
+    private void Finish(Merging merging, bool lockApart = false)
+    {
+        if (merging is { Attempted: true, Result: { } result })
+        {
+            Merged?.Invoke(this, result);
+        }
+
+        if (!merging.KeyRefused)
+        {
+            return;
+        }
+
+        if (lockApart)
+        {
+            _ = LockAsync(VaultLockReason.ReloadRefused);
+        }
+        else
+        {
+            Lock(VaultLockReason.ReloadRefused);
+        }
+    }
+
+    /// <summary>Forgets a merge's refusal, once another copy is in place or the file holds what the open copy does. Call under <c>_gate</c>.</summary>
+    private void ForgetRefusal()
+    {
+        _refusal = null;
+        _refusedDigest = null;
+    }
+
+    private static bool Same(byte[]? one, byte[]? other) =>
+        one is not null && other is not null && CryptographicOperations.FixedTimeEquals(one, other);
+
+    /// <summary>What a merge under the edit gate came to, for <see cref="Finish"/> to say and act on outside it.</summary>
+    /// <param name="Result">What became of the merge, or null when none ran.</param>
+    /// <param name="Attempted">Whether it merged now, rather than answering with the standing refusal.</param>
+    /// <param name="KeyRefused">Whether the unlock's key no longer opens the file.</param>
+    private readonly record struct Merging(MergeResult? Result, bool Attempted, bool KeyRefused)
+    {
+        internal static Merging None => default;
+    }
+
     /// <summary>Puts <paramref name="reopened"/> in the place of <paramref name="expected"/>, keeping the idle countdown.</summary>
     /// <returns>False, having disposed <paramref name="reopened"/>, when the session locked or moved on meanwhile.</returns>
     private bool Swap(Vault expected, Vault reopened, HardwareKey? hardwareKey)
@@ -1300,6 +1593,7 @@ internal sealed class AppVaultSession : IDisposable
             _vault.Saved -= OnVaultSaved;
             _vault.Dispose();
             ForgetUnsaved();
+            ForgetRefusal();
             reopened.Edited += OnVaultEdited;
             reopened.Saved += OnVaultSaved;
             _vault = reopened;
@@ -1410,6 +1704,8 @@ internal sealed class AppVaultSession : IDisposable
             locked = _vault is not null;
             ended = _lifetime;
             _lifetime = null;
+            _ownerMerge = null;
+            ForgetRefusal();
             vault = _vault;
             _vault = null;
             hardwareKey = _hardwareKey;
