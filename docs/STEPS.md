@@ -37,20 +37,6 @@ These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
-- [ ] **F.74 — Find why KeePassXC 2.8.0 exits at the macOS first-run gate.** Needs: none.
-  - In app 40984082285 at `28a95a73`, keepassxc first run (macos-15) failed with "FIRST-RUN GATE FAILED: KeePassXC exited before opening the vaults", its last output a Qt font-alias warning; the rerun of that job passed, which does not close it. Nothing that run's batch changed touches first run or how the gate starts KeePassXC. [F.68](steps/F.68.md) recorded 2.8.0 not crashing in 60 starts as evidence, not KeePassXC's diagnosis.
-  - Capture KeePassXC's exit status and crash report on the runner when it exits early, so the next occurrence names the cause, then repair the gate or report upstream.
-- [ ] **F.73 — Find why a masked field's window surface differed on macOS.** Needs: none.
-  - In app 40909966048 at `34564a1a`, desktop tests (macos-15), `DrawnMaskTests.A_shell_field_leaves_the_window_surface_the_same_for_any_value(name: "AccessConfirmPassword")` failed once: the window's property dump for two typed values differed at position 11822, past an `ItemsControl`'s `ItemCount` and `ItemsPanel`, around its `ItemsSource` (`DrawnMaskTests.cs:168`); the rerun of that job passed, which does not close it. Nothing that run's batch changed is in the app. [F.17](steps/F.17.md) closed an earlier exposure in the same field.
-  - Diagnose what changes in the surface between the two values, keep its regression and repair the cause, whether the test reads a surface still settling or the field leaks its value's shape.
-- [ ] **F.72 — Find what hangs the macOS desktop gates since `t6`'s second batch.** Needs: none.
-  - At `dfe09d12`, desktop gates (macos-15) was cancelled at its timeout twice in a row with no log kept, app 40749086048's first attempt at 1053 s and dev run 40751958140 at 901 s, after about 40 runs that never hung; the gates had passed in 457 s at `42ef9de5`, which differs only in a label and a path list. Three probes on a branch then passed, in 440 s, 393 s and 422 s: 40754396801 streamed each gate through `tee` under `bash -x` with three-minute caps, 40757177371 kept the files with the caps and a heartbeat, and 40758266185 ran the gates as they are with timestamps and a watchdog that would have printed the processes and logs; no gate took over 65 s.
-  - Candidates are what that batch changed on macOS: 4.10a's unlock and lock paths, P.1a's import, and F.70's accept loop, which on Unix now hangs up after each answer. Catch a hang with the watchdog probe, keep its regression and repair the cause.
-- [ ] **F.71 — Explain the knocks a Windows locked app still misses with a spare pipe waiting.** Needs: none.
-  - After F.70's repair `LockedAppEndpointTests.BridgesInQuickSuccession_AreEachHeard` still timed out on windows-2025, twice in about 19,000 knocks, once at bridge 187 in dev run 40190674348; F.70's probes ruled out a spare failing to accept and a stopped listener ([F.70](steps/F.70.md)).
-  - Diagnose the mechanism, keep its regression and repair the cause.
-
-
 ## T5 — Desktop delivery
 
 The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 1.0.0.
@@ -72,7 +58,7 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **H-0028 — Make the crash-report database and switch the route on.** Human. Needs: 4.11b.
   - Follow [Switching crash reports on](../site/README.md#switching-crash-reports-on-h-0028) in `site/README.md`: create the D1 database, add its `CRASH_DB` binding and `CRASH_ENABLED` to `wrangler.jsonc`, apply `crash-schema.sql`, and integrate that one commit ([4.11b](steps/4.11b.md)).
   - Acceptance: before it, `verify-site-endpoint.sh` sees the deployed route answer 503; after its deploy, the script sees the route's refusals, and a probe report is stored, read back with `wrangler d1 execute` and deleted.
-- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12, B.5 and B.6 (D-0672), every T6 task but a person's check on real hardware (D-0557) and 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12, B.5 and B.6 (D-0672), every T6 task but 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
   - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.
@@ -125,10 +111,6 @@ Package managers and agent marketplaces carry a version only after it is publish
 
 Each row keeps its historical meaning and is expanded when selected. Designs the founder approved on 2026-10-24 split 8.1 and 8.3a (D-0548), 1.4b (D-0537 to D-0546), and P.4a and P.4b (D-0547) into children, which keep their parents' IDs; a parent closes when all its children have. P.4a1 is done, and the typing children, P.4a2 to P.4a5 and P.4b, left 1.0.0 for BACKLOG (D-0632).
 
-- [ ] **4.10c — Check Windows quick unlock on a machine with Windows Hello (H-0025).** Human. Needs: none.
-  - On a Windows 10 or 11 machine with Windows Hello set up, run the app's Windows package built from 4.10a: unlock with the master password and answer Windows Hello, the first time making keypaste's key; lock with `Ctrl/Cmd+L` and resume with Unlock with Windows Hello.
-  - Check the prompt comes in front of the app each time, a cancelled prompt opens nothing and says nothing, the PIN instead of a face or finger opens it, `keypaste lock` then asks for the master password, and a vault that needs a YubiKey resumed with Windows Hello asks for its touch.
-  - Record the Windows version, the Windows Hello method and the app's commit in [4.10a](steps/4.10a.md)'s limits. No CI runner has Windows Hello set up, so only a person can make these acts (T-44).
 - [ ] **4.10b — Add macOS quick unlock.** Needs: 3.5b.
   - Touch ID, under the same session policy, using the signed app's entitlements.
 - [ ] **8.1e — Install and remove the host per browser.** Needs: 8.1c.
@@ -148,11 +130,6 @@ Each row keeps its historical meaning and is expanded when selected. Designs the
 - [ ] **1.4b4 — `keypaste approve` merges another program's save.** Needs: 1.4b2.
   - The folder watch and poll moved into Core for both owners, and `keypaste approve`'s terminal line, hardware-key touch and refusal text (D-0546).
   - Accepted when `ApproveCommandTests` shows another program's save merged without a restart, and `verify-keepassxc-merge.sh` gains, passing on the three runners, G9: `keypaste approve` narrows an agent and an older KeePassXC copy is moved over the file, and the narrowing holds with the older record in history; and G10: KeePassXC saves while `keypaste approve` serves a bridge, and the next request is refused as `vault-changed` and then served from the merged copy in the same session, with no restart.
-- [ ] **P.1b — Check hardware-key vaults with a physical YubiKey (H-0026).** Human. Needs: none.
-  - [P.1a](steps/P.1a.md) built what code can do: create, unlock, save, change and import such a vault in the app, and reach it from the CLI only through the app (D-0366, D-0514), all against a software key.
-  - On Windows, macOS and Linux, with the app built from P.1a, make the [desktop guide](desktop.md)'s check 52 with a YubiKey 5 and a second key holding the same secret, then create a vault with the key, and import a KeePassXC database that needs it.
-  - Check the refusals with the physical key: another key, the other slot, no key and two keys plugged in are each named, and the spare-key and lost-key limits hold as Settings states them, which PRODUCT §2 asks to be verified before support is advertised.
-  - Record the platform, the key's model and firmware, the KeePassXC version and the app's commit in P.1a's limits. No CI runner has a YubiKey, so only a person can make these acts (T-37). OS quick unlock and browser passkeys are separate features.
 
 ## T7 — Agents without values
 

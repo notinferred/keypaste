@@ -52,7 +52,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | Signed, notarized and verified packages for three platforms, with guidance a new user can follow, a guide to running agents safely, and phone apps checked by hand. | F.20, F.32, F.24, F.25, 4.7a2, 3.5b, 4.7e, R.1a, 4.7c2, L.3, R.1b, L.1, R.1 |
 | A KeePassXC user loses nothing they use daily by switching: quick unlock with Windows Hello and Touch ID, TOTP codes, including for agents, never releasing the seed, browser fill starting from the KeePassXC-Browser extension people already have, attachments, merging a synced file's changes instead of refusing until a reload, importers from Bitwarden, LastPass, 1Password and KeePassXC CSV, local password health, and hardware-key vaults beyond the desktop's unlock. | 4.10a, 4.10b, 9.2a, 9.2b, 8.1, 8.3a, P.4a1, V.8a, V.8b, 1.4a, 1.4b1–1.4b3, 1.4b5, 9.1a–9.1f, V.9, P.1a |
 | The app shows its terms of use at first run and, once the person chooses Send crash reports there or in Settings, reports its crashes to keypaste.com with nothing from the vault in them, so bugs found after release reach the founder. | 4.11a, 4.11b, 4.11c |
-| The gaps the 2026-10-22 sweep deferred that a person would notice are fixed, each still marked **For 1.0.0.** in its step record's limits; the test-coverage gaps are marked **After 1.0.0.**, and the CI diagnoses F.71 to F.74 do not hold the release (D-0669). | — |
+| The gaps the 2026-10-22 sweep deferred that a person would notice are fixed, each still marked **For 1.0.0.** in its step record's limits; the test-coverage gaps are marked **After 1.0.0.**, and the CI failures BACKLOG lists do not hold the release (D-0669, D-0673). | — |
 | Once 1.0.0's bytes are published, the same day: install with Homebrew, Scoop or winget; a Claude Code plugin, a Claude Desktop extension, an MCP Registry listing, a Gemini CLI extension, and Cursor and VS Code install links; a one-prompt setup page on keypaste.com; and the guides on keypaste.com's Astro pages, with a content security policy (D-0401). | 3.7a, 3.7b, 3.7c, G.6a, G.6b, G.6c, G.6d, G.6e, G.7, L.2b |
 
 Outside inputs gate this release:
@@ -62,7 +62,7 @@ Outside inputs gate this release:
 - Apple Developer enrollment (3.5a, H-0015);
 - for the reach tasks, the MCP Registry namespace and hosting (H-0022) and the package-manager and plugin-directory submissions (H-0023).
 
-A person's check on real hardware, such as Windows Hello (4.10c) or a physical YubiKey (P.1b), does not hold the release: each stays open, and a published claim about it waits for its evidence (D-0557).
+A person's check on real hardware, such as Windows Hello or a physical YubiKey, does not hold the release: each is a note in [BACKLOG](docs/BACKLOG.md), and a published claim about it waits for its evidence (D-0557).
 
 Published version prefixes are immutable. If Apple enrollment lags, the choice at 4.7c2 is to wait, or to ship macOS as `1.0.1`.
 
