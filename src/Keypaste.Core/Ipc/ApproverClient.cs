@@ -87,6 +87,21 @@ public sealed class ApproverClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(pipeName);
 
+        return await ConnectPipeAsync(pipeName, timeout, cancellationToken).ConfigureAwait(false) is { } pipe
+            ? new ApproverClient(pipe)
+            : null;
+    }
+
+    /// <summary>Connects to an owner's pipe as <see cref="TryConnectAsync"/> does, or reports that nothing answered.</summary>
+    /// <param name="pipeName">The pipe.</param>
+    /// <param name="timeout">How long to wait for it to answer the door.</param>
+    /// <param name="cancellationToken">Cancels the attempt.</param>
+    /// <returns>The connected pipe, or null.</returns>
+    internal static async ValueTask<NamedPipeClientStream?> ConnectPipeAsync(
+        string pipeName,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
         // Identification only, so on Windows whoever made the pipe can tell who connected but cannot act as them.
         var pipe = new NamedPipeClientStream(
             ".",
@@ -105,7 +120,7 @@ public sealed class ApproverClient : IAsyncDisposable
                 TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
                 TaskScheduler.Default).ConfigureAwait(false);
 
-            return new ApproverClient(pipe);
+            return pipe;
         }
         catch (Exception ex) when (ex is OperationCanceledException or TimeoutException or IOException or UnauthorizedAccessException)
         {

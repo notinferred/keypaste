@@ -43,6 +43,14 @@ public enum ApproverMessageKind
     AccessChange = 13,
     /// <summary>A terminal's edit to the vault's items, which the owner puts to the person and saves (D-0464).</summary>
     Edit = 14,
+    /// <summary>A browser's request to pair, made only on a browser's attachment (D-0627).</summary>
+    BrowserPair = 15,
+    /// <summary>A browser's check of a pairing the extension holds, made only on a browser's attachment.</summary>
+    BrowserCheck = 16,
+    /// <summary>A browser's request for a page's logins, made only on a browser's attachment.</summary>
+    BrowserFill = 17,
+    /// <summary>A browser's request to lock now, made only on a browser's attachment.</summary>
+    BrowserLock = 18,
 }
 
 /// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
@@ -68,6 +76,13 @@ public sealed record AttachRequest(string Vault)
     /// </summary>
     /// <remarks>Display only, like <see cref="Client"/> (THREATS.md T-3): each request carries its own exposure, and that is what is enforced.</remarks>
     public IReadOnlyList<string>? Exposure { get; init; }
+
+    /// <summary>
+    /// The KeePassXC-Browser build a browser relay attaches for, as its browser named the caller, which makes this a browser's
+    /// attachment; null from a bridge, a runner or a terminal (D-0627).
+    /// </summary>
+    /// <remarks>Whoever can reach the pipe can name it, as anything can start the relay with it (THREATS.md T-48).</remarks>
+    public string? Browser { get; init; }
 }
 
 /// <summary>The session a connection is now attached to, or why it is not attached.</summary>

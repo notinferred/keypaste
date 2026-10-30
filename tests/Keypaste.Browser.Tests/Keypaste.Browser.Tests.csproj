@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Keypaste.Browser/Keypaste.Browser.csproj" />
+    <ProjectReference Include="../Keypaste.FakeBrowser/Keypaste.FakeBrowser.csproj" />
   </ItemGroup>
 
 </Project>

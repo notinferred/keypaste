@@ -35,7 +35,7 @@ namespace Keypaste.Core.Ipc;
 /// would have.
 /// </para>
 /// </remarks>
-public static class ApproverProtocol
+public static partial class ApproverProtocol
 {
     /// <summary>The wire version, so a later change to the shape is unambiguous.</summary>
     /// <remarks>
@@ -431,6 +431,10 @@ public static class ApproverProtocol
                 AccessListKind => ApproverMessageKind.AccessList,
                 AccessChangeKind => ApproverMessageKind.AccessChange,
                 EditKind => ApproverMessageKind.Edit,
+                BrowserPairKind => ApproverMessageKind.BrowserPair,
+                BrowserCheckKind => ApproverMessageKind.BrowserCheck,
+                BrowserFillKind => ApproverMessageKind.BrowserFill,
+                BrowserLockKind => ApproverMessageKind.BrowserLock,
                 _ => ApproverMessageKind.Unknown,
             };
         }
@@ -669,10 +673,20 @@ public static class ApproverProtocol
                 return false;
             }
 
+            // A browser's attachment says nothing of an agent, so it can never be counted or listed as one.
+            var browser = Optional(root, "browser");
+
+            if (browser is not null
+                && (browser.Length is 0 or > AttachClient.MaximumLength || name is not null || version is not null || label is not null || exposure is not null))
+            {
+                return false;
+            }
+
             request = new AttachRequest(vault)
             {
                 Client = name is null && version is null && label is null ? null : new AttachClient(name, version, label),
                 Exposure = exposure,
+                Browser = browser,
             };
 
             return true;

@@ -359,6 +359,22 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.EditAsync(editRequest, connectionId, cancellationToken).ConfigureAwait(false));
 
+            case ApproverMessageKind.BrowserPair when ApproverProtocol.TryDecode(frame, out BrowserPairRequest? pair):
+                return ApproverProtocol.Encode(
+                    await _handler.PairBrowserAsync(pair, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.BrowserCheck when ApproverProtocol.TryDecode(frame, out BrowserCheckRequest? check):
+                return ApproverProtocol.Encode(
+                    await _handler.CheckBrowserAsync(check, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.BrowserFill when ApproverProtocol.TryDecode(frame, out BrowserFillRequest? fill):
+                return ApproverProtocol.Encode(
+                    await _handler.FillBrowserAsync(fill, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.BrowserLock when ApproverProtocol.TryDecode(frame, out BrowserLockRequest? browserLock):
+                return ApproverProtocol.Encode(
+                    await _handler.LockBrowserAsync(browserLock, connectionId, cancellationToken).ConfigureAwait(false));
+
             default:
                 return null;
         }

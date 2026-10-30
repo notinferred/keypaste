@@ -10,6 +10,10 @@
 
   <!-- No PackageReference: libsodium is built from its signed release by scripts/build-libsodium.sh (D-0611, D-0612). -->
 
+  <ItemGroup>
+    <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
+  </ItemGroup>
+
   <!--
     The shared libsodium a build that runs in the .NET runtime loads, the tests' included. It flows into the output of every
     project that references this one and never into a publish: the NativeAOT keypaste links the static archive instead
@@ -36,6 +40,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.Browser.Tests" />
+    <InternalsVisibleTo Include="Keypaste.FakeBrowser" />
   </ItemGroup>
 
 </Project>

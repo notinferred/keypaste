@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.FakeBrowser</RootNamespace>
+
+    <!-- Not a test project: a stand-in for KeePassXC-Browser, which starts a native messaging host as a browser does and
+         speaks the extension's protocol to it, so no test or gate needs a real browser to reach the relay (8.1c). -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Its NaCl box is the libsodium Keypaste.Browser calls, reached through that project's internals. -->
+    <ProjectReference Include="../../src/Keypaste.Browser/Keypaste.Browser.csproj" />
+  </ItemGroup>
+
+</Project>

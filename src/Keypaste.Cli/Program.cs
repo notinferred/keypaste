@@ -17,6 +17,11 @@ internal static class Program
             return await BridgeEntry.RunAsync(args[1..]).ConfigureAwait(false);
         }
 
+        if (BrowserEntry.StartsRelay(args))
+        {
+            return await BrowserEntry.RunAsync(args).ConfigureAwait(false);
+        }
+
         if (args is [SelfTestFlag])
         {
             return BrowserEntry.SelfTest(StandardStreams.Output(), StandardStreams.Error());

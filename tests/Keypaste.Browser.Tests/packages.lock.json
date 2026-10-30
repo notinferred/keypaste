@@ -123,8 +123,26 @@
           "xunit.v3.runner.common": "[3.2.2]"
         }
       },
-      "keypaste.browser": {
+      "keepasslib": {
         "type": "Project"
+      },
+      "keypaste.browser": {
+        "type": "Project",
+        "dependencies": {
+          "Keypaste.Core": "[0.5.0, )"
+        }
+      },
+      "keypaste.core": {
+        "type": "Project",
+        "dependencies": {
+          "KeePassLib": "[1.0.0, )"
+        }
+      },
+      "keypaste.fakebrowser": {
+        "type": "Project",
+        "dependencies": {
+          "Keypaste.Browser": "[0.5.0, )"
+        }
       }
     }
   }

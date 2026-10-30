@@ -127,6 +127,41 @@ public interface IApproverHandler
     ValueTask<EditReply> EditAsync(EditRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new EditReply(Audit.AuditDecision.Denied, Audit.AuditMethod.NoSession, "this keypaste process does not take changes from a terminal"));
 
+    /// <summary>Pairs the browser attached on this connection (D-0627).</summary>
+    /// <param name="request">The extension's identification key, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The pairing, or why there is none. A handler that answers no browser refuses.</returns>
+    ValueTask<BrowserReply> PairBrowserAsync(BrowserPairRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new BrowserReply(BrowserOutcome.Refused, _noBrowsers));
+
+    /// <summary>Checks a pairing the browser attached on this connection holds.</summary>
+    /// <param name="request">The pairing and its key, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>Whether it is this browser's. A handler that answers no browser refuses.</returns>
+    ValueTask<BrowserReply> CheckBrowserAsync(BrowserCheckRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new BrowserReply(BrowserOutcome.Refused, _noBrowsers));
+
+    /// <summary>Decides which logins of a page the browser attached on this connection gets.</summary>
+    /// <param name="request">The pairing, its key and the page, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The logins released, or why none were. A handler that answers no browser refuses.</returns>
+    ValueTask<BrowserFillReply> FillBrowserAsync(BrowserFillRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new BrowserFillReply(BrowserOutcome.Refused, _noBrowsers));
+
+    /// <summary>Locks now for the browser attached on this connection, asking nobody.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>Whether the session the request was made under has ended. A handler that answers no browser refuses.</returns>
+    ValueTask<BrowserReply> LockBrowserAsync(BrowserLockRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new BrowserReply(BrowserOutcome.Refused, _noBrowsers));
+
+    /// <summary>What a handler that answers no browser says.</summary>
+    private const string _noBrowsers = "this keypaste process does not answer browsers";
+
     /// <summary>Tells the handler a connection has gone, so its grants can go with it.</summary>
     /// <param name="connectionId">The connection that ended.</param>
     void Disconnected(string connectionId);

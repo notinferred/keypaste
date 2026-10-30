@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
@@ -46,6 +47,11 @@ namespace Keypaste.Core.Ownership;
 /// The owner runs nothing: the bridge starts the command.
 /// </para>
 /// <para>
+/// A browser's attachment, which names the KeePassXC-Browser build its relay was started for, makes only a pairing, a pairing
+/// check, a fill and a lock, and no other attachment makes those (D-0627). Its lock is answered as <c>keypaste lock</c>'s; the
+/// other three are decided by the <see cref="IBrowserRequests"/> this owner was given, and refused without one.
+/// </para>
+/// <para>
 /// Every listing, credential, run, token and settings-change request it reads is recorded in this
 /// owner's own log before it is answered, a request refused at admission, withdrawn or failed while
 /// deciding included, and a release whose line cannot be written is refused (THREATS.md T-6). While
@@ -73,6 +79,7 @@ public sealed class SessionAuthority : IApproverHandler
     private readonly RequestRecorder _recorder;
     private readonly SessionEnvironments? _environments;
     private readonly SessionEditor? _editor;
+    private readonly IBrowserRequests? _browsers;
     private readonly Action? _lockNow;
     private readonly TimeProvider _clock;
     private readonly ConcurrentDictionary<string, Attachment> _attached = new(StringComparer.Ordinal);
@@ -92,6 +99,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="lockNow">What <c>keypaste lock</c> runs, which must end the session for the reply to say locked; null refuses it.</param>
     /// <param name="clock">What attachments and releases are timed on; null is the system clock.</param>
     /// <param name="editor">What a terminal's edit is put to the person and made with, or null to refuse every one.</param>
+    /// <param name="browsers">What decides a browser's pairing, pairing check and fill, or null to refuse every one.</param>
     public SessionAuthority(
         VaultIdentity vault,
         Func<SessionLifetime?> lifetime,
@@ -100,7 +108,8 @@ public sealed class SessionAuthority : IApproverHandler
         SessionEnvironments? environments = null,
         Action? lockNow = null,
         TimeProvider? clock = null,
-        SessionEditor? editor = null)
+        SessionEditor? editor = null,
+        IBrowserRequests? browsers = null)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(lifetime);
@@ -113,6 +122,7 @@ public sealed class SessionAuthority : IApproverHandler
         _recorder = new RequestRecorder(audit);
         _environments = environments;
         _editor = editor;
+        _browsers = browsers;
         _lockNow = lockNow;
         _clock = clock ?? TimeProvider.System;
     }
@@ -307,6 +317,13 @@ public sealed class SessionAuthority : IApproverHandler
             return Answer(AttachReply.Refused(AuditMethod.NoSession, "the keypaste process that answered holds a different vault"));
         }
 
+        var browser = BrowserIdentity.Of(request.Browser);
+
+        if (request.Browser is not null && browser is null)
+        {
+            return Answer(AttachReply.Refused(AuditMethod.InvalidRequest, BrowserIdentity.Only));
+        }
+
         if (Live() is not { } lifetime)
         {
             return Answer(AttachReply.Refused(AuditMethod.VaultLocked, _lockedReason));
@@ -317,6 +334,7 @@ public sealed class SessionAuthority : IApproverHandler
         {
             LastRequestAt = now,
             Exposure = request.Exposure ?? [],
+            Browser = browser,
         };
 
         return Answer(AttachReply.To(lifetime.Id));
@@ -1709,11 +1727,6 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// The lock runs on its own, since an owner's lock waits for its connections to end (D-0392), and the
-    /// reply waits for it to end the session it was asked under. The reply is then the confirmation, and
-    /// nothing more is asked on a connection the lock is closing (F.62).
-    /// </remarks>
     public async ValueTask<LockReply> LockAsync(LockRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -1723,17 +1736,152 @@ public sealed class SessionAuthority : IApproverHandler
             return new LockReply(false, refusal.Reason);
         }
 
+        var (locked, reason) = await LockNowAsync(lifetime, cancellationToken).ConfigureAwait(false);
+
+        return new LockReply(locked, reason);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Answered as <c>keypaste lock</c> is, asking nobody, since it only takes access away, and recorded nowhere (D-0439, D-0627).</remarks>
+    public async ValueTask<BrowserReply> LockBrowserAsync(BrowserLockRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal, browser: true))
+        {
+            return new BrowserReply(BrowserRefusal(refusal.Method), refusal.Reason);
+        }
+
+        var (locked, reason) = await LockNowAsync(lifetime, cancellationToken).ConfigureAwait(false);
+
+        return new BrowserReply(locked ? BrowserOutcome.Done : BrowserOutcome.Refused, reason);
+    }
+
+    /// <inheritdoc/>
+    public ValueTask<BrowserReply> PairBrowserAsync(BrowserPairRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return DecideBrowserAsync(
+            request.Vault,
+            request.Session,
+            connectionId,
+            (browsers, browser, token) => browsers.PairAsync(request, browser, connectionId, token),
+            static (outcome, reason) => new BrowserReply(outcome, reason),
+            admitted: null,
+            cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public ValueTask<BrowserReply> CheckBrowserAsync(BrowserCheckRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return DecideBrowserAsync(
+            request.Vault,
+            request.Session,
+            connectionId,
+            (browsers, browser, token) => browsers.CheckAsync(request, browser, connectionId, token),
+            static (outcome, reason) => new BrowserReply(outcome, reason),
+            admitted: null,
+            cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The logins leave only while the lifetime the request was admitted to is live and nothing withdrew it (D-0313), and all of
+    /// them or none: a reply too large for one frame is refused whole.
+    /// </remarks>
+    public async ValueTask<BrowserFillReply> FillBrowserAsync(BrowserFillRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        SessionLifetime? admitted = null;
+        var waiting = CancellationToken.None;
+
+        var reply = await DecideBrowserAsync(
+            request.Vault,
+            request.Session,
+            connectionId,
+            (browsers, browser, token) => browsers.FillAsync(request, browser, connectionId, token),
+            static (outcome, reason) => new BrowserFillReply(outcome, reason),
+            (lifetime, wait) => (admitted, waiting) = (lifetime, wait),
+            cancellationToken).ConfigureAwait(false);
+
+        if (reply.Outcome != BrowserOutcome.Done)
+        {
+            return reply with { Logins = [] };
+        }
+
+        if (admitted is null || !admitted.TryCommitAfter(waiting))
+        {
+            var (method, reason) = admitted is null ? (AuditMethod.VaultLocked, _lockedReason) : WithdrawnBy(admitted, "the logins were sent");
+            return new BrowserFillReply(BrowserRefusal(method), reason);
+        }
+
+        return ApproverProtocol.Fits(reply) ? reply : new BrowserFillReply(BrowserOutcome.Refused, "the logins would not fit one reply");
+    }
+
+    /// <summary>
+    /// Admits a browser's pairing, pairing check or fill on a browser's attachment to the live session and has
+    /// <see cref="_browsers"/> decide it, withdrawn by a lock or a reload as a person's question is; <paramref name="admitted"/>
+    /// is told the lifetime it was admitted to and the wait a release must commit after.
+    /// </summary>
+    private async ValueTask<T> DecideBrowserAsync<T>(
+        string vault,
+        string session,
+        string connectionId,
+        Func<IBrowserRequests, BrowserIdentity, CancellationToken, ValueTask<T>> decide,
+        Func<BrowserOutcome, string, T> refused,
+        Action<SessionLifetime, CancellationToken>? admitted,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        if (!TryAdmit(vault, session, connectionId, out var lifetime, out var refusal, browser: true))
+        {
+            return refused(BrowserRefusal(refusal.Method), refusal.Reason);
+        }
+
+        if (_browsers is not { } browsers || !_attached.TryGetValue(connectionId, out var attachment) || attachment.Browser is not { } browser)
+        {
+            return refused(BrowserOutcome.Refused, "this keypaste process does not pair browsers or fill logins in them");
+        }
+
+        var waiting = lifetime.Waiting;
+        admitted?.Invoke(lifetime, waiting);
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, waiting);
+        Withdrawals.AddOwner(waiting);
+
+        return await Decided(
+            token => decide(browsers, browser, token),
+            lifetime,
+            (method, reason) => refused(BrowserRefusal(method), reason),
+            waiting,
+            withdrawn.Token).ConfigureAwait(false);
+    }
+
+    /// <summary>What a browser is told for a request refused under this method: locked when no unlock answers it, otherwise refused.</summary>
+    private static BrowserOutcome BrowserRefusal(AuditMethod method) =>
+        method is AuditMethod.VaultLocked or AuditMethod.NoSession ? BrowserOutcome.Locked : BrowserOutcome.Refused;
+
+    /// <summary>Has the owner lock, and waits for the lock to end <paramref name="lifetime"/>.</summary>
+    /// <remarks>
+    /// The lock runs on its own, since an owner's lock waits for its connections to end (D-0392), and the reply waits for it to
+    /// end the session it was asked under. The reply is then the confirmation, and nothing more is asked on a connection the
+    /// lock is closing (F.62).
+    /// </remarks>
+    private async ValueTask<(bool Locked, string Reason)> LockNowAsync(SessionLifetime lifetime, CancellationToken cancellationToken)
+    {
         if (_lockNow is not { } lockNow)
         {
-            return new LockReply(false, "the keypaste process holding this vault cannot be locked from outside");
+            return (false, "the keypaste process holding this vault cannot be locked from outside");
         }
 
         _ = Task.Run(lockNow, CancellationToken.None);
         await EndedAsync(lifetime, cancellationToken).ConfigureAwait(false);
 
-        return lifetime.IsLive
-            ? new LockReply(false, "the request ended before the vault was locked")
-            : new LockReply(true, string.Empty);
+        return lifetime.IsLive ? (false, "the request ended before the vault was locked") : (true, string.Empty);
     }
 
     /// <inheritdoc/>
@@ -1804,12 +1952,17 @@ public sealed class SessionAuthority : IApproverHandler
         _ => "the prompt could not be shown, so nobody was asked",
     };
 
+    /// <summary>
+    /// Admits a request to the live session from the kind of attachment that may make it: a browser's makes only the four
+    /// <paramref name="browser"/> marks, and no other attachment makes those (D-0627).
+    /// </summary>
     private bool TryAdmit(
         string vault,
         string session,
         string connectionId,
         [NotNullWhen(true)] out SessionLifetime? lifetime,
-        out (AuditMethod Method, string Reason) refusal)
+        out (AuditMethod Method, string Reason) refusal,
+        bool browser = false)
     {
         ArgumentNullException.ThrowIfNull(connectionId);
 
@@ -1823,6 +1976,12 @@ public sealed class SessionAuthority : IApproverHandler
         else if (!_attached.TryGetValue(connectionId, out var attachment))
         {
             refusal = (AuditMethod.NoSession, "the request came from a connection attached to no unlock of the vault");
+        }
+        else if ((attachment.Browser is not null) != browser)
+        {
+            refusal = (AuditMethod.InvalidRequest, browser
+                ? "only a browser's connection pairs, checks a pairing, fills or locks for a browser"
+                : "a browser's connection only pairs, checks a pairing, fills and locks");
         }
         else if (!string.Equals(attachment.Vault, vault, StringComparison.Ordinal))
         {
@@ -1857,6 +2016,9 @@ public sealed class SessionAuthority : IApproverHandler
         internal DateTimeOffset AttachedAt { get; } = attachedAt;
 
         internal IReadOnlyList<string> Exposure { get; init; } = [];
+
+        /// <summary>The KeePassXC-Browser build a browser's attachment named, or null for any other attachment.</summary>
+        internal BrowserIdentity? Browser { get; init; }
 
         internal DateTimeOffset LastRequestAt
         {

@@ -24,9 +24,9 @@ public sealed class SodiumSourceRulesTests
         Assert.Equal(["src/Keypaste.Cli/Keypaste.Cli.csproj"], Naming(Files("src", "*.csproj"), _link));
 
     [Fact]
-    public void Only_the_CLI_and_these_tests_reference_Keypaste_Browser() =>
+    public void Only_the_CLI_these_tests_and_the_fake_browser_reference_Keypaste_Browser() =>
         Assert.Equal(
-            ["src/Keypaste.Cli/Keypaste.Cli.csproj", "tests/Keypaste.Browser.Tests/Keypaste.Browser.Tests.csproj"],
+            ["src/Keypaste.Cli/Keypaste.Cli.csproj", "tests/Keypaste.Browser.Tests/Keypaste.Browser.Tests.csproj", "tests/Keypaste.FakeBrowser/Keypaste.FakeBrowser.csproj"],
             Naming([.. Files("src", "*.csproj"), .. Files("tests", "*.csproj")], _reference));
 
     [Fact]

@@ -496,7 +496,10 @@
         }
       },
       "keypaste.browser": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "Keypaste.Core": "[0.5.0, )"
+        }
       },
       "keypaste.core": {
         "type": "Project",
