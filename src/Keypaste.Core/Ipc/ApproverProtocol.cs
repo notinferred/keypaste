@@ -725,7 +725,12 @@ public static partial class ApproverProtocol
             // Optional so an older owner still attaches; bounded so a version cannot outgrow a line.
             var ownerVersion = Optional(root, "owner_version");
 
-            if (refused == session is { Length: > 0 } || ownerVersion?.Length > AttachClient.MaximumLength)
+            // A hash is a SHA-256 in lowercase hex, and only an attachment carries one (D-0636).
+            var databaseHash = Optional(root, "database_hash");
+
+            if (refused == session is { Length: > 0 }
+                || ownerVersion?.Length > AttachClient.MaximumLength
+                || (databaseHash is not null && (refused || databaseHash.Length != 64 || !databaseHash.All(char.IsAsciiHexDigitLower))))
             {
                 return false;
             }
@@ -733,7 +738,7 @@ public static partial class ApproverProtocol
             var answered = refused
                 ? AttachReply.Refused(Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed, reason)
                 : AttachReply.To(session!);
-            reply = answered with { OwnerVersion = ownerVersion };
+            reply = answered with { OwnerVersion = ownerVersion, DatabaseHash = databaseHash };
 
             return true;
         }

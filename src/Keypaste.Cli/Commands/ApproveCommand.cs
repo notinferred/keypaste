@@ -5,6 +5,7 @@ using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Infrastructure;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
@@ -54,6 +55,7 @@ internal static class ApproveCommand
     internal const string ApproverOption = "approver";
     internal const string TimeoutOption = "approval-timeout";
     internal const string MaxTtlOption = "max-ttl";
+    internal const string PairBrowserOption = "pair-browser";
 
     private static readonly OptionSpec[] _options =
     [
@@ -62,6 +64,7 @@ internal static class ApproveCommand
         new(ApproverOption, TakesValue: true),
         new(TimeoutOption, TakesValue: true),
         new(MaxTtlOption, TakesValue: true),
+        new(PairBrowserOption, TakesValue: true),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -91,6 +94,14 @@ internal static class ApproveCommand
 
         if (!TryLimits(line, context, out var limits))
         {
+            return CliApp.ExitUsageError;
+        }
+
+        var pairing = line.Value(PairBrowserOption);
+
+        if (pairing is not null && PairingNames.Problem(pairing, []) is { } badName)
+        {
+            context.Stderr.WriteLine($"keypaste: --{PairBrowserOption}: {badName}");
             return CliApp.ExitUsageError;
         }
 
@@ -141,7 +152,7 @@ internal static class ApproveCommand
                 line,
                 context,
                 OwnerKind.TerminalAgent,
-                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, caps, File.Exists(retired) ? retired : null, Reach(vaultPath, pipeName, home, context), context));
+                (claim, vault) => Serve(vault, claim, audit, pipeName, limits, caps, File.Exists(retired) ? retired : null, Reach(vaultPath, pipeName, home, context), pairing, context));
         }
     }
 
@@ -168,6 +179,7 @@ internal static class ApproveCommand
         AccessCapsSource caps,
         string? retiredPolicy,
         (string? Vault, string? Approver) reach,
+        string? pairing,
         CliContext context)
     {
         var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive, context.ConsoleStyle);
@@ -240,6 +252,9 @@ internal static class ApproveCommand
                 // A terminal's edit, once the person allows it here, is saved under the same claim (D-0464).
                 WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
                 ClientsPath = caps.Path,
+
+                // A browser pairs only while this terminal's person armed it with --pair-browser (D-0634).
+                BrowserUses = new PairingUses(),
             });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -264,6 +279,12 @@ internal static class ApproveCommand
                     TimeProvider.System.GetUtcNow());
 
                 Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, retiredPolicy, automatic, console);
+
+                if (pairing is not null)
+                {
+                    server.Browsers?.Arm(pairing);
+                    console.WriteLine($"keypaste: pairing a browser as {pairing} for the next 2 minutes: in KeePassXC-Browser, press Connect, then answer here.");
+                }
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
@@ -439,6 +460,7 @@ internal static class ApproveCommand
     {
         writer.WriteLine("usage: keypaste approve [--vault <path>] [--keyfile <path>] [--approver <name>]");
         writer.WriteLine("                        [--approval-timeout <seconds>] [--max-ttl <seconds>]");
+        writer.WriteLine("                        [--pair-browser <name>]");
         writer.WriteLine();
         writer.WriteLine("Unlocks your vault and waits. When an AI agent asks keypaste mcp for a");
         writer.WriteLine("credential, the request appears here and nothing is released until you say yes.");
@@ -449,6 +471,7 @@ internal static class ApproveCommand
         writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
         writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
         writer.WriteLine($"  --max-ttl <secs>           how long an [h] allowance lasts, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
+        writer.WriteLine("  --pair-browser <name>      pair KeePassXC-Browser under this name in the first 2 minutes");
         writer.WriteLine();
         writer.WriteLine("Each agent's settings, kept in the vault, decide what it can see and how it is");
         writer.WriteLine("asked; an agent you set to Automatic is answered without asking you, and every");

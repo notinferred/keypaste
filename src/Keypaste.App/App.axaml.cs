@@ -7,6 +7,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using Keypaste.App.Clipboard;
 using Keypaste.App.HardwareKeys;
+using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
 using Keypaste.App.ViewModels;
@@ -98,7 +99,7 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings, Unexpected),
+            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings, Unexpected, OpenBrowserFill),
             AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)),
             Unexpected);
 
@@ -233,6 +234,17 @@ internal sealed partial class App : Application, IDisposable
     {
         OpenWindow();
         _shell?.OpenAgentSettings(agent);
+    }
+
+    /// <summary>Shows the window on Settings, where Pair a browser is, as the not-paired notice asks.</summary>
+    internal void OpenBrowserFill()
+    {
+        OpenWindow();
+
+        if (_shell is { } shell)
+        {
+            shell.Current = Destinations.Of(DestinationKind.Settings);
+        }
     }
 
     /// <summary>Closes the window into the menu bar or tray; closing still ends the session, so the process stays locked and holds no secret (D-0385).</summary>

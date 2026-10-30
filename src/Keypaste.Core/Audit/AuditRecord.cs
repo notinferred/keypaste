@@ -16,7 +16,7 @@ public enum AuditDecision
 /// <see cref="Prompt"/> with <see cref="AuditDecision.Denied"/> means a person said no, and only
 /// <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got to it.
 /// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="GrantCache"/>, <see cref="Automatic"/>,
-/// <see cref="Token"/>, <see cref="Narrowing"/> and <see cref="Merged"/> ever accompany <see cref="AuditDecision.Granted"/>.
+/// <see cref="Token"/>, <see cref="Narrowing"/>, <see cref="Merged"/> and <see cref="Removed"/> ever accompany <see cref="AuditDecision.Granted"/>.
 /// <see cref="Automatic"/> is the one release no person saw, so it must never be logged as
 /// <see cref="Prompt"/> or <see cref="GrantCache"/>, which both claim a person acted.
 /// Adding a member means adding a case to <c>AuditLog.Wire</c>.
@@ -136,6 +136,15 @@ public enum AuditMethod
     /// <summary>The vault's holder merged another program's save with the changes its copy held and saved the result (D-0545).</summary>
     /// <remarks>Released nothing and was asked of nobody: the line names the items the merge decided between, never a value.</remarks>
     Merged = 28,
+
+    /// <summary>A browser asked to pair while the person had not armed pairing, so it was refused before anybody was asked (D-0634).</summary>
+    NotArmed = 29,
+
+    /// <summary>A browser presented a pairing the vault does not hold for its build and key, so its check was refused (D-0635).</summary>
+    NotPaired = 30,
+
+    /// <summary>The person removed a browser's pairing, which released nothing and took its access away (D-0633).</summary>
+    Removed = 31,
 }
 
 /// <summary>Who asked.</summary>

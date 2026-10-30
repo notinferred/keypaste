@@ -399,6 +399,13 @@ public sealed partial class PlainWordsTests
         })));
         yield return ("the Always for notice", new NoticeWindow(new AlwaysForNotice("work laptop", "billing:dev", "another request was already in front of a person"), _ => { }));
         yield return ("the locked notice", new LockedNoticeWindow("billing.kdbx", () => { }, TimeProvider.System));
+        yield return ("a browser's pairing", new PairingWindow(new PairingViewModel(new PairingPrompt
+        {
+            Identity = Core.Browser.BrowserIdentity.ChromeWebStore,
+            SuggestedName = "Chrome on work laptop",
+            TakenNames = ["Chrome on work laptop"],
+        })));
+        yield return ("the not-paired notice", new PairingNoticeWindow(new PairingNotice(Core.Browser.BrowserIdentity.FirefoxAddOns), () => { }));
     }
 
     private static IEnumerable<(string Where, string Text)> Shown(Control root, string where)

@@ -8,6 +8,10 @@ namespace Keypaste.Core.Browser;
 /// </summary>
 public interface IBrowserRequests
 {
+    /// <summary>The database hash the extension files this vault's pairing under, which a browser's attachment is told, or null while locked (D-0636).</summary>
+    /// <returns>The hash in lowercase hex, or null.</returns>
+    string? DatabaseHash();
+
     /// <summary>Decides a pairing.</summary>
     /// <param name="request">The extension's identification key.</param>
     /// <param name="browser">The build the connection attached as.</param>

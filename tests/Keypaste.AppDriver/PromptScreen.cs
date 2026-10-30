@@ -142,6 +142,12 @@ internal sealed class PromptScreen : IDisposable
             return;
         }
 
+        if (window is PairingNoticeWindow)
+        {
+            Console.Out.WriteLine($"pair-notice identity={Text(window, "IdentityText")} text={Text(window, "NoticeText")}");
+            return;
+        }
+
         _open = window;
 
         Console.Out.WriteLine(window switch
@@ -159,6 +165,8 @@ internal sealed class PromptScreen : IDisposable
             TerminalEditWindow =>
                 $"edit-prompt command={Text(window, "CommandText")} item={Text(window, "ItemText")} " +
                 $"asked={Text(window, "OriginText")} changes={string.Join("; ", Changes(window))}",
+            PairingWindow =>
+                $"pair-prompt identity={Text(window, "IdentityText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
                 $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")} " +
@@ -169,6 +177,7 @@ internal sealed class PromptScreen : IDisposable
         {
             AccessChangeWindow => "access-prompt withdrawn",
             TerminalEditWindow => "edit-prompt withdrawn",
+            PairingWindow => "pair-prompt withdrawn",
             _ => "prompt withdrawn",
         };
 

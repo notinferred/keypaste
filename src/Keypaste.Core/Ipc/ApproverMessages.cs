@@ -97,6 +97,12 @@ public sealed record AttachReply(string? Session, AuditMethod? Refusal, string R
     /// <summary>The answering keypaste's version, or null from one older than this field; display only, for <c>keypaste doctor</c>.</summary>
     public string? OwnerVersion { get; init; }
 
+    /// <summary>
+    /// For a browser's attachment, the database hash the extension files this vault's pairing under, in lowercase hex; null for
+    /// any other attachment, a refusal, or an owner that pairs no browsers (D-0636).
+    /// </summary>
+    public string? DatabaseHash { get; init; }
+
     /// <summary>A connection attached to a session.</summary>
     /// <param name="session">The session's identifier.</param>
     /// <returns>The reply.</returns>

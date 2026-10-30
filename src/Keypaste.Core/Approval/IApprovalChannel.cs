@@ -62,10 +62,25 @@ public interface IApprovalChannel
     ValueTask<ApprovalAnswer> AskAsync(TerminalEditPrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(ApprovalAnswer.NoChannel);
 
+    /// <summary>Asks a human, who armed pairing, to pair a browser under a name they may change, and waits for their answer.</summary>
+    /// <param name="prompt">What to show. Render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the human said, with the name they gave it, or why they were not asked.</returns>
+    /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing is paired.</remarks>
+    ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(PairingAnswer.NoChannel);
+
     /// <summary>Tells a human, where they chose Always for, that the change it asked for did not take effect, and why.</summary>
     /// <param name="notice">What to say. Already sanitized; render it as inert text.</param>
     /// <remarks>It asks nothing and must not wait for anything. A channel that cannot show it says nothing.</remarks>
     void Tell(AlwaysForNotice notice)
+    {
+    }
+
+    /// <summary>Tells a human that a browser asked to pair while pairing was not armed, and how to pair one.</summary>
+    /// <param name="notice">What asked.</param>
+    /// <remarks>It asks nothing and must not wait for anything. A channel that cannot show it says nothing.</remarks>
+    void Tell(PairingNotice notice)
     {
     }
 }

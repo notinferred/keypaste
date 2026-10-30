@@ -575,6 +575,61 @@
           </StackPanel>
         </Border>
 
+        <!-- Browser fill: pairing KeePassXC-Browser, armed by this press alone, and the pairings the vault holds (D-0634). -->
+        <Border Name="BrowserFillCard" Classes="card filled settings" IsVisible="{Binding HasBrowserFill}">
+          <StackPanel DataContext="{Binding BrowserFill}" x:DataType="vm:BrowserFillViewModel">
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="globe" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Browser fill" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                  <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Classes="row-label" Text="Pair a browser" />
+                    <TextBlock Classes="caption" TextWrapping="Wrap"
+                               Text="KeePassXC-Browser pairs with keypaste as it pairs with KeePassXC. For the next 2 minutes, one browser can ask to pair, and you confirm it in a window keypaste shows." />
+                  </StackPanel>
+                  <Panel Grid.Column="1" VerticalAlignment="Top">
+                    <Button Name="PairBrowser" Content="Pair a browser" Command="{Binding PairCommand}" IsVisible="{Binding !IsArmed}"
+                            AutomationProperties.Name="Pair a browser" />
+                    <Button Name="StopPairing" Classes="ghost" Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding IsArmed}"
+                            AutomationProperties.Name="Stop pairing" />
+                  </Panel>
+                </Grid>
+                <TextBlock Name="PairingArmedLine" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
+                           Text="{Binding ArmedText}" IsVisible="{Binding IsArmed}" />
+                <TextBlock Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="row-label" Text="Paired browsers" />
+                <TextBlock Classes="caption" Text="No browser is paired with this vault." IsVisible="{Binding HasNoRows}" />
+                <ItemsControl Name="PairingsList" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PairingItem">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,10">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                          <TextBlock FontSize="13.5" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Name}" TextWrapping="Wrap" />
+                          <TextBlock FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
+                          <TextBlock Classes="caption" Text="{Binding Used}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="ghost sm" Content="Remove" VerticalAlignment="Top"
+                                AutomationProperties.Name="Remove this pairing"
+                                Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).RemoveCommand}"
+                                CommandParameter="{Binding}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
         <!-- Recent vaults -->
         <Border Classes="card filled settings">
           <StackPanel>

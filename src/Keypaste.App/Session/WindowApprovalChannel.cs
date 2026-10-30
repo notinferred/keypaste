@@ -30,11 +30,13 @@ namespace Keypaste.App.Session;
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
 /// <param name="openSettings">What the Always for notice's Open settings does with the agent's name, or null to offer Close alone.</param>
 /// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null (D-0596).</param>
+/// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
 internal sealed class WindowApprovalChannel(
     TimeProvider clock,
     TimeSpan answerWindow,
     Action<string>? openSettings = null,
-    Action<Exception, string>? unexpected = null) : IApprovalChannel
+    Action<Exception, string>? unexpected = null,
+    Action? openBrowserFill = null) : IApprovalChannel
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -43,6 +45,7 @@ internal sealed class WindowApprovalChannel(
 
     // Read and written on the UI thread only.
     private Showing? _showing;
+    private PairingNoticeWindow? _pairingNotice;
 
     /// <summary>Raised on the UI thread once a prompt window, or a notice, is on screen.</summary>
     internal event EventHandler<Window>? Shown;
@@ -85,6 +88,47 @@ internal sealed class WindowApprovalChannel(
 
         var request = new TerminalEditViewModel(prompt);
         return ShowAsync(request, () => new TerminalEditWindow(request), cancellationToken);
+    }
+
+    /// <summary>Asks the person who armed pairing to pair a browser, under a name they may change, in a prompt window of its own (D-0634).</summary>
+    public async ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new PairingViewModel(prompt);
+        var answer = await ShowAsync(request, () => new PairingWindow(request), cancellationToken).ConfigureAwait(false);
+
+        return answer == ApprovalAnswer.ApprovedOnce ? new PairingAnswer(answer, request.Name) : new PairingAnswer(answer, null);
+    }
+
+    /// <summary>Tells the person a browser asked to pair while pairing was not on, in one notice at a time, which takes nothing down.</summary>
+    public void Tell(PairingNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            // One is enough to say it; a browser asking again while it is up adds nothing to read.
+            if (_pairingNotice is not null)
+            {
+                return;
+            }
+
+            try
+            {
+                var window = new PairingNoticeWindow(notice, openBrowserFill);
+                window.Closed += (_, _) => _pairingNotice = null;
+                _pairingNotice = window;
+                window.Show();
+                Shown?.Invoke(this, window);
+            }
+            catch (Exception ex)
+            {
+                // A notice that cannot be shown changes nothing: the request stays refused, and its line says why.
+                _pairingNotice = null;
+                unexpected?.Invoke(ex, CrashReporting.AlwaysForNoticeSite);
+            }
+        });
     }
 
     /// <summary>

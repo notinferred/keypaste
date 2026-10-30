@@ -337,7 +337,8 @@ public sealed class SessionAuthority : IApproverHandler
             Browser = browser,
         };
 
-        return Answer(AttachReply.To(lifetime.Id));
+        // A browser's attachment is told the hash its extension files this vault's pairing under (D-0636).
+        return Answer(AttachReply.To(lifetime.Id) with { DatabaseHash = browser is null ? null : _browsers?.DatabaseHash() });
     }
 
     /// <inheritdoc/>
@@ -1758,33 +1759,77 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
-    public ValueTask<BrowserReply> PairBrowserAsync(BrowserPairRequest request, string connectionId, CancellationToken cancellationToken)
+    /// <remarks>A pairing granted binds this connection to it, as a check that proves it does (D-0635).</remarks>
+    public async ValueTask<BrowserReply> PairBrowserAsync(BrowserPairRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return DecideBrowserAsync(
+        var reply = await DecideBrowserAsync(
             request.Vault,
             request.Session,
             connectionId,
             (browsers, browser, token) => browsers.PairAsync(request, browser, connectionId, token),
             static (outcome, reason) => new BrowserReply(outcome, reason),
             admitted: null,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+
+        Bind(connectionId, request.Session, reply);
+        return reply;
     }
 
     /// <inheritdoc/>
-    public ValueTask<BrowserReply> CheckBrowserAsync(BrowserCheckRequest request, string connectionId, CancellationToken cancellationToken)
+    /// <remarks>
+    /// Whatever the check finds, the connection is bound to no pairing but the one it proves, so a fill names only a pairing
+    /// this connection proved in this unlock (D-0635).
+    /// </remarks>
+    public async ValueTask<BrowserReply> CheckBrowserAsync(BrowserCheckRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(connectionId);
 
-        return DecideBrowserAsync(
+        if (_attached.TryGetValue(connectionId, out var attachment))
+        {
+            attachment.Pairing = null;
+        }
+
+        var reply = await DecideBrowserAsync(
             request.Vault,
             request.Session,
             connectionId,
             (browsers, browser, token) => browsers.CheckAsync(request, browser, connectionId, token),
             static (outcome, reason) => new BrowserReply(outcome, reason),
             admitted: null,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+
+        Bind(connectionId, request.Session, reply);
+        return reply;
+    }
+
+    /// <summary>Ends every connection's binding to a pairing the person removed, so none of them fills under it again.</summary>
+    /// <param name="pairing">The pairing's name.</param>
+    public void Unbind(string pairing)
+    {
+        ArgumentNullException.ThrowIfNull(pairing);
+
+        foreach (var attachment in _attached.Values)
+        {
+            if (string.Equals(attachment.Pairing, pairing, StringComparison.Ordinal))
+            {
+                attachment.Pairing = null;
+            }
+        }
+    }
+
+    /// <summary>Binds a browser's connection to the pairing a reply proved, while it is still attached to the session it asked under.</summary>
+    private void Bind(string connectionId, string session, BrowserReply reply)
+    {
+        if (reply is { Outcome: BrowserOutcome.Done, Pairing: { } pairing }
+            && _attached.TryGetValue(connectionId, out var attachment)
+            && attachment.Browser is not null
+            && string.Equals(attachment.Session, session, StringComparison.Ordinal))
+        {
+            attachment.Pairing = pairing;
+        }
     }
 
     /// <inheritdoc/>
@@ -1796,8 +1841,18 @@ public sealed class SessionAuthority : IApproverHandler
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        ArgumentNullException.ThrowIfNull(connectionId);
+
         SessionLifetime? admitted = null;
         var waiting = CancellationToken.None;
+
+        // A fill on a connection no check or pairing bound to its pairing reaches nobody (D-0635).
+        if (_attached.TryGetValue(connectionId, out var attachment)
+            && attachment.Browser is not null
+            && !string.Equals(attachment.Pairing, request.Pairing, StringComparison.Ordinal))
+        {
+            return new BrowserFillReply(BrowserOutcome.NotPaired, "this connection has proved no pairing of that name; check it first");
+        }
 
         var reply = await DecideBrowserAsync(
             request.Vault,
@@ -2006,6 +2061,7 @@ public sealed class SessionAuthority : IApproverHandler
     private sealed class Attachment(string vault, string session, AttachClient? client, DateTimeOffset attachedAt)
     {
         private long _lastRequestTicks;
+        private string? _pairing;
 
         internal string Vault { get; } = vault;
 
@@ -2019,6 +2075,13 @@ public sealed class SessionAuthority : IApproverHandler
 
         /// <summary>The KeePassXC-Browser build a browser's attachment named, or null for any other attachment.</summary>
         internal BrowserIdentity? Browser { get; init; }
+
+        /// <summary>The pairing the last check or pairing on a browser's connection proved, or null (D-0635).</summary>
+        internal string? Pairing
+        {
+            get => Volatile.Read(ref _pairing);
+            set => Volatile.Write(ref _pairing, value);
+        }
 
         internal DateTimeOffset LastRequestAt
         {

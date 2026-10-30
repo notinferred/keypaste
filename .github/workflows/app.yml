@@ -27,6 +27,8 @@ on:
       - 'scripts/verify-run-session.sh'
       - 'scripts/verify-held-saves.sh'
       - 'scripts/verify-crash-report.sh'
+      - 'scripts/verify-browser-host.sh'
+      - 'tests/Keypaste.FakeBrowser/**'
       - 'scripts/verify-clipboard-markers.sh'
       - 'scripts/exercise-desktop-install.sh'
       - 'scripts/exercise-desktop-upgrade.sh'
@@ -174,7 +176,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2025","macos-15"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 17
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -204,7 +206,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 14
+    timeout-minutes: 18
     env:
       # KeePassXC's Windows console encoding can alter a non-ASCII master password.
       KP_COMPAT_PASSWORD: ci-master-pw
@@ -234,11 +236,16 @@ jobs:
         shell: bash
         run: bash scripts/build-argon2.sh
 
-      - name: Restore and build the CLI and the app driver
+      # The relay the gate starts loads the shared libsodium beside the CLI, as the fake browser does (8.1d).
+      - name: Build the libsodium the relay loads
+        shell: bash
+        run: bash scripts/build-libsodium.sh
+
+      - name: Restore and build the CLI, the app driver and the fake browser
         shell: bash
         run: |
           set -euo pipefail
-          for project in src/Keypaste.Cli/Keypaste.Cli.csproj tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj; do
+          for project in src/Keypaste.Cli/Keypaste.Cli.csproj tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj tests/Keypaste.FakeBrowser/Keypaste.FakeBrowser.csproj; do
             dotnet restore "$project" --locked-mode
             dotnet build "$project" --no-restore -c Release
           done

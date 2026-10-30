@@ -27,9 +27,16 @@
 # KeePass with its Twofish plugin writes one. The shipped CLI saves it and KeePassXC reads it as Twofish; KeePassXC
 # then saves an entry of its own into it, keeping Twofish; the CLI reads that entry, and the app reads it and saves.
 #
-# NEGATIVE CONTROL: a vault KeePassXC stripped of an attachment, and one imported without its entry
-# CustomData, must each fail the same check every workflow passes, and KeePassXC's AES vault must fail the
-# Twofish check.
+# The document also carries KeePassXC-Browser's data as KeePassXC 2.8.0 writes it (8.1d, 9.4's limit): a pairing in the
+# meta CustomData (KPXC_BROWSER_<id> holding the extension's identification key, and its _CREATED_ stamp), an entry's
+# remembered Allow list (KeePassXC-Browser Settings) and an entry's BrowserHideEntry. After every write each item reads back
+# from KeePassXC with its key and value as imported. On a fifth vault, after keypaste's CLI and app have saved it, keypaste's
+# owner, holding it as the app does, refuses that pairing when tests/Keypaste.FakeBrowser presents it to keypaste's relay, and
+# answers a database hash of its own.
+#
+# NEGATIVE CONTROL: a vault KeePassXC stripped of an attachment, one imported without its entry CustomData, and one imported
+# without KeePassXC-Browser's pairing must each fail the same check every workflow passes, and KeePassXC's AES vault must fail
+# the Twofish check.
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -40,6 +47,8 @@ dir=${1:-}
 . "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 kp=$(keypaste_bin)
 drv=$(app_driver)
+fake=$(resolve KEYPASTE_FAKE_BROWSER artifacts/bin/Keypaste.FakeBrowser/release/Keypaste.FakeBrowser)
+require jq
 
 rm -rf "$dir"
 mkdir -p "$dir/home"
@@ -82,16 +91,30 @@ expect() {
 markers=(kp94-meta-value kp94-group-value kp94-entry-value kp94-plain-value kp94-secret-value kp94-window kp94-tag KP7BOTPJBSWY3DPE
   kp4a1-group kp4a1-item kp4a1-regex kp4a1-placeholder kp4a1-title)
 
+# KeePassXC-Browser's items in KeePassXC's export $1 outside <History>, one "<Key>..</Key><Value>..</Value>" line each,
+# sorted: a save may reorder a CustomData's items or stamp them when the file becomes KDBX 4.1, and neither changes an item.
+browser_data() {
+  tr -d '\r\n\t' <"$1" \
+    | sed 's#<Item>#\n#g; s#</Item>#\n#g' \
+    | sed 's#<LastModificationTime>[^<]*</LastModificationTime>##' \
+    | grep -E '^<Key>(KPXC_BROWSER_|_CREATED_|KeePassXC-Browser Settings|BrowserHideEntry)' \
+    | sort
+}
+
+# KeePassXC's export $1 outside <History>, written as $1.current: every edit copies the entry into its history, so a
+# marker the edit dropped from the entry itself would still be found in the revision.
+outside_history() { awk '/<History>/{past=1} !past{print} /<\/History>/{past=0}' "$1" >"$1.current"; }
+
 # Whether KeePassXC still sees everything keypaste does not model, on the entry at $2.
 check_intact() {
   local db=$1 entry=$2 xml="$dir/intact.xml" marker name
   kx export "$db" -f xml >"$xml" 2>/dev/null || { echo "KeePassXC cannot open $db"; return 1; }
-  # Outside <History> only: every edit copies the entry into its history, so a marker the edit dropped
-  # from the entry itself would still be found in the revision.
-  awk '/<History>/{past=1} !past{print} /<\/History>/{past=0}' "$xml" >"$xml.current"
+  outside_history "$xml"
   for marker in "${markers[@]}"; do
     grep -qF "$marker" "$xml.current" || { echo "KeePassXC no longer finds $marker outside history in $db"; return 1; }
   done
+  [ "$(browser_data "$xml.current")" = "$browser_baseline" ] \
+    || { echo "KeePassXC no longer reads KeePassXC-Browser's pairing and settings as imported in $db"; return 1; }
   grep -qi '>false<' <<<"$(awk '/<Name>review<\/Name>/{group=1} group && /<EnableAutoType>/{print; exit}' "$xml.current")" \
     || { echo "KeePassXC no longer reads Auto-Type as off for the review group in $db"; return 1; }
   for name in blob.bin note.txt; do
@@ -184,6 +207,9 @@ revisions_at() {
 # C.2's notes: two keys, a GitHub token on a line of its own, a PEM block and a sentence. The token
 # is assembled here so no literal token sits in the repository.
 gh_token="ghp_$(printf 'kp2c%.0s' 1 2 3 4 5 6 7 8 9)"
+
+# The identification key KeePassXC-Browser paired with KeePassXC under kp81d-keepassxc, which the extension presents again.
+kpxc_key=$(head -c 32 /dev/urandom | base64 | tr -d '\n')
 kept_notes=$'-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\nRecovery codes are in the safe.'
 
 cat >"$dir/seed.xml" <<EOF
@@ -192,7 +218,11 @@ cat >"$dir/seed.xml" <<EOF
   <Meta>
     <Generator>verify-keepassxc-workflows</Generator>
     <DatabaseName>kp94</DatabaseName>
-    <CustomData><Item><Key>kp94.meta</Key><Value>kp94-meta-value</Value></Item></CustomData>
+    <CustomData>
+      <Item><Key>kp94.meta</Key><Value>kp94-meta-value</Value></Item>
+      <Item><Key>KPXC_BROWSER_kp81d-keepassxc</Key><Value>$kpxc_key</Value></Item>
+      <Item><Key>_CREATED_kp81d-keepassxc</Key><Value>10/24/26 10:00 AM</Value></Item>
+    </CustomData>
   </Meta>
   <Root>
     <Group>
@@ -217,7 +247,10 @@ cat >"$dir/seed.xml" <<EOF
             <Association><Window>//^kp4a1-regex [0-9]+//</Window><KeystrokeSequence>{USERNAME}{ENTER}</KeystrokeSequence></Association>
             <Association><Window>*{TITLE} kp4a1-placeholder*</Window><KeystrokeSequence>{C:kp4a1-title}{PASSWORD}{ENTER}</KeystrokeSequence></Association>
           </AutoType>
-          <CustomData><Item><Key>kp94.entry</Key><Value>kp94-entry-value</Value></Item></CustomData>
+          <CustomData>
+            <Item><Key>kp94.entry</Key><Value>kp94-entry-value</Value></Item>
+            <Item><Key>KeePassXC-Browser Settings</Key><Value>{"Allow":["kp81d.example"],"Deny":[],"Realm":""}</Value></Item>
+          </CustomData>
           <History>
             <Entry>
               <UUID>$(uuid database)</UUID>
@@ -231,6 +264,7 @@ cat >"$dir/seed.xml" <<EOF
           <String><Key>Title</Key><Value>cache</Value></String>
           <String><Key>Password</Key><Value ProtectInMemory="True">c-1</Value></String>
           <AutoType><Enabled>True</Enabled><DataTransferObfuscation>0</DataTransferObfuscation><DefaultSequence>{C:kp4a1-item}{PASSWORD}{ENTER}</DefaultSequence></AutoType>
+          <CustomData><Item><Key>BrowserHideEntry</Key><Value>true</Value></Item></CustomData>
         </Entry>
       </Group>
       <Group>
@@ -310,16 +344,26 @@ kpxc_import() {
 # ---------------------------------------------------------------------------------------
 # NEGATIVE CONTROL first: the check below must be able to fail.
 # ---------------------------------------------------------------------------------------
-step "the intact check fails on a vault missing an attachment or its entry CustomData"
+step "the intact check fails on a vault missing an attachment, its entry CustomData or KeePassXC-Browser's pairing"
 kpxc_import "$dir/control.kdbx" "$pw" "" "$dir/seed.xml"
 container=$(kx db-info "$dir/control.kdbx" | grep -E '^(Cipher|KDF):')
+kx export "$dir/control.kdbx" -f xml >"$dir/baseline.xml" || die "KeePassXC cannot export the control vault"
+outside_history "$dir/baseline.xml"
+browser_baseline=$(browser_data "$dir/baseline.xml.current")
+[ "$(printf '%s\n' "$browser_baseline" | wc -l | tr -d ' ')" = 4 ] \
+  || die "KeePassXC did not import KeePassXC-Browser's four items: $browser_baseline"
+grep -qF "<Key>KPXC_BROWSER_kp81d-keepassxc</Key><Value>$kpxc_key</Value>" <<<"$browser_baseline" \
+  || die "KeePassXC did not import the pairing's key as written"
 intact "$dir/control.kdbx" servers/database
 kx attachment-rm "$dir/control.kdbx" servers/database note.txt >/dev/null || die "KeePassXC could not remove an attachment"
 check_intact "$dir/control.kdbx" servers/database >/dev/null && die "the intact check passed a vault missing an attachment"
 grep -v 'kp94.entry' "$dir/seed.xml" >"$dir/seed-stripped.xml"
 kpxc_import "$dir/control-stripped.kdbx" "$pw" "" "$dir/seed-stripped.xml"
 check_intact "$dir/control-stripped.kdbx" servers/database >/dev/null && die "the intact check passed a vault missing its entry CustomData"
-echo "    both controls fail the check"
+grep -v 'KPXC_BROWSER_kp81d' "$dir/seed.xml" >"$dir/seed-unpaired.xml"
+kpxc_import "$dir/control-unpaired.kdbx" "$pw" "" "$dir/seed-unpaired.xml"
+check_intact "$dir/control-unpaired.kdbx" servers/database >/dev/null && die "the intact check passed a vault missing KeePassXC-Browser's pairing"
+echo "    all three controls fail the check"
 
 exercise() {
   local kind=$1 secret=$2 kf=$3
@@ -601,6 +645,34 @@ exercise keyfile-only "" "$dir/keyfile-only.keyx"
 # ---------------------------------------------------------------------------------------
 # New items from templates, through the app, on a vault KeePassXC made (N.4).
 # ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# KeePassXC-Browser's data (8.1d): keypaste keeps it and grants nothing from it.
+# ---------------------------------------------------------------------------------------
+step "browser data: after keypaste's saves, keypaste's owner refuses KeePassXC's pairing and answers a hash of its own"
+db="$dir/browser.kdbx"
+kpxc_import "$db" "$pw" "" "$dir/seed.xml"
+container=$(kx db-info "$db" | grep -E '^(Cipher|KDF):') || die "KeePassXC cannot report on the browser vault"
+new_pw=
+did "keypaste env set" kp_cli "$db" env set kp94 TOKEN=t-browser
+new_pw=pw-browser
+did "the app's edit" app edit "$db" servers/database "kp81d notes" "https://kp81d.example"
+new_pw=
+intact "$db" servers/database
+
+hold_out="$dir/hold.txt"
+exec 7> >(KEYPASTE_DRIVER_PASSWORD=$cur_pw exec "$drv" hold "$(native "$db")" >"$hold_out" 2>&1)
+wait_for 'holding session' "$hold_out"
+grep -q 'not served' "$hold_out" && die "the app unlocked the browser vault and did not serve it"
+KEYPASTE_VAULT=$(native "$db") "$fake" "$kp" chrome --id-key "$kpxc_key" --within 60 get-databasehash test-associate=kp81d-keepassxc \
+  >"$dir/keypaste-browser.txt" 2>&1 || die "keypaste's relay exited with an error: $(cat "$dir/keypaste-browser.txt")"
+own_hash=$(sed -n 2p "$dir/keypaste-browser.txt" | jq -er '.hash') || die "keypaste answered no database hash: $(cat "$dir/keypaste-browser.txt")"
+sed -n 3p "$dir/keypaste-browser.txt" | jq -e '.errorCode == "8"' >/dev/null \
+  || die "keypaste's owner did not refuse KeePassXC's pairing: $(sed -n 3p "$dir/keypaste-browser.txt")"
+exec 7>&-
+wait_for '^shut down' "$hold_out"
+intact "$db" servers/database
+echo "    refused with error 8; keypaste's hash is $own_hash"
+
 step "templates: the app makes one item from each template, and KeePassXC reads each whole, with no revision"
 db="$dir/templates.kdbx"
 cur_pw=$pw cur_kf= new_pw=
@@ -745,5 +817,5 @@ cur_kf=
 kx db-info "$dir/created-app.kdbx" >/dev/null 2>&1 && die "KeePassXC opens the app's vault without its keyfile"
 refused "the app creating over an existing vault" "$dir/created-cli.kdbx" app create "$dir/created-cli.kdbx"
 
-printf '\nWORKFLOWS GATE PASSED: three KeePassXC vaults through the CLI and the app, one item from each template on a fourth, a KDBX 3.1 conversion, a Twofish vault both ways, creation, and every refusal byte-identical, on %s\n' \
+printf '\nWORKFLOWS GATE PASSED: three KeePassXC vaults through the CLI and the app, KeePassXC-Browser data kept, refused by keypaste and answered by KeePassXC on a fourth, one item from each template on a fifth, a KDBX 3.1 conversion, a Twofish vault both ways, creation, and every refusal byte-identical, on %s\n' \
   "$("$cli" --version | tr -d '\r')"

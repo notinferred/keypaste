@@ -45,6 +45,7 @@ internal sealed class Relay : IAsyncDisposable
     private byte[]? _extensionKey;
     private BrowserLink? _link;
     private Pairing? _paired;
+    private string? _databaseHash;
     private bool _toldLocked;
 
     private Relay(RelayOptions options, Stream output)
@@ -161,7 +162,7 @@ internal sealed class Relay : IAsyncDisposable
 
         return action switch
         {
-            GetDatabaseHash => await DatabaseHashAsync(knock, stop).ConfigureAwait(false),
+            GetDatabaseHash => await DatabaseHashAsync(replyNonce, knock, stop).ConfigureAwait(false),
             Associate => await AssociateAsync(inner, replyNonce, knock, stop).ConfigureAwait(false),
             TestAssociate => await TestAssociateAsync(inner, replyNonce, knock, stop).ConfigureAwait(false),
             GetLogins => await GetLoginsAsync(inner, replyNonce, knock, stop).ConfigureAwait(false),
@@ -234,11 +235,32 @@ internal sealed class Relay : IAsyncDisposable
         return inner is not null;
     }
 
-    /// <summary>Answers whether the vault is open; its hash, which pairing files keypaste's pairing under, comes with pairing (8.1d).</summary>
-    private async Task<byte[]> DatabaseHashAsync(bool knock, CancellationToken stop) =>
-        Error(GetDatabaseHash, await AttachAsync(knock, stop).ConfigureAwait(false) is null
-            ? ExtensionError.DatabaseNotOpened
-            : ExtensionError.DatabaseHashNotReceived);
+    /// <summary>
+    /// The hash the owner told this attachment, which the extension files keypaste's pairing under, apart from KeePassXC's; an
+    /// owner that pairs no browsers tells none, answered with error 2 (D-0636). No <c>oldHash</c> is ever sent.
+    /// </summary>
+    private async Task<byte[]> DatabaseHashAsync(byte[] replyNonce, bool knock, CancellationToken stop)
+    {
+        if (await AttachAsync(knock, stop).ConfigureAwait(false) is null)
+        {
+            return Error(GetDatabaseHash, ExtensionError.DatabaseNotOpened);
+        }
+
+        return _databaseHash is { } hash
+            ? Sealed(GetDatabaseHash, replyNonce, writer => writer.WriteString("hash", hash))
+            : Error(GetDatabaseHash, ExtensionError.DatabaseHashNotReceived);
+    }
+
+    /// <summary>The hash and the pairing an answer to <c>associate</c> or <c>test-associate</c> carries, as KeePassXC's does.</summary>
+    private void WritePaired(Utf8JsonWriter writer, string pairing)
+    {
+        if (_databaseHash is { } hash)
+        {
+            writer.WriteString("hash", hash);
+        }
+
+        writer.WriteString("id", pairing);
+    }
 
     private async Task<byte[]> AssociateAsync(Dictionary<string, string> inner, byte[] replyNonce, bool knock, CancellationToken stop)
     {
@@ -262,7 +284,7 @@ internal sealed class Relay : IAsyncDisposable
         if (reply is { Outcome: BrowserOutcome.Done, Pairing: { } pairing } && IsPairing(pairing))
         {
             _paired = new Pairing(pairing, identificationKey, session);
-            return Sealed(Associate, replyNonce, writer => writer.WriteString("id", pairing));
+            return Sealed(Associate, replyNonce, writer => WritePaired(writer, pairing));
         }
 
         return Error(Associate, reply is null or { Outcome: BrowserOutcome.Locked }
@@ -291,7 +313,7 @@ internal sealed class Relay : IAsyncDisposable
         if (reply is { Outcome: BrowserOutcome.Done })
         {
             _paired = new Pairing(pairing, key, session);
-            return Sealed(TestAssociate, replyNonce, writer => writer.WriteString("id", pairing));
+            return Sealed(TestAssociate, replyNonce, writer => WritePaired(writer, pairing));
         }
 
         return Error(TestAssociate, reply is null or { Outcome: BrowserOutcome.Locked }
@@ -405,8 +427,10 @@ internal sealed class Relay : IAsyncDisposable
                 break;
             }
 
-            if (await _link.AttachAsync(request, stop).ConfigureAwait(false) is { Attached: true, Session: { } session })
+            if (await _link.AttachAsync(request, stop).ConfigureAwait(false) is { Attached: true, Session: { } session } attached)
             {
+                _databaseHash = attached.DatabaseHash;
+
                 if (_toldLocked)
                 {
                     _toldLocked = false;

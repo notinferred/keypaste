@@ -702,6 +702,9 @@ internal sealed class KeePassInterop : IDisposable
     /// </remarks>
     internal bool RecyclesDeletedEntries => _database.RecycleBinEnabled;
 
+    /// <summary>The root group's UUID as KeePassXC writes it for its own database hash: its 16 bytes as the file stores them, in lowercase hex.</summary>
+    internal string RootGroupHex => Convert.ToHexStringLower(_database.RootGroup.Uuid.UuidBytes);
+
     /// <summary>Deletes the one entry with this name, reversibly where the vault allows it.</summary>
     /// <param name="name">The entry to delete.</param>
     /// <param name="recycled">
@@ -4314,7 +4317,7 @@ internal sealed class KeePassInterop : IDisposable
             {
                 PwEntry? theirs = _theirEntries.GetValueOrDefault(mine.Uuid);
 
-                if (RevokedToken(mine, theirs))
+                if (RevokedBearer(mine, theirs))
                 {
                     theirs?.ParentGroup.Entries.Remove(theirs);
                 }
@@ -4335,7 +4338,7 @@ internal sealed class KeePassInterop : IDisposable
                     continue;
                 }
 
-                if (RevokedToken(null, theirs))
+                if (RevokedBearer(null, theirs))
                 {
                     theirs.ParentGroup.Entries.Remove(theirs);
                 }
@@ -4347,16 +4350,17 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         /// <summary>
-        /// Whether either copy keeps the entry in <see cref="ReservedGroups.Tokens"/> and either holds a tombstone for it, which always wins
-        /// over a token's record whatever the times, changes or places, so the result does not hold it (D-0544, D-0631).
+        /// Whether either copy keeps the entry in <see cref="ReservedGroups.Tokens"/> or <see cref="ReservedGroups.Browsers"/> and either
+        /// holds a tombstone for it, which always wins over a token's or a pairing's record whatever the times, changes or places, so the
+        /// result does not hold it (D-0544, D-0631, D-0633).
         /// </summary>
-        private bool RevokedToken(PwEntry? mine, PwEntry? theirs) =>
+        private bool RevokedBearer(PwEntry? mine, PwEntry? theirs) =>
             (mine ?? theirs) is { } entry
             && (_myDeletions.ContainsKey(entry.Uuid) || _theirDeletions.ContainsKey(entry.Uuid))
-            && ((mine is not null && IsToken(_open, mine)) || (theirs is not null && IsToken(_file, theirs)));
+            && ((mine is not null && IsBearer(_open, mine)) || (theirs is not null && IsBearer(_file, theirs)));
 
-        private static bool IsToken(KeePassInterop copy, PwEntry entry) =>
-            string.Equals(copy.PathOf(entry.ParentGroup), ReservedGroups.Tokens, StringComparison.Ordinal);
+        private static bool IsBearer(KeePassInterop copy, PwEntry entry) =>
+            copy.PathOf(entry.ParentGroup) is ReservedGroups.Tokens or ReservedGroups.Browsers;
 
         /// <summary>An entry both copies hold, by whole versions: lineage where the base shows it, the later in whole seconds otherwise, and every version kept in its history (D-0537 to D-0539).</summary>
         private void Merge(PwEntry mine, PwEntry theirs)

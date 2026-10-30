@@ -92,7 +92,8 @@ internal sealed record LogRow
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(clock);
 
-        var byYou = Is(entry.Method, "share-created") || Is(entry.Method, "share-revoked") || Is(entry.Tool, "token bundle");
+        var byYou = Is(entry.Method, "share-created") || Is(entry.Method, "share-revoked") || Is(entry.Tool, "token bundle")
+            || (Is(entry.Tool, "browser") && Is(entry.Method, "removed"));
         var (secrets, where) = Place(entry);
         var (result, tone) = Outcome(entry);
         var local = entry.At is { } at ? TimeZoneInfo.ConvertTime(at, clock.LocalTimeZone) : (DateTimeOffset?)null;
@@ -122,6 +123,12 @@ internal sealed record LogRow
 
     private static string ActorOf(AuditEntry entry)
     {
+        // A browser's line names the build as its client and the pairing as its label (D-0637).
+        if (Is(entry.Tool, "browser"))
+        {
+            return entry.Label.Length > 0 ? entry.Label : "KeePassXC-Browser";
+        }
+
         if (Is(entry.Method, "token"))
         {
             return TokenAuditReason.TryName(entry.Reason, out var name) ? name : "token";
@@ -148,6 +155,12 @@ internal sealed record LogRow
             "run" => entry.Granted ? "Injected" : "Requested",
             "access_change" => entry.Granted ? "Changed settings" : "Asked to change settings",
             "terminal_edit" => entry.Granted ? "Changed from a terminal" : "Asked to change from a terminal",
+            "browser" => entry.Field switch
+            {
+                "check" => "Checked its pairing",
+                "remove" => "Removed a pairing",
+                _ => entry.Granted ? "Paired a browser" : "Asked to pair",
+            },
             "token bundle" => "Bundled",
             "" => _none,
             var tool when tool.EndsWith("_credential", StringComparison.Ordinal) => "Requested",
@@ -228,6 +241,7 @@ internal sealed record LogRow
             "token" => ("Token", LogTone.Info),
             "share-created" => ("Link", LogTone.Muted),
             "share-revoked" => ("Revoked", LogTone.Muted),
+            "removed" => ("Removed", LogTone.Muted),
             _ => ("Allowed", LogTone.Ok),
         };
     }

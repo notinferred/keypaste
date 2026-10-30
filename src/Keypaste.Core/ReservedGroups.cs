@@ -16,6 +16,9 @@ public static class ReservedGroups
     /// <summary>Agents' access: one entry per agent, titled with its name and holding its ACAF record.</summary>
     public const string Agents = Root + "/agents";
 
+    /// <summary>Browsers' pairings: one entry per pairing, titled with its name and holding a hash of the extension's key, never the key.</summary>
+    public const string Browsers = Root + "/browsers";
+
     /// <summary>Whether a group path is reserved or inside a reserved group.</summary>
     /// <param name="groupPath">A group path as <see cref="VaultEntry.GroupPath"/> spells it.</param>
     /// <returns><see langword="true"/> for <see cref="Root"/> and everything under it, in any case.</returns>

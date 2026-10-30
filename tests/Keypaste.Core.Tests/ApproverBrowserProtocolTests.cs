@@ -31,6 +31,25 @@ public sealed class ApproverBrowserProtocolTests
         Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachRequest? _));
 
     [Fact]
+    public void An_attach_reply_carries_the_database_hash_it_was_given()
+    {
+        var hash = new string('0', 63) + "f";
+        var told = AttachReply.To("s") with { DatabaseHash = hash };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(told), out AttachReply? decoded));
+        Assert.Equal(hash, decoded.DatabaseHash);
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(AttachReply.To("s")), out AttachReply? untold));
+        Assert.Null(untold.DatabaseHash);
+    }
+
+    [Theory]
+    [InlineData("""{"v":2,"kind":"attach","session":"s","reason":"","database_hash":"ABCDEF0000000000000000000000000000000000000000000000000000000000"}""")]
+    [InlineData("""{"v":2,"kind":"attach","session":"s","reason":"","database_hash":"abc"}""")]
+    [InlineData("""{"v":2,"kind":"attach","method":0,"reason":"locked","database_hash":"0000000000000000000000000000000000000000000000000000000000000000"}""")]
+    public void A_database_hash_that_is_not_a_lowercase_sha_256_or_beside_a_refusal_is_refused(string frame) =>
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachReply? _));
+
+    [Fact]
     public void The_four_requests_round_trip_as_their_own_kinds()
     {
         var pair = new BrowserPairRequest(_key) { Vault = "/v.kdbx", Session = "s" };

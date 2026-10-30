@@ -57,6 +57,7 @@ internal sealed class SessionHost : IDisposable
     private readonly Action? _requestLock;
     private readonly string? _launchName;
     private readonly HourlyLimit _hourly;
+    private readonly PairingUses _pairingUses = new();
     private readonly Action<Exception>? _unexpected;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
@@ -296,6 +297,72 @@ internal sealed class SessionHost : IDisposable
         return hosted?.ShowPrompt() == true;
     }
 
+    /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
+    internal DateTimeOffset? PairingArmedUntil
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Browsers?.ArmedUntil;
+            }
+        }
+    }
+
+    /// <summary>Arms pairing a browser for two minutes and one pairing, for the person's press of Pair a browser and nothing else (D-0634).</summary>
+    /// <returns>Whether this unlock pairs browsers and is now armed.</returns>
+    internal bool ArmPairing()
+    {
+        lock (_gate)
+        {
+            if (_hosted?.Browsers is not { } browsers)
+            {
+                return false;
+            }
+
+            browsers.Arm();
+            return true;
+        }
+    }
+
+    /// <summary>Ends an arming before its two minutes are up.</summary>
+    internal void DisarmPairing()
+    {
+        lock (_gate)
+        {
+            _hosted?.Browsers?.Disarm();
+        }
+    }
+
+    /// <summary>The pairings the unlocked vault holds, with when each was last proven here; none while nothing here answers browsers.</summary>
+    internal IReadOnlyList<PairingRow> Pairings()
+    {
+        SessionBrowsers? browsers;
+
+        lock (_gate)
+        {
+            browsers = _hosted?.Browsers;
+        }
+
+        // Outside the lock, which a lock of the session takes: listing reads the session's vault.
+        return browsers?.List() ?? [];
+    }
+
+    /// <summary>Removes a pairing for the person, saving it and recording it.</summary>
+    /// <param name="id">The pairing's name.</param>
+    /// <returns>Whether it was removed, and why not.</returns>
+    internal PairingRemoval RemovePairing(string id)
+    {
+        SessionBrowsers? browsers;
+
+        lock (_gate)
+        {
+            browsers = _hosted?.Browsers;
+        }
+
+        return browsers?.Remove(id) ?? new PairingRemoval(false, _notAnswering);
+    }
+
     /// <summary>Ends every grant given to a bridge started with this label.</summary>
     /// <param name="label">The raw label.</param>
     internal void RevokeClient(string label)
@@ -421,7 +488,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), _unexpected);
+            var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _pairingUses, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), _unexpected);
             _hosted = hosted;
             Endpoint = hosted.Endpoint;
             Failure = hosted.Failure;
@@ -510,6 +577,9 @@ internal sealed class SessionHost : IDisposable
 
         internal IReadOnlyList<ReleaseSeen> Released => _server.Authority.Released;
 
+        /// <summary>What pairs a browser for this unlock while the vault's endpoint still accepts, or null.</summary>
+        internal SessionBrowsers? Browsers => AnswersAgents ? _server.Browsers : null;
+
         private bool AnswersAgents => _agents is { IsCompleted: false };
 
         internal void RevokeClient(string label) => _server.Authority.RevokeClient(label);
@@ -563,6 +633,7 @@ internal sealed class SessionHost : IDisposable
             IApprovalChannel channel,
             Action? requestLock,
             HourlyLimit hourly,
+            PairingUses pairingUses,
             string? approverOverride,
             string? launchName,
             Action<EditDone> edited,
@@ -599,6 +670,9 @@ internal sealed class SessionHost : IDisposable
                     ClientsPath = KeypasteHome.ClientsPath(session.Home),
                     Edited = edited,
                     Unexpected = unexpected,
+
+                    // A browser pairs only while the person armed it in Settings, saved through this session (D-0634).
+                    BrowserUses = pairingUses,
                 });
 
                 string? launchFailure = null;

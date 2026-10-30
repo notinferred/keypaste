@@ -52,10 +52,16 @@ public sealed record SessionServerOptions
     public TimeProvider Clock { get; init; } = TimeProvider.System;
 
     /// <summary>
-    /// Runs a terminal's edit on the vault of the lifetime it was asked under and saves it under the
-    /// owner's claim, or null to refuse every edit (D-0464).
+    /// Runs a terminal's edit, or a browser's pairing the person confirmed, on the vault of the lifetime it was asked under and
+    /// saves it under the owner's claim, or null to refuse every edit and pairing (D-0464, D-0634).
     /// </summary>
     public Func<SessionLifetime, Func<Vault, bool>, AgentSave>? WriteEdit { get; init; }
+
+    /// <summary>
+    /// When each browser's pairing was last proven, kept for the owner's life, or null for an owner that pairs no browsers;
+    /// pairing also needs <see cref="WriteEdit"/> (D-0634).
+    /// </summary>
+    public PairingUses? BrowserUses { get; init; }
 
     /// <summary>This computer's <c>clients.toml</c>, which says which agents a tag change would reach unasked.</summary>
     public string ClientsPath { get; init; } = string.Empty;
@@ -103,6 +109,9 @@ public sealed class SessionServer : IDisposable
     /// <summary>What answers each request.</summary>
     public SessionAuthority Authority { get; }
 
+    /// <summary>What pairs a browser for this unlock, arming included, or null for an owner that pairs none.</summary>
+    public SessionBrowsers? Browsers { get; private init; }
+
     /// <summary>Builds what answers agents for one unlock, binding no endpoint.</summary>
     /// <param name="options">How this owner differs.</param>
     /// <returns>The server, whose <see cref="Authority"/> answers before <see cref="Bind"/> binds the vault's endpoint, or if it never does.</returns>
@@ -144,6 +153,10 @@ public sealed class SessionServer : IDisposable
                 ? new SessionEditor(gate, options.UnlockedFor, write, options.ClientsPath, options.Clock, options.Narrate, options.Edited)
                 : null;
 
+            var browsers = options.BrowserUses is { } uses && options.WriteEdit is { } pair
+                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, options.Audit, uses, options.Clock, options.Narrate)
+                : null;
+
             var authority = new SessionAuthority(
                 options.Vault,
                 options.CurrentLifetime,
@@ -152,12 +165,18 @@ public sealed class SessionServer : IDisposable
                 new SessionEnvironments(gate, options.UnlockedFor, options.Clock, envGrants, options.Narrate, launches),
                 options.LockNow,
                 options.Clock,
-                editor)
+                editor,
+                browsers)
             {
                 Unexpected = options.Unexpected,
             };
 
-            return new SessionServer(authority, gate, grants, envGrants, options.WatchEdits, options.UnwatchEdits);
+            if (browsers is not null)
+            {
+                browsers.Removed += (_, pairing) => authority.Unbind(pairing);
+            }
+
+            return new SessionServer(authority, gate, grants, envGrants, options.WatchEdits, options.UnwatchEdits) { Browsers = browsers };
         }
         catch
         {

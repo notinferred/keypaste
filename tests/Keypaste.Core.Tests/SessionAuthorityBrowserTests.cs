@@ -11,7 +11,9 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// A vault's owner over a real pipe, as the browser relay reaches it: a browser's attachment names one of the three
 /// KeePassXC-Browser builds, makes only a pairing, a pairing check, a fill and a lock, and no other attachment makes those;
-/// the lock locks as <c>keypaste lock</c> does, asking nobody, and a fill releases nothing across a lock (D-0627, D-0313).
+/// the lock locks as <c>keypaste lock</c> does, asking nobody, and a fill releases nothing across a lock (D-0627, D-0313). A
+/// browser's attachment is told the database hash, and a fill is decided only for the pairing a check or a pairing on the same
+/// connection proved (D-0635, D-0636).
 /// </summary>
 public sealed class SessionAuthorityBrowserTests : IDisposable
 {
@@ -75,6 +77,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         Assert.Equal(BrowserOutcome.Done, fill.Outcome);
         Assert.Equal("hunter2", Assert.Single(fill.Logins).Password);
         Assert.Equal(3, browsers.Decided.Count);
+        Assert.Equal(["pair", "check", "fill"], browsers.Decided.Select(decided => decided.Act));
         Assert.All(browsers.Decided, decided => Assert.Same(BrowserIdentity.FirefoxAddOns, decided.Browser));
         Assert.Single(browsers.Decided.Select(decided => decided.ConnectionId).Distinct(StringComparer.Ordinal));
     }
@@ -139,7 +142,71 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         var fill = await link.FillAsync(new BrowserFillRequest("pairing", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.Equal(new BrowserReply(BrowserOutcome.Refused, "this keypaste process does not pair browsers or fill logins in them"), paired);
-        Assert.Equal(BrowserOutcome.Refused, fill?.Outcome);
+        Assert.Equal(BrowserOutcome.NotPaired, fill?.Outcome);
+    }
+
+    [Fact]
+    public async Task A_browser_s_attachment_is_told_the_database_hash_and_no_other_attachment_is()
+    {
+        var browsers = new FakeBrowsers { Hash = new string('a', 64) };
+        await using var owner = Owner.Start(this, browsers: browsers);
+
+        await using var browser = await owner.ConnectAsync();
+        var told = await browser.AttachAsync(new AttachRequest(VaultPath) { Browser = BrowserIdentity.EdgeAddOns.Caller }, Token);
+        await using var agent = await owner.ConnectAsync();
+        var untold = await agent.AttachAsync(new AttachRequest(VaultPath), Token);
+        await using var nothing = Owner.Start(this);
+        await using var unpaired = await nothing.ConnectAsync();
+        var none = await unpaired.AttachAsync(new AttachRequest(VaultPath) { Browser = BrowserIdentity.EdgeAddOns.Caller }, Token);
+
+        Assert.Equal(new string('a', 64), told?.DatabaseHash);
+        Assert.True(untold?.Attached);
+        Assert.Null(untold?.DatabaseHash);
+        Assert.True(none?.Attached);
+        Assert.Null(none?.DatabaseHash);
+    }
+
+    [Fact]
+    public async Task A_fill_is_decided_only_for_the_pairing_its_own_connection_proved()
+    {
+        var browsers = new FakeBrowsers();
+        await using var owner = Owner.Start(this, browsers: browsers);
+        await using var unproved = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await using var proved = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await CheckAsync(proved, "laptop");
+
+        var beforeAnyCheck = await unproved.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var anotherPairing = await proved.FillAsync(new BrowserFillRequest("desktop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+        var itsOwn = await proved.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+
+        Assert.Equal(BrowserOutcome.NotPaired, beforeAnyCheck?.Outcome);
+        Assert.Equal(BrowserOutcome.NotPaired, anotherPairing?.Outcome);
+        Assert.Equal(BrowserOutcome.Done, itsOwn?.Outcome);
+        Assert.Equal(2, browsers.Decided.Count);
+    }
+
+    [Fact]
+    public async Task A_check_that_fails_and_a_removed_pairing_each_leave_the_connection_bound_to_nothing()
+    {
+        var browsers = new FakeBrowsers();
+        SessionAuthority? authority = null;
+        await using var owner = Owner.Start(this, browsers: browsers, built: built => authority = built);
+        await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+
+        await CheckAsync(link, "laptop");
+        browsers.CheckOutcome = BrowserOutcome.NotPaired;
+        var failed = await link.CheckAsync(new BrowserCheckRequest("laptop", Key()) { Vault = VaultPath, Session = "session-one" }, Token);
+        var afterFailure = await link.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+
+        browsers.CheckOutcome = BrowserOutcome.Done;
+        await CheckAsync(link, "laptop");
+        authority!.Unbind("laptop");
+        var afterRemoval = await link.FillAsync(new BrowserFillRequest("laptop", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
+
+        Assert.Equal(BrowserOutcome.NotPaired, failed?.Outcome);
+        Assert.Equal(BrowserOutcome.NotPaired, afterFailure?.Outcome);
+        Assert.Equal(BrowserOutcome.NotPaired, afterRemoval?.Outcome);
+        Assert.DoesNotContain(browsers.Decided, decided => decided.Act == "fill");
     }
 
     [Fact]
@@ -168,6 +235,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         };
         await using var owner = Owner.Start(this, browsers: browsers);
         await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await CheckAsync(link, "pairing");
 
         var fill = await link.FillAsync(new BrowserFillRequest("pairing", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
 
@@ -188,6 +256,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         };
         await using var owner = Owner.Start(this, browsers: browsers);
         await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await CheckAsync(link, "pairing");
 
         var fill = await link.FillAsync(new BrowserFillRequest("pairing", Key(), "https://github.com/") { Vault = VaultPath, Session = "session-one" }, Token);
 
@@ -230,31 +299,47 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
 
     private static string Key() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
+    private async Task CheckAsync(BrowserLink link, string pairing)
+    {
+        var reply = await link.CheckAsync(new BrowserCheckRequest(pairing, Key()) { Vault = VaultPath, Session = "session-one" }, Token);
+        Assert.Equal(BrowserOutcome.Done, reply?.Outcome);
+    }
+
     /// <summary>Browser answers that decide every pairing, check and fill as a test sets them, keeping who each was for.</summary>
     private sealed class FakeBrowsers : IBrowserRequests
     {
-        internal ConcurrentQueue<(BrowserIdentity Browser, string ConnectionId)> Decided { get; } = new();
+        internal ConcurrentQueue<(BrowserIdentity Browser, string ConnectionId, string Act)> Decided { get; } = new();
 
         internal BrowserFillReply Fill { get; set; } = new(BrowserOutcome.Done, string.Empty);
 
         /// <summary>Runs while a fill is decided.</summary>
         internal Action? Deciding { get; init; }
 
+        /// <summary>The database hash a browser's attachment is told, or null.</summary>
+        internal string? Hash { get; init; }
+
+        /// <summary>What a check comes to.</summary>
+        internal BrowserOutcome CheckOutcome { get; set; } = BrowserOutcome.Done;
+
+        public string? DatabaseHash() => Hash;
+
         public ValueTask<BrowserReply> PairAsync(BrowserPairRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
         {
-            Decided.Enqueue((browser, connectionId));
+            Decided.Enqueue((browser, connectionId, "pair"));
             return ValueTask.FromResult(new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = "firefox here" });
         }
 
         public ValueTask<BrowserReply> CheckAsync(BrowserCheckRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
         {
-            Decided.Enqueue((browser, connectionId));
-            return ValueTask.FromResult(new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = request.Pairing });
+            Decided.Enqueue((browser, connectionId, "check"));
+            return ValueTask.FromResult(CheckOutcome == BrowserOutcome.Done
+                ? new BrowserReply(BrowserOutcome.Done, string.Empty) { Pairing = request.Pairing }
+                : new BrowserReply(CheckOutcome, "not this browser's"));
         }
 
         public ValueTask<BrowserFillReply> FillAsync(BrowserFillRequest request, BrowserIdentity browser, string connectionId, CancellationToken cancellationToken)
         {
-            Decided.Enqueue((browser, connectionId));
+            Decided.Enqueue((browser, connectionId, "fill"));
             Deciding?.Invoke();
             return ValueTask.FromResult(Fill);
         }
@@ -269,7 +354,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         private readonly Task _running;
         private bool _disposed;
 
-        private Owner(SessionAuthorityBrowserTests test, Action? lockNow, IBrowserRequests? browsers)
+        private Owner(SessionAuthorityBrowserTests test, Action? lockNow, IBrowserRequests? browsers, Action<SessionAuthority>? built)
         {
             _test = test;
             PipeName = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
@@ -280,14 +365,15 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
                 audit: () => test._log.Log,
                 lockNow: lockNow,
                 browsers: browsers);
+            built?.Invoke(authority);
             _listener = new ApproverListener(PipeName, authority);
             _running = _listener.RunAsync(_stop.Token);
         }
 
         internal string PipeName { get; }
 
-        internal static Owner Start(SessionAuthorityBrowserTests test, Action? lockNow = null, IBrowserRequests? browsers = null) =>
-            new(test, lockNow, browsers);
+        internal static Owner Start(SessionAuthorityBrowserTests test, Action? lockNow = null, IBrowserRequests? browsers = null, Action<SessionAuthority>? built = null) =>
+            new(test, lockNow, browsers, built);
 
         internal async Task<BrowserLink> ConnectAsync()
         {

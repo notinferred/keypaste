@@ -238,6 +238,11 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>The app's crash reports, whose switch this screen shows; null where the app composed none.</summary>
     internal CrashReporting? Crashes { get; init; }
 
+    /// <summary>Browser fill: pairing a browser and the pairings the vault holds; null where nothing answers browsers.</summary>
+    internal BrowserFillViewModel? BrowserFill { get; init; }
+
+    internal bool HasBrowserFill => BrowserFill is not null;
+
     internal bool HasCrashReports => Crashes is not null;
 
     /// <summary>Whether crash reports are sent, as chosen at first run; turning it off deletes the reports waiting (D-0594).</summary>
@@ -505,7 +510,11 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Zeroes whatever the access form holds; the shell calls this on lock and on leaving.</summary>
-    public void Dispose() => Access.Dispose();
+    public void Dispose()
+    {
+        Access.Dispose();
+        BrowserFill?.Dispose();
+    }
 
     private static string When(VaultBackup backup) =>
         backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);

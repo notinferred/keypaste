@@ -227,6 +227,7 @@ check_desktop_gates() {
   integration_script scripts/verify-run-session.sh
   integration_script scripts/verify-held-saves.sh
   integration_script scripts/verify-crash-report.sh
+  integration_script scripts/verify-browser-host.sh
   # The macOS install and upgrade legs run under the stock bash 3.2 (D-0398).
   if [ "$(uname -s)" = Darwin ]; then
     run /bin/bash scripts/exercise-desktop-install.sh --selftest
@@ -402,11 +403,18 @@ profile_desktop() {
     if [ "${#projects[@]}" -gt 0 ]; then test_projects; else test_desktop; fi
   fi
 }
+# The browser host gate starts the CLI's relay, which loads the shared libsodium from beside it, and the fake browser.
+prepare_browser_host() {
+  build_libsodium
+  prepare src/Keypaste.Cli/Keypaste.Cli.csproj
+  prepare tests/Keypaste.FakeBrowser/Keypaste.FakeBrowser.csproj
+}
 profile_desktop_gates() {
   if [ "$phase" != test-only ] && [ "$desktop_prepared" = false ] \
     && { [ -z "$log_dir" ] || [ ! -e "$log_dir/desktop.prepared" ]; }; then
     prepare_desktop
   fi
+  if [ "$phase" != test-only ]; then prepare_browser_host; fi
   if [ "$phase" != prepare-only ]; then check_desktop_gates; fi
 }
 profile_integration() {
@@ -417,7 +425,7 @@ profile_integration() {
   if [ "$phase" != prepare-only ]; then check_integration; fi
 }
 profile_compat() {
-  prepare_backend
+  prepare_backend with-libsodium
   export KP_COMPAT_PASSWORD=keypaste-local-compat-fixture
   run bash scripts/make-compat-fixture.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-compat.sh artifacts/compat/local.kdbx

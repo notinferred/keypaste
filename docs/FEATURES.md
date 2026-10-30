@@ -53,6 +53,8 @@ A KDBX 3.1 vault, which KeePassXC writes from a document with no custom data, un
 
 A Twofish vault, which `keepassxc-cli` cannot make, is written by the app driver as KeePass with its Twofish plugin writes one. KeePassXC reads it as Twofish after the CLI saves it, then saves an entry into it, which the CLI reads and the desktop reads and saves; the vault stays Twofish throughout (D-0292) (`4f19fbdc`; ci 39850506100, app 39850506098).
 
+As of 2026-10-30, in source, the seed also carries KeePassXC-Browser's data as KeePassXC 2.8.0 writes it: a pairing in the meta custom data, an entry's remembered Allow list and an entry's `BrowserHideEntry`. After every write each item reads back from KeePassXC with its key and value as imported, and a vault imported without the pairing fails that check. On a vault the CLI and the desktop have saved, keypaste's owner refuses that pairing when a browser presents it to keypaste and answers a database hash of its own ([8.1d](steps/8.1d.md)). That KeePassXC, its browser integration on, still answers its own pairing afterwards is not shown ([BACKLOG](BACKLOG.md#investigation-candidates)). The vault is imported by `keepassxc-cli`, not made in KeePassXC's window.
+
 These are refused, and each leaves the vault byte-identical with no backup taken:
 
 - Opening with a wrong password, or with a missing or wrong keyfile, from either front end.
@@ -73,7 +75,7 @@ Not exercised:
 - A vault protected by a real YubiKey (see Hardware-key unlock above).
 - ChaCha20.
 - An Argon2 vault made by KeePassXC, because `keepassxc-cli` cannot choose a KDF.
-- Custom icons and KeePassXC's browser-integration data.
+- Custom icons.
 
 The desktop is driven through its screens' commands, not through rendered windows. This is a supported subset, not KeePassXC parity (D-0292).
 

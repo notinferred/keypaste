@@ -119,6 +119,7 @@ internal static class Program
         "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
+        "             pair, pairings, unpair <name>, which press Settings › Browser fill's Pair a browser, list it and Remove;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
         "       twofish-create <vault>\n" +
         "       launch [--background]\n" +
@@ -1246,6 +1247,18 @@ internal sealed class Driver(string home)
                     Activity(authority);
                     break;
 
+                case ["pair"]:
+                    Pair(authority);
+                    break;
+
+                case ["pairings"]:
+                    Pairings(authority);
+                    break;
+
+                case ["unpair", ..]:
+                    Unpair(authority, command["unpair ".Length..]);
+                    break;
+
                 case ["revoke", var which]:
                     Revoke(authority, which);
                     break;
@@ -1312,6 +1325,49 @@ internal sealed class Driver(string home)
         Console.Out.WriteLine("shut down");
         Report(authority);
         return 0;
+    }
+
+    /// <summary>Presses Settings › Browser fill's Pair a browser, as a person does, and says whether pairing is now on (D-0634).</summary>
+    private static void Pair(AppAuthority authority)
+    {
+        using var browserFill = new BrowserFillViewModel(authority);
+
+        if (!browserFill.PairCommand.CanExecute(null))
+        {
+            throw new DriverException("Pair a browser cannot be pressed");
+        }
+
+        browserFill.PairCommand.Execute(null);
+        Console.Out.WriteLine(browserFill.IsArmed ? "pairing armed" : $"pairing not armed: {browserFill.Message}");
+    }
+
+    /// <summary>Prints the pairings Settings › Browser fill lists, by name and build, or <c>pairings none</c>.</summary>
+    private static void Pairings(AppAuthority authority)
+    {
+        using var browserFill = new BrowserFillViewModel(authority);
+
+        if (browserFill.Rows.Count == 0)
+        {
+            Console.Out.WriteLine("pairings none");
+        }
+
+        foreach (var row in browserFill.Rows)
+        {
+            Console.Out.WriteLine($"pairing identity={row.Identity} name={row.Name}");
+        }
+    }
+
+    /// <summary>Presses Remove on the pairing of that name in Settings › Browser fill.</summary>
+    private static void Unpair(AppAuthority authority, string name)
+    {
+        using var browserFill = new BrowserFillViewModel(authority);
+        var row = browserFill.Rows.FirstOrDefault(row => string.Equals(row.Name, name, StringComparison.Ordinal))
+            ?? throw new DriverException($"Settings lists no pairing named {name}");
+
+        browserFill.RemoveCommand.Execute(row);
+        Console.Out.WriteLine(browserFill.Rows.Any(listed => string.Equals(listed.Name, name, StringComparison.Ordinal))
+            ? $"not unpaired: {browserFill.Message}"
+            : $"unpaired {name}");
     }
 
     /// <summary>Prints what Agents shows, read by its own view model from the authority and the audit file.</summary>

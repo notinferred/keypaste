@@ -1,0 +1,67 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.PairingWindow"
+                    x:DataType="vm:PairingViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: a browser asks to pair"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Fixed heights, as in the other prompt windows. The build is what the browser named, never proof of it (THREATS.md
+       T-48), and no key is drawn. No button is the default: Enter allows nothing, and Escape denies. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="globe" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Name="TitleText" Classes="prompt-title" Text="A browser asks to pair" />
+          <TextBlock Classes="prompt-sub" Text="You turned on pairing in Settings" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="prompt-call" Height="40" Padding="12,0">
+        <TextBlock Name="IdentityText" Classes="value" Text="{Binding Identity}" TextWrapping="Wrap" MaxLines="2"
+                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+      </Border>
+
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption" Text="Name this pairing, as the browser will list it" />
+        <TextBox Name="NameBox" Text="{Binding Name}" MaxLength="64" AutomationProperties.Name="Name of this pairing" />
+        <TextBlock Name="NameProblemText" Height="18" FontSize="12" Foreground="{DynamicResource KpDanger}"
+                   Text="{Binding NameProblem}" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+
+      <TextBlock Name="ExplainerText" Classes="prompt-note" Text="{Binding Explainer}" />
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="Allow" Classes="prompt primary" Content="Pair"
+                HorizontalAlignment="Right" Command="{Binding AllowCommand}" />
+      </Grid>
+
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

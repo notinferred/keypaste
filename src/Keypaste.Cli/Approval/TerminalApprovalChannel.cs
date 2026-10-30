@@ -142,6 +142,37 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return answer;
     }
 
+    public async ValueTask<PairingAnswer> AskAsync(PairingPrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        _console.WriteLine(Render(request, RuleLine));
+
+        char? choice;
+
+        try
+        {
+            choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started)), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _ = Withdrawn("Nothing was paired.");
+            return new PairingAnswer(ApprovalAnswer.Denied, null);
+        }
+
+        var allowed = choice == 'y';
+
+        _console.WriteLine(string.Join(
+            Environment.NewLine,
+            allowed
+                ? _console.Paint(Tone.Ok, $"keypaste: allowed. Saving the pairing {request.SuggestedName} in the vault.")
+                : _console.Paint(Tone.Danger, "keypaste: denied. Nothing was paired."),
+            RuleLine));
+
+        return allowed ? new PairingAnswer(ApprovalAnswer.ApprovedOnce, request.SuggestedName) : new PairingAnswer(ApprovalAnswer.Denied, null);
+    }
+
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -175,6 +206,16 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             : "`keypaste clients` can ask for it again.";
 
         _console.WriteLine(_console.Paint(Tone.Danger, $"keypaste: allowed once. {notice.Unmade} {again}"));
+    }
+
+    public void Tell(PairingNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+
+        _console.WriteLine(_console.Paint(
+            Tone.Danger,
+            $"keypaste: {notice.Identity.Described} asked to pair, and was refused: pairing is not on. "
+            + "To pair it, start keypaste approve with --pair-browser <name>, then connect again."));
     }
 
     /// <summary>
@@ -468,6 +509,23 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         return string.Join(Environment.NewLine, lines);
     }
+
+    /// <summary>A browser's request to pair: the build it named and the pairing's name, never a key.</summary>
+    internal static string Render(PairingPrompt request, string rule) =>
+        string.Join(
+            Environment.NewLine,
+            string.Empty,
+            rule,
+            "keypaste: a browser asks to pair with this vault.",
+            string.Empty,
+            $"  browser  {request.IdentityText}",
+            $"  name     {request.SuggestedName}",
+            string.Empty,
+            "  The browser names this build when it starts keypaste, and any program you run can name it too,",
+            "  so allow only a pairing you started in your browser just now.",
+            string.Empty,
+            "  [d] deny: nothing is paired.",
+            "  [y] allow: keypaste saves the pairing in the vault, and that browser can ask you for logins.");
 
     /// <summary>A terminal's edit: the command, the item, where it says it came from and what changes, never a value.</summary>
     internal static string Render(TerminalEditPrompt request, string rule)

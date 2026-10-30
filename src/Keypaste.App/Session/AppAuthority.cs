@@ -135,6 +135,24 @@ internal sealed class AppAuthority : IDisposable
 
     internal ApproverActivity Activity => _host.Activity;
 
+    /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
+    internal DateTimeOffset? PairingArmedUntil => _host.PairingArmedUntil;
+
+    /// <summary>Arms pairing a browser for two minutes and one pairing; only Settings' Pair a browser calls it (D-0634).</summary>
+    /// <returns>Whether this unlock pairs browsers and is now armed.</returns>
+    internal bool ArmPairing() => _host.ArmPairing();
+
+    /// <summary>Ends an arming before its two minutes are up.</summary>
+    internal void DisarmPairing() => _host.DisarmPairing();
+
+    /// <summary>The pairings the unlocked vault holds, with when each was last proven here.</summary>
+    internal IReadOnlyList<Core.Ownership.PairingRow> Pairings() => _host.Pairings();
+
+    /// <summary>Removes a pairing for the person, saving and recording it.</summary>
+    /// <param name="id">The pairing's name.</param>
+    /// <returns>Whether it was removed, and why not.</returns>
+    internal Core.Ownership.PairingRemoval RemovePairing(string id) => _host.RemovePairing(id);
+
     /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
     /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
     internal void Revoke(GrantKey key) => _host.Revoke(key);

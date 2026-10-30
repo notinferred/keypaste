@@ -114,6 +114,9 @@ internal sealed class FakeOwner(string pipeName) : IApproverHandler, IAsyncDispo
     /// <summary>The session a browser attaches to, or null to answer every attach as locked.</summary>
     internal string? Session { get; set; } = "session-one";
 
+    /// <summary>The database hash an attachment is told, or null for an owner that pairs no browsers.</summary>
+    internal string? DatabaseHash { get; set; }
+
     /// <summary>Every request this owner read, in order.</summary>
     internal ConcurrentQueue<object> Heard { get; } = new();
 
@@ -165,7 +168,7 @@ internal sealed class FakeOwner(string pipeName) : IApproverHandler, IAsyncDispo
         Heard.Enqueue(request);
 
         return ValueTask.FromResult(Session is { } session
-            ? AttachReply.To(session)
+            ? AttachReply.To(session) with { DatabaseHash = DatabaseHash }
             : AttachReply.Refused(AuditMethod.VaultLocked, "the vault is locked"));
     }
 

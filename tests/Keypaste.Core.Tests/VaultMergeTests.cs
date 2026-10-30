@@ -8,6 +8,7 @@ using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
 using Keypaste.Core.Agents;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Internal;
 using Xunit;
 using static Keypaste.Core.Tests.AgentAccessBuilders;
@@ -745,6 +746,52 @@ public sealed class VaultMergeTests : IDisposable
 
         using var merged = Vault.Open(FilePath, _password);
         Assert.Equal(theirs, Assert.Single(new AgentAccessStore(merged).Read(agent).Own).Access);
+    }
+
+    /// <summary>
+    /// A tombstone wins over a pairing's record whatever the times or changes, as over a token's: one copy removed the pairing and the
+    /// other changed its record afterwards, which would keep an ordinary item in the bin, or in place in a vault that does not recycle (D-0540, D-0633).
+    /// </summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void ATombstone_WinsOverAPairingsRecord_ThatTheOtherCopyChanged(bool removedHere, bool recycles)
+    {
+        const string pairing = "Chrome on desk";
+        var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var record = new EntryName(ReservedGroups.Browsers, pairing);
+        Seed("stripe");
+        using (var vault = Vault.Open(VaultPath, _password))
+        {
+            vault.SetRecyclesDeletedEntries(recycles);
+            Assert.True(new BrowserPairings(vault).TryAdd(pairing, BrowserIdentity.ChromeWebStore, key, DateTimeOffset.UtcNow, out _));
+            vault.Save();
+        }
+
+        File.Copy(VaultPath, FilePath, overwrite: true);
+        using var open = Vault.Open(VaultPath, _password);
+
+        if (removedHere)
+        {
+            Assert.True(new BrowserPairings(open).Remove(pairing, out _));
+            InFile(FilePath, database => Edit(database, pairing, _later, entry => entry.Strings.Set(PwDefs.UrlField, new ProtectedString(false, "https://example.com"))));
+        }
+        else
+        {
+            Assert.True(open.UpdateEntry(open.Find(record)! with { Url = "https://example.com" }));
+            InFile(FilePath, database => Purge(database, pairing, _later));
+        }
+
+        var report = Merge(open);
+
+        using var merged = Vault.Open(FilePath, _password);
+        Assert.Null(merged.Find(record));
+        Assert.Empty(merged.ReadRecycled());
+        Assert.Empty(report.Kept);
+        Assert.Equal(1, merged.TombstoneCount);
+        Assert.Equal(PairingCheck.Unknown, new BrowserPairings(merged).Verify(pairing, BrowserIdentity.ChromeWebStore, key));
     }
 
     [Fact]

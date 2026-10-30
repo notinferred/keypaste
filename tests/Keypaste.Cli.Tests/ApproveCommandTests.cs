@@ -94,6 +94,18 @@ public sealed class ApproveCommandTests : IDisposable
         Assert.Contains("keypaste clients", usage.ToString(), StringComparison.Ordinal);
     }
 
+    /// <summary>Pairing is armed only by the person who starts it, with a name a pairing can have (D-0634).</summary>
+    [Fact]
+    public void PairBrowser_TakesAName_AndRefusesOneNoPairingCanHave()
+    {
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("approve", "--pair-browser", "work/laptop", "--vault", _harness.VaultPath));
+        Assert.Contains("--pair-browser: the name cannot contain '/'", _harness.Err, StringComparison.Ordinal);
+
+        using var usage = new StringWriter();
+        ApproveCommand.WriteUsage(usage);
+        Assert.Contains("--pair-browser <name>", usage.ToString(), StringComparison.Ordinal);
+    }
+
     /// <summary>No mode releases an entry in a protected profile: the person at the terminal is shown it, with no timed choice.</summary>
     [Fact]
     public async Task AProtectedProfileEntry_IsPromptedDespiteAutomatic()

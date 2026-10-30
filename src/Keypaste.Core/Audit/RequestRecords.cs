@@ -1,4 +1,5 @@
 using Keypaste.Core.Approval;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tokens;
@@ -25,6 +26,22 @@ public static class AuditTools
 
     /// <summary>Another program's save merged with the vault's holder's copy and saved by that holder (D-0545).</summary>
     public const string Merge = "vault_merge";
+
+    /// <summary>A browser's pairing granted, denied, refused or removed, and a pairing check refused (D-0637).</summary>
+    public const string Browser = "browser";
+}
+
+/// <summary>What a browser's line is about, written as its field.</summary>
+public enum BrowserAct
+{
+    /// <summary>A request to pair.</summary>
+    Pair = 0,
+
+    /// <summary>A check of a pairing the extension holds.</summary>
+    Check = 1,
+
+    /// <summary>The person's removal of a pairing.</summary>
+    Remove = 2,
 }
 
 /// <summary>The audit line of each kind of agent request, built here for every process that writes one.</summary>
@@ -356,6 +373,50 @@ public static class RequestRecords
             Session = session,
             Vault = vault,
             Entries = named,
+        };
+    }
+
+    /// <summary>The line for a browser's pairing or its check, naming the build and the pairing and never a key (D-0637).</summary>
+    /// <param name="identity">The KeePassXC-Browser build the browser named, written as the client's name by its extension ID.</param>
+    /// <param name="pairing">The pairing's name, written as the client's label, or null when there is none to name.</param>
+    /// <param name="act">What the line is about, written as its field.</param>
+    /// <param name="decision">Whether it was done.</param>
+    /// <param name="method">How that was decided.</param>
+    /// <param name="reason">keypaste's own words. Trusted text.</param>
+    /// <param name="session">The unlocked session that answered, or null.</param>
+    /// <param name="vault">The vault's identity key, or null.</param>
+    /// <returns>The record to append.</returns>
+    public static AuditRecord Browser(
+        BrowserIdentity identity,
+        string? pairing,
+        BrowserAct act,
+        AuditDecision decision,
+        AuditMethod method,
+        string reason,
+        string? session,
+        string? vault)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(reason);
+
+        return new AuditRecord
+        {
+            Tool = AuditTools.Browser,
+            Client = AuditClient.Of(identity.Id, null, pairing),
+            Args = new AuditArgs
+            {
+                Field = act switch
+                {
+                    BrowserAct.Check => "check",
+                    BrowserAct.Remove => "remove",
+                    _ => "pair",
+                },
+            },
+            Decision = decision,
+            Method = method,
+            Reason = EntryNameSanitizer.SanitizeProse(reason, AuditArgs.ReasonExcerptLength).Text,
+            Session = session,
+            Vault = vault,
         };
     }
 

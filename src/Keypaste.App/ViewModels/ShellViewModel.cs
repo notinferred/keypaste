@@ -895,7 +895,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { Login = LoginItem, CliLink = CliLink, Crashes = _crashes },
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync) { Login = LoginItem, CliLink = CliLink, Crashes = _crashes, BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _clock, _post) },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),

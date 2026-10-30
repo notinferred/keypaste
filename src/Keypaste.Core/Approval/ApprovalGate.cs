@@ -298,6 +298,36 @@ public sealed class ApprovalGate : IDisposable
         return AskThroughAsync(cooldownKeys, new Asked(null, null, null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken, coolUnanswered: true);
     }
 
+    /// <summary>Asks a human, who armed pairing, to pair a browser, under the same window and slot as every other question.</summary>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>The answer, and the name the human gave the pairing only when it allows it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="prompt"/> is null.</exception>
+    /// <remarks>
+    /// No cooldown: a pairing is asked about only after the person armed it, and each arming answers one confirmation (D-0634),
+    /// so a refusal is held back by the arming it spent rather than by a minute.
+    /// </remarks>
+    public async ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        string? name = null;
+        var answer = await AskThroughAsync(
+            [],
+            new Asked(null, null, null, null, null),
+            async token =>
+            {
+                var said = await _channel.AskAsync(prompt, token).ConfigureAwait(false);
+                name = said.Name;
+                return said.Answer;
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        return answer == ApprovalAnswer.ApprovedOnce && name is not null && prompt.NameProblem(name) is null
+            ? new PairingAnswer(answer, name)
+            : new PairingAnswer(answer == ApprovalAnswer.ApprovedOnce ? ApprovalAnswer.Denied : answer, null);
+    }
+
     private async ValueTask<ApprovalAnswer> AskThroughAsync(
         IReadOnlyList<string> cooldownKeys,
         Asked listed,
@@ -498,6 +528,29 @@ public sealed class ApprovalGate : IDisposable
         catch (Exception)
         {
             // Saying it failed; the release and its line stand as they are.
+        }
+    }
+
+    /// <summary>Tells the person, through the channel, that a browser asked to pair while pairing was not armed.</summary>
+    /// <param name="notice">What asked.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="notice"/> is null.</exception>
+    /// <remarks>It asks nothing, so it takes no slot and waits for nothing; a channel that fails to show it changes no refusal.</remarks>
+    public void Tell(PairingNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _channel.Tell(notice);
+        }
+        catch (Exception)
+        {
+            // Saying it failed; the refusal and its line stand as they are.
         }
     }
 

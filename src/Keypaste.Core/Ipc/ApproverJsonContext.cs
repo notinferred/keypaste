@@ -100,6 +100,7 @@ internal sealed class AttachReplyFrame(AttachReply reply)
     public int? Method => (int?)reply.Refusal;
     public string Reason => reply.Reason;
     public string? OwnerVersion => reply.OwnerVersion;
+    public string? DatabaseHash => reply.DatabaseHash;
 }
 
 internal sealed class CredentialRequestFrame(CredentialRequest request)

@@ -1902,6 +1902,20 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>The root group's UUID, its 16 bytes as the file stores them, in lowercase hex, which a browser's database hash is made from (D-0636).</summary>
+    internal string RootGroupHex
+    {
+        get
+        {
+            lock (_state)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+
+                return _interop.RootGroupHex;
+            }
+        }
+    }
+
     /// <summary>Deletes the one entry with this name. Call <see cref="Save"/> to persist it.</summary>
     /// <returns>
     /// What happened to the entry. Deleting nothing is not an error here; the caller decides

@@ -461,6 +461,47 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("scrubbed", shown, StringComparison.Ordinal);
     }
 
+    private static PairingPrompt PairingPromptFor(string name = "laptop") => new()
+    {
+        Identity = Keypaste.Core.Browser.BrowserIdentity.ChromeWebStore,
+        SuggestedName = name,
+        TakenNames = [],
+        NameChosen = true,
+    };
+
+    /// <summary>A browser's request to pair names the build it claims and the pairing's name, and only y pairs it (D-0634).</summary>
+    [Theory]
+    [InlineData("y", ApprovalAnswer.ApprovedOnce)]
+    [InlineData("", ApprovalAnswer.Denied)]
+    [InlineData("o", ApprovalAnswer.Denied)]
+    [InlineData("d", ApprovalAnswer.Denied)]
+    public async Task APairing_NamesTheBuildAndTheName_AndOnlyYPairs(string answer, ApprovalAnswer expected)
+    {
+        var rig = Build(answer);
+
+        var said = await rig.Channel.AskAsync(PairingPromptFor(), Token);
+
+        Assert.Equal(expected, said.Answer);
+        Assert.Equal(expected == ApprovalAnswer.ApprovedOnce ? "laptop" : null, said.Name);
+        var shown = rig.Stderr.ToString();
+        Assert.Contains("keypaste: a browser asks to pair with this vault.", shown, StringComparison.Ordinal);
+        Assert.Contains("  browser  KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)", shown, StringComparison.Ordinal);
+        Assert.Contains("  name     laptop", shown, StringComparison.Ordinal);
+        Assert.Contains("any program you run can name it too", shown, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARequestToPairWhileNotArmed_SaysHowToPair()
+    {
+        var rig = Build();
+
+        rig.Channel.Tell(new PairingNotice(Keypaste.Core.Browser.BrowserIdentity.FirefoxAddOns));
+
+        var said = rig.Stderr.ToString();
+        Assert.Contains("KeePassXC-Browser from Firefox Add-ons (keepassxc-browser@keepassxc.org) asked to pair, and was refused", said, StringComparison.Ordinal);
+        Assert.Contains("--pair-browser <name>", said, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void TheChannelRejectsNulls()
     {

@@ -310,6 +310,29 @@ public sealed class RelayTests
         Assert.Equal(new AttachRequest(rig.Options.VaultPath) { Browser = BrowserIdentity.ChromeWebStore.Caller }, attached);
     }
 
+    /// <summary>
+    /// The hash the owner tells the attachment answers <c>get-databasehash</c> sealed, and comes with each pairing and check, as
+    /// KeePassXC's answers carry it, so the extension keeps keypaste's pairing in a slot of its own (D-0636).
+    /// </summary>
+    [Fact]
+    public async Task The_hash_the_owner_tells_answers_get_databasehash_and_comes_with_each_pairing_and_check()
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        var hash = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+        rig.Owner.DatabaseHash = hash;
+
+        var told = await rig.Browser.RequestAsync("get-databasehash", new JsonObject { ["connectedKeys"] = new JsonArray(Key()) }, Token);
+        var paired = await rig.Browser.RequestAsync("associate", new JsonObject { ["key"] = rig.Browser.PublicKey, ["idKey"] = Key() }, Token);
+        var check = await CheckAsync(rig, Key());
+
+        Assert.Equal(hash, (string?)told.Message!["hash"]);
+        Assert.False(told.Message.ContainsKey("oldHash"));
+        Assert.Equal(hash, (string?)paired.Message!["hash"]);
+        Assert.Equal(_pairing, (string?)paired.Message["id"]);
+        Assert.Equal(hash, (string?)check.Message!["hash"]);
+        Assert.Equal(_pairing, (string?)check.Message["id"]);
+    }
+
     [Fact]
     public async Task An_associate_reaches_the_owner_only_under_the_exchanged_session_key_and_names_only_the_identification_key()
     {
