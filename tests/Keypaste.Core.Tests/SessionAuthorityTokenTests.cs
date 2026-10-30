@@ -136,7 +136,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     public async Task ARevokedToken_IsRefused()
     {
         var token = Mint("ci", "read:acme-api/staging/*");
-        Assert.True(new TokenStore(_vault).Revoke("ci"));
+        Assert.True(new TokenStore(_vault).Revoke("ci", _fixture.Clock.GetUtcNow()));
         _vault.Save();
         var authority = await AttachedAsync();
 

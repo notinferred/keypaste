@@ -75,7 +75,10 @@ public sealed record VaultMergeSave(VaultMergeSaveOutcome Outcome, string Reason
 }
 
 /// <summary>What a merge of the open vault with another program's save did, by name and never by value, for the notice and the audit line (D-0542, D-0545, D-0603).</summary>
-/// <param name="TookFromOpenCopy">Whether the merged copy holds anything the file does not, so it must be saved; otherwise it is the file as it is (D-0543).</param>
+/// <param name="TookFromOpenCopy">
+/// Whether the merged copy differs from the file, by what it took from the open copy or by dropping a token's record the file held beside its own tombstone (D-0631),
+/// so it must be saved; otherwise it is the file as it is (D-0543).
+/// </param>
 /// <param name="Conflicts">Each item both copies changed, the version not current kept in its history.</param>
 /// <param name="Kept">Each item one copy deleted after the other changed it, kept with that change.</param>
 /// <param name="RenamedGroups">Each group both copies changed under different names, whose losing name KDBX keeps no history of.</param>

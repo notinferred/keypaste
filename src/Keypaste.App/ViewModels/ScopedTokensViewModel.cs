@@ -235,7 +235,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         {
             if (write.Unwritten)
             {
-                write.Value.Store.RevokeId(write.Value.Info!.Id);
+                write.Value.Store.TakeBack(write.Value.Info!.Id);
             }
 
             return (false, null, problem);
@@ -245,14 +245,14 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         return (true, write.Value.Token, $"Copy {write.Value.Info!.Prefix} now: it is shown once and keypaste keeps only a verifier.");
     }
 
-    /// <summary>Deletes a token for good and saves the vault.</summary>
+    /// <summary>Revokes a token for good and saves the vault.</summary>
     /// <param name="row">The token, as <see cref="Rows"/> listed it.</param>
     /// <returns>Why nothing was revoked, or null when it was.</returns>
     internal string? Revoke(ScopedTokenRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
 
-        var write = _session.Write(vault => new TokenStore(vault).RevokeId(row.Id), revoked => revoked);
+        var write = _session.Write(vault => new TokenStore(vault).RevokeId(row.Id, _session.Clock.GetUtcNow()), revoked => revoked);
         var failure = write.Outcome == WriteOutcome.NothingToSave ? "That token is no longer in the vault." : write.Problem("try again");
         Refresh();
         return failure;

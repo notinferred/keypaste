@@ -295,7 +295,7 @@ internal static class TokenCommand
         {
             var shown = EntryNameSanitizer.Sanitize(target, 64).Text;
 
-            if (!new TokenStore(vault).Revoke(target))
+            if (!new TokenStore(vault).Revoke(target, context.Clock.GetUtcNow()))
             {
                 context.Stderr.WriteLine($"keypaste token revoke: no token named '{shown}'");
                 return CliApp.ExitNotFound;
@@ -576,7 +576,7 @@ internal static class TokenCommand
         writer.WriteLine("  create <name> --scope <scopes> [--ttl <n>m|h|d] [--allow-prod] [--json]");
         writer.WriteLine("                             mint a token; it is printed once and never stored");
         writer.WriteLine("  ls [--json]                list tokens: name, prefix, scope and expiry, never a secret");
-        writer.WriteLine("  revoke <name|id>           delete a token for good");
+        writer.WriteLine("  revoke <name|id>           stop a token working, for good");
         writer.WriteLine("  bundle <name> -o <file> [--force] [--token <token|-|env>]");
         writer.WriteLine("                             seal the token's sets into a file for CI");
         writer.WriteLine();

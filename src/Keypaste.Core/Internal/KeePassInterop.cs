@@ -636,6 +636,22 @@ internal sealed class KeePassInterop : IDisposable
         return entries;
     }
 
+    /// <summary>The name of each entry <see cref="ReadEntries"/> returns whose UUID the vault also holds a tombstone for.</summary>
+    internal IReadOnlySet<EntryName> ReadTombstoned()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        HashSet<PwUuid> deleted = [.. _database.DeletedObjects.Select(tombstone => tombstone.Uuid)];
+        HashSet<EntryName> names = [];
+
+        if (deleted.Count > 0)
+        {
+            CollectTombstoned(_database.RootGroup, string.Empty, deleted, names, Bin());
+        }
+
+        return names;
+    }
+
     /// <summary>Every entry whose title, group path, username, URL or one of whose own tags contains the query.</summary>
     /// <remarks>
     /// The same traversal as <see cref="Collect"/>, so a result can never name a path a listing
@@ -3395,6 +3411,25 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
+    private static void CollectTombstoned(PwGroup group, string groupPath, HashSet<PwUuid> deleted, HashSet<EntryName> names, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            if (deleted.Contains(entry.Uuid))
+            {
+                names.Add(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)));
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectTombstoned(child, ChildPath(groupPath, child.Name), deleted, names, bin);
+            }
+        }
+    }
+
     private static void CollectNotes(PwGroup group, string groupPath, List<EntryNotes> found, PwGroup? bin)
     {
         foreach (PwEntry entry in group.Entries)
@@ -4277,7 +4312,13 @@ internal sealed class KeePassInterop : IDisposable
         {
             foreach (PwEntry mine in _mine.RootGroup.GetEntries(true))
             {
-                if (_theirEntries.TryGetValue(mine.Uuid, out PwEntry? theirs))
+                PwEntry? theirs = _theirEntries.GetValueOrDefault(mine.Uuid);
+
+                if (RevokedToken(mine, theirs))
+                {
+                    theirs?.ParentGroup.Entries.Remove(theirs);
+                }
+                else if (theirs is not null)
                 {
                     Merge(mine, theirs);
                 }
@@ -4289,12 +4330,33 @@ internal sealed class KeePassInterop : IDisposable
 
             foreach (PwEntry theirs in _theirEntries.Values)
             {
-                if (!_myEntries.ContainsKey(theirs.Uuid))
+                if (_myEntries.ContainsKey(theirs.Uuid))
+                {
+                    continue;
+                }
+
+                if (RevokedToken(null, theirs))
+                {
+                    theirs.ParentGroup.Entries.Remove(theirs);
+                }
+                else
                 {
                     KeepTheirs(theirs);
                 }
             }
         }
+
+        /// <summary>
+        /// Whether either copy keeps the entry in <see cref="ReservedGroups.Tokens"/> and either holds a tombstone for it, which always wins
+        /// over a token's record whatever the times, changes or places, so the result does not hold it (D-0544, D-0631).
+        /// </summary>
+        private bool RevokedToken(PwEntry? mine, PwEntry? theirs) =>
+            (mine ?? theirs) is { } entry
+            && (_myDeletions.ContainsKey(entry.Uuid) || _theirDeletions.ContainsKey(entry.Uuid))
+            && ((mine is not null && IsToken(_open, mine)) || (theirs is not null && IsToken(_file, theirs)));
+
+        private static bool IsToken(KeePassInterop copy, PwEntry entry) =>
+            string.Equals(copy.PathOf(entry.ParentGroup), ReservedGroups.Tokens, StringComparison.Ordinal);
 
         /// <summary>An entry both copies hold, by whole versions: lineage where the base shows it, the later in whole seconds otherwise, and every version kept in its history (D-0537 to D-0539).</summary>
         private void Merge(PwEntry mine, PwEntry theirs)

@@ -41,9 +41,11 @@ public enum TokenCheck
 /// as well as the recorded one.
 /// </para>
 /// <para>
-/// Creating and revoking change the open vault and do not save it. Revoking deletes the entry and
-/// purges it from the recycle bin, so restoring from the bin cannot bring a token back; a vault
-/// restored from a backup can.
+/// Creating and revoking change the open vault and do not save it. Revoking writes a newer version
+/// of the record with no verifier and the time it was revoked, which KeePassXC's default merge
+/// carries over an older copy where it would drop a deletion, and the record is purged once the
+/// token has expired; a record whose UUID the vault also holds a tombstone for reads as revoked
+/// (D-0544, D-0629, D-0630).
 /// </para>
 /// </remarks>
 /// <param name="vault">The open vault.</param>
@@ -59,6 +61,8 @@ public sealed class TokenStore(Vault vault)
     public static readonly TimeSpan MaximumLifetime = TimeSpan.FromDays(365);
 
     private const string _timestampFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+
+    private const string _revokedProperty = "revoked";
 
     // A property named twice would leave the reader to pick one, and the writer may have meant the other (D-0325).
     private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };
@@ -94,15 +98,16 @@ public sealed class TokenStore(Vault vault)
     }
 
     /// <summary>Every token the open vault holds, by name.</summary>
-    /// <returns>The tokens that read back whole; a damaged entry is not listed.</returns>
+    /// <returns>The tokens that read back whole and unrevoked; a damaged entry is not listed.</returns>
     public IReadOnlyList<TokenInfo> List() =>
-        [.. Entries(_vault.ReadEntries(includeReserved: true))
-            .Select(entry => TryRead(entry, out var info) ? info : null)
+        [.. Records()
+            .Where(record => !record.Revoked)
+            .Select(record => record.Info)
             .OfType<TokenInfo>()
             .OrderBy(info => info.Name, StringComparer.Ordinal)];
 
     /// <summary>Mints a token and records it in the open vault, which the caller saves.</summary>
-    /// <param name="name">What to call it, unique among the vault's tokens.</param>
+    /// <param name="name">What to call it, unique among the vault's unrevoked tokens.</param>
     /// <param name="scopes">What it may read.</param>
     /// <param name="ttl">How long it lasts, from <see cref="MinimumLifetime"/> to <see cref="MaximumLifetime"/>.</param>
     /// <param name="allowProd">Whether a scope may name a protected profile, which then asks the person live.</param>
@@ -111,6 +116,7 @@ public sealed class TokenStore(Vault vault)
     /// <param name="token">The token, to be shown once and never stored.</param>
     /// <param name="error">Why nothing was minted, or empty.</param>
     /// <returns>Whether a token was minted.</returns>
+    /// <remarks>Minting also purges each revoked record whose token has expired (D-0630).</remarks>
     public bool TryCreate(
         string name,
         IReadOnlyList<TokenScope> scopes,
@@ -150,17 +156,19 @@ public sealed class TokenStore(Vault vault)
             return false;
         }
 
-        var entries = Entries(_vault.ReadEntries(includeReserved: true)).ToList();
+        var records = Records();
 
-        if (entries.Any(entry => string.Equals(entry.Username, name, StringComparison.Ordinal)))
+        if (records.Any(record => !record.Revoked && string.Equals(record.Entry.Username, name, StringComparison.Ordinal)))
         {
             error = $"a token named '{name}' already exists";
             return false;
         }
 
+        PurgeExpired(records, now);
+
         token = TokenSecret.New(out var id, out var secret);
 
-        while (entries.Any(entry => string.Equals(entry.Title, id, StringComparison.Ordinal)))
+        while (records.Any(record => string.Equals(record.Entry.Title, id, StringComparison.Ordinal)))
         {
             CryptographicOperations.ZeroMemory(secret);
             token = TokenSecret.New(out id, out secret);
@@ -177,7 +185,7 @@ public sealed class TokenStore(Vault vault)
                 Title = id,
                 Username = name,
                 Password = TokenSecret.Verifier(id, secret),
-                Notes = Notes(info),
+                Notes = Notes(info, revoked: null),
             });
         }
         finally
@@ -189,43 +197,108 @@ public sealed class TokenStore(Vault vault)
         return true;
     }
 
-    /// <summary>Deletes a token from the open vault for good, which the caller saves.</summary>
-    /// <param name="nameOrId">The token's name, or its id when no token has that name.</param>
-    /// <returns>Whether a token was deleted.</returns>
-    public bool Revoke(string nameOrId)
+    /// <summary>Revokes a token in the open vault for good, which the caller saves.</summary>
+    /// <param name="nameOrId">The token's name, or its id when no unrevoked token has that name.</param>
+    /// <param name="now">What expiry is judged against.</param>
+    /// <returns>Whether a token was revoked.</returns>
+    /// <remarks>
+    /// An unexpired token's record becomes a newer version with no verifier and an expired one's is
+    /// purged, and each revoked record whose token has expired is purged with it (D-0629, D-0630).
+    /// </remarks>
+    public bool Revoke(string nameOrId, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(nameOrId);
 
-        var entries = Entries(_vault.ReadEntries(includeReserved: true)).ToList();
-        var named = entries.Where(entry => string.Equals(entry.Username, nameOrId, StringComparison.Ordinal)).ToList();
+        var records = Records();
+        var named = records.Where(record => !record.Revoked && string.Equals(record.Entry.Username, nameOrId, StringComparison.Ordinal)).ToList();
 
-        return Delete(named.Count > 0 ? named : WithId(entries, nameOrId));
+        return Revoke(named.Count > 0 ? named : WithId(records, nameOrId), records, now);
     }
 
-    /// <summary>Deletes the token with this id from the open vault for good, which the caller saves.</summary>
+    /// <summary>Revokes the token with this id in the open vault for good, which the caller saves, as <see cref="Revoke(string, DateTimeOffset)"/> does.</summary>
     /// <param name="id">The token's id, never taken as a name.</param>
-    /// <returns>Whether a token was deleted.</returns>
-    public bool RevokeId(string id)
+    /// <param name="now">What expiry is judged against.</param>
+    /// <returns>Whether a token was revoked.</returns>
+    public bool RevokeId(string id, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(id);
 
-        return Delete(WithId(Entries(_vault.ReadEntries(includeReserved: true)), id));
+        var records = Records();
+
+        return Revoke(WithId(records, id), records, now);
     }
 
-    private static List<VaultEntry> WithId(IEnumerable<VaultEntry> entries, string id) =>
-        [.. entries.Where(entry => string.Equals(entry.Title, id, StringComparison.Ordinal))];
-
-    private bool Delete(List<VaultEntry> doomed)
+    /// <summary>Takes a token whose creation no save wrote back out of the open vault, deleting and purging its record.</summary>
+    /// <param name="id">The token's id, as <see cref="TryCreate"/> recorded it.</param>
+    /// <returns>Whether a record was taken back.</returns>
+    /// <remarks>
+    /// Only for a creation the caller's save failed to write: no copy of the vault holds that record,
+    /// so no merge can bring it back and nothing needs to stay revoked (D-0630).
+    /// </remarks>
+    public bool TakeBack(string id)
     {
-        foreach (var entry in doomed)
+        ArgumentNullException.ThrowIfNull(id);
+
+        var doomed = WithId(Records(), id);
+
+        foreach (var record in doomed)
         {
-            if (_vault.RemoveEntry(EntryName.Of(entry), out var recycled) == DeletionOutcome.Recycled)
-            {
-                _vault.PurgeRecycled(recycled);
-            }
+            Purge(record.Entry);
         }
 
         return doomed.Count > 0;
+    }
+
+    private static List<TokenRecord> WithId(List<TokenRecord> records, string id) =>
+        [.. records.Where(record => !record.Revoked && string.Equals(record.Entry.Title, id, StringComparison.Ordinal))];
+
+    private bool Revoke(List<TokenRecord> doomed, List<TokenRecord> records, DateTimeOffset now)
+    {
+        if (doomed.Count == 0)
+        {
+            return false;
+        }
+
+        PurgeExpired(records, now);
+
+        foreach (var record in doomed)
+        {
+            // An emptied verifier also makes a keypaste that predates the revoked mark refuse the version (D-0629).
+            if (record.Info is { } info && now < record.Lasts)
+            {
+                _vault.UpdateEntry(record.Entry with
+                {
+                    Password = string.Empty,
+                    Notes = Notes(info with { Expires = record.Lasts }, Truncated(now)),
+                });
+            }
+            else
+            {
+                Purge(record.Entry);
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Purges each revoked record whose token has expired by its notes, the expiry every copy of the record holds (D-0630).</summary>
+    private void PurgeExpired(List<TokenRecord> records, DateTimeOffset now)
+    {
+        foreach (var record in records)
+        {
+            if (record is { Revoked: true, Info: not null } && now >= record.Lasts)
+            {
+                Purge(record.Entry);
+            }
+        }
+    }
+
+    private void Purge(VaultEntry entry)
+    {
+        if (_vault.RemoveEntry(EntryName.Of(entry), out var recycled) == DeletionOutcome.Recycled)
+        {
+            _vault.PurgeRecycled(recycled);
+        }
     }
 
     /// <summary>Checks a presented token against the vault as its file holds it.</summary>
@@ -249,7 +322,7 @@ public sealed class TokenStore(Vault vault)
 
         try
         {
-            switch (_vault.ReadSaved(out var saved))
+            switch (_vault.ReadSavedWithTombstones(out var saved, out var tombstoned))
             {
                 case SavedRead.Current:
                     break;
@@ -264,7 +337,9 @@ public sealed class TokenStore(Vault vault)
             var matches = Entries(saved!).Where(entry => string.Equals(entry.Title, id, StringComparison.Ordinal)).ToList();
 
             if (matches is not [var entry]
-                || !TryRead(entry, out var recorded)
+                || tombstoned!.Contains(EntryName.Of(entry))
+                || !TryRead(entry, out var recorded, out _, out var revoked)
+                || revoked
                 || !CryptographicOperations.FixedTimeEquals(
                     Encoding.UTF8.GetBytes(TokenSecret.Verifier(id, secret)),
                     Encoding.UTF8.GetBytes(entry.Password)))
@@ -280,6 +355,21 @@ public sealed class TokenStore(Vault vault)
         {
             CryptographicOperations.ZeroMemory(secret);
         }
+    }
+
+    /// <summary>Each entry of the tokens group as the open vault holds it, read back.</summary>
+    private List<TokenRecord> Records()
+    {
+        var tombstoned = _vault.ReadTombstoned();
+
+        return
+        [
+            .. Entries(_vault.ReadEntries(includeReserved: true)).Select(entry =>
+            {
+                _ = TryRead(entry, out var info, out var lasts, out var revoked);
+                return new TokenRecord(entry, info, lasts, revoked || tombstoned.Contains(EntryName.Of(entry)));
+            }),
+        ];
     }
 
     private static IEnumerable<VaultEntry> Entries(IEnumerable<VaultEntry> entries) =>
@@ -299,7 +389,7 @@ public sealed class TokenStore(Vault vault)
             DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
             out time);
 
-    private static string Notes(TokenInfo info)
+    private static string Notes(TokenInfo info, DateTimeOffset? revoked)
     {
         using var buffer = new MemoryStream();
 
@@ -318,17 +408,31 @@ public sealed class TokenStore(Vault vault)
             json.WriteString("created", Timestamp(info.Created));
             json.WriteString("expires", Timestamp(info.Expires));
             json.WriteBoolean("allow_prod", info.AllowProd);
+
+            if (revoked is { } at)
+            {
+                json.WriteString(_revokedProperty, Timestamp(at));
+            }
+
             json.WriteEndObject();
         }
 
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private static bool TryRead(VaultEntry entry, [NotNullWhen(true)] out TokenInfo? info)
+    /// <summary>Reads a record of the tokens group back whole.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <param name="info">What it records, its expiry shortened by one set on the entry.</param>
+    /// <param name="lasts">The expiry its notes record, which an expiry set on the entry in one copy does not change in another.</param>
+    /// <param name="revoked">Whether its notes say it was revoked.</param>
+    /// <returns>Whether it reads back whole; an unrevoked record also needs its verifier.</returns>
+    private static bool TryRead(VaultEntry entry, [NotNullWhen(true)] out TokenInfo? info, out DateTimeOffset lasts, out bool revoked)
     {
         info = null;
+        lasts = default;
+        revoked = false;
 
-        if (entry.Title.Length != TokenSecret.IdLength || entry.Password.Length == 0)
+        if (entry.Title.Length != TokenSecret.IdLength)
         {
             return false;
         }
@@ -351,6 +455,13 @@ public sealed class TokenStore(Vault vault)
                 return false;
             }
 
+            var marked = root.TryGetProperty(_revokedProperty, out _);
+
+            if (!marked && entry.Password.Length == 0)
+            {
+                return false;
+            }
+
             List<TokenScope> scopes = [];
 
             foreach (var element in scopeArray.EnumerateArray())
@@ -363,6 +474,8 @@ public sealed class TokenStore(Vault vault)
                 scopes.Add(scope);
             }
 
+            lasts = expires;
+
             // An expiry set on the entry in KeePassXC can only shorten the token's life.
             if (entry.Expires is { } entryExpires && entryExpires < expires)
             {
@@ -370,6 +483,7 @@ public sealed class TokenStore(Vault vault)
             }
 
             info = new TokenInfo(entry.Title, name, scopes, created, expires, allowProd.GetBoolean());
+            revoked = marked;
             return true;
         }
         catch (JsonException)
@@ -383,4 +497,11 @@ public sealed class TokenStore(Vault vault)
         value = root.TryGetProperty(name, out var element) && element.ValueKind == JsonValueKind.String ? element.GetString() : null;
         return value is not null;
     }
+
+    /// <summary>One entry of the tokens group as it reads back.</summary>
+    /// <param name="Entry">The entry.</param>
+    /// <param name="Info">What it records, or null when it does not read back whole.</param>
+    /// <param name="Lasts">The expiry its notes record, when <paramref name="Info"/> is set.</param>
+    /// <param name="Revoked">Whether its notes say it was revoked or the vault holds a tombstone for its UUID (D-0544).</param>
+    private sealed record TokenRecord(VaultEntry Entry, TokenInfo? Info, DateTimeOffset Lasts, bool Revoked);
 }

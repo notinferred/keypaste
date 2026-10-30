@@ -1379,6 +1379,43 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary><see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/>, with <see cref="ReadTombstoned"/> read from the same state.</summary>
+    /// <param name="entries">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <param name="tombstoned">Under the same condition, the name of each of those entries whose UUID the vault also holds a tombstone for.</param>
+    /// <returns>Whether the vault matches its file, and if not, why.</returns>
+    internal SavedRead ReadSavedWithTombstones(out IReadOnlyList<VaultEntry>? entries, out IReadOnlySet<EntryName>? tombstoned)
+    {
+        entries = null;
+        tombstoned = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            entries = _interop.ReadEntries();
+            tombstoned = _interop.ReadTombstoned();
+            return SavedRead.Current;
+        }
+    }
+
+    /// <summary>The name of each entry <see cref="ReadEntries"/> returns whose UUID the vault also holds a tombstone for, as this vault holds it now, saved or not.</summary>
+    /// <remarks>KeePassXC's default merge applies no deletion, so a file it merged can hold an object beside its own tombstone (D-0544).</remarks>
+    internal IReadOnlySet<EntryName> ReadTombstoned()
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadTombstoned();
+        }
+    }
+
     /// <summary>Every live entry as a listing names it, but only while this vault holds exactly what its file holds; no value is read.</summary>
     /// <param name="listing">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
     /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
