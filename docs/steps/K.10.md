@@ -84,6 +84,10 @@ Completed 2026-10-31 at `0b79ae7f` on `k10`, source only; runs ci 41203232296 an
   - ci 41203232296 passed every job.
   - app 41203240059 passed every job but `keepassxc first run (macos-15)`, which failed as F.74 does: KeePassXC exited before opening the vaults after the Qt font-alias warning.
   - `publish + selftest` passed on all three runners.
+- **main at `5cd60be8`:**
+  - ci 41205756948 passed every job.
+  - app 41205756958 failed `keepassxc first run (macos-15)` as F.74, on its rerun too.
+  - It also failed `desktop gates (windows-2025)`, whose rerun passed: in `verify-crash-report.sh` the UI-thread crash left two reports where one was expected. This is its second occurrence after K.8's, so it is now in BACKLOG's investigation candidates (D-0673).
 
 ## Decisions
 
