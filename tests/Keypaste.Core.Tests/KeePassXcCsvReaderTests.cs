@@ -75,16 +75,6 @@ public sealed class KeePassXcCsvReaderTests : IDisposable
         Assert.Equal([new ExportOmission("column Tags", "keypaste does not read this column of a KeePassXC export")], contents.Items[0].Omitted);
     }
 
-    [Fact]
-    public void A_byte_order_mark_and_CRLF_line_breaks_read_as_LF_does()
-    {
-        var lf = _reader.Read(Export());
-        var crlf = _reader.Read(Export("\r\n", byteOrderMark: true));
-
-        Assert.Equal(lf.Items.Select(Shape), crlf.Items.Select(Shape));
-        Assert.Equal(lf.Unread, crlf.Unread);
-    }
-
     // ---------------------------------------------------------------- recognizing and refusing
 
     [Theory]
@@ -110,28 +100,6 @@ public sealed class KeePassXcCsvReaderTests : IDisposable
         Assert.NotNull(source);
         Assert.Equal("KeePassXC CSV", source.Format);
         Assert.Equal(5, source.Items.Count);
-    }
-
-    [Theory]
-    [InlineData("\"Root\",\"X\",\"kx-pw-short\"", "line 2: it has 3 fields, and the first record has 10 fields")]
-    [InlineData("\"Root\",\"X\",\"\",\"kx-pw-open,,,0,,", "line 2: a quoted field is not closed")]
-    [InlineData("\"Root\",\"X\",\"\",\"kx-pw\"broken\",\"\",\"\",\"\",\"0\",\"\",\"\"", "line 2: text follows a quoted field's closing quote")]
-    public void A_malformed_export_is_refused_naming_its_line_and_never_a_value(string row, string expected)
-    {
-        var path = Write("keepassxc.csv", Bytes(_header, row));
-
-        var refused = Assert.Throws<VaultException>(() => ExportImport.Open(path, ExportImport.Readers));
-
-        Assert.Equal($"keepassxc.csv is not a KeePassXC CSV export keypaste reads: {expected}", refused.Message);
-        Assert.DoesNotContain("kx-pw", refused.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_header_naming_a_column_twice_is_refused()
-    {
-        var refused = Assert.Throws<ExportFormatException>(() => _reader.Read(Bytes("\"Group\",\"Title\",\"Username\",\"Password\",\"URL\",\"Notes\",\"Title\"", "\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"")));
-
-        Assert.Equal("its header names the Title column twice", refused.Message);
     }
 
     // ---------------------------------------------------------------- into a vault

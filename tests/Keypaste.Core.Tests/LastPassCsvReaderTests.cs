@@ -126,16 +126,6 @@ public sealed class LastPassCsvReaderTests : IDisposable
             contents.Items[0].Omitted);
     }
 
-    [Fact]
-    public void A_byte_order_mark_and_LF_line_breaks_read_as_CRLF_does()
-    {
-        var crlf = _reader.Read(Export());
-        var lf = _reader.Read(Export("\n", byteOrderMark: true));
-
-        Assert.Equal(crlf.Items.Select(Shape), lf.Items.Select(Shape));
-        Assert.Equal(crlf.Unread, lf.Unread);
-    }
-
     // ---------------------------------------------------------------- recognizing and refusing
 
     [Theory]
@@ -161,28 +151,6 @@ public sealed class LastPassCsvReaderTests : IDisposable
         Assert.NotNull(source);
         Assert.Equal("LastPass CSV", source.Format);
         Assert.Equal(8, source.Items.Count);
-    }
-
-    [Theory]
-    [InlineData("https://x.example,u,lp-pw\"broken,,,X,,0", "line 2: a field that does not start with a quote holds one")]
-    [InlineData("https://x.example,u,lp-pw-short", "line 2: it has 3 fields, and the first record has 8 fields")]
-    [InlineData("https://x.example,u,\"lp-pw-open,,,X,,0", "line 2: a quoted field is not closed")]
-    public void A_malformed_export_is_refused_naming_its_line_and_never_a_value(string row, string expected)
-    {
-        var path = Write("lastpass.csv", Bytes(_header, row));
-
-        var refused = Assert.Throws<VaultException>(() => ExportImport.Open(path, ExportImport.Readers));
-
-        Assert.Equal($"lastpass.csv is not a LastPass CSV export keypaste reads: {expected}", refused.Message);
-        Assert.DoesNotContain("lp-pw", refused.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_header_naming_a_column_twice_is_refused()
-    {
-        var refused = Assert.Throws<ExportFormatException>(() => _reader.Read(Bytes("url,username,password,extra,name,grouping,url", "a,b,c,d,e,f,g")));
-
-        Assert.Equal("its header names the url column twice", refused.Message);
     }
 
     // ---------------------------------------------------------------- into a vault

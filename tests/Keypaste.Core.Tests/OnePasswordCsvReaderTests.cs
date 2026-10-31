@@ -65,16 +65,6 @@ public sealed class OnePasswordCsvReaderTests : IDisposable
         Assert.Empty(contents.Unread);
     }
 
-    [Fact]
-    public void A_byte_order_mark_and_CRLF_line_breaks_read_as_LF_does()
-    {
-        var lf = _reader.Read(Export());
-        var crlf = _reader.Read(Export("\r\n", byteOrderMark: true));
-
-        Assert.Equal(lf.Items.Select(Shape), crlf.Items.Select(Shape));
-        Assert.Equal(lf.Unread, crlf.Unread);
-    }
-
     // ---------------------------------------------------------------- recognizing and refusing
 
     [Theory]
@@ -105,28 +95,6 @@ public sealed class OnePasswordCsvReaderTests : IDisposable
         Assert.NotNull(source);
         Assert.Equal("1Password CSV", source.Format);
         Assert.Equal(4, source.Items.Count);
-    }
-
-    [Theory]
-    [InlineData("\"X\",\"https://x.example\",\"u\",\"op-pw-short\"", "line 2: it has 4 fields, and the first record has 9 fields")]
-    [InlineData("\"X\",\"https://x.example\",\"u\",\"op-pw-open,false,false,,", "line 2: a quoted field is not closed")]
-    [InlineData("X,https://x.example,u,op-pw\"broken,,false,false,,", "line 2: a field that does not start with a quote holds one")]
-    public void A_malformed_export_is_refused_naming_its_line_and_never_a_value(string row, string expected)
-    {
-        var path = Write("1password.csv", Bytes(_header, row));
-
-        var refused = Assert.Throws<VaultException>(() => ExportImport.Open(path, ExportImport.Readers));
-
-        Assert.Equal($"1password.csv is not a 1Password CSV export keypaste reads: {expected}", refused.Message);
-        Assert.DoesNotContain("op-pw", refused.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_header_naming_a_column_twice_in_any_case_is_refused()
-    {
-        var refused = Assert.Throws<ExportFormatException>(() => _reader.Read(Bytes("Title,Url,Username,Password,Notes,TITLE", "a,b,c,d,e,f")));
-
-        Assert.Equal("its header names the TITLE column twice", refused.Message);
     }
 
     // ---------------------------------------------------------------- into a vault

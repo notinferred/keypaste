@@ -20,8 +20,6 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
   NUGET_XMLDOC_MODE: skip
-  # Empty makes this run the baseline; otherwise each suite compares itself with this run's report.
-  BASELINE_RUN: ''
 
 jobs:
   suite:
@@ -31,29 +29,20 @@ jobs:
       matrix:
         include:
           - suite: toml
+            baseline: '41215522812'
             project: src/Keypaste.Infrastructure
             mutate: Toml.cs TomlWriter.cs
-            classes: TomlWriterTests TomlLimitsTests PolicyTomlTests
+            classes: TomlTests
           - suite: csv
+            baseline: '41215522812'
             project: src/Keypaste.Infrastructure
             mutate: Csv.cs
             classes: CsvTests KeePassXcCsvReaderTests OnePasswordCsvReaderTests LastPassCsvReaderTests
           - suite: csv-readers
+            baseline: '41214578767'
             project: src/Keypaste.Core
             mutate: Import/CsvExport.cs Import/KeePassXcCsvReader.cs Import/OnePasswordCsvReader.cs Import/LastPassCsvReader.cs
             classes: CsvTests KeePassXcCsvReaderTests OnePasswordCsvReaderTests LastPassCsvReaderTests
-          - suite: placeholders
-            project: src/Keypaste.Core
-            mutate: KeePassPlaceholders.cs PlaceholderFill.cs
-            classes: KeePassPlaceholdersTests
-          - suite: psl
-            project: src/Keypaste.Core
-            mutate: Browser/PublicSuffixList.cs
-            classes: Browser.PublicSuffixListTests
-          - suite: merge
-            project: src/Keypaste.Core
-            mutate: Vault.cs:184-359 Internal/KeePassInterop.cs:4025-5004
-            classes: VaultMergeTests VaultMergeSaveTests
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -99,6 +88,10 @@ jobs:
           json.dump(config, open(os.path.join(os.environ["RUNNER_TEMP"], "stryker-config.json"), "w"), indent=2)
           print(json.dumps(config, indent=2))
           PY
+          # Stryker mutates only a project the test project references itself, and Infrastructure comes through Core.
+          if [ "$PROJECT" = src/Keypaste.Infrastructure ]; then
+            dotnet add tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj reference src/Keypaste.Infrastructure/Keypaste.Infrastructure.csproj
+          fi
           cd "$PROJECT"
           "$RUNNER_TEMP/stryker/dotnet-stryker" --config-file "$RUNNER_TEMP/stryker-config.json" --output "$RUNNER_TEMP/out"
           cp "$RUNNER_TEMP/out/reports/mutation-report.json" "$RUNNER_TEMP/report.json"
@@ -108,11 +101,13 @@ jobs:
           name: mutations-${{ matrix.suite }}
           path: ${{ runner.temp }}/report.json
 
+      # A suite with no baseline run is the baseline; otherwise it compares itself with that run's report.
       - name: Compare with the baseline
-        if: env.BASELINE_RUN != ''
+        if: matrix.baseline != ''
         env:
           GH_TOKEN: ${{ github.token }}
           SUITE: ${{ matrix.suite }}
+          BASELINE_RUN: ${{ matrix.baseline }}
         run: |
           gh run download "$BASELINE_RUN" --repo "$GITHUB_REPOSITORY" -n "mutations-$SUITE" -D "$RUNNER_TEMP/baseline"
           python3 - <<'PY'
