@@ -6,7 +6,7 @@ usage() {
   cat <<'USAGE'
 Usage: bash scripts/verify.sh [--from <profile>] [--list]
        bash scripts/verify.sh <profile> [--list] [--prepare-only|--test-only]
-       bash scripts/verify.sh backend|desktop [--prepare-only|--test-only] --project <dir>... [--filter-class <class>]
+       bash scripts/verify.sh test <class or project>... [--list]
 
 With no profile, runs every profile but compat and tools: workflows and scripts beside the dotnet
 profiles, which run in sequence. A failed run names every failed profile, prints their held
@@ -31,6 +31,9 @@ compat         Prepare the backend and the app driver, and verify creation, writ
 compile        Locked restore and Release build of both solutions and the consistency project, and dotnet format;
                no tests, and the build servers stop when it ends. A development machine runs it before each push
                (D-0468). Never run without being named.
+test           Build the projects of the fully qualified test classes named, a class's project being its namespace up
+               to .Tests, or of each tests/<project> named, run those classes or the whole project, and stop the build
+               servers. A development machine runs it for the classes a change touches (D-0671).
 tools          Prepare the backend, and connect keypaste to the real AI tools installed on this machine, read each
                registration back with the tool's own command where it has one, else at the file level, and remove
                it again. It writes those tools' own configuration, so it runs only on a GitHub runner, after
@@ -38,12 +41,11 @@ tools          Prepare the backend, and connect keypaste to the real AI tools in
 
 --list prints the selection and commands without executing them. Backend, desktop, desktop-gates
 and integration accept --prepare-only and --test-only for CI or a build already prepared by this
-command. --project narrows backend or desktop to those test projects and the helpers they start,
-and --filter-class runs one test class in each.
+command. test and compile take the SDK global.json pins from ~/.dotnet when the dotnet on PATH lacks it.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
 On Windows and macOS each profile that builds, but compile, first builds the libargon2 the app and the
 CLI carry with scripts/build-argon2.sh, which needs curl and Visual Studio's C compiler or Xcode's clang.
-backend, run whole or with tests/Keypaste.Browser.Tests, first builds the libsodium those tests load with
+backend, and test for a Keypaste.Browser.Tests class, first build the libsodium those tests load with
 scripts/build-libsodium.sh, which needs curl, OpenSSL 3, and make with a C compiler or Visual Studio's.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
 (or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP), and Node 22 with npm and
@@ -62,8 +64,7 @@ profile=''
 phase=all
 list=false
 from=''
-projects=()
-filter_class=''
+targets=()
 timeout_command=timeout
 if command -v gtimeout >/dev/null 2>&1; then timeout_command=gtimeout; fi
 while [ "$#" -gt 0 ]; do
@@ -75,24 +76,18 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || bad_usage '--from needs a profile'
       from="$2"; shift
       ;;
-    --project)
-      [ -n "${2:-}" ] || bad_usage '--project needs a test project directory'
-      projects+=("${2%/}"); shift
-      ;;
-    --filter-class)
-      [ -z "$filter_class" ] || bad_usage 'choose one --filter-class'
-      [ -n "${2:-}" ] || bad_usage '--filter-class needs a test class'
-      filter_class="$2"; shift
-      ;;
     --prepare-only|--test-only)
       [ "$phase" = all ] || bad_usage 'choose only one phase'
       phase="${1#--}"
       ;;
-    format|backend|desktop|desktop-gates|scripts|workflows|integration|compat|tools|compile)
+    format|backend|desktop|desktop-gates|scripts|workflows|integration|compat|tools|compile|test)
       [ -z "$profile" ] || bad_usage 'choose one profile'
       profile="$1"
       ;;
-    *) bad_usage "unknown argument: $1" ;;
+    *)
+      [ "$profile" = test ] || bad_usage "unknown argument: $1"
+      targets+=("$1")
+      ;;
   esac
   shift
 done
@@ -104,14 +99,26 @@ if [ -n "$profile" ] && [ -n "$from" ]; then bad_usage '--from resumes a full ru
 project_file() {
   case "$1" in *.csproj) echo "$1" ;; *) echo "$1/${1##*/}.csproj" ;; esac
 }
-if [ "${#projects[@]}" -gt 0 ]; then
-  if [ "$profile" != backend ] && [ "$profile" != desktop ]; then bad_usage '--project narrows backend or desktop'; fi
-  for dir in "${projects[@]}"; do
-    [ -f "$(project_file "$dir")" ] || bad_usage "no project at $(project_file "$dir")"
-  done
-fi
-if [ -n "$filter_class" ] && [ "${#projects[@]}" -eq 0 ]; then
-  bad_usage '--filter-class needs --project'
+
+# The test profile's projects and, for each, the classes it runs, none for the whole project.
+projects=()
+project_classes=()
+add_target() {
+  local project class='' i=0
+  case "$1" in
+    tests/*) project="${1%/}" ;;
+    *.Tests.*[!A-Za-z0-9_.+]*) bad_usage "not a fully qualified test class: $1" ;;
+    *.Tests.*) project="tests/${1%%.Tests.*}.Tests" class="$1" ;;
+    *) bad_usage "not a fully qualified test class or a tests/ project: $1" ;;
+  esac
+  [ -f "$(project_file "$project")" ] || bad_usage "no project at $(project_file "$project") for $1"
+  while [ "$i" -lt "${#projects[@]}" ] && [ "${projects[$i]}" != "$project" ]; do i=$((i + 1)); done
+  projects[i]="$project"
+  project_classes[i]="${project_classes[$i]:+${project_classes[$i]} }$class"
+}
+if [ "$profile" = test ]; then
+  [ "${#targets[@]}" -gt 0 ] || bad_usage 'test needs a fully qualified test class or a tests/ project'
+  for target in "${targets[@]}"; do add_target "$target"; done
 fi
 if [ -n "$from" ]; then
   case " ${sequence[*]} " in
@@ -159,42 +166,29 @@ run_tests() {
   return "$code"
 }
 
-# Test executables a test project starts from artifacts/bin without referencing them.
-runtime_helpers() {
-  case "$1" in
-    tests/Keypaste.Core.Tests) echo tests/Keypaste.TxfContender tests/Keypaste.VaultSaver ;;
-    tests/Keypaste.Mcp.Tests) echo tests/Keypaste.PoolStarver ;;
-    tests/Keypaste.App.Tests) echo tests/Keypaste.EnvReporter src/Keypaste.Cli ;;
-  esac
-}
-
 # The shared libsodium Keypaste.Browser's tests load (D-0612), built only where they run.
 build_libsodium() {
   run bash scripts/build-libsodium.sh
 }
 
+# Each test project builds the programs its tests start through its own references.
 prepare_projects() {
-  local dir helper project targets=()
+  local dir
   for dir in "${projects[@]}"; do
-    targets+=("$dir")
-    for helper in $(runtime_helpers "$dir"); do targets+=("$helper"); done
     if [ "$dir" = tests/Keypaste.Browser.Tests ]; then build_libsodium; fi
   done
   build_argon2
-  for project in "${targets[@]}"; do run dotnet restore "$(project_file "$project")" --locked-mode; done
-  for project in "${targets[@]}"; do run dotnet build "$(project_file "$project")" --no-restore -c Release -warnaserror; done
+  for dir in "${projects[@]}"; do prepare "$(project_file "$dir")"; done
 }
 test_projects() {
-  local dir options
-  for dir in "${projects[@]}"; do
+  local i=0 options
+  while [ "$i" -lt "${#projects[@]}" ]; do
     options=()
-    if [ "$dir" = tests/Keypaste.App.Tests ]; then options+=(--long-running 120); fi
-    if [ -n "$filter_class" ]; then options+=(--filter-class "$filter_class"); fi
-    if [ "${#options[@]}" -gt 0 ]; then
-      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release -- "${options[@]}"
-    else
-      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release
-    fi
+    if [ "${projects[$i]}" = tests/Keypaste.App.Tests ]; then options+=(--long-running 120); fi
+    # shellcheck disable=SC2206 # class names hold no spaces or glob characters
+    if [ -n "${project_classes[$i]}" ]; then options+=(--filter-class ${project_classes[$i]}); fi
+    run_tests dotnet test "$(project_file "${projects[$i]}")" --no-build -c Release ${options[@]+-- "${options[@]}"}
+    i=$((i + 1))
   done
 }
 
@@ -349,8 +343,11 @@ profile_format() {
 }
 
 # The build servers would otherwise stay resident after a development machine's check, even a failed one.
-profile_compile() {
+stop_build_servers_on_exit() {
   if [ "$list" = false ]; then trap 'dotnet build-server shutdown >/dev/null 2>&1 || true' EXIT; fi
+}
+profile_compile() {
+  stop_build_servers_on_exit
   argon2=false
   prepare_backend
   prepare_desktop
@@ -373,35 +370,30 @@ check_integration() {
 
 backend_prepared=false
 profile_backend() {
-  if [ "$phase" != test-only ]; then
-    if [ "${#projects[@]}" -gt 0 ]; then
-      prepare_projects
-    elif [ "$phase" = all ]; then
-      prepare_backend with-libsodium
-    else
-      prepare_backend
-    fi
+  if [ "$phase" = all ]; then
+    prepare_backend with-libsodium
+  elif [ "$phase" = prepare-only ]; then
+    prepare_backend
   fi
   backend_prepared=true
   if [ -n "$log_dir" ]; then : > "$log_dir/backend.prepared"; fi
-  if [ "$phase" != prepare-only ]; then
-    if [ "${#projects[@]}" -gt 0 ]; then test_projects; else test_backend; fi
-  fi
+  if [ "$phase" != prepare-only ]; then test_backend; fi
 }
 desktop_prepared=false
 profile_desktop() {
   if [ "$phase" != test-only ]; then
-    if [ "${#projects[@]}" -gt 0 ]; then
-      prepare_projects
-    else
-      prepare_desktop
-      desktop_prepared=true
-      if [ -n "$log_dir" ]; then : > "$log_dir/desktop.prepared"; fi
-    fi
+    prepare_desktop
+    desktop_prepared=true
+    if [ -n "$log_dir" ]; then : > "$log_dir/desktop.prepared"; fi
   fi
-  if [ "$phase" != prepare-only ]; then
-    if [ "${#projects[@]}" -gt 0 ]; then test_projects; else test_desktop; fi
-  fi
+  if [ "$phase" != prepare-only ]; then test_desktop; fi
+}
+
+profile_test() {
+  export MSBUILDDISABLENODEREUSE=1
+  stop_build_servers_on_exit
+  prepare_projects
+  test_projects
 }
 # The browser host gate starts the CLI's relay, which loads the shared libsodium from beside it, and the fake browser.
 prepare_browser_host() {
@@ -470,6 +462,16 @@ plan_profiles() {
   done
   printf 'verify: skip %-13s needs an installed KeePassXC; run it by name\n' compat
   printf 'verify: skip %-13s needs the real AI tools installed; run it by name\n' tools
+}
+
+# A development machine may keep global.json's SDK in ~/.dotnet beside a newer one on PATH, which global.json refuses.
+use_pinned_sdk() {
+  local version
+  version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' global.json | head -n 1)"
+  if command -v dotnet >/dev/null 2>&1 && dotnet --list-sdks 2>/dev/null | grep -F "$version [" >/dev/null; then return; fi
+  [ -d "$HOME/.dotnet/sdk/$version" ] || return 0
+  export DOTNET_ROOT="$HOME/.dotnet" PATH="$HOME/.dotnet:$PATH"
+  echo "verify: using SDK $version from ~/.dotnet"
 }
 
 require_tools() {
@@ -579,6 +581,7 @@ if [ -z "$profile" ]; then
   run_selection
   exit 0
 fi
+case "$profile" in test|compile) use_pinned_sdk ;; esac
 if [ "$list" = false ]; then require_for "$profile"; fi
 "profile_${profile//-/_}"
 if [ "$list" = false ]; then printf 'Verification passed: %s (%s)\n' "$profile" "$phase"; fi

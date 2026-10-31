@@ -1,8 +1,7 @@
 name: dev
 
-# K.6a, K.6c, F.66: runs one test class, one verify.sh profile on one runner, regenerates the lock files, or runs ci.yml's
-# and app.yml's Linux jobs on a pushed branch so the founder's machine never has to; scripts/dev.sh dispatches it. It is never a release gate or integration
-# evidence, so no dev run stands in for a full ci or app run (D-0383, D-0460).
+# F.66: runs one verify.sh profile on one runner on a pushed branch, to retry a failure only that runner showed; scripts/dev.sh
+# dispatches it. It is never a release gate or integration evidence, so no dev run stands in for a full ci or app run (D-0383).
 #
 # R.1a: acts mode installs an existing app.yml run's packages, at any commit, through install-desktop.yml and performs
 # the install exercise and R.1a's acts with this branch's scripts, to iterate on them without a new package build.
@@ -10,10 +9,6 @@ name: dev
 on:
   workflow_dispatch:
     inputs:
-      filter_class:
-        description: A fully qualified test class; its namespace selects its project
-        type: string
-        default: ''
       profile:
         description: The verify.sh profile that profile mode runs; backend, integration, desktop or desktop-gates
         type: string
@@ -31,19 +26,19 @@ on:
         type: string
         default: ''
       mode:
-        description: class runs filter_class, profile runs profile, linux runs ci.yml's and app.yml's Linux jobs, relock regenerates the lock files, acts installs app_run's packages and performs R.1a's acts
+        description: profile runs profile, acts installs app_run's packages and performs R.1a's acts
         type: choice
-        options: [class, profile, linux, relock, acts]
-        default: class
+        options: [profile, acts]
+        default: profile
 
-run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.filter_class }}${{ inputs.profile }}${{ inputs.app_run }} ${{ inputs.os }} ${{ inputs.nonce }}
+run-name: dev ${{ github.ref_name }} ${{ inputs.mode }} ${{ inputs.profile }}${{ inputs.app_run }} ${{ inputs.os }} ${{ inputs.nonce }}
 
 permissions:
   contents: read
 
-# A new dispatch of the same mode, class or profile and runner on a branch supersedes the run before it.
+# A new dispatch of the same mode, profile and runner on a branch supersedes the run before it.
 concurrency:
-  group: dev-${{ github.ref }}-${{ inputs.mode }}-${{ inputs.filter_class }}${{ inputs.profile }}-${{ inputs.os }}
+  group: dev-${{ github.ref }}-${{ inputs.mode }}-${{ inputs.profile }}-${{ inputs.os }}
   cancel-in-progress: true
 
 env:
@@ -55,53 +50,6 @@ env:
   MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
-  class:
-    name: ${{ inputs.filter_class }} (${{ matrix.os }})
-    if: inputs.mode == 'class'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ fromJSON(inputs.os == 'all' && '["ubuntu-24.04","windows-2025","macos-15"]' || format('["{0}"]', inputs.os)) }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
-      - name: Build and run the test class
-        shell: bash
-        env:
-          FILTER_CLASS: ${{ inputs.filter_class }}
-          # ScreenRenderer draws its frames only when this names a folder; other classes ignore it.
-          KEYPASTE_SCREENS_OUT: ${{ runner.temp }}/screens
-        run: |
-          set -euo pipefail
-          [[ "$FILTER_CLASS" =~ ^[A-Za-z0-9_.]+$ ]] || { echo "::error::filter_class must be a fully qualified test class"; exit 1; }
-          case "$FILTER_CLASS" in
-            Keypaste.Core.Tests.*) profile=backend project=tests/Keypaste.Core.Tests ;;
-            Keypaste.Cli.Tests.*) profile=backend project=tests/Keypaste.Cli.Tests ;;
-            Keypaste.Mcp.Tests.*) profile=backend project=tests/Keypaste.Mcp.Tests ;;
-            Keypaste.Browser.Tests.*) profile=backend project=tests/Keypaste.Browser.Tests ;;
-            Keypaste.App.Tests.*) profile=desktop project=tests/Keypaste.App.Tests ;;
-            Keypaste.App.Windows.Tests.*) profile=desktop project=tests/Keypaste.App.Windows.Tests ;;
-            Keypaste.Consistency.Tests.*) profile=desktop project=tests/Keypaste.Consistency.Tests ;;
-            *) echo "::error::filter_class must begin with a test project's namespace, such as Keypaste.Core.Tests."; exit 1 ;;
-          esac
-          bash scripts/verify.sh "$profile" --project "$project" --filter-class "$FILTER_CLASS"
-
-      - if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: screens-${{ matrix.os }}
-          path: ${{ runner.temp }}/screens
-          if-no-files-found: ignore
-          retention-days: 7
-
   # One verify.sh profile on one runner, to retry a failure that only that runner showed (D-0468).
   profile:
     name: ${{ inputs.profile }} (${{ matrix.os }})
@@ -138,64 +86,6 @@ jobs:
             backend|integration|desktop|desktop-gates) bash scripts/verify.sh "$PROFILE" ;;
             *) echo "::error::profile must be backend, integration, desktop or desktop-gates"; exit 1 ;;
           esac
-
-  # A development machine has no SDK, so a changed dependency or RuntimeIdentifiers list gets its lock
-  # files here: the same SDK as ci.yml and app.yml restores every locked project against what it now declares.
-  relock:
-    name: regenerate lock files
-    if: inputs.mode == 'relock'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
-      - name: Restore against the declared dependencies and keep the lock files that changed
-        shell: bash
-        run: |
-          set -euo pipefail
-          for target in keypaste.slnx keypaste.app.slnx tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj; do
-            dotnet restore "$target" --force-evaluate
-          done
-          out="$RUNNER_TEMP/relock"
-          mkdir -p "$out"
-          git status --porcelain -- '*packages.lock.json' | sed 's/^...//' > "$out/changed.txt"
-          while IFS= read -r file; do
-            mkdir -p "$out/$(dirname "$file")"
-            cp "$file" "$out/$file"
-          done < "$out/changed.txt"
-          cat "$out/changed.txt"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: relock
-          path: ${{ runner.temp }}/relock
-          retention-days: 7
-
-  # ci.yml's and app.yml's jobs at this commit, narrowed by linux_only; on a tag ref app.yml would attest (D-0460).
-  ci:
-    name: linux ci
-    if: inputs.mode == 'linux' && github.ref_type == 'branch'
-    uses: ./.github/workflows/ci.yml
-    with:
-      linux_only: true
-
-  app:
-    name: linux app
-    if: inputs.mode == 'linux' && github.ref_type == 'branch'
-    uses: ./.github/workflows/app.yml
-    with:
-      linux_only: true
-    # A called job's permissions are checked against its caller's before the run starts, whatever its condition.
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
 
   # install-desktop.yml's install exercise and R.1a's acts on app_run's packages, with this branch's scripts (R.1a).
   acts:

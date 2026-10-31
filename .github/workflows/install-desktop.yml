@@ -16,7 +16,7 @@ run-name: ${{ inputs.rehearsal && format('install-desktop rehearsal of app run {
 # at install-real-tools.sh's pin and, on Linux, xterm for the app's Run, none of which the app needs, and the job
 # summary carries each act's verdict. dev.yml's acts mode calls this with dev: any successful app run's packages,
 # installed as a rehearsal installs them and acted on with the calling ref's scripts, on one runner or all; it is
-# never evidence of anything (D-0460).
+# never evidence of anything (D-0383).
 
 on:
   workflow_dispatch:

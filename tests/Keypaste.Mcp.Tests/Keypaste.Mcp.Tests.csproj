@@ -30,9 +30,10 @@
     <Compile Include="../Keypaste.Core.Tests/CheapKeyDerivation.cs" Link="CheapKeyDerivation.cs" />
   </ItemGroup>
 
-  <!-- The child an agent's run starts in the capture tests: built beside these tests, never referenced. -->
+  <!-- The programs these tests start, such as the child an agent's run starts in the capture tests: built beside them, never referenced. -->
   <ItemGroup>
     <ProjectReference Include="../Keypaste.EnvReporter/Keypaste.EnvReporter.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Keypaste.PoolStarver/Keypaste.PoolStarver.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

@@ -55,12 +55,6 @@ on:
         description: Run only the tools jobs, for a step whose push already ran the rest; never counts toward a release (D-0468)
         type: boolean
         default: false
-  workflow_call:
-    inputs:
-      linux_only:
-        description: Run only the Linux jobs, without compat and tools; only dev.yml's linux mode passes it (D-0460)
-        type: boolean
-        default: false
   # Weekly, so a runner image or upstream change shows without a commit.
   schedule:
     - cron: '17 4 * * 1'
@@ -84,8 +78,6 @@ env:
 jobs:
   # Every run runs every job but tools, which runs on the schedule and on a dispatch that asks for it; a dispatch, the
   # schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0423, D-0438).
-  # dev.yml's linux mode calls it with linux_only to run its Linux jobs but compat; that run counts toward
-  # nothing (D-0460).
   checks:
     name: scripts + workflows
     if: ${{ !inputs.only_tools }}
@@ -152,7 +144,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2025","macos-15"]') }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -180,7 +172,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.linux_only && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2025","macos-15"]') }}
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -205,7 +197,7 @@ jobs:
 
   compat:
     name: compat (${{ matrix.os }})
-    if: ${{ !inputs.linux_only && !inputs.only_tools }}
+    if: ${{ !inputs.only_tools }}
     strategy:
       fail-fast: false
       matrix:

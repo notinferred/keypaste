@@ -16,6 +16,12 @@
     <ProjectReference Include="../../src/Keypaste.App/Keypaste.App.csproj" />
   </ItemGroup>
 
+  <!-- The programs these tests start, a Run's child and the CLI a terminal runs: built beside them, never referenced. -->
+  <ItemGroup>
+    <ProjectReference Include="../Keypaste.EnvReporter/Keypaste.EnvReporter.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Keypaste.Cli/Keypaste.Cli.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
   <!--
     Compiled in rather than copied, for the reason Keypaste.Consistency.Tests gives about
     CliHarness.cs: one statement of who publishes this project, checked in every front end's

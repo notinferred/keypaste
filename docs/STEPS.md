@@ -8,9 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672): they move architecture rules into the compiler, tests onto the founder's machine and hand-written code onto established libraries in the order PRODUCT §4.9 sets (D-0670, D-0671).
 
-- [ ] **K.8 — Run test classes on the founder's machine.** Needs: none.
-  - `verify.sh` gains a local mode that runs one test project or class with the pinned SDK and leaves nothing running, which CLAUDE.md names (D-0671).
-  - Accepted when a Core, a CLI and an App test class run on the founder's Mac with the same result as the same class on CI.
 - [ ] **B.5 — Cache NuGet restores in CI.** Needs: none.
   - Locked-mode restores are cached by their lock files' hash, an exception to D-0423's "nothing cached" for restores only (D-0671).
   - Accepted when a second run restores from the cache, a changed lock file restores fresh, and both runs' job times are recorded.

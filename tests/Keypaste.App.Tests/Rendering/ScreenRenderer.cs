@@ -29,11 +29,9 @@ namespace Keypaste.App.Tests.Rendering;
 /// Draws every screen of the app to a PNG with a demo vault, for comparing against the design in
 /// docs/design. It runs only when KEYPASTE_SCREENS_OUT names a folder, and is skipped otherwise:
 /// <code>
-/// KEYPASTE_SCREENS_OUT=/tmp/screens dotnet test tests/Keypaste.App.Tests -- --filter-class Keypaste.App.Tests.Rendering.ScreenRenderer
+/// KEYPASTE_SCREENS_OUT=/tmp/screens bash scripts/verify.sh test Keypaste.App.Tests.Rendering.ScreenRenderer
 /// </code>
-/// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) dev.yml sets it, so
-/// <c>bash scripts/dev.sh --class Keypaste.App.Tests.Rendering.ScreenRenderer --os all</c> draws them on
-/// each runner and uploads them as <c>screens-&lt;runner&gt;</c>. It writes every screen
+/// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
 /// twice, into <c>dark</c> and <c>light</c> folders, with the system set to each and no theme chosen,
 /// as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Add a
 /// screen by adding a <see cref="Save"/> call.
