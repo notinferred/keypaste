@@ -79,26 +79,6 @@ public sealed class EntriesOrganizeTests : IDisposable
     // ---------------------------------------------------------------- groups
 
     [Fact]
-    public void A_created_group_is_in_the_file()
-    {
-        using (var context = New())
-        {
-            var entries = context.Entries;
-
-            entries.SelectedGroup = Group(entries, string.Empty);
-            entries.BeginCreateGroupCommand.Execute(null);
-            entries.DraftGroupName = "archive";
-            entries.ConfirmCreateGroupCommand.Execute(null);
-
-            Assert.Null(entries.Error);
-            Assert.False(entries.IsCreatingGroup);
-        }
-
-        using var reopened = Vault.Open(_vaultPath, Master);
-        Assert.Contains("archive", reopened.ReadGroupPaths());
-    }
-
-    [Fact]
     public void A_group_is_created_inside_the_one_that_is_selected()
     {
         using (var context = New())
@@ -280,23 +260,6 @@ public sealed class EntriesOrganizeTests : IDisposable
             reopened.ReadRecycled().Select(recycled => (recycled.Title, recycled.OriginalGroupPath)).Order());
     }
 
-    /// <summary>The env group is keypaste's to assign, so it is not deleted, and the screen says why.</summary>
-    [Fact]
-    public void The_env_group_is_not_deleted_and_says_why()
-    {
-        var before = Digest(_vaultPath);
-
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.SelectedGroup = Group(entries, "env");
-        entries.BeginDeleteGroupCommand.Execute(null);
-        entries.ConfirmDeleteGroupCommand.Execute(null);
-
-        Assert.Contains("keypaste assigns", entries.Error, StringComparison.Ordinal);
-        Assert.Equal(before, Digest(_vaultPath));
-    }
-
     /// <summary>
     /// Organizing can change which places an agent sees cover an entry, wherever it happens.
     /// </summary>
@@ -310,53 +273,6 @@ public sealed class EntriesOrganizeTests : IDisposable
     }
 
     // ---------------------------------------------------------------- one entry, one write
-
-    [Fact]
-    public void A_renamed_entry_keeps_its_history_and_stays_selected()
-    {
-        using (var context = New())
-        {
-            var entries = context.Entries;
-
-            Select(entries, "servers", "production");
-            entries.OrganizeCommand.Execute(null);
-            entries.DraftTitle = "production-db";
-            entries.ConfirmOrganizeCommand.Execute(null);
-
-            Assert.Null(entries.Error);
-            Assert.Equal(new EntryName("servers", "production-db"), entries.Selected?.Name);
-        }
-
-        using var reopened = Vault.Open(_vaultPath, Master);
-        var name = new EntryName("servers", "production-db");
-
-        Assert.Equal("second", reopened.Find(name)!.Password, StringComparer.Ordinal);
-        Assert.Equal(
-            new[] { "first" },
-            reopened.ReadHistory(name)!.Select(revision => revision.Fields.Password));
-    }
-
-    [Fact]
-    public void A_moved_entry_is_at_its_new_path_and_stays_selected()
-    {
-        using (var context = New())
-        {
-            var entries = context.Entries;
-
-            Select(entries, "servers", "production");
-            entries.OrganizeCommand.Execute(null);
-            entries.MoveTarget = Group(entries, string.Empty);
-            entries.ConfirmOrganizeCommand.Execute(null);
-
-            Assert.Null(entries.Error);
-            Assert.Equal(new EntryName(string.Empty, "production"), entries.Selected?.Name);
-        }
-
-        using var reopened = Vault.Open(_vaultPath, Master);
-
-        Assert.Null(reopened.Find(new EntryName("servers", "production")));
-        Assert.Equal("second", reopened.Find(new EntryName(string.Empty, "production"))!.Password, StringComparer.Ordinal);
-    }
 
     /// <summary>
     /// The combined write, which is what one Save on the form performs.
@@ -562,32 +478,6 @@ public sealed class EntriesOrganizeTests : IDisposable
     // ---------------------------------------------------------------- finding
 
     [Fact]
-    public void Search_finds_an_entry_by_its_username()
-    {
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.Search = "dba@example.test";
-
-        var row = Assert.Single(entries.Rows);
-        Assert.Equal("production", row.Title);
-        Assert.Equal("username", row.Why);
-    }
-
-    [Fact]
-    public void Search_finds_an_entry_by_its_url()
-    {
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.Search = "db.example.test";
-
-        var row = Assert.Single(entries.Rows);
-        Assert.Equal("production", row.Title);
-        Assert.Equal("URL", row.Why);
-    }
-
-    [Fact]
     public void Search_does_not_find_an_entry_by_its_password()
     {
         using var context = New();
@@ -598,19 +488,6 @@ public sealed class EntriesOrganizeTests : IDisposable
         Assert.NotEmpty(entries.Rows);
 
         entries.Search = "second";
-        Assert.Empty(entries.Rows);
-    }
-
-    [Fact]
-    public void Search_does_not_find_an_entry_by_its_notes()
-    {
-        using var context = New();
-        var entries = context.Entries;
-
-        entries.Search = "production";
-        Assert.NotEmpty(entries.Rows);
-
-        entries.Search = "recovery-code-in-the-notes";
         Assert.Empty(entries.Rows);
     }
 

@@ -74,22 +74,6 @@ public sealed class SearchVerbTests : IDisposable
     }
 
     [Fact]
-    public void A_group_match_lists_each_item_under_it_in_path_order()
-    {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("search", "router"));
-
-        Assert.Equal(["home/router/admin", "home/router/printer"], Lines());
-    }
-
-    [Fact]
-    public void A_username_and_url_match_names_both()
-    {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("search", "acme"));
-
-        Assert.Equal(["acme/acme portal  username, URL"], Lines());
-    }
-
-    [Fact]
     public void A_tag_match_names_the_tag()
     {
         _harness.AssertExit(CliApp.ExitSuccess, Run("search", "prod"));
@@ -106,15 +90,6 @@ public sealed class SearchVerbTests : IDisposable
         Assert.Equal("home/router/printer", item.GetProperty("path").GetString());
         Assert.Equal(["tag"], item.GetProperty("matched").EnumerateArray().Select(field => field.GetString()));
         Assert.Equal(["env:office:prod"], item.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()));
-    }
-
-    [Fact]
-    public void Passwords_notes_and_custom_fields_are_never_matched()
-    {
-        _harness.AssertExit(CliApp.ExitSuccess, Run("search", "needle"));
-
-        Assert.Empty(_harness.Out);
-        Assert.Contains("no item matches", _harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]

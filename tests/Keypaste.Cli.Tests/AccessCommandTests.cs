@@ -115,46 +115,6 @@ public sealed class AccessCommandTests
     }
 
     [Fact]
-    public void A_file_in_the_backup_directory_is_refused_as_the_new_keyfile()
-    {
-        using var harness = Seeded();
-        var directory = Directory.CreateDirectory(VaultBackups.DirectoryFor(harness.VaultPath)).FullName;
-        var inside = Path.Combine(directory, "raw.key");
-        File.WriteAllBytes(inside, new byte[32]);
-
-        var exit = harness.Run("access", "--new-keyfile", inside, "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Empty(harness.Prompt.PromptsSeen);
-    }
-
-    [Fact]
-    public void A_hashed_file_is_refused_as_the_new_keyfile()
-    {
-        using var harness = Seeded();
-        var hashed = Path.Combine(harness.Directory, "notes.txt");
-        File.WriteAllText(hashed, "an ordinary file somebody picked, which is exactly the problem");
-        var bytes = File.ReadAllBytes(harness.VaultPath);
-
-        var exit = harness.Run("access", "--new-keyfile", hashed, "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("exact contents", harness.Err, StringComparison.Ordinal);
-        Assert.Equal(bytes, File.ReadAllBytes(harness.VaultPath));
-    }
-
-    [Fact]
-    public void A_missing_new_keyfile_is_not_found()
-    {
-        using var harness = Seeded();
-
-        var exit = harness.Run("access", "--new-keyfile", Path.Combine(harness.Directory, "absent.key"), "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitNotFound, exit);
-        Assert.Contains("no keyfile at", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void A_wrong_current_password_exits_four_and_names_hardware_keys()
     {
         using var harness = Seeded();
@@ -170,20 +130,6 @@ public sealed class AccessCommandTests
     }
 
     [Fact]
-    public void An_empty_new_password_is_a_usage_error()
-    {
-        using var harness = Seeded();
-        var bytes = File.ReadAllBytes(harness.VaultPath);
-
-        harness.Prompt.Enqueue(_master, string.Empty);
-        var exit = harness.Run("access", "--password", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("cannot be empty", harness.Err, StringComparison.Ordinal);
-        Assert.Equal(bytes, File.ReadAllBytes(harness.VaultPath));
-    }
-
-    [Fact]
     public void A_mismatched_confirmation_is_a_usage_error()
     {
         using var harness = Seeded();
@@ -195,18 +141,6 @@ public sealed class AccessCommandTests
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("do not match", harness.Err, StringComparison.Ordinal);
         Assert.Equal(bytes, File.ReadAllBytes(harness.VaultPath));
-    }
-
-    [Fact]
-    public void Removing_a_keyfile_the_vault_does_not_have_is_a_usage_error()
-    {
-        using var harness = Seeded();
-
-        harness.Prompt.Enqueue(_master);
-        var exit = harness.Run("access", "--remove-keyfile", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("no keyfile to remove", harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -275,24 +209,6 @@ public sealed class AccessCommandTests
 
         Assert.Equal(3, harness.Prompt.IssuedSecrets.Count);
         Assert.All(harness.Prompt.IssuedSecrets, buffer => Assert.True(buffer.IsZeroed));
-    }
-
-    [Fact]
-    public void An_xml_keyfile_is_refused_before_any_prompt_by_a_build_that_would_hash_it()
-    {
-        using var harness = Seeded();
-        var keyfile = XmlKeyfile(harness);
-        var bytes = File.ReadAllBytes(harness.VaultPath);
-        var copies = VaultBackups.List(harness.VaultPath);
-
-        using var fallback = VaultKeyfile.SimulateXmlFallback();
-        var exit = harness.Run("access", "--new-keyfile", keyfile, "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitNotFound, exit);
-        Assert.Contains("cannot read one", harness.Err, StringComparison.Ordinal);
-        Assert.Empty(harness.Prompt.PromptsSeen);
-        Assert.Equal(bytes, File.ReadAllBytes(harness.VaultPath));
-        Assert.Equal(copies, VaultBackups.List(harness.VaultPath));
     }
 
     [Fact]

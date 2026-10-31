@@ -834,17 +834,6 @@ public sealed class ApproverProtocolTests
     }
 
     [Fact]
-    public void EncodingRejectsNulls()
-    {
-        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((CredentialRequest)null!));
-        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((CredentialReply)null!));
-        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((NamesRequest)null!));
-        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((NamesReply)null!));
-        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((AttachRequest)null!));
-        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((AttachReply)null!));
-    }
-
-    [Fact]
     public void ARequestCarriesItsVaultAndSession()
     {
         var sent = Request() with { Vault = "/home/me/vault.kdbx", Session = "0123abcd" };

@@ -60,19 +60,6 @@ public sealed class OwnerDenialTests : IDisposable
     }
 
     [Fact]
-    public async Task ALockedOwner_IsADenialReachingNoSession()
-    {
-        await using var owner = Owner.Start(this);
-        owner.Lock();
-        await using var harness = new McpHarness(owner.PipeName, VaultPath);
-        var client = await harness.StartAsync("--expose", "env/**");
-
-        var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
-
-        AssertDenied(harness, result, owner, "vault-locked");
-    }
-
-    [Fact]
     public async Task NoOwner_IsADenialReachingNoSession()
     {
         await using var harness = new McpHarness("keypaste-nobody-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), VaultPath);
@@ -81,18 +68,6 @@ public sealed class OwnerDenialTests : IDisposable
         var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
 
         AssertDenied(harness, result, owner: null, "no-approver");
-    }
-
-    [Fact]
-    public async Task AnOwnerOfAnotherVault_RefusesTheAttachment_AndThatIsADenial()
-    {
-        await using var owner = Owner.Start(this, holds: Path.Combine(_directory, "other.kdbx"));
-        await using var harness = new McpHarness(owner.PipeName, VaultPath);
-        var client = await harness.StartAsync("--expose", "env/**");
-
-        var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
-
-        AssertDenied(harness, result, owner, "no-session");
     }
 
     /// <summary>

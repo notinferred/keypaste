@@ -253,22 +253,6 @@ public sealed class RunToolTests : IDisposable
     }
 
     [Fact]
-    public async Task ABareNameInTheBridgesDirectory_IsNotRun()
-    {
-        await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce);
-        await using var harness = new McpHarness(owner.PipeName, VaultPath);
-        var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
-        var run = Run();
-        run["command"] = new[] { Path.GetFileNameWithoutExtension(Environment.ProcessPath)! };
-
-        var result = await client.CallToolAsync(ToolText.RunToolName, run, cancellationToken: Token);
-
-        Assert.True(result.IsError);
-        Assert.Contains("\"command\" argument", TextOf(result), StringComparison.Ordinal);
-        Assert.Equal(0, owner.Asked);
-    }
-
-    [Fact]
     public async Task AReferenceOutsideTheExposure_IsRefusedByTheBridge()
     {
         await using var owner = Owner.Start(this, ApprovalAnswer.ApprovedOnce);
@@ -384,23 +368,6 @@ public sealed class RunToolTests : IDisposable
 
         await File.WriteAllTextAsync(release, "go", Token);
         Assert.False((await first).IsError);
-    }
-
-    [Fact]
-    public async Task AnOwnerWithoutRun_IsRefused_NothingStarts()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.Start();
-        var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
-        var marker = Path.Combine(_directory, "ran");
-
-        var result = await client.CallToolAsync(ToolText.RunToolName, Run("--touch", marker), cancellationToken: Token);
-
-        Assert.True(result.IsError);
-        Assert.False(File.Exists(marker));
-
-        // The owner recorded its refusal; the bridge writes nothing after an answer.
-        Assert.Empty(harness.AuditLines());
     }
 
     [Fact]

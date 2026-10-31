@@ -161,19 +161,6 @@ public sealed class AttachmentVerbTests : IDisposable
     }
 
     [Fact]
-    public void Replace_and_rm_of_an_attachment_the_item_lacks_are_not_found_and_write_nothing()
-    {
-        var before = Bytes();
-
-        _harness.AssertExit(CliApp.ExitNotFound, Run("attachment", "replace", "api/Stripe", "absent.txt", Written("notes.txt", [1])));
-        _harness.AssertExit(CliApp.ExitNotFound, Run("attachment", "rm", "api/Stripe", "absent.txt"));
-        _harness.AssertExit(CliApp.ExitNotFound, Run("attachment", "rm", "api/Nobody", "absent.txt"));
-
-        Assert.Equal(before, Bytes());
-        Assert.Contains("'api/Stripe' has no attachment absent.txt", _harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Save_writes_the_bytes_to_a_new_file_and_says_it_is_not_encrypted()
     {
         var bytes = Enumerable.Range(0, 300).Select(i => (byte)(i * 7)).ToArray();

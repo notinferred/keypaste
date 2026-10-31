@@ -259,12 +259,4 @@ public sealed class ApprovalPromptTests
         Assert.DoesNotContain('\u2028', gain);
         Assert.DoesNotContain('\u202E', gain);
     }
-
-    [Fact]
-    public void ForRejectsNulls()
-    {
-        Assert.Throws<ArgumentNullException>(() => ApprovalPrompt.For("c", null!, "password", "r", 60));
-        Assert.Throws<ArgumentNullException>(() => ApprovalPrompt.For("c", new EntryName("a", "b"), null!, "r", 60));
-        Assert.Throws<ArgumentNullException>(() => ApprovalPrompt.For("c", new EntryName("a", "b"), "password", null!, 60));
-    }
 }

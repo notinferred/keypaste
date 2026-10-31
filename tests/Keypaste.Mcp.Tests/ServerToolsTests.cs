@@ -534,22 +534,6 @@ public sealed class ServerToolsTests
         Assert.Equal("failed", MethodOf(Assert.Single(harness.AuditLines())));
     }
 
-    /// <summary>A request the owner answered is recorded by the owner, before it replied, and leaves no line in the bridge's log.</summary>
-    [Fact]
-    public async Task AnAnsweredRequest_LeavesNoLineInTheBridgesLog()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartApproving();
-        harness.Source.With("env/dev", "STRIPE_KEY");
-        var client = await harness.StartAsync();
-
-        await CallAsync(client, ToolText.ListToolName);
-        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
-
-        Assert.Contains(FakeApprover.Sentinel, TextOf(result), StringComparison.Ordinal);
-        Assert.Empty(harness.AuditLines());
-    }
-
     /// <summary>
     /// The agent's stated reason reaches the person who has to judge it, verbatim. If it did not,
     /// the approval prompt would be asking somebody to decide on less than the agent said.
@@ -596,27 +580,6 @@ public sealed class ServerToolsTests
         Assert.Contains("password", text, StringComparison.Ordinal);
         Assert.DoesNotContain("seed", text, StringComparison.Ordinal);
         Assert.DoesNotContain("im_start", text, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// D-0422 at the bridge, which cannot read tags: under the default it refuses a standard field
-    /// itself and forwards a project variable for the owner to decide by the entry's tags.
-    /// </summary>
-    [Fact]
-    public async Task UnderTheDefault_APasswordNeverReachesTheApprover_AndAVariableDoes()
-    {
-        await using var harness = new McpHarness();
-        harness.Approver.StartApproving();
-        var client = await harness.StartAsync("--expose", EntryExposure.DefaultGlob);
-
-        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "services/Stripe"));
-        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "services/Stripe", field: "STRIPE_SECRET_KEY"));
-
-        // One line, the bridge's own refusal; the owner recorded the request it answered.
-        Assert.Equal("out-of-scope", MethodOf(Assert.Single(harness.AuditLines())));
-
-        var forwarded = Assert.Single(harness.Approver.Received);
-        Assert.Equal("STRIPE_SECRET_KEY", forwarded.Field, StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -715,35 +678,6 @@ public sealed class ServerToolsTests
             Assert.Equal("denied", root.GetProperty("decision").GetString());
             Assert.Equal("env/**", root.GetProperty("exposure")[0].GetString());
         }
-    }
-
-    /// <summary>
-    /// The log a real server run leaves behind verifies against its own chain.
-    /// </summary>
-    /// <remarks>
-    /// <c>AuditChainTests</c> builds its files through the writer directly, which proves the chain is
-    /// internally consistent but not that the bridge produces one — a server that opened the log
-    /// twice, or wrote through some path of its own, would pass every test there and leave a file
-    /// nobody could verify. This is the cheap in-process half of what
-    /// <c>scripts/verify-log-chain.sh</c> proves against the shipped binaries.
-    /// </remarks>
-    [Fact]
-    public async Task ARealRunLeavesALogThatVerifies()
-    {
-        await using var harness = new McpHarness();
-        harness.Source.Recorded = false;
-        var client = await harness.StartAsync();
-
-        await CallAsync(client, ToolText.ListToolName);
-        await CallAsync(client, ToolText.CredentialToolName, Credential());
-        await CallAsync(client, ToolText.ListToolName);
-
-        var report = AuditChainVerifier.Verify(harness.AuditPath);
-
-        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
-        Assert.Equal(3, report.Records);
-        Assert.Equal(3, report.LatestSequence);
-        Assert.Empty(report.Findings);
     }
 
     /// <summary>

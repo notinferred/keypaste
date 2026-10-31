@@ -376,32 +376,6 @@ public sealed class AccessChangeToolTests : IDisposable
         Assert.Empty(harness.AuditLines());
     }
 
-    /// <summary>
-    /// Through a real owner, an agent's request for Automatic until a time, at most so many an hour, puts
-    /// that limit in front of the person, its end on this computer's clock with its offset, and once
-    /// confirmed the record holds the end in UTC.
-    /// </summary>
-    [Fact]
-    public async Task ThroughTheOwner_TheConfirmationShowsTheLimitAsked_AndTheRecordHoldsItInUtc()
-    {
-        var clock = new ManualClock(_now) { Zone = TestZones.PlusTwo };
-        await using var owner = new Owner(this, clock);
-        await using var harness = new McpHarness(owner.PipeName, VaultPath) { Clock = clock };
-        var client = await harness.StartAsync();
-
-        owner.Answer = ApprovalAnswer.ApprovedOnce;
-        var confirmed = await AskAsync(client, new() { ["reason"] = _reason, ["mode"] = "automatic", ["until"] = "2026-07-26 18:00", ["per_hour"] = 20 });
-
-        Assert.Equal(ToolText.AccessConfirmed, TextOf(confirmed));
-        Assert.Equal(
-            ["by default: Automatic until 2026-07-26 18:00 +02:00, at most 20 an hour: released without asking, recorded in history"],
-            Assert.Single(owner.Prompts).Gains);
-        var saved = owner.Settings.Records[McpHarness.ClientLabel];
-        Assert.Equal(AgentMode.Automatic, saved.Mode);
-        Assert.Equal(new AccessLimit { PerHour = 20, Until = new DateTimeOffset(2026, 7, 26, 16, 0, 0, TimeSpan.Zero) }, saved.Limit);
-        Assert.EndsWith($"({McpHarness.ClientLabel}: mode automatic, per-hour 20, until 2026-07-26T16:00:00Z)", Text(Assert.Single(owner.Log.Lines()), "reason"), StringComparison.Ordinal);
-    }
-
     /// <summary>A real owner over the test's directory: settings in memory, a person who answers as told, and its own log.</summary>
     private sealed class Owner : IAsyncDisposable, IApprovalChannel
     {

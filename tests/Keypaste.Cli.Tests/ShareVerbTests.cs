@@ -213,22 +213,6 @@ public sealed class ShareVerbTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Banking/Chase", "--field", "OPENAI_API_KEY")]
-    [InlineData("kp:///Banking/Chase#OPENAI_API_KEY")]
-    public void Share_AnEnvNamedCustomField_SealsThatOneFieldUnderItsName(params string[] args)
-    {
-        SeedCustomFields();
-
-        _cli.AssertExit(CliApp.ExitSuccess, Share([.. args, "--print"]));
-
-        Assert.True(ShareLink.TryParse(_cli.Out.Trim(), out var id, out var key));
-        Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out _));
-        var field = Assert.Single(payload.Fields);
-        Assert.Equal(("OPENAI_API_KEY", "sk-proj-SHARED-FIELD-SENTINEL"), (field.Name, field.Value));
-        Assert.DoesNotContain("RECOVERY-SENTINEL", _server.Requests[0].Body, StringComparison.Ordinal);
-    }
-
-    [Theory]
     [InlineData("Banking/Chase", "--field", "Recovery codes")]
     [InlineData("Banking/Chase", "--field", "otp")]
     [InlineData("kp:///Banking/Chase#Recovery%20codes")]
@@ -278,22 +262,6 @@ public sealed class ShareVerbTests : IDisposable
 
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("--endpoint must be an https origin", _cli.Err, StringComparison.Ordinal);
-        Assert.Empty(_cli.Prompt.PromptsSeen);
-        Assert.Empty(_server.Requests);
-    }
-
-    [Fact]
-    public void Share_EnvironmentNonLoopbackEndpoint_IsRefused()
-    {
-        _cli.Environment[ShareEndpoint.EnvironmentVariable] = "https://share.attacker.example";
-
-        var exit = Share("env/acme-api/STRIPE_KEY");
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains(
-            "keypaste share: KEYPASTE_SHARE_URL may only name a local development server; pass --endpoint to use another host",
-            _cli.Err,
-            StringComparison.Ordinal);
         Assert.Empty(_cli.Prompt.PromptsSeen);
         Assert.Empty(_server.Requests);
     }
@@ -398,21 +366,6 @@ public sealed class ShareVerbTests : IDisposable
         Clear();
         _cli.AssertExit(CliApp.ExitSuccess, Share("ls", "--offline", "--json"));
         Assert.Equal("[]", _cli.Out.Trim());
-    }
-
-    [Fact]
-    public void ShareRevoke_NetworkFailure_KeepsTheRecord()
-    {
-        var link = CreatePrinted();
-        Assert.True(ShareLink.TryParse(link, out var id, out _));
-        _server.Unreachable = true;
-
-        Assert.Equal(CliApp.ExitInternalError, Share("revoke", id));
-        Assert.Contains("the link still opens", _cli.Err, StringComparison.Ordinal);
-
-        Clear();
-        _cli.AssertExit(CliApp.ExitSuccess, Share("ls", "--offline", "--json"));
-        Assert.Contains(id, _cli.Out, StringComparison.Ordinal);
     }
 
     [Fact]

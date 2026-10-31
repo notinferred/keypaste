@@ -120,12 +120,4 @@ public sealed class SecretBufferTests
 
         Assert.True(buffer.IsZeroed);
     }
-
-    [Fact]
-    public void ValueEquals_RejectsNull()
-    {
-        using var buffer = new SecretBuffer();
-
-        Assert.Throws<ArgumentNullException>(() => buffer.ValueEquals(null!));
-    }
 }

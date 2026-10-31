@@ -204,39 +204,6 @@ public sealed class TokenVerbTests : IDisposable
     }
 
     [Fact]
-    public void AnEntryExpirySetElsewhere_BoundsTheBundleAndTheListing()
-    {
-        var token = Mint(_harness, "ci-staging", "read:acme-api/staging/*");
-        var expires = _harness.Clock.Now.AddDays(1);
-
-        using (var vault = Vault.Open(_harness.VaultPath, Master))
-        {
-            var entry = Assert.Single(vault.ReadEntries(includeReserved: true), entry => entry.GroupPath == ReservedGroups.Tokens);
-            vault.SetExpiryUnchecked(EntryName.Of(entry), expires);
-            vault.Save();
-        }
-
-        Clear();
-        _harness.AssertExit(0, Bundle(token));
-
-        var file = File.ReadAllBytes(BundlePath);
-        Assert.Contains("expires 2026-07-27", _harness.Err, StringComparison.Ordinal);
-        Assert.True(TokenBundle.TryOpen(file, token, expires.AddSeconds(-1), out _, out var error), error);
-        Assert.False(TokenBundle.TryOpen(file, token, expires, out _, out error));
-        Assert.Contains("expired", error, StringComparison.Ordinal);
-
-        Clear();
-        _harness.Clock.Now = expires;
-        _harness.Prompt.Enqueue(Master);
-        _harness.AssertExit(0, _harness.Run("token", "ls", "--json", "--vault", _harness.VaultPath));
-
-        using var json = JsonDocument.Parse(_harness.Out);
-        var row = Assert.Single(json.RootElement.EnumerateArray().ToList());
-        Assert.Equal("2026-07-27T15:00:00Z", row.GetProperty("expires").GetString());
-        Assert.True(row.GetProperty("expired").GetBoolean());
-    }
-
-    [Fact]
     public void Bundle_RequiresAVerifiedToken()
     {
         var token = Mint(_harness, "ci-staging", "read:acme-api/staging/*");

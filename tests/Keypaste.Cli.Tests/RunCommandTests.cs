@@ -202,30 +202,6 @@ public sealed class RunCommandTests
 
     // ---- fail closed -------------------------------------------------------------------
 
-    [Fact]
-    public void AnExpiredEntry_StopsTheRun_NamingItAndWhy_WithoutAnyValue()
-    {
-        using var harness = Seeded(("GOOD", "good-value-7c1e"));
-        var old = new Core.EntryName("services", "Old");
-
-        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
-        {
-            vault.AddEntry(new Core.VaultEntry { GroupPath = "services", Title = "Old", Password = "login-7c1e" });
-            Assert.True(vault.SetFields(old, [new Core.FieldWrite("OLD", "old-value-7c1e")]));
-            Assert.True(vault.AddTag(old, "env:dev"));
-            vault.SetExpiryUnchecked(old, new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
-            vault.Save();
-        }
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("run", "dev", "--vault", harness.VaultPath, "--", "node");
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("OLD expired 2020-01-02 03:04:05Z (services/Old)", harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("7c1e", harness.Err + harness.Out, StringComparison.Ordinal);
-        Assert.Empty(harness.ProcessLauncher.Started);
-    }
-
     // ---- exit codes --------------------------------------------------------------------
 
     [Theory]
@@ -403,23 +379,6 @@ public sealed class RunCommandTests
         Assert.Equal("dev-db", harness.ProcessLauncher.Environment["DB"]);
         Assert.Equal("octocat", harness.ProcessLauncher.Environment["GH"]);
         Assert.Contains("environment dev", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Run_AutoDiscoveredFileWithEntryReferences_IsRefused()
-    {
-        using var harness = Profiled();
-        harness.WorkingDirectory = EnvVerbTests.MapProject(harness, "acme-api");
-        Write(harness, Core.EnvReferenceFile.FileName, "DB=kp://acme-api/dev/DATABASE_URL\nGH=kp:///work/github\n");
-
-        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
-
-        Assert.Contains(
-            "keypaste run: .env.keypaste names vault items, not this directory's project acme-api; pass --env-file .env.keypaste to use it",
-            harness.Err,
-            StringComparison.Ordinal);
-        Assert.Empty(harness.Prompt.PromptsSeen);
-        Assert.Empty(harness.ProcessLauncher.Started);
     }
 
     [Fact]

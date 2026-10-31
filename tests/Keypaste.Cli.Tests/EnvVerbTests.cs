@@ -37,31 +37,6 @@ public sealed class EnvVerbTests
         Assert.DoesNotContain("postgres", harness.Err, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// A new key is a protected field of the environment's home entry, tagged into it, which
-    /// KeePassXC shows and <c>keypaste get --field</c> reads (D-0413); no entry is made for the key.
-    /// </summary>
-    [Fact]
-    public void Set_StoresANewKeyOnTheHomeEntry_ProtectedAndReadableByGet()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-
-        harness.Prompt.Enqueue(Master, "s3cret-value");
-        harness.Run("env", "set", "billing", "TOKEN", "--vault", harness.VaultPath);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "env/billing/.env", "--field", "TOKEN", "--reveal", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Equal("s3cret-value", harness.Out.ReplaceLineEndings("\n").Trim(), StringComparer.Ordinal);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Equal(["env:billing"], vault.Tags(_home));
-        Assert.True(Assert.Single(vault.Fields(_home)!).IsProtected);
-        Assert.Null(vault.Find(new EntryName("env/billing", "TOKEN")));
-    }
-
     [Fact]
     public void Set_WithAnInlineValue_TakesItFromTheArgument()
     {
@@ -157,26 +132,6 @@ public sealed class EnvVerbTests
         Assert.Single(opened.ReadHistory(_home)!);
     }
 
-    [Theory]
-    [InlineData("not-a-key")]
-    [InlineData("api_key")]
-    [InlineData("KPXC_X")]
-    [InlineData("URL")]
-    public void Set_RefusesANewKeyNoProjectReleases(string key)
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "set", "billing", key + "=v", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains(key, harness.Err, StringComparison.Ordinal);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Empty(vault.ReadEntries());
-    }
-
     [Fact]
     public void Set_WithEntry_WritesANewKeyOnTheTaggedEntryNamed_AndRefusesAnotherOrAMissingOne()
     {
@@ -210,21 +165,6 @@ public sealed class EnvVerbTests
     }
 
     [Fact]
-    public void Set_AKeyTwoEntriesHold_IsRefusedNamingBoth()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-        TagTwoHolders(harness, "STRIPE_KEY");
-
-        var before = Digest(harness.VaultPath);
-        harness.Prompt.Enqueue(Master);
-        Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "set", "billing", "STRIPE_KEY=new", "--vault", harness.VaultPath));
-
-        Assert.Contains("STRIPE_KEY is on more than one item (services/Stripe, services/Twin)", harness.Err, StringComparison.Ordinal);
-        Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
-    }
-
-    [Fact]
     public void Rm_RemovesTheField_LeavesTheRest_AndHistoryKeepsIt()
     {
         using var harness = new CliHarness();
@@ -247,47 +187,6 @@ public sealed class EnvVerbTests
         Assert.Empty(vault.ReadRecycled());
         Assert.True(vault.RestoreRevision(_home, 0));
         Assert.Equal("1", vault.ReadField(_home, "A"), StringComparer.Ordinal);
-    }
-
-    /// <summary>An untagged entry under <c>env/</c> is no variable (D-0416), so <c>env rm</c> cannot reach it.</summary>
-    [Fact]
-    public void Rm_LeavesAnUntaggedEntryUnderEnvAlone()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-        Author(harness, ("env/billing", "A", "1"));
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "rm", "billing", "A", "--yes", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitNotFound, exit);
-        Assert.Contains("no env set for 'billing'", harness.Err, StringComparison.Ordinal);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Equal("1", vault.Find("env/billing/A")?.Password, StringComparer.Ordinal);
-    }
-
-    /// <summary>
-    /// Two entries in one project holding one key. Removing either would be a guess, so the
-    /// command refuses, exits nonzero and leaves the file exactly as it found it — which is why
-    /// this asserts on the bytes: <see cref="Vault.Save"/> re-randomises salt and nonces, so an
-    /// unchanged digest proves no save happened rather than that the contents matched.
-    /// </summary>
-    [Fact]
-    public void Rm_AKeyTwoEntriesHold_IsRefused_AndTheVaultIsNotWritten()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-        TagTwoHolders(harness, "TOKEN");
-
-        var before = Digest(harness.VaultPath);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "rm", "billing", "TOKEN", "--yes", "--vault", harness.VaultPath);
-
-        Assert.NotEqual(CliApp.ExitSuccess, exit);
-        Assert.Contains("TOKEN is on more than one item (services/Stripe, services/Twin)", harness.Err, StringComparison.Ordinal);
-        Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
     }
 
     [Fact]
@@ -325,24 +224,6 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "rm", "billing", "NOPE", "--yes", "--vault", harness.VaultPath));
-    }
-
-    /// <summary>
-    /// A project with no variables left is not the same as a project that never existed, and
-    /// <c>env ls</c> has to keep telling them apart or a script cannot branch on it.
-    /// </summary>
-    [Fact]
-    public void Ls_OnAProjectWithNoVariablesLeft_SucceedsAndListsNone()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-
-        harness.Prompt.Enqueue(Master);
-        harness.Run("env", "set", "billing", "A=1", "--vault", harness.VaultPath);
-        harness.Prompt.Enqueue(Master);
-        harness.Run("env", "rm", "billing", "A", "--yes", "--vault", harness.VaultPath);
-
-        Assert.Equal(["  dev", "    env/billing/.env"], Ls(harness, "billing"));
     }
 
     [Fact]
@@ -629,27 +510,6 @@ public sealed class EnvVerbTests
         }
 
         vault.Save();
-    }
-
-    /// <summary>Tags <c>services/Stripe</c> and <c>services/Twin</c> into billing, each holding <paramref name="key"/>.</summary>
-    private static void TagTwoHolders(CliHarness harness, string key)
-    {
-        using var vault = Vault.Open(harness.VaultPath, Master);
-
-        foreach (var title in new[] { "Stripe", "Twin" })
-        {
-            var name = new EntryName("services", title);
-            vault.AddEntry(new VaultEntry { GroupPath = "services", Title = title, Password = "login" });
-            Assert.True(vault.SetFields(name, [new FieldWrite(key, "old-" + title)]));
-            Assert.True(vault.AddTag(name, "env:billing"));
-        }
-
-        vault.Save();
-    }
-
-    private static string Digest(string path)
-    {
-        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     }
 
     private static void SeedVault(CliHarness harness)

@@ -139,44 +139,6 @@ public sealed class RunSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task A_locked_owner_refuses_and_nobody_is_asked()
-    {
-        await using var owner = Owner(ApprovalAnswer.Approved);
-        owner.Lifetime.End();
-
-        _harness.AssertExit(CliApp.ExitInternalError, Run("dev"));
-
-        Assert.Empty(_harness.ProcessLauncher.Started);
-        Assert.Empty(_harness.Prompt.PromptsSeen);
-        Assert.Contains("locked", _harness.Err, StringComparison.Ordinal);
-        Assert.Null(owner.Channel.Last);
-    }
-
-    /// <summary>The owner records a request it refuses as invalid, which the runner, the side that could skip it, never does (T-30).</summary>
-    [Fact]
-    public async Task A_command_the_prompt_cannot_show_whole_is_refused_and_recorded_by_the_owner()
-    {
-        await using var owner = Owner(ApprovalAnswer.Approved);
-
-        _harness.AssertExit(
-            CliApp.ExitInternalError,
-            _harness.Run("run", "--session", "--vault", _harness.VaultPath, "dev", "--", "deploy", new string('a', EnvReleasePrompt.MaximumCommandLength)));
-
-        Assert.Contains(
-            $"the command is longer than the {EnvReleasePrompt.MaximumCommandLength} characters a prompt shows whole, so nothing was started",
-            _harness.Err,
-            StringComparison.Ordinal);
-        Assert.Empty(_harness.ProcessLauncher.Started);
-        Assert.Null(owner.Channel.Last);
-
-        var line = Assert.Single(owner.AuditLines());
-        Assert.Contains("keypaste run --session", line, StringComparison.Ordinal);
-        Assert.Contains("\"decision\":\"denied\"", line, StringComparison.Ordinal);
-        Assert.Contains("\"method\":\"invalid-request\"", line, StringComparison.Ordinal);
-        Assert.Contains($"\"session\":\"{owner.Lifetime.Id}\"", line, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task An_unknown_project_exits_3_and_an_unusable_set_names_its_entries_unasked()
     {
         await using var owner = Owner(ApprovalAnswer.Approved);
@@ -427,23 +389,6 @@ public sealed class RunSessionTests : IDisposable
         Assert.DoesNotContain("starting with", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("answer in its prompt", _harness.Err, StringComparison.Ordinal);
         Assert.Single(_harness.ProcessLauncher.Started);
-        Assert.Null(owner.Channel.Last);
-    }
-
-    [Fact]
-    public async Task A_set_changed_after_the_confirmation_starts_nothing_unasked()
-    {
-        await using var owner = Owner(ApprovalAnswer.Approved);
-        Confirmed(owner);
-        owner.Edit(vault => ProjectVariables.Set(vault, "dev", "ADDED", "added-value"));
-
-        _harness.AssertExit(CliApp.ExitInternalError, RunLaunched("dev"));
-
-        Assert.Contains(
-            "keypaste run: dev's variables changed after you confirmed in the app, so nothing was started",
-            _harness.Err,
-            StringComparison.Ordinal);
-        Assert.Empty(_harness.ProcessLauncher.Started);
         Assert.Null(owner.Channel.Last);
     }
 

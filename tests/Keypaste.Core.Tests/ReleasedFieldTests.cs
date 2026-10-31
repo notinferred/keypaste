@@ -45,10 +45,6 @@ public sealed class ReleasedFieldTests
 
         Assert.Equal(value, released.Value.ToString(), StringComparer.Ordinal);
     }
-
-    [Fact]
-    public void ItRejectsANullFieldName() =>
-        Assert.Throws<ArgumentNullException>(() => new ReleasedField(null!, "x"));
 }
 
 /// <summary>
@@ -86,8 +82,4 @@ public sealed class CredentialFieldsTests
     [InlineData("recovery-codes")]
     public void NothingElseIs(string field) =>
         Assert.False(CredentialFields.IsReleasable(field));
-
-    [Fact]
-    public void IsReleasable_RejectsNull() =>
-        Assert.Throws<ArgumentNullException>(() => CredentialFields.IsReleasable(null!));
 }

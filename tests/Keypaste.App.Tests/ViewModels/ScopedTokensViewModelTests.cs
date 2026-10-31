@@ -104,19 +104,6 @@ public sealed class ScopedTokensViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Revoke_RemovesTheRow()
-    {
-        using var screen = new ScopedTokensViewModel(_session);
-        var (_, token, _) = screen.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false);
-
-        Assert.Null(screen.Revoke(Assert.Single(screen.Rows)));
-
-        Assert.Empty(screen.Rows);
-        Assert.Equal(TokenCheck.Unknown, new TokenStore(_session.Unlocked!).Verify(token!, _clock.GetUtcNow(), out _));
-        Assert.Empty(_session.Unlocked!.ReadRecycled());
-    }
-
-    [Fact]
     public void Revoke_RemovesTheRowsToken_NotOneNamedLikeItsId()
     {
         using var screen = new ScopedTokensViewModel(_session);

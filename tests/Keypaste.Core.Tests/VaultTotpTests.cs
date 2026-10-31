@@ -128,20 +128,6 @@ public sealed class VaultTotpTests : IDisposable
         Assert.DoesNotContain("GEZDGNBV", refusal, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void Neither_the_spec_nor_a_code_shows_the_seed()
-    {
-        using var vault = Seeded(NewVaultPath());
-        vault.SetFieldsUnchecked(_github, [new FieldWrite(TotpSpec.OtpField, $"otpauth://totp/GitHub?secret={_rfcSha256Base32}&algorithm=SHA256&digits=8")]);
-
-        using var spec = vault.ReadTotp(_github, out _);
-        var code = spec!.Code(_at);
-
-        Assert.DoesNotContain("GEZDGNBV", spec.ToString(), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("1234567890", spec.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain(code.Value, code.ToString(), StringComparison.Ordinal);
-    }
-
     private static Vault Seeded(string path)
     {
         var vault = Vault.Create(path, _master);

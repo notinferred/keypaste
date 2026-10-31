@@ -211,10 +211,6 @@ public sealed class EntryExposureTests
         Assert.False(Allows(exposure, name));
     }
 
-    [Fact]
-    public void TryCreate_RejectsNull() =>
-        Assert.Throws<ArgumentNullException>(() => EntryExposure.TryCreate(null!, out _, out _));
-
     /// <summary>keypaste's own records are never named or released, whatever a bridge or a rule was told.</summary>
     [Theory]
     [InlineData("**")]

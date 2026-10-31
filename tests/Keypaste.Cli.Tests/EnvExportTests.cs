@@ -40,28 +40,6 @@ public sealed class EnvExportTests
     private static string Target(CliHarness harness, string name = "out.env") =>
         Path.Combine(harness.Directory, name);
 
-    [Fact]
-    public void Export_WritesAFileThatPullReadsBackUnchanged()
-    {
-        using var harness = SeededWithTwo();
-        var path = Target(harness);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "export", "billing", path, "--dotenv", "--yes", "--vault", harness.VaultPath);
-
-        harness.AssertExit(CliApp.ExitSuccess, exit);
-
-        Assert.True(DotEnv.TryDecode(File.ReadAllBytes(path), out var text, out var decodeError), decodeError);
-        Assert.True(DotEnv.TryParse(text, out var document));
-        Assert.Equal(
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["API_KEY"] = "sk_live_secret",
-                ["PORT"] = "8080",
-            },
-            document.Variables.ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal));
-    }
-
     /// <summary>
     /// The whole round trip, through the two verbs a user actually types. It is what makes the
     /// escape hatch an escape hatch rather than a lossy dump.
@@ -413,43 +391,6 @@ public sealed class EnvExportTests
 
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Equal(File.ReadAllBytes(harness.VaultPath), File.ReadAllBytes(target));
-    }
-
-    /// <summary>
-    /// Wider than "the vault this export reads from", deliberately: a hard link and a bind mount
-    /// reach one file by a path nothing managed can resolve, and losing somebody else's vault costs
-    /// exactly as much. DECISIONS.md D-0092 records the widening.
-    /// </summary>
-    [Fact]
-    public void AKdbxDestination_IsRefused_EvenWhenItIsNotTheSource()
-    {
-        using var harness = SeededWithTwo();
-        var other = Path.Combine(harness.Directory, "other.kdbx");
-        File.Copy(harness.VaultPath, other);
-        var before = File.ReadAllBytes(other);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run(
-            "env", "export", "billing", other, "--dotenv", "--yes", "--force", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Equal(before, File.ReadAllBytes(other));
-    }
-
-    /// <summary>The guard did not become "refuse anything near a vault".</summary>
-    [Fact]
-    public void AFileBesideTheVault_StillExports()
-    {
-        using var harness = SeededWithTwo();
-        var target = Target(harness);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run(
-            "env", "export", "billing", target, "--dotenv", "--yes", "--vault", harness.VaultPath);
-
-        harness.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Contains("API_KEY", File.ReadAllText(target), StringComparison.Ordinal);
-        Assert.Single(harness.ConsoleStyle.Alarms);
     }
 
     [Fact]

@@ -362,39 +362,6 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.Equal(digest, Digest(_vaultPath));
     }
 
-    [Fact]
-    public async Task A_vault_that_cannot_be_replaced_is_left_as_it_was()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Skip("Only Windows refuses a rename onto a file another handle holds; the core suite arranges the failure everywhere.");
-            return;
-        }
-
-        ChangeThroughTheApp("v1");
-        var digest = Digest(_vaultPath);
-
-        using var session = new AppVaultSession(_clock);
-        var landed = 0;
-        using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => landed++);
-
-        unlock.StartRestoreCommand.Execute(null);
-        var restore = unlock.Restore!;
-        Enter(restore, _master);
-        await restore.CheckAsync();
-
-        using (new FileStream(_vaultPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-        {
-            await restore.ConfirmAsync();
-        }
-
-        Assert.Equal(0, landed);
-        Assert.False(session.IsUnlocked);
-        Assert.Contains("Nothing was replaced", restore.Message, StringComparison.Ordinal);
-        Assert.Equal(digest, Digest(_vaultPath));
-        Assert.Equal("v1", Read(_vaultPath));
-    }
-
     // ------------------------------------------------------------------ a pending restore does not wait
 
     [Fact]

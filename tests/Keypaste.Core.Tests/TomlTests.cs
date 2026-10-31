@@ -264,17 +264,6 @@ public sealed class TomlTests
         Assert.Equal(Toml.MaximumStringLength, TomlLimits.Policy.StringLength);
     }
 
-    [Fact]
-    public void TryGet_RejectsNull()
-    {
-        Assert.True(Toml.TryParse("[[allow]]\n", out var document, out _));
-        Assert.Throws<ArgumentNullException>(() => Assert.Single(document.Tables).TryGet(null!, out _));
-    }
-
-    [Fact]
-    public void TryParse_RejectsNull() =>
-        Assert.Throws<ArgumentNullException>(() => Toml.TryParse(null!, out _, out _));
-
     private static Gen<string> Chars(string pool, int least, int most) =>
         Gen.Choose(least, most).SelectMany(n => Gen.Elements(pool.ToCharArray()).ArrayOf(n)).Select(chars => new string(chars));
 

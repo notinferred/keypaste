@@ -416,13 +416,4 @@ public sealed class VaultCredentialSourceTests : IDisposable
         Assert.False(source.TryResolve("env/dev/STRIPE_KEY", out _, out var failure));
         Assert.Equal(CredentialFailure.Failed, failure);
     }
-
-    [Fact]
-    public void TheSourceRejectsNulls()
-    {
-        Assert.Throws<ArgumentNullException>(() => new VaultCredentialSource(null!));
-        Assert.Throws<ArgumentNullException>(() => Source().TryResolve(null!, out _, out _));
-        Assert.Throws<ArgumentNullException>(() => Source().TryRead(null!, "password", out _, out _, out _));
-        Assert.Throws<ArgumentNullException>(() => Source().TryRead(new EntryName("a", "b"), null!, out _, out _, out _));
-    }
 }

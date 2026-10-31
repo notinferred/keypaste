@@ -315,8 +315,4 @@ public sealed class EntryNameSanitizerTests
         Assert.Equal(string.Empty, result.Text);
         Assert.False(result.WasAltered);
     }
-
-    [Fact]
-    public void Sanitize_RejectsNull() =>
-        Assert.Throws<ArgumentNullException>(() => EntryNameSanitizer.Sanitize(null!));
 }

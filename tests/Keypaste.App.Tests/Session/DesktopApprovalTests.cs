@@ -30,7 +30,6 @@ public sealed class DesktopApprovalTests
 {
     internal const string Sentinel = "SENTINEL-DESKTOP-APPROVAL-3f9a1c";
     internal const string EntryPath = "env/ci/DEPLOY_KEY";
-    internal const string ProdEntryPath = "env/ci/prod/DEPLOY_KEY";
     internal const string TaggedEntryPath = "services/Stripe";
     internal const string Label = "ci-probe";
     internal const string ApiKeySentinel = "SENTINEL-DESKTOP-OPENAI-7d2e4b";
@@ -627,26 +626,6 @@ public sealed class DesktopApprovalTests
 
             Assert.Equal(AuditDecision.Granted, answered!.Decision);
             Assert.Equal(0, answered.TtlSeconds);
-        });
-
-    /// <summary>An entry under <c>env/…/prod</c> with no protecting tag of its own is an ordinary entry, offered the timed allow (D-0416).</summary>
-    [Fact]
-    public Task An_untagged_entry_under_a_prod_path_is_offered_the_timed_allow() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.Ask(entry: ProdEntryPath);
-            var window = await app.PromptAsync();
-
-            Assert.True(window.FindControl<Button>("Approve")!.IsVisible);
-            Assert.Equal("once, or for 1 hour", Text(window, "LifetimeText"));
-
-            await app.ArmAsync();
-            Click(window, "Approve");
-            var answered = await reply.WaitAsync(_wait, Token);
-
-            Assert.Equal(AuditDecision.Granted, answered!.Decision);
-            Assert.Equal(3600, answered.TtlSeconds);
         });
 
     [Fact]

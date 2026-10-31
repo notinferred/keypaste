@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text.RegularExpressions;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -83,34 +82,6 @@ public sealed class WordListTests
     {
         Assert.Equal(Math.Log2(VendoredWordList.Words().Length), WordList.BitsPerWord);
         Assert.InRange(WordList.BitsPerWord, 12.92, 12.93);
-    }
-
-    /// <summary>
-    /// The pin is stated once.
-    /// </summary>
-    /// <remarks>
-    /// D-0203 and D-0207 refuse a pin restated outside its one authority. UPSTREAM.md has to point
-    /// at the symbol, because a second copy of the hex is a second thing to forget to update.
-    /// </remarks>
-    [Fact]
-    public void The_provenance_document_names_the_pin_and_does_not_restate_it()
-    {
-        var upstream = File.ReadAllText(Path.Combine(VendoredWordList.Directory, "UPSTREAM.md"));
-
-        Assert.Contains("WordList.Digest", upstream, StringComparison.Ordinal);
-        Assert.False(
-            Regex.IsMatch(upstream, "[0-9a-fA-F]{64}", RegexOptions.None, TimeSpan.FromSeconds(5)),
-            "UPSTREAM.md holds a 64-character hex run; the pin belongs in WordList.Digest alone");
-    }
-
-    [Fact]
-    public void The_notices_file_attributes_the_list_and_its_licence()
-    {
-        var notices = File.ReadAllText(Path.Combine(VendoredWordList.RepoRoot(), "THIRD_PARTY_NOTICES.md"));
-
-        Assert.Contains("Electronic Frontier Foundation", notices, StringComparison.Ordinal);
-        Assert.Contains("CC-BY-4.0", notices, StringComparison.Ordinal);
-        Assert.Contains("third_party/eff-large-wordlist/LICENSE", notices, StringComparison.Ordinal);
     }
 
     [Fact]

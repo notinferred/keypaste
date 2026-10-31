@@ -181,30 +181,6 @@ public sealed class KeyfileOptionTests
         Assert.Equal(asked, harness.Prompt.SecretPrompts.Count);
     }
 
-    [Fact]
-    public void An_empty_file_is_refused_as_a_keyfile()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(_master);
-        var keyfile = Path.Combine(harness.Directory, "empty.keyx");
-        File.WriteAllBytes(keyfile, []);
-
-        Assert.Equal(CliApp.ExitNotFound, harness.Run("ls", "--vault", harness.VaultPath, "--keyfile", keyfile));
-        Assert.Contains("is empty", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void The_vault_is_refused_as_its_own_keyfile()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(_master);
-
-        var exit = harness.Run("ls", "--vault", harness.VaultPath, "--keyfile", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitNotFound, exit);
-        Assert.Contains("is a KeePass vault, not a keyfile", harness.Err, StringComparison.Ordinal);
-    }
-
     /// <summary>
     /// A vault with no keyfile, opened with one, is a wrong unlock secret — and the message has to
     /// name both factors, or somebody with a good password retypes the one thing that was right.
@@ -261,21 +237,6 @@ public sealed class KeyfileOptionTests
 
         Assert.Contains("locks the vault for good", harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("locks the vault for good", harness.Out, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_keyfile_somebody_actually_made_draws_no_warning()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(_master, ("env/demo/TOKEN", "value"));
-
-        var keyfile = Path.Combine(harness.Directory, "real.keyx");
-        File.WriteAllBytes(keyfile, new byte[32]);
-
-        harness.Prompt.Enqueue(_master);
-        harness.Run("ls", "--vault", harness.VaultPath, "--keyfile", keyfile);
-
-        Assert.DoesNotContain("locks the vault for good", harness.Err, StringComparison.Ordinal);
     }
 
     // ---------------------------------------------------------------------------------------

@@ -100,23 +100,12 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.RemoveEntry(new EntryName("env/billing", "ABSENT"), out var missing));
 
         Assert.Equal(default, missing);
+        Assert.Empty(vault.ReadRecycled());
 
         vault.SetRecyclesDeletedEntries(false);
 
         Assert.Equal(DeletionOutcome.DeletedPermanently, vault.RemoveEntry(_token, out var erased));
         Assert.Equal(default, erased);
-    }
-
-    [Fact]
-    public void RemoveEntry_MatchesNothing_WhenNoEntryHasThatName()
-    {
-        using var vault = Seeded(out _);
-
-        Assert.Equal(
-            DeletionOutcome.NothingMatched,
-            vault.RemoveEntry(new EntryName("env/billing", "ABSENT")));
-
-        Assert.Empty(vault.ReadRecycled());
     }
 
     [Fact]

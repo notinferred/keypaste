@@ -69,17 +69,6 @@ public sealed class StartupSettingsTests
         Assert.Equal(ThemeVariant.Dark, Current.RequestedThemeVariant);
     });
 
-    [Fact]
-    public Task A_theme_of_System_paints_what_the_operating_system_says() => Started(fixture =>
-    {
-        Save(fixture, AppSettings.Default with { Theme = AppTheme.System });
-
-        using var session = Compose(fixture, new ManualClock(AppClock.Start));
-
-        // The headless platform reports dark (PlatformTheme); ThemeFollowsSystemTests switches it.
-        Assert.Equal(ThemeVariant.Dark, Current.ActualThemeVariant);
-    });
-
     /// <summary>
     /// The whole of V-F.2a in one place: save preferences, throw the session away, compose a new
     /// one from the file alone, and the effective timeout, the displayed choice and the applied

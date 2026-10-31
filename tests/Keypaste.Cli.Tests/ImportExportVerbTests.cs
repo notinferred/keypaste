@@ -110,27 +110,6 @@ public sealed class ImportExportVerbTests : IDisposable
     }
 
     [Fact]
-    public void A_LastPass_export_is_copied_in_through_the_readers_keypaste_ships()
-    {
-        _cli.ExportReaders = ExportImport.Readers;
-        var export = Path.Combine(_cli.Directory, "lastpass_export.csv");
-        File.WriteAllText(export, "url,username,password,totp,extra,name,grouping,fav\r\nhttps://example.com,ada,lp-pw-example,,lp-notes-example,Example,Work,1\r\n");
-
-        _cli.Prompt.Enqueue(_master);
-        var exit = _cli.Run("import", export, "--vault", _cli.VaultPath, "--into", "imported");
-
-        _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Contains("  lastpass_export.csv · LastPass CSV · 1 item", _cli.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("lp-pw-example", _cli.Out + _cli.Err, StringComparison.Ordinal);
-
-        using var vault = Vault.Open(_cli.VaultPath, _master);
-        var name = new EntryName("imported/Work", "Example");
-        var item = vault.Find(name)!;
-        Assert.Equal(("ada", "lp-pw-example", "https://example.com", "lp-notes-example"), (item.Username, item.Password, item.Url, item.Notes));
-        Assert.Equal(["Favorite"], vault.Tags(name));
-    }
-
-    [Fact]
     public void A_file_no_reader_recognizes_is_refused_as_it_was_before()
     {
         var notes = Path.Combine(_cli.Directory, "notes.txt");
@@ -142,48 +121,6 @@ public sealed class ImportExportVerbTests : IDisposable
         _cli.AssertExit(CliApp.ExitInternalError, exit);
         Assert.Equal($"keypaste import: {notKdbx}{Environment.NewLine}", _cli.Err);
         Assert.Empty(_cli.Prompt.PromptsSeen);
-    }
-
-    [Fact]
-    public void A_bitwarden_export_is_copied_by_the_reader_keypaste_ships_with_its_passkey_naming_what_it_leaves_out()
-    {
-        _cli.ExportReaders = ExportImport.Readers;
-        var export = Path.Combine(_cli.Directory, "bitwarden_export.json");
-        File.WriteAllText(export, """
-            {
-              "encrypted": false,
-              "folders": [ { "id": "work", "name": "Work" } ],
-              "items": [
-                {
-                  "type": 1, "name": "Mail", "folderId": "work",
-                  "login": {
-                    "username": "export-user-mail", "password": "export-pw-mail", "totp": "JBSWY3DPEHPK3PXP",
-                    "fido2Credentials": [ { "credentialId": "b64.AQIDBA", "keyValue": "BAMCAQ", "rpId": "mail.example", "userHandle": "BQYHCA", "userName": "export-user-mail" } ]
-                  }
-                }
-              ]
-            }
-            """);
-
-        _cli.Prompt.Enqueue(_master);
-        var exit = _cli.Run("import", export, "--vault", _cli.VaultPath, "--into", "bitwarden");
-
-        _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Contains("  bitwarden_export.json · Bitwarden JSON · 1 item", _cli.Err, StringComparison.Ordinal);
-        Assert.Contains(
-            Lines(
-                "  ✓ 1 item · 0 projects · copied into bitwarden",
-                "  not imported: attachments (a Bitwarden .json export holds none; save each from Bitwarden and add it to its item)"),
-            _cli.Err,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("passkey", _cli.Err, StringComparison.Ordinal);
-        AssertNoValue();
-
-        using var vault = Vault.Open(_cli.VaultPath, _master);
-        var mail = new EntryName("bitwarden/Work", "Mail");
-        Assert.Equal(("export-user-mail", "export-pw-mail"), (vault.Find(mail)!.Username, vault.Find(mail)!.Password));
-        Assert.Equal("otpauth://totp/Mail:export-user-mail?secret=JBSWY3DPEHPK3PXP", vault.ReadField(mail, "otp"));
-        Assert.Equal(("AQIDBA", "mail.example"), (vault.ReadField(mail, "KPEX_PASSKEY_CREDENTIAL_ID"), vault.ReadField(mail, "KPEX_PASSKEY_RELYING_PARTY")));
     }
 
     [Fact]

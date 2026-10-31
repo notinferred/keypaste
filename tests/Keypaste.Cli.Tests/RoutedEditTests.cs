@@ -130,21 +130,6 @@ public sealed class RoutedEditTests : IDisposable
     }
 
     [Fact]
-    public async Task A_denied_edit_changes_nothing()
-    {
-        var before = File.ReadAllBytes(_harness.VaultPath);
-        await using var owner = Owner(ApprovalAnswer.Denied);
-
-        using (Hold(OwnerKind.DesktopApp))
-        {
-            _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("rm", "Work/github", "--yes", "--vault", _harness.VaultPath));
-        }
-
-        Assert.Contains("keypaste rm: not saved: a person refused this change", _harness.Err, StringComparison.Ordinal);
-        Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
-    }
-
-    [Fact]
     public async Task A_master_password_piped_before_the_value_sends_nothing()
     {
         var before = File.ReadAllBytes(_harness.VaultPath);

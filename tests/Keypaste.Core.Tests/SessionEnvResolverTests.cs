@@ -46,30 +46,6 @@ public sealed class SessionEnvResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task A_lock_while_the_person_is_asked_releases_nothing()
-    {
-        var lifetime = _lifetime!;
-        var asked = new TaskCompletionSource<EnvPreview>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var pending = Resolver().ResolveAsync(
-            "dev",
-            async (preview, token) =>
-            {
-                asked.SetResult(preview);
-                await Task.Delay(Timeout.Infinite, token);
-                return true;
-            },
-            Cancel).AsTask();
-
-        Assert.Equal(["TOKEN"], (await asked.Task.WaitAsync(Cancel)).Keys);
-        lifetime.End();
-
-        var resolved = await pending.WaitAsync(Cancel);
-        Assert.Equal(EnvOutcome.Locked, resolved.Outcome);
-        Assert.Empty(resolved.Variables);
-    }
-
-    [Fact]
     public async Task A_lock_after_confirming_commits_nothing()
     {
         var lifetime = _lifetime!;

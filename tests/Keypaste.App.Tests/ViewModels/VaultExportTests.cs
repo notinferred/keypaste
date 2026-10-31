@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
@@ -107,63 +106,6 @@ public sealed class VaultExportTests
         Assert.Contains("already exists", model.Message, StringComparison.Ordinal);
     }
 
-    /// <remarks>
-    /// Under the very name the picker suggests, which the backup parser does not recognise: the
-    /// refusal is about the folder, so the suggestion is never what keeps an export out of it.
-    /// </remarks>
-    [Fact]
-    public async Task The_backup_directory_is_refused_whatever_the_file_is_called()
-    {
-        using var fixture = new TempVault();
-        using var session = Unlocked(fixture);
-        var picker = new FakeVaultFilePicker();
-        using var model = Screen(session, fixture, picker);
-
-        await model.ExportAsync();
-        var inside = Path.Combine(VaultBackups.DirectoryFor(fixture.Path_), picker.SuggestedExportName!);
-
-        picker.ExportPath = inside;
-        await model.ExportAsync();
-
-        Assert.Equal(2, picker.ExportCalls);
-        Assert.False(File.Exists(inside));
-        Assert.Contains("backup directory", model.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task The_vault_itself_is_refused_and_unchanged()
-    {
-        using var fixture = new TempVault();
-        using var session = Unlocked(fixture);
-        var digest = Digest(fixture.Path_);
-        using var model = Screen(session, fixture, new FakeVaultFilePicker { ExportPath = fixture.Path_ });
-
-        await model.ExportAsync();
-
-        Assert.Equal(digest, Digest(fixture.Path_));
-        Assert.Contains("the vault itself", model.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task A_vault_changed_on_disk_is_not_exported()
-    {
-        using var fixture = new TempVault();
-        using var session = Unlocked(fixture);
-        var destination = Path.Combine(fixture.Home, "stale.kdbx");
-        using var model = Screen(session, fixture, new FakeVaultFilePicker { ExportPath = destination });
-
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
-        {
-            other.AddEntry(new VaultEntry { Title = "somebody else's", Password = "edit" });
-            other.Save();
-        }
-
-        await model.ExportAsync();
-
-        Assert.False(File.Exists(destination));
-        Assert.Contains("Reload to see it", model.Message, StringComparison.Ordinal);
-    }
-
     [Fact]
     public void The_section_says_where_the_copies_are_and_counts_them_as_they_are_now()
     {
@@ -209,6 +151,4 @@ public sealed class VaultExportTests
 
     private static SettingsViewModel Screen(AppVaultSession session, TempVault fixture, FakeVaultFilePicker picker) =>
         new(session, fixture.Home, new DesktopPreferences(fixture.Home), _ => { }, picker);
-
-    private static string Digest(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
 }

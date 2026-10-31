@@ -365,21 +365,6 @@ public sealed class GrantCacheTests
         Assert.DoesNotContain(cache.InForce(), grant => grant.Key == Key(field: "password"));
     }
 
-    [Fact]
-    public void TheCacheRejectsNulls()
-    {
-        Assert.Throws<ArgumentNullException>(() => new GrantCache(null!));
-
-        using var cache = new GrantCache(new ManualClock());
-
-        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), null!, _ttl, Approved(), cache.Generation));
-
-        using var released = new ReleasedField("password", "sk_live_x");
-        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), released, _ttl, null!, cache.Generation));
-        Assert.Throws<ArgumentNullException>(() => cache.Revoke(null!));
-        Assert.Throws<ArgumentNullException>(() => cache.RevokeEntries(null!));
-    }
-
     /// <summary>
     /// V-F.3a's own case. Expiry was measured on the wall clock alone, so an hour's rollback made
     /// an already-expired grant usable again — and the one-shot timer that should have zeroed it

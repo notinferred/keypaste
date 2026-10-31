@@ -107,19 +107,6 @@ public sealed class SetupVerbTests
         return JsonNode.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(Uri.UnescapeDataString(encoded))));
     }
 
-    [Fact]
-    public void Claude_code_is_told_the_scope_and_the_transport()
-    {
-        using var harness = Wired("claude");
-
-        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "claude-code"));
-
-        var call = Assert.Single(Ran(harness), Adds);
-        Assert.StartsWith("claude mcp add --scope user --transport stdio keypaste --", call, StringComparison.Ordinal);
-        Assert.Contains("--client-label claude-code", call, StringComparison.Ordinal);
-        Assert.Contains(harness.VaultPath, call, StringComparison.Ordinal);
-    }
-
     /// <summary>
     /// The keypaste that runs setup is the bridge, so a client is told to start it as <c>keypaste mcp</c>,
     /// with <c>mcp</c> before the bridge's own flags.
@@ -151,22 +138,6 @@ public sealed class SetupVerbTests
         Assert.Contains("rather than through dotnet", harness.Err, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Codex rejects <c>--scope</c> and <c>--transport</c>; they are Claude Code's alone.
-    /// </summary>
-    [Fact]
-    public void Codex_is_not_told_about_a_scope_it_has_no_concept_of()
-    {
-        using var harness = Wired("codex");
-
-        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "codex"));
-
-        var call = Assert.Single(Ran(harness), Adds);
-        Assert.StartsWith("codex mcp add keypaste --", call, StringComparison.Ordinal);
-        Assert.DoesNotContain("--scope", call, StringComparison.Ordinal);
-        Assert.DoesNotContain("--transport", call, StringComparison.Ordinal);
-    }
-
     [Fact]
     public void Gemini_cli_is_given_the_program_before_the_separator_and_the_person_is_told_about_trusted_folders()
     {
@@ -179,33 +150,6 @@ public sealed class SetupVerbTests
     }
 
     [Fact]
-    public void Devin_is_told_its_user_scope()
-    {
-        using var harness = Wired("devin");
-
-        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "devin"));
-
-        Assert.StartsWith("devin mcp add -s user keypaste -- ", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// The audit log exists to tell clients apart, so one run wiring two clients must not label
-    /// them both the same.
-    /// </summary>
-    [Fact]
-    public void Each_client_is_labelled_as_itself()
-    {
-        using var harness = Wired("claude", "codex");
-
-        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness));
-
-        var calls = Ran(harness).Where(Adds).ToList();
-        Assert.Equal(2, calls.Count);
-        Assert.Contains(calls, c => c.Contains("--client-label claude-code", StringComparison.Ordinal));
-        Assert.Contains(calls, c => c.Contains("--client-label codex", StringComparison.Ordinal));
-    }
-
-    [Fact]
     public void An_absent_client_is_reported_and_not_invoked()
     {
         using var harness = Wired("claude");
@@ -214,21 +158,6 @@ public sealed class SetupVerbTests
 
         Assert.Contains("  codex            not installed on this machine", harness.Out, StringComparison.Ordinal);
         Assert.DoesNotContain(harness.ProcessRunner.Calls, c => c.Contains("codex", StringComparison.Ordinal));
-    }
-
-    /// <summary>A client is found only on PATH's absolute entries, never in the directory setup runs in (D-0436).</summary>
-    [Fact]
-    public void A_client_in_the_working_directory_and_not_on_path_is_not_installed_and_never_run()
-    {
-        using var harness = Wired();
-        var work = Directory.CreateDirectory(Path.Combine(harness.Directory, "work")).FullName;
-        harness.ProcessRunner.Installed.Add(Plant(work, "claude"));
-        harness.ProcessRunner.Installed.Add("claude");
-        harness.WorkingDirectory = work;
-
-        harness.AssertExit(CliApp.ExitNotFound, RunSetup(harness, "--client", "claude-code"));
-
-        Assert.Empty(harness.ProcessRunner.Calls);
     }
 
     [Fact]
@@ -331,35 +260,6 @@ public sealed class SetupVerbTests
     }
 
     [Fact]
-    public void Claude_desktop_is_not_offered_on_linux()
-    {
-        Assert.SkipUnless(OperatingSystem.IsLinux(), "Claude Desktop has no Linux app");
-
-        using var harness = Wired();
-
-        harness.AssertExit(CliApp.ExitUsageError, RunSetup(harness, "--client", "claude-desktop"));
-    }
-
-    /// <summary>
-    /// The owner holds each agent to its settings on every request, so the bridge is registered offering run and
-    /// reaching every item, and the person is told what an agent with no settings gets.
-    /// </summary>
-    [Fact]
-    public void Each_client_is_registered_with_run_offered_and_every_item_in_reach()
-    {
-        using var harness = Wired("claude");
-
-        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "claude-code"));
-
-        Assert.EndsWith("--client-label claude-code --allow-run --expose **", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
-        Assert.Contains(
-            "can see        ** (each agent sees what its settings allow: every project's variables until you change them)\n"
-                + "run            offered; each agent runs nothing until you turn run on in its settings\n",
-            harness.Out.ReplaceLineEndings("\n"),
-            StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Expose_narrows_the_bridge_with_each_glob_as_its_own_flag()
     {
         using var harness = Wired("claude");
@@ -370,20 +270,6 @@ public sealed class SetupVerbTests
         Assert.EndsWith("--client-label claude-code --allow-run --expose env/** --expose deploy/**", call, StringComparison.Ordinal);
         Assert.DoesNotContain("--expose **", call, StringComparison.Ordinal);
         Assert.Contains("can see        env/**, deploy/** (no agent these tools start sees beyond these, whatever its settings)", harness.Out, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_client_configured_by_file_starts_the_bridge_offering_run_with_every_item_in_reach()
-    {
-        using var harness = Wired();
-        var cursor = Seed(harness, "cursor", "{}");
-
-        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "cursor"));
-
-        using var written = JsonDocument.Parse(File.ReadAllText(cursor));
-        var arguments = written.RootElement.GetProperty("mcpServers").GetProperty("keypaste").GetProperty("args").EnumerateArray()
-            .Select(argument => argument.GetString() ?? string.Empty);
-        Assert.Equal(["--client-label", "cursor", "--allow-run", "--expose", "**"], arguments.TakeLast(5));
     }
 
     /// <summary>
@@ -399,24 +285,6 @@ public sealed class SetupVerbTests
 
         Assert.Contains("there is no vault at", harness.Err, StringComparison.Ordinal);
         Assert.Single(Ran(harness), Adds);
-    }
-
-    /// <summary>
-    /// Running it twice has to work, because re-running is how a moved vault or a moved binary is
-    /// fixed. The clients disagree: Codex overwrites an existing entry, Claude Code refuses it —
-    /// so keypaste clears first and the two behave alike.
-    /// </summary>
-    [Fact]
-    public void Wiring_a_client_that_already_has_keypaste_clears_it_first()
-    {
-        using var harness = Wired("claude");
-
-        harness.AssertExit(CliApp.ExitSuccess, RunSetup(harness, "--client", "claude-code"));
-
-        var calls = Ran(harness);
-        Assert.Equal(2, calls.Count);
-        Assert.Equal("claude mcp remove --scope user keypaste", calls[0]);
-        Assert.Contains("mcp add", calls[1], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -502,17 +370,6 @@ public sealed class SetupVerbTests
 
         Assert.DoesNotContain("--vault", Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
         Assert.EndsWith("  keypaste approve", harness.Out.TrimEnd(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void The_vault_path_is_made_absolute_because_a_clients_working_directory_is_not_ours()
-    {
-        using var harness = Wired("claude");
-        harness.SeedVault(_master, ("env/demo/KEY", "value"));
-
-        harness.AssertExit(CliApp.ExitSuccess, harness.Run("setup", "--yes", "--vault", harness.VaultPath));
-
-        Assert.Contains(Path.GetFullPath(harness.VaultPath), Assert.Single(Ran(harness), Adds), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -734,18 +591,6 @@ public sealed class SetupVerbTests
         harness.AssertExit(CliApp.ExitClientsRefused, harness.Run("setup", "--remove", "--yes"));
 
         Assert.Contains("keypaste: Claude Code said: No MCP server found with name: keypaste", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Removing_from_a_client_configured_by_file_edits_only_its_entry()
-    {
-        using var harness = Wired();
-        var cursor = Seed(harness, "cursor", """{"mcpServers": {"keypaste": {"command": "k"}}}""");
-
-        harness.AssertExit(CliApp.ExitSuccess, harness.Run("setup", "--remove", "--yes"));
-
-        Assert.Equal("""{"mcpServers": {}}""", File.ReadAllText(cursor));
-        Assert.Contains($"  cursor           removed; the original is kept as {McpConfigFile.BackupPath(cursor)}", harness.Out, StringComparison.Ordinal);
     }
 
     [Fact]

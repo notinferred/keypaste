@@ -413,10 +413,6 @@ public sealed class AppVaultSessionTests
         Assert.False(session.IsUnlocked);
     }
 
-    [Fact]
-    public void The_default_is_five_minutes() =>
-        Assert.Equal(TimeSpan.FromMinutes(5), AppVaultSession.DefaultIdleTimeout);
-
     /// <summary>Opens a vault the way a caller should: the buffer is owned, and it is disposed.</summary>
     private static UnlockOutcome Unlock(AppVaultSession session, string path, string password)
     {

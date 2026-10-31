@@ -107,19 +107,6 @@ public sealed class RunTokenTests : IDisposable
     }
 
     [Fact]
-    public void Bundle_Expired_StartsNothing()
-    {
-        var token = Bundled("read:acme-api/staging/*", "--ttl", "1h");
-        _harness.Environment[RunWithToken.EnvironmentVariable] = token;
-        _harness.Clock.Now = _harness.Clock.Now.AddHours(1);
-
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("run", "--bundle", BundlePath, "--", "deploy"));
-
-        Assert.Empty(_harness.ProcessLauncher.Started);
-        Assert.Contains("expired", _harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Bundle_SeveralPairsUnnamed_IsUsage()
     {
         var token = Bundled("read:acme-api/staging/*,read:web/staging/*");
@@ -211,20 +198,6 @@ public sealed class RunTokenTests : IDisposable
     }
 
     [Fact]
-    public async Task Session_OwnerAuditUnwritable_StartsNothing()
-    {
-        var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*");
-        await using var owner = Owner.Start(this, audited: false);
-        RunAsARunner(token);
-
-        _harness.AssertExit(CliApp.ExitInternalError, Run("-p", "staging", "acme-api"));
-
-        Assert.Empty(_harness.ProcessLauncher.Started);
-        Assert.Contains("the audit log could not be opened, so nothing was started", _harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain(TokenVerbTests.Value, _harness.Out + _harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task Session_Refused_StartsNothing()
     {
         var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*,read:acme-api/qa/*");
@@ -241,31 +214,6 @@ public sealed class RunTokenTests : IDisposable
         Assert.Contains("'acme-api' has no 'qa' environment", _harness.Err, StringComparison.Ordinal);
         Assert.Null(owner.Channel.Last);
         Assert.Equal(3, owner.AuditLines().Count);
-    }
-
-    [Fact]
-    public async Task Session_AnInvalidRequest_IsRefusedAndTheOwnerAudited()
-    {
-        var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*");
-        await using var owner = Owner.Start(this, audited: true);
-        RunAsARunner(token);
-
-        _harness.AssertExit(
-            CliApp.ExitInternalError,
-            _harness.Run(
-                "run", "--token", "env", "--vault", _harness.VaultPath, "-p", "staging", "acme-api",
-                "--", "deploy", new string('a', EnvReleasePrompt.MaximumCommandLength)));
-
-        Assert.Empty(_harness.ProcessLauncher.Started);
-        Assert.Contains("characters a prompt shows whole, so nothing was started", _harness.Err, StringComparison.Ordinal);
-
-        var line = Assert.Single(owner.AuditLines());
-        Assert.Contains("keypaste run --token", line, StringComparison.Ordinal);
-        Assert.Contains("\"method\":\"token\"", line, StringComparison.Ordinal);
-        Assert.Contains("\"decision\":\"denied\"", line, StringComparison.Ordinal);
-        Assert.Contains("characters a prompt shows whole", line, StringComparison.Ordinal);
-        Assert.DoesNotContain(token[13..], line, StringComparison.Ordinal);
-        Assert.False(File.Exists(KeypasteHome.AuditPath(RunnerHome)));
     }
 
     [Fact]

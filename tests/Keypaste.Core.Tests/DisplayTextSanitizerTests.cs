@@ -200,9 +200,6 @@ public sealed class DisplayTextSanitizerTests
     }
 
     [Fact]
-    public void Null_and_a_non_positive_cap_are_refused()
-    {
-        Assert.Throws<ArgumentNullException>(() => DisplayTextSanitizer.Sanitize(null!));
+    public void A_non_positive_cap_is_refused() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => DisplayTextSanitizer.Sanitize("a", 0));
-    }
 }

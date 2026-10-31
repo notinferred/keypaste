@@ -392,10 +392,6 @@ public sealed class DotEnvWriterTests
     }
 
     [Fact]
-    public void NullVariablesThrows() =>
-        Assert.Throws<ArgumentNullException>(() => DotEnvWriter.TryFormat(null!, out _, out _));
-
-    [Fact]
     public void NothingIsWritten_ForAnEmptyProject()
     {
         var file = Format();

@@ -110,19 +110,6 @@ public sealed class EntryAttachmentsTests : IDisposable
     }
 
     [Fact]
-    public async Task Exactly_the_cap_is_attached()
-    {
-        using var context = new Context(_vaultPath);
-        var attachments = context.Open(_loose).Attachments;
-        context.Picker.AttachmentPath = Chosen("full.bin", new byte[EntryAttachment.MaximumSize]);
-
-        await attachments.AddCommand.ExecuteAsync();
-
-        Assert.Null(context.Entries.Error);
-        Assert.Equal(["5.0 MiB"], attachments.Rows.Select(row => row.SizeText));
-    }
-
-    [Fact]
     public async Task Replacing_keeps_the_name_as_one_revision()
     {
         using var context = new Context(_vaultPath);

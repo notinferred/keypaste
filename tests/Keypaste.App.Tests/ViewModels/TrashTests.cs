@@ -174,28 +174,6 @@ public sealed class TrashTests : IDisposable
         Assert.Equal("v0", Assert.Single(reopened.ReadHistory(name)!).Fields.Password, StringComparer.Ordinal);
     }
 
-    [Fact]
-    public void A_deleted_tagged_entry_is_restored_and_its_project_holds_it_again()
-    {
-        using (var context = new Context(_vaultPath))
-        {
-            Delete(context, "env/billing/.env");
-
-            var trash = context.NewTrash();
-            trash.Selected = Assert.Single(trash.Rows);
-            trash.RestoreCommand.Execute(null);
-
-            Assert.Equal(".env is back in env/billing.", trash.Notice, StringComparer.Ordinal);
-        }
-
-        using var reopened = Vault.Open(_vaultPath, _master);
-
-        Assert.Equal(
-            "sk-live",
-            Assert.Single(EnvResolution.List(reopened, "billing", "dev").Variables).Value,
-            StringComparer.Ordinal);
-    }
-
     /// <summary>
     /// Two home entries of one title from two projects land in one bin. The row a person selected is
     /// the row that comes back, because the address is an identity and not a title (D-0250).
@@ -570,26 +548,6 @@ public sealed class TrashTests : IDisposable
 
         Assert.True(asked > 0);
         Assert.Contains(nameof(TrashViewModel.EmptyPrompt), raised);
-    }
-
-    /// <summary>
-    /// The positive control for the digest: a check that never sees the bytes change would pass
-    /// for a screen that writes nothing at all.
-    /// </summary>
-    [Fact]
-    public void A_restore_that_works_does_change_the_file()
-    {
-        using var context = new Context(_vaultPath);
-
-        Delete(context, "servers/production");
-
-        var trash = context.NewTrash();
-        var before = Digest(_vaultPath);
-
-        trash.Selected = Assert.Single(trash.Rows);
-        trash.RestoreCommand.Execute(null);
-
-        Assert.NotEqual(before, Digest(_vaultPath));
     }
 
     [Fact]

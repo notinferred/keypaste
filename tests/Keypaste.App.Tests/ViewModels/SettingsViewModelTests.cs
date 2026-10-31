@@ -25,32 +25,6 @@ public sealed class SettingsViewModelTests
         Assert.Equal(TimeSpan.FromMinutes(1), session.IdleTimeout);
     }
 
-    /// <summary>
-    /// A restart is a fresh read of the file and a fresh session armed from it — not a second view
-    /// model over the same run. The old version of this test built one, which is why it passed
-    /// throughout the whole time launch was ignoring the file (F.2a).
-    /// </summary>
-    [Fact]
-    public void A_choice_survives_a_restart()
-    {
-        using var fixture = new TempVault();
-        using var first = new AppVaultSession(new ManualClock(AppClock.Start));
-
-        using var screen = Screen(first, fixture);
-        screen.Idle = screen.IdleChoices.Single(c => c.Seconds == 900);
-        screen.Theme = AppTheme.Dark;
-        screen.LockWhenMinimized = true;
-
-        var restarted = new DesktopPreferences(fixture.Home);
-        using var second = new AppVaultSession(new ManualClock(AppClock.Start), restarted.IdleTimeout);
-        using var after = new SettingsViewModel(second, fixture.Home, restarted, _ => { });
-
-        Assert.Equal(TimeSpan.FromMinutes(15), second.IdleTimeout);
-        Assert.Equal(900, after.Idle.Seconds);
-        Assert.Equal(AppTheme.Dark, after.Theme);
-        Assert.True(after.LockWhenMinimized);
-    }
-
     [Fact]
     public void Use_this_vault_chooses_it_for_agents_and_the_CLI_and_a_later_preference_keeps_it()
     {
@@ -186,25 +160,6 @@ public sealed class SettingsViewModelTests
 
         Assert.Empty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
         Assert.True(model.HasMessage);
-    }
-
-    /// <summary>
-    /// An unreadable settings file costs a preference, never a lock — the session still gets a
-    /// timeout that locks, because the default already does.
-    /// </summary>
-    [Fact]
-    public void A_malformed_settings_file_still_yields_a_timeout_that_locks()
-    {
-        using var fixture = new TempVault();
-        File.WriteAllText(KeypasteHome.SettingsPath(fixture.Home), "[[settings]]\nnot a pair\n");
-
-        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
-        using var model = Screen(session, fixture);
-
-        Assert.InRange(
-            model.Idle.Seconds,
-            AppSettings.MinimumIdleTimeoutSeconds,
-            AppSettings.MaximumIdleTimeoutSeconds);
     }
 
     private static SettingsViewModel Screen(AppVaultSession session, TempVault fixture) =>

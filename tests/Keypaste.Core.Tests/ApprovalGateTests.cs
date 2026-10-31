@@ -329,16 +329,6 @@ public sealed class ApprovalGateTests
     }
 
     [Fact]
-    public void TheGateRejectsNulls()
-    {
-        var clock = new ManualClock();
-
-        Assert.Throws<ArgumentNullException>(() => new ApprovalGate(null!, clock, ApprovalLimits.Default));
-        Assert.Throws<ArgumentNullException>(() => new ApprovalGate(new ScriptedChannel(ApprovalAnswer.Denied), null!, ApprovalLimits.Default));
-        Assert.Throws<ArgumentNullException>(() => new ApprovalGate(new ScriptedChannel(ApprovalAnswer.Denied), clock, null!));
-    }
-
-    [Fact]
     public async Task TheRequestBeingAsked_IsWaiting_WithItsWindowCountingDown_UntilItIsAnswered()
     {
         var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };

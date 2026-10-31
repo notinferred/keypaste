@@ -502,16 +502,6 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("--pair-browser <name>", said, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void TheChannelRejectsNulls()
-    {
-        var console = new AgentConsole(new StringWriter(), interactive: false);
-
-        Assert.Throws<ArgumentNullException>(() => new TerminalApprovalChannel(null!, console, _window, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new TerminalApprovalChannel(new FakeSecretPrompt(), null!, _window, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new TerminalApprovalChannel(new FakeSecretPrompt(), console, _window, null!));
-    }
-
     private static RunPrompt RunPromptFor(int grantSeconds = 900, OnceOnly onceOnly = OnceOnly.None) =>
         RunPrompt.For(
             new Keypaste.Core.Ipc.RunRequest

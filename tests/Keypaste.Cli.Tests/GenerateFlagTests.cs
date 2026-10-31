@@ -44,23 +44,6 @@ public sealed class GenerateFlagTests
         Assert.Contains("32-character password generated", harness.Err, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(12)]
-    [InlineData(PasswordGenerator.MinimumLength)]
-    [InlineData(64)]
-    public void Length_IsHonoured(int length)
-    {
-        using var harness = Seeded();
-
-        harness.Prompt.Enqueue(Master);
-        harness.Run(
-            "add", "svc/api",
-            "--generate", "--length", length.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--vault", harness.VaultPath);
-
-        Assert.Equal(length, Read(harness, "svc/api").Length);
-    }
-
     [Fact]
     public void NoSymbols_LeavesOnlyLettersAndDigits()
     {
@@ -92,19 +75,6 @@ public sealed class GenerateFlagTests
         {
             Assert.DoesNotContain(lookalike, Read(harness, "svc/api"));
         }
-    }
-
-    [Fact]
-    public void EnvSet_Generate_StoresAValueUnderTheProject()
-    {
-        using var harness = Seeded();
-
-        harness.Prompt.Enqueue(Master);
-        Assert.Equal(
-            CliApp.ExitSuccess,
-            harness.Run("env", "set", "billing", "STRIPE_KEY", "--generate", "--vault", harness.VaultPath));
-
-        Assert.Equal(20, Read(harness, "env/billing/.env", "STRIPE_KEY").Length);
     }
 
     /// <summary>
@@ -150,22 +120,6 @@ public sealed class GenerateFlagTests
         Assert.Equal(
             CliApp.ExitUsageError,
             harness.Run("add", "svc/api", "--generate", "--length", length, "--vault", harness.VaultPath));
-    }
-
-    [Fact]
-    public void Add_Words_StoresASixWordPassphrase()
-    {
-        using var harness = Seeded();
-
-        harness.Prompt.Enqueue(Master);
-        Assert.Equal(
-            CliApp.ExitSuccess,
-            harness.Run("add", "svc/api", "--generate", "--words", "6", "--vault", harness.VaultPath));
-
-        var pieces = Read(harness, "svc/api").Split(PasswordGenerator.DefaultSeparator);
-
-        Assert.Equal(6, pieces.Length);
-        Assert.All(pieces, piece => Assert.NotEmpty(piece));
     }
 
     /// <remarks>

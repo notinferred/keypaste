@@ -106,35 +106,6 @@ public sealed class GeneratedPassphraseTests : IDisposable
     }
 
     /// <summary>
-    /// The character choice still generates exactly what it generated before V.6.
-    /// </summary>
-    /// <remarks>
-    /// The recipe moved behind <see cref="GeneratorViewModel"/>, so the default path is worth
-    /// re-asserting on this form: a generator whose default silently became words would leave the
-    /// existing twenty-character test as the only thing saying otherwise.
-    /// </remarks>
-    [Fact]
-    public void The_default_is_still_a_twenty_character_password_on_both_forms()
-    {
-        using (var context = New())
-        {
-            var form = NewItemForm.Open(context.Entries, "database");
-            context.Entries.ConfirmAddCommand.Execute(null);
-
-            var project = Billing(context);
-            project.BeginAddCommand.Execute(null);
-            project.NewKey = "DATABASE_URL";
-            project.ConfirmAddCommand.Execute(null);
-
-            Assert.Null(context.Entries.Error);
-            Assert.Null(context.EnvSets.Error);
-        }
-
-        Assert.Equal(PasswordGenerator.DefaultLength, Reread("database").Length);
-        Assert.Equal(PasswordGenerator.DefaultLength, RereadHomeField("DATABASE_URL").Length);
-    }
-
-    /// <summary>
     /// A word count the core refuses writes nothing and says so.
     /// </summary>
     /// <remarks>

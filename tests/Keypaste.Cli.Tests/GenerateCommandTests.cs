@@ -160,28 +160,6 @@ public sealed class GenerateCommandTests
         Assert.Contains("32", harness.Out, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Two invocations do not print the same passphrase.
-    /// </summary>
-    /// <remarks>
-    /// V-V.6's "two generators do not repeat" clause, at the surface a person actually uses. It is
-    /// a weak assertion on its own — two draws of 78 bits colliding would be remarkable — and it
-    /// is here because a generator that seeded itself per process would fail exactly this and
-    /// nothing else in the suite.
-    /// </remarks>
-    [Fact]
-    public void TwoInvocations_DoNotPrintTheSamePassphrase()
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        for (var i = 0; i < 20; i++)
-        {
-            using var harness = new CliHarness();
-            harness.Run("generate", "--words", "6");
-            Assert.True(seen.Add(harness.Out.Trim()), "two invocations printed the same passphrase");
-        }
-    }
-
     /// <summary>The words, read from the vendored file rather than from the shipped list.</summary>
     private static HashSet<string> VendoredWords()
     {

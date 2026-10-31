@@ -92,3 +92,11 @@ D-0679.
 - **A fixed seed** means a property meets a new case only when its seed or generators change.
 - **The no-value tests stay examples** over each vendor's real fixture. A property over generated secret cells would have cost about what it saved.
 - **Properties for the placeholders, the PSL matcher and the merge** are in BACKLOG.
+- **A test audit followed** (founder, 2026-10-31).
+  - Three read-only searches compared the CLI's, the bridge's, the App's and Core's tests with Core's tests and the compiler's rules.
+  - 169 test methods were deleted from 77 files, 2,853 lines with the six helpers only they used. Each either repeated assertions a named test still makes, or only checked a null argument the nullable build refuses at every call site.
+  - What stays: the riskier duplicates on the bridge, injection and rekey paths, the retired-words tests, and the repeats that could merge into theories.
+  - The touched classes passed on the founder's Mac: 1,778 tests.
+  - At `1c099ee0`, ci 41233435085 passed every job, and app 41233442749 passed every job but `keepassxc first run (macos-15)`, which failed as F.74 does.
+  - BACKLOG has the audit's two findings: the attachment files' file-wide ban pragma, and the token bundle's rules in the CLI.
+- **.NET's `TextFieldParser` was measured against `Csv.cs` and not adopted.** It accepts a quote inside a bare field, a lone carriage return and spaces around a quoted field, and it numbers a record after a blank line wrongly.

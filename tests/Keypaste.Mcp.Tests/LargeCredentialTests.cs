@@ -253,33 +253,6 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         Assert.Equal(["undeliverable", "prompt"], LinesOf(harness).Select(line => line.Method));
     }
 
-    /// <summary>Asking twice for a field that cannot be delivered costs one prompt, not two.</summary>
-    /// <remarks>
-    /// The size belongs to the entry rather than to the request, so every retry ends the same way.
-    /// The grant is stored as any approved release stores one, which is what lets the second request
-    /// be answered from the cache instead of going back to a person (THREATS.md T-11). The two lines
-    /// carry the same method and different reasons, and the reason is where "they had already said
-    /// yes" is recorded.
-    /// </remarks>
-    [Fact]
-    public async Task AnUndeliverableRelease_AsksAPersonOnce()
-    {
-        var (harness, client) = await StartAsync();
-        await using var _ = harness;
-
-        _human.Answer = ApprovalAnswer.Approved;
-
-        await client.CallToolAsync(ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
-        await client.CallToolAsync(ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
-
-        Assert.Equal(1, _human.Asked);
-
-        var lines = LinesOf(harness);
-
-        Assert.Equal(["undeliverable", "undeliverable"], lines.Select(line => line.Method));
-        Assert.Contains("had already approved", lines[1].Reason, StringComparison.Ordinal);
-    }
-
     /// <summary>Answers however the test says, and counts how often it was asked.</summary>
     private sealed class ScriptedHuman : IApprovalChannel
     {

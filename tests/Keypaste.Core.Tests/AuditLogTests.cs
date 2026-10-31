@@ -859,11 +859,4 @@ public sealed class AuditLogTests : IDisposable
         Assert.Equal(1, entry.Line);
         Assert.Equal(1, restarted.Line);
     }
-
-    [Fact]
-    public void TryOpen_RejectsNull()
-    {
-        Assert.Throws<ArgumentNullException>(() => AuditLog.TryOpen(null!, TimeProvider.System, out _, out _));
-        Assert.Throws<ArgumentNullException>(() => AuditLog.TryOpen(LogPath, null!, out _, out _));
-    }
 }

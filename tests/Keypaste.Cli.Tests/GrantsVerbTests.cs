@@ -79,18 +79,6 @@ public sealed class GrantsVerbTests : IDisposable
     }
 
     [Fact]
-    public async Task Grants_ALockedOwner_HoldsNothing()
-    {
-        await using var owner = SessionOwner.Start(_harness);
-        owner.Grant("claude-code", "env/acme-api", "STRIPE_KEY");
-        owner.Lifetime.End();
-
-        _harness.AssertExit(CliApp.ExitSuccess, Run("grants", "--json"));
-
-        Assert.Equal("[]" + Environment.NewLine, _harness.Out);
-    }
-
-    [Fact]
     public async Task Revoke_ById()
     {
         await using var owner = SessionOwner.Start(_harness);

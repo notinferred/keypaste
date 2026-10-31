@@ -1,4 +1,3 @@
-using System.Text;
 using Keypaste.Core;
 using Xunit;
 
@@ -59,24 +58,6 @@ public sealed class EnvPullTests
         Assert.Contains("3 new", harness.Err, StringComparison.Ordinal);
         Assert.Contains("API_KEY", harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("sk_live_secret", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Pull_OfAReferenceFile_IsRefused_AndTheVaultKeepsItsValues()
-    {
-        using var harness = Seeded();
-        harness.Prompt.Enqueue(Master, "real-key");
-        harness.Run("env", "set", "billing", "API_KEY", "--vault", harness.VaultPath);
-        harness.Stderr.GetStringBuilder().Clear();
-        var path = WriteEnvFile(harness, EnvReferenceFile.Format("billing", "dev", ["API_KEY"]), EnvReferenceFile.FileName);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
-
-        Assert.NotEqual(CliApp.ExitSuccess, exit);
-        Assert.Contains(EnvReferenceFile.FileName, harness.Err, StringComparison.Ordinal);
-        Assert.Equal([new EnvVariable("API_KEY", "real-key")], Stored(harness, "billing"));
-        Assert.True(File.Exists(path));
     }
 
     /// <summary>
@@ -299,22 +280,6 @@ public sealed class EnvPullTests
     }
 
     [Fact]
-    public void Pull_RefusesTwoNamesDifferingOnlyInCase_BeforeWritingAnything()
-    {
-        using var harness = Seeded();
-        var path = WriteEnvFile(harness, "TOKEN=a\nToken=b\n");
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("only in case", harness.Err, StringComparison.Ordinal);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Empty(ProjectCatalog.Read(vault).Projects);
-    }
-
-    [Fact]
     public void Pull_OfAFileThatChangesNothing_SucceedsAndSaysSo()
     {
         using var harness = Seeded();
@@ -393,62 +358,6 @@ public sealed class EnvPullTests
     }
 
     /// <summary>
-    /// `--delete-source` never prompts, so its window is short — but a key derivation is hundreds
-    /// of milliseconds and the check has to exist on this path too.
-    /// </summary>
-    [Fact]
-    public void Pull_DeleteSource_WhenTheSourceChanged_KeepsIt_AndFails()
-    {
-        using var harness = Seeded();
-        var path = WriteEnvFile(harness, "A=1\n");
-
-        harness.Prompt.OnPrompt = ChangeTheFile(harness, path, "Master password", "A=1\nB=2\n");
-        harness.Prompt.Enqueue(Master);
-
-        var exit = harness.Run(
-            "env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Equal("A=1\nB=2\n", File.ReadAllText(path));
-        Assert.Contains("The file still contains the values.", harness.Err, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// Same content, different file. The digest cannot see this one and the path rule can.
-    /// </summary>
-    [Fact]
-    public void Pull_WhenTheSourceIsReplacedByASymlinkElsewhere_LeavesTheOtherFileAlone()
-    {
-        using var harness = Seeded();
-        var path = WriteEnvFile(harness, "A=1\n");
-        var elsewhere = WriteEnvFile(harness, "A=1\n", "elsewhere.env");
-
-        // Probed before the run, so a machine that cannot make links skips here rather than
-        // throwing out of a prompt with a vault open.
-        RequireSymbolicLinks(harness, elsewhere);
-
-        harness.Prompt.OnPrompt = prompt =>
-        {
-            if (!prompt.StartsWith("Master password", StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            harness.Prompt.OnPrompt = null;
-            File.Delete(path);
-            File.CreateSymbolicLink(path, elsewhere);
-        };
-        harness.Prompt.Enqueue(Master);
-
-        var exit = harness.Run(
-            "env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
-
-        harness.AssertExit(CliApp.ExitInternalError, exit);
-        Assert.True(File.Exists(elsewhere));
-        Assert.Equal("A=1\n", File.ReadAllText(elsewhere));
-    }
-
-    /// <summary>
     /// `File.Delete` does not throw for a file that is not there, so the old code reported a
     /// deletion it had not performed.
     /// </summary>
@@ -474,29 +383,6 @@ public sealed class EnvPullTests
         harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.DoesNotContain("Deleted ", harness.Err, StringComparison.Ordinal);
         Assert.Contains("already gone", harness.Err, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// The positive control for the whole set: an untouched file is still deleted on confirmation,
-    /// or the tests above would pass just as well against a command that never deletes anything.
-    /// </summary>
-    [Fact]
-    public void Pull_WithAnUnchangedSource_StillDeletesItOnConfirmation()
-    {
-        using var harness = Seeded();
-        var path = WriteEnvFile(harness, "A=1\n");
-
-        harness.Prompt.Interactive = true;
-        harness.Prompt.Enqueue(Master, "y", "y");
-
-        var exit = harness.Run("env", "pull", "billing", path, "--vault", harness.VaultPath);
-
-        harness.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.False(File.Exists(path));
-        Assert.Contains($"Deleted {path}.", harness.Err, StringComparison.Ordinal);
-
-        // And nothing was left beside it under a temporary name.
-        Assert.Empty(Directory.GetFiles(harness.Directory, "*.keypaste-*"));
     }
 
     /// <summary>
@@ -553,43 +439,6 @@ public sealed class EnvPullTests
         Assert.Equal("A=1\n", File.ReadAllText(path));
     }
 
-    /// <summary>
-    /// The import succeeded and the file could not be removed, so it is sitting under a temporary
-    /// name beside where it was. Naming it is the whole of the obligation: it is plaintext, it is
-    /// the user's, and a run that quietly left it there would be worse than one that never tried.
-    /// </summary>
-    /// <remarks>
-    /// Windows only. The read-only attribute is what makes <c>File.Delete</c> refuse there; on
-    /// Linux and macOS the directory governs deletion and the file goes without complaint.
-    /// </remarks>
-    [Fact]
-    public void Pull_WhenTheSourceCannotBeDeleted_NamesWhereItLeftIt_AndFails()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Skip("on this platform the read-only attribute does not prevent deletion.");
-        }
-
-        using var harness = Seeded();
-        var path = WriteEnvFile(harness, "A=1\n");
-        File.SetAttributes(path, FileAttributes.ReadOnly);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run(
-            "env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
-
-        var left = Assert.Single(Directory.GetFiles(harness.Directory, "*.keypaste-*"));
-        foreach (var file in Directory.GetFiles(harness.Directory))
-        {
-            File.SetAttributes(file, FileAttributes.Normal);
-        }
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Equal("A=1\n", File.ReadAllText(left));
-        Assert.Contains(left, harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("Deleted ", harness.Err, StringComparison.Ordinal);
-    }
-
     /// <summary>Plants a rewrite of the source at the named prompt, once.</summary>
     private static Action<string> ChangeTheFile(
         CliHarness harness,
@@ -606,32 +455,4 @@ public sealed class EnvPullTests
             harness.Prompt.OnPrompt = null;
             File.WriteAllText(path, contents);
         };
-
-    private static void RequireSymbolicLinks(CliHarness harness, string target)
-    {
-        var probe = Path.Combine(harness.Directory, "probe.link");
-        try
-        {
-            File.CreateSymbolicLink(probe, target);
-            File.Delete(probe);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Assert.Skip($"this machine cannot create symbolic links: {ex.Message}");
-        }
-    }
-
-    [Fact]
-    public void Pull_ReadsAUtf16File()
-    {
-        using var harness = Seeded();
-        var path = Path.Combine(harness.Directory, "utf16.env");
-        File.WriteAllText(path, "A=café\n", new UnicodeEncoding(bigEndian: false, byteOrderMark: true));
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
-
-        harness.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Equal("café", Assert.Single(Stored(harness, "billing")).Value);
-    }
 }

@@ -31,45 +31,6 @@ public sealed class VerbTests
         Assert.Empty(vault.ReadEntries());
     }
 
-    [Fact]
-    public void Init_MismatchedPasswords_WritesNoVault()
-    {
-        using var harness = new CliHarness();
-        harness.Prompt.Enqueue(Master, "something else");
-
-        var exit = harness.Run("init", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitAuthFailed, exit);
-        Assert.False(File.Exists(harness.VaultPath));
-        Assert.Contains("do not match", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Init_RefusesToOverwriteAnExistingVault()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master);
-
-        harness.Prompt.Enqueue(Master, Master);
-        var exit = harness.Run("init", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("already exists", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Init_EmptyPassword_IsRejected()
-    {
-        using var harness = new CliHarness();
-        harness.Prompt.Enqueue(string.Empty, string.Empty);
-
-        var exit = harness.Run("init", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitAuthFailed, exit);
-        Assert.False(File.Exists(harness.VaultPath));
-        Assert.Contains("the master password cannot be empty", harness.Err, StringComparison.Ordinal);
-    }
-
     /// <summary>
     /// What each refusal says, pinned word for word.
     /// </summary>
@@ -170,19 +131,6 @@ public sealed class VerbTests
     }
 
     [Fact]
-    public void Add_DuplicateEntry_IsRejected()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("solo", "one"));
-
-        harness.Prompt.Enqueue(Master, "two");
-        var exit = harness.Run("add", "solo", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("already exists", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Add_GroupInPathAndFlag_IsAUsageError()
     {
         using var harness = new CliHarness();
@@ -191,39 +139,6 @@ public sealed class VerbTests
         var exit = harness.Run("add", "a/b", "--group", "c", "--vault", harness.VaultPath);
 
         Assert.Equal(CliApp.ExitUsageError, exit);
-    }
-
-    /// <summary>
-    /// Three identities can answer to <c>a/b/c</c>: the title in the root group, <c>b/c</c> in
-    /// <c>a</c>, and <c>c</c> in <c>a/b</c>. With the first two present, the third is a different
-    /// identity that no existing-entry check would catch — and creating it would deepen a
-    /// collision <c>get</c> already refuses. The digest is the assertion that nothing was written:
-    /// <see cref="Vault.Save"/> re-randomises salt and nonces, so an unchanged one proves no save
-    /// happened rather than that the contents matched.
-    /// </summary>
-    [Fact]
-    public void Add_APathThatAlreadyNamesTwo_IsRefused_AndTheVaultIsNotWritten()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master);
-        Author(harness, string.Empty, "a/b/c", "root-titled");
-        Author(harness, "a", "b/c", "slashed");
-
-        var before = Digest(harness.VaultPath);
-
-        harness.Prompt.Enqueue(Master, "third");
-        var exit = harness.Run("add", "a/b/c", "--vault", harness.VaultPath);
-
-        Assert.NotEqual(CliApp.ExitSuccess, exit);
-        Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
-
-        // Why it refused matters: "already exists" would be a false statement about an identity
-        // no entry has, and it is the answer the old joined-path check gave.
-        Assert.Contains("names more than one item", harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("already exists", harness.Err, StringComparison.Ordinal);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Equal(2, vault.ReadEntries().Count);
     }
 
     /// <summary>
@@ -284,19 +199,6 @@ public sealed class VerbTests
     }
 
     [Fact]
-    public void Get_DefaultTimeout_IsTwentySeconds()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("solo", "solo-secret"));
-
-        harness.Prompt.Enqueue(Master);
-        harness.Run("get", "solo", "--vault", harness.VaultPath);
-
-        Assert.Equal(TimeSpan.FromSeconds(20), harness.ClearStrategy.RequestedDelay);
-        Assert.True(harness.ClearStrategy.Cleared);
-    }
-
-    [Fact]
     public void Get_TimeoutZero_DoesNotScheduleAClear()
     {
         using var harness = new CliHarness();
@@ -307,29 +209,6 @@ public sealed class VerbTests
 
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Null(harness.ClearStrategy.RequestedDelay);
-    }
-
-    /// <summary>
-    /// If the user copied something else during the wait, keypaste leaves it alone. keepassxc-cli
-    /// clears unconditionally and destroys whatever was there; its own GUI does not.
-    /// </summary>
-    [Fact]
-    public void Get_ClipboardChangedSinceTheCopy_IsLeftAlone()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("solo", "solo-secret"));
-
-        // Simulate the user copying something else during the twenty-second wait.
-        harness.ClearStrategy.DuringWait =
-            () => harness.Clipboard.ReplaceExternally("something the user copied");
-
-        harness.Prompt.Enqueue(Master);
-        harness.Run("get", "solo", "--vault", harness.VaultPath);
-
-        Assert.False(harness.ClearStrategy.Cleared);
-        Assert.Equal(0, harness.Clipboard.ClearCount);
-        Assert.Equal("something the user copied", harness.Clipboard.Content, StringComparer.Ordinal);
-        Assert.Contains("leaving it alone", harness.Err, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -501,22 +380,6 @@ public sealed class VerbTests
         Assert.All(harness.Out, c => Assert.True(c < 128, $"non-ASCII character U+{(int)c:X4} in ls output"));
     }
 
-    [Fact]
-    public void Ls_NeverPrintsAUsernameOrPassword()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master);
-
-        harness.Prompt.Enqueue(Master, "top-secret");
-        harness.Run("add", "solo", "--vault", harness.VaultPath, "--username", "the-user");
-
-        harness.Prompt.Enqueue(Master);
-        harness.Run("ls", "--vault", harness.VaultPath);
-
-        Assert.DoesNotContain("top-secret", harness.Out, StringComparison.Ordinal);
-        Assert.DoesNotContain("the-user", harness.Out, StringComparison.Ordinal);
-    }
-
     /// <summary>
     /// The entry leaves the vault's own listing and lands somewhere it can be recovered from, and
     /// the command says which of the two deletions it did. Saying "Removed" for a deletion that
@@ -581,45 +444,6 @@ public sealed class VerbTests
     }
 
     /// <summary>
-    /// A joined path is not an identity. An entry titled <c>b/c</c> in group <c>a</c> and an entry
-    /// titled <c>c</c> in group <c>a/b</c> are both <c>a/b/c</c>, so there is nothing for the
-    /// command to delete that would not be a guess (docs/PRODUCT.md law 3.7). The digest is the
-    /// assertion that nothing was written: <see cref="Vault.Save"/> re-randomises salt and nonces,
-    /// so an unchanged digest proves no save happened rather than that the contents matched.
-    /// </summary>
-    [Fact]
-    public void Rm_ACollidingPath_IsRefused_AndTheVaultIsNotWritten()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("a/b/c", "nested"));
-        Author(harness, "a", "b/c", "slashed");
-
-        var before = Digest(harness.VaultPath);
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("rm", "a/b/c", "--vault", harness.VaultPath, "--yes");
-
-        Assert.NotEqual(CliApp.ExitSuccess, exit);
-        Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Equal(2, vault.ReadEntries().Count);
-    }
-
-    [Fact]
-    public void Rm_AGroupPath_IsRejectedWithAGroupSpecificMessage()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("compat/ascii", "a"));
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("rm", "compat", "--vault", harness.VaultPath, "--yes");
-
-        Assert.Equal(CliApp.ExitNotFound, exit);
-        Assert.Contains("is a group", harness.Err, StringComparison.Ordinal);
-    }
-
-    /// <summary>
     /// A piped run must not have its confirmation answered by whatever the next line of stdin
     /// happens to be. In a vault with no recycle bin the deletion is irreversible, and in one with
     /// a bin it is most of the way there, so either way it is asked for explicitly.
@@ -639,46 +463,6 @@ public sealed class VerbTests
 
         using var vault = Vault.Open(harness.VaultPath, Master);
         Assert.NotNull(vault.Find("solo"));
-    }
-
-    [Fact]
-    public void VaultFlag_BeatsTheEnvironmentVariable()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("solo", "solo-secret"));
-        harness.Environment[VaultLocator.EnvironmentVariable] =
-            Path.Combine(harness.Directory, "does-not-exist.kdbx");
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal");
-
-        Assert.Equal(CliApp.ExitSuccess, exit);
-    }
-
-    [Fact]
-    public void EnvironmentVariable_IsUsedWhenTheFlagIsAbsent()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("solo", "solo-secret"));
-        harness.Environment[VaultLocator.EnvironmentVariable] = harness.VaultPath;
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("get", "solo", "--reveal");
-
-        Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Equal("solo-secret", harness.Out.TrimEnd(), StringComparer.Ordinal);
-    }
-
-    [Fact]
-    public void NoVaultAnywhere_IsAUsageError_NamingBothMechanisms()
-    {
-        using var harness = new CliHarness();
-
-        var exit = harness.Run("ls");
-
-        Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("--vault", harness.Err, StringComparison.Ordinal);
-        Assert.Contains(VaultLocator.EnvironmentVariable, harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -712,19 +496,6 @@ public sealed class VerbTests
         Assert.DoesNotContain("secret", harness.Out, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void Ls_Text_SkipsReserved()
-    {
-        using var harness = new CliHarness();
-        harness.SeedVault(Master, ("Banking/Chase", "chase-secret"));
-        Author(harness, ".keypaste/shares", "s1", "revoke-token");
-
-        harness.Prompt.Enqueue(Master);
-        harness.AssertExit(CliApp.ExitSuccess, harness.Run("ls", "--flat", "--vault", harness.VaultPath));
-
-        Assert.Equal(["Banking/", "Banking/Chase"], harness.Out.ReplaceLineEndings("\n").TrimEnd().Split('\n'));
-    }
-
     /// <summary>
     /// Writes an entry the CLI itself cannot create: <c>add</c> reads a separator in the argument
     /// as a group, so a title containing one has to come through the core, the way KeePassXC does.
@@ -750,10 +521,5 @@ public sealed class VerbTests
                 new FieldWrite("Recovery codes", "recovery-7b3a"),
             ]));
         vault.Save();
-    }
-
-    private static string Digest(string path)
-    {
-        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     }
 }

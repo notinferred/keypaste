@@ -192,21 +192,6 @@ public sealed partial class CrashReportingTests : IDisposable
     }
 
     [Fact]
-    public void A_marker_another_version_left_is_taken_and_reports_nothing()
-    {
-        File.WriteAllText(SettingsFile, "[[settings]]\ncrash_reports = 1\nterms = \"" + TermsOfUse.Carried.Version + "\"\n");
-        Directory.CreateDirectory(Folder);
-        File.WriteAllText(Marker, "0.0.1 2026-07-27T10:00:00.0000000+00:00");
-
-        using var next = Reporting();
-        next.Start();
-
-        Assert.Empty(next.Waiting());
-        Assert.True(File.Exists(Marker));
-        Assert.StartsWith(Core.CoreInfo.Version + " ", File.ReadAllText(Marker), StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void A_start_after_dont_send_deletes_a_report_put_in_the_outbox()
     {
         using (var on = Reporting())

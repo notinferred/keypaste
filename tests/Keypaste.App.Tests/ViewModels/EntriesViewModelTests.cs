@@ -116,20 +116,6 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Equal(4, context.Entries.Rows.Count);
     }
 
-    [Theory]
-    [InlineData("prod", "production")]
-    [InlineData("PROD", "production")]
-    [InlineData("servers", "production")]
-    [InlineData("hub", "github")]
-    public void Search_matches_a_title_or_a_group_either_case(string search, string expected)
-    {
-        using var context = New();
-
-        context.Entries.Search = search;
-
-        Assert.Contains(context.Entries.Rows, row => row.Title == expected);
-    }
-
     [Fact]
     public void Search_narrows_within_the_selected_group()
     {

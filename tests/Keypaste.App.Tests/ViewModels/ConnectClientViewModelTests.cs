@@ -358,19 +358,6 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task A_file_holding_no_keypaste_entry_is_not_connected_and_is_left_alone()
-    {
-        var cursor = Seed(Path.Combine(".cursor", "mcp.json"), """{"mcpServers": {"other": {"command": "other"}}}""");
-        using var model = Model("cursor", removes: true);
-
-        await model.PreviewAsync();
-
-        Assert.Equal("Cursor is not connected; there is nothing to remove.", model.Message);
-        Assert.False(model.ConfirmCommand.CanExecute(null));
-        Assert.False(File.Exists(McpConfigFile.BackupPath(cursor)));
-    }
-
-    [Fact]
     public async Task Removing_a_client_configured_by_file_edits_only_its_entry()
     {
         const string seed = """{"mcpServers": {"keypaste": {"command": "k"}, "other": {"command": "other"}}}""";
@@ -452,18 +439,6 @@ public sealed class ConnectClientViewModelTests : IDisposable
         await model.OpenInstallLinkCommand.ExecuteAsync();
 
         Assert.Equal("Your system didn't open the link. Copy it and paste it into your browser, which hands it to Cursor.", model.Message);
-    }
-
-    [Fact]
-    public async Task A_tool_that_takes_no_link_is_offered_none()
-    {
-        using var model = Model(web: new RecordingLauncher());
-
-        await model.PreviewAsync();
-
-        Assert.True(model.HasPreview);
-        Assert.Null(model.InstallLink);
-        Assert.False(model.OpenInstallLinkCommand.CanExecute(null));
     }
 
     [Fact]

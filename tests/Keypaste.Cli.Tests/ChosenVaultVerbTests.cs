@@ -36,30 +36,6 @@ public sealed class ChosenVaultVerbTests
     }
 
     [Fact]
-    public void TheEnvironment_WinsOverTheChosenVault()
-    {
-        using var harness = Seeded();
-        ChosenVault.Choose(Home(harness), harness.VaultPath, onlyIfNone: false);
-        harness.Environment[VaultLocator.EnvironmentVariable] = Missing(harness, "from-env.kdbx");
-
-        Assert.Equal(CliApp.ExitNotFound, harness.Run("ls"));
-        Assert.Contains("from-env.kdbx", harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TheFlag_WinsOverTheEnvironmentAndTheChosenVault()
-    {
-        using var harness = Seeded();
-        ChosenVault.Choose(Home(harness), Missing(harness, "chosen.kdbx"), onlyIfNone: false);
-        harness.Environment[VaultLocator.EnvironmentVariable] = Missing(harness, "from-env.kdbx");
-
-        harness.Prompt.Enqueue(_master);
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("get", "solo", "--reveal", "--vault", harness.VaultPath));
-
-        Assert.Equal("solo-secret", harness.Out.TrimEnd());
-    }
-
-    [Fact]
     public void WithNoVaultAnywhere_TheErrorNamesTheNextStep()
     {
         using var harness = new CliHarness();
@@ -94,19 +70,6 @@ public sealed class ChosenVaultVerbTests
         again.Environment[KeypasteHome.EnvironmentVariable] = Home(harness);
         Assert.Equal(CliApp.ExitSuccess, again.Run("use"));
         Assert.Equal(harness.VaultPath, again.Out.TrimEnd());
-    }
-
-    [Fact]
-    public void Use_KeepsTheOtherPreferences()
-    {
-        using var harness = Seeded();
-        AppSettings.Save(KeypasteHome.SettingsPath(Home(harness)), AppSettings.Default with { IdleTimeoutSeconds = 900, Theme = AppTheme.Light });
-
-        Assert.Equal(CliApp.ExitSuccess, harness.Run("use", harness.VaultPath));
-
-        var settings = AppSettings.Load(KeypasteHome.SettingsPath(Home(harness)));
-        Assert.Equal(900, settings.IdleTimeoutSeconds);
-        Assert.Equal(AppTheme.Light, settings.Theme);
     }
 
     [Fact]

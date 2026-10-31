@@ -135,25 +135,6 @@ public sealed class LostTagRecommendationsTests : IDisposable
         Assert.Equal("1", Settings(again).Count);
     }
 
-    [Fact]
-    public async Task A_tag_removed_in_keypaste_is_not_listed()
-    {
-        using var shell = Shell();
-        await shell.Recommendations.Checking;
-
-        Assert.DoesNotContain(shell.Recommendations.LostTags, row => row.Finding.Entry == _web);
-
-        var vault = _session.Unlocked!;
-        Assert.True(vault.AddTag(_web, "env:web:staging"));
-        Assert.True(vault.RemoveTags(_web, ["env:web:staging"]));
-        vault.Save();
-        shell.Recommendations.Check();
-        await shell.Recommendations.Checking;
-
-        Assert.Single(shell.Recommendations.LostTags);
-        Assert.DoesNotContain(shell.Recommendations.LostTags, row => row.Finding.Entry == _web);
-    }
-
     private static NavItem Settings(ShellViewModel shell) =>
         shell.FooterNav.Single(item => item.Destination.Kind == DestinationKind.Settings);
 

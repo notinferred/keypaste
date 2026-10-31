@@ -126,20 +126,6 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
         Assert.DoesNotContain(_sentinel, _log.Text(), StringComparison.Ordinal);
     }
 
-    /// <summary>With nothing holding the vault, the call is the bridge's one line, and the owner's log has none.</summary>
-    [Fact]
-    public async Task ACallNothingAnswered_IsOneLineInTheBridgesLog()
-    {
-        await using var harness = new McpHarness("keypaste-nobody-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), VaultPath);
-        var client = await harness.StartAsync("--expose", "env/**");
-
-        var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
-
-        Assert.True(result.IsError);
-        Assert.Equal("no-approver", Field(Assert.Single(harness.AuditLines()), "method"));
-        Assert.Empty(_log!.Lines());
-    }
-
     /// <summary>
     /// A client that gives up while the person is being asked leaves one line, cancelled, and it is the
     /// owner's: the bridge withdrew the request it had sent, and the owner recorded the withdrawal.

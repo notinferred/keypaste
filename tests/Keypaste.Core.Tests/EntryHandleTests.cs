@@ -110,8 +110,4 @@ public sealed class EntryHandleTests
     [InlineData("env/dev/DATABASE_URL", false)]
     public void LooksLikeHandle_AcceptsOnlyTheExactShape(string value, bool expected) =>
         Assert.Equal(expected, EntryHandle.LooksLikeHandle(value));
-
-    [Fact]
-    public void For_RejectsNull() =>
-        Assert.Throws<ArgumentNullException>(() => EntryHandle.For(null!));
 }

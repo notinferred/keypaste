@@ -184,18 +184,6 @@ public sealed class FieldVerbTests : IDisposable
         Assert.Equal(_secret + Environment.NewLine, _harness.Out);
     }
 
-    [Fact]
-    public void Get_field_reads_a_field_keypaste_will_not_write()
-    {
-        var path = Path.Combine(_harness.Directory, "foreign.kdbx");
-        Keypaste.Core.Internal.KeePassInterop.WriteForeignUnchecked(path, System.Text.Encoding.UTF8.GetBytes(_master), null, "AES-KDF", "AES-256");
-
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("get", "Banking/Checking", "--field", "otp", "--reveal", "--vault", path));
-
-        Assert.StartsWith("otpauth://", _harness.Out, StringComparison.Ordinal);
-    }
-
     [Theory]
     [InlineData("Password")]
     [InlineData("password")]
@@ -268,17 +256,6 @@ public sealed class FieldVerbTests : IDisposable
     }
 
     [Fact]
-    public void Field_rm_of_a_field_that_is_not_there_is_not_found_and_writes_nothing()
-    {
-        var before = Bytes();
-
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitNotFound, Run("field", "rm", "api/Stripe", "ABSENT"));
-
-        Assert.Equal(before, Bytes());
-    }
-
-    [Fact]
     public void Field_mv_renames_one_field_in_one_revision_keeping_its_value_and_protection()
     {
         Seed(new FieldWrite("KEY", _secret), new FieldWrite("Region", _plain, Protect: false));
@@ -292,45 +269,6 @@ public sealed class FieldVerbTests : IDisposable
         Assert.Equal(revisions + 1, Revisions());
         Assert.Contains("renamed KEY to STRIPE_KEY on api/Stripe", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(_secret, _harness.Err + _harness.Out, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Field_mv_onto_a_name_the_item_has_in_any_case_is_refused_and_writes_nothing()
-    {
-        Seed(new FieldWrite("KEY", _secret), new FieldWrite("OTHER", "o"));
-        var before = Bytes();
-
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitUsageError, Run("field", "mv", "api/Stripe", "KEY", "other"));
-
-        Assert.Equal(before, Bytes());
-        Assert.Contains("already has a field called other", _harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Field_mv_onto_a_field_a_TOTP_is_read_from_is_refused_and_writes_nothing()
-    {
-        Seed(new FieldWrite("KEY", _secret));
-        var before = Bytes();
-
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitUsageError, Run("field", "mv", "api/Stripe", "KEY", "TimeOtp-Secret"));
-
-        Assert.Equal(before, Bytes());
-    }
-
-    [Fact]
-    public void Field_mv_of_a_field_or_an_item_that_is_not_there_is_not_found_and_writes_nothing()
-    {
-        var before = Bytes();
-
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitNotFound, Run("field", "mv", "api/Stripe", "ABSENT", "PRESENT"));
-
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitNotFound, Run("field", "mv", "api/Nobody", "KEY", "OTHER"));
-
-        Assert.Equal(before, Bytes());
     }
 
     [Theory]

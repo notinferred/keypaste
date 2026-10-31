@@ -869,27 +869,6 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.DoesNotContain(EnvResolution.List(reread, "dev", "dev").Variables, variable => variable.Key == "FRESH");
     }
 
-    [Fact]
-    public async Task A_reference_file_is_refused_before_the_preview_and_the_vault_keeps_its_values()
-    {
-        var file = Path.Combine(_project, EnvReferenceFile.FileName);
-        File.WriteAllText(file, EnvReferenceFile.Format("dev", "dev", ["API_KEY", "DB_URL"]));
-        _picker.DotEnvPath = file;
-
-        using var screen = Screen();
-        screen.OpenCommand.Execute("dev");
-        await screen.OpenProject!.Import.ChooseCommand.ExecuteAsync();
-
-        Assert.False(screen.OpenProject.Import.IsPreviewing);
-        Assert.Contains("Nothing was imported", screen.Error, StringComparison.Ordinal);
-        Assert.Contains(EnvReferenceFile.FileName, screen.Error, StringComparison.Ordinal);
-
-        using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
-        Assert.Equal(
-            [new EnvVariable("API_KEY", _apiKey), new EnvVariable("DB_URL", _dbUrl)],
-            EnvResolution.List(reread, "dev", "dev").Variables);
-    }
-
     /// <summary>Open terminal on macOS: the window's run ends in the person's shell, here one that reports what it was given.</summary>
     [SupportedOSPlatform("macos")]
     private async Task OpenTerminalThroughTerminalAsync(EnvSetsViewModel screen, ProjectLaunchViewModel launch, string pipeName)

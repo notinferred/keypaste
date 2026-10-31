@@ -344,29 +344,6 @@ public sealed class DoctorVerbTests : IDisposable
     }
 
     [Fact]
-    public void A_registered_keypaste_of_another_version_is_asked_only_its_version_and_its_help()
-    {
-        Healthy();
-        var old = Another("old", "0.0.1");
-        Register(McpConfigLocation.Cursor, old, "mcp", "--client-label", "cursor");
-
-        var (exit, found) = Doctor();
-
-        _harness.AssertExit(CliApp.ExitNeedsFixing, exit);
-        Assert.Equal([$"{old} --version", $"{old} mcp --help --client-label cursor"], _harness.ProcessRunner.Calls);
-        Assert.Equal(
-            new Finding(
-                "versions",
-                "versions",
-                "fix",
-                $"Cursor starts keypaste 0.0.1, this is {CoreInfo.Version}",
-                Where: null,
-                "run `keypaste setup --client cursor` from the keypaste you keep"),
-            Assert.Single(found, finding => finding.Area == "versions"));
-        Assert.Equal(new Finding("tool", "cursor", "ok", "starts keypaste 0.0.1 from a place upgrades keep", old, Fix: null), Tool(found));
-    }
-
-    [Fact]
     public void A_registered_keypaste_that_cannot_be_started_is_a_fix_quoting_its_first_line()
     {
         Healthy();
@@ -384,19 +361,6 @@ public sealed class DoctorVerbTests : IDisposable
     }
 
     [Fact]
-    public void A_tool_installed_and_not_connected_is_a_note_saying_how_to_connect_it()
-    {
-        Healthy();
-        Directory.CreateDirectory(McpConfigLocation.Cursor.Folders(Machine())[0]);
-
-        var (exit, found) = Doctor();
-
-        _harness.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Equal(new Finding("tool", "cursor", "note", "installed but not connected", Where: null, "run `keypaste setup --client cursor`"), Tool(found));
-        Assert.Empty(_harness.ProcessRunner.Calls);
-    }
-
-    [Fact]
     public void A_tools_file_keypaste_cannot_read_is_a_note_and_starts_nothing()
     {
         Healthy();
@@ -411,23 +375,6 @@ public sealed class DoctorVerbTests : IDisposable
         Assert.Equal(("cursor", "note", path), (cursor.Subject, cursor.Status, cursor.Where));
         Assert.StartsWith("keypaste cannot tell whether it is connected: ", cursor.Says, StringComparison.Ordinal);
         Assert.Empty(_harness.ProcessRunner.Calls);
-    }
-
-    [Fact]
-    public void Another_keypaste_first_on_path_is_asked_only_its_version()
-    {
-        Healthy();
-        var other = Another("other", "0.0.1");
-        _harness.Environment["PATH"] = Path.GetDirectoryName(other) + Path.PathSeparator + Bin;
-
-        var (exit, found) = Doctor();
-
-        _harness.AssertExit(CliApp.ExitNeedsFixing, exit);
-        Assert.Equal([$"{other} --version"], _harness.ProcessRunner.Calls);
-        Assert.Equal(new Finding("path", "PATH", "ok", "a terminal runs another keypaste", other, Fix: null), Assert.Single(found, finding => finding.Area == "path"));
-        Assert.Equal(
-            new Finding("versions", "versions", "fix", $"a terminal runs keypaste 0.0.1, this is {CoreInfo.Version}", other, "a terminal runs that one: update or remove it"),
-            Assert.Single(found, finding => finding.Area == "versions"));
     }
 
     [Fact]

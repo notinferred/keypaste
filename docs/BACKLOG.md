@@ -54,6 +54,8 @@ These observations were previously in DECISIONS. They are not completed fixes or
 
 | Observation | What must be established |
 |---|---|
+| `EntryAttachmentRow.cs` and `EntryAttachmentsViewModel.cs` turn RS0030 off for the whole file with no restore, so none of the App's bans holds there: `AttachmentSourceRulesTests` stops a launch from them, and nothing stops a network call or a file write. The other files that do so (`OpenerProcess.cs`, `CrashSender.cs`, `ShareClient.cs`, `ShareService.cs`) are the network and launch code their exemptions name. | Whether each attachment pragma can wrap only the calls it exempts and be restored after, so the compiler holds the other bans in those files and the scan shrinks to what no ban expresses. |
+| The token bundle's refusals of a protected environment are in the CLI's `TokenCommand.cs`, not in Core (PRODUCT §4.2), and `TokenVerbTests.Bundle_Refuses*` are their only tests. | Whether those rules belong with Core's token store, where the app and the bridge would share them. |
 | Exposure parse errors lose detail when a reply is too large | Bound diagnostics at their source if a reproducible operator problem needs it; preserve the transport limit. |
 | Approver disconnects, write failures and handler exceptions lack separate diagnostics | Establish which missing observation prevents diagnosis; never log secret content. |
 | Post-upload listing is printed rather than checked | Prove the storage consistency assumption before changing publication completion; immutable versions must not be burned by a false failure. |

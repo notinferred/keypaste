@@ -158,23 +158,6 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public async Task A_field_holding_another_value_refuses_the_move_and_writes_nothing()
-    {
-        var vault = _session.Unlocked!;
-        vault.SetFields(_stripe, [new FieldWrite("STRIPE_SECRET_KEY", "sk_test_other")]);
-        vault.Save();
-        using var shell = Shell();
-        await shell.Recommendations.Checking;
-        var bytes = File.ReadAllBytes(_fixture.Path_);
-
-        shell.Recommendations.Rows.Single(row => row.Key == "STRIPE_SECRET_KEY").MoveCommand.Execute(null);
-
-        Assert.StartsWith("services/Stripe already has a STRIPE_SECRET_KEY field with a different value", shell.Recommendations.Message, StringComparison.Ordinal);
-        Assert.Equal(bytes, File.ReadAllBytes(_fixture.Path_));
-        Assert.Equal("sk_test_other", vault.ReadField(_stripe, "STRIPE_SECRET_KEY"));
-    }
-
-    [Fact]
     public async Task An_unreadable_dismissals_file_still_lists_every_key_and_is_never_replaced()
     {
         var path = KeypasteHome.RecommendationsPath(_fixture.Home);
@@ -188,17 +171,6 @@ public sealed class RecommendationsTests : IDisposable
 
         Assert.Contains("could not be read", shell.Recommendations.Message, StringComparison.Ordinal);
         Assert.Equal("not json", File.ReadAllText(path));
-    }
-
-    [Fact]
-    public void Searching_for_a_value_left_in_notes_finds_nothing()
-    {
-        using var shell = Shell();
-        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-
-        entries.Search = "sk_test_1";
-
-        Assert.Empty(entries.Rows);
     }
 
     [Fact]

@@ -136,24 +136,6 @@ public sealed class VaultRoundTripTests : IDisposable
     }
 
     /// <summary>
-    /// Saving uses a file transaction so an interrupted write cannot truncate a readable
-    /// vault. That mechanism is Windows-specific in places and degrades silently elsewhere,
-    /// so this asserts on all three operating systems that it leaves nothing behind.
-    /// </summary>
-    [Fact]
-    public void Save_LeavesNoStrayFilesBesideTheVault()
-    {
-        var path = VaultPath("clean.kdbx");
-        CreateVaultWithOneEntry(path);
-
-        var leftovers = Directory.GetFiles(_directory)
-            .Where(f => !string.Equals(f, path, StringComparison.Ordinal))
-            .ToArray();
-
-        Assert.Empty(leftovers);
-    }
-
-    /// <summary>
     /// A disposed vault must not keep serving entries: the whole point of disposal is that the
     /// decrypted contents and key material are gone.
     /// </summary>

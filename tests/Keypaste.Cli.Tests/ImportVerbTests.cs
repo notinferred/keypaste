@@ -120,18 +120,6 @@ public sealed class ImportVerbTests : IDisposable
     }
 
     [Fact]
-    public void Import_AnEnvGroup_LandsUnderIntoAsAPlainGroup()
-    {
-        Seed();
-        var source = Source("acme.kdbx", vault => vault.AddEntry(new VaultEntry { Title = "bad-key", GroupPath = "env/acme-api", Password = "x" }));
-
-        _cli.Prompt.Enqueue(_sourcePassword, _master);
-        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("import", source, "--into", "Imported", "--dry-run", "--vault", _cli.VaultPath));
-        Assert.Matches(@"(?m)^    env +2  → Imported/env$", _cli.Out.ReplaceLineEndings("\n"));
-        Assert.DoesNotContain("env set", _cli.Out + _cli.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Import_WrongSourcePassword_Exits4()
     {
         Seed();
@@ -186,48 +174,6 @@ public sealed class ImportVerbTests : IDisposable
         Assert.Contains("already unlocked in", _cli.Err, StringComparison.Ordinal);
         Assert.Empty(_cli.Prompt.PromptsSeen);
         Assert.Equal(before, File.ReadAllBytes(_cli.VaultPath));
-    }
-
-    [Fact]
-    public void Import_IntoTheReservedGroup_Exits1()
-    {
-        Seed();
-        var source = Source("acme.kdbx");
-        var before = File.ReadAllBytes(_cli.VaultPath);
-
-        _cli.Prompt.Enqueue(_sourcePassword, _master);
-        var exit = _cli.Run("import", source, "--vault", _cli.VaultPath, "--into", ".keypaste");
-
-        _cli.AssertExit(CliApp.ExitUsageError, exit);
-        Assert.Contains(".keypaste is keypaste's own group; nothing is imported into it", _cli.Err, StringComparison.Ordinal);
-        Assert.Equal(before, File.ReadAllBytes(_cli.VaultPath));
-    }
-
-    [Fact]
-    public void Import_NeverPrintsAValue()
-    {
-        Seed();
-        var source = Source("acme.kdbx", vault => vault.AddEntry(new VaultEntry
-        {
-            Title = "sentinel",
-            GroupPath = "Banking",
-            Password = SecretHygieneTests.SentinelPassword,
-            Username = SecretHygieneTests.SentinelUsername,
-            Notes = SecretHygieneTests.SentinelNotes,
-            Url = SecretHygieneTests.SentinelUrl,
-        }));
-
-        foreach (var shape in new[] { new[] { "--dry-run" }, [], ["--in-place"] })
-        {
-            _cli.Prompt.Enqueue(_sourcePassword, _master);
-            _cli.AssertExit(CliApp.ExitSuccess, _cli.Run(["import", source, "--vault", _cli.VaultPath, .. shape]));
-        }
-
-        foreach (var sentinel in new[] { SecretHygieneTests.SentinelPassword, SecretHygieneTests.SentinelUsername, SecretHygieneTests.SentinelNotes, SecretHygieneTests.SentinelUrl, _sourcePassword, _master })
-        {
-            Assert.DoesNotContain(sentinel, _cli.Out, StringComparison.Ordinal);
-            Assert.DoesNotContain(sentinel, _cli.Err, StringComparison.Ordinal);
-        }
     }
 
     private void Seed()

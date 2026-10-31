@@ -414,10 +414,6 @@ public sealed class DotEnvTests
     public void ADollarThatIsNotAVariableReference_IsNotNoted(string line) =>
         Assert.Empty(Parse(line).Notes);
 
-    [Fact]
-    public void NullText_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => DotEnv.TryParse(null!, out _));
-
     // ---- the golden file ---------------------------------------------------------------
 
     /// <summary>

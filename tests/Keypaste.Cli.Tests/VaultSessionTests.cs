@@ -22,35 +22,6 @@ public sealed class VaultSessionTests : IDisposable
     private static ParseResult Line() => CliApp.Parse([]);
 
     [Fact]
-    public void OpenHeld_RefusesAHeldVault_NamingTheHolder_WithoutAskingForThePassword()
-    {
-        _harness.SeedVault(_master);
-        _harness.Prompt.PromptsSeen.Clear();
-        Assert.True(VaultClaim.TryAcquire(Home, _harness.VaultPath, OwnerKind.DesktopApp, out var claim, out var refusal), refusal);
-        var ran = false;
-
-        using (claim)
-        {
-            _harness.Prompt.Enqueue(_master);
-
-            var exit = VaultSession.OpenHeld(_harness.VaultPath, Line(), _harness.NewContext(), _ =>
-            {
-                ran = true;
-                return CliApp.ExitSuccess;
-            });
-
-            _harness.AssertExit(CliApp.ExitInternalError, exit);
-        }
-
-        Assert.False(ran);
-        Assert.Empty(_harness.Prompt.PromptsSeen);
-        Assert.Contains(
-            $"keypaste: this vault is already unlocked in the keypaste desktop app (process {Environment.ProcessId}). Make the change there, or run `keypaste lock` and try again.",
-            _harness.Err,
-            StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void OpenHeld_ReleasesTheClaimAfterward()
     {
         _harness.SeedVault(_master);

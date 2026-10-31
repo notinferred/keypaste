@@ -68,39 +68,6 @@ public sealed class SetVerbTests : IDisposable
         Assert.Contains(vault.ReadHistory(new EntryName("Banking", "Chase"))!, revision => revision.Fields.Password == "old-value");
     }
 
-    /// <summary>An entry under <c>env</c> is an ordinary entry and no variable (D-0416), so no variable-name rule applies there.</summary>
-    [Fact]
-    public void Set_UnderEnv_WritesAnOrdinaryEntry()
-    {
-        foreach (var name in new[] { "env/acme-api/staging/bad-name", "env/KEY" })
-        {
-            _harness.Prompt.Enqueue(_master, _value);
-            _harness.AssertExit(CliApp.ExitSuccess, Set(name));
-        }
-
-        using var vault = Vault.Open(_harness.VaultPath, _master);
-        Assert.Equal(_value, vault.Find("env/acme-api/staging/bad-name")?.Password);
-        Assert.Equal(_value, vault.Find("env/KEY")?.Password);
-        Assert.Empty(ProjectCatalog.Read(vault).Projects);
-    }
-
-    [Fact]
-    public void Set_IntoTheRecycleBin_IsRefused()
-    {
-        _harness.Prompt.Enqueue(_master, _value);
-        _harness.AssertExit(CliApp.ExitSuccess, Set("Banking/Chase"));
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("rm", "Banking/Chase", "--yes", "--vault", _harness.VaultPath));
-        _harness.Stderr.GetStringBuilder().Clear();
-
-        _harness.Prompt.Enqueue(_master, "new-value");
-        Assert.NotEqual(CliApp.ExitSuccess, Set("Recycle Bin/Chase"));
-
-        Assert.Contains("recycle bin", _harness.Err, StringComparison.Ordinal);
-        using var vault = Vault.Open(_harness.VaultPath, _master);
-        Assert.Single(vault.ReadRecycled());
-    }
-
     [Fact]
     public void Set_Generate()
     {
@@ -222,18 +189,6 @@ public sealed class SetVerbTests : IDisposable
         Assert.Contains("keypaste set: The item title cannot begin or end with whitespace.", _harness.Err, StringComparison.Ordinal);
         Assert.Equal(["Master password: "], _harness.Prompt.PromptsSeen);
         Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
-    }
-
-    [Theory]
-    [InlineData("env/acme-api/dev")]
-    [InlineData("env/acme-api/staging/sub")]
-    [InlineData("env")]
-    public void Add_UnderEnv_WritesAnOrdinaryEntry(string group)
-    {
-        _harness.Prompt.Enqueue(_master, _value);
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "bad-key", "--group", group, "--vault", _harness.VaultPath));
-
-        Assert.Equal(_value, Read(group, "bad-key")?.Password);
     }
 
     [Fact]

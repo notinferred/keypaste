@@ -77,18 +77,6 @@ public sealed class ClientsVerbTests : IDisposable
         Assert.False(File.Exists(ClientsPath));
     }
 
-    /// <summary>With nothing holding the vault, a limit on Automatic only lowers this computer's ceilings, so it is made there and listed with them.</summary>
-    [Fact]
-    public void WithNoOwner_ALimit_IsKeptAsACeiling()
-    {
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "cursor", "--per-hour", "5"));
-        _harness.Stdout.GetStringBuilder().Clear();
-
-        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("clients", "--json"));
-
-        Assert.Equal("""[{"kind":"ceiling","label":"cursor","per_hour":5}]""" + Environment.NewLine, _harness.Out);
-    }
-
     [Fact]
     public void Json_ListsEachCeilingAsARow()
     {
@@ -114,22 +102,6 @@ public sealed class ClientsVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run(args));
 
         Assert.False(File.Exists(ClientsPath));
-    }
-
-    /// <summary>The file before agents had settings is not this file: its <c>policy</c> form is refused, naming its line, and left as it was.</summary>
-    [Fact]
-    public void TheOldClientsFile_IsRefused_AndUntouched()
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(ClientsPath)!);
-        File.WriteAllText(ClientsPath, "[[client]]\nlabel = \"cursor\"\npolicy = \"ask\"\n");
-        var before = File.ReadAllBytes(ClientsPath);
-
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients"));
-        Assert.Contains("line 3", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("fix it or delete it", _harness.Err, StringComparison.Ordinal);
-
-        _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("clients", "cursor", "--mode", "ask"));
-        Assert.Equal(before, File.ReadAllBytes(ClientsPath));
     }
 
     [Fact]

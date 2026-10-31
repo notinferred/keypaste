@@ -543,13 +543,6 @@ public sealed class ApproverListenerTests
         Assert.Null(await client.ListAsync(new NamesRequest([]), Token));
     }
 
-    [Fact]
-    public void TheListenerRejectsNulls()
-    {
-        Assert.Throws<ArgumentNullException>(() => new ApproverListener(null!, new RecordingHandler()));
-        Assert.Throws<ArgumentNullException>(() => new ApproverListener("x", null!));
-    }
-
     /// <summary>
     /// A handler written before grants and lock existed answers them with its interface's refusals:
     /// it lists nothing, ends nothing and does not lock.

@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Cli.Approval;
@@ -8,7 +7,6 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
-using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -106,44 +104,6 @@ public sealed class ApproveCommandTests : IDisposable
         Assert.Contains("--pair-browser <name>", help.Out, StringComparison.Ordinal);
     }
 
-    /// <summary>No mode releases an entry in a protected profile: the person at the terminal is shown it, with no timed choice.</summary>
-    [Fact]
-    public async Task AProtectedProfileEntry_IsPromptedDespiteAutomatic()
-    {
-        var prompt = new FakeSecretPrompt();
-        prompt.Enqueue("h");
-        using var stderr = new StringWriter();
-        var console = new AgentConsole(stderr, interactive: false);
-        using var grants = new GrantCache(TimeProvider.System);
-        using var gate = new ApprovalGate(
-            new TerminalApprovalChannel(prompt, console, ApprovalLimits.Default.Window, TimeProvider.System),
-            TimeProvider.System,
-            ApprovalLimits.Default);
-        var source = new ProdEntry();
-        var settings = new FakeAgentSettings();
-        settings.Records["claude-code"] = new AgentAccess { Mode = AgentMode.Automatic, See = Everything() };
-        var handler = new ApproverHandler(source, source, gate, grants, settings);
-
-        var reply = await handler.RequestAsync(
-            new CredentialRequest
-            {
-                Entry = ProdEntry.Path,
-                Field = "password",
-                Reason = "rotate the production key",
-                TtlSeconds = 300,
-                Exposure = ["env/**"],
-                ClientName = "claude-code",
-                ClientLabel = "claude-code",
-            },
-            "conn-1",
-            Token);
-
-        Assert.Equal(AuditMethod.Prompt, reply.Method);
-        Assert.Equal(AuditDecision.Denied, reply.Decision);
-        Assert.Contains("this item is in a protected environment: it is asked about every time.", stderr.ToString(), StringComparison.Ordinal);
-        Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(prompt.PromptsSeen));
-    }
-
     /// <summary>
     /// A change from a terminal that gives an agent more is confirmed in the approver's own terminal, then
     /// saved in the vault under its claim, where the next owner reads it; its line names the change.
@@ -197,26 +157,6 @@ public sealed class ApproveCommandTests : IDisposable
 
         using var vault = Vault.Open(_harness.VaultPath, _master);
         Assert.Empty(new AgentAccessStore(vault).Read("claude-code").Own);
-    }
-
-    /// <summary>A narrowing from a terminal applies at once, with nobody asked: in this computer's ceilings and in the vault.</summary>
-    [Fact]
-    public async Task ANarrowing_AppliesAtOnce_WithNobodyAsked()
-    {
-        await using var approver = await RunningApprover.StartAsync(_harness, _master);
-        using var terminal = Terminal(approver);
-
-        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("clients", "claude-code", "--mode", "ask", "--vault", _harness.VaultPath));
-
-        Assert.Contains("applied at once, since it gives the agent nothing more", terminal.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("a change would give an agent more", approver.Text, StringComparison.Ordinal);
-        Assert.True(AccessCaps.TryLoad(KeypasteHome.ClientsPath(Home), out var caps, out var problem), problem);
-        Assert.Equal(AgentMode.Ask, Assert.Single(caps.Rows).Mode);
-
-        await approver.StopAsync(terminal);
-
-        using var vault = Vault.Open(_harness.VaultPath, _master);
-        Assert.Equal(AgentMode.Ask, Assert.Single(new AgentAccessStore(vault).Read("claude-code").Own).Access.Mode);
     }
 
     /// <summary>
@@ -286,12 +226,6 @@ public sealed class ApproveCommandTests : IDisposable
             using var document = JsonDocument.Parse(line);
             return document.RootElement.Clone();
         }
-    }
-
-    private static EntryExposure Everything()
-    {
-        Assert.True(EntryExposure.TryCreate(["**"], out var exposure, out var error), error);
-        return exposure;
     }
 
     /// <summary><c>keypaste approve</c> on the harness's vault, run in this process on its own thread and pipe.</summary>
@@ -373,41 +307,5 @@ public sealed class ApproveCommandTests : IDisposable
 
             _synchronized.Dispose();
         }
-    }
-
-    /// <summary>One entry tagged into a protected profile.</summary>
-    private sealed class ProdEntry : ICredentialSource, IEntryNameLister
-    {
-        internal const string Path = "env/acme/prod/API_KEY";
-
-        private static readonly EntryName _name = new("env/acme/prod", "API_KEY");
-
-        private static readonly string[] _tags = ["env:acme:prod"];
-
-        public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
-        {
-            name = _name;
-            failure = CredentialFailure.None;
-            return true;
-        }
-
-        public bool TryRead(EntryName name, string field, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure, out string unfilled)
-        {
-            value = new ReleasedField(field, "prod-sentinel");
-            failure = CredentialFailure.None;
-            unfilled = string.Empty;
-            return true;
-        }
-
-        public bool TryList(EntryExposure exposure, [NotNullWhen(true)] out IReadOnlyList<ListedEntry>? names, out CredentialFailure failure)
-        {
-            names = [new ListedEntry(_name, ["password"], _tags)];
-            failure = CredentialFailure.None;
-            return true;
-        }
-
-        public bool RequiresLiveApproval(EntryName name) => EnvProfileNames.RequiresLiveApproval(_tags);
-
-        public IReadOnlyList<string> Tags(EntryName name) => _tags;
     }
 }

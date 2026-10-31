@@ -68,16 +68,6 @@ public sealed class GetTotpVerbTests : IDisposable
     }
 
     [Fact]
-    public void The_code_follows_the_clock()
-    {
-        _harness.Clock.Now = DateTimeOffset.FromUnixTimeSeconds(1111111109);
-
-        _harness.AssertExit(CliApp.ExitSuccess, Run("get", "web/Bank", "totp", "--reveal"));
-
-        Assert.Equal("07081804" + Environment.NewLine, _harness.Out);
-    }
-
-    [Fact]
     public void An_item_with_no_TOTP_is_not_found_and_one_keypaste_refuses_says_why_without_its_seed()
     {
         _harness.AssertExit(CliApp.ExitNotFound, Run("get", "web/Plain", "totp", "--reveal"));

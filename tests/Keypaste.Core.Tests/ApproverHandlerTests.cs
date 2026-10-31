@@ -842,21 +842,4 @@ public sealed class ApproverHandlerTests
 
     private static ApproverHandler LiveOnly(ApproverFixture fixture) =>
         new(fixture.Source, fixture.Source, fixture.Gate, fixture.Grants, fixture.Settings, fixture.Narration.Add, _ => true, fixture.Hourly, fixture.Clock);
-
-    [Fact]
-    public void TheHandlerRejectsNulls()
-    {
-        using var fixture = new ApproverFixture();
-
-        var s = fixture.Source;
-        var g = fixture.Gate;
-        var c = fixture.Grants;
-        var p = IAgentSettings.Defaults;
-
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(null!, s, g, c, p));
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, null!, g, c, p));
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, s, null!, c, p));
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, s, g, null!, p));
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, s, g, c, null!));
-    }
 }
