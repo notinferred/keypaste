@@ -1,0 +1,141 @@
+name: mutations
+
+# K.11's probe: Stryker.NET over each suite K.11 rewrites, showing that its properties kill every mutant the examples
+# they replace killed. It runs on the k11 branch only and is deleted before integration; docs/steps/K.11.md keeps its result.
+
+on:
+  push:
+    branches: [k11]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: mutations-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  NUGET_XMLDOC_MODE: skip
+  # Empty makes this run the baseline; otherwise each suite compares itself with this run's report.
+  BASELINE_RUN: ''
+
+jobs:
+  suite:
+    name: ${{ matrix.suite }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: toml
+            project: src/Keypaste.Infrastructure
+            mutate: Toml.cs TomlWriter.cs
+            classes: TomlWriterTests TomlLimitsTests PolicyTomlTests
+          - suite: csv
+            project: src/Keypaste.Infrastructure
+            mutate: Csv.cs
+            classes: CsvTests KeePassXcCsvReaderTests OnePasswordCsvReaderTests LastPassCsvReaderTests
+          - suite: csv-readers
+            project: src/Keypaste.Core
+            mutate: Import/CsvExport.cs Import/KeePassXcCsvReader.cs Import/OnePasswordCsvReader.cs Import/LastPassCsvReader.cs
+            classes: CsvTests KeePassXcCsvReaderTests OnePasswordCsvReaderTests LastPassCsvReaderTests
+          - suite: placeholders
+            project: src/Keypaste.Core
+            mutate: KeePassPlaceholders.cs PlaceholderFill.cs
+            classes: KeePassPlaceholdersTests
+          - suite: psl
+            project: src/Keypaste.Core
+            mutate: Browser/PublicSuffixList.cs
+            classes: Browser.PublicSuffixListTests
+          - suite: merge
+            project: src/Keypaste.Core
+            mutate: Vault.cs:184-359 Internal/KeePassInterop.cs:4025-5004
+            classes: VaultMergeTests VaultMergeSaveTests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Install Stryker.NET
+        run: dotnet tool install dotnet-stryker --version 5.0.0 --tool-path "$RUNNER_TEMP/stryker"
+
+      - name: Mutate
+        env:
+          PROJECT: ${{ matrix.project }}
+          MUTATE: ${{ matrix.mutate }}
+          CLASSES: ${{ matrix.classes }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          project = os.environ["PROJECT"]
+          mutate = []
+          for item in os.environ["MUTATE"].split():
+              path, _, lines = item.partition(":")
+              if not lines:
+                  mutate.append(f"**/{path}")
+                  continue
+              first, last = (int(n) for n in lines.split("-"))
+              text = open(os.path.join(project, path), encoding="utf-8").read().split("\n")
+              start = sum(len(line) + 1 for line in text[: first - 1])
+              end = sum(len(line) + 1 for line in text[:last]) - 1
+              mutate.append(f"**/{path}{{{start}..{end}}}")
+          classes = "|".join(f"FullyQualifiedName~Keypaste.Core.Tests.{name}." for name in os.environ["CLASSES"].split())
+          config = {"stryker-config": {
+              "test-projects": [os.path.abspath("tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj")],
+              "test-runner": "mtp",
+              "test-case-filter": classes,
+              "mutate": mutate,
+              "reporters": ["json", "progress", "cleartext"],
+          }}
+          json.dump(config, open(os.path.join(os.environ["RUNNER_TEMP"], "stryker-config.json"), "w"), indent=2)
+          print(json.dumps(config, indent=2))
+          PY
+          cd "$PROJECT"
+          "$RUNNER_TEMP/stryker/dotnet-stryker" --config-file "$RUNNER_TEMP/stryker-config.json" --output "$RUNNER_TEMP/out"
+          cp "$RUNNER_TEMP/out/reports/mutation-report.json" "$RUNNER_TEMP/report.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutations-${{ matrix.suite }}
+          path: ${{ runner.temp }}/report.json
+
+      - name: Compare with the baseline
+        if: env.BASELINE_RUN != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUITE: ${{ matrix.suite }}
+        run: |
+          gh run download "$BASELINE_RUN" --repo "$GITHUB_REPOSITORY" -n "mutations-$SUITE" -D "$RUNNER_TEMP/baseline"
+          python3 - <<'PY'
+          import json, os, sys
+          def mutants(path):
+              report = json.load(open(path, encoding="utf-8"))
+              return {
+                  (name, m["mutatorName"], m["location"]["start"]["line"], m["location"]["start"]["column"],
+                   m["location"]["end"]["line"], m["location"]["end"]["column"], m.get("replacement", "")): m["status"]
+                  for name, file in report["files"].items() for m in file["mutants"]
+              }
+          detected = {"Killed", "Timeout"}
+          before = mutants(os.path.join(os.environ["RUNNER_TEMP"], "baseline", "report.json"))
+          after = mutants(os.path.join(os.environ["RUNNER_TEMP"], "report.json"))
+          for label, run in (("baseline", before), ("now", after)):
+              counts = {}
+              for status in run.values():
+                  counts[status] = counts.get(status, 0) + 1
+              print(label, len(run), dict(sorted(counts.items())))
+          lost = sorted(key for key, status in before.items() if status in detected and after.get(key) not in detected)
+          gained = sum(1 for key, status in after.items() if status in detected and before.get(key) not in detected)
+          print(f"killed now and not before: {gained}")
+          for name, mutator, line, column, *_, replacement in lost:
+              print(f"lost: {os.path.basename(name)}:{line}:{column} {mutator}: {replacement}")
+          sys.exit(1 if lost else 0)
+          PY
