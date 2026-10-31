@@ -27,7 +27,7 @@ namespace Keypaste.App.ViewModels;
 /// typed for the file stays in a buffer that is cleared once it has been tried.
 /// </para>
 /// </remarks>
-internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisposable
+internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSink, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly KdbxProbe? _probe;
@@ -40,17 +40,10 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     private readonly string _fileName;
     private readonly SecretBuffer _password = new();
 
-    private ImportSource? _source;
     private string? _keyfilePath;
-    private int? _hardwareKeySlot;
     private HardwareKey? _asking;
-    private bool _waitingForTouch;
     private string _into = string.Empty;
-    private string _message = string.Empty;
-    private bool _keepInPlace;
-    private bool _busy;
     private bool _blocked;
-    private bool _disposed;
 
     /// <summary>Reads the file's header and waits for its password.</summary>
     /// <param name="session">The session whose vault an import copies into.</param>
@@ -97,55 +90,20 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
         else
         {
-            _message = exportFormats is { Count: > 0 }
+            Message = exportFormats is { Count: > 0 }
                 ? $"{WhyUnreadable(path, error)} Nor is it an export keypaste reads: {ExportImportViewModel.Either(exportFormats)}."
                 : WhyUnreadable(path, error);
         }
 
-        UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => !_busy && _probe is not null && _source is null);
-        ConfirmCommand = new RelayCommand(Confirm, () => CanConfirm);
+        UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => !Busy && _probe is not null && Source is null);
         CancelCommand = new RelayCommand(Dispose);
-        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy && _source is null && _pickKeyfile is not null);
-        ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _source is null && _keyfilePath is not null);
-        UseHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = 2, () => !_busy && _source is null && OffersHardwareKey && _hardwareKeySlot is null);
-        SwitchSlotCommand = new RelayCommand(() => HardwareKeySlot = _hardwareKeySlot == 1 ? 2 : 1, () => !_busy && _source is null && _hardwareKeySlot is not null);
-        ClearHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = null, () => !_busy && _source is null && _hardwareKeySlot is not null);
-        CancelTouchCommand = new RelayCommand(() => Volatile.Read(ref _asking)?.CancelWait(), () => _waitingForTouch);
-        ChooseAnotherCommand = new AsyncRelayCommand(() => _chooseAnother!(), () => _chooseAnother is not null && !_disposed);
-
-        DependsOn(nameof(CardDetail), nameof(Source), nameof(EntryCount), nameof(KeyFactors));
-        DependsOn(nameof(HasTrailingMessage), nameof(HasMessage), nameof(NeedsUnlock));
-        DependsOn(nameof(NeedsUnlock), nameof(Disposed), nameof(Source), nameof(KeepEditingInPlace));
-        DependsOn(nameof(ShowsConfirm), nameof(NeedsUnlock));
-        DependsOn(nameof(ShowsRows), nameof(Source), nameof(KeepEditingInPlace));
-        DependsOn(nameof(UnlockText), nameof(Busy));
-        DependsOn(nameof(SkippedText), nameof(Source));
-        DependsOn(nameof(HasSkipped), nameof(SkippedText));
-        DependsOn(nameof(InPlaceNote), nameof(Source));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(KeyfileName), nameof(KeyfilePath));
-        DependsOn(nameof(HasKeyfile), nameof(KeyfilePath));
-        DependsOn(nameof(UsesHardwareKey), nameof(HardwareKeySlot));
-        DependsOn(nameof(HardwareKeyLabel), nameof(HardwareKeySlot));
-        DependsOn(nameof(OtherSlotLabel), nameof(HardwareKeySlot));
-        DependsOn(nameof(UnlockIsPrimary), nameof(IsWaitingForTouch));
-        DependsOn(nameof(KeyFactors), nameof(Source));
-        DependsOn(nameof(EntryCount), nameof(Source));
-        DependsOn(nameof(IsDecrypted), nameof(Source));
-        DependsOn(nameof(IsLocked), nameof(Source));
-        DependsOn(nameof(CardText), nameof(Source), nameof(EntryCount), nameof(KeyFactors));
-        DependsOn(nameof(PasswordLength), nameof(Disposed));
-        DependsOn(nameof(ConfirmText), nameof(KeepEditingInPlace));
-        DependsOn(nameof(CanConfirm), nameof(Disposed), nameof(KeepEditingInPlace), nameof(Source));
-        DependsOn(UnlockCommand, nameof(Busy), nameof(Source));
-        DependsOn(ConfirmCommand, nameof(CanConfirm));
-        DependsOn(ChooseKeyfileCommand, nameof(Busy), nameof(Source));
-        DependsOn(ClearKeyfileCommand, nameof(Busy), nameof(Source), nameof(KeyfilePath));
-        DependsOn(UseHardwareKeyCommand, nameof(Busy), nameof(Source), nameof(HardwareKeySlot));
-        DependsOn(SwitchSlotCommand, nameof(Busy), nameof(Source), nameof(HardwareKeySlot));
-        DependsOn(ClearHardwareKeyCommand, nameof(Busy), nameof(Source), nameof(HardwareKeySlot));
-        DependsOn(CancelTouchCommand, nameof(IsWaitingForTouch));
-        DependsOn(ChooseAnotherCommand, nameof(Disposed));
+        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !Busy && Source is null && _pickKeyfile is not null);
+        ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !Busy && Source is null && _keyfilePath is not null);
+        UseHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = 2, () => !Busy && Source is null && OffersHardwareKey && HardwareKeySlot is null);
+        SwitchSlotCommand = new RelayCommand(() => HardwareKeySlot = HardwareKeySlot == 1 ? 2 : 1, () => !Busy && Source is null && HardwareKeySlot is not null);
+        ClearHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = null, () => !Busy && Source is null && HardwareKeySlot is not null);
+        CancelTouchCommand = new RelayCommand(() => Volatile.Read(ref _asking)?.CancelWait(), () => IsWaitingForTouch);
+        ChooseAnotherCommand = new AsyncRelayCommand(() => _chooseAnother!(), () => _chooseAnother is not null && !Disposed);
 
         _session.Locked += OnLocked;
     }
@@ -165,7 +123,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal bool CanChooseAnother => IsUnreadable && _chooseAnother is not null;
 
     /// <summary>The file card's second line: the header before unlock, and what unlocked it after.</summary>
-    internal string CardDetail => _source is null
+    internal string CardDetail => Source is null
         ? $"{Version} · {Kdf} · {Cipher}"
         : $"{Version} · {Kdf} · {Entries(EntryCount)} · {KeyFactors}";
 
@@ -173,22 +131,22 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal bool HasTrailingMessage => HasMessage && !NeedsUnlock && IsReadable;
 
     /// <summary>Whether the password and keyfile are still wanted before rows can show.</summary>
-    internal bool NeedsUnlock => !_disposed && _probe is not null && _source is null && !_keepInPlace;
+    internal bool NeedsUnlock => !Disposed && _probe is not null && Source is null && !KeepEditingInPlace;
 
     /// <summary>Whether a paste may join the password: the field is showing and no unlock is reading it.</summary>
-    private bool TakesPassword => NeedsUnlock && !_busy;
+    private bool TakesPassword => NeedsUnlock && !Busy;
 
     /// <summary>Whether the confirm button shows: the file was read and nothing more is needed to unlock it.</summary>
     internal bool ShowsConfirm => IsReadable && !NeedsUnlock;
 
     /// <summary>Whether the group mapping shows: the file is unlocked and is being copied.</summary>
-    internal bool ShowsRows => _source is not null && !_keepInPlace;
+    internal bool ShowsRows => Source is not null && !KeepEditingInPlace;
 
     /// <summary>The unlock button's words, which say when Argon2 is running.</summary>
-    internal string UnlockText => _busy ? "Unlocking…" : "Unlock";
+    internal string UnlockText => Busy ? "Unlocking…" : "Unlock";
 
     /// <summary>What the file holds that no import copies, such as its recycle bin.</summary>
-    internal string SkippedText => _source is { Skipped.Count: > 0 } source
+    internal string SkippedText => Source is { Skipped.Count: > 0 } source
         ? "Not copied: " + string.Join(", ", source.Skipped.Select(skip => $"{Show(skip.SourceGroup)} ({Entries(skip.EntryCount)})"))
         : string.Empty;
 
@@ -199,14 +157,14 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// The file's key is not carried over from this dialog: the unlock screen asks for it, so after a
     /// decrypt here the note says it will be asked for again.
     /// </remarks>
-    internal string InPlaceNote => (_session.VaultPath, _source) switch
+    internal string InPlaceNote => (_session.VaultPath, Source) switch
     {
         ({ } open, null) => $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault, asking for its password. Nothing is copied.",
         ({ } open, _) => $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault; you type its password once more there. Nothing is copied.",
         _ => $"{FileName} opens as the vault. Nothing is copied.",
     };
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     /// <summary>The keyfile's name; the full path is a tooltip.</summary>
     internal string KeyfileName => _keyfilePath is null ? string.Empty : Show(System.IO.Path.GetFileName(_keyfilePath));
@@ -220,17 +178,16 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal bool OffersHardwareKey => _session.HardwareKeys is not null;
 
     /// <summary>The YubiKey slot the file needs as well, or <see langword="null"/>.</summary>
-    internal int? HardwareKeySlot
-    {
-        get => _hardwareKeySlot;
-        private set => Set(ref _hardwareKeySlot, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsesHardwareKey), nameof(HardwareKeyLabel), nameof(OtherSlotLabel))]
+    [NotifyCanExecuteChangedFor(nameof(UseHardwareKeyCommand), nameof(SwitchSlotCommand), nameof(ClearHardwareKeyCommand))]
+    internal partial int? HardwareKeySlot { get; private set; }
 
-    internal bool UsesHardwareKey => _hardwareKeySlot is not null;
+    internal bool UsesHardwareKey => HardwareKeySlot is not null;
 
-    internal string HardwareKeyLabel => _hardwareKeySlot is { } slot ? $"YubiKey, slot {slot}" : string.Empty;
+    internal string HardwareKeyLabel => HardwareKeySlot is { } slot ? $"YubiKey, slot {slot}" : string.Empty;
 
-    internal string OtherSlotLabel => _hardwareKeySlot == 1 ? "Use slot 2" : "Use slot 1";
+    internal string OtherSlotLabel => HardwareKeySlot == 1 ? "Use slot 2" : "Use slot 1";
 
     /// <summary>Asks for a YubiKey as well, in slot 2 until another is chosen.</summary>
     internal RelayCommand UseHardwareKeyCommand { get; }
@@ -242,14 +199,13 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal RelayCommand ClearHardwareKeyCommand { get; }
 
     /// <summary>Whether the YubiKey waits to be touched, when its waiting dot is the dialog's one amber element.</summary>
-    internal bool IsWaitingForTouch
-    {
-        get => _waitingForTouch;
-        private set => Set(ref _waitingForTouch, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UnlockIsPrimary))]
+    [NotifyCanExecuteChangedFor(nameof(CancelTouchCommand))]
+    internal partial bool IsWaitingForTouch { get; private set; }
 
     /// <summary>Whether Unlock is the amber action, which it is except while the YubiKey waits.</summary>
-    internal bool UnlockIsPrimary => !_waitingForTouch;
+    internal bool UnlockIsPrimary => !IsWaitingForTouch;
 
     /// <summary>Stops waiting for the YubiKey, so nothing is opened.</summary>
     internal RelayCommand CancelTouchCommand { get; }
@@ -266,38 +222,48 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal string Cipher => _probe?.Cipher ?? string.Empty;
 
     /// <summary>What unlocked the file, as the card words it: <c>key file + password</c>.</summary>
-    internal string KeyFactors => _source is null
+    internal string KeyFactors => Source is null
         ? string.Empty
-        : string.Join(" + ", _source.KeyFactors.Reverse());
+        : string.Join(" + ", Source.KeyFactors.Reverse());
 
     /// <summary>How many entries a whole import copies.</summary>
-    internal int EntryCount => _source?.EntryCount ?? 0;
+    internal int EntryCount => Source?.EntryCount ?? 0;
 
-    internal bool IsDecrypted => _source is not null;
+    internal bool IsDecrypted => Source is not null;
 
     /// <summary>Whether the file was read but not yet unlocked.</summary>
-    internal bool IsLocked => _probe is not null && _source is null;
+    internal bool IsLocked => _probe is not null && Source is null;
 
     /// <summary>The unlocked file, while there is one. A test seam for when its key goes.</summary>
-    internal ImportSource? Source
-    {
-        get => _source;
-        private set => Set(ref _source, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CardDetail), nameof(NeedsUnlock), nameof(ShowsRows), nameof(SkippedText), nameof(InPlaceNote))]
+    [NotifyPropertyChangedFor(nameof(KeyFactors), nameof(EntryCount), nameof(IsDecrypted), nameof(IsLocked), nameof(CardText), nameof(CanConfirm))]
+    [NotifyPropertyChangedFor(nameof(HasTrailingMessage), nameof(ShowsConfirm), nameof(HasSkipped))]
+    [NotifyCanExecuteChangedFor(nameof(UnlockCommand), nameof(ChooseKeyfileCommand), nameof(ClearKeyfileCommand), nameof(UseHardwareKeyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SwitchSlotCommand), nameof(ClearHardwareKeyCommand), nameof(ConfirmCommand))]
+    internal partial ImportSource? Source { get; private set; }
 
     /// <summary>The file card's one line.</summary>
-    internal string CardText => _source is null
+    internal string CardText => Source is null
         ? $"{FileName} · {Version} · {Kdf} · Locked"
         : $"{FileName} · {Version} · {Kdf} · {Entries(EntryCount)} · {KeyFactors} · Decrypted";
 
     /// <summary>How many characters of the file's password have been typed, which is all a screen may know.</summary>
-    internal int PasswordLength => _disposed ? 0 : _password.Length;
+    internal int PasswordLength => Disposed ? 0 : _password.Length;
 
     /// <summary>The file's keyfile, prefilled from one found beside it.</summary>
     internal string? KeyfilePath
     {
         get => _keyfilePath;
-        set => Set(ref _keyfilePath, string.IsNullOrEmpty(value) ? null : value);
+        set
+        {
+            if (SetProperty(ref _keyfilePath, string.IsNullOrEmpty(value) ? null : value))
+            {
+                OnPropertyChanged(nameof(KeyfileName));
+                OnPropertyChanged(nameof(HasKeyfile));
+                ClearKeyfileCommand.NotifyCanExecuteChanged();
+            }
+        }
     }
 
     internal AsyncRelayCommand UnlockCommand { get; }
@@ -311,7 +277,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         get => _into;
         set
         {
-            if (Set(ref _into, value ?? string.Empty) && _source is not null)
+            if (SetProperty(ref _into, value ?? string.Empty) && Source is not null)
             {
                 Lay(_into);
             }
@@ -319,68 +285,63 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     }
 
     /// <summary>Whether confirming opens the file as the vault instead of copying it in.</summary>
-    internal bool KeepEditingInPlace
-    {
-        get => _keepInPlace;
-        set => Set(ref _keepInPlace, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsUnlock), nameof(ShowsRows), nameof(ConfirmText), nameof(CanConfirm), nameof(HasTrailingMessage))]
+    [NotifyPropertyChangedFor(nameof(ShowsConfirm))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    internal partial bool KeepEditingInPlace { get; set; }
 
     /// <summary>What is wrong with the file or the import as a whole, or empty.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage), nameof(HasTrailingMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool Busy
-    {
-        get => _busy;
-        private set => Set(ref _busy, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UnlockText))]
+    [NotifyCanExecuteChangedFor(nameof(UnlockCommand), nameof(ChooseKeyfileCommand), nameof(ClearKeyfileCommand), nameof(UseHardwareKeyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SwitchSlotCommand), nameof(ClearHardwareKeyCommand))]
+    internal partial bool Busy { get; private set; }
 
-    private bool Disposed
-    {
-        get => _disposed;
-        set => Set(ref _disposed, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsUnlock), nameof(PasswordLength), nameof(CanConfirm), nameof(HasTrailingMessage), nameof(ShowsConfirm))]
+    [NotifyCanExecuteChangedFor(nameof(ChooseAnotherCommand), nameof(ConfirmCommand))]
+    private partial bool Disposed { get; set; }
 
     /// <summary><c>Import 142 entries</c>, or <c>Open acme.kdbx</c> when keeping the file in place.</summary>
-    internal string ConfirmText => _keepInPlace
+    internal string ConfirmText => KeepEditingInPlace
         ? $"Open {FileName}"
         : $"Import {Entries(Rows.Where(row => row.Include).Sum(row => row.Count))}";
 
     /// <summary>False while any included row is blocked, or before there is anything to confirm.</summary>
-    internal bool CanConfirm => !_disposed && _probe is not null
-        && (_keepInPlace || (_source is not null && _session.IsUnlocked && !_blocked && Rows.Any(row => row.Include)));
-
-    internal RelayCommand ConfirmCommand { get; }
+    internal bool CanConfirm => !Disposed && _probe is not null
+        && (KeepEditingInPlace || (Source is not null && _session.IsUnlocked && !_blocked && Rows.Any(row => row.Include)));
 
     internal RelayCommand CancelCommand { get; }
 
     internal void TypePassword(char c)
     {
-        if (!_disposed)
+        if (!Disposed)
         {
             _password.Append(c);
-            Raise(nameof(PasswordLength));
+            OnPropertyChanged(nameof(PasswordLength));
         }
     }
 
     internal void BackspacePassword()
     {
-        if (!_disposed)
+        if (!Disposed)
         {
             _password.Backspace();
-            Raise(nameof(PasswordLength));
+            OnPropertyChanged(nameof(PasswordLength));
         }
     }
 
     internal void ClearPassword()
     {
-        if (!_disposed)
+        if (!Disposed)
         {
             _password.Clear();
-            Raise(nameof(PasswordLength));
+            OnPropertyChanged(nameof(PasswordLength));
         }
     }
 
@@ -414,7 +375,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         if (outcome == PasteOutcome.Pasted)
         {
             _password.Append(pasted.Value);
-            Raise(nameof(PasswordLength));
+            OnPropertyChanged(nameof(PasswordLength));
             Message = string.Empty;
         }
         else
@@ -427,7 +388,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <remarks>Internal so a test can await what <see cref="UnlockCommand"/> starts.</remarks>
     internal async Task UnlockAsync()
     {
-        if (_disposed || _probe is not { } probe || _source is not null)
+        if (Disposed || _probe is not { } probe || Source is not null)
         {
             return;
         }
@@ -435,7 +396,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         Busy = true;
         Message = string.Empty;
         var keyfile = _keyfilePath;
-        var slot = _hardwareKeySlot;
+        var slot = HardwareKeySlot;
         using var key = slot is { } chosen && _session.HardwareKeys is { } keys ? new HardwareKey(keys, chosen) : null;
 
         if (key is not null)
@@ -449,7 +410,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
             // The key answers the file's one challenge here; a source is never saved, so nothing asks it again.
             var opened = await Task.Run(() => KdbxImport.Open(probe.Path, _password.Value, keyfile, key)).ConfigureAwait(true);
 
-            if (_disposed || !_session.IsUnlocked)
+            if (Disposed || !_session.IsUnlocked)
             {
                 opened.Dispose();
                 return;
@@ -508,18 +469,18 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     {
         if (_post is { } post)
         {
-            post(() => IsWaitingForTouch = waiting && !_disposed);
+            post(() => IsWaitingForTouch = waiting && !Disposed);
         }
         else
         {
-            IsWaitingForTouch = waiting && !_disposed;
+            IsWaitingForTouch = waiting && !Disposed;
         }
     }
 
     /// <summary>Closes the file and forgets its password and rows.</summary>
     public void Dispose()
     {
-        if (_disposed)
+        if (Disposed)
         {
             return;
         }
@@ -528,17 +489,17 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         _session.Locked -= OnLocked;
         Volatile.Read(ref _asking)?.CancelWait();
         IsWaitingForTouch = false;
-        _source?.Dispose();
+        Source?.Dispose();
         Source = null;
         _password.Dispose();
         Rows.Clear();
-        Raise(nameof(ConfirmText));
+        OnPropertyChanged(nameof(ConfirmText));
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task ChooseKeyfileAsync()
     {
-        if (_pickKeyfile is null || await _pickKeyfile().ConfigureAwait(true) is not { } picked || _disposed)
+        if (_pickKeyfile is null || await _pickKeyfile().ConfigureAwait(true) is not { } picked || Disposed)
         {
             return;
         }
@@ -556,6 +517,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         KeyfilePath = full;
     }
 
+    [RelayCommand(CanExecute = nameof(CanConfirm))]
     private void Confirm()
     {
         if (!CanConfirm || _probe is not { } probe)
@@ -563,16 +525,16 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
             return;
         }
 
-        if (_keepInPlace)
+        if (KeepEditingInPlace)
         {
             var keyfile = _keyfilePath;
-            var slot = _hardwareKeySlot;
+            var slot = HardwareKeySlot;
             Dispose();
             _openInPlace(probe.Path, keyfile, slot);
             return;
         }
 
-        if (_source is not { } source)
+        if (Source is not { } source)
         {
             return;
         }
@@ -605,14 +567,14 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <summary>Lays every row out as the default plan puts it, under <paramref name="into"/> or the file's name.</summary>
     private void Lay(string? into)
     {
-        if (_source is null || _session.Unlocked is not { } vault)
+        if (Source is null || _session.Unlocked is not { } vault)
         {
             return;
         }
 
-        var plan = _source.DefaultPlan(vault, into);
+        var plan = Source.DefaultPlan(vault, into);
         _into = plan.Into;
-        Raise(nameof(Into));
+        OnPropertyChanged(nameof(Into));
 
         Rows.Clear();
         foreach (var row in plan.Rows)
@@ -628,9 +590,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <summary>Checks the rows as they stand and says what blocks.</summary>
     private void Check()
     {
-        if (_source is not null && _session.Unlocked is { } vault)
+        if (Source is not null && _session.Unlocked is { } vault)
         {
-            var problems = _source.Check(vault, Plan());
+            var problems = Source.Check(vault, Plan());
 
             foreach (var row in Rows)
             {
@@ -645,8 +607,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
                 .Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text));
         }
 
-        Raise(nameof(ConfirmText));
-        Raise(nameof(CanConfirm));
+        OnPropertyChanged(nameof(ConfirmText));
+        OnPropertyChanged(nameof(CanConfirm));
+        ConfirmCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>The probe's refusal about this file, without the directory it names.</summary>
@@ -676,21 +639,15 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
 }
 
 /// <summary>One group of the file being imported: where it lands, whether it is copied, and what is wrong.</summary>
-internal sealed class ImportRowViewModel : ObservableObject
+internal sealed partial class ImportRowViewModel : ObservableObject
 {
     private readonly Action _changed;
     private ImportRow _row;
-    private string _problem = string.Empty;
-    private bool _blocks;
 
     internal ImportRowViewModel(ImportRow row, Action changed)
     {
         _row = row;
         _changed = changed;
-
-        DependsOn(nameof(Destination), nameof(Row));
-        DependsOn(nameof(Include), nameof(Row));
-        DependsOn(nameof(HasProblem), nameof(Problem));
     }
 
     /// <summary>The row as the plan will copy it.</summary>
@@ -717,23 +674,28 @@ internal sealed class ImportRowViewModel : ObservableObject
     }
 
     /// <summary>Why this row cannot be copied as it stands, or a note about it; empty when there is nothing to say.</summary>
-    internal string Problem => _problem;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasProblem))]
+    internal partial string Problem { get; private set; } = string.Empty;
 
     /// <summary>Whether <see cref="Problem"/> stops the import.</summary>
-    internal bool Blocks => _blocks;
+    [ObservableProperty]
+    internal partial bool Blocks { get; private set; }
 
-    internal bool HasProblem => _problem.Length > 0;
+    internal bool HasProblem => Problem.Length > 0;
 
     internal void Show(string problem, bool blocks)
     {
-        Set(ref _problem, problem, nameof(Problem));
-        Set(ref _blocks, blocks, nameof(Blocks));
+        Problem = problem;
+        Blocks = blocks;
     }
 
     private void Change(ImportRow row)
     {
-        if (Set(ref _row, row, nameof(Row)))
+        if (SetProperty(ref _row, row, nameof(Row)))
         {
+            OnPropertyChanged(nameof(Destination));
+            OnPropertyChanged(nameof(Include));
             _changed();
         }
     }

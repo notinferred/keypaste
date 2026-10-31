@@ -77,7 +77,7 @@ public sealed class VaultAccessTests : IDisposable
         var access = settings.Access;
 
         Enter(access, _master, _later);
-        access.ReviewCommand.Execute(null);
+        access.ReviewCommand.Press();
 
         Assert.True(access.IsConfirming);
         Assert.Contains(VaultBackups.DirectoryFor(_vaultPath), access.BackupCost, StringComparison.Ordinal);
@@ -122,7 +122,7 @@ public sealed class VaultAccessTests : IDisposable
         // Add.
         _picker.KeyfilePath = _keyA;
         Enter(access, _master);
-        await access.ChooseKeyfileCommand.ExecuteAsync();
+        await access.ChooseKeyfileCommand.PressAsync();
         Assert.True(access.AttachKeyfile);
         Assert.Contains("a.key", access.KeyfileWarning, StringComparison.Ordinal);
         await Confirm(access);
@@ -138,7 +138,7 @@ public sealed class VaultAccessTests : IDisposable
         {
             Assert.Equal(_keyA, unlock.KeyfilePath);
 
-            unlock.ClearKeyfileCommand.Execute(null);
+            unlock.ClearKeyfileCommand.Press();
             Type(unlock, _master);
             await unlock.UnlockAsync();
             Assert.Equal(0, landed);
@@ -156,7 +156,7 @@ public sealed class VaultAccessTests : IDisposable
             Assert.True(again.Access.HasKeyfile);
             _picker.KeyfilePath = _keyB;
             Enter(again.Access, _master);
-            await again.Access.ChooseKeyfileCommand.ExecuteAsync();
+            await again.Access.ChooseKeyfileCommand.PressAsync();
             await Confirm(again.Access);
             Assert.StartsWith("Changed.", again.Access.Message, StringComparison.Ordinal);
         }
@@ -189,7 +189,7 @@ public sealed class VaultAccessTests : IDisposable
         _picker.NewKeyfilePath = created;
 
         Enter(access, _master);
-        await access.CreateKeyfileCommand.ExecuteAsync();
+        await access.CreateKeyfileCommand.PressAsync();
 
         Assert.Equal("vault.keyx", _picker.SuggestedKeyfileName);
         Assert.Equal(new KeyfileInspection(KeyfileOutcome.Accepted, KeyfileForm.Xml), VaultKeyfile.Inspect(created));
@@ -216,7 +216,7 @@ public sealed class VaultAccessTests : IDisposable
         var before = File.ReadAllBytes(_keyA);
         _picker.NewKeyfilePath = _keyA;
 
-        await access.CreateKeyfileCommand.ExecuteAsync();
+        await access.CreateKeyfileCommand.PressAsync();
 
         Assert.Equal(1, _picker.NewKeyfileCalls);
         Assert.Equal(before, File.ReadAllBytes(_keyA));
@@ -233,7 +233,7 @@ public sealed class VaultAccessTests : IDisposable
         {
             _picker.KeyfilePath = _keyA;
             Enter(first.Access, _master);
-            await first.Access.ChooseKeyfileCommand.ExecuteAsync();
+            await first.Access.ChooseKeyfileCommand.PressAsync();
             await Confirm(first.Access);
         }
 
@@ -253,7 +253,7 @@ public sealed class VaultAccessTests : IDisposable
         using var unlock = new UnlockViewModel(session, _home, _picker, () => landed++);
         Assert.Equal(_keyA, unlock.KeyfilePath);
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = Assert.IsType<RestoreBackupViewModel>(unlock.Restore);
         Assert.Equal(_keyA, restore.KeyfilePath);
         Assert.Equal(newest.Path, restore.Selected!.Backup.Path);
@@ -301,10 +301,10 @@ public sealed class VaultAccessTests : IDisposable
         var before = Snapshot();
 
         Enter(access, _master, _later);
-        access.ReviewCommand.Execute(null);
+        access.ReviewCommand.Press();
         Assert.True(access.IsConfirming);
 
-        access.CancelCommand.Execute(null);
+        access.CancelCommand.Press();
 
         Assert.False(access.IsConfirming);
         Assert.False(access.SetPassword);
@@ -340,7 +340,7 @@ public sealed class VaultAccessTests : IDisposable
 
         _picker.KeyfilePath = document;
         Enter(settings.Access, _master);
-        await settings.Access.ChooseKeyfileCommand.ExecuteAsync();
+        await settings.Access.ChooseKeyfileCommand.PressAsync();
 
         Assert.Equal(1, _picker.KeyfileCalls);
         Assert.Null(settings.Access.NewKeyfilePath);
@@ -429,14 +429,14 @@ public sealed class VaultAccessTests : IDisposable
 
         raised.Clear();
         asked.Clear();
-        access.ReviewCommand.Execute(null);
+        access.ReviewCommand.Press();
 
         string[] reviewed = [nameof(VaultAccessViewModel.IsConfirming), nameof(VaultAccessViewModel.IsEditing)];
         Assert.Empty(reviewed.Except(raised));
         Assert.Equal(["confirm", "review"], asked.Distinct().Order(StringComparer.Ordinal));
 
         raised.Clear();
-        access.CancelCommand.Execute(null);
+        access.CancelCommand.Press();
 
         string[] cancelled =
         [
@@ -533,7 +533,7 @@ public sealed class VaultAccessTests : IDisposable
 
     private static async Task Confirm(VaultAccessViewModel access)
     {
-        access.ReviewCommand.Execute(null);
+        access.ReviewCommand.Press();
         Assert.True(access.IsConfirming, access.Message);
         await access.ChangeAsync();
     }

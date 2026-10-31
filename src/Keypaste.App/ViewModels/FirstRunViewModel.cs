@@ -10,11 +10,10 @@ namespace Keypaste.App.ViewModels;
 /// Continue is not "I agree": the AGPL lets anyone run keypaste without accepting anything, so the terms are a notice and the
 /// one thing asked is whether to send reports. The same terms are shown again when a build carries terms with a new date.
 /// </remarks>
-internal sealed class FirstRunViewModel : ObservableObject
+internal sealed partial class FirstRunViewModel : ObservableObject
 {
     private readonly Func<bool, bool> _choose;
     private readonly Action _done;
-    private bool _choosing;
 
     /// <summary>The first run's two steps.</summary>
     /// <param name="terms">The terms shown.</param>
@@ -33,25 +32,19 @@ internal sealed class FirstRunViewModel : ObservableObject
         ContinueCommand = new RelayCommand(() => IsChoosing = true, () => !IsChoosing);
         SendCommand = new RelayCommand(() => Answer(send: true), () => IsChoosing);
         DontSendCommand = new RelayCommand(() => Answer(send: false), () => IsChoosing);
-
-        DependsOn(nameof(IsReading), nameof(IsChoosing));
-        DependsOn(ContinueCommand, nameof(IsChoosing));
-        DependsOn(SendCommand, nameof(IsChoosing));
-        DependsOn(DontSendCommand, nameof(IsChoosing));
     }
 
     /// <summary>The terms of use.</summary>
     internal TermsOfUse Terms { get; }
 
     /// <summary>Whether the terms are showing.</summary>
-    internal bool IsReading => !_choosing;
+    internal bool IsReading => !IsChoosing;
 
     /// <summary>Whether the crash-report choice is showing.</summary>
-    internal bool IsChoosing
-    {
-        get => _choosing;
-        private set => Set(ref _choosing, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReading))]
+    [NotifyCanExecuteChangedFor(nameof(ContinueCommand), nameof(SendCommand), nameof(DontSendCommand))]
+    internal partial bool IsChoosing { get; private set; }
 
     /// <summary>Goes on from the terms to the choice.</summary>
     internal RelayCommand ContinueCommand { get; }

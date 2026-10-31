@@ -36,7 +36,7 @@ internal sealed class BackupRow(VaultBackup backup, bool isDamaged)
 /// screen, which is still the locked one.
 /// </para>
 /// </remarks>
-internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
+internal sealed partial class RestoreBackupViewModel : ObservableObject, IDisposable
 {
     internal const string PasswordNote =
         "A backup opens with the master password it was made under, which may be an earlier one. " +
@@ -63,12 +63,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     private readonly Func<SecretBuffer, Task<PasteOutcome>>? _paste;
 
     private SecretBuffer _password = new();
-    private VaultBackupSummary? _validated;
     private ITimer? _expiry;
     private BackupRow? _selected;
-    private string? _keyfilePath;
-    private string _message = string.Empty;
-    private bool _busy;
     private bool _disposed;
 
     internal RestoreBackupViewModel(
@@ -87,40 +83,21 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         _idleTimeout = idleTimeout;
         _post = post;
         _restored = restored;
-        _keyfilePath = keyfilePath;
         _pickKeyfile = pickKeyfile;
         _newHardwareKey = newHardwareKey;
         _paste = paste;
 
-        CheckCommand = new AsyncRelayCommand(CheckAsync, () => CanCheck);
-        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => IsConfirming && !_busy);
-        CancelCommand = new RelayCommand(() => Forget(string.Empty), () => IsConfirming && !_busy);
-        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => IsChoosing && !_busy);
-        ClearKeyfileCommand = new RelayCommand(() => SetKeyfile(null), () => IsChoosing && !_busy && _keyfilePath is not null);
-
-        DependsOn(nameof(KeyfileName), nameof(KeyfilePath));
-        DependsOn(nameof(HasKeyfile), nameof(KeyfilePath));
-        DependsOn(nameof(IsChoosing), nameof(Validated));
-        DependsOn(nameof(IsConfirming), nameof(Validated));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(IsError), nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(HasNote), nameof(HasMessage), nameof(IsError));
-        DependsOn(nameof(Taken), nameof(Validated));
-        DependsOn(nameof(Holds), nameof(Validated));
-        DependsOn(nameof(Replaces), nameof(Validated));
-        DependsOn(CheckCommand, nameof(Busy), nameof(IsChoosing), nameof(Selected), nameof(MaskedLength), nameof(KeyfilePath));
-        DependsOn(ConfirmCommand, nameof(IsConfirming), nameof(Busy));
-        DependsOn(CancelCommand, nameof(IsConfirming), nameof(Busy));
-        DependsOn(ChooseKeyfileCommand, nameof(IsChoosing), nameof(Busy));
-        DependsOn(ClearKeyfileCommand, nameof(IsChoosing), nameof(Busy), nameof(KeyfilePath));
+        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => IsConfirming && !Busy);
+        CancelCommand = new RelayCommand(() => Forget(string.Empty), () => IsConfirming && !Busy);
+        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => IsChoosing && !Busy);
+        ClearKeyfileCommand = new RelayCommand(() => SetKeyfile(null), () => IsChoosing && !Busy && KeyfilePath is not null);
+        KeyfilePath = keyfilePath;
 
         Rows = [.. VaultBackups.List(vaultPath).Select(backup => new BackupRow(backup, !KdbxHeader.IsVaultFile(backup.Path)))];
         _selected = Rows.FirstOrDefault(row => !row.IsDamaged);
     }
 
     internal IReadOnlyList<BackupRow> Rows { get; private set; }
-
-    internal AsyncRelayCommand CheckCommand { get; }
 
     internal AsyncRelayCommand ConfirmCommand { get; }
 
@@ -137,15 +114,14 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     /// The keyfile the backup was made under, starting as the one the unlock screen had chosen. A copy
     /// keeps the factors the vault had when it was taken, so after an access change it is the old one.
     /// </summary>
-    internal string? KeyfilePath
-    {
-        get => _keyfilePath;
-        private set => Set(ref _keyfilePath, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeyfileName), nameof(HasKeyfile))]
+    [NotifyCanExecuteChangedFor(nameof(CheckCommand), nameof(ClearKeyfileCommand))]
+    internal partial string? KeyfilePath { get; private set; }
 
-    internal string KeyfileName => _keyfilePath is null ? string.Empty : Path.GetFileName(_keyfilePath);
+    internal string KeyfileName => KeyfilePath is null ? string.Empty : Path.GetFileName(KeyfilePath);
 
-    internal bool HasKeyfile => _keyfilePath is not null;
+    internal bool HasKeyfile => KeyfilePath is not null;
 
     /// <summary>Whether the check asks the YubiKey the unlock screen had chosen, as a copy made under one needs.</summary>
     internal bool UsesHardwareKey => _newHardwareKey is not null;
@@ -155,8 +131,9 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         get => _selected;
         set
         {
-            if (Set(ref _selected, value))
+            if (SetProperty(ref _selected, value))
             {
+                CheckCommand.NotifyCanExecuteChanged();
                 // Moving the selection abandons a check made of a different copy.
                 Forget(value is { IsDamaged: true }
                     ? "That copy is not a KeePass file any more, so it can't be restored. Try another."
@@ -171,22 +148,19 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
 
     internal bool IsConfirming => Validated is not null;
 
-    internal bool Busy
-    {
-        get => _busy;
-        private set => Set(ref _busy, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckCommand), nameof(ConfirmCommand), nameof(CancelCommand), nameof(ChooseKeyfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearKeyfileCommand))]
+    internal partial bool Busy { get; private set; }
 
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage), nameof(IsError), nameof(HasNote))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     /// <summary>Whether <see cref="Message"/> is a refusal, drawn in red under the password; only the idle note is not.</summary>
-    internal bool IsError => HasMessage && !string.Equals(_message, _expired, StringComparison.Ordinal);
+    internal bool IsError => HasMessage && !string.Equals(Message, _expired, StringComparison.Ordinal);
 
     internal bool HasNote => HasMessage && !IsError;
 
@@ -216,15 +190,15 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     internal string Warning => OtherPrograms;
 #pragma warning restore CA1822
 
-    private VaultBackupSummary? Validated
-    {
-        get => _validated;
-        set => Set(ref _validated, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsConfirming), nameof(Taken), nameof(Holds), nameof(Replaces))]
+    [NotifyCanExecuteChangedFor(nameof(CheckCommand), nameof(ChooseKeyfileCommand), nameof(ClearKeyfileCommand), nameof(ConfirmCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+    private partial VaultBackupSummary? Validated { get; set; }
 
     private bool CanCheck =>
-        !_busy && IsChoosing && _selected is { IsDamaged: false }
-        && (_password.Length > 0 || _keyfilePath is not null || _newHardwareKey is not null);
+        !Busy && IsChoosing && _selected is { IsDamaged: false }
+        && (_password.Length > 0 || KeyfilePath is not null || _newHardwareKey is not null);
 
     internal void Type(char c) => Edit(() => _password.Append(c));
 
@@ -235,7 +209,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     /// <summary>Appends what is on the clipboard to the backup's password once the clipboard has answered, as the unlock field does.</summary>
     internal async Task PasteAsync()
     {
-        if (_disposed || _busy || _paste is null)
+        if (_disposed || Busy || _paste is null)
         {
             return;
         }
@@ -256,13 +230,14 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     /// <summary>Drops a pending restore without a word, as a minimize does.</summary>
     internal void CancelPending()
     {
-        if (!_disposed && !_busy)
+        if (!_disposed && !Busy)
         {
             Forget(string.Empty);
         }
     }
 
     /// <summary>Opens the selected backup and, if it opens, shows what restoring it would do.</summary>
+    [RelayCommand(CanExecute = nameof(CanCheck))]
     internal async Task CheckAsync()
     {
         if (_disposed || !CanCheck || _selected is not { } row)
@@ -276,7 +251,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         try
         {
             // Argon2, as unlocking is, so off the UI thread for the same reason.
-            var keyfile = _keyfilePath;
+            var keyfile = KeyfilePath;
             using var hardwareKey = _newHardwareKey?.Invoke();
             Validated = await Task.Run(() => VaultBackups.Inspect(_vaultPath, row.Backup, _password.Value, keyfile, hardwareKey))
                 .ConfigureAwait(true);
@@ -285,7 +260,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         }
         catch (InvalidMasterPasswordException)
         {
-            Forget(_keyfilePath is null ? _refused : _refusedWithKeyfile);
+            Forget(KeyfilePath is null ? _refused : _refusedWithKeyfile);
         }
         catch (VaultException e)
         {
@@ -300,7 +275,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     /// <summary>Replaces the vault with the checked backup, then hands over the password that opens it.</summary>
     internal async Task ConfirmAsync()
     {
-        if (_disposed || _busy || _validated is not { } validated)
+        if (_disposed || Busy || Validated is not { } validated)
         {
             return;
         }
@@ -312,7 +287,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         try
         {
             var report = await Task.Run(() => VaultBackups.Restore(validated)).ConfigureAwait(true);
-            await _restored(report, _password, _keyfilePath).ConfigureAwait(true);
+            await _restored(report, _password, KeyfilePath).ConfigureAwait(true);
             Forget(string.Empty);
         }
         catch (VaultChangedOnDiskException)
@@ -341,7 +316,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         _password.Dispose();
         Selected = null;
         Rows = [];
-        Raise(nameof(Rows));
+        OnPropertyChanged(nameof(Rows));
     }
 
     private async Task ChooseKeyfileAsync()
@@ -365,7 +340,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
 
     private void SetKeyfile(string? keyfile)
     {
-        if (_disposed || _busy || IsConfirming)
+        if (_disposed || Busy || IsConfirming)
         {
             return;
         }
@@ -376,14 +351,15 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
 
     private void Edit(Action edit)
     {
-        if (_disposed || _busy || IsConfirming)
+        if (_disposed || Busy || IsConfirming)
         {
             return;
         }
 
         edit();
         Arm();
-        Raise(nameof(MaskedLength));
+        OnPropertyChanged(nameof(MaskedLength));
+        CheckCommand.NotifyCanExecuteChanged();
 
         // A damaged copy keeps its explanation: the button stays off, and it should still say why.
         if (HasMessage && _selected is not { IsDamaged: true })
@@ -406,7 +382,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         _password.Dispose();
         _password = new SecretBuffer();
         Message = message;
-        Raise(nameof(MaskedLength));
+        OnPropertyChanged(nameof(MaskedLength));
+        CheckCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Starts the idle deadline again, measured on the clock the session locks by.</summary>
@@ -418,7 +395,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
 
     private void Expire()
     {
-        if (!_disposed && !_busy && (_validated is not null || _password.Length > 0))
+        if (!_disposed && !Busy && (Validated is not null || _password.Length > 0))
         {
             Forget(_expired);
         }

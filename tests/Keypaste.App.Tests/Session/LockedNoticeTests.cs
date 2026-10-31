@@ -254,7 +254,7 @@ public sealed class LockedNoticeTests
             Assert.True(await TellAsync(vault.Path_));
             var notice = await NoticeAsync(notices);
 
-            app.Tray!.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == AppTray.QuitHeader).Command!.Execute(null);
+            app.Tray!.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == AppTray.QuitHeader).Command!.Press();
 
             await Until(() => !notice.IsVisible);
             Assert.Null(app.LockedNotice);

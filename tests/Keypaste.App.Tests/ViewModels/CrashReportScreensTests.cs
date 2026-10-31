@@ -107,13 +107,13 @@ public sealed class CrashReportScreensTests : IDisposable
             "2 crash reports are waiting to be sent. Each is shown as it would be sent. This copy of keypaste was not built as one of its packages, so it sends none of them.",
             diagnostics.ReportsSummary);
 
-        diagnostics.Reports[0].DeleteCommand.Execute(null);
+        diagnostics.Reports[0].DeleteCommand.Press();
 
         Assert.Equal([waiting[1].Text], diagnostics.Reports.Select(row => row.Json));
         Assert.Equal([waiting[1].Text], _crashes.Waiting().Select(report => report.Text));
         Assert.StartsWith("1 crash report is waiting to be sent.", diagnostics.ReportsSummary, StringComparison.Ordinal);
 
-        diagnostics.Reports[0].DeleteCommand.Execute(null);
+        diagnostics.Reports[0].DeleteCommand.Press();
 
         Assert.Empty(diagnostics.Reports);
         Assert.Equal("No crash reports are waiting to be sent.", diagnostics.ReportsSummary);

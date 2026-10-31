@@ -22,7 +22,7 @@ internal sealed partial class KdbxImportView : UserControl
         AvaloniaXamlLoader.Load(this);
 
         _password = this.FindControl<MaskedInput>("ImportPassword")!;
-        _password.Submitted += (_, _) => Run(Model?.UnlockCommand);
+        _password.Submitted += (_, _) => Model?.UnlockCommand.Press();
 
         // The view is built with the shell and hidden; a dialog opens when it is given a model.
         DataContextChanged += (_, _) =>
@@ -70,7 +70,7 @@ internal sealed partial class KdbxImportView : UserControl
             return;
         }
 
-        model.CancelCommand.Execute(null);
+        model.CancelCommand.Press();
         e.Handled = true;
     }
 
@@ -118,14 +118,6 @@ internal sealed partial class KdbxImportView : UserControl
         if (control is not null)
         {
             Dispatcher.UIThread.Post(() => control.Focus(), DispatcherPriority.Background);
-        }
-    }
-
-    private static void Run(AsyncRelayCommand? command)
-    {
-        if (command is not null && command.CanExecute(null))
-        {
-            command.Execute(null);
         }
     }
 }

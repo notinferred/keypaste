@@ -173,7 +173,7 @@ public sealed class AgentClientsTests
         Assert.True(model.HasClientsProblem);
         Assert.Contains("refused", model.ClientsProblem, StringComparison.Ordinal);
 
-        model.ResetClientsCommand.Execute(null);
+        model.ResetClientsCommand.Press();
         await model.Resetting;
 
         Assert.True(Assert.Single(person.Asked).ResetsCeilings);
@@ -181,7 +181,7 @@ public sealed class AgentClientsTests
         Assert.Equal(Malformed, File.ReadAllText(app.ClientsPath));
 
         person.Answer = ApprovalAnswer.ApprovedOnce;
-        model.ResetClientsCommand.Execute(null);
+        model.ResetClientsCommand.Press();
         await model.Resetting;
 
         Assert.False(model.HasClientsProblem);
@@ -191,7 +191,7 @@ public sealed class AgentClientsTests
 
         File.WriteAllText(app.ClientsPath, Later);
         model.Refresh();
-        model.ResetClientsCommand.Execute(null);
+        model.ResetClientsCommand.Press();
         await model.Resetting;
 
         Assert.Equal(Malformed, File.ReadAllText(app.ClientsPath + AccessCaps.KeptSuffix));

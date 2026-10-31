@@ -137,7 +137,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         await import.ReadAsync();
         import.Into = "imported";
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.True(import.IsImported, import.Message);
         Assert.False(import.IsPreviewing);
@@ -150,7 +150,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         Assert.Equal(VaultSaveStatus.Saved, _session.Unlocked!.SaveState().Status);
         AssertNoValue(import);
 
-        import.CancelCommand.Execute(null);
+        import.CancelCommand.Press();
 
         Assert.Equal(["Imported 3 items from bitwarden_export.json"], _announced);
         Assert.Empty(import.NotImported);
@@ -180,7 +180,7 @@ public sealed class ExportImportViewModelTests : IDisposable
             other.Save();
         }
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.True(import.IsPreviewing);
         Assert.Contains("Reload to see it", import.Message, StringComparison.Ordinal);
@@ -212,7 +212,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         Assert.False(import.ConfirmCommand.CanExecute(null));
         Assert.True(import.CanChooseAnother);
 
-        await import.ChooseAnotherCommand.ExecuteAsync();
+        await import.ChooseAnotherCommand.PressAsync();
         Assert.Equal(1, asked);
     }
 
@@ -264,7 +264,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         await import.ReadAsync();
         var source = import.Source!;
 
-        import.CancelCommand.Execute(null);
+        import.CancelCommand.Press();
 
         Assert.Throws<ObjectDisposedException>(() => source.Plan(null!, null));
         Assert.Empty(_announced);

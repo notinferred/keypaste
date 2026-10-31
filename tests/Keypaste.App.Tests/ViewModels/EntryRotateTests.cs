@@ -50,13 +50,13 @@ public sealed class EntryRotateTests : IDisposable
         Assert.NotEmpty(detail.Created);
         Assert.Equal(detail.Created, detail.Rotated);
 
-        detail.RotateCommand.Execute(null);
+        detail.RotateCommand.Press();
 
         Assert.True(detail.IsConfirmingRotate);
         Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
         Assert.Equal(_old, _session.Unlocked!.Find(new EntryName("api", "token"))!.Password);
 
-        detail.ConfirmRotateCommand.Execute(null);
+        detail.ConfirmRotateCommand.Press();
 
         Assert.False(detail.IsConfirmingRotate);
         var rotated = _session.Unlocked.Find(new EntryName("api", "token"))!.Password;
@@ -72,8 +72,8 @@ public sealed class EntryRotateTests : IDisposable
     {
         var detail = _entries.Detail!;
 
-        detail.RotateCommand.Execute(null);
-        detail.CancelRotateCommand.Execute(null);
+        detail.RotateCommand.Press();
+        detail.CancelRotateCommand.Press();
 
         Assert.False(detail.IsConfirmingRotate);
         Assert.Equal(_old, _session.Unlocked!.Find(new EntryName("api", "token"))!.Password);
@@ -89,8 +89,8 @@ public sealed class EntryRotateTests : IDisposable
         }
 
         var detail = _entries.Detail!;
-        detail.RotateCommand.Execute(null);
-        detail.ConfirmRotateCommand.Execute(null);
+        detail.RotateCommand.Press();
+        detail.ConfirmRotateCommand.Press();
 
         Assert.Contains("Something else changed this vault", _entries.Error, StringComparison.Ordinal);
     }

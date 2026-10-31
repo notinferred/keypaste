@@ -65,9 +65,9 @@ public sealed class EnvProfilesTests : IDisposable
         project.SelectedProfile = "staging";
         Assert.Empty(project.Variables);
 
-        project.BeginAddCommand.Execute(null);
+        project.BeginAddCommand.Press();
         project.NewKey = "STAGING_ONLY";
-        project.ConfirmAddCommand.Execute(null);
+        project.ConfirmAddCommand.Press();
         Assert.Null(screen.Error);
 
         Assert.Equal(["STAGING_ONLY"], project.Variables.Select(row => row.Key));
@@ -76,7 +76,7 @@ public sealed class EnvProfilesTests : IDisposable
         project.SelectedProfile = "prod";
         Assert.Equal(["DATABASE_URL", "SENTRY_DSN"], project.Variables.Select(row => row.Key));
         project.BeginRemove(project.Variables.Single(row => row.Key == "SENTRY_DSN"));
-        project.ConfirmRemoveCommand.Execute(null);
+        project.ConfirmRemoveCommand.Press();
 
         project.SelectedProfile = "Prod";
         Assert.Equal("prod", project.SelectedProfile);
@@ -108,14 +108,14 @@ public sealed class EnvProfilesTests : IDisposable
             project.ReplacementValue.Type(c);
         }
 
-        project.ConfirmReplaceCommand.Execute(null);
+        project.ConfirmReplaceCommand.Press();
         Assert.Null(screen.Error);
         Assert.Equal("stripe-replaced", _session.Unlocked.ReadField(stripe, "STRIPE_KEY"));
         Assert.Equal(before + 1, _session.Unlocked.ReadHistory(stripe)!.Count);
 
         project.BeginRemove(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Assert.Equal("Remove STRIPE_KEY from services/Stripe? Its value stays in the item's history.", project.RemovePrompt);
-        project.ConfirmRemoveCommand.Execute(null);
+        project.ConfirmRemoveCommand.Press();
 
         Assert.Null(screen.Error);
         Assert.Equal("Removed STRIPE_KEY from services/Stripe. Its value stays in the item's history.", screen.Notice);
@@ -133,7 +133,7 @@ public sealed class EnvProfilesTests : IDisposable
         var project = Open(screen);
         project.SelectedProfile = "staging";
 
-        project.BeginAddCommand.Execute(null);
+        project.BeginAddCommand.Press();
         Assert.Equal(
             [new EnvEntryChoice(null, "env/acme-api/.env.staging, created on first use"), new EnvEntryChoice(stripe, "services/Stripe")],
             project.EntryChoices);
@@ -141,22 +141,22 @@ public sealed class EnvProfilesTests : IDisposable
 
         project.NewKey = "WEBHOOK_SECRET";
         project.NewEntry = project.EntryChoices[1];
-        project.ConfirmAddCommand.Execute(null);
+        project.ConfirmAddCommand.Press();
         Assert.Null(screen.Error);
         Assert.Equal(20, _session.Unlocked!.ReadField(stripe, "WEBHOOK_SECRET")?.Length);
         Assert.Null(_session.Unlocked.Find(home));
 
-        project.BeginAddCommand.Execute(null);
+        project.BeginAddCommand.Press();
         project.NewKey = "HOME_KEY";
-        project.ConfirmAddCommand.Execute(null);
+        project.ConfirmAddCommand.Press();
         Assert.Null(screen.Error);
         Assert.Equal(["env:acme-api:staging"], _session.Unlocked.Tags(home));
         Assert.True(Assert.Single(_session.Unlocked.Fields(home)!).IsProtected);
         Assert.Equal(new EnvEntryChoice(home, "env/acme-api/.env.staging"), project.EntryChoices[0]);
 
-        project.BeginAddCommand.Execute(null);
+        project.BeginAddCommand.Press();
         project.NewKey = "lower_case";
-        project.ConfirmAddCommand.Execute(null);
+        project.ConfirmAddCommand.Press();
         Assert.Contains("'lower_case' cannot be a project's variable", screen.Error, StringComparison.Ordinal);
         Assert.True(project.IsAdding);
         Assert.Single(_session.Unlocked.Fields(home)!);
@@ -207,7 +207,7 @@ public sealed class EnvProfilesTests : IDisposable
                 KeypasteHome.ProjectsPath(_fixture.Home),
                 [new ProjectMapping(Path.GetFullPath(_fixture.Path_), "acme-api", directory, "dotnet run")]));
 
-            screen.OpenCommand.Execute("acme-api");
+            screen.OpenCommand.Press("acme-api");
             Assert.Equal("keypaste run --session -p dev acme-api -- dotnet run", screen.OpenProject!.RunCommand);
         }
         finally
@@ -222,10 +222,10 @@ public sealed class EnvProfilesTests : IDisposable
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
 
-        screen.OpenCommand.Execute("-web");
+        screen.OpenCommand.Press("-web");
         Assert.Equal("keypaste run --session -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
 
-        screen.OpenCommand.Execute("acme-api");
+        screen.OpenCommand.Press("acme-api");
         Assert.Equal("keypaste run --session -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
 
         Assert.Equal("keypaste run --session --project=--help -- ", EnvSetsViewModel.RunCommandFor("--help"));
@@ -304,7 +304,7 @@ public sealed class EnvProfilesTests : IDisposable
     public void ACopiedRunCommand_HandsKeypasteTheProjectWholeInEachShell_OrIsNotOffered(string project)
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
-        screen.OpenCommand.Execute(project);
+        screen.OpenCommand.Press(project);
         var card = screen.OpenProject!;
 
         if (!CopiedRunCommand.IsCopyable(project, OperatingSystem.IsWindows()))
@@ -366,19 +366,19 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Null(sentry.Variable);
         Assert.Equal("DATABASE_URL", project.Rows.Single(row => row.Key == "DATABASE_URL").Variable?.Key);
 
-        sentry.Cells[0].Act.Execute(null);
+        sentry.Cells[0].Act.Press();
         Assert.Equal("dev", project.SelectedProfile);
         Assert.True(project.IsAdding);
         Assert.Equal("SENTRY_DSN", project.NewKey);
-        project.CancelAddCommand.Execute(null);
+        project.CancelAddCommand.Press();
 
-        project.Columns.Single(column => column.Name == "prod").Select.Execute(null);
+        project.Columns.Single(column => column.Name == "prod").Select.Press();
         Assert.Equal("prod", project.SelectedProfile);
         Assert.Equal("SENTRY_DSN", project.Rows.Single(row => row.Key == "SENTRY_DSN").Variable?.Key);
 
-        project.BeginAddProfileCommand.Execute(null);
+        project.BeginAddProfileCommand.Press();
         project.NewProfile = "staging";
-        project.ConfirmAddProfileCommand.Execute(null);
+        project.ConfirmAddProfileCommand.Press();
         Assert.Equal(["dev", "staging", "prod"], project.Columns.Select(column => column.Name));
         Assert.True(project.IsAdding);
 
@@ -399,7 +399,7 @@ public sealed class EnvProfilesTests : IDisposable
         using var screen = new EnvSetsViewModel(_session, _countdown, picker);
         var project = Open(screen);
 
-        await project.ExportReferencesCommand.ExecuteAsync();
+        await project.ExportReferencesCommand.PressAsync();
 
         Assert.Equal(1, picker.Calls);
         Assert.Equal(project.ReferencePreview, File.ReadAllText(path));
@@ -407,7 +407,7 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Null(screen.Error);
 
         picker.Path = _fixture.Path_;
-        await project.ExportReferencesCommand.ExecuteAsync();
+        await project.ExportReferencesCommand.PressAsync();
         Assert.Contains("is a vault", screen.Error, StringComparison.Ordinal);
     }
 
@@ -455,7 +455,7 @@ public sealed class EnvProfilesTests : IDisposable
         using var screen = new EnvSetsViewModel(_session, _countdown);
         var project = Open(screen);
 
-        project.Environments[0].AddEntry.Execute(null);
+        project.Environments[0].AddEntry.Press();
         Assert.True(project.IsAddingEntry);
         Assert.Equal("Add an item to dev", project.AddEntryTitle);
         var offered = project.EntryCandidates.Select(candidate => candidate.Entry).ToList();
@@ -471,13 +471,13 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal("Add to dev", project.TagChangeAction);
 
         var before = File.ReadAllBytes(_fixture.Path_);
-        project.CancelTagChangeCommand.Execute(null);
+        project.CancelTagChangeCommand.Press();
         Assert.False(project.IsConfirmingTagChange);
         Assert.Empty(_session.Unlocked.Tags(queue)!);
         Assert.Equal(before, File.ReadAllBytes(_fixture.Path_));
 
         project.ChosenEntry = Assert.Single(project.EntryCandidates);
-        project.ConfirmTagChangeCommand.Execute(null);
+        project.ConfirmTagChangeCommand.Press();
 
         Assert.Null(screen.Error);
         Assert.Equal("Added services/Queue to acme-api/dev.", screen.Notice);
@@ -495,18 +495,18 @@ public sealed class EnvProfilesTests : IDisposable
         using var screen = new EnvSetsViewModel(_session, _countdown);
         var project = Open(screen);
 
-        project.Environments[0].Members.Single(member => member.Entry == mail).Remove.Execute(null);
+        project.Environments[0].Members.Single(member => member.Entry == mail).Remove.Press();
         Assert.Equal(
             ["Removing env:acme-api, env:acme-api:dev takes services/Mail out of acme-api/dev.", "Leaving acme-api/dev: MAIL_KEY."],
             project.TagChangeLines);
         Assert.Equal(("Remove from dev", "Keep it"), (project.TagChangeAction, project.TagChangeCancel));
 
         var before = File.ReadAllBytes(_fixture.Path_);
-        project.CancelTagChangeCommand.Execute(null);
+        project.CancelTagChangeCommand.Press();
         Assert.Equal(before, File.ReadAllBytes(_fixture.Path_));
 
-        project.Environments[0].Members.Single(member => member.Entry == mail).Remove.Execute(null);
-        project.ConfirmTagChangeCommand.Execute(null);
+        project.Environments[0].Members.Single(member => member.Entry == mail).Remove.Press();
+        project.ConfirmTagChangeCommand.Press();
 
         Assert.Null(screen.Error);
         Assert.Equal("Removed services/Mail from acme-api/dev. The item and its fields are kept.", screen.Notice);
@@ -549,7 +549,7 @@ public sealed class EnvProfilesTests : IDisposable
             Assert.Contains("does not overwrite the disk blocks", import.DeleteWarning, StringComparison.Ordinal);
             Assert.Equal("Imported 1 variable into acme-api/dev.", screen.Notice);
 
-            import.KeepSourceCommand.Execute(null);
+            import.KeepSourceCommand.Press();
 
             Assert.False(import.IsOfferingDelete);
             Assert.False(import.DeleteSourceCommand.CanExecute(null));
@@ -572,7 +572,7 @@ public sealed class EnvProfilesTests : IDisposable
 
             using var screen = new EnvSetsViewModel(_session, _countdown);
             var import = Imported(screen, file);
-            import.DeleteSourceCommand.Execute(null);
+            import.DeleteSourceCommand.Press();
 
             Assert.Null(screen.Error);
             Assert.Equal($"Deleted {file}.", screen.Notice);
@@ -599,7 +599,7 @@ public sealed class EnvProfilesTests : IDisposable
             using var screen = new EnvSetsViewModel(_session, _countdown);
             var import = Imported(screen, file);
             File.WriteAllText(file, "FRESH=fresh-sentinel\nADDED=later\n");
-            import.DeleteSourceCommand.Execute(null);
+            import.DeleteSourceCommand.Press();
 
             Assert.Equal("FRESH=fresh-sentinel\nADDED=later\n", File.ReadAllText(file));
             Assert.Contains("was not deleted: it changed after keypaste read it", screen.Error, StringComparison.Ordinal);
@@ -608,7 +608,7 @@ public sealed class EnvProfilesTests : IDisposable
             File.WriteAllText(file, "OTHER=one\n");
             import.Preview(file);
             File.WriteAllText(file, "OTHER=two\n");
-            import.ConfirmCommand.Execute(null);
+            import.ConfirmCommand.Press();
 
             Assert.False(import.IsOfferingDelete);
             Assert.Contains("changed after keypaste read it, so what it holds now was not imported, and it was left in place.", screen.Notice, StringComparison.Ordinal);
@@ -651,7 +651,7 @@ public sealed class EnvProfilesTests : IDisposable
         var import = Open(screen).Import;
         import.Preview(file);
         Assert.True(import.IsPreviewing, screen.Error);
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
         Assert.Null(screen.Error);
         return import;
     }
@@ -687,7 +687,7 @@ public sealed class EnvProfilesTests : IDisposable
 
     private static EnvProjectViewModel Open(EnvSetsViewModel screen)
     {
-        screen.OpenCommand.Execute("acme-api");
+        screen.OpenCommand.Press("acme-api");
         return screen.OpenProject!;
     }
 

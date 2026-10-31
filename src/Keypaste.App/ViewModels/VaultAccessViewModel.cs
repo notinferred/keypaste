@@ -29,7 +29,7 @@ internal enum KeyfileChoice
 /// disposes this.
 /// </para>
 /// </remarks>
-internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
+internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly string? _home;
@@ -40,14 +40,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     private SecretBuffer _new = new();
     private SecretBuffer _confirm = new();
     private bool _setPassword;
-    private KeyfileChoice _keyfile;
-    private KeyfileChoice _hardwareKey;
-    private int _newSlot = 2;
-    private string? _newKeyfilePath;
     private bool _createdKeyfile;
-    private bool _confirming;
-    private bool _busy;
-    private string _message = string.Empty;
     private bool _disposed;
 
     internal VaultAccessViewModel(AppVaultSession session, string? home, IVaultFilePicker? picker, Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
@@ -59,42 +52,11 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         _picker = picker;
         _paste = paste;
 
-        ReviewCommand = new RelayCommand(Review, () => CanReview);
-        ConfirmCommand = new AsyncRelayCommand(ChangeAsync, () => _confirming && !_busy);
-        CancelCommand = new RelayCommand(() => Forget(string.Empty), () => _confirming && !_busy);
+        ConfirmCommand = new AsyncRelayCommand(ChangeAsync, () => IsConfirming && !Busy);
+        CancelCommand = new RelayCommand(() => Forget(string.Empty), () => IsConfirming && !Busy);
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => IsEditing && _picker is not null);
         CreateKeyfileCommand = new AsyncRelayCommand(CreateKeyfileAsync, () => IsEditing && _picker is not null);
-
-        DependsOn(nameof(Factors), nameof(Now));
-        DependsOn(nameof(HasKeyfile), nameof(Now));
-        DependsOn(nameof(AttachLabel), nameof(HasKeyfile));
-        DependsOn(nameof(IsEditing), nameof(IsConfirming), nameof(Busy));
-        DependsOn(nameof(KeepKeyfile), nameof(Keyfile));
-        DependsOn(nameof(AttachKeyfile), nameof(Keyfile));
-        DependsOn(nameof(RemoveKeyfile), nameof(Keyfile));
-        DependsOn(nameof(HasHardwareKey), nameof(Now));
-        DependsOn(nameof(AttachHardwareKeyLabel), nameof(HasHardwareKey));
-        DependsOn(nameof(KeepHardwareKey), nameof(HardwareKey));
-        DependsOn(nameof(AttachHardwareKey), nameof(HardwareKey));
-        DependsOn(nameof(RemoveHardwareKey), nameof(HardwareKey));
-        DependsOn(nameof(NewSlotOne), nameof(NewSlot));
-        DependsOn(nameof(NewSlotTwo), nameof(NewSlot));
-        DependsOn(nameof(HardwareKeyWarning), nameof(HardwareKey));
-        DependsOn(nameof(HasHardwareKeyWarning), nameof(HardwareKeyWarning));
-        DependsOn(nameof(NewKeyfileName), nameof(NewKeyfilePath));
-        DependsOn(nameof(Summary), nameof(Now), nameof(Keyfile), nameof(NewKeyfilePath), nameof(HardwareKey), nameof(NewSlot), nameof(SetPassword));
-        DependsOn(nameof(KeyfileWarning), nameof(Keyfile), nameof(NewKeyfilePath), nameof(NewKeyfileName));
-        DependsOn(nameof(HasKeyfileWarning), nameof(KeyfileWarning));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(ReviewCommand, nameof(IsEditing), nameof(SetPassword), nameof(Keyfile), nameof(HardwareKey), nameof(NewKeyfilePath), nameof(CurrentMaskedLength), nameof(NewMaskedLength), nameof(Now));
-        DependsOn(ConfirmCommand, nameof(IsConfirming), nameof(Busy));
-        DependsOn(CancelCommand, nameof(IsConfirming), nameof(Busy));
-        DependsOn(ChooseKeyfileCommand, nameof(IsEditing));
-        DependsOn(CreateKeyfileCommand, nameof(IsEditing));
     }
-
-    /// <summary>Shows the confirmation for the change the form describes.</summary>
-    internal RelayCommand ReviewCommand { get; }
 
     /// <summary>Makes the change.</summary>
     internal AsyncRelayCommand ConfirmCommand { get; }
@@ -123,19 +85,19 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     internal int ConfirmMaskedLength => _confirm.Length;
 
     /// <summary>Whether the form, rather than the confirmation, is showing.</summary>
-    internal bool IsEditing => !_confirming && !_busy;
+    internal bool IsEditing => !IsConfirming && !Busy;
 
-    internal bool IsConfirming
-    {
-        get => _confirming;
-        private set => Set(ref _confirming, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditing))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand), nameof(ReviewCommand), nameof(ChooseKeyfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateKeyfileCommand))]
+    internal partial bool IsConfirming { get; private set; }
 
-    internal bool Busy
-    {
-        get => _busy;
-        private set => Set(ref _busy, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditing))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand), nameof(ReviewCommand), nameof(ChooseKeyfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateKeyfileCommand))]
+    internal partial bool Busy { get; private set; }
 
     /// <summary>Whether the change sets a new master password.</summary>
     internal bool SetPassword
@@ -143,9 +105,15 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         get => _setPassword;
         set
         {
-            if (IsEditing && Set(ref _setPassword, value) && !value)
+            if (IsEditing && SetProperty(ref _setPassword, value))
             {
-                ResetNew();
+                OnPropertyChanged(nameof(Summary));
+                ReviewCommand.NotifyCanExecuteChanged();
+
+                if (!value)
+                {
+                    ResetNew();
+                }
             }
         }
     }
@@ -226,13 +194,12 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     internal bool HasHardwareKeyWarning => HardwareKeyWarning.Length > 0;
 
     /// <summary>The keyfile to attach, once one has been chosen.</summary>
-    internal string? NewKeyfilePath
-    {
-        get => _newKeyfilePath;
-        private set => Set(ref _newKeyfilePath, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewKeyfileName), nameof(Summary), nameof(KeyfileWarning), nameof(HasKeyfileWarning))]
+    [NotifyCanExecuteChangedFor(nameof(ReviewCommand))]
+    internal partial string? NewKeyfilePath { get; private set; }
 
-    internal string NewKeyfileName => _newKeyfilePath is null ? string.Empty : Path.GetFileName(_newKeyfilePath);
+    internal string NewKeyfileName => NewKeyfilePath is null ? string.Empty : Path.GetFileName(NewKeyfilePath);
 
     /// <summary>What the confirmation says the change will do.</summary>
     internal string Summary
@@ -246,7 +213,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 
             var keyfileAfter = Keyfile switch
             {
-                KeyfileChoice.Attach => _newKeyfilePath,
+                KeyfileChoice.Attach => NewKeyfilePath,
                 KeyfileChoice.Remove => null,
                 _ => now.Keyfile,
             };
@@ -270,7 +237,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         : string.Empty;
 
     /// <summary>Shown when a keyfile is being attached.</summary>
-    internal string KeyfileWarning => Keyfile == KeyfileChoice.Attach && _newKeyfilePath is { } keyfile
+    internal string KeyfileWarning => Keyfile == KeyfileChoice.Attach && NewKeyfilePath is { } keyfile
         ? _createdKeyfile && _session.VaultPath is { } vault
             ? UnlockViewModel.CreatedKeyfileNote(keyfile, vault)
             : $"Keep a copy of {NewKeyfileName} somewhere other than beside the vault. Losing it locks the vault, and nothing recovers it."
@@ -278,31 +245,27 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 
     internal bool HasKeyfileWarning => KeyfileWarning.Length > 0;
 
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
-    private KeyfileChoice Keyfile
-    {
-        get => _keyfile;
-        set => Set(ref _keyfile, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeepKeyfile), nameof(AttachKeyfile), nameof(RemoveKeyfile), nameof(Summary), nameof(KeyfileWarning))]
+    [NotifyPropertyChangedFor(nameof(HasKeyfileWarning))]
+    [NotifyCanExecuteChangedFor(nameof(ReviewCommand))]
+    private partial KeyfileChoice Keyfile { get; set; }
 
-    private KeyfileChoice HardwareKey
-    {
-        get => _hardwareKey;
-        set => Set(ref _hardwareKey, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeepHardwareKey), nameof(AttachHardwareKey), nameof(RemoveHardwareKey), nameof(HardwareKeyWarning))]
+    [NotifyPropertyChangedFor(nameof(Summary), nameof(HasHardwareKeyWarning))]
+    [NotifyCanExecuteChangedFor(nameof(ReviewCommand))]
+    private partial KeyfileChoice HardwareKey { get; set; }
 
-    private int NewSlot
-    {
-        get => _newSlot;
-        set => Set(ref _newSlot, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewSlotOne), nameof(NewSlotTwo), nameof(Summary))]
+    private partial int NewSlot { get; set; } = 2;
 
     /// <summary>The open vault's factors, or null once it has locked.</summary>
     private (bool Password, string? Keyfile, int? Slot)? Now
@@ -323,7 +286,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     private bool CanReview =>
         IsEditing
         && (_setPassword || Keyfile != KeyfileChoice.Keep || HardwareKey != KeyfileChoice.Keep)
-        && (Keyfile != KeyfileChoice.Attach || _newKeyfilePath is not null)
+        && (Keyfile != KeyfileChoice.Attach || NewKeyfilePath is not null)
         && (!_setPassword || _new.Length > 0)
         && (_current.Length > 0 || Now is { Password: false });
 
@@ -380,7 +343,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     /// </summary>
     internal async Task ChangeAsync()
     {
-        if (_disposed || !_confirming || _busy)
+        if (_disposed || !IsConfirming || Busy)
         {
             return;
         }
@@ -394,21 +357,21 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 #pragma warning disable CA2000
             var change = new VaultAccessChange(
                 _setPassword,
-                _keyfile switch
+                Keyfile switch
                 {
                     KeyfileChoice.Attach => AccessKeyfileChange.Attach,
                     KeyfileChoice.Remove => AccessKeyfileChange.Remove,
                     _ => AccessKeyfileChange.Keep,
                 },
-                _keyfile == KeyfileChoice.Attach ? _newKeyfilePath : null)
+                Keyfile == KeyfileChoice.Attach ? NewKeyfilePath : null)
             {
-                HardwareKeyChange = _hardwareKey switch
+                HardwareKeyChange = HardwareKey switch
                 {
                     KeyfileChoice.Attach => AccessHardwareKeyChange.Attach,
                     KeyfileChoice.Remove => AccessHardwareKeyChange.Remove,
                     _ => AccessHardwareKeyChange.Keep,
                 },
-                HardwareKey = _hardwareKey == KeyfileChoice.Attach ? _session.NewHardwareKey(_newSlot) : null,
+                HardwareKey = HardwareKey == KeyfileChoice.Attach ? _session.NewHardwareKey(NewSlot) : null,
             };
 #pragma warning restore CA2000
 
@@ -485,14 +448,14 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
             VaultAccessOutcome.NothingToChange => "Nothing would change.",
             VaultAccessOutcome.EmptyPassword => "A new master password can't be empty. Nothing was changed.",
             VaultAccessOutcome.PasswordsDoNotMatch => "Those two new passwords aren't the same. Nothing was changed.",
-            VaultAccessOutcome.WouldLeaveNoPassword when _keyfile == KeyfileChoice.Remove =>
+            VaultAccessOutcome.WouldLeaveNoPassword when Keyfile == KeyfileChoice.Remove =>
                 "This vault's keyfile is all that opens it, so it can go only if a master password is set in the same change. Nothing was changed.",
             VaultAccessOutcome.WouldLeaveNoPassword =>
                 "This vault has no master password or keyfile, so its YubiKey can go only if a master password is set in the same change. Nothing was changed.",
             VaultAccessOutcome.NoKeyfileToRemove => "This vault has no keyfile to remove. Nothing was changed.",
             VaultAccessOutcome.NoHardwareKeyToRemove => "This vault has no YubiKey to remove. Nothing was changed.",
             VaultAccessOutcome.HardwareKeyNotFound =>
-                $"No YubiKey with slot {_newSlot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager. Nothing was changed.",
+                $"No YubiKey with slot {NewSlot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager. Nothing was changed.",
             VaultAccessOutcome.KeyfileUnusable => $"{UnlockViewModel.ExplainKeyfile(result.Result.Keyfile.Outcome)} Nothing was changed.",
             VaultAccessOutcome.KeyfileIsFragile =>
                 "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile. Nothing was changed.",
@@ -596,6 +559,8 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Shows the confirmation for the change the form describes.</summary>
+    [RelayCommand(CanExecute = nameof(CanReview))]
     private void Review()
     {
         if (_disposed || !CanReview)
@@ -615,9 +580,10 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         }
 
         edit();
-        Raise(nameof(CurrentMaskedLength));
-        Raise(nameof(NewMaskedLength));
-        Raise(nameof(ConfirmMaskedLength));
+        OnPropertyChanged(nameof(CurrentMaskedLength));
+        OnPropertyChanged(nameof(NewMaskedLength));
+        OnPropertyChanged(nameof(ConfirmMaskedLength));
+        ReviewCommand.NotifyCanExecuteChanged();
 
         if (HasMessage)
         {
@@ -635,17 +601,30 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 
         _current.Dispose();
         _current = new SecretBuffer();
-        Raise(nameof(CurrentMaskedLength));
+        OnPropertyChanged(nameof(CurrentMaskedLength));
+        ReviewCommand.NotifyCanExecuteChanged();
         ResetNew();
         IsConfirming = false;
-        Set(ref _setPassword, false, nameof(SetPassword));
+        if (SetProperty(ref _setPassword, false, nameof(SetPassword)))
+        {
+            OnPropertyChanged(nameof(Summary));
+            ReviewCommand.NotifyCanExecuteChanged();
+        }
+
         Keyfile = KeyfileChoice.Keep;
         HardwareKey = KeyfileChoice.Keep;
         NewSlot = 2;
         _createdKeyfile = false;
         NewKeyfilePath = null;
         Message = message;
-        Raise(nameof(Now));
+        OnPropertyChanged(nameof(Now));
+        OnPropertyChanged(nameof(Factors));
+        OnPropertyChanged(nameof(HasKeyfile));
+        OnPropertyChanged(nameof(HasHardwareKey));
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(AttachLabel));
+        OnPropertyChanged(nameof(AttachHardwareKeyLabel));
+        ReviewCommand.NotifyCanExecuteChanged();
     }
 
     private void ResetNew()
@@ -654,7 +633,8 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         _confirm.Dispose();
         _new = new SecretBuffer();
         _confirm = new SecretBuffer();
-        Raise(nameof(NewMaskedLength));
-        Raise(nameof(ConfirmMaskedLength));
+        OnPropertyChanged(nameof(NewMaskedLength));
+        OnPropertyChanged(nameof(ConfirmMaskedLength));
+        ReviewCommand.NotifyCanExecuteChanged();
     }
 }

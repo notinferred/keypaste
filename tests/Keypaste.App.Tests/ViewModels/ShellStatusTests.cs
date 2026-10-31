@@ -91,7 +91,7 @@ public sealed class ShellStatusTests
         Assert.EndsWith(" Your change to env/app/MINE was not saved, and reloading discards it.", shell.VaultChanged, StringComparison.Ordinal);
 
         var before = shell.Content;
-        shell.ReloadCommand.Execute(null);
+        shell.ReloadCommand.Press();
 
         Assert.False(shell.HasVaultChanged);
         Assert.Equal($"{name} · saved", shell.VaultStatus);
@@ -122,7 +122,7 @@ public sealed class ShellStatusTests
         Assert.EndsWith(" Your changes to env/app/FIRST and env/app/SECOND were not saved, and reloading discards them.", shell.VaultChanged, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-", shell.VaultChanged, StringComparison.Ordinal);
 
-        shell.ReloadCommand.Execute(null);
+        shell.ReloadCommand.Press();
 
         Assert.Empty(session.Unsaved);
         Assert.False(shell.HasVaultChanged);
@@ -179,7 +179,7 @@ public sealed class ShellStatusTests
                 other.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), next, next).Outcome);
         }
 
-        shell.ReloadCommand.Execute(null);
+        shell.ReloadCommand.Press();
 
         Assert.Equal([VaultLockReason.ReloadRefused], locked);
         Assert.False(session.IsUnlocked);
@@ -365,7 +365,7 @@ public sealed class ShellStatusTests
         try
         {
             var returned = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _ = Task.Run(() => returned.SetResult(shell.LockCommand.ExecuteAsync()), Token);
+            _ = Task.Run(() => returned.SetResult(shell.LockCommand.PressAsync()), Token);
             locking = await returned.Task.WaitAsync(_connect, Token);
             await prompt.Withdrawn.WaitAsync(_connect, Token);
 
@@ -551,7 +551,7 @@ public sealed class ShellStatusTests
         Assert.StartsWith(conflict + " Another program saved", shell.Notice, StringComparison.Ordinal);
         Assert.EndsWith("Your change to env/app/LATER is saved.", shell.Notice, StringComparison.Ordinal);
 
-        shell.DismissNoticeCommand.Execute(null);
+        shell.DismissNoticeCommand.Press();
 
         Assert.False(shell.HasNotice);
     }
@@ -600,7 +600,7 @@ public sealed class ShellStatusTests
         await shell.Merging.WaitAsync(_connect, Token);
         Assert.Equal(1, merges);
 
-        shell.ReloadCommand.Execute(null);
+        shell.ReloadCommand.Press();
 
         Assert.False(shell.HasVaultChanged);
         Assert.NotNull(session.Unlocked!.Find("env/app/OTHER"));
@@ -623,7 +623,7 @@ public sealed class ShellStatusTests
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
         var detail = entries.Detail!;
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         detail.DraftNotes = "typed before the merge";
 
         SaveElsewhere(fixture, "ELSEWHERE");
@@ -635,7 +635,7 @@ public sealed class ShellStatusTests
         Assert.True(detail.IsEditing);
         Assert.Equal("typed before the merge", detail.DraftNotes);
 
-        detail.SaveCommand.Execute(null);
+        detail.SaveCommand.Press();
         Assert.False(detail.IsEditing, entries.Error);
 
         using var file = Vault.Open(fixture.Path_, TempVault.Password);

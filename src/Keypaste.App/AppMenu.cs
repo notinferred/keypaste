@@ -18,7 +18,7 @@ internal static class AppMenu
 
         var import = new NativeMenuItem(ImportHeader)
         {
-            Command = new RelayCommand(() => shell()?.ImportCommand.Execute(null)),
+            Command = new RelayCommand(() => shell()?.ImportCommand.Press()),
         };
 
         var file = new NativeMenu();

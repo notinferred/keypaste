@@ -41,7 +41,7 @@ internal sealed record LogFilterOption(LogFilter Filter, string Words);
 /// inserted would read exactly like one keypaste wrote. The verdict's paragraphs wait to be asked for.
 /// </para>
 /// </remarks>
-internal sealed class LogViewModel : ObservableObject
+internal sealed partial class LogViewModel : ObservableObject
 {
     /// <summary>What an empty machine is told.</summary>
     internal const string NothingYet = "Nothing has asked keypaste for a credential on this machine yet.";
@@ -76,24 +76,8 @@ internal sealed class LogViewModel : ObservableObject
         _filter = agentsOnly ? Filters[1] : Filters[0];
         IsAgentHistory = agentsOnly;
 
-        RefreshCommand = new RelayCommand(Refresh);
         VerifyCommand = new RelayCommand(ToggleVerdict, () => OffersChainCheck && _verdict is not null);
         CopyHashCommand = new RelayCommand(() => _ = CopyHashAsync(), () => OffersChainCheck && _clipboard is not null && _verdict is { HasHash: true });
-
-        DependsOn(nameof(OffersVerify), nameof(HasTable));
-        DependsOn(nameof(ShowAll), nameof(Filter));
-        DependsOn(nameof(ShowAgents), nameof(Filter));
-        DependsOn(nameof(ShowYou), nameof(Filter));
-        DependsOn(nameof(ShowDenied), nameof(Filter));
-        DependsOn(nameof(HasRows), nameof(Rows));
-        DependsOn(nameof(FilterEmpty), nameof(HasTable), nameof(Rows));
-        DependsOn(nameof(HasUnreadableNote), nameof(HasTable));
-        DependsOn(nameof(HasNotes), nameof(HasUnverifiedNote), nameof(HasUnreadNote), nameof(HasUnreadableNote));
-        DependsOn(nameof(VerifyLabel), nameof(VerdictShown));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(HasNotice), nameof(HasMessage), nameof(IsEmpty));
-        DependsOn(VerifyCommand, nameof(Verdict));
-        DependsOn(CopyHashCommand, nameof(Verdict));
 
         Refresh();
     }
@@ -139,8 +123,12 @@ internal sealed class LogViewModel : ObservableObject
         get => _filter;
         set
         {
-            if (value is not null && Set(ref _filter, value))
+            if (value is not null && SetProperty(ref _filter, value))
             {
+                OnPropertyChanged(nameof(ShowAll));
+                OnPropertyChanged(nameof(ShowYou));
+                OnPropertyChanged(nameof(ShowAgents));
+                OnPropertyChanged(nameof(ShowDenied));
                 Apply();
             }
         }
@@ -233,14 +221,13 @@ internal sealed class LogViewModel : ObservableObject
     /// <summary>Whether the message is the chain being broken, which the screen marks as a warning.</summary>
     internal bool IsBroken => _history.Kind == AuditReadKind.Broken;
 
-    internal RelayCommand RefreshCommand { get; }
-
     internal RelayCommand VerifyCommand { get; }
 
     /// <summary>Copies the latest hash, which is not a secret, so it can be kept somewhere else.</summary>
     internal RelayCommand CopyHashCommand { get; }
 
     /// <summary>Re-reads the log from disk and re-checks it; the verdict folds away, because it described the last read.</summary>
+    [RelayCommand]
     internal void Refresh()
     {
         _history = AuditHistory.Read(_path);
@@ -257,13 +244,22 @@ internal sealed class LogViewModel : ObservableObject
 
         _all = [.. _history.Entries.Reverse().Select(entry => LogRow.From(entry, !_history.Unverified.Contains(entry.Line), _clock))];
 
-        Raise(nameof(HasTable));
-        Raise(nameof(Verdict));
-        Raise(nameof(VerdictShown));
-        Raise(nameof(Message));
-        Raise(nameof(IsEmpty));
-        Raise(nameof(IsBroken));
-        Raise(nameof(UnreadableNote));
+        OnPropertyChanged(nameof(HasTable));
+        OnPropertyChanged(nameof(Verdict));
+        OnPropertyChanged(nameof(VerdictShown));
+        OnPropertyChanged(nameof(Message));
+        OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(IsBroken));
+        OnPropertyChanged(nameof(UnreadableNote));
+        OnPropertyChanged(nameof(OffersVerify));
+        OnPropertyChanged(nameof(FilterEmpty));
+        OnPropertyChanged(nameof(HasUnreadableNote));
+        OnPropertyChanged(nameof(HasNotes));
+        OnPropertyChanged(nameof(VerifyLabel));
+        OnPropertyChanged(nameof(HasMessage));
+        OnPropertyChanged(nameof(HasNotice));
+        VerifyCommand.NotifyCanExecuteChanged();
+        CopyHashCommand.NotifyCanExecuteChanged();
 
         Apply();
     }
@@ -302,10 +298,13 @@ internal sealed class LogViewModel : ObservableObject
         _unreadShown = _rows.Any(row => row.ReasonUnread);
         _summary = HasTable ? Tally(_rows.Count, _history.Total, _filter.Words) : string.Empty;
 
-        Raise(nameof(Rows));
-        Raise(nameof(Summary));
-        Raise(nameof(HasUnverifiedNote));
-        Raise(nameof(HasUnreadNote));
+        OnPropertyChanged(nameof(Rows));
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(HasUnverifiedNote));
+        OnPropertyChanged(nameof(HasUnreadNote));
+        OnPropertyChanged(nameof(HasRows));
+        OnPropertyChanged(nameof(FilterEmpty));
+        OnPropertyChanged(nameof(HasNotes));
     }
 
     /// <summary>Marks the first row of each day with its divider; a table of today alone needs none.</summary>
@@ -347,6 +346,7 @@ internal sealed class LogViewModel : ObservableObject
     private void ToggleVerdict()
     {
         _verdictShown = !_verdictShown;
-        Raise(nameof(VerdictShown));
+        OnPropertyChanged(nameof(VerdictShown));
+        OnPropertyChanged(nameof(VerifyLabel));
     }
 }

@@ -67,12 +67,12 @@ public sealed class EntryTagSuggestionsTests : IDisposable
         var detail = Select("api/token");
 
         detail.DraftTag = detail.TagSuggestions[0];
-        detail.AddTagCommand.Execute(null);
+        detail.AddTagCommand.Press();
 
         Assert.True(detail.IsConfirmingTagChange);
         Assert.DoesNotContain("env:billing:prod", _session.Unlocked!.Tags(_token)!);
 
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Press();
 
         Assert.Contains("env:billing:prod", _session.Unlocked.Tags(_token)!);
         Assert.Equal(["env:shop:staging"], detail.TagSuggestions);

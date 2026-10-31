@@ -21,7 +21,7 @@ internal sealed partial class UnlockView : UserControl
         password.BackspacePressed += (_, _) => Model?.Backspace();
         password.ClearRequested += (_, _) => Model?.ClearPassword();
         // Enter on an empty field asks Windows Hello where it can unlock the vault, so the keyboard path stays launch, Enter.
-        password.Submitted += (_, _) => Run(Model is { MaskedLength: 0, OffersQuickUnlock: true } model ? model.ResumeCommand : Model?.UnlockCommand);
+        password.Submitted += (_, _) => (Model is { MaskedLength: 0, OffersQuickUnlock: true } model ? model.ResumeCommand : Model?.UnlockCommand)?.Press();
         password.Pasting = () => Model?.PasteAsync() ?? Task.CompletedTask;
 
         var created = this.FindControl<MaskedInput>("NewPassword")!;
@@ -35,14 +35,14 @@ internal sealed partial class UnlockView : UserControl
         confirm.CharacterTyped += (_, c) => Model?.TypeConfirm(c);
         confirm.BackspacePressed += (_, _) => Model?.BackspaceConfirm();
         confirm.ClearRequested += (_, _) => Model?.ClearConfirm();
-        confirm.Submitted += (_, _) => Run(Model?.CreateCommand);
+        confirm.Submitted += (_, _) => Model?.CreateCommand.Press();
         confirm.Pasting = () => Model?.PasteConfirmAsync() ?? Task.CompletedTask;
 
         var backup = this.FindControl<MaskedInput>("BackupPassword")!;
         backup.CharacterTyped += (_, c) => Model?.Restore?.Type(c);
         backup.BackspacePressed += (_, _) => Model?.Restore?.Backspace();
         backup.ClearRequested += (_, _) => Model?.Restore?.ClearPassword();
-        backup.Submitted += (_, _) => Run(Model?.Restore?.CheckCommand);
+        backup.Submitted += (_, _) => Model?.Restore?.CheckCommand.Press();
         backup.Pasting = () => Model?.Restore?.PasteAsync() ?? Task.CompletedTask;
 
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
@@ -88,14 +88,6 @@ internal sealed partial class UnlockView : UserControl
     }
 
     private UnlockViewModel? Model => DataContext as UnlockViewModel;
-
-    private static void Run(AsyncRelayCommand? command)
-    {
-        if (command is not null && command.CanExecute(null))
-        {
-            command.Execute(null);
-        }
-    }
 
     private static void OnDragOver(object? sender, DragEventArgs e)
     {

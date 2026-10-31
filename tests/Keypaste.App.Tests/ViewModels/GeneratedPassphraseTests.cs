@@ -59,7 +59,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
         {
             var form = NewItemForm.Open(context.Entries, "database");
             form.Generator.UseWords = true;
-            context.Entries.ConfirmAddCommand.Execute(null);
+            context.Entries.ConfirmAddCommand.Press();
 
             Assert.Null(context.Entries.Error);
         }
@@ -74,11 +74,11 @@ public sealed class GeneratedPassphraseTests : IDisposable
         {
             var project = Billing(context);
 
-            project.BeginAddCommand.Execute(null);
+            project.BeginAddCommand.Press();
             project.NewKey = "DATABASE_URL";
             project.Generator.UseWords = true;
             project.Generator.WordCount = 8;
-            project.ConfirmAddCommand.Execute(null);
+            project.ConfirmAddCommand.Press();
 
             Assert.Null(context.EnvSets.Error);
         }
@@ -94,7 +94,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
             var form = NewItemForm.Open(context.Entries, "database");
             form.Generator.UseWords = true;
             form.Generator.Separator = "_";
-            context.Entries.ConfirmAddCommand.Execute(null);
+            context.Entries.ConfirmAddCommand.Press();
 
             Assert.Null(context.Entries.Error);
         }
@@ -120,7 +120,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
             var form = NewItemForm.Open(context.Entries, "database");
             form.Generator.UseWords = true;
             form.Generator.WordCount = 3;
-            context.Entries.ConfirmAddCommand.Execute(null);
+            context.Entries.ConfirmAddCommand.Press();
 
             Assert.NotNull(form.Error);
             Assert.True(context.Entries.IsAdding);
@@ -143,7 +143,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
 
     private static EnvProjectViewModel Billing(Context context)
     {
-        context.EnvSets.OpenCommand.Execute("billing");
+        context.EnvSets.OpenCommand.Press("billing");
         return context.EnvSets.OpenProject!;
     }
 

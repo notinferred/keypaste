@@ -22,18 +22,16 @@ namespace Keypaste.App.ViewModels;
 /// <see cref="EntryNameSanitizer"/> and the core's own addressing.
 /// </para>
 /// </remarks>
-internal sealed class EntriesViewModel : ObservableObject, IDisposable
+internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
 
     private IReadOnlyList<EntryRow> _all = [];
-    private IReadOnlyList<EntryRow> _rows = [];
     private readonly EntryActivitySource? _activity;
     private readonly IWebLauncher? _web;
     private readonly Action<Action>? _post;
     private readonly IVaultFilePicker? _picker;
-    private IReadOnlyList<GroupNode> _groups = [];
     private GroupNode? _selectedGroup;
     private EntryName? _selection;
     private EntryName? _pinned;
@@ -41,21 +39,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private string _search = string.Empty;
     private string? _matchedQuery;
     private Dictionary<EntryName, EntryMatch> _matches = [];
-    private string? _error;
-    private bool _isConfirmingDelete;
-    private string? _notice;
     private RecycledEntryId? _undo;
     private NewItemViewModel? _newItem;
-    private bool _isOrganizing;
-    private bool _isCreatingGroup;
-    private bool _isRenamingGroup;
-    private bool _isMovingGroup;
-    private bool _isConfirmingGroupDelete;
-    private string _draftTitle = string.Empty;
-    private string _draftGroupName = string.Empty;
-    private GroupNode? _moveTarget;
-    private GroupNode? _groupMoveTarget;
-    private IReadOnlyList<GroupNode> _moveTargets = [];
 
     internal EntriesViewModel(
         AppVaultSession session,
@@ -77,8 +62,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
-        CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
-        ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
         DeleteCommand = new RelayCommand(
             () => IsConfirmingDelete = true,
             () => Selected is not null && !IsConfirmingDelete);
@@ -86,7 +69,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         CancelDeleteCommand = new RelayCommand(
             () => IsConfirmingDelete = false,
             () => IsConfirmingDelete);
-        UndoDeleteCommand = new RelayCommand(UndoDelete, () => CanUndoDelete);
 
         OrganizeCommand = new RelayCommand(BeginOrganize, () => Selected is not null && !IsOrganizing);
         ConfirmOrganizeCommand = new RelayCommand(ConfirmOrganize, () => IsOrganizing);
@@ -111,49 +93,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             () => IsCreatingGroup || IsRenamingGroup || IsMovingGroup || IsConfirmingGroupDelete);
         DuplicateCommand = new RelayCommand(Duplicate, () => Selected is not null);
 
-        DependsOn(nameof(CanRenameGroup), nameof(SelectedGroup));
-        DependsOn(nameof(ListTitle), nameof(SelectedGroup), nameof(VaultName));
-        DependsOn(nameof(SearchScope), nameof(SelectedGroup), nameof(ListTitle));
-        DependsOn(nameof(ShowsListEmpty), nameof(Rows));
-        DependsOn(nameof(ListEmptyNote), nameof(Search), nameof(SelectedGroup), nameof(ListTitle));
-        DependsOn(nameof(ListEmptyOffersNew), nameof(Search));
-        DependsOn(nameof(ListEmptyOffersImport), nameof(TotalCount), nameof(ListEmptyOffersNew), nameof(SelectedGroup));
-        DependsOn(nameof(IsAdding), nameof(NewItem));
-        DependsOn(nameof(Selected), nameof(Rows), nameof(IsAdding));
-        DependsOn(nameof(DeletePrompt), nameof(Selected));
-        DependsOn(nameof(AddIsPrimary), nameof(IsAdding), nameof(IsOrganizing), nameof(IsCreatingGroup), nameof(IsRenamingGroup), nameof(IsMovingGroup), nameof(Detail));
-        DependsOn(nameof(ShowsList), nameof(IsAdding), nameof(Detail));
-        DependsOn(nameof(ShowsPlaceholder), nameof(Detail), nameof(IsAdding));
-        DependsOn(nameof(HasError), nameof(Error));
-        DependsOn(nameof(HasNotice), nameof(Notice));
-        DependsOn(nameof(OrganizePrompt), nameof(Selected));
-        DependsOn(nameof(CreateGroupPrompt), nameof(SelectedGroup));
-        DependsOn(nameof(RenameGroupPrompt), nameof(SelectedGroup));
-        DependsOn(nameof(MoveGroupPrompt), nameof(SelectedGroup));
-        DependsOn(nameof(GroupDeletePrompt), nameof(SelectedGroup), nameof(IsConfirmingGroupDelete));
-        DependsOn(nameof(ShowsProjectRenameNote), nameof(IsRenamingGroup), nameof(SelectedGroup));
-        DependsOn(nameof(ProjectRenameNote), nameof(ShowsProjectRenameNote), nameof(SelectedGroup));
-        DependsOn(BeginAddCommand, nameof(IsAdding));
-        DependsOn(CancelAddCommand, nameof(IsAdding));
-        DependsOn(ConfirmAddCommand, nameof(IsAdding));
-        DependsOn(DeleteCommand, nameof(Selected), nameof(IsConfirmingDelete));
-        DependsOn(ConfirmDeleteCommand, nameof(IsConfirmingDelete));
-        DependsOn(CancelDeleteCommand, nameof(IsConfirmingDelete));
-        DependsOn(UndoDeleteCommand, nameof(CanUndoDelete));
-        DependsOn(OrganizeCommand, nameof(Selected), nameof(IsOrganizing));
-        DependsOn(ConfirmOrganizeCommand, nameof(IsOrganizing));
-        DependsOn(CancelOrganizeCommand, nameof(IsOrganizing));
-        DependsOn(BeginCreateGroupCommand, nameof(IsCreatingGroup));
-        DependsOn(ConfirmCreateGroupCommand, nameof(IsCreatingGroup));
-        DependsOn(BeginRenameGroupCommand, nameof(IsRenamingGroup), nameof(SelectedGroup));
-        DependsOn(ConfirmRenameGroupCommand, nameof(IsRenamingGroup));
-        DependsOn(BeginMoveGroupCommand, nameof(IsMovingGroup), nameof(SelectedGroup));
-        DependsOn(ConfirmMoveGroupCommand, nameof(IsMovingGroup));
-        DependsOn(BeginDeleteGroupCommand, nameof(IsConfirmingGroupDelete), nameof(SelectedGroup));
-        DependsOn(ConfirmDeleteGroupCommand, nameof(IsConfirmingGroupDelete));
-        DependsOn(CancelGroupCommand, nameof(IsCreatingGroup), nameof(IsRenamingGroup), nameof(IsMovingGroup), nameof(IsConfirmingGroupDelete));
-        DependsOn(DuplicateCommand, nameof(Selected));
-
         Reload();
 
         if (_activity is not null)
@@ -164,11 +103,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>The group tree, flattened, with "All items" first.</summary>
-    internal IReadOnlyList<GroupNode> Groups
-    {
-        get => _groups;
-        private set => Set(ref _groups, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<GroupNode> Groups { get; private set; } = [];
 
     /// <summary>Which group is showing. Null means every entry.</summary>
     internal GroupNode? SelectedGroup
@@ -176,8 +112,22 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         get => _selectedGroup;
         set
         {
-            if (Set(ref _selectedGroup, value))
+            if (SetProperty(ref _selectedGroup, value))
             {
+                OnPropertyChanged(nameof(CanRenameGroup));
+                OnPropertyChanged(nameof(ListTitle));
+                OnPropertyChanged(nameof(SearchScope));
+                OnPropertyChanged(nameof(ListEmptyNote));
+                OnPropertyChanged(nameof(ListEmptyOffersImport));
+                OnPropertyChanged(nameof(CreateGroupPrompt));
+                OnPropertyChanged(nameof(RenameGroupPrompt));
+                OnPropertyChanged(nameof(MoveGroupPrompt));
+                OnPropertyChanged(nameof(GroupDeletePrompt));
+                OnPropertyChanged(nameof(ShowsProjectRenameNote));
+                OnPropertyChanged(nameof(ProjectRenameNote));
+                BeginRenameGroupCommand.NotifyCanExecuteChanged();
+                BeginMoveGroupCommand.NotifyCanExecuteChanged();
+                BeginDeleteGroupCommand.NotifyCanExecuteChanged();
                 Filter();
                 CloseGroupForms();
             }
@@ -201,14 +151,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal RelayCommand ClearScopeCommand { get; }
 
     /// <summary>What matches the search and the selected group.</summary>
-    internal IReadOnlyList<EntryRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsListEmpty), nameof(Selected), nameof(DeletePrompt), nameof(OrganizePrompt))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(OrganizeCommand), nameof(DuplicateCommand))]
+    internal partial IReadOnlyList<EntryRow> Rows { get; private set; } = [];
 
     /// <summary>Whether the list has nothing to show, so it says why instead of standing blank.</summary>
-    internal bool ShowsListEmpty => _rows.Count == 0 && _session.Unlocked is not null;
+    internal bool ShowsListEmpty => Rows.Count == 0 && _session.Unlocked is not null;
 
     /// <summary>Why the list is empty: nothing matched the filter, or there is nothing where it is looking.</summary>
     internal string ListEmptyNote =>
@@ -245,8 +194,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         get => _search;
         set
         {
-            if (Set(ref _search, value))
+            if (SetProperty(ref _search, value))
             {
+                OnPropertyChanged(nameof(ListEmptyNote));
+                OnPropertyChanged(nameof(ListEmptyOffersNew));
+                OnPropertyChanged(nameof(ListEmptyOffersImport));
                 // A new query is a new question, so an entry held in the list by the last one stops
                 // being held by this one.
                 _pinned = null;
@@ -303,11 +255,9 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// a recycle bin the entry can be recovered; in one whose owner turned the bin off it cannot,
     /// and <see cref="DeletePrompt"/> says which vault this is rather than guessing.
     /// </remarks>
-    internal bool IsConfirmingDelete
-    {
-        get => _isConfirmingDelete;
-        private set => Set(ref _isConfirmingDelete, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ConfirmDeleteCommand), nameof(CancelDeleteCommand))]
+    internal partial bool IsConfirmingDelete { get; private set; }
 
     /// <summary>What the confirmation asks, naming what goes and whether it can come back.</summary>
     /// <remarks>
@@ -363,8 +313,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 value.PropertyChanged += OnDetailChanged;
             }
 
-            if (Set(ref _detail, value))
+            if (SetProperty(ref _detail, value))
             {
+                OnPropertyChanged(nameof(AddIsPrimary));
+                OnPropertyChanged(nameof(ShowsList));
+                OnPropertyChanged(nameof(ShowsPlaceholder));
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
                 // a notes field read from an open vault, and the lock has to mean something.
                 previous?.Dispose();
@@ -376,13 +329,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal bool ShowsPlaceholder => _detail is null && !IsAdding;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
-    internal string? Error
-    {
-        get => _error;
-        private set => Set(ref _error, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    internal partial string? Error { get; private set; }
 
-    internal bool HasError => _error is not null;
+    internal bool HasError => Error is not null;
 
     /// <summary>What the last deletion did, or null.</summary>
     /// <remarks>
@@ -390,13 +341,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// switched off between the confirmation and the deletion cannot make this line wrong. The CLI
     /// says the same thing for the same reason.
     /// </remarks>
-    internal string? Notice
-    {
-        get => _notice;
-        private set => Set(ref _notice, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotice))]
+    internal partial string? Notice { get; private set; }
 
-    internal bool HasNotice => _notice is not null;
+    internal bool HasNotice => Notice is not null;
 
     /// <summary>Whether the last deletion can still be taken back from here.</summary>
     internal bool CanUndoDelete => _undo is not null;
@@ -415,8 +364,21 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         {
             var old = _newItem;
 
-            if (Set(ref _newItem, value))
+            if (SetProperty(ref _newItem, value))
             {
+                OnPropertyChanged(nameof(IsAdding));
+                OnPropertyChanged(nameof(Selected));
+                OnPropertyChanged(nameof(AddIsPrimary));
+                OnPropertyChanged(nameof(ShowsList));
+                OnPropertyChanged(nameof(ShowsPlaceholder));
+                OnPropertyChanged(nameof(DeletePrompt));
+                OnPropertyChanged(nameof(OrganizePrompt));
+                BeginAddCommand.NotifyCanExecuteChanged();
+                CancelAddCommand.NotifyCanExecuteChanged();
+                ConfirmAddCommand.NotifyCanExecuteChanged();
+                DeleteCommand.NotifyCanExecuteChanged();
+                OrganizeCommand.NotifyCanExecuteChanged();
+                DuplicateCommand.NotifyCanExecuteChanged();
                 old?.Dispose();
             }
         }
@@ -426,56 +388,48 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     {
         if (e.PropertyName == nameof(EntryDetailViewModel.HasOwnPrimary))
         {
-            Raise(nameof(AddIsPrimary));
+            OnPropertyChanged(nameof(AddIsPrimary));
         }
 
         if (e.PropertyName == nameof(EntryDetailViewModel.TakesWholeView))
         {
-            Raise(nameof(ShowsList));
+            OnPropertyChanged(nameof(ShowsList));
         }
     }
 
     /// <summary>Whether the organize form is showing for the selected entry.</summary>
-    internal bool IsOrganizing
-    {
-        get => _isOrganizing;
-        private set => Set(ref _isOrganizing, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
+    [NotifyCanExecuteChangedFor(nameof(OrganizeCommand), nameof(ConfirmOrganizeCommand), nameof(CancelOrganizeCommand))]
+    internal partial bool IsOrganizing { get; private set; }
 
     /// <summary>Whether the new-group form is showing.</summary>
-    internal bool IsCreatingGroup
-    {
-        get => _isCreatingGroup;
-        private set => Set(ref _isCreatingGroup, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
+    [NotifyCanExecuteChangedFor(nameof(BeginCreateGroupCommand), nameof(ConfirmCreateGroupCommand), nameof(CancelGroupCommand))]
+    internal partial bool IsCreatingGroup { get; private set; }
 
     /// <summary>Whether the rename-group form is showing.</summary>
-    internal bool IsRenamingGroup
-    {
-        get => _isRenamingGroup;
-        private set => Set(ref _isRenamingGroup, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary), nameof(ShowsProjectRenameNote), nameof(ProjectRenameNote))]
+    [NotifyCanExecuteChangedFor(nameof(BeginRenameGroupCommand), nameof(ConfirmRenameGroupCommand), nameof(CancelGroupCommand))]
+    internal partial bool IsRenamingGroup { get; private set; }
 
     /// <summary>Whether the move-group form is showing.</summary>
-    internal bool IsMovingGroup
-    {
-        get => _isMovingGroup;
-        private set => Set(ref _isMovingGroup, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
+    [NotifyCanExecuteChangedFor(nameof(BeginMoveGroupCommand), nameof(ConfirmMoveGroupCommand), nameof(CancelGroupCommand))]
+    internal partial bool IsMovingGroup { get; private set; }
 
     /// <summary>Whether the group delete confirmation is showing.</summary>
-    internal bool IsConfirmingGroupDelete
-    {
-        get => _isConfirmingGroupDelete;
-        private set => Set(ref _isConfirmingGroupDelete, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GroupDeletePrompt))]
+    [NotifyCanExecuteChangedFor(nameof(BeginDeleteGroupCommand), nameof(ConfirmDeleteGroupCommand), nameof(CancelGroupCommand))]
+    internal partial bool IsConfirmingGroupDelete { get; private set; }
 
     /// <summary>The group the selected group would move into, from <see cref="MoveTargets"/>.</summary>
-    internal GroupNode? GroupMoveTarget
-    {
-        get => _groupMoveTarget;
-        set => Set(ref _groupMoveTarget, value);
-    }
+    [ObservableProperty]
+    internal partial GroupNode? GroupMoveTarget { get; set; }
 
     /// <summary>Which group is being moved.</summary>
     internal string MoveGroupPrompt =>
@@ -533,18 +487,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal RelayCommand DuplicateCommand { get; }
 
     /// <summary>The title being typed for the selected entry.</summary>
-    internal string DraftTitle
-    {
-        get => _draftTitle;
-        set => Set(ref _draftTitle, value);
-    }
+    [ObservableProperty]
+    internal partial string DraftTitle { get; set; } = string.Empty;
 
     /// <summary>The name being typed for a group.</summary>
-    internal string DraftGroupName
-    {
-        get => _draftGroupName;
-        set => Set(ref _draftGroupName, value);
-    }
+    [ObservableProperty]
+    internal partial string DraftGroupName { get; set; } = string.Empty;
 
     /// <summary>The groups an entry can be moved into.</summary>
     /// <remarks>
@@ -554,18 +502,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <see cref="OrganizeOutcome.DestinationMissing"/> the ordinary answer to a typo, where the
     /// add form would have created the group.
     /// </remarks>
-    internal IReadOnlyList<GroupNode> MoveTargets
-    {
-        get => _moveTargets;
-        private set => Set(ref _moveTargets, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<GroupNode> MoveTargets { get; private set; } = [];
 
     /// <summary>The group the entry would move into.</summary>
-    internal GroupNode? MoveTarget
-    {
-        get => _moveTarget;
-        set => Set(ref _moveTarget, value);
-    }
+    [ObservableProperty]
+    internal partial GroupNode? MoveTarget { get; set; }
 
     /// <summary>What the organize form is looking at.</summary>
     internal string OrganizePrompt =>
@@ -648,10 +590,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     internal RelayCommand BeginAddCommand { get; }
 
-    internal RelayCommand CancelAddCommand { get; }
-
-    internal RelayCommand ConfirmAddCommand { get; }
-
     /// <summary>Asks for confirmation. It does not delete.</summary>
     internal RelayCommand DeleteCommand { get; }
 
@@ -659,14 +597,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal RelayCommand ConfirmDeleteCommand { get; }
 
     internal RelayCommand CancelDeleteCommand { get; }
-
-    /// <summary>Puts back the entry the last deletion recycled.</summary>
-    /// <remarks>
-    /// Recovery beside the action it reverses, for the one deletion a person is still looking at.
-    /// The Trash screen is where every other recovery happens, including this one after a
-    /// navigation or a lock.
-    /// </remarks>
-    internal RelayCommand UndoDeleteCommand { get; }
 
     /// <summary>Reads the vault again, keeping the selection if it survived.</summary>
     internal void Reload()
@@ -698,7 +628,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             })];
         Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         MoveTargets = Groups;
-        Raise(nameof(TotalCount));
+        OnPropertyChanged(nameof(TotalCount));
+        OnPropertyChanged(nameof(ListEmptyOffersImport));
 
         // The tree is rebuilt from the vault, so the node the sidebar had is not in the new list.
         // Re-pointing at the one with the same path keeps the filter and the highlight where they
@@ -707,7 +638,21 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _selectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, wantedGroup ?? string.Empty, StringComparison.Ordinal))
             ?? Groups.FirstOrDefault(node => node.IsEverything);
 
-        Raise(nameof(SelectedGroup));
+        OnPropertyChanged(nameof(SelectedGroup));
+        OnPropertyChanged(nameof(CanRenameGroup));
+        OnPropertyChanged(nameof(ListTitle));
+        OnPropertyChanged(nameof(SearchScope));
+        OnPropertyChanged(nameof(ListEmptyNote));
+        OnPropertyChanged(nameof(ListEmptyOffersImport));
+        OnPropertyChanged(nameof(CreateGroupPrompt));
+        OnPropertyChanged(nameof(RenameGroupPrompt));
+        OnPropertyChanged(nameof(MoveGroupPrompt));
+        OnPropertyChanged(nameof(GroupDeletePrompt));
+        OnPropertyChanged(nameof(ShowsProjectRenameNote));
+        OnPropertyChanged(nameof(ProjectRenameNote));
+        BeginRenameGroupCommand.NotifyCanExecuteChanged();
+        BeginMoveGroupCommand.NotifyCanExecuteChanged();
+        BeginDeleteGroupCommand.NotifyCanExecuteChanged();
 
         // The vault changed underneath, so an answer about the old one is not an answer about this.
         _matchedQuery = null;
@@ -763,7 +708,10 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         IsMovingGroup = false;
         IsConfirmingGroupDelete = false;
 
-        Raise(nameof(Search));
+        OnPropertyChanged(nameof(Search));
+        OnPropertyChanged(nameof(ListEmptyNote));
+        OnPropertyChanged(nameof(ListEmptyOffersNew));
+        OnPropertyChanged(nameof(ListEmptyOffersImport));
     }
 
     /// <summary>Nothing derived from the vault outlives this.</summary>
@@ -926,7 +874,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         IsConfirmingDelete = false;
         IsOrganizing = false;
 
-        Raise(nameof(Selected));
+        OnPropertyChanged(nameof(Selected));
+        OnPropertyChanged(nameof(DeletePrompt));
+        OnPropertyChanged(nameof(OrganizePrompt));
+        DeleteCommand.NotifyCanExecuteChanged();
+        OrganizeCommand.NotifyCanExecuteChanged();
+        DuplicateCommand.NotifyCanExecuteChanged();
     }
 
     private void BeginAdd()
@@ -942,12 +895,14 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
     }
 
+    [RelayCommand(CanExecute = nameof(IsAdding))]
     private void CancelAdd()
     {
         NewItem = null;
         Error = null;
     }
 
+    [RelayCommand(CanExecute = nameof(IsAdding))]
     private void ConfirmAdd()
     {
         if (_newItem?.Create() is not { } name)
@@ -1008,6 +963,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Restores the entry the last deletion recycled, by the identity core returned.</summary>
+    /// <remarks>
+    /// Recovery beside the action it reverses, for the one deletion a person is still looking at.
+    /// The Trash screen is where every other recovery happens, including this one after a
+    /// navigation or a lock.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanUndoDelete))]
     private void UndoDelete()
     {
         if (_undo is not { } id)
@@ -1552,6 +1513,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     {
         _undo = undo;
         Notice = notice;
-        Raise(nameof(CanUndoDelete));
+        OnPropertyChanged(nameof(CanUndoDelete));
+        UndoDeleteCommand.NotifyCanExecuteChanged();
     }
 }

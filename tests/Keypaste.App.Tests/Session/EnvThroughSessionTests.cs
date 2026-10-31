@@ -94,14 +94,14 @@ public sealed class EnvThroughSessionTests : IDisposable
         {
             entries.Selected = entries.Rows.Single(row => row.Name == ProjectVariables.Home("dev"));
             var detail = entries.Detail!;
-            detail.Fields.Single(field => field.Name == "TOKEN").ReplaceCommand.Execute(null);
+            detail.Fields.Single(field => field.Name == "TOKEN").ReplaceCommand.Press();
 
             foreach (var c in "v2")
             {
                 detail.ReplacementFieldValue.Type(c);
             }
 
-            detail.ConfirmReplaceFieldCommand.Execute(null);
+            detail.ConfirmReplaceFieldCommand.Press();
             Assert.False(detail.IsReplacingField, entries.Error);
         }
 

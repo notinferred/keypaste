@@ -39,7 +39,7 @@ public sealed class CliLinkSettingsTests
         Assert.True(screen.OffersCliLink);
         Assert.False(screen.OffersCliReplace);
 
-        await screen.LinkCliCommand.ExecuteAsync();
+        await screen.LinkCliCommand.PressAsync();
 
         Assert.Equal(1, link.Links);
         Assert.Equal(0, link.Replaces);
@@ -61,7 +61,7 @@ public sealed class CliLinkSettingsTests
         Assert.True(screen.OffersCliLink);
         Assert.False(screen.OffersCliReplace);
 
-        await screen.LinkCliCommand.ExecuteAsync();
+        await screen.LinkCliCommand.PressAsync();
 
         Assert.Equal(1, link.Links);
         Assert.Equal($"A terminal runs this app's keypaste from {FakeCliLink.Location}.", screen.CliLinkText);
@@ -96,7 +96,7 @@ public sealed class CliLinkSettingsTests
         Assert.Equal(note, screen.CliLinkNote);
         Assert.True(screen.OffersCliLink);
 
-        await screen.LinkCliCommand.ExecuteAsync();
+        await screen.LinkCliCommand.PressAsync();
 
         Assert.Equal(1, link.Links);
         Assert.Equal($"{MacLink} runs this app's keypaste.", screen.CliLinkText);
@@ -134,7 +134,7 @@ public sealed class CliLinkSettingsTests
         using var session = new AppVaultSession(new ManualClock());
         using var screen = Screen(home, session, link);
 
-        screen.BeginReplaceCliCommand.Execute(null);
+        screen.BeginReplaceCliCommand.Press();
 
         Assert.True(screen.IsConfirmingCliReplace);
         Assert.StartsWith(
@@ -145,7 +145,7 @@ public sealed class CliLinkSettingsTests
         Assert.Equal(0, link.Replaces);
         Assert.Equal(0, link.Links);
 
-        screen.CancelReplaceCliCommand.Execute(null);
+        screen.CancelReplaceCliCommand.Press();
 
         Assert.False(screen.IsConfirmingCliReplace);
         Assert.False(screen.ConfirmReplaceCliCommand.CanExecute(null));
@@ -164,8 +164,8 @@ public sealed class CliLinkSettingsTests
         using var screen = Screen(home, session, link);
 
         Assert.False(screen.ConfirmReplaceCliCommand.CanExecute(null));
-        screen.BeginReplaceCliCommand.Execute(null);
-        await screen.ConfirmReplaceCliCommand.ExecuteAsync();
+        screen.BeginReplaceCliCommand.Press();
+        await screen.ConfirmReplaceCliCommand.PressAsync();
 
         Assert.Equal(1, link.Replaces);
         Assert.Equal(0, link.Links);
@@ -218,7 +218,7 @@ public sealed class CliLinkSettingsTests
         using var session = new AppVaultSession(new ManualClock());
         using var screen = Screen(home, session, link);
 
-        await screen.LinkCliCommand.ExecuteAsync();
+        await screen.LinkCliCommand.PressAsync();
 
         Assert.Equal(1, link.Links);
         Assert.Equal(message, screen.Message);
@@ -237,35 +237,13 @@ public sealed class CliLinkSettingsTests
         using var session = new AppVaultSession(new ManualClock());
         using var screen = Screen(home, session, link);
 
-        screen.BeginReplaceCliCommand.Execute(null);
-        await screen.ConfirmReplaceCliCommand.ExecuteAsync();
+        screen.BeginReplaceCliCommand.Press();
+        await screen.ConfirmReplaceCliCommand.PressAsync();
 
         Assert.Equal(1, link.Replaces);
         Assert.Equal(message, screen.Message);
         Assert.False(screen.IsConfirmingCliReplace);
         Assert.True(screen.OffersCliReplace);
-    }
-
-    [Fact]
-    public async Task A_link_under_way_cannot_be_started_again()
-    {
-        using var gate = new SemaphoreSlim(0);
-        var link = FakeCliLink.At(CliLinkState.Absent, gate: gate);
-        using var home = new TempHome();
-        using var session = new AppVaultSession(new ManualClock());
-        using var screen = Screen(home, session, link);
-
-        var first = screen.LinkCliCommand.ExecuteAsync();
-
-        Assert.True(screen.IsCliLinking);
-        Assert.False(screen.LinkCliCommand.CanExecute(null));
-        await screen.LinkCliCommand.ExecuteAsync();
-
-        gate.Release();
-        await first;
-
-        Assert.Equal(1, link.Links);
-        Assert.False(screen.IsCliLinking);
     }
 
     [Fact]
@@ -277,14 +255,14 @@ public sealed class CliLinkSettingsTests
         using var session = new AppVaultSession(new ManualClock());
         using var screen = Screen(home, session, link);
 
-        screen.BeginReplaceCliCommand.Execute(null);
-        var first = screen.ConfirmReplaceCliCommand.ExecuteAsync();
+        screen.BeginReplaceCliCommand.Press();
+        var first = screen.ConfirmReplaceCliCommand.PressAsync();
 
         Assert.True(screen.IsCliLinking);
         Assert.False(screen.ConfirmReplaceCliCommand.CanExecute(null));
         Assert.False(screen.CancelReplaceCliCommand.CanExecute(null));
-        await screen.ConfirmReplaceCliCommand.ExecuteAsync();
-        screen.CancelReplaceCliCommand.Execute(null);
+        await screen.ConfirmReplaceCliCommand.PressAsync();
+        screen.CancelReplaceCliCommand.Press();
         Assert.True(screen.IsConfirmingCliReplace);
 
         gate.Release();

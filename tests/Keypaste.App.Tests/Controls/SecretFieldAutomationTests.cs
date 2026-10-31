@@ -402,7 +402,7 @@ public sealed class SecretFieldAutomationTests
         {
             Model.Selected = Model.Rows.Single(row => row.Title == "github");
             Drain();
-            Model.Detail!.BeginAddFieldCommand.Execute(null);
+            Model.Detail!.BeginAddFieldCommand.Press();
             Drain();
         }
 
@@ -435,7 +435,7 @@ public sealed class SecretFieldAutomationTests
         {
             Model.Selected = Model.Rows.Single(row => row.Title == "github");
             Drain();
-            Model.Detail!.EditCommand.Execute(null);
+            Model.Detail!.EditCommand.Press();
             Drain();
         }
 
@@ -452,7 +452,7 @@ public sealed class SecretFieldAutomationTests
         {
             Model = new EnvSetsViewModel(Session, Countdown);
             Show(new EnvSetsView { DataContext = Model });
-            Model.OpenCommand.Execute("billing");
+            Model.OpenCommand.Press("billing");
             Drain();
         }
 
@@ -466,7 +466,7 @@ public sealed class SecretFieldAutomationTests
 
         internal void BeginAdd()
         {
-            Project.BeginAddCommand.Execute(null);
+            Project.BeginAddCommand.Press();
             Project.GenerateValue = false;
             Drain();
         }

@@ -33,7 +33,7 @@ namespace Keypaste.App.ViewModels;
 /// (D-0481); one keypaste cannot compute says why in <see cref="TotpProblem"/> instead.
 /// </para>
 /// </remarks>
-internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
+internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
@@ -41,45 +41,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private readonly IWebLauncher? _web;
     private readonly Action<Action> _post;
     private EntryTotpRow? _totp;
-    private string? _totpProblem;
     private string _entryPath;
     private string _title;
     private string _groupPath;
 
-    private string _username;
-    private string _url;
-    private string _notes;
-    private int _passwordLength;
-    private bool _isEditing;
-    private string _draftUsername = string.Empty;
-    private string _draftUrl = string.Empty;
-    private string _draftNotes = string.Empty;
-    private bool _isConfirmingRotate;
-    private string _created = string.Empty;
-    private string _rotated = string.Empty;
-    private string _expiry = string.Empty;
-    private bool _isExpired;
     private string? _uuid;
-    private EntryAgentAccess? _agentAccess;
-    private bool _showsAgentAccess;
-    private string _agentAccessSummary = "None active";
-    private string _lastUsedText = "never";
-    private EntryKind _kind;
-    private IReadOnlyList<string> _agentLines = [];
-    private IReadOnlyList<EntryFieldRow> _fields = [];
-    private IReadOnlyList<EntryTagChip> _tags = [];
-    private bool _isAddingField;
-    private string _draftFieldName = string.Empty;
-    private bool _newFieldProtected = true;
     private EntryFieldRow? _replacingField;
-    private EntryFieldRow? _removingField;
     private EntryFieldRow? _renamingField;
     private string _draftFieldRename = string.Empty;
-    private IReadOnlyList<string> _fieldRenameLines = [];
-    private IReadOnlyList<EnvironmentRow> _environments = [];
-    private string _draftTag = string.Empty;
-    private IReadOnlyList<string> _tagSuggestions = [];
-    private ProjectTagChange? _pendingTagChange;
 
     internal EntryDetailViewModel(
         AppVaultSession session,
@@ -104,36 +73,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         _post = post ?? (run => run());
         Report = report;
 
-        _title = entry.Title;
-        _groupPath = entry.GroupPath;
-        _username = entry.Username;
-        _url = entry.Url;
-        _notes = entry.Notes;
-        PasswordLength = entry.Password.Length;
-        _kind = EntryKinds.Of(entry);
-        VaultName = session.VaultPath is { } vaultPath ? System.IO.Path.GetFileName(vaultPath) : string.Empty;
-
-        Reference = KpReferences.ForEntry(Name);
-
-        NewPassword = new SecretField(clipboard);
-        NewFieldValue = new SecretField(clipboard);
-        ReplacementFieldValue = new SecretField(clipboard);
-        _restored = restored;
-        History = new EntryHistoryViewModel(session, clipboard, this, Restored);
-        Attachments = new EntryAttachmentsViewModel(session, Name, picker, report, History.Refresh);
-
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
         CopyReferenceCommand = new AsyncRelayCommand(CopyReferenceAsync, () => Reference is not null);
-        OpenUrlCommand = new AsyncRelayCommand(OpenUrlAsync, () => OpensUrl);
         CopyUrlCommand = new AsyncRelayCommand(CopyUrlAsync, () => Url.Length > 0);
-        History.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(EntryHistoryViewModel.IsOpen))
-            {
-                Raise(nameof(TakesWholeView));
-            }
-        };
         EditCommand = new RelayCommand(BeginEdit, () => !IsEditing);
         CancelCommand = new RelayCommand(CancelEdit, () => IsEditing);
         SaveCommand = new RelayCommand(SaveEdit, () => IsEditing);
@@ -153,62 +96,31 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(() => PendingTagChange = null, () => PendingTagChange is not null);
 
-        DependsOn(nameof(HasFields), nameof(Fields));
-        DependsOn(nameof(ShowsTotp), nameof(Totp), nameof(IsEditing));
-        DependsOn(nameof(ShowsTotpProblem), nameof(TotpProblem), nameof(IsEditing));
-        DependsOn(nameof(HasTags), nameof(Tags));
-        DependsOn(nameof(IsReplacingField), nameof(ReplacingField));
-        DependsOn(nameof(ReplaceFieldPrompt), nameof(ReplacingField));
-        DependsOn(nameof(HasOwnPrimary), nameof(IsEditing), nameof(IsConfirmingRotate), nameof(IsAddingField), nameof(IsReplacingField), nameof(IsRenamingField));
-        DependsOn(nameof(TakesWholeView), nameof(IsEditing));
-        DependsOn(nameof(IsRemovingField), nameof(RemovingField));
-        DependsOn(nameof(RemoveFieldPrompt), nameof(RemovingField));
-        DependsOn(nameof(IsRenamingField), nameof(RenamingField));
-        DependsOn(nameof(RenameFieldPrompt), nameof(RenamingField));
-        DependsOn(nameof(IsConfirmingFieldRename), nameof(FieldRenameLines));
-        DependsOn(nameof(FieldsSummary), nameof(Fields));
-        DependsOn(nameof(TagsSummary), nameof(Tags));
-        DependsOn(nameof(ShowsEnvironments), nameof(Environments), nameof(IsEditing));
-        DependsOn(nameof(IsConfirmingTagChange), nameof(PendingTagChange));
-        DependsOn(nameof(TagChangeLines), nameof(PendingTagChange));
-        DependsOn(nameof(TagChangeAction), nameof(PendingTagChange));
-        DependsOn(nameof(ShowsAgentAccessSummary), nameof(AgentLines));
-        DependsOn(nameof(HasBeenUsed), nameof(LastUsedText));
-        DependsOn(nameof(HasExpiry), nameof(Expiry));
-        DependsOn(nameof(ExpiryLabel), nameof(IsExpired));
-        DependsOn(nameof(KindLabel), nameof(Kind));
-        DependsOn(nameof(Location), nameof(KindLabel), nameof(GroupPath));
-        DependsOn(nameof(OpensUrl), nameof(Url));
-        DependsOn(nameof(ShowsUrlNote), nameof(Url), nameof(OpensUrl));
-        DependsOn(nameof(ShowsNotes), nameof(Notes));
-        DependsOn(nameof(HasReference), nameof(Reference));
-        DependsOn(nameof(DisplayUsername), nameof(Username));
-        DependsOn(nameof(DisplayUrl), nameof(Url));
-        DependsOn(nameof(DisplayNotes), nameof(Notes));
-        DependsOn(nameof(MaskedLength), nameof(PasswordLength));
-        DependsOn(nameof(PasswordMask), nameof(PasswordLength));
-        DependsOn(CopyPasswordCommand, nameof(PasswordLength));
-        DependsOn(CopyUsernameCommand, nameof(Username));
-        DependsOn(OpenUrlCommand, nameof(OpensUrl));
-        DependsOn(CopyUrlCommand, nameof(Url));
-        DependsOn(EditCommand, nameof(IsEditing));
-        DependsOn(CancelCommand, nameof(IsEditing));
-        DependsOn(SaveCommand, nameof(IsEditing));
-        DependsOn(RotateCommand, nameof(IsConfirmingRotate), nameof(IsEditing));
-        DependsOn(ConfirmRotateCommand, nameof(IsConfirmingRotate));
-        DependsOn(CancelRotateCommand, nameof(IsConfirmingRotate));
-        DependsOn(BeginAddFieldCommand, nameof(IsAddingField));
-        DependsOn(ConfirmAddFieldCommand, nameof(IsAddingField), nameof(DraftFieldName));
-        DependsOn(CancelAddFieldCommand, nameof(IsAddingField));
-        DependsOn(ConfirmReplaceFieldCommand, nameof(ReplacingField));
-        DependsOn(CancelReplaceFieldCommand, nameof(ReplacingField));
-        DependsOn(ConfirmRemoveFieldCommand, nameof(RemovingField));
-        DependsOn(CancelRemoveFieldCommand, nameof(RemovingField));
-        DependsOn(ConfirmRenameFieldCommand, nameof(RenamingField), nameof(DraftFieldRename));
-        DependsOn(CancelRenameFieldCommand, nameof(RenamingField));
-        DependsOn(AddTagCommand, nameof(DraftTag));
-        DependsOn(ConfirmTagChangeCommand, nameof(PendingTagChange));
-        DependsOn(CancelTagChangeCommand, nameof(PendingTagChange));
+        _title = entry.Title;
+        _groupPath = entry.GroupPath;
+        Username = entry.Username;
+        Url = entry.Url;
+        Notes = entry.Notes;
+        PasswordLength = entry.Password.Length;
+        Kind = EntryKinds.Of(entry);
+        VaultName = session.VaultPath is { } vaultPath ? System.IO.Path.GetFileName(vaultPath) : string.Empty;
+
+        Reference = KpReferences.ForEntry(Name);
+
+        NewPassword = new SecretField(clipboard);
+        NewFieldValue = new SecretField(clipboard);
+        ReplacementFieldValue = new SecretField(clipboard);
+        _restored = restored;
+        History = new EntryHistoryViewModel(session, clipboard, this, Restored);
+        Attachments = new EntryAttachmentsViewModel(session, Name, picker, report, History.Refresh);
+
+        History.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(EntryHistoryViewModel.IsOpen))
+            {
+                OnPropertyChanged(nameof(TakesWholeView));
+            }
+        };
 
         ReadTimes();
         ReadFieldsAndTags();
@@ -218,13 +130,11 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal ClipboardCountdown Clipboard => _clipboard;
 
     /// <summary>The entry's custom fields, by name, in ordinal order.</summary>
-    internal IReadOnlyList<EntryFieldRow> Fields
-    {
-        get => _fields;
-        private set => Set(ref _fields, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFields), nameof(FieldsSummary))]
+    internal partial IReadOnlyList<EntryFieldRow> Fields { get; private set; } = [];
 
-    internal bool HasFields => _fields.Count > 0;
+    internal bool HasFields => Fields.Count > 0;
 
     /// <summary>The item's TOTP, when keypaste can compute one; null otherwise.</summary>
     internal EntryTotpRow? Totp
@@ -234,8 +144,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         {
             var previous = _totp;
 
-            if (Set(ref _totp, value))
+            if (SetProperty(ref _totp, value))
             {
+                OnPropertyChanged(nameof(ShowsTotp));
                 previous?.Dispose();
             }
         }
@@ -244,22 +155,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal bool ShowsTotp => !IsEditing && _totp is not null;
 
     /// <summary>Why the item's TOTP cannot be computed, naming a field and never a value; null otherwise.</summary>
-    internal string? TotpProblem
-    {
-        get => _totpProblem;
-        private set => Set(ref _totpProblem, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTotpProblem))]
+    internal partial string? TotpProblem { get; private set; }
 
-    internal bool ShowsTotpProblem => !IsEditing && _totpProblem is not null;
+    internal bool ShowsTotpProblem => !IsEditing && TotpProblem is not null;
 
     /// <summary>The entry's own tags, never its group's.</summary>
-    internal IReadOnlyList<EntryTagChip> Tags
-    {
-        get => _tags;
-        private set => Set(ref _tags, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTags), nameof(TagsSummary))]
+    internal partial IReadOnlyList<EntryTagChip> Tags { get; private set; } = [];
 
-    internal bool HasTags => _tags.Count > 0;
+    internal bool HasTags => Tags.Count > 0;
 
     /// <summary>A new field's value, while its form is open.</summary>
     internal SecretField NewFieldValue { get; }
@@ -267,24 +174,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <summary>A replacement for one field's value, while its form is open.</summary>
     internal SecretField ReplacementFieldValue { get; }
 
-    internal bool IsAddingField
-    {
-        get => _isAddingField;
-        private set => Set(ref _isAddingField, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOwnPrimary))]
+    [NotifyCanExecuteChangedFor(nameof(BeginAddFieldCommand), nameof(ConfirmAddFieldCommand), nameof(CancelAddFieldCommand))]
+    internal partial bool IsAddingField { get; private set; }
 
-    internal string DraftFieldName
-    {
-        get => _draftFieldName;
-        set => Set(ref _draftFieldName, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmAddFieldCommand))]
+    internal partial string DraftFieldName { get; set; } = string.Empty;
 
     /// <summary>Whether the new field is protected; on unless the person turns it off.</summary>
-    internal bool NewFieldProtected
-    {
-        get => _newFieldProtected;
-        set => Set(ref _newFieldProtected, value);
-    }
+    [ObservableProperty]
+    internal partial bool NewFieldProtected { get; set; } = true;
 
     /// <summary>The field whose value the replace form is for, or null.</summary>
     internal EntryFieldRow? ReplacingField
@@ -292,8 +193,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         get => _replacingField;
         private set
         {
-            if (Set(ref _replacingField, value))
+            if (SetProperty(ref _replacingField, value))
             {
+                OnPropertyChanged(nameof(IsReplacingField));
+                OnPropertyChanged(nameof(ReplaceFieldPrompt));
+                OnPropertyChanged(nameof(HasOwnPrimary));
+                ConfirmReplaceFieldCommand.NotifyCanExecuteChanged();
+                CancelReplaceFieldCommand.NotifyCanExecuteChanged();
                 ReplacementFieldValue.Clear();
             }
         }
@@ -310,15 +216,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
 
     /// <summary>The field the remove confirmation is for, or null.</summary>
-    internal EntryFieldRow? RemovingField
-    {
-        get => _removingField;
-        private set => Set(ref _removingField, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRemovingField), nameof(RemoveFieldPrompt))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmRemoveFieldCommand), nameof(CancelRemoveFieldCommand))]
+    internal partial EntryFieldRow? RemovingField { get; private set; }
 
-    internal bool IsRemovingField => _removingField is not null;
+    internal bool IsRemovingField => RemovingField is not null;
 
-    internal string RemoveFieldPrompt => $"Remove {_removingField?.DisplayName} from this item? Its value stays in the item's history.";
+    internal string RemoveFieldPrompt => $"Remove {RemovingField?.DisplayName} from this item? Its value stays in the item's history.";
 
     /// <summary>The field the rename form is for, or null.</summary>
     internal EntryFieldRow? RenamingField
@@ -326,8 +231,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         get => _renamingField;
         private set
         {
-            if (Set(ref _renamingField, value))
+            if (SetProperty(ref _renamingField, value))
             {
+                OnPropertyChanged(nameof(IsRenamingField));
+                OnPropertyChanged(nameof(RenameFieldPrompt));
+                OnPropertyChanged(nameof(HasOwnPrimary));
+                ConfirmRenameFieldCommand.NotifyCanExecuteChanged();
+                CancelRenameFieldCommand.NotifyCanExecuteChanged();
                 DraftFieldRename = value?.Name ?? string.Empty;
                 FieldRenameLines = [];
             }
@@ -344,8 +254,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         get => _draftFieldRename;
         set
         {
-            if (Set(ref _draftFieldRename, value))
+            if (SetProperty(ref _draftFieldRename, value))
             {
+                ConfirmRenameFieldCommand.NotifyCanExecuteChanged();
                 FieldRenameLines = [];
             }
         }
@@ -356,13 +267,11 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// project variable it is, the <c>kp://</c> references that name it and the item's fields whose
     /// <c>{S:…}</c> names it. Names only, never a value; empty until the rename needs asking about.
     /// </summary>
-    internal IReadOnlyList<string> FieldRenameLines
-    {
-        get => _fieldRenameLines;
-        private set => Set(ref _fieldRenameLines, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingFieldRename))]
+    internal partial IReadOnlyList<string> FieldRenameLines { get; private set; } = [];
 
-    internal bool IsConfirmingFieldRename => _fieldRenameLines.Count > 0;
+    internal bool IsConfirmingFieldRename => FieldRenameLines.Count > 0;
 
     /// <summary>Renames the field, or first says what the rename breaks.</summary>
     internal RelayCommand ConfirmRenameFieldCommand { get; }
@@ -370,34 +279,27 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal RelayCommand CancelRenameFieldCommand { get; }
 
     /// <summary>The custom fields by name and protection, for the history's comparison; never a value.</summary>
-    internal string FieldsSummary => EntryRevisionRow.Describe(_fields.Select(row => (row.Name, row.IsProtected)));
+    internal string FieldsSummary => EntryRevisionRow.Describe(Fields.Select(row => (row.Name, row.IsProtected)));
 
     /// <summary>The item's own tags, for the history's comparison.</summary>
-    internal string TagsSummary => EntryRevisionRow.Describe(_tags.Select(chip => chip.Tag));
+    internal string TagsSummary => EntryRevisionRow.Describe(Tags.Select(chip => chip.Tag));
 
     /// <summary>The project environments the item's own tags put it in, for the Environments card.</summary>
-    internal IReadOnlyList<EnvironmentRow> Environments
-    {
-        get => _environments;
-        private set => Set(ref _environments, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsEnvironments))]
+    internal partial IReadOnlyList<EnvironmentRow> Environments { get; private set; } = [];
 
     /// <summary>Whether the Environments card shows: the item's own tags put it in a project.</summary>
-    internal bool ShowsEnvironments => !IsEditing && _environments.Count > 0;
+    internal bool ShowsEnvironments => !IsEditing && Environments.Count > 0;
 
     /// <summary>A tag being typed, added on Add tag.</summary>
-    internal string DraftTag
-    {
-        get => _draftTag;
-        set => Set(ref _draftTag, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddTagCommand))]
+    internal partial string DraftTag { get; set; } = string.Empty;
 
     /// <summary>The vault's project tags this item does not carry, which the tag box offers as a tag is typed; choosing one only fills <see cref="DraftTag"/>.</summary>
-    internal IReadOnlyList<string> TagSuggestions
-    {
-        get => _tagSuggestions;
-        private set => Set(ref _tagSuggestions, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<string> TagSuggestions { get; private set; } = [];
 
     internal RelayCommand BeginAddFieldCommand { get; }
 
@@ -416,19 +318,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal RelayCommand AddTagCommand { get; }
 
     /// <summary>A project tag being added or removed, held until the person confirms what it reaches (D-0415); null otherwise.</summary>
-    internal ProjectTagChange? PendingTagChange
-    {
-        get => _pendingTagChange;
-        private set => Set(ref _pendingTagChange, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingTagChange), nameof(TagChangeLines), nameof(TagChangeAction))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmTagChangeCommand), nameof(CancelTagChangeCommand))]
+    internal partial ProjectTagChange? PendingTagChange { get; private set; }
 
-    internal bool IsConfirmingTagChange => _pendingTagChange is not null;
+    internal bool IsConfirmingTagChange => PendingTagChange is not null;
 
     /// <summary>What the pending tag change reaches: its environment and the fields joining or leaving it, never a value.</summary>
-    internal IReadOnlyList<string> TagChangeLines => _pendingTagChange?.Describe() ?? [];
+    internal IReadOnlyList<string> TagChangeLines => PendingTagChange?.Describe() ?? [];
 
     /// <summary>What the confirming button says.</summary>
-    internal string TagChangeAction => _pendingTagChange?.Adding == false ? "Remove tag" : "Add tag";
+    internal string TagChangeAction => PendingTagChange?.Adding == false ? "Remove tag" : "Add tag";
 
     /// <summary>Writes the pending tag change.</summary>
     internal RelayCommand ConfirmTagChangeCommand { get; }
@@ -591,11 +492,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal RelayCommand CancelRotateCommand { get; }
 
     /// <summary>Whether the pane is asking whether to rotate.</summary>
-    internal bool IsConfirmingRotate
-    {
-        get => _isConfirmingRotate;
-        private set => Set(ref _isConfirmingRotate, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOwnPrimary))]
+    [NotifyCanExecuteChangedFor(nameof(RotateCommand), nameof(ConfirmRotateCommand), nameof(CancelRotateCommand))]
+    internal partial bool IsConfirmingRotate { get; private set; }
 
     /// <summary>What the confirm row asks; an instance property because a binding needs one.</summary>
 #pragma warning disable CA1822
@@ -604,75 +504,54 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 #pragma warning restore CA1822
 
     /// <summary>When the entry was created, as the metadata row shows it.</summary>
-    internal string Created
-    {
-        get => _created;
-        private set => Set(ref _created, value);
-    }
+    [ObservableProperty]
+    internal partial string Created { get; private set; } = string.Empty;
 
     /// <summary>When its current password was set, as the metadata row shows it.</summary>
-    internal string Rotated
-    {
-        get => _rotated;
-        private set => Set(ref _rotated, value);
-    }
+    [ObservableProperty]
+    internal partial string Rotated { get; private set; } = string.Empty;
 
     /// <summary>When the item expires or expired, its local date and time as the metadata row shows it; empty when it never expires.</summary>
-    internal string Expiry
-    {
-        get => _expiry;
-        private set => Set(ref _expiry, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasExpiry))]
+    internal partial string Expiry { get; private set; } = string.Empty;
 
     /// <summary>Whether the item has an expiry, so its metadata row shows.</summary>
-    internal bool HasExpiry => _expiry.Length > 0;
+    internal bool HasExpiry => Expiry.Length > 0;
 
     /// <summary>Whether its expiry has passed by the session's clock, as a run judges it (D-0337).</summary>
-    internal bool IsExpired
-    {
-        get => _isExpired;
-        private set => Set(ref _isExpired, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExpiryLabel))]
+    internal partial bool IsExpired { get; private set; }
 
     /// <summary>The expiry row's label.</summary>
-    internal string ExpiryLabel => _isExpired ? "Expired" : "Expires";
+    internal string ExpiryLabel => IsExpired ? "Expired" : "Expires";
 
     /// <summary>
     /// Whether the Agent access card shows: an agent attached here whose settings reach this entry
     /// can name it, or it has left the vault or is being asked for (N.5). False until the first reading,
     /// and always when nothing answers agents.
     /// </summary>
-    internal bool ShowsAgentAccess
-    {
-        get => _showsAgentAccess;
-        private set => Set(ref _showsAgentAccess, value);
-    }
+    [ObservableProperty]
+    internal partial bool ShowsAgentAccess { get; private set; }
 
     /// <summary>What agents did with this entry, or null before the first reading.</summary>
-    internal EntryAgentAccess? AgentAccess
-    {
-        get => _agentAccess;
-        private set => Set(ref _agentAccess, value);
-    }
+    [ObservableProperty]
+    internal partial EntryAgentAccess? AgentAccess { get; private set; }
 
     /// <summary>The Agent access card's one line, when <see cref="AgentLines"/> does not list the same agents.</summary>
-    internal string AgentAccessSummary
-    {
-        get => _agentAccessSummary;
-        private set => Set(ref _agentAccessSummary, value);
-    }
+    [ObservableProperty]
+    internal partial string AgentAccessSummary { get; private set; } = "None active";
 
-    internal bool ShowsAgentAccessSummary => _agentLines.Count == 0;
+    internal bool ShowsAgentAccessSummary => AgentLines.Count == 0;
 
     /// <summary>When an agent last received it: "in use", "4m ago" or "never".</summary>
-    internal string LastUsedText
-    {
-        get => _lastUsedText;
-        private set => Set(ref _lastUsedText, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBeenUsed))]
+    internal partial string LastUsedText { get; private set; } = "never";
 
     /// <summary>Whether an agent ever received it, which is when the card says when.</summary>
-    internal bool HasBeenUsed => _lastUsedText != "never";
+    internal bool HasBeenUsed => LastUsedText != "never";
 
     /// <summary>Takes the latest picture of what agents did, never a value.</summary>
     /// <param name="activity">The picture.</param>
@@ -687,7 +566,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         var now = _session.Clock.GetUtcNow();
         var access = activity.Access(Name);
-        IReadOnlyList<string> tags = [.. _tags.Select(chip => chip.Tag)];
+        IReadOnlyList<string> tags = [.. Tags.Select(chip => chip.Tag)];
         ShowsAgentAccess = activity.AgentsCanSee(Name, tags);
         AgentAccess = access;
         AgentAccessSummary = UseText.Summary(access, activity.Seeing(Name, tags));
@@ -696,20 +575,16 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     }
 
     /// <summary>The Agent access card's detail: each grant in force, then each client that received this entry.</summary>
-    internal IReadOnlyList<string> AgentLines
-    {
-        get => _agentLines;
-        private set => Set(ref _agentLines, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsAgentAccessSummary))]
+    internal partial IReadOnlyList<string> AgentLines { get; private set; } = [];
 
     /// <summary>What sort of entry this is.</summary>
-    internal EntryKind Kind
-    {
-        get => _kind;
-        private set => Set(ref _kind, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KindLabel), nameof(Location))]
+    internal partial EntryKind Kind { get; private set; }
 
-    internal string KindLabel => EntryKinds.Label(_kind);
+    internal string KindLabel => EntryKinds.Label(Kind);
 
     /// <summary>The vault's file name.</summary>
     internal string VaultName { get; }
@@ -738,9 +613,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     /// <summary>Whether the URL is shown as text, with a line saying why it opens nothing.</summary>
     internal bool ShowsUrlNote => Url.Length > 0 && !OpensUrl;
-
-    /// <summary>Opens the URL in the default browser, its placeholders filled in.</summary>
-    internal AsyncRelayCommand OpenUrlCommand { get; }
 
     /// <summary>Copies the URL, which is not a secret, with the countdown only once it filled in another field.</summary>
     internal AsyncRelayCommand CopyUrlCommand { get; }
@@ -815,23 +687,19 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal string DisplayNotes =>
         DisplayTextSanitizer.Sanitize(Notes, DisplayTextSanitizer.MaximumNotesLength).Text;
 
-    internal string Username
-    {
-        get => _username;
-        private set => Set(ref _username, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayUsername))]
+    [NotifyCanExecuteChangedFor(nameof(CopyUsernameCommand))]
+    internal partial string Username { get; private set; }
 
-    internal string Url
-    {
-        get => _url;
-        private set => Set(ref _url, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OpensUrl), nameof(ShowsUrlNote), nameof(DisplayUrl))]
+    [NotifyCanExecuteChangedFor(nameof(CopyUrlCommand), nameof(OpenUrlCommand))]
+    internal partial string Url { get; private set; }
 
-    internal string Notes
-    {
-        get => _notes;
-        private set => Set(ref _notes, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsNotes), nameof(DisplayNotes))]
+    internal partial string Notes { get; private set; }
 
     /// <summary>
     /// How long the password is, which is all this object knows about it.
@@ -841,11 +709,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <see cref="Controls.MaskedInput.MaskedLength"/> makes. It is a disclosure, and a small one:
     /// it is visible to anyone who can already see that an entry exists.
     /// </remarks>
-    internal int PasswordLength
-    {
-        get => _passwordLength;
-        private set => Set(ref _passwordLength, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MaskedLength), nameof(PasswordMask))]
+    [NotifyCanExecuteChangedFor(nameof(CopyPasswordCommand))]
+    internal partial int PasswordLength { get; private set; }
 
     /// <summary>The dots the detail pane shows where the password would be.</summary>
     internal string PasswordMask => new('•', Math.Min(PasswordLength, 24));
@@ -871,29 +738,19 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// <summary>The item's attachments by name and size, and the way to add, replace, remove and save them (V.8b).</summary>
     internal EntryAttachmentsViewModel Attachments { get; }
 
-    internal bool IsEditing
-    {
-        get => _isEditing;
-        private set => Set(ref _isEditing, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
+    [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand))]
+    internal partial bool IsEditing { get; private set; }
 
-    internal string DraftUsername
-    {
-        get => _draftUsername;
-        set => Set(ref _draftUsername, value);
-    }
+    [ObservableProperty]
+    internal partial string DraftUsername { get; set; } = string.Empty;
 
-    internal string DraftUrl
-    {
-        get => _draftUrl;
-        set => Set(ref _draftUrl, value);
-    }
+    [ObservableProperty]
+    internal partial string DraftUrl { get; set; } = string.Empty;
 
-    internal string DraftNotes
-    {
-        get => _draftNotes;
-        set => Set(ref _draftNotes, value);
-    }
+    [ObservableProperty]
+    internal partial string DraftNotes { get; set; } = string.Empty;
 
     /// <summary>Copies the password, with the auto-clearing countdown.</summary>
     internal AsyncRelayCommand CopyPasswordCommand { get; }
@@ -1004,11 +861,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         History.Dispose();
         Attachments.Dispose();
 
-        Raise(nameof(Reference));
-        Raise(nameof(KdbxEntry));
-        Raise(nameof(Title));
-        Raise(nameof(GroupPath));
-        Raise(nameof(Path));
+        OnPropertyChanged(nameof(Reference));
+        OnPropertyChanged(nameof(KdbxEntry));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(GroupPath));
+        OnPropertyChanged(nameof(Path));
+        OnPropertyChanged(nameof(Location));
+        OnPropertyChanged(nameof(HasReference));
     }
 
     /// <summary>Picks up what a restore left, and tells the screen which entry it left it on.</summary>
@@ -1060,6 +919,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private async Task CopyUsernameAsync() =>
         await CopyFilledAsync(Username, "The username", "Username").ConfigureAwait(true);
 
+    /// <summary>Opens the URL in the default browser, its placeholders filled in.</summary>
+    [RelayCommand(CanExecute = nameof(OpensUrl))]
     private async Task OpenUrlAsync()
     {
         if (Filled(vault => vault.FillPlaceholders(Name, Url), "The web address", "opened") is not { } url)
@@ -1121,7 +982,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             IsExpired = times?.Expires <= now;
             Rotated = UseText.Dated(EntryRotation.LastRotated(vault, Name), now);
             _uuid = vault.EntryUuid(Name);
-            Raise(nameof(KdbxEntry));
+            OnPropertyChanged(nameof(KdbxEntry));
         }
         catch (VaultException e)
         {
@@ -1161,7 +1022,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         {
             Fields = [.. (vault.Fields(Name) ?? []).Select(field => new EntryFieldRow(this, field))];
             Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(tag, RemoveTag))];
-            TagSuggestions = [.. ProjectCatalog.MemberTags(vault).Except(_tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
+            TagSuggestions = [.. ProjectCatalog.MemberTags(vault).Except(Tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
             Environments = [.. (_session.ReadEnvironments(vault, Name) ?? []).Select(environment => new EnvironmentRow(environment))];
             ReadTotp(vault);
         }
@@ -1312,7 +1173,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         var old = row.DisplayName;
         var renamed = EntryNameSanitizer.Sanitize(newName).Text;
-        var environments = _tags
+        var environments = Tags
             .Select(chip => ProjectTag.Read(chip.Tag))
             .Where(tag => tag.Kind == ProjectTagKind.Member)
             .Select(tag => EntryNameSanitizer.SanitizePath($"{tag.Project}/{tag.Environment}").Text)

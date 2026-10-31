@@ -63,11 +63,11 @@ public sealed class AccessibleDriveTests
             AssertNamedByText(shell, kind.ToString());
         }
 
-        shell.Shell.OpenProjectCommand.Execute("billing");
+        shell.Shell.OpenProjectCommand.Press("billing");
         AssertNamedByText(shell, "a project");
 
         var project = Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject!;
-        project.Environments[0].AddEntry.Execute(null);
+        project.Environments[0].AddEntry.Press();
         project.ChosenEntry = project.EntryCandidates[0];
         AssertNamedByText(shell, "a project's add-entry form, asked");
 

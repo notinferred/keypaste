@@ -154,7 +154,7 @@ public sealed class FirstRunTests : IDisposable
         Assert.False(model.ShowsHardwareKey);
         Assert.True(model.OffersMoreOptions);
 
-        model.ShowMoreOptionsCommand.Execute(null);
+        model.ShowMoreOptionsCommand.Press();
         Assert.True(model.ShowsHardwareKey);
         Assert.False(model.OffersMoreOptions);
 

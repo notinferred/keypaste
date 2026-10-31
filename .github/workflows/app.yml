@@ -7,7 +7,6 @@ on:
     branches: [main]
     paths:
       - 'src/Keypaste.App/**'
-      - 'src/Keypaste.Mvvm/**'
       - 'tests/Keypaste.App.Tests/**'
       - 'tests/Keypaste.App.Windows.Tests/**'
       - 'tests/Keypaste.MinimizeObserver/**'
@@ -515,7 +514,7 @@ jobs:
           out="artifacts/app/${{ matrix.rid }}"
           if [ -n "$REHEARSAL" ]; then
             scripts/sign-windows.sh --component app --rehearsal "$REHEARSAL" "$out"
-            scripts/verify-windows-signature.sh "$REHEARSAL" "$out/keypaste-app.exe" "$out/keypaste-app.dll" "$out/Keypaste.Core.dll" "$out/Keypaste.Infrastructure.dll" "$out/Keypaste.Mvvm.dll" "$out/KeePassLib.dll" "$out/keypaste.exe" "$out/argon2.dll"
+            scripts/verify-windows-signature.sh "$REHEARSAL" "$out/keypaste-app.exe" "$out/keypaste-app.dll" "$out/Keypaste.Core.dll" "$out/Keypaste.Infrastructure.dll" "$out/KeePassLib.dll" "$out/keypaste.exe" "$out/argon2.dll"
             "$out/keypaste-app.exe" --selftest
           else
             scripts/sign-windows.sh --component app "$out"

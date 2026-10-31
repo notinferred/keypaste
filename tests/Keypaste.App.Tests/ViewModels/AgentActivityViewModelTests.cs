@@ -123,11 +123,11 @@ public sealed class AgentActivityViewModelTests
 
         if (all)
         {
-            model.EndAllCommand.Execute(null);
+            model.EndAllCommand.Press();
         }
         else
         {
-            model.EndCommand.Execute(Assert.Single(model.Grants));
+            model.EndCommand.Press(Assert.Single(model.Grants));
         }
 
         Assert.Empty(model.Grants);
@@ -159,7 +159,7 @@ public sealed class AgentActivityViewModelTests
         Assert.All(listed, grant => Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "example", "password", 3600), grant));
 
         var ended = model.Grants[0];
-        model.EndCommand.Execute(ended);
+        model.EndCommand.Press(ended);
 
         var kept = Assert.Single(model.Grants);
         Assert.NotEqual(ended.Id, kept.Id);
@@ -317,7 +317,7 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("57m left", grant.LeftText);
         Assert.Equal(3419d / 3600, grant.Fraction, 3);
 
-        model.EndCommand.Execute(grant);
+        model.EndCommand.Press(grant);
 
         Assert.Empty(model.Grants);
         Assert.Equal(["Ended claude-code's allowance."], said);
@@ -338,7 +338,7 @@ public sealed class AgentActivityViewModelTests
         using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: said.Add);
 
         Assert.True(model.ShowPromptCommand.CanExecute(null));
-        model.ShowPromptCommand.Execute(null);
+        model.ShowPromptCommand.Press();
 
         Assert.Equal(["The prompt window is no longer open."], said);
         Assert.Single(model.Waiting);
@@ -527,12 +527,12 @@ public sealed class AgentActivityViewModelTests
         var cursor = Row(model, "cursor");
         var gemini = Row(model, "gemini-cli");
 
-        model.ConnectCommand.Execute(cursor);
+        model.ConnectCommand.Press(cursor);
         await model.Opening.WaitAsync(_connect, Token);
         var first = model.Connection!;
         Assert.Same(first, cursor.Connection);
 
-        model.ConnectAgainCommand.Execute(claude);
+        model.ConnectAgainCommand.Press(claude);
         await model.Opening.WaitAsync(_connect, Token);
 
         Assert.Null(cursor.Connection);
@@ -541,7 +541,7 @@ public sealed class AgentActivityViewModelTests
 
         using var held = new ManualResetEventSlim();
         tools.Runner.HoldChanges = held;
-        var running = model.Connection.ConfirmCommand.ExecuteAsync();
+        var running = model.Connection.ConfirmCommand.PressAsync();
 
         Assert.True(model.Connection.IsBusy);
         Assert.False(model.ConnectCommand.CanExecute(cursor));
@@ -558,7 +558,7 @@ public sealed class AgentActivityViewModelTests
         Assert.True(model.CloseConnectionCommand.CanExecute(null));
         Assert.True(Probes(tools) > 3, "the tools were not looked for again after the plan ran");
 
-        model.CloseConnectionCommand.Execute(null);
+        model.CloseConnectionCommand.Press();
 
         Assert.Null(model.Connection);
         Assert.Null(claude.Connection);

@@ -62,7 +62,7 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
     public void Conceal() => _owner.Conceal(this);
 
     /// <summary>Picks up a new length after the value changed.</summary>
-    internal void Resize(int length) => Set(ref _maskedLength, length, nameof(MaskedLength));
+    internal void Resize(int length) => SetProperty(ref _maskedLength, length, nameof(MaskedLength));
 
     private async Task CopyAsync()
     {

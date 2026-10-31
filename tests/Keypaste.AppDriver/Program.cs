@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using CommunityToolkit.Mvvm.Input;
 using Keypaste.App;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
@@ -11,7 +12,6 @@ using Keypaste.Core.AutoType;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Recent;
-using Keypaste.Mvvm;
 
 namespace Keypaste.AppDriver;
 
@@ -422,7 +422,7 @@ internal sealed class Driver(string home)
             return Refused("the Create button is disabled");
         }
 
-        await unlock.CreateCommand.ExecuteAsync().ConfigureAwait(true);
+        await unlock.CreateCommand.ExecuteAsync(null).ConfigureAwait(true);
         return session.IsUnlocked ? Did("created") : Refused(unlock.Message);
     }
 
@@ -1559,7 +1559,7 @@ internal sealed class Driver(string home)
             return;
         }
 
-        var launching = button.ExecuteAsync();
+        var launching = button.ExecuteAsync(null);
 
         if (launch.IsConfirming)
         {
@@ -1847,7 +1847,7 @@ internal sealed class Driver(string home)
             {
                 try
                 {
-                    await command.ExecuteAsync().ConfigureAwait(false);
+                    await command.ExecuteAsync(null).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -1989,7 +1989,7 @@ internal sealed class Driver(string home)
             return Refused("the Unlock button is disabled");
         }
 
-        await unlock.UnlockCommand.ExecuteAsync().ConfigureAwait(true);
+        await unlock.UnlockCommand.ExecuteAsync(null).ConfigureAwait(true);
         return session.IsUnlocked ? null : Refused(unlock.Message);
     }
 
@@ -2031,7 +2031,7 @@ internal sealed class Driver(string home)
         }
     }
 
-    private static void Press(RelayCommand command, string button)
+    private static void Press(IRelayCommand command, string button)
     {
         if (!command.CanExecute(null))
         {
@@ -2041,14 +2041,14 @@ internal sealed class Driver(string home)
         command.Execute(null);
     }
 
-    private static async Task PressAsync(AsyncRelayCommand command, string button)
+    private static async Task PressAsync(IAsyncRelayCommand command, string button)
     {
         if (!command.CanExecute(null))
         {
             throw new DriverException($"the {button} button is disabled");
         }
 
-        await command.ExecuteAsync().ConfigureAwait(true);
+        await command.ExecuteAsync(null).ConfigureAwait(true);
     }
 
     private static int Did(string? what)

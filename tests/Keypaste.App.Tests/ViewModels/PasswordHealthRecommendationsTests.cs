@@ -99,7 +99,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
 
             foreach (var row in shell.Recommendations.Passwords.ToList())
             {
-                row.DismissCommand.Execute(null);
+                row.DismissCommand.Press();
             }
 
             Assert.Equal(string.Empty, Settings(shell).Count);
@@ -121,7 +121,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         {
             await shell.Recommendations.Checking;
 
-            shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail).DismissCommand.Execute(null);
+            shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail).DismissCommand.Press();
 
             Assert.Equal("3", Settings(shell).Count);
             Assert.Equal((_mail, "Dismissed"), (shell.Recommendations.Passwords[^1].Finding.Entry, shell.Recommendations.Passwords[^1].StateLabel));
@@ -136,7 +136,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         Assert.Equal((_mail, PasswordProblem.Weak), (dismissed.Finding.Entry, dismissed.Finding.Problem));
         Assert.Equal("3", Settings(again).Count);
 
-        dismissed.ReviewAgainCommand.Execute(null);
+        dismissed.ReviewAgainCommand.Press();
 
         Assert.Equal("4", Settings(again).Count);
         Assert.DoesNotContain(again.Recommendations.Passwords, row => row.IsDismissed);
@@ -147,7 +147,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     {
         using var shell = Shell();
         await shell.Recommendations.Checking;
-        shell.Recommendations.Passwords.Single(row => row.Finding.Problem == PasswordProblem.Expired).DismissCommand.Execute(null);
+        shell.Recommendations.Passwords.Single(row => row.Finding.Problem == PasswordProblem.Expired).DismissCommand.Press();
         Assert.Equal("3", Settings(shell).Count);
 
         var vault = _session.Unlocked!;
@@ -189,7 +189,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         Assert.Equal("Open services/Mail in Items", weak.OpenLabel);
         Assert.Equal(OrganizeOutcome.Renamed, _session.Unlocked!.RenameEntry(_mail, "Mailbox", out var renamed));
 
-        weak.OpenCommand.Execute(null);
+        weak.OpenCommand.Press();
 
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         Assert.Equal(DestinationKind.Entries, shell.Current.Kind);
@@ -207,7 +207,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         var weak = shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail);
 
         _session.Unlocked!.RemoveEntry(_mail, out _);
-        weak.OpenCommand.Execute(null);
+        weak.OpenCommand.Press();
 
         Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
         Assert.Equal("services/Mail is no longer in this vault.", shell.Recommendations.Message);

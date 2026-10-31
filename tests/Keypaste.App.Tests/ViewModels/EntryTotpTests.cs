@@ -70,7 +70,7 @@ public sealed class EntryTotpTests : IDisposable
 
         Assert.Equal(_codeAt09, totp.Reveal());
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         Assert.False(detail.ShowsTotp);
     }
 
@@ -132,7 +132,7 @@ public sealed class EntryTotpTests : IDisposable
         using var context = new Context(_vaultPath);
         var totp = context.Open(_github).Totp!;
 
-        await totp.CopyCommand.ExecuteAsync();
+        await totp.CopyCommand.PressAsync();
 
         Assert.Equal(_codeAt09, context.Clipboard.Content);
         Assert.True(context.Clipboard.ContentWasSetAsASecret);

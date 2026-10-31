@@ -22,6 +22,7 @@
     -->
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <MvvmToolkitEnableINotifyPropertyChangingSupport>false</MvvmToolkitEnableINotifyPropertyChangingSupport>
 
     <!--
       Declared in the plural, and never passed as `-r` to restore, for the reason D-0040 gives: a
@@ -57,15 +58,16 @@
 
   <ItemGroup>
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
-    <ProjectReference Include="../Keypaste.Mvvm/Keypaste.Mvvm.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Keypaste.Mvvm" />
+    <Using Include="CommunityToolkit.Mvvm.ComponentModel" />
+    <Using Include="CommunityToolkit.Mvvm.Input" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />

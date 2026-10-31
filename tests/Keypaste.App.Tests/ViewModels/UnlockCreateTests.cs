@@ -299,7 +299,7 @@ public sealed class UnlockCreateTests : IDisposable
 
         Assert.False(model.CreateKeyfileCommand.CanExecute(null));
         await model.StartCreateAsync();
-        await model.CreateKeyfileCommand.ExecuteAsync();
+        await model.CreateKeyfileCommand.PressAsync();
 
         Assert.Equal("new.keyx", _picker.SuggestedKeyfileName);
         Assert.Equal(new KeyfileInspection(KeyfileOutcome.Accepted, KeyfileForm.Xml), VaultKeyfile.Inspect(keyfile));
@@ -332,7 +332,7 @@ public sealed class UnlockCreateTests : IDisposable
         Assert.Contains("Keep a copy", model.KeyfileNote, StringComparison.Ordinal);
         Assert.DoesNotContain("vault's folder", model.KeyfileNote, StringComparison.Ordinal);
 
-        model.ClearKeyfileCommand.Execute(null);
+        model.ClearKeyfileCommand.Press();
 
         Assert.False(model.HasKeyfileNote);
         Assert.True(File.Exists(_picker.NewKeyfilePath));

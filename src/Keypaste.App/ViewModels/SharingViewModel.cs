@@ -45,7 +45,7 @@ internal sealed record SharingRow(string Id, string What, string Recipient, stri
 /// shell calls on every lock. Nothing is asked of the network because the screen opened: statuses
 /// are checked on request, and whether the share server takes links is learned from its answer.
 /// </remarks>
-internal sealed class SharingViewModel : ObservableObject, IDisposable
+internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 {
     /// <summary>What <see cref="Ttl"/> offers.</summary>
     internal static readonly IReadOnlyList<string> TtlOptions = ["1h", "24h", "7d"];
@@ -60,17 +60,9 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     private readonly bool _misconfigured;
     private Dictionary<string, EntryName> _entries = new(StringComparer.Ordinal);
 
-    private IReadOnlyList<SharingRow> _rows = [];
-    private IReadOnlyList<string> _candidates = [];
-    private SharingRow? _selected;
-    private string? _selectedWhat;
     private string _field = "password";
     private string _recipient = string.Empty;
     private string _ttl = "24h";
-    private int _views = 1;
-    private bool _requirePassphrase;
-    private string? _error;
-    private string? _unavailable;
 
     /// <param name="session">The open vault.</param>
     /// <param name="clipboard">Where the link goes, with its clear countdown.</param>
@@ -96,29 +88,20 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _service = service;
         _showToast = showToast ?? (_ => { });
-        _unavailable = unavailable;
         _misconfigured = unavailable is not null;
-        _selectedWhat = what;
         Passphrase = new SecretField(clipboard);
         CancelCommand = new RelayCommand(() => cancel?.Invoke());
 
-        CreateCommand = new AsyncRelayCommand(CreateAsync, () => _selectedWhat is not null && _unavailable is null);
-        RevokeCommand = new AsyncRelayCommand(RevokeAsync, () => _selected is not null);
+        CreateCommand = new AsyncRelayCommand(CreateAsync, () => SelectedWhat is not null && Unavailable is null);
+        RevokeCommand = new AsyncRelayCommand(RevokeAsync, () => Selected is not null);
         RevokeRowCommand = new RelayCommand<SharingRow>(row =>
         {
             Selected = row;
-            RevokeCommand.Execute(null);
+            RevokeCommand.Press();
         });
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(online: true));
-        RetryCommand = new AsyncRelayCommand(RetryAsync);
-
-        DependsOn(nameof(IsEmpty), nameof(Rows));
-        DependsOn(nameof(HasUnchecked), nameof(Rows));
-        DependsOn(nameof(HasError), nameof(Error));
-        DependsOn(nameof(IsUnavailable), nameof(Unavailable));
-        DependsOn(nameof(CanRetry), nameof(Unavailable));
-        DependsOn(CreateCommand, nameof(SelectedWhat), nameof(Unavailable));
-        DependsOn(RevokeCommand, nameof(Selected));
+        Unavailable = unavailable;
+        SelectedWhat = what;
 
         _ = LoadAsync(online: false);
     }
@@ -135,97 +118,79 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
 #pragma warning restore CA1822
 
     /// <summary>The links made from this vault, soonest to expire first.</summary>
-    internal IReadOnlyList<SharingRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(HasUnchecked))]
+    internal partial IReadOnlyList<SharingRow> Rows { get; private set; } = [];
 
     /// <summary>Whether the vault remembers no link.</summary>
-    internal bool IsEmpty => _rows.Count == 0;
+    internal bool IsEmpty => Rows.Count == 0;
 
     /// <summary>Whether a link's status has not been asked for yet, since opening the screen asks nothing.</summary>
-    internal bool HasUnchecked => _rows.Any(row => !row.Checked);
+    internal bool HasUnchecked => Rows.Any(row => !row.Checked);
 
     /// <summary>The entries that can be shared, by path; keypaste's own records are not among them.</summary>
-    internal IReadOnlyList<string> Candidates
-    {
-        get => _candidates;
-        private set => Set(ref _candidates, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<string> Candidates { get; private set; } = [];
 
     /// <summary>The row <see cref="RevokeCommand"/> acts on.</summary>
-    internal SharingRow? Selected
-    {
-        get => _selected;
-        set => Set(ref _selected, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RevokeCommand))]
+    internal partial SharingRow? Selected { get; set; }
 
     /// <summary>The path of the entry to share, one of <see cref="Candidates"/>.</summary>
-    internal string? SelectedWhat
-    {
-        get => _selectedWhat;
-        set => Set(ref _selectedWhat, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
+    internal partial string? SelectedWhat { get; set; }
 
     /// <summary>One of <see cref="FieldOptions"/>.</summary>
     internal string Field
     {
         get => _field;
-        set => Set(ref _field, value ?? "password");
+        set => SetProperty(ref _field, value ?? "password");
     }
 
     /// <summary>A label for the person's own list. Never sent.</summary>
     internal string Recipient
     {
         get => _recipient;
-        set => Set(ref _recipient, value ?? string.Empty);
+        set => SetProperty(ref _recipient, value ?? string.Empty);
     }
 
     /// <summary>One of <see cref="TtlOptions"/>.</summary>
     internal string Ttl
     {
         get => _ttl;
-        set => Set(ref _ttl, value ?? "24h");
+        set => SetProperty(ref _ttl, value ?? "24h");
     }
 
     /// <summary>One of <see cref="ViewOptions"/>.</summary>
-    internal int Views
-    {
-        get => _views;
-        set => Set(ref _views, value);
-    }
+    [ObservableProperty]
+    internal partial int Views { get; set; } = 1;
 
     /// <summary>Whether the recipient must also type a passphrase, sent to them separately.</summary>
-    internal bool RequirePassphrase
-    {
-        get => _requirePassphrase;
-        set => Set(ref _requirePassphrase, value);
-    }
+    [ObservableProperty]
+    internal partial bool RequirePassphrase { get; set; }
 
     /// <summary>The passphrase, entered through the masked field.</summary>
     internal SecretField Passphrase { get; }
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
-    internal string? Error
-    {
-        get => _error;
-        private set => Set(ref _error, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    internal partial string? Error { get; private set; }
 
-    internal bool HasError => _error is not null;
+    internal bool HasError => Error is not null;
 
     /// <summary>Why no link can be made right now, or null while sharing is thought to work.</summary>
-    internal string? Unavailable
-    {
-        get => _unavailable;
-        private set => Set(ref _unavailable, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsUnavailable), nameof(CanRetry))]
+    [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
+    internal partial string? Unavailable { get; private set; }
 
-    internal bool IsUnavailable => _unavailable is not null;
+    internal bool IsUnavailable => Unavailable is not null;
 
     /// <summary>Whether trying again could change the answer: the server's could, a bad endpoint's cannot.</summary>
-    internal bool CanRetry => _unavailable is not null && !_misconfigured;
+    internal bool CanRetry => Unavailable is not null && !_misconfigured;
 
     /// <summary>Uploads the share and copies its link.</summary>
     internal AsyncRelayCommand CreateCommand { get; }
@@ -244,9 +209,6 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
 
     /// <summary>Asks the share server how many views each link has left.</summary>
     internal AsyncRelayCommand RefreshCommand { get; }
-
-    /// <summary>Makes the link again after the share server said it was unavailable.</summary>
-    internal AsyncRelayCommand RetryCommand { get; }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>
     public void Dispose()
@@ -270,20 +232,20 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_selectedWhat is null || !_entries.TryGetValue(_selectedWhat, out var entry))
+        if (SelectedWhat is null || !_entries.TryGetValue(SelectedWhat, out var entry))
         {
             Error = "Choose what to share.";
             return;
         }
 
-        if (_requirePassphrase && !Passphrase.HasValue)
+        if (RequirePassphrase && !Passphrase.HasValue)
         {
             Error = "Type the passphrase the recipient will need, or turn the passphrase off.";
             return;
         }
 
-        using var passphrase = _requirePassphrase ? Buffer(Passphrase) : null;
-        var request = new ShareRequest(entry, _field, TtlOf(_ttl), _views, passphrase, _recipient.Length == 0 ? null : _recipient);
+        using var passphrase = RequirePassphrase ? Buffer(Passphrase) : null;
+        var request = new ShareRequest(entry, _field, TtlOf(_ttl), Views, passphrase, _recipient.Length == 0 ? null : _recipient);
         var outcome = await _service.CreateAsync(vault, request, CancellationToken.None).ConfigureAwait(true);
 
         if (!outcome.Ok)
@@ -324,6 +286,8 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         await LoadAsync(online: true).ConfigureAwait(true);
     }
 
+    /// <summary>Makes the link again after the share server said it was unavailable.</summary>
+    [RelayCommand]
     private Task RetryAsync()
     {
         Unavailable = null;
@@ -334,7 +298,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     {
         Error = null;
 
-        if (_selected is not { } row)
+        if (Selected is not { } row)
         {
             return;
         }
@@ -387,7 +351,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         _entries = entries;
         Candidates = [.. entries.Keys.Order(StringComparer.OrdinalIgnoreCase)];
 
-        var wanted = _selected?.Id;
+        var wanted = Selected?.Id;
         var listed = await _service.ListAsync(vault, online, CancellationToken.None).ConfigureAwait(true);
         Rows = [.. listed.Select(share => Row(share, online))];
         Selected = wanted is null ? null : Rows.FirstOrDefault(row => row.Id == wanted);

@@ -220,7 +220,7 @@ public sealed class HistoryRevealAutomationTests
 
             Model.Selected = Model.Rows.Single(row => row.Title == "github");
             Drain();
-            History.ToggleCommand.Execute(null);
+            History.ToggleCommand.Press();
             Drain();
             History.Selected = History.Rows[0];
             Drain();

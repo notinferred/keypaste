@@ -454,7 +454,7 @@ public sealed class SecretHygieneTests
         entries.Selected = entries.Rows.Single(row => row.Title == SentinelTitle);
 
         var detail = entries.Detail!;
-        detail.History.ToggleCommand.Execute(null);
+        detail.History.ToggleCommand.Press();
 
         var revision = detail.History.Rows[0];
         Assert.Equal(SentinelSupersededPassword.Length, revision.MaskedLength);
@@ -556,7 +556,7 @@ public sealed class SecretHygieneTests
 
         shell.Current = Destinations.Of(DestinationKind.EnvSets);
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
-        env.OpenCommand.Execute(SentinelProject);
+        env.OpenCommand.Press(SentinelProject);
 
         var project = env.OpenProject;
         Assert.NotNull(project);
@@ -599,7 +599,7 @@ public sealed class SecretHygieneTests
 
         shell.Current = Destinations.Of(DestinationKind.EnvSets);
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
-        env.OpenCommand.Execute(SentinelProject);
+        env.OpenCommand.Press(SentinelProject);
 
         var project = env.OpenProject!;
         var row = project.Variables.Single();
@@ -643,7 +643,7 @@ public sealed class SecretHygieneTests
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == SentinelTitle);
 
-        await entries.Detail!.CopyPasswordCommand.ExecuteAsync();
+        await entries.Detail!.CopyPasswordCommand.PressAsync();
 
         // The positive half: the copy happened. A sweep for a password that was never copied is a
         // sweep for a string nothing produced.
@@ -693,8 +693,8 @@ public sealed class SecretHygieneTests
 
         // Deleted through the screen, so the trash below holds a row somebody's action produced
         // rather than an empty list that would sweep clean whatever the screen did.
-        entries.DeleteCommand.Execute(null);
-        entries.ConfirmDeleteCommand.Execute(null);
+        entries.DeleteCommand.Press();
+        entries.ConfirmDeleteCommand.Press();
 
         shell.Current = Destinations.Of(DestinationKind.Trash);
         var trash = Assert.IsType<TrashViewModel>(shell.Content);
@@ -791,7 +791,7 @@ public sealed class SecretHygieneTests
         using var unlock = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(unlock.Offer(fixture.VaultFile));
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = Assert.IsType<RestoreBackupViewModel>(unlock.Restore);
 
         foreach (var c in Master)
@@ -826,7 +826,7 @@ public sealed class SecretHygieneTests
 
         Sweep();
 
-        restore.CancelCommand.Execute(null);
+        restore.CancelCommand.Press();
         Assert.Equal(0, restore.MaskedLength);
 
         Sweep();

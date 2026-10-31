@@ -80,8 +80,8 @@ public sealed class RecommendationsTests : IDisposable
         await shell.Recommendations.Checking;
         var list = shell.Recommendations;
 
-        list.SelectAllCommand.Execute(null);
-        list.MoveSelectedCommand.Execute(null);
+        list.SelectAllCommand.Press();
+        list.MoveSelectedCommand.Press();
         await list.Checking;
 
         Assert.StartsWith("Moved 3 keys from the notes of services/Stripe", list.Message, StringComparison.Ordinal);
@@ -107,7 +107,7 @@ public sealed class RecommendationsTests : IDisposable
             await shell.Recommendations.Checking;
 
             var openAi = shell.Recommendations.Rows.Single(row => row.Key == "OPENAI_API_KEY");
-            openAi.DismissCommand.Execute(null);
+            openAi.DismissCommand.Press();
 
             Assert.Equal("2", Settings(shell).Count);
             Assert.Equal("Dismissed", shell.Recommendations.Rows[^1].StateLabel);
@@ -127,7 +127,7 @@ public sealed class RecommendationsTests : IDisposable
         var dismissed = again.Recommendations.Rows.Single(row => row.IsDismissed);
         Assert.Equal("OPENAI_API_KEY", dismissed.Key);
 
-        dismissed.ReviewAgainCommand.Execute(null);
+        dismissed.ReviewAgainCommand.Press();
 
         Assert.Equal("3", Settings(again).Count);
         Assert.DoesNotContain(again.Recommendations.Rows, row => row.IsDismissed);
@@ -148,8 +148,8 @@ public sealed class RecommendationsTests : IDisposable
         var bytes = File.ReadAllBytes(_fixture.Path_);
         var history = vault.ReadHistory(_stripe)!.Count;
 
-        shell.Recommendations.SelectAllCommand.Execute(null);
-        shell.Recommendations.MoveSelectedCommand.Execute(null);
+        shell.Recommendations.SelectAllCommand.Press();
+        shell.Recommendations.MoveSelectedCommand.Press();
 
         Assert.StartsWith("The notes of services/Stripe changed after they were checked, so nothing was moved.", shell.Recommendations.Message, StringComparison.Ordinal);
         Assert.Equal(bytes, File.ReadAllBytes(_fixture.Path_));
@@ -167,7 +167,7 @@ public sealed class RecommendationsTests : IDisposable
         await shell.Recommendations.Checking;
         Assert.Equal(3, shell.Recommendations.NeedsReview);
 
-        shell.Recommendations.Rows[0].DismissCommand.Execute(null);
+        shell.Recommendations.Rows[0].DismissCommand.Press();
 
         Assert.Contains("could not be read", shell.Recommendations.Message, StringComparison.Ordinal);
         Assert.Equal("not json", File.ReadAllText(path));

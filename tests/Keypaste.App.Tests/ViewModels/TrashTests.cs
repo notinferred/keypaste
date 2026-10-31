@@ -119,7 +119,7 @@ public sealed class TrashTests : IDisposable
 
             var trash = context.NewTrash();
             trash.Selected = Assert.Single(trash.Rows);
-            trash.RestoreCommand.Execute(null);
+            trash.RestoreCommand.Press();
 
             Assert.Equal("production is back in servers.", trash.Notice, StringComparer.Ordinal);
             Assert.Null(trash.Error);
@@ -149,8 +149,8 @@ public sealed class TrashTests : IDisposable
         using (var context = new Context(_vaultPath))
         {
             context.Entries.SelectedGroup = context.Entries.Groups.Single(node => node.Path == "servers");
-            context.Entries.BeginDeleteGroupCommand.Execute(null);
-            context.Entries.ConfirmDeleteGroupCommand.Execute(null);
+            context.Entries.BeginDeleteGroupCommand.Press();
+            context.Entries.ConfirmDeleteGroupCommand.Press();
 
             Assert.Null(context.Entries.Error);
             Assert.DoesNotContain(context.Entries.Groups, node => node.Path == "servers");
@@ -161,7 +161,7 @@ public sealed class TrashTests : IDisposable
             Assert.Equal("servers", row.Where, StringComparer.Ordinal);
 
             trash.Selected = row;
-            trash.RestoreCommand.Execute(null);
+            trash.RestoreCommand.Press();
 
             Assert.Equal("production is back in servers.", trash.Notice, StringComparer.Ordinal);
             Assert.True(trash.IsEmpty);
@@ -190,7 +190,7 @@ public sealed class TrashTests : IDisposable
             Assert.Equal(2, trash.Rows.Count);
 
             trash.Selected = trash.Rows.Single(row => row.Where == "env/dev");
-            trash.RestoreCommand.Execute(null);
+            trash.RestoreCommand.Press();
 
             Assert.Equal(".env is back in env/dev.", trash.Notice, StringComparer.Ordinal);
             Assert.Equal("env/billing", Assert.Single(trash.Rows).Where, StringComparer.Ordinal);
@@ -218,20 +218,20 @@ public sealed class TrashTests : IDisposable
 
         // Asking is not doing: the file is untouched until the second act.
         var armed = Digest(_vaultPath);
-        trash.PurgeCommand.Execute(null);
+        trash.PurgeCommand.Press();
 
         Assert.True(trash.IsConfirmingPurge);
         Assert.Contains("cannot be undone", trash.PurgePrompt, StringComparison.Ordinal);
         Assert.Equal(armed, Digest(_vaultPath));
 
-        trash.CancelPurgeCommand.Execute(null);
+        trash.CancelPurgeCommand.Press();
 
         Assert.False(trash.IsConfirmingPurge);
         Assert.Equal(armed, Digest(_vaultPath));
         Assert.Single(trash.Rows);
 
-        trash.PurgeCommand.Execute(null);
-        trash.ConfirmPurgeCommand.Execute(null);
+        trash.PurgeCommand.Press();
+        trash.ConfirmPurgeCommand.Press();
 
         Assert.Equal("production and its history are gone.", trash.Notice, StringComparer.Ordinal);
         Assert.True(trash.IsEmpty);
@@ -278,7 +278,7 @@ public sealed class TrashTests : IDisposable
         trash.ConfirmPurgeCommand.CanExecuteChanged += (_, _) => asked.Add("confirm");
         trash.CancelPurgeCommand.CanExecuteChanged += (_, _) => asked.Add("cancel");
 
-        trash.PurgeCommand.Execute(null);
+        trash.PurgeCommand.Press();
 
         Assert.Equal(["cancel", "confirm", "purge", "restore"], asked.Order(StringComparer.Ordinal));
         Assert.False(trash.RestoreCommand.CanExecute(null));
@@ -310,7 +310,7 @@ public sealed class TrashTests : IDisposable
         trash.Selected = Assert.Single(trash.Rows);
         var raised = Record(trash);
 
-        trash.RestoreCommand.Execute(null);
+        trash.RestoreCommand.Press();
 
         Assert.Contains(nameof(TrashViewModel.HasNotice), raised);
         Assert.True(trash.HasNotice);
@@ -328,7 +328,7 @@ public sealed class TrashTests : IDisposable
         context.Session.Lock(VaultLockReason.Manual);
         var raised = Record(trash);
 
-        trash.RestoreCommand.Execute(null);
+        trash.RestoreCommand.Press();
 
         Assert.Contains(nameof(TrashViewModel.HasError), raised);
         Assert.True(trash.HasError);
@@ -350,7 +350,7 @@ public sealed class TrashTests : IDisposable
         trash.Selected = Assert.Single(trash.Rows);
 
         var before = Digest(_vaultPath);
-        trash.RestoreCommand.Execute(null);
+        trash.RestoreCommand.Press();
 
         Assert.Null(trash.Notice);
         Assert.NotNull(trash.Error);
@@ -378,11 +378,11 @@ public sealed class TrashTests : IDisposable
 
             var trash = context.NewTrash();
             trash.Selected = Assert.Single(trash.Rows);
-            trash.RestoreCommand.Execute(null);
+            trash.RestoreCommand.Press();
 
             Assert.Equal("Restore as production (restored 2)", trash.RestoreAsLabel, StringComparer.Ordinal);
 
-            trash.RestoreAsCommand.Execute(null);
+            trash.RestoreAsCommand.Press();
 
             Assert.Equal("production is back in servers as production (restored 2).", trash.Notice, StringComparer.Ordinal);
             Assert.Null(trash.Error);
@@ -411,7 +411,7 @@ public sealed class TrashTests : IDisposable
 
         var trash = context.NewTrash();
         trash.Selected = trash.Rows.Single(row => row.Title == "production");
-        trash.RestoreCommand.Execute(null);
+        trash.RestoreCommand.Press();
         Assert.True(trash.OffersRestoreAs);
 
         trash.Selected = trash.Rows.Single(row => row.Title == ".env");
@@ -433,14 +433,14 @@ public sealed class TrashTests : IDisposable
         Delete(context, "servers/production");
 
         var trash = context.NewTrash();
-        trash.EmptyCommand.Execute(null);
+        trash.EmptyCommand.Press();
 
         var vault = context.Session.Unlocked!;
         Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("env/billing", ".env")));
         vault.Save();
         var before = Digest(_vaultPath);
 
-        trash.ConfirmEmptyCommand.Execute(null);
+        trash.ConfirmEmptyCommand.Press();
 
         Assert.Equal(
             "The trash changed after you asked, so nothing was deleted. Check what is in it and empty it again.",
@@ -471,7 +471,7 @@ public sealed class TrashTests : IDisposable
             trash.Selected = trash.Rows[0];
 
             var armed = Digest(_vaultPath);
-            trash.EmptyCommand.Execute(null);
+            trash.EmptyCommand.Press();
 
             Assert.True(trash.IsConfirmingEmpty);
             Assert.Equal(
@@ -482,14 +482,14 @@ public sealed class TrashTests : IDisposable
             Assert.False(trash.RestoreCommand.CanExecute(null));
             Assert.Equal(armed, Digest(_vaultPath));
 
-            trash.CancelEmptyCommand.Execute(null);
+            trash.CancelEmptyCommand.Press();
 
             Assert.False(trash.IsConfirmingEmpty);
             Assert.Equal(armed, Digest(_vaultPath));
             Assert.Equal(2, trash.Rows.Count);
 
-            trash.EmptyCommand.Execute(null);
-            trash.ConfirmEmptyCommand.Execute(null);
+            trash.EmptyCommand.Press();
+            trash.ConfirmEmptyCommand.Press();
 
             Assert.Equal("The trash is empty. 2 items and their history are gone.", trash.Notice, StringComparer.Ordinal);
             Assert.Null(trash.Error);
@@ -524,7 +524,7 @@ public sealed class TrashTests : IDisposable
             StringComparer.Ordinal);
 
         trash.Selected = Assert.Single(trash.Rows);
-        trash.RestoreCommand.Execute(null);
+        trash.RestoreCommand.Press();
 
         Assert.True(trash.IsEmpty);
         Assert.False(trash.EmptyCommand.CanExecute(null));
@@ -544,7 +544,7 @@ public sealed class TrashTests : IDisposable
         trash.EmptyCommand.CanExecuteChanged += (_, _) => asked++;
         var raised = Record(trash);
 
-        trash.RestoreCommand.Execute(null);
+        trash.RestoreCommand.Press();
 
         Assert.True(asked > 0);
         Assert.Contains(nameof(TrashViewModel.EmptyPrompt), raised);
@@ -566,7 +566,7 @@ public sealed class TrashTests : IDisposable
         Assert.True(vault.PurgeRecycled(trash.Selected!.Id));
         vault.Save();
 
-        trash.RestoreCommand.Execute(null);
+        trash.RestoreCommand.Press();
 
         Assert.Equal("production is not in the trash any more.", trash.Error, StringComparer.Ordinal);
         Assert.True(trash.IsEmpty);
@@ -605,7 +605,7 @@ public sealed class TrashTests : IDisposable
 
         var trash = context.NewTrash();
         trash.Selected = Assert.Single(trash.Rows);
-        trash.PurgeCommand.Execute(null);
+        trash.PurgeCommand.Press();
 
         context.Session.Lock(VaultLockReason.Manual);
         trash.Dispose();
@@ -633,7 +633,7 @@ public sealed class TrashTests : IDisposable
             Assert.True(context.Entries.CanUndoDelete);
             Assert.DoesNotContain(context.Entries.Rows, row => row.Path == "servers/production");
 
-            context.Entries.UndoDeleteCommand.Execute(null);
+            context.Entries.UndoDeleteCommand.Press();
 
             Assert.False(context.Entries.CanUndoDelete);
             Assert.Null(context.Entries.Notice);
@@ -702,25 +702,25 @@ public sealed class TrashTests : IDisposable
     private static void Delete(Context context, string path)
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Path == path);
-        context.Entries.DeleteCommand.Execute(null);
-        context.Entries.ConfirmDeleteCommand.Execute(null);
+        context.Entries.DeleteCommand.Press();
+        context.Entries.ConfirmDeleteCommand.Press();
     }
 
     private static void Add(Context context, string path)
     {
         var form = NewItemForm.Open(context.Entries, path);
-        context.Entries.ConfirmAddCommand.Execute(null);
+        context.Entries.ConfirmAddCommand.Press();
 
         Assert.Null(context.Entries.Error);
     }
 
     private static void RemoveVariable(Context context, string project, string key)
     {
-        context.Env.OpenCommand.Execute(project);
+        context.Env.OpenCommand.Press(project);
 
         var open = context.Env.OpenProject!;
-        open.Variables.Single(row => row.Key == key).RemoveCommand.Execute(null);
-        open.ConfirmRemoveCommand.Execute(null);
+        open.Variables.Single(row => row.Key == key).RemoveCommand.Press();
+        open.ConfirmRemoveCommand.Press();
     }
 
     private static List<string> Record(TrashViewModel trash)

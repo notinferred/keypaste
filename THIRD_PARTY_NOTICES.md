@@ -98,6 +98,12 @@ Copyright (c) .NET Foundation and Contributors. Licensed under the MIT License; 
 
 `keypaste` parses the arguments of its verbs and of the MCP bridge with `System.CommandLine` 2.0.14 (D-0678), which reaches the desktop app through Keypaste.Infrastructure without being called there. It is not vendored or modified.
 
+## CommunityToolkit.Mvvm
+
+Copyright (c) .NET Foundation and Contributors. Licensed under the MIT License; the text is at <https://github.com/CommunityToolkit/dotnet/blob/main/License.md>.
+
+The desktop app references `CommunityToolkit.Mvvm` 8.4.2 from NuGet for its view models' properties and commands (D-0680). It is not vendored or modified, and the CLI and the MCP bridge do not contain it.
+
 ## Yubico .NET SDK
 
 Copyright (c) Yubico AB. Licensed under the Apache License, Version 2.0; the full text is at <https://www.apache.org/licenses/LICENSE-2.0> and in each package as `LICENSE.txt`.

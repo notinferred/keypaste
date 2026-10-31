@@ -5,10 +5,8 @@ using Keypaste.Core.Recommendations;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>One project tag an entry lost in another app, as Settings › Recommendations lists it (V.11).</summary>
-internal sealed class LostTagRow : ObservableObject
+internal sealed partial class LostTagRow : ObservableObject
 {
-    private IReadOnlyList<string> _confirmation = [];
-
     internal LostTagRow(RecommendationsViewModel owner, LostProjectTag finding, bool isDismissed)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -24,9 +22,6 @@ internal sealed class LostTagRow : ObservableObject
         CancelRestoreCommand = new RelayCommand(() => Confirmation = []);
         DismissCommand = new RelayCommand(() => owner.Dismiss(this));
         ReviewAgainCommand = new RelayCommand(() => owner.ReviewAgain(this));
-
-        DependsOn(nameof(IsConfirming), nameof(Confirmation));
-        DependsOn(nameof(NeedsReview), nameof(IsConfirming));
     }
 
     internal LostProjectTag Finding { get; }
@@ -51,13 +46,11 @@ internal sealed class LostTagRow : ObservableObject
     internal string Description => $"{Tag} {Where}, {StateLabel.ToLowerInvariant()}";
 
     /// <summary>What putting the tag back does, shown before it is written (D-0415), or empty when nothing is being asked.</summary>
-    internal IReadOnlyList<string> Confirmation
-    {
-        get => _confirmation;
-        set => Set(ref _confirmation, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirming), nameof(NeedsReview))]
+    internal partial IReadOnlyList<string> Confirmation { get; set; } = [];
 
-    internal bool IsConfirming => _confirmation.Count > 0;
+    internal bool IsConfirming => Confirmation.Count > 0;
 
     internal RelayCommand RestoreCommand { get; }
 

@@ -127,11 +127,11 @@ public sealed class ClosingTheMainWindowTests
             await Until(() => main.FindControl<ContentControl>("Root")!.Content is UnlockView);
             await Until(() => !Item(app, AppTray.LockHeader).IsEnabled);
 
-            Item(app, AppTray.OpenHeader).Command!.Execute(null);
+            Item(app, AppTray.OpenHeader).Command!.Press();
             Assert.True(main.IsVisible);
             Assert.IsType<UnlockView>(main.FindControl<ContentControl>("Root")!.Content);
 
-            Item(app, AppTray.QuitHeader).Command!.Execute(null);
+            Item(app, AppTray.QuitHeader).Command!.Press();
             Assert.True(requested, "Quit on the tray menu did not ask the app to quit");
         });
 
@@ -240,7 +240,7 @@ public sealed class ClosingTheMainWindowTests
 
             Assert.Equal(new[] { false }, dock);
 
-            Item(app, AppTray.OpenHeader).Command!.Execute(null);
+            Item(app, AppTray.OpenHeader).Command!.Press();
             Assert.True(app.Main!.IsVisible);
             Assert.Equal(new[] { false, true }, dock);
 
@@ -299,7 +299,7 @@ public sealed class ClosingTheMainWindowTests
     {
         var unlock = Assert.IsType<UnlockViewModel>(Assert.IsType<UnlockView>(main.FindControl<ContentControl>("Root")!.Content).DataContext);
         Assert.True(unlock.Offer(vault));
-        unlock.UseHardwareKeyCommand.Execute(null);
+        unlock.UseHardwareKeyCommand.Press();
         Assert.Equal(2, unlock.HardwareKeySlot);
 
         foreach (var c in TempVault.Password)

@@ -49,13 +49,16 @@
 
        Avalonia.Diagnostics is deliberately absent. It has no 12.x release, and a runtime
        visual-tree inspector attached to a process holding an unlocked vault is not something to
-       ship even in Debug. CommunityToolkit.Mvvm is absent: the bindings are
-       hand-written in src/Keypaste.Mvvm (D-0427). -->
+       ship even in Debug.
+
+       CommunityToolkit.Mvvm, a .NET Foundation package with no dependencies of its own, generates
+       the view models' properties and commands at build time (D-0680). -->
   <ItemGroup Label="Desktop app">
     <PackageVersion Include="Avalonia" Version="12.1.0" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
   <!-- Hardware-key unlocking in the desktop app (P.1), justified in DECISIONS.md D-0366 as

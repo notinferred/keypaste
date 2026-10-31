@@ -28,45 +28,42 @@ namespace Keypaste.App.ViewModels;
 /// recomputed on every change to <see cref="WordCount"/> for exactly that reason.
 /// </para>
 /// </remarks>
-internal sealed class GeneratorViewModel : ObservableObject
+internal sealed partial class GeneratorViewModel : ObservableObject
 {
-    private bool _useWords;
-    private int _wordCount = PasswordGenerator.DefaultWords;
     private string _separator = PasswordGenerator.DefaultSeparator.ToString();
 
     internal GeneratorViewModel()
     {
-        DependsOn(nameof(UseCharacters), nameof(UseWords));
-        DependsOn(nameof(Strength), nameof(UseWords), nameof(WordCount));
-        DependsOn(nameof(Error), nameof(UseWords), nameof(WordCount), nameof(Separator));
     }
 
     /// <summary>Whether to draw words from the list rather than characters from an alphabet.</summary>
-    internal bool UseWords
-    {
-        get => _useWords;
-        set => Set(ref _useWords, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UseCharacters), nameof(Strength), nameof(Error))]
+    internal partial bool UseWords { get; set; }
 
     /// <summary>The other half of the pair, so one binding can drive two radio buttons.</summary>
     internal bool UseCharacters
     {
-        get => !_useWords;
+        get => !UseWords;
         set => UseWords = !value;
     }
 
     /// <summary>How many words a passphrase gets.</summary>
-    internal int WordCount
-    {
-        get => _wordCount;
-        set => Set(ref _wordCount, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(Error))]
+    internal partial int WordCount { get; set; } = PasswordGenerator.DefaultWords;
 
     /// <summary>What goes between the words, as the box holds it.</summary>
     internal string Separator
     {
         get => _separator;
-        set => Set(ref _separator, value ?? string.Empty);
+        set
+        {
+            if (SetProperty(ref _separator, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(Error));
+            }
+        }
     }
 
     /// <summary>The fewest words the generator will produce.</summary>

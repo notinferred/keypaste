@@ -32,7 +32,7 @@ namespace Keypaste.App.ViewModels;
 /// tool's file, until Run it has connected the tool.
 /// </para>
 /// </remarks>
-internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
+internal sealed partial class ConnectClientViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClientConnector _connector;
@@ -42,18 +42,11 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     private readonly IWebLauncher? _web;
     private readonly CancellationTokenSource _closing = new();
 
-    private McpSetupPlan? _pending;
     private McpServerRegistration? _pendingRegistration;
-    private McpServerRegistration? _registered;
-    private string? _installLink;
     private string _preview = string.Empty;
     private string _previewNote = string.Empty;
-    private string _message = string.Empty;
     private McpConnectionCheck? _check;
     private IReadOnlyList<McpListedEntry> _checkEntries = [];
-    private McpListedEntry? _checkEntry;
-    private string _checkMessage = string.Empty;
-    private bool _isRunning;
     private bool _disposed;
 
     /// <param name="session">The vault the tool is connected to.</param>
@@ -87,26 +80,12 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         Client = client;
         Removes = removes;
 
-        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => _pending is not null && !_isRunning);
-        CancelCommand = new RelayCommand(Cancel, () => _pending is not null && !_isRunning);
-        CheckCommand = new AsyncRelayCommand(CheckAsync, () => _registered is not null && !IsChecking);
-        AskCommand = new AsyncRelayCommand(AskAsync, () => _check is not null && _checkEntry is not null && _checkEntries.Count > 0);
+        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => Pending is not null && !IsRunning);
+        CancelCommand = new RelayCommand(Cancel, () => Pending is not null && !IsRunning);
+        CheckCommand = new AsyncRelayCommand(CheckAsync, () => Registered is not null && !IsChecking);
+        AskCommand = new AsyncRelayCommand(AskAsync, () => _check is not null && SelectedCheckEntry is not null && _checkEntries.Count > 0);
         OpenInstallLinkCommand = new AsyncRelayCommand(OpenInstallLinkAsync, () => OffersInstallLink && _web is not null);
         CopyInstallLinkCommand = new AsyncRelayCommand(CopyInstallLinkAsync, () => OffersInstallLink && _clipboard is not null);
-
-        DependsOn(nameof(HasPreview), nameof(Preview));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(IsPicking), nameof(CheckEntries), nameof(IsChecking));
-        DependsOn(nameof(HasCheckMessage), nameof(CheckMessage));
-        DependsOn(nameof(OffersCheck), nameof(Registered), nameof(IsChecking), nameof(CheckMessage));
-        DependsOn(nameof(IsBusy), nameof(IsRunning), nameof(IsChecking));
-        DependsOn(ConfirmCommand, nameof(Pending), nameof(IsRunning));
-        DependsOn(CancelCommand, nameof(Pending), nameof(IsRunning));
-        DependsOn(CheckCommand, nameof(Registered), nameof(IsChecking));
-        DependsOn(AskCommand, nameof(IsChecking), nameof(SelectedCheckEntry), nameof(CheckEntries));
-        DependsOn(nameof(OffersInstallLink), nameof(InstallLink), nameof(Registered));
-        DependsOn(OpenInstallLinkCommand, nameof(InstallLink), nameof(Registered));
-        DependsOn(CopyInstallLinkCommand, nameof(InstallLink), nameof(Registered));
     }
 
     /// <summary>The tool this pane connects or disconnects.</summary>
@@ -127,55 +106,47 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     internal string PreviewNote => _previewNote;
 
     /// <summary>What the last action did, or why it could not.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     /// <summary>The names the check's bridge listed, when there is more than one to choose from.</summary>
     internal IReadOnlyList<McpListedEntry> CheckEntries => _checkEntries;
 
     internal bool IsPicking => _checkEntries.Count > 1 && _check is not null;
 
-    internal McpListedEntry? SelectedCheckEntry
-    {
-        get => _checkEntry;
-        set => Set(ref _checkEntry, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AskCommand))]
+    internal partial McpListedEntry? SelectedCheckEntry { get; set; }
 
     /// <summary>What the check found, never a value.</summary>
-    internal string CheckMessage
-    {
-        get => _checkMessage;
-        private set => Set(ref _checkMessage, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCheckMessage), nameof(OffersCheck))]
+    internal partial string CheckMessage { get; private set; } = string.Empty;
 
-    internal bool HasCheckMessage => _checkMessage.Length > 0;
+    internal bool HasCheckMessage => CheckMessage.Length > 0;
 
     internal bool IsChecking => _check is not null;
 
     /// <summary>Whether Run it is running the plan.</summary>
-    internal bool IsRunning
-    {
-        get => _isRunning;
-        private set => Set(ref _isRunning, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusy))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand))]
+    internal partial bool IsRunning { get; private set; }
 
     /// <summary>Whether a plan or a check is running, which no other pane may interrupt.</summary>
-    internal bool IsBusy => _isRunning || IsChecking;
+    internal bool IsBusy => IsRunning || IsChecking;
 
     /// <summary>Whether the check is offered: once a Connect has registered the tool, and while its words remain.</summary>
-    internal bool OffersCheck => !Removes && (_registered is not null || IsChecking || HasCheckMessage);
+    internal bool OffersCheck => !Removes && (Registered is not null || IsChecking || HasCheckMessage);
 
     /// <summary>The registration Connect ran, which the check starts.</summary>
-    internal McpServerRegistration? Registered
-    {
-        get => _registered;
-        private set => Set(ref _registered, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersCheck), nameof(OffersInstallLink))]
+    [NotifyCanExecuteChangedFor(nameof(CheckCommand), nameof(OpenInstallLinkCommand), nameof(CopyInstallLinkCommand))]
+    internal partial McpServerRegistration? Registered { get; private set; }
 
     /// <summary>Runs the plan on screen, and only that.</summary>
     internal AsyncRelayCommand ConfirmCommand { get; }
@@ -188,14 +159,13 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     internal AsyncRelayCommand AskCommand { get; }
 
     /// <summary>The link that has the tool add keypaste itself, holding the entry Run it would write; null for a tool that takes none.</summary>
-    internal string? InstallLink
-    {
-        get => _installLink;
-        private set => Set(ref _installLink, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersInstallLink))]
+    [NotifyCanExecuteChangedFor(nameof(OpenInstallLinkCommand), nameof(CopyInstallLinkCommand))]
+    internal partial string? InstallLink { get; private set; }
 
     /// <summary>Whether the link is offered: until Run it has connected the tool.</summary>
-    internal bool OffersInstallLink => _installLink is not null && _registered is null;
+    internal bool OffersInstallLink => InstallLink is not null && Registered is null;
 
     internal string OpenInstallLinkLabel => $"Open in {Client.DisplayName}";
 
@@ -207,11 +177,9 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     internal AsyncRelayCommand CopyInstallLinkCommand { get; }
 
-    private McpSetupPlan? Pending
-    {
-        get => _pending;
-        set => Set(ref _pending, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand))]
+    private partial McpSetupPlan? Pending { get; set; }
 
     /// <summary>Composes the plan the pane shows, which Run it runs; nothing is written.</summary>
     internal Task PreviewAsync() => Removes ? PreviewRemoveAsync() : PreviewConnectAsync();
@@ -307,7 +275,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     private async Task ConfirmAsync()
     {
-        if (_pending is not { } plan)
+        if (Pending is not { } plan)
         {
             return;
         }
@@ -365,7 +333,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     private async Task OpenInstallLinkAsync()
     {
-        if (_installLink is not { } link || _web is null)
+        if (InstallLink is not { } link || _web is null)
         {
             return;
         }
@@ -380,7 +348,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     private async Task CopyInstallLinkAsync()
     {
-        if (_installLink is { } link && _clipboard is not null)
+        if (InstallLink is { } link && _clipboard is not null)
         {
             await _clipboard.CopyPlainAsync(link, $"{Client.DisplayName} install link").ConfigureAwait(true);
         }
@@ -388,7 +356,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
 
     private async Task CheckAsync()
     {
-        if (_registered is not { } registration)
+        if (Registered is not { } registration)
         {
             return;
         }
@@ -436,14 +404,16 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
                 return;
             default:
                 _checkEntries = listing.Entries;
-                Raise(nameof(CheckEntries));
+                OnPropertyChanged(nameof(CheckEntries));
+                OnPropertyChanged(nameof(IsPicking));
+                AskCommand.NotifyCanExecuteChanged();
                 SelectedCheckEntry = listing.Entries[0];
                 CheckMessage = $"The bridge lists {listing.Entries.Count} items. Pick the one to ask for.";
                 return;
         }
     }
 
-    private Task AskAsync() => _checkEntry is { } entry ? RequestAsync(entry) : Task.CompletedTask;
+    private Task AskAsync() => SelectedCheckEntry is { } entry ? RequestAsync(entry) : Task.CompletedTask;
 
     private async Task RequestAsync(McpListedEntry entry)
     {
@@ -453,7 +423,9 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         }
 
         _checkEntries = [];
-        Raise(nameof(CheckEntries));
+        OnPropertyChanged(nameof(CheckEntries));
+        OnPropertyChanged(nameof(IsPicking));
+        AskCommand.NotifyCanExecuteChanged();
 
         CheckMessage = $"Asking for {Shown(entry.Field)} of {entry.Name}. Answer in the prompt window.";
 
@@ -481,7 +453,12 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     private void SetCheck(McpConnectionCheck? check)
     {
         _check = check;
-        Raise(nameof(IsChecking));
+        OnPropertyChanged(nameof(IsChecking));
+        OnPropertyChanged(nameof(IsPicking));
+        OnPropertyChanged(nameof(OffersCheck));
+        OnPropertyChanged(nameof(IsBusy));
+        CheckCommand.NotifyCanExecuteChanged();
+        AskCommand.NotifyCanExecuteChanged();
     }
 
     private async Task EndCheckAsync(string message)
@@ -574,8 +551,9 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     {
         _preview = plan.Display;
         _previewNote = note;
-        Raise(nameof(Preview));
-        Raise(nameof(PreviewNote));
+        OnPropertyChanged(nameof(Preview));
+        OnPropertyChanged(nameof(PreviewNote));
+        OnPropertyChanged(nameof(HasPreview));
     }
 
     /// <summary>Drops a plan that was shown but not confirmed, so an edit can never run an old preview.</summary>
@@ -586,8 +564,9 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         _preview = string.Empty;
         _previewNote = string.Empty;
         Message = string.Empty;
-        Raise(nameof(Preview));
-        Raise(nameof(PreviewNote));
+        OnPropertyChanged(nameof(Preview));
+        OnPropertyChanged(nameof(PreviewNote));
+        OnPropertyChanged(nameof(HasPreview));
     }
 
     public void Dispose()

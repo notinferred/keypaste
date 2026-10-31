@@ -41,7 +41,7 @@ public sealed class AgentActivityViewTests
         var connect = window.GetVisualDescendants().OfType<Button>().Single(button => button is { Name: "ConnectTool", IsEffectivelyVisible: true } && button.DataContext == row);
         Assert.Equal("Connect Claude Code", AutomationProperties.GetName(connect));
 
-        connect.Command!.Execute(connect.CommandParameter);
+        connect.Command!.Press(connect.CommandParameter);
         await model.Opening;
         WindowInput.Drain();
 

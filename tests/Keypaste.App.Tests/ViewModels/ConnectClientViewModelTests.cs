@@ -165,7 +165,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal(Plan("claude-code", Registration(_server, McpServerPins.None, "claude-code")), model.Preview);
         Assert.DoesNotContain("--vault", model.Preview, StringComparison.Ordinal);
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
         Assert.DoesNotContain(_runner.Changes, change => change.Contains("--vault", StringComparison.Ordinal));
     }
 
@@ -193,7 +193,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model();
 
         await model.PreviewAsync();
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         var registered = model.Registered!;
         Assert.EndsWith("--client-label claude-code --allow-run --expose **", _runner.Changes[^1], StringComparison.Ordinal);
@@ -238,7 +238,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model(cancelled: () => cancelled++);
 
         await model.PreviewAsync();
-        model.CancelCommand.Execute(null);
+        model.CancelCommand.Press();
 
         Assert.Equal(1, cancelled);
         Assert.Empty(_runner.Changes);
@@ -256,7 +256,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
 
         await model.PreviewAsync();
         var shown = model.Preview;
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal(shown, string.Join('\n', _runner.Changes));
         Assert.Contains("--client-label claude-code", shown, StringComparison.Ordinal);
@@ -292,7 +292,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal(Plan("gemini-cli", Expected("gemini-cli")), model.Preview);
         Assert.EndsWith(trusted, model.PreviewNote, StringComparison.Ordinal);
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.EndsWith(trusted, model.Message, StringComparison.Ordinal);
     }
@@ -314,7 +314,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
             model.PreviewNote);
         Assert.Equal(seed, File.ReadAllText(file));
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal(
             $"Connected. Cursor starts keypaste mcp for this vault; Check asks through it once. The original is kept as {backup}. Restart Cursor to load it.",
@@ -337,7 +337,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal("claude mcp remove --scope user keypaste", model.Preview);
         Assert.Empty(_runner.Changes);
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal(["claude mcp remove --scope user keypaste"], _runner.Changes);
         Assert.StartsWith("Removed.", model.Message, StringComparison.Ordinal);
@@ -370,7 +370,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal($"edit {file}: remove mcpServers.keypaste; keeps the original as {backup}", model.Preview);
         Assert.Equal($"Remove changes only keypaste's part of {file}, and keeps the first original as {backup}.", model.PreviewNote);
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal("""{"mcpServers": {"other": {"command": "other"}}}""", File.ReadAllText(file));
         Assert.Equal(seed, File.ReadAllText(backup));
@@ -395,8 +395,8 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.True(model.OffersInstallLink);
         Assert.Equal("Open in Cursor", model.OpenInstallLinkLabel);
 
-        await model.OpenInstallLinkCommand.ExecuteAsync();
-        await model.CopyInstallLinkCommand.ExecuteAsync();
+        await model.OpenInstallLinkCommand.PressAsync();
+        await model.CopyInstallLinkCommand.PressAsync();
 
         Assert.Equal(expected, Assert.Single(launcher.Opened).AbsoluteUri);
         Assert.Equal(expected, clipboard.Content);
@@ -404,7 +404,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal("{}", File.ReadAllText(file));
         Assert.Empty(_runner.Calls);
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.StartsWith("Connected.", model.Message, StringComparison.Ordinal);
         Assert.False(model.OffersInstallLink);
@@ -420,7 +420,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model("cursor", web: new RecordingLauncher());
 
         await model.PreviewAsync();
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.EndsWith("nothing was written.", model.Message, StringComparison.Ordinal);
         Assert.Null(model.Registered);
@@ -436,7 +436,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model("cursor", web: new RecordingLauncher(opens: false));
 
         await model.PreviewAsync();
-        await model.OpenInstallLinkCommand.ExecuteAsync();
+        await model.OpenInstallLinkCommand.PressAsync();
 
         Assert.Equal("Your system didn't open the link. Copy it and paste it into your browser, which hands it to Cursor.", model.Message);
     }
@@ -475,7 +475,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model("cursor", findServer: Through(link), web: new RecordingLauncher());
 
         await model.PreviewAsync();
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal(1, link.Links);
         Assert.EndsWith("nothing was written.", model.Message, StringComparison.Ordinal);
@@ -492,7 +492,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model();
 
         await model.PreviewAsync();
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal("Claude Code refused: that scope is not writable here", model.Message);
         Assert.False(model.CheckCommand.CanExecute(null));
@@ -507,7 +507,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model(removes: true);
 
         await model.PreviewAsync();
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal("Claude Code refused: No MCP server found with name: keypaste", model.Message);
     }
@@ -554,7 +554,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Contains($"It first creates {link.LinkPath}, which starts this AppImage.", model.PreviewNote, StringComparison.Ordinal);
         Assert.Equal(0, link.Links);
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal(1, link.Links);
         Assert.Equal(2, _runner.Changes.Count);
@@ -577,7 +577,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Contains($"It first replaces {link.LinkPath}, which is another program, keeping it as {link.BackupPath}.", model.PreviewNote, StringComparison.Ordinal);
         Assert.Equal(0, link.Replaces);
 
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal((0, 1), (link.Links, link.Replaces));
         Assert.StartsWith("Connected.", model.Message, StringComparison.Ordinal);
@@ -590,7 +590,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         using var model = Model(findServer: Through(link));
 
         await model.PreviewAsync();
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
 
         Assert.Equal($"keypaste could not create {link.LinkPath}: Permission denied. Nothing else was changed.", model.Message);
         Assert.Empty(_runner.Changes);
@@ -603,7 +603,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
     {
         using var model = await ConnectedAsync();
 
-        await model.CheckCommand.ExecuteAsync();
+        await model.CheckCommand.PressAsync();
 
         var bridge = Assert.Single(_bridges);
         Assert.Equal("k1_0", bridge.AskedFor);
@@ -619,7 +619,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
     {
         using var model = await ConnectedAsync("env/ci/DEPLOY_KEY", "env/ci/OTHER");
 
-        await model.CheckCommand.ExecuteAsync();
+        await model.CheckCommand.PressAsync();
 
         Assert.True(model.IsPicking);
         Assert.Equal(["env/ci/DEPLOY_KEY", "env/ci/OTHER"], model.CheckEntries.Select(entry => entry.Name));
@@ -627,7 +627,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Null(_bridges[0].AskedFor);
 
         model.SelectedCheckEntry = model.CheckEntries[1];
-        await model.AskCommand.ExecuteAsync();
+        await model.AskCommand.PressAsync();
 
         Assert.Equal("k1_1", _bridges[0].AskedFor);
         Assert.False(model.IsPicking);
@@ -652,7 +652,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
     public async Task Closing_the_screen_while_the_check_waits_ends_its_bridge()
     {
         var model = await ConnectedAsync("env/ci/DEPLOY_KEY", "env/ci/OTHER");
-        await model.CheckCommand.ExecuteAsync();
+        await model.CheckCommand.PressAsync();
         Assert.True(model.IsChecking);
         Assert.True(model.IsBusy);
 
@@ -666,7 +666,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
     {
         var model = Model(listed: listed);
         await model.PreviewAsync();
-        await model.ConfirmCommand.ExecuteAsync();
+        await model.ConfirmCommand.PressAsync();
         Assert.NotNull(model.Registered);
         return model;
     }

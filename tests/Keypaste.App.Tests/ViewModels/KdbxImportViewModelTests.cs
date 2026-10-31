@@ -95,7 +95,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         using var import = NewImport();
         await Unlock(import);
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Equal(["Imported 3 items from foreign.kdbx"], _announced);
         Assert.False(import.IsDecrypted);
@@ -125,7 +125,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
             other.Save();
         }
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Equal(before, _session.Unlocked!.Search(string.Empty).Select(match => match.Name));
         Assert.DoesNotContain(_session.Unlocked!.ReadGroupPaths(includeReserved: true), group => group.StartsWith("foreign", StringComparison.Ordinal));
@@ -145,7 +145,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
         import.KeepEditingInPlace = true;
         Assert.True(import.CanConfirm);
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Equal([(Path.GetFullPath(_source), (string?)_keyfile)], _opened);
         Assert.Empty(_announced);
@@ -176,7 +176,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         await Unlock(import);
         var source = import.Source!;
 
-        import.CancelCommand.Execute(null);
+        import.CancelCommand.Press();
 
         Assert.False(import.IsDecrypted);
         AssertDisposed(source);
@@ -189,7 +189,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         await Unlock(import);
         var source = import.Source!;
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Single(_announced);
         AssertDisposed(source);
@@ -228,7 +228,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         Assert.False(import.NeedsUnlock);
         Assert.True(import.CanChooseAnother);
 
-        await import.ChooseAnotherCommand.ExecuteAsync();
+        await import.ChooseAnotherCommand.PressAsync();
         Assert.Equal(1, asked);
     }
 

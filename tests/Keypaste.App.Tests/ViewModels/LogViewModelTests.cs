@@ -114,7 +114,7 @@ public sealed class LogViewModelTests : IDisposable
         _home.Append("env/prod/GITHUB_TOKEN");
 
         Assert.True(model.RefreshCommand.CanExecute(null));
-        model.RefreshCommand.Execute(null);
+        model.RefreshCommand.Press();
 
         Assert.Equal(2, model.Rows.Count);
     }
@@ -131,7 +131,7 @@ public sealed class LogViewModelTests : IDisposable
         Assert.NotNull(model.Verdict);
         Assert.True(model.VerifyCommand.CanExecute(null));
 
-        model.VerifyCommand.Execute(null);
+        model.VerifyCommand.Press();
 
         var report = AuditChainVerifier.Verify(_home.LogPath);
         Assert.True(model.VerdictShown);

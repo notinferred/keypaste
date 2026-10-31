@@ -16,7 +16,6 @@ internal sealed class ApprovalViewModel : PromptViewModel
         OffersAlways = prompt.AlwaysFor is not null;
         AlwaysLabel = prompt.AlwaysFor is { } scope ? $"Always for {scope.Name}" : string.Empty;
         AlwaysForCommand = new RelayCommand(() => Decide(ApprovalAnswer.AlwaysForProject), () => IsArmed && OffersAlways && !IsAnswered);
-        DependsOn(AlwaysForCommand, nameof(IsArmed), nameof(IsAnswered));
 
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
@@ -43,6 +42,8 @@ internal sealed class ApprovalViewModel : PromptViewModel
 
     /// <summary>Allows this request once, then asks the person to make its project environment Automatic for the agent.</summary>
     internal RelayCommand AlwaysForCommand { get; }
+
+    protected override void OnAllowsChanged() => AlwaysForCommand.NotifyCanExecuteChanged();
 
     /// <summary>Whether the prompt offers Always for, which then has its own place on it.</summary>
     internal bool OffersAlways { get; }

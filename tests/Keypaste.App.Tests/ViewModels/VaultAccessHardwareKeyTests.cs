@@ -59,7 +59,7 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
         Enter(access, _master);
         access.AttachHardwareKey = true;
         access.NewSlotOne = true;
-        access.ReviewCommand.Execute(null);
+        access.ReviewCommand.Press();
 
         Assert.True(access.IsConfirming);
         Assert.Contains("YubiKey in slot 1", access.Summary, StringComparison.Ordinal);
@@ -94,7 +94,7 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
         {
             Enter(adding.Access, _master);
             adding.Access.AttachHardwareKey = true;
-            adding.Access.ReviewCommand.Execute(null);
+            adding.Access.ReviewCommand.Press();
             await adding.Access.ChangeAsync();
             Assert.StartsWith("Changed.", adding.Access.Message, StringComparison.Ordinal);
         }
@@ -106,7 +106,7 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
 
         Enter(access, _master);
         access.RemoveHardwareKey = true;
-        access.ReviewCommand.Execute(null);
+        access.ReviewCommand.Press();
         Assert.Equal("Afterwards the vault opens with its master password.", access.Summary);
 
         await access.ChangeAsync();
@@ -131,7 +131,7 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
         _device.Connected = false;
         Enter(access, _master);
         access.AttachHardwareKey = true;
-        access.ReviewCommand.Execute(null);
+        access.ReviewCommand.Press();
         await access.ChangeAsync();
 
         Assert.StartsWith("No YubiKey with slot 2 programmed is plugged in.", access.Message, StringComparison.Ordinal);

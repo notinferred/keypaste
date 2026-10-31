@@ -86,9 +86,9 @@ public sealed class EntriesOrganizeTests : IDisposable
             var entries = context.Entries;
 
             entries.SelectedGroup = Group(entries, "servers");
-            entries.BeginCreateGroupCommand.Execute(null);
+            entries.BeginCreateGroupCommand.Press();
             entries.DraftGroupName = "retired";
-            entries.ConfirmCreateGroupCommand.Execute(null);
+            entries.ConfirmCreateGroupCommand.Press();
 
             Assert.Null(entries.Error);
         }
@@ -119,9 +119,9 @@ public sealed class EntriesOrganizeTests : IDisposable
             var entries = context.Entries;
 
             entries.SelectedGroup = Group(entries, "servers");
-            entries.BeginRenameGroupCommand.Execute(null);
+            entries.BeginRenameGroupCommand.Press();
             entries.DraftGroupName = "hosts";
-            entries.ConfirmRenameGroupCommand.Execute(null);
+            entries.ConfirmRenameGroupCommand.Press();
 
             Assert.Null(entries.Error);
         }
@@ -147,11 +147,11 @@ public sealed class EntriesOrganizeTests : IDisposable
         var entries = context.Entries;
 
         entries.SelectedGroup = Group(entries, "servers");
-        entries.BeginRenameGroupCommand.Execute(null);
+        entries.BeginRenameGroupCommand.Press();
         Assert.False(entries.ShowsProjectRenameNote);
 
         entries.SelectedGroup = Group(entries, "env/billing");
-        entries.BeginRenameGroupCommand.Execute(null);
+        entries.BeginRenameGroupCommand.Press();
 
         Assert.True(entries.ShowsProjectRenameNote);
         Assert.Contains("New keys for billing go to items in env/billing", entries.ProjectRenameNote, StringComparison.Ordinal);
@@ -170,14 +170,14 @@ public sealed class EntriesOrganizeTests : IDisposable
             var entries = context.Entries;
 
             entries.SelectedGroup = Group(entries, "servers");
-            entries.BeginMoveGroupCommand.Execute(null);
+            entries.BeginMoveGroupCommand.Press();
 
             Assert.True(entries.IsMovingGroup);
             Assert.Equal(string.Empty, entries.GroupMoveTarget?.Path);
             Assert.Same(entries.MoveTargets, entries.Groups);
 
             entries.GroupMoveTarget = Group(entries, "env");
-            entries.ConfirmMoveGroupCommand.Execute(null);
+            entries.ConfirmMoveGroupCommand.Press();
 
             Assert.Null(entries.Error);
             Assert.False(entries.IsMovingGroup);
@@ -207,9 +207,9 @@ public sealed class EntriesOrganizeTests : IDisposable
         var entries = context.Entries;
 
         entries.SelectedGroup = Group(entries, group);
-        entries.BeginMoveGroupCommand.Execute(null);
+        entries.BeginMoveGroupCommand.Press();
         entries.GroupMoveTarget = Group(entries, target);
-        entries.ConfirmMoveGroupCommand.Execute(null);
+        entries.ConfirmMoveGroupCommand.Press();
 
         Assert.Contains(said, entries.Error, StringComparison.Ordinal);
         Assert.True(entries.IsMovingGroup);
@@ -230,7 +230,7 @@ public sealed class EntriesOrganizeTests : IDisposable
             var entries = context.Entries;
 
             entries.SelectedGroup = Group(entries, "env/billing");
-            entries.BeginDeleteGroupCommand.Execute(null);
+            entries.BeginDeleteGroupCommand.Press();
 
             Assert.True(entries.IsConfirmingGroupDelete);
             Assert.Equal(
@@ -241,10 +241,10 @@ public sealed class EntriesOrganizeTests : IDisposable
             entries.SelectedGroup = Group(entries, "servers");
             Assert.False(entries.IsConfirmingGroupDelete);
 
-            entries.BeginDeleteGroupCommand.Execute(null);
+            entries.BeginDeleteGroupCommand.Press();
             Assert.Contains("the 2 items in it", entries.GroupDeletePrompt, StringComparison.Ordinal);
 
-            entries.ConfirmDeleteGroupCommand.Execute(null);
+            entries.ConfirmDeleteGroupCommand.Press();
 
             Assert.Null(entries.Error);
             Assert.True(entries.SelectedGroup?.IsEverything);
@@ -285,10 +285,10 @@ public sealed class EntriesOrganizeTests : IDisposable
             var entries = context.Entries;
 
             Select(entries, "servers", "production");
-            entries.OrganizeCommand.Execute(null);
+            entries.OrganizeCommand.Press();
             entries.DraftTitle = "PROD_DB";
             entries.MoveTarget = Group(entries, "env/billing");
-            entries.ConfirmOrganizeCommand.Execute(null);
+            entries.ConfirmOrganizeCommand.Press();
 
             Assert.Null(entries.Error);
             Assert.Equal(new EntryName("env/billing", "PROD_DB"), entries.Selected?.Name);
@@ -316,9 +316,9 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.SelectedGroup = Group(entries, "servers");
         Select(entries, "servers", "production");
 
-        entries.OrganizeCommand.Execute(null);
+        entries.OrganizeCommand.Press();
         entries.MoveTarget = Group(entries, "env/billing");
-        entries.ConfirmOrganizeCommand.Execute(null);
+        entries.ConfirmOrganizeCommand.Press();
 
         Assert.Null(entries.Error);
         Assert.Equal("env/billing", entries.SelectedGroup?.Path);
@@ -346,7 +346,7 @@ public sealed class EntriesOrganizeTests : IDisposable
             var entries = context.Entries;
 
             Select(entries, "env/billing", "STRIPE_KEY");
-            entries.DuplicateCommand.Execute(null);
+            entries.DuplicateCommand.Press();
 
             Assert.Null(entries.Error);
             Assert.Equal(new EntryName("env/billing", "STRIPE_KEY (copy)"), entries.Selected?.Name);
@@ -355,7 +355,7 @@ public sealed class EntriesOrganizeTests : IDisposable
                 entries.Notice);
 
             Select(entries, "servers", "production");
-            entries.DuplicateCommand.Execute(null);
+            entries.DuplicateCommand.Press();
 
             Assert.Equal("Duplicated production as production (copy).", entries.Notice);
         }
@@ -383,10 +383,10 @@ public sealed class EntriesOrganizeTests : IDisposable
         var entries = context.Entries;
 
         Select(entries, "servers", "production");
-        entries.OrganizeCommand.Execute(null);
+        entries.OrganizeCommand.Press();
         entries.DraftTitle = title;
         entries.MoveTarget = Group(entries, group);
-        entries.ConfirmOrganizeCommand.Execute(null);
+        entries.ConfirmOrganizeCommand.Press();
 
         Assert.NotNull(entries.Error);
         Assert.Equal(before, Digest(_vaultPath));
@@ -401,9 +401,9 @@ public sealed class EntriesOrganizeTests : IDisposable
         var entries = context.Entries;
 
         Select(entries, "servers", "production");
-        entries.OrganizeCommand.Execute(null);
+        entries.OrganizeCommand.Press();
         entries.DraftTitle = "something-else";
-        entries.CancelOrganizeCommand.Execute(null);
+        entries.CancelOrganizeCommand.Press();
 
         Assert.False(entries.IsOrganizing);
         Assert.Equal(before, Digest(_vaultPath));
@@ -426,17 +426,17 @@ public sealed class EntriesOrganizeTests : IDisposable
             var entries = context.Entries;
 
             Select(entries, "servers", "production");
-            entries.OrganizeCommand.Execute(null);
+            entries.OrganizeCommand.Press();
 
             // The rename is fine on its own; the destination, where the title is taken, is what refuses.
             entries.DraftTitle = "STRIPE_KEY";
             entries.MoveTarget = Group(entries, "env/billing");
-            entries.ConfirmOrganizeCommand.Execute(null);
+            entries.ConfirmOrganizeCommand.Press();
 
             Assert.NotNull(entries.Error);
 
             var form = NewItemForm.Open(entries, "unrelated");
-            entries.ConfirmAddCommand.Execute(null);
+            entries.ConfirmAddCommand.Press();
 
             Assert.Null(entries.Error);
         }
@@ -460,16 +460,16 @@ public sealed class EntriesOrganizeTests : IDisposable
         var entries = context.Entries;
 
         entries.SelectedGroup = Group(entries, string.Empty);
-        entries.BeginCreateGroupCommand.Execute(null);
+        entries.BeginCreateGroupCommand.Press();
         entries.DraftGroupName = "servers";
-        entries.ConfirmCreateGroupCommand.Execute(null);
+        entries.ConfirmCreateGroupCommand.Press();
 
         Assert.NotNull(entries.Error);
         Assert.Equal(before, Digest(_vaultPath));
 
         // The name keypaste assigns meaning to is refused too, and says which.
         entries.DraftGroupName = "env";
-        entries.ConfirmCreateGroupCommand.Execute(null);
+        entries.ConfirmCreateGroupCommand.Press();
 
         Assert.Contains("keypaste assigns", entries.Error!, StringComparison.Ordinal);
         Assert.Equal(before, Digest(_vaultPath));
@@ -597,9 +597,9 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.Search = "production";
         Select(entries, "servers", "production");
 
-        entries.OrganizeCommand.Execute(null);
+        entries.OrganizeCommand.Press();
         entries.DraftTitle = "renamed-away";
-        entries.ConfirmOrganizeCommand.Execute(null);
+        entries.ConfirmOrganizeCommand.Press();
 
         Assert.Null(entries.Error);
         Assert.Contains(entries.Rows, row => row.Title == "renamed-away");
@@ -620,7 +620,7 @@ public sealed class EntriesOrganizeTests : IDisposable
 
         entries.Search = "dba@example.test";
         Select(entries, "servers", "production");
-        entries.OrganizeCommand.Execute(null);
+        entries.OrganizeCommand.Press();
 
         Assert.True(entries.IsOrganizing);
 

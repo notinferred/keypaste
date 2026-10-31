@@ -51,7 +51,7 @@ internal sealed record SettingRow(ProjectScope Scope, IReadOnlyList<SettingChoic
 /// and no commands.
 /// </para>
 /// </remarks>
-internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
+internal sealed partial class AgentSettingsViewModel : ObservableObject, IDisposable
 {
     private const string _byDefault = "by default";
     private const string _mode = "mode";
@@ -68,7 +68,7 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
         nameof(Identity), nameof(ModeChoices), nameof(ValueChoices), nameof(RunChoices), nameof(SeeScopes), nameof(SeeChoices),
         nameof(IsOnly), nameof(AlsoSees), nameof(HasAlsoSees), nameof(SeePattern), nameof(Rows), nameof(HasRows), nameof(NewRowScopes), nameof(NewRowScope),
         nameof(LimitTargets), nameof(OffersLimits), nameof(LimitTarget), nameof(LimitNow), nameof(HeldBack), nameof(IsHeldBack),
-        nameof(Beneath), nameof(IsBeneath), nameof(CanChange),
+        nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption),
     ];
 
     private static readonly string[] _timesOfDay = [@"h\:mm", @"hh\:mm", @"h\:mm\:ss", @"hh\:mm\:ss"];
@@ -95,16 +95,11 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
     private IReadOnlyList<SettingRow> _rows = [];
     private IReadOnlyList<string> _newRowScopes = [];
     private List<string> _limitTargets = [];
-    private string? _newRowScope;
     private string? _limitTarget;
     private string _perHour = string.Empty;
     private DateTime? _untilDate;
     private string _untilTime = string.Empty;
     private string _seePattern = string.Empty;
-    private string _problem = string.Empty;
-    private string _message = string.Empty;
-    private bool _isAdvancedOpen;
-    private bool _isChanging;
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, which reads and changes their settings.</param>
@@ -124,23 +119,11 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
             choice => CanChange && choice is not null && (choice.Setting != _pick || IsOnly));
         ApplyPicksCommand = new RelayCommand(() => Start(ApplyPicksAsync), () => CanChange && PicksChanged);
         ApplySeeCommand = new RelayCommand(() => Start(ApplySeeAsync), () => CanChange);
-        AddRowCommand = new RelayCommand(() => Start(AddRowAsync), () => CanChange && _newRowScope is not null);
+        AddRowCommand = new RelayCommand(() => Start(AddRowAsync), () => CanChange && NewRowScope is not null);
         RemoveRowCommand = new RelayCommand<SettingRow>(row => Start(() => RemoveRowAsync(row!)), row => CanChange && row is not null);
         ApplyLimitCommand = new RelayCommand(() => Start(ApplyLimitAsync), () => CanChange && _limitTarget is not null);
         UseVaultCommand = new RelayCommand(() => Start(UseVaultAsync), () => CanChange && IsHeldBack);
         ToggleAdvancedCommand = new RelayCommand(() => IsAdvancedOpen = !IsAdvancedOpen);
-
-        DependsOn(nameof(CanChange), nameof(IsChanging));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(HasProblem), nameof(Problem));
-        DependsOn(nameof(PicksCaption), nameof(SeeChoices), nameof(IsOnly));
-        DependsOn(ChooseCommand, nameof(CanChange), nameof(IsOnly));
-        DependsOn(ApplyPicksCommand, nameof(CanChange), nameof(SeeChoices), nameof(IsOnly));
-        DependsOn(ApplySeeCommand, nameof(CanChange));
-        DependsOn(AddRowCommand, nameof(CanChange), nameof(NewRowScope));
-        DependsOn(RemoveRowCommand, nameof(CanChange));
-        DependsOn(ApplyLimitCommand, nameof(CanChange), nameof(LimitTarget));
-        DependsOn(UseVaultCommand, nameof(CanChange), nameof(HeldBack));
 
         Read();
     }
@@ -195,15 +178,12 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
     internal string SeePattern
     {
         get => _seePattern;
-        set => Set(ref _seePattern, value ?? string.Empty);
+        set => SetProperty(ref _seePattern, value ?? string.Empty);
     }
 
     /// <summary>Whether the pattern field is shown.</summary>
-    internal bool IsAdvancedOpen
-    {
-        get => _isAdvancedOpen;
-        private set => Set(ref _isAdvancedOpen, value);
-    }
+    [ObservableProperty]
+    internal partial bool IsAdvancedOpen { get; private set; }
 
     /// <summary>Its project rows, each beating the default for what it covers.</summary>
     internal IReadOnlyList<SettingRow> Rows => _rows;
@@ -213,11 +193,9 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
     /// <summary>The projects and environments a row can be added for: the vault's, without a row yet, and none protected.</summary>
     internal IReadOnlyList<string> NewRowScopes => _newRowScopes;
 
-    internal string? NewRowScope
-    {
-        get => _newRowScope;
-        set => Set(ref _newRowScope, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddRowCommand))]
+    internal partial string? NewRowScope { get; set; }
 
     /// <summary>Where a limit on Automatic can be set: by default and each row, wherever the mode is Automatic.</summary>
     internal IReadOnlyList<string> LimitTargets => _limitTargets;
@@ -229,8 +207,9 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
         get => _limitTarget;
         set
         {
-            if (Set(ref _limitTarget, value))
+            if (SetProperty(ref _limitTarget, value))
             {
+                ApplyLimitCommand.NotifyCanExecuteChanged();
                 ShowLimit();
             }
         }
@@ -240,21 +219,21 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
     internal string PerHourText
     {
         get => _perHour;
-        set => Set(ref _perHour, value ?? string.Empty);
+        set => SetProperty(ref _perHour, value ?? string.Empty);
     }
 
     /// <summary>The day Automatic ends on this computer's clock, or null for no end.</summary>
     internal DateTime? UntilDate
     {
         get => _untilDate;
-        set => Set(ref _untilDate, value?.Date);
+        set => SetProperty(ref _untilDate, value?.Date);
     }
 
     /// <summary>The time of day on <see cref="UntilDate"/> that Automatic ends, such as <c>18:00</c>, or empty for the close of that day.</summary>
     internal string UntilTimeText
     {
         get => _untilTime;
-        set => Set(ref _untilTime, value ?? string.Empty);
+        set => SetProperty(ref _untilTime, value ?? string.Empty);
     }
 
     /// <summary>The limit at <see cref="LimitTarget"/> now, its end on this computer's clock with that clock's offset from UTC.</summary>
@@ -271,32 +250,28 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
     internal bool IsBeneath => Beneath.Length > 0;
 
     /// <summary>Why the settings cannot be read, or empty.</summary>
-    internal string Problem
-    {
-        get => _problem;
-        private set => Set(ref _problem, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasProblem))]
+    internal partial string Problem { get; private set; } = string.Empty;
 
-    internal bool HasProblem => _problem.Length > 0;
+    internal bool HasProblem => Problem.Length > 0;
 
     /// <summary>What became of the last change, or empty.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     /// <summary>Whether a change is waiting for its answer.</summary>
-    internal bool IsChanging
-    {
-        get => _isChanging;
-        private set => Set(ref _isChanging, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanChange))]
+    [NotifyCanExecuteChangedFor(nameof(ChooseCommand), nameof(ApplyPicksCommand), nameof(ApplySeeCommand), nameof(AddRowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RemoveRowCommand), nameof(ApplyLimitCommand), nameof(UseVaultCommand))]
+    internal partial bool IsChanging { get; private set; }
 
     /// <summary>Whether a choice can be made now: the settings were read and no change is waiting.</summary>
-    internal bool CanChange => !_isChanging && _state is not null;
+    internal bool CanChange => !IsChanging && _state is not null;
 
     /// <summary>The change last started, done once it has its answer.</summary>
     internal Task Changing { get; private set; } = Task.CompletedTask;
@@ -370,7 +345,7 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
 
     /// <summary>Adds a row for <see cref="NewRowScope"/>.</summary>
     internal Task AddRowAsync() =>
-        _newRowScope is { } name && ProjectScope.TryParseName(name, out var scope, out _) && _state is { } state
+        NewRowScope is { } name && ProjectScope.TryParseName(name, out var scope, out _) && _state is { } state
             ? ApplyAsync(project: name, mode: AgentModes.Name(ModeOf(state.Vault, scope)))
             : Task.CompletedTask;
 
@@ -457,7 +432,7 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
                 .Where(scope => vault.Projects.All(row => row.Scope != scope))
                 .Select(scope => scope.Name),
         ];
-        _newRowScope = Kept(_newRowScope, _newRowScopes);
+        NewRowScope = Kept(NewRowScope, _newRowScopes);
 
         List<string> targets = vault.Mode == AgentMode.Automatic ? [_byDefault] : [];
         targets.AddRange(vault.Projects.Where(row => row.Mode == AgentMode.Automatic).Select(row => row.Scope.Name));
@@ -474,7 +449,12 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
 
         foreach (var name in _read)
         {
-            Raise(name);
+            OnPropertyChanged(name);
+        }
+
+        foreach (var command in new IRelayCommand[] { ApplyPicksCommand, ChooseCommand, AddRowCommand, ApplyLimitCommand, UseVaultCommand, ApplySeeCommand, RemoveRowCommand })
+        {
+            command.NotifyCanExecuteChanged();
         }
     }
 
@@ -624,9 +604,12 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
     {
         _choosingOnly = only;
         ShowSeeScopes();
-        Raise(nameof(SeeScopes));
-        Raise(nameof(IsOnly));
-        Raise(nameof(SeeChoices));
+        OnPropertyChanged(nameof(SeeScopes));
+        OnPropertyChanged(nameof(IsOnly));
+        OnPropertyChanged(nameof(SeeChoices));
+        OnPropertyChanged(nameof(PicksCaption));
+        ApplyPicksCommand.NotifyCanExecuteChanged();
+        ChooseCommand.NotifyCanExecuteChanged();
         return Task.CompletedTask;
     }
 
@@ -644,7 +627,9 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
         }
 
         _seeChoices = [.. _seeChoices.Select(choice => choice with { IsChosen = _picked.Contains(choice.Word) })];
-        Raise(nameof(SeeChoices));
+        OnPropertyChanged(nameof(SeeChoices));
+        OnPropertyChanged(nameof(PicksCaption));
+        ApplyPicksCommand.NotifyCanExecuteChanged();
     }
 
     private void ShowSeeScopes() =>
@@ -675,7 +660,7 @@ internal sealed class AgentSettingsViewModel : ObservableObject, IDisposable
 
         PerHourText = limit.PerHour?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         LimitNow = _limitTarget is null ? string.Empty : $"Now: {AccessChangePrompt.Words(limit, Zone)}.";
-        Raise(nameof(LimitNow));
+        OnPropertyChanged(nameof(LimitNow));
 
         if (limit.Until is not { } until)
         {

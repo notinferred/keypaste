@@ -21,14 +21,12 @@ internal sealed class PairingViewModel : PromptViewModel
         _name = prompt.SuggestedName;
         Identity = prompt.IdentityText;
         AllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && !IsAnswered && NameProblem is null);
-
-        DependsOn(nameof(NameProblem), nameof(Name));
-        DependsOn(nameof(HasNameProblem), nameof(NameProblem));
-        DependsOn(AllowCommand, nameof(IsArmed), nameof(IsAnswered), nameof(Name));
     }
 
     /// <summary>Pairs the browser under <see cref="Name"/>.</summary>
     internal RelayCommand AllowCommand { get; }
+
+    protected override void OnAllowsChanged() => AllowCommand.NotifyCanExecuteChanged();
 
     /// <summary>The build the browser named: <c>KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)</c>.</summary>
     internal string Identity { get; }
@@ -37,7 +35,15 @@ internal sealed class PairingViewModel : PromptViewModel
     internal string Name
     {
         get => _name;
-        set => Set(ref _name, value ?? string.Empty);
+        set
+        {
+            if (SetProperty(ref _name, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(NameProblem));
+                OnPropertyChanged(nameof(HasNameProblem));
+                AllowCommand.NotifyCanExecuteChanged();
+            }
+        }
     }
 
     /// <summary>Why the name cannot be used, or null.</summary>

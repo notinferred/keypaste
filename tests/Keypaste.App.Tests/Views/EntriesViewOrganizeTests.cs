@@ -79,7 +79,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         Assert.NotNull(title);
         Assert.False(title!.IsEffectivelyVisible);
 
-        context.Entries.OrganizeCommand.Execute(null);
+        context.Entries.OrganizeCommand.Press();
         window.UpdateLayout();
 
         Assert.True(title.IsEffectivelyVisible);
@@ -110,7 +110,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         Assert.NotNull(button);
         Assert.False(context.Entries.IsOrganizing);
 
-        button!.Command!.Execute(button.CommandParameter);
+        button!.Command!.Press(button.CommandParameter);
 
         Assert.True(context.Entries.IsOrganizing);
     });
@@ -121,12 +121,12 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         using var context = New();
         var window = Shown(context);
 
-        context.Entries.BeginCreateGroupCommand.Execute(null);
+        context.Entries.BeginCreateGroupCommand.Press();
         window.UpdateLayout();
         Assert.True(Named<TextBox>(window, "NewGroupName")!.IsEffectivelyVisible);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(node => node.Path == "servers");
-        context.Entries.BeginRenameGroupCommand.Execute(null);
+        context.Entries.BeginRenameGroupCommand.Press();
         window.UpdateLayout();
 
         Assert.True(Named<TextBox>(window, "RenameGroupName")!.IsEffectivelyVisible);
@@ -134,7 +134,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         // An ordinary group holds no project home, so the line about new keys stays off.
         Assert.False(Named<TextBlock>(window, "ProjectRenameNote")!.IsEffectivelyVisible);
 
-        context.Entries.BeginMoveGroupCommand.Execute(null);
+        context.Entries.BeginMoveGroupCommand.Press();
         window.UpdateLayout();
 
         var target = Named<ComboBox>(window, "MoveGroupTarget")!;
@@ -142,7 +142,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         Assert.Same(context.Entries.Groups.Single(node => node.IsEverything), target.SelectedItem);
         Assert.False(Named<TextBox>(window, "RenameGroupName")!.IsEffectivelyVisible);
 
-        context.Entries.BeginDeleteGroupCommand.Execute(null);
+        context.Entries.BeginDeleteGroupCommand.Press();
         window.UpdateLayout();
 
         var prompt = Named<TextBlock>(window, "GroupDeletePrompt")!;
@@ -162,7 +162,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         window.UpdateLayout();
 
         var button = Named<Button>(window, "DuplicateEntry")!;
-        button.Command!.Execute(button.CommandParameter);
+        button.Command!.Press(button.CommandParameter);
 
         Assert.Null(context.Entries.Error);
         Assert.Equal(new EntryName("servers", "production (copy)"), context.Entries.Selected?.Name);

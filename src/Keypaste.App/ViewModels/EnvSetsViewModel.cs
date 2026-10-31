@@ -21,7 +21,7 @@ namespace Keypaste.App.ViewModels;
 /// showing eight projects has read one project's worth of anything.
 /// </para>
 /// </remarks>
-internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
+internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
@@ -29,13 +29,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     private readonly ProjectLaunching _launching;
     private readonly Action<string>? _toast;
 
-    private IReadOnlyList<string> _projectNames = [];
-    private IReadOnlyList<EnvTagProblemRow> _malformed = [];
     private EnvProjectViewModel? _open;
-    private string? _error;
-    private string? _notice;
-    private bool _isAdding;
-    private string _newProject = string.Empty;
 
     internal EnvSetsViewModel(
         AppVaultSession session,
@@ -53,7 +47,6 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         _launching = launching ?? ProjectLaunching.ForThisMachine(authority: null);
         _toast = toast;
 
-        OpenCommand = new RelayCommand<string>(Open);
         CopyRunCommandCommand = new RelayCommand<string>(
             project => _ = CopyRunCommandAsync(project ?? string.Empty));
         CloseCommand = new RelayCommand(() => Open(null));
@@ -61,44 +54,28 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
 
-        DependsOn(nameof(HasProjects), nameof(Projects));
-        DependsOn(nameof(HasMalformedTags), nameof(MalformedTags));
-        DependsOn(nameof(ProjectChoices), nameof(OpenProject), nameof(Projects));
-        DependsOn(nameof(SelectedProject), nameof(OpenProject));
-        DependsOn(nameof(HasOpenProject), nameof(OpenProject));
-        DependsOn(nameof(IsEmpty), nameof(HasProjects), nameof(HasOpenProject));
-        DependsOn(nameof(HasError), nameof(Error));
-        DependsOn(nameof(HasNotice), nameof(Notice));
-        DependsOn(BeginAddCommand, nameof(IsAdding));
-        DependsOn(CancelAddCommand, nameof(IsAdding));
-        DependsOn(ConfirmAddCommand, nameof(IsAdding));
-
         Reload();
     }
 
     /// <summary>Every project in the vault, by name.</summary>
-    internal IReadOnlyList<string> Projects
-    {
-        get => _projectNames;
-        private set => Set(ref _projectNames, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasProjects), nameof(ProjectChoices), nameof(IsEmpty))]
+    internal partial IReadOnlyList<string> Projects { get; private set; } = [];
 
-    internal bool HasProjects => _projectNames.Count > 0;
+    internal bool HasProjects => Projects.Count > 0;
 
     /// <summary>Every tag in the vault that starts like a project tag and puts its entry in no project, as <c>keypaste env ls</c> warns of them.</summary>
-    internal IReadOnlyList<EnvTagProblemRow> MalformedTags
-    {
-        get => _malformed;
-        private set => Set(ref _malformed, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMalformedTags))]
+    internal partial IReadOnlyList<EnvTagProblemRow> MalformedTags { get; private set; } = [];
 
-    internal bool HasMalformedTags => _malformed.Count > 0;
+    internal bool HasMalformedTags => MalformedTags.Count > 0;
 
     /// <summary>What the header's project picker offers: every project, and the open one while it has no variable yet.</summary>
     internal IReadOnlyList<string> ProjectChoices =>
-        _open is { } open && !_projectNames.Contains(open.Name, StringComparer.Ordinal)
-            ? [.. _projectNames, open.Name]
-            : _projectNames;
+        _open is { } open && !Projects.Contains(open.Name, StringComparer.Ordinal)
+            ? [.. Projects, open.Name]
+            : Projects;
 
     /// <summary>The open project's name; setting it opens that project.</summary>
     internal string? SelectedProject
@@ -121,8 +98,12 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         {
             var previous = _open;
 
-            if (Set(ref _open, value))
+            if (SetProperty(ref _open, value))
             {
+                OnPropertyChanged(nameof(ProjectChoices));
+                OnPropertyChanged(nameof(SelectedProject));
+                OnPropertyChanged(nameof(HasOpenProject));
+                OnPropertyChanged(nameof(IsEmpty));
                 // Disposed on the way out: it holds a reveal slot and a table read from an open
                 // vault, and leaving it alive would keep both after the card was closed.
                 previous?.Dispose();
@@ -136,41 +117,30 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     internal bool IsEmpty => !HasProjects && !HasOpenProject;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
-    internal string? Error
-    {
-        get => _error;
-        private set => Set(ref _error, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    internal partial string? Error { get; private set; }
 
-    internal bool HasError => _error is not null;
+    internal bool HasError => Error is not null;
 
     /// <summary>What the last action did, or null.</summary>
     /// <remarks>
     /// Separate from <see cref="Error"/> because a removal that worked is not a failure, and a
     /// person needs to be told where the variable went. The screen draws them the same way.
     /// </remarks>
-    internal string? Notice
-    {
-        get => _notice;
-        private set => Set(ref _notice, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotice))]
+    internal partial string? Notice { get; private set; }
 
-    internal bool HasNotice => _notice is not null;
+    internal bool HasNotice => Notice is not null;
 
-    internal bool IsAdding
-    {
-        get => _isAdding;
-        private set => Set(ref _isAdding, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(BeginAddCommand), nameof(CancelAddCommand), nameof(ConfirmAddCommand))]
+    internal partial bool IsAdding { get; private set; }
 
     /// <summary>The name of the project being created.</summary>
-    internal string NewProject
-    {
-        get => _newProject;
-        set => Set(ref _newProject, value);
-    }
-
-    internal RelayCommand<string> OpenCommand { get; }
+    [ObservableProperty]
+    internal partial string NewProject { get; set; } = string.Empty;
 
     /// <summary>Copies a card's run command, plainly and with no countdown.</summary>
     internal RelayCommand<string> CopyRunCommandCommand { get; }
@@ -276,6 +246,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         MalformedTags = [];
     }
 
+    [RelayCommand]
     private void Open(string? project)
     {
         Error = null;

@@ -71,7 +71,7 @@ public sealed class ExistingSecretTests : IDisposable
             var form = NewItemForm.Open(context.Entries, "api");
             form.GeneratePassword = false;
             Enter(form.Password, _typed);
-            context.Entries.ConfirmAddCommand.Execute(null);
+            context.Entries.ConfirmAddCommand.Press();
 
             Assert.Null(context.Entries.Error);
         }
@@ -89,7 +89,7 @@ public sealed class ExistingSecretTests : IDisposable
             var form = NewItemForm.Open(context.Entries, "api");
             form.GeneratePassword = false;
             await form.Password.Paste();
-            context.Entries.ConfirmAddCommand.Execute(null);
+            context.Entries.ConfirmAddCommand.Press();
 
             Assert.Null(context.Entries.Error);
             Assert.Empty(form.Password.Note);
@@ -113,7 +113,7 @@ public sealed class ExistingSecretTests : IDisposable
             form.GeneratePassword = false;
             Enter(form.Password, _typed);
             await form.Password.Paste();
-            context.Entries.ConfirmAddCommand.Execute(null);
+            context.Entries.ConfirmAddCommand.Press();
 
             Assert.Null(context.Entries.Error);
         }
@@ -163,7 +163,7 @@ public sealed class ExistingSecretTests : IDisposable
         {
             var form = NewItemForm.Open(context.Entries, "api");
             form.GeneratePassword = false;
-            context.Entries.ConfirmAddCommand.Execute(null);
+            context.Entries.ConfirmAddCommand.Press();
 
             Assert.Null(context.Entries.Error);
         }
@@ -178,9 +178,9 @@ public sealed class ExistingSecretTests : IDisposable
         {
             var detail = Github(context);
 
-            detail.EditCommand.Execute(null);
+            detail.EditCommand.Press();
             Enter(detail.NewPassword, _typed);
-            detail.SaveCommand.Execute(null);
+            detail.SaveCommand.Press();
 
             Assert.Null(context.Entries.Error);
         }
@@ -199,9 +199,9 @@ public sealed class ExistingSecretTests : IDisposable
         {
             var detail = Github(context);
 
-            detail.EditCommand.Execute(null);
+            detail.EditCommand.Press();
             detail.DraftUsername = "someone-else";
-            detail.SaveCommand.Execute(null);
+            detail.SaveCommand.Press();
 
             Assert.Null(context.Entries.Error);
         }
@@ -232,7 +232,7 @@ public sealed class ExistingSecretTests : IDisposable
         var form = NewItemForm.Open(context.Entries, "api");
         form.GeneratePassword = false;
         Enter(form.Password, _typed);
-        context.Entries.ConfirmAddCommand.Execute(null);
+        context.Entries.ConfirmAddCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.True(form.Password.IsZeroed);
@@ -246,7 +246,7 @@ public sealed class ExistingSecretTests : IDisposable
         var form = NewItemForm.Open(context.Entries);
         form.GeneratePassword = false;
         Enter(form.Password, _typed);
-        context.Entries.CancelAddCommand.Execute(null);
+        context.Entries.CancelAddCommand.Press();
 
         Assert.True(form.Password.IsZeroed);
     }
@@ -257,9 +257,9 @@ public sealed class ExistingSecretTests : IDisposable
         using var context = New();
         var detail = Github(context);
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         Enter(detail.NewPassword, _typed);
-        detail.CancelCommand.Execute(null);
+        detail.CancelCommand.Press();
 
         Assert.True(detail.NewPassword.IsZeroed);
     }
@@ -274,7 +274,7 @@ public sealed class ExistingSecretTests : IDisposable
         form.GeneratePassword = false;
         Enter(form.Password, _typed);
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         Enter(detail.NewPassword, _pasted);
 
         context.Session.Lock(VaultLockReason.Manual);
@@ -291,11 +291,11 @@ public sealed class ExistingSecretTests : IDisposable
         {
             var project = Billing(context);
 
-            project.BeginAddCommand.Execute(null);
+            project.BeginAddCommand.Press();
             project.NewKey = "DATABASE_URL";
             project.GenerateValue = false;
             Enter(project.NewValue, _typed);
-            project.ConfirmAddCommand.Execute(null);
+            project.ConfirmAddCommand.Press();
 
             Assert.Null(context.EnvSets.Error);
         }
@@ -311,11 +311,11 @@ public sealed class ExistingSecretTests : IDisposable
             context.Clipboard.Plant(_pasted);
             var project = Billing(context);
 
-            project.BeginAddCommand.Execute(null);
+            project.BeginAddCommand.Press();
             project.NewKey = "DATABASE_URL";
             project.GenerateValue = false;
             await project.NewValue.Paste();
-            project.ConfirmAddCommand.Execute(null);
+            project.ConfirmAddCommand.Press();
 
             Assert.Null(context.EnvSets.Error);
         }
@@ -332,7 +332,7 @@ public sealed class ExistingSecretTests : IDisposable
 
             project.BeginReplace(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
             Enter(project.ReplacementValue, _typed);
-            project.ConfirmReplaceCommand.Execute(null);
+            project.ConfirmReplaceCommand.Press();
 
             Assert.Null(context.EnvSets.Error);
             Assert.False(project.IsReplacing);
@@ -356,7 +356,7 @@ public sealed class ExistingSecretTests : IDisposable
 
         project.BeginReplace(row);
         Enter(project.ReplacementValue, _typed);
-        project.ConfirmReplaceCommand.Execute(null);
+        project.ConfirmReplaceCommand.Press();
 
         Assert.Equal(_typed.Length, row.MaskedLength);
     }
@@ -369,15 +369,15 @@ public sealed class ExistingSecretTests : IDisposable
 
         project.BeginReplace(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Enter(project.ReplacementValue, _typed);
-        project.ConfirmReplaceCommand.Execute(null);
+        project.ConfirmReplaceCommand.Press();
 
         Assert.Null(context.EnvSets.Error);
         Assert.True(project.ReplacementValue.IsZeroed);
 
-        project.BeginAddCommand.Execute(null);
+        project.BeginAddCommand.Press();
         project.GenerateValue = false;
         Enter(project.NewValue, _typed);
-        project.CancelAddCommand.Execute(null);
+        project.CancelAddCommand.Press();
 
         Assert.True(project.NewValue.IsZeroed);
 
@@ -403,11 +403,11 @@ public sealed class ExistingSecretTests : IDisposable
         var row = project.Variables.Single(variable => variable.Key == "STRIPE_KEY");
 
         project.BeginRemove(row);
-        project.ConfirmRemoveCommand.Execute(null);
+        project.ConfirmRemoveCommand.Press();
 
         project.BeginReplace(row);
         Enter(project.ReplacementValue, _typed);
-        project.ConfirmReplaceCommand.Execute(null);
+        project.ConfirmReplaceCommand.Press();
 
         Assert.Equal("STRIPE_KEY is no longer on env/billing/.env, so nothing was written.", context.EnvSets.Error);
         Assert.False(project.IsReplacing);
@@ -431,7 +431,7 @@ public sealed class ExistingSecretTests : IDisposable
 
     private static EnvProjectViewModel Billing(Context context)
     {
-        context.EnvSets.OpenCommand.Execute("billing");
+        context.EnvSets.OpenCommand.Press("billing");
         return context.EnvSets.OpenProject!;
     }
 

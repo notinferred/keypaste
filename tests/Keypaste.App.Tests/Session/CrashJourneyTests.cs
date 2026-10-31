@@ -70,7 +70,7 @@ public sealed class CrashJourneyTests
             Assert.IsType<FirstRunView>(root.Content);
             Assert.False(File.Exists(KeypasteHome.SettingsPath(fixture.Home)));
 
-            first.DontSendCommand.Execute(null);
+            first.DontSendCommand.Press();
 
             Assert.IsType<UnlockView>(root.Content);
             Assert.Equal("unlock", crashes.Screen);
@@ -154,7 +154,7 @@ public sealed class CrashJourneyTests
                 unlock.Type(c);
             }
 
-            await unlock.UnlockCommand.ExecuteAsync();
+            await unlock.UnlockCommand.PressAsync();
             await Until(() => root.Content is ShellView);
 
             var shell = Assert.IsType<ShellViewModel>(Assert.IsType<ShellView>(root.Content).DataContext);

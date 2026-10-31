@@ -110,7 +110,7 @@ public sealed class ScreenRenderer
                 }
 
                 Save(window, output, "71-yubikey-touch");
-                unlock.CancelTouchCommand.Execute(null);
+                unlock.CancelTouchCommand.Press();
                 Wait(unlocking);
                 window.Close();
             }
@@ -146,7 +146,7 @@ public sealed class ScreenRenderer
             }
 
             Save(shellWindow, output, "72-yubikey-save-touch");
-            shell.CancelTouchCommand.Execute(null);
+            shell.CancelTouchCommand.Press();
             Assert.ThrowsAny<VaultException>(() => Wait(saving));
             shellWindow.Close();
             device.NeverTouched = false;
@@ -159,7 +159,7 @@ public sealed class ScreenRenderer
 
             settings.Access.AttachHardwareKey = true;
             settings.Access.NewSlotOne = true;
-            settings.Access.ReviewCommand.Execute(null);
+            settings.Access.ReviewCommand.Press();
             var settingsWindow = Show(new SettingsView { DataContext = settings });
             settingsWindow.Height = 1900;
             Save(settingsWindow, output, "73-yubikey-settings");
@@ -241,7 +241,7 @@ public sealed class ScreenRenderer
         window.Width = _width;
         window.Height = 1500;
 
-        agents.EndCommand.Execute(agents.Grants[0]);
+        agents.EndCommand.Press(agents.Grants[0]);
         var claudeRow = agents.Rows.Single(row => row.Key == "claude-code");
         claudeRow.IsOpen = true;
         Save(window, output!, "27-agents-settings-open");
@@ -250,7 +250,7 @@ public sealed class ScreenRenderer
         window.Width = _width;
 
         claudeRow.IsOpen = false;
-        agents.ConnectCommand.Execute(agents.Rows.Single(row => row.Key == "cursor"));
+        agents.ConnectCommand.Press(agents.Rows.Single(row => row.Key == "cursor"));
         await agents.Opening;
         Save(window, output!, "24-agents-connect");
 
@@ -269,17 +269,17 @@ public sealed class ScreenRenderer
         Assert.True(tokens.Create("local-evals", "read:acme-api/dev/OPENAI_API_KEY", TimeSpan.FromDays(7), false).Ok);
         Save(window, output!, "22-settings-tokens");
 
-        tokens.OpenFormCommand.Execute(null);
+        tokens.OpenFormCommand.Press();
         tokens.Name = "deploy-preview";
         tokens.Scope = "read:acme-web/preview/*";
         tokens.Expiry = "7d";
         Save(window, output!, "22b-settings-tokens-new");
 
-        tokens.CreateCommand.Execute(null);
+        tokens.CreateCommand.Press();
         Save(window, output!, "23-settings-tokens-minted");
 
-        tokens.DoneMintedCommand.Execute(null);
-        tokens.AskRevokeCommand.Execute(tokens.Rows[0]);
+        tokens.DoneMintedCommand.Press();
+        tokens.AskRevokeCommand.Press(tokens.Rows[0]);
         Save(window, output!, "26-settings-tokens-revoke");
 
         window.Close();
@@ -389,17 +389,17 @@ public sealed class ScreenRenderer
         window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = false;
 
         entries.SelectedGroup = entries.Groups[0];
-        entries.BeginAddCommand.Execute(null);
+        entries.BeginAddCommand.Press();
         Save(window, output, "13-secrets-new");
-        entries.CancelAddCommand.Execute(null);
+        entries.CancelAddCommand.Press();
 
         entries.Selected = entries.Rows.First(row => row.Title == "github");
         WindowInput.Drain();
-        entries.Detail!.History.ToggleCommand.Execute(null);
+        entries.Detail!.History.ToggleCommand.Press();
         WindowInput.Drain();
         entries.Detail.History.Selected = entries.Detail.History.Rows[0];
         Save(window, output, "14-secrets-history");
-        entries.Detail.History.ToggleCommand.Execute(null);
+        entries.Detail.History.ToggleCommand.Press();
 
         window.Width = 1000;
         window.Height = 680;
@@ -413,21 +413,21 @@ public sealed class ScreenRenderer
 
         window.Width = _width;
         window.Height = _height;
-        entries.Detail!.RotateCommand.Execute(null);
+        entries.Detail!.RotateCommand.Press();
         Save(window, output, "17-secrets-rotate");
-        entries.Detail.CancelRotateCommand.Execute(null);
+        entries.Detail.CancelRotateCommand.Press();
 
-        entries.DeleteCommand.Execute(null);
+        entries.DeleteCommand.Press();
         Save(window, output, "18-secrets-delete");
-        entries.CancelDeleteCommand.Execute(null);
+        entries.CancelDeleteCommand.Press();
 
-        entries.OrganizeCommand.Execute(null);
+        entries.OrganizeCommand.Press();
         Save(window, output, "19-secrets-organize");
-        entries.CancelOrganizeCommand.Execute(null);
+        entries.CancelOrganizeCommand.Press();
 
-        entries.Detail.EditCommand.Execute(null);
+        entries.Detail.EditCommand.Press();
         Save(window, output, "20-secrets-edit");
-        entries.Detail.CancelCommand.Execute(null);
+        entries.Detail.CancelCommand.Press();
 
         // A filter that matches nothing.
         entries.Search = "no-such-secret";
@@ -534,7 +534,7 @@ public sealed class ScreenRenderer
             using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: picker);
             var window = Show(new ShellView { DataContext = shell });
 
-            Wait(shell.ImportCommand.ExecuteAsync());
+            Wait(shell.ImportCommand.PressAsync());
             var import = shell.Import!;
 
             foreach (var c in "keepass")
@@ -565,7 +565,7 @@ public sealed class ScreenRenderer
             Save(window, output, "96-import-in-place");
 
             import.KeepEditingInPlace = false;
-            import.ConfirmCommand.Execute(null);
+            import.ConfirmCommand.Press();
             Assert.Null(shell.Import);
             Save(window, output, "97-import-done");
 
@@ -574,7 +574,7 @@ public sealed class ScreenRenderer
             shell.OpenImport(damaged);
             Assert.True(shell.Import!.IsUnreadable);
             Save(window, output, "99-import-unreadable");
-            shell.Import!.CancelCommand.Execute(null);
+            shell.Import!.CancelCommand.Press();
 
             var export = Path.Combine(demo.Home, "bitwarden_export.json");
             File.WriteAllText(export, """
@@ -606,10 +606,10 @@ public sealed class ScreenRenderer
             Assert.True(exported.HasHeld);
             Save(window, output, "9a-export-preview");
 
-            exported.ConfirmCommand.Execute(null);
+            exported.ConfirmCommand.Press();
             Assert.True(exported.IsImported, exported.Message);
             Save(window, output, "9b-export-imported");
-            exported.CancelCommand.Execute(null);
+            exported.CancelCommand.Press();
             window.Close();
         }
 
@@ -637,7 +637,7 @@ public sealed class ScreenRenderer
             Save(window, output, "83-lock-recent");
 
             Assert.True(unlock.OffersRestore);
-            unlock.StartRestoreCommand.Execute(null);
+            unlock.StartRestoreCommand.Press();
             Save(window, output, "84-lock-restore");
 
             var restore = unlock.Restore!;
@@ -810,7 +810,7 @@ public sealed class ScreenRenderer
         trash.Selected = trash.Rows[0];
         Save(window, output, "93-trash-rows");
 
-        trash.PurgeCommand.Execute(null);
+        trash.PurgeCommand.Press();
         Save(window, output, "94-trash-confirm");
 
         window.Close();
@@ -833,7 +833,7 @@ public sealed class ScreenRenderer
         var firstRun = new FirstRunViewModel(Terms.TermsOfUse.Carried, _ => true, () => { });
         window.FindControl<ContentControl>("Root")!.Content = new FirstRunView { DataContext = firstRun };
         Save(window, output, "00a-first-run-terms");
-        firstRun.ContinueCommand.Execute(null);
+        firstRun.ContinueCommand.Press();
         Save(window, output, "00b-first-run-choice");
         window.Close();
     }
@@ -871,7 +871,7 @@ public sealed class ScreenRenderer
 
             if (shell.Content is EnvSetsViewModel env)
             {
-                env.OpenCommand.Execute("acme-api");
+                env.OpenCommand.Press("acme-api");
             }
 
             Save(window, output, ScreenName(destination));
@@ -903,9 +903,9 @@ public sealed class ScreenRenderer
         Save(window, output, "04-settings-activity-log-you");
 
         log.Filter = log.Filters[0];
-        log.VerifyCommand.Execute(null);
+        log.VerifyCommand.Press();
         Save(window, output, "04-settings-activity-log-verify");
-        log.VerifyCommand.Execute(null);
+        log.VerifyCommand.Press();
 
         window.Width = 960;
         Save(window, output, "04-settings-activity-log-narrow");
@@ -919,7 +919,7 @@ public sealed class ScreenRenderer
         log.Refresh();
         Save(window, output, "04-settings-activity-log-broken");
 
-        log.VerifyCommand.Execute(null);
+        log.VerifyCommand.Press();
         Save(window, output, "04-settings-activity-log-broken-verify");
 
         var fresh = Directory.CreateTempSubdirectory("keypaste-screens-empty-").FullName;
@@ -989,18 +989,18 @@ public sealed class ScreenRenderer
         Hold(window, "DATABASE_URL", () => Save(window, output, "45-env-narrow-held"));
         window.Width = _width;
 
-        project.BeginAddCommand.Execute(null);
+        project.BeginAddCommand.Press();
         Save(window, output, "41-env-add");
-        project.CancelAddCommand.Execute(null);
+        project.CancelAddCommand.Press();
 
-        project.Environments[0].AddEntry.Execute(null);
+        project.Environments[0].AddEntry.Press();
         project.ChosenEntry = project.EntryCandidates[0];
         Save(window, output, "46-env-add-entry");
-        project.CancelAddEntryCommand.Execute(null);
+        project.CancelAddEntryCommand.Press();
 
-        project.Environments.Single(environment => environment.Name == "staging").Members[^1].Remove.Execute(null);
+        project.Environments.Single(environment => environment.Name == "staging").Members[^1].Remove.Press();
         Save(window, output, "47-env-remove-entry");
-        project.CancelTagChangeCommand.Execute(null);
+        project.CancelTagChangeCommand.Press();
 
         // A tag KeePassXC or a phone app wrote with a capital, left unsaved.
         session.Unlocked!.AddTag(project.Environments[0].Members[0].Entry, "env:acme-api:Prod");
@@ -1074,11 +1074,11 @@ public sealed class ScreenRenderer
 
         Save(window, output, name + "-unchecked");
 
-        Wait(sharing.RefreshCommand.ExecuteAsync());
+        Wait(sharing.RefreshCommand.PressAsync());
         Save(window, output, name);
 
         shell.Current = Destinations.Of(DestinationKind.Entries);
-        shell.ShareCommand.Execute("Work/aws-console");
+        shell.ShareCommand.Press("Work/aws-console");
         var dialog = shell.Share!;
         dialog.Recipient = "sam@acme.dev";
         dialog.RequirePassphrase = true;
@@ -1086,10 +1086,10 @@ public sealed class ScreenRenderer
 
         shares.Answer = _ => FakeShareServer.Json(System.Net.HttpStatusCode.NotFound, "{\"error\":\"not found\"}");
         dialog.RequirePassphrase = false;
-        Wait(dialog.CreateCommand.ExecuteAsync());
+        Wait(dialog.CreateCommand.PressAsync());
         Save(window, output, "12-items-share-unavailable");
         shares.Answer = null;
-        dialog.CancelCommand.Execute(null);
+        dialog.CancelCommand.Press();
     }
 
     /// <summary>A place is named by its digit; a screen under one by its place's digit and both names.</summary>

@@ -144,13 +144,13 @@ public sealed class ImportDialogKeyboardTests
 
         var button = window.GetVisualDescendants().OfType<ToggleButton>().Single(button => button.Name == "AddEntry");
         button.Focus();
-        Drain(shell.ImportCommand.ExecuteAsync());
+        Drain(shell.ImportCommand.PressAsync());
         Assert.NotNull(shell.Import);
         Assert.False(button.IsFocused);
 
         if (how == "cancel")
         {
-            shell.Import!.CancelCommand.Execute(null);
+            shell.Import!.CancelCommand.Press();
         }
         else
         {

@@ -127,7 +127,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal($"From {ApprovalPrompt.Shown(ProjectVariables.Home("dev"))}", launch.ConfirmSources);
         AssertNothingStarted();
 
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -168,7 +168,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -195,7 +195,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.True(launch.IsConfirming);
         Assert.Equal(_project, launch.ConfirmDirectory);
 
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         var started = Assert.IsType<ChildResult>(launch.LastStart);
@@ -213,7 +213,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var launch = Mapped(screen, out _);
 
         var running = launch.LaunchAsync(run: true);
-        launch.CancelLaunchCommand.Execute(null);
+        launch.CancelLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertNothingStarted();
@@ -256,7 +256,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
             // Confirmed, and the answer queued behind the lock: the set is read again only once the
             // queue runs, by which time the unlock that asked has ended.
-            launch.ConfirmLaunchCommand.Execute(null);
+            launch.ConfirmLaunchCommand.Press();
             _session.Lock(VaultLockReason.Manual);
             queue.RunUntil(running);
 
@@ -283,8 +283,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Execute(null);
-        screen.CloseCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
+        screen.CloseCommand.Press();
         await running.WaitAsync(Cancel);
 
         Assert.Null(screen.OpenProject);
@@ -314,7 +314,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         };
 
         var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         var (exit, output) = Assert.Single(_terminal.Windows).Ended();
@@ -339,7 +339,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         _terminal!.Refusal = "LSOpenURLsWithRole() failed with error -10810";
 
         var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         Assert.Equal("Nothing was started: Terminal did not open: LSOpenURLsWithRole() failed with error -10810.", screen.Error);
@@ -375,7 +375,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -431,7 +431,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
             var running = launch.LaunchAsync(run: true);
             Assert.True(launch.IsConfirming, screen.Error);
-            launch.ConfirmLaunchCommand.Execute(null);
+            launch.ConfirmLaunchCommand.Press();
             await running.WaitAsync(Cancel);
 
             AssertStarted(screen, launch);
@@ -467,7 +467,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.True(launch.IsConfirming);
         Assert.Equal(command, launch.ConfirmStarts);
 
-        launch.CancelLaunchCommand.Execute(null);
+        launch.CancelLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertNothingStarted();
@@ -483,7 +483,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var screen = Screen();
         var launch = Mapped(screen, out var pipeName);
         launch.Command = Longest(launch.Command);
-        launch.SaveCommand.Execute(null);
+        launch.SaveCommand.Press();
         Assert.Equal(ProjectMappings.MaximumCommandLength, launch.Mapping?.Command.Length);
 
         using var pipe = Listen(pipeName);
@@ -491,7 +491,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -526,7 +526,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         screen.OpenProject!.SelectedProfile = "staging";
         Assert.Equal("staging", launch.Profile);
 
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -560,7 +560,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -589,7 +589,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var launch = Mapped(screen, out var pipeName);
         launch.Directory = directory;
         launch.Command = "touch ran && " + launch.Command;
-        launch.SaveCommand.Execute(null);
+        launch.SaveCommand.Press();
         Assert.Equal(directory, launch.Mapping?.Directory);
 
         using var pipe = Listen(pipeName);
@@ -597,7 +597,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -619,14 +619,14 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var screen = Screen();
         var launch = Mapped(screen, out var pipeName);
         launch.Command += " KEY_29_" + new string('W', 69);
-        launch.SaveCommand.Execute(null);
+        launch.SaveCommand.Press();
 
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -728,14 +728,14 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var screen = Screen();
         var launch = Mapped(screen, out var pipeName);
         launch.Command += " CERTIFICATE";
-        launch.SaveCommand.Execute(null);
+        launch.SaveCommand.Press();
 
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -761,7 +761,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         Assert.Equal("Nothing was started: dev's variables are too large for keypaste to hand to Terminal.", screen.Error);
@@ -803,10 +803,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         _picker.DotEnvPath = file;
 
         using var screen = Screen();
-        screen.OpenCommand.Execute("dev");
+        screen.OpenCommand.Press("dev");
         var import = screen.OpenProject!.Import;
 
-        await import.ChooseCommand.ExecuteAsync();
+        await import.ChooseCommand.PressAsync();
 
         Assert.True(import.IsPreviewing);
         Assert.Equal(
@@ -814,7 +814,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             import.Rows);
         Assert.DoesNotContain(import.Rows, row => row.Contains(_imported, StringComparison.Ordinal) || row.Contains(_apiKey, StringComparison.Ordinal));
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.False(import.IsPreviewing);
         Assert.Null(screen.Error);
@@ -837,12 +837,12 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         _picker.DotEnvPath = file;
 
         using var screen = Screen();
-        screen.OpenCommand.Execute("dev");
+        screen.OpenCommand.Press("dev");
         var import = screen.OpenProject!.Import;
 
-        await import.ChooseCommand.ExecuteAsync();
+        await import.ChooseCommand.PressAsync();
         Assert.True(import.IsPreviewing);
-        import.CancelCommand.Execute(null);
+        import.CancelCommand.Press();
 
         Assert.False(import.IsPreviewing);
         using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
@@ -857,8 +857,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         _picker.DotEnvPath = file;
 
         using var screen = Screen();
-        screen.OpenCommand.Execute("dev");
-        await screen.OpenProject!.Import.ChooseCommand.ExecuteAsync();
+        screen.OpenCommand.Press("dev");
+        await screen.OpenProject!.Import.ChooseCommand.PressAsync();
 
         Assert.False(screen.OpenProject.Import.IsPreviewing);
         Assert.Contains("nothing was imported", screen.Error, StringComparison.Ordinal);
@@ -885,7 +885,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal(TerminalOpen.ShownName, launch.ConfirmStarts);
         Assert.Equal(_project, launch.ConfirmDirectory);
 
-        launch.ConfirmLaunchCommand.Execute(null);
+        launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
@@ -1239,11 +1239,11 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
     private ProjectLaunchViewModel MappedTo(EnvSetsViewModel screen, string command, string project = "dev")
     {
-        screen.OpenCommand.Execute(project);
+        screen.OpenCommand.Press(project);
         var launch = screen.OpenProject!.Launch;
         launch.Directory = _project;
         launch.Command = command;
-        launch.SaveCommand.Execute(null);
+        launch.SaveCommand.Press();
 
         Assert.True(launch.IsMapped, screen.Error);
         return launch;

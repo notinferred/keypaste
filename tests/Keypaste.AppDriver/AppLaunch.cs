@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Headless;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Input;
 using Keypaste.App;
 using Keypaste.App.Clipboard;
 using Keypaste.App.ViewModels;
@@ -13,7 +14,6 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Linking;
 using Keypaste.Core.Ownership;
-using Keypaste.Mvvm;
 
 namespace Keypaste.AppDriver;
 
@@ -269,7 +269,7 @@ internal static class AppLaunch
             throw new DriverException("the Unlock button is disabled");
         }
 
-        await unlock.UnlockCommand.ExecuteAsync().ConfigureAwait(true);
+        await unlock.UnlockCommand.ExecuteAsync(null).ConfigureAwait(true);
         await UntilAsync(() => root.Content is ShellView, "the shell never came up after Unlock").ConfigureAwait(true);
     }
 
@@ -286,12 +286,12 @@ internal static class AppLaunch
             throw new DriverException($"{title}'s Copy password is disabled");
         }
 
-        await detail.CopyPasswordCommand.ExecuteAsync().ConfigureAwait(true);
+        await detail.CopyPasswordCommand.ExecuteAsync(null).ConfigureAwait(true);
     }
 
     private static async Task LockAsync(ContentControl root)
     {
-        await Shell(root).LockCommand.ExecuteAsync().ConfigureAwait(true);
+        await Shell(root).LockCommand.ExecuteAsync(null).ConfigureAwait(true);
         await UntilAsync(() => root.Content is UnlockView, "the unlock screen never came back after Lock").ConfigureAwait(true);
     }
 

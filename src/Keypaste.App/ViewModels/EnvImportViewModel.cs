@@ -20,7 +20,7 @@ namespace Keypaste.App.ViewModels;
 /// preview read (<see cref="SourceSnapshot"/>), so a file changed since is kept.
 /// </para>
 /// </remarks>
-internal sealed class EnvImportViewModel : ObservableObject, IDisposable
+internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
 {
     private const int _problemsShown = 10;
 
@@ -37,15 +37,9 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
     private string _planned = EnvProfileNames.Default;
 
-    private DotEnvDocument? _document;
     private IReadOnlyList<EnvKeyWrite> _previewed = [];
-    private IReadOnlyList<string> _rows = [];
-    private string _source = string.Empty;
-    private string _notes = string.Empty;
     private SourceSnapshot? _read;
     private SourceSnapshot? _leftover;
-    private string _leftoverPath = string.Empty;
-    private string _deleteWarning = string.Empty;
 
     internal EnvImportViewModel(
         AppVaultSession session,
@@ -69,18 +63,8 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         _imported = imported;
 
         ChooseCommand = new AsyncRelayCommand(ChooseAsync, () => _picker is not null);
-        ConfirmCommand = new RelayCommand(Confirm, () => IsPreviewing);
         CancelCommand = new RelayCommand(Clear, () => IsPreviewing);
-        DeleteSourceCommand = new RelayCommand(DeleteSource, () => IsOfferingDelete);
         KeepSourceCommand = new RelayCommand(EndOffer, () => IsOfferingDelete);
-
-        DependsOn(nameof(IsPreviewing), nameof(Document));
-        DependsOn(nameof(HasNotes), nameof(Notes));
-        DependsOn(nameof(IsOfferingDelete), nameof(Leftover));
-        DependsOn(ConfirmCommand, nameof(IsPreviewing));
-        DependsOn(CancelCommand, nameof(IsPreviewing));
-        DependsOn(DeleteSourceCommand, nameof(IsOfferingDelete));
-        DependsOn(KeepSourceCommand, nameof(IsOfferingDelete));
     }
 
     /// <summary>The profile a file is previewed for; the preview's own profile is what Import writes to.</summary>
@@ -89,60 +73,42 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
     /// <summary>Whether a file is read and waiting on Import.</summary>
     internal bool IsPreviewing => Document is not null;
 
-    private DotEnvDocument? Document
-    {
-        get => _document;
-        set => Set(ref _document, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPreviewing))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand))]
+    private partial DotEnvDocument? Document { get; set; }
 
     /// <summary>The file being previewed.</summary>
-    internal string Source
-    {
-        get => _source;
-        private set => Set(ref _source, value);
-    }
+    [ObservableProperty]
+    internal partial string Source { get; private set; } = string.Empty;
 
     /// <summary>One line per variable: its name and what importing does to it. Never a value.</summary>
-    internal IReadOnlyList<string> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<string> Rows { get; private set; } = [];
 
     /// <summary>What the reader interpreted, naming keys.</summary>
-    internal string Notes
-    {
-        get => _notes;
-        private set => Set(ref _notes, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotes))]
+    internal partial string Notes { get; private set; } = string.Empty;
 
-    internal bool HasNotes => _notes.Length > 0;
+    internal bool HasNotes => Notes.Length > 0;
 
     /// <summary>The imported file the screen offers to delete, or empty when it offers none.</summary>
-    internal string Leftover
-    {
-        get => _leftoverPath;
-        private set => Set(ref _leftoverPath, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOfferingDelete))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteSourceCommand), nameof(KeepSourceCommand))]
+    internal partial string Leftover { get; private set; } = string.Empty;
 
     /// <summary>Whether the screen offers to delete the file it imported.</summary>
-    internal bool IsOfferingDelete => _leftoverPath.Length > 0;
+    internal bool IsOfferingDelete => Leftover.Length > 0;
 
     /// <summary>What deleting the file cannot erase: the disk blocks it used and, inside a git repository, its history.</summary>
-    internal string DeleteWarning
-    {
-        get => _deleteWarning;
-        private set => Set(ref _deleteWarning, value);
-    }
+    [ObservableProperty]
+    internal partial string DeleteWarning { get; private set; } = string.Empty;
 
     internal AsyncRelayCommand ChooseCommand { get; }
 
-    internal RelayCommand ConfirmCommand { get; }
-
     internal RelayCommand CancelCommand { get; }
-
-    /// <summary>Deletes the imported file, only while it still holds what the preview read.</summary>
-    internal RelayCommand DeleteSourceCommand { get; }
 
     /// <summary>Leaves the imported file where it is.</summary>
     internal RelayCommand KeepSourceCommand { get; }
@@ -229,9 +195,10 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         Document = document;
     }
 
+    [RelayCommand(CanExecute = nameof(IsPreviewing))]
     private void Confirm()
     {
-        if (_document is not { } document || _read is not { } read)
+        if (Document is not { } document || _read is not { } read)
         {
             return;
         }
@@ -324,6 +291,8 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
             : string.Empty;
     }
 
+    /// <summary>Deletes the imported file, only while it still holds what the preview read.</summary>
+    [RelayCommand(CanExecute = nameof(IsOfferingDelete))]
     private void DeleteSource()
     {
         if (_leftover is not { } read)

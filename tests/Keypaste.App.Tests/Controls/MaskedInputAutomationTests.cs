@@ -571,7 +571,7 @@ public sealed class MaskedInputAutomationTests
             Model.SelectedPath = null;
             Assert.True(Model.Offer(_fixture.Path_));
 
-            Model.StartRestoreCommand.Execute(null);
+            Model.StartRestoreCommand.Press();
             Assert.NotNull(Model.Restore);
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         }

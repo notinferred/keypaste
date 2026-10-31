@@ -11,8 +11,4 @@ public sealed class PublisherMetadataTests
     [Fact]
     public void It_is_published_as_the_project() =>
         PublisherMetadata.IsThisProject(typeof(Keypaste.App.App).Assembly);
-
-    [Fact]
-    public void Its_bindings_are_published_as_the_project() =>
-        PublisherMetadata.IsThisProject(typeof(Keypaste.Mvvm.ObservableObject).Assembly);
 }

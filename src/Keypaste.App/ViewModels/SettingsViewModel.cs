@@ -23,7 +23,7 @@ internal sealed record IdleChoice(int Seconds, string Label);
 /// to leave the screen with a setting that looks changed but is not. Shortening the idle timeout
 /// re-arms the session on the spot rather than at the next lock.
 /// </remarks>
-internal sealed class SettingsViewModel : ObservableObject, IDisposable
+internal sealed partial class SettingsViewModel : ObservableObject, IDisposable
 {
     private const string _translocatedNote =
         "macOS is running this copy from a temporary location. Move keypaste to Applications and open it again to link it.";
@@ -40,11 +40,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     private bool _lockWhenMinimized;
     private bool _stayInTray;
     private bool? _openAtLogin;
-    private string _message = string.Empty;
     private bool _exporting;
     private CliLinkStatus? _cliStatus;
-    private bool _cliLinking;
-    private bool _confirmingCliReplace;
 
     internal SettingsViewModel(
         AppVaultSession session,
@@ -76,7 +73,6 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         IdleChoices = ChoicesFor(_settings.IdleTimeoutSeconds);
         _idle = IdleChoices.Single(choice => choice.Seconds == _settings.IdleTimeoutSeconds);
 
-        ForgetAllCommand = new RelayCommand(ForgetAll);
         UseThisVaultCommand = new RelayCommand(UseThisVault, () => !IsThisVaultChosen && _session.VaultPath is not null);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
         Access = new VaultAccessViewModel(session, home, picker, paste);
@@ -90,20 +86,6 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         CancelReplaceCliCommand = new RelayCommand(
             () => IsConfirmingCliReplace = false,
             () => IsConfirmingCliReplace && !IsCliLinking);
-
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(ChosenVaultText), nameof(IsThisVaultChosen));
-        DependsOn(UseThisVaultCommand, nameof(IsThisVaultChosen));
-        DependsOn(nameof(CliLinkText), nameof(CliStatus));
-        DependsOn(nameof(CliLinkNote), nameof(CliStatus));
-        DependsOn(nameof(HasCliLinkNote), nameof(CliLinkNote));
-        DependsOn(nameof(CliReplacePrompt), nameof(CliStatus));
-        DependsOn(nameof(OffersCliLink), nameof(CliStatus));
-        DependsOn(nameof(OffersCliReplace), nameof(CliStatus));
-        DependsOn(LinkCliCommand, nameof(OffersCliLink), nameof(IsCliLinking));
-        DependsOn(BeginReplaceCliCommand, nameof(OffersCliReplace), nameof(IsConfirmingCliReplace), nameof(IsCliLinking));
-        DependsOn(ConfirmReplaceCliCommand, nameof(IsConfirmingCliReplace), nameof(IsCliLinking));
-        DependsOn(CancelReplaceCliCommand, nameof(IsConfirmingCliReplace), nameof(IsCliLinking));
     }
 
     /// <summary>Settings › Advanced, the screen that leads to the activity log, share links, scoped tokens and diagnostics.</summary>
@@ -159,7 +141,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _idle;
         set
         {
-            if (value is not null && Set(ref _idle, value))
+            if (value is not null && SetProperty(ref _idle, value))
             {
                 _session.IdleTimeout = TimeSpan.FromSeconds(value.Seconds);
                 Persist(_settings with { IdleTimeoutSeconds = value.Seconds });
@@ -173,7 +155,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _theme;
         set
         {
-            if (Set(ref _theme, value))
+            if (SetProperty(ref _theme, value))
             {
                 _applyTheme(value);
                 Persist(_settings with { Theme = value });
@@ -208,7 +190,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _lockWhenMinimized;
         set
         {
-            if (Set(ref _lockWhenMinimized, value))
+            if (SetProperty(ref _lockWhenMinimized, value))
             {
                 Persist(_settings with { LockWhenMinimized = value });
             }
@@ -228,7 +210,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _stayInTray;
         set
         {
-            if (Set(ref _stayInTray, value))
+            if (SetProperty(ref _stayInTray, value))
             {
                 Persist(_settings with { StayInTray = value });
             }
@@ -260,7 +242,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
             // The next preference this screen writes starts from the choice, not from what it read when it opened.
             _settings = _preferences.Current;
-            Raise();
+            OnPropertyChanged();
             Message = saved ? string.Empty : "That preference could not be saved, so it will not survive a restart.";
         }
     }
@@ -283,7 +265,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
             var done = value ? Login.Enable() : Login.Disable();
             _openAtLogin = Login.IsEnabled;
-            Raise();
+            OnPropertyChanged();
 
             if (!done)
             {
@@ -293,9 +275,6 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
             }
         }
     }
-
-    /// <summary>Empties the recent-vaults list.</summary>
-    internal RelayCommand ForgetAllCommand { get; }
 
     /// <summary>Makes the unlocked vault the one agents and the CLI use without <c>--vault</c> (D-0389).</summary>
     internal RelayCommand UseThisVaultCommand { get; }
@@ -381,18 +360,15 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     internal bool OffersCliReplace => CliStatus is { State: CliLinkState.Foreign, BackupExists: false, Translocated: false };
 
     /// <summary>Whether a link or a replacement is under way, which on macOS lasts until the person answers the system's dialog.</summary>
-    internal bool IsCliLinking
-    {
-        get => _cliLinking;
-        private set => Set(ref _cliLinking, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LinkCliCommand), nameof(BeginReplaceCliCommand), nameof(ConfirmReplaceCliCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelReplaceCliCommand))]
+    internal partial bool IsCliLinking { get; private set; }
 
     /// <summary>Whether the confirmation that names what Replace moves is showing.</summary>
-    internal bool IsConfirmingCliReplace
-    {
-        get => _confirmingCliReplace;
-        private set => Set(ref _confirmingCliReplace, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(BeginReplaceCliCommand), nameof(ConfirmReplaceCliCommand), nameof(CancelReplaceCliCommand))]
+    internal partial bool IsConfirmingCliReplace { get; private set; }
 
     /// <summary>What Replace moves and where it keeps it.</summary>
     internal string CliReplacePrompt => CliStatus is { } status
@@ -447,13 +423,11 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 #pragma warning restore CA1822
 
     /// <summary>Confirmation of the last thing that happened, or nothing.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     /// <summary>Asks where, then has the core write the copy.</summary>
     /// <remarks>
@@ -476,7 +450,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         }
 
         _exporting = true;
-        ExportCommand.RaiseCanExecuteChanged();
+        ExportCommand.NotifyCanExecuteChanged();
 
         try
         {
@@ -506,7 +480,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         finally
         {
             _exporting = false;
-            ExportCommand.RaiseCanExecuteChanged();
+            ExportCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -535,7 +509,9 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
             _ => $"{KeypasteHome.SettingsPath(_home)} could not be written, so nothing changed.",
         };
 
-        Raise(nameof(IsThisVaultChosen));
+        OnPropertyChanged(nameof(IsThisVaultChosen));
+        OnPropertyChanged(nameof(ChosenVaultText));
+        UseThisVaultCommand.NotifyCanExecuteChanged();
     }
 
     private static string AdministratorNote(CliLinkStatus status) =>
@@ -574,7 +550,15 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             _cliStatus = CliLink?.Read();
             IsCliLinking = false;
-            Raise(nameof(CliStatus));
+            OnPropertyChanged(nameof(CliStatus));
+            OnPropertyChanged(nameof(CliLinkText));
+            OnPropertyChanged(nameof(CliLinkNote));
+            OnPropertyChanged(nameof(CliReplacePrompt));
+            OnPropertyChanged(nameof(OffersCliLink));
+            OnPropertyChanged(nameof(OffersCliReplace));
+            OnPropertyChanged(nameof(HasCliLinkNote));
+            LinkCliCommand.NotifyCanExecuteChanged();
+            BeginReplaceCliCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -590,6 +574,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         _ => $"keypaste could not link {link.LinkPath}: {result.Reason}",
     };
 
+    /// <summary>Empties the recent-vaults list.</summary>
+    [RelayCommand]
     private void ForgetAll()
     {
         RecentVaults.Save(KeypasteHome.RecentPath(_home), []);

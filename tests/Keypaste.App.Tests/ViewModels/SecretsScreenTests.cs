@@ -165,7 +165,7 @@ public sealed class SecretsScreenTests : IDisposable
         Assert.True(form.ShowsUsername && form.ShowsUrl);
         form.Username = "me";
         form.Url = "https://gitlab.com";
-        context.Entries.ConfirmAddCommand.Execute(null);
+        context.Entries.ConfirmAddCommand.Press();
 
         var added = context.Session.Unlocked!.Find(new EntryName("Work", "gitlab"))!;
         Assert.Equal("me", added.Username);
@@ -182,7 +182,7 @@ public sealed class SecretsScreenTests : IDisposable
         using var context = new Context(_vaultPath);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api");
-        await context.Entries.Detail!.CopyReferenceCommand.ExecuteAsync();
+        await context.Entries.Detail!.CopyReferenceCommand.PressAsync();
 
         Assert.Equal("kp:///env/acme-api/DATABASE_URL", context.Clipboard.Content);
         Assert.False(context.Clipboard.ContentWasSetAsASecret);

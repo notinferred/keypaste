@@ -67,7 +67,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.True(env.HasChildren);
         Assert.False(env.IsExpanded);
 
-        shell.FoldCommand.Execute(env);
+        shell.FoldCommand.Press(env);
         Assert.Equal(["Items", "Work", "env", "billing", "Projects", "billing", "Agents"], Titles(shell));
 
         shell.SelectedSidebarRow = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env/billing");
@@ -105,23 +105,23 @@ public sealed class ShellViewModelTests : IDisposable
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         Assert.Equal("Work", entries.SelectedGroup?.Path);
 
-        shell.RenameGroupCommand.Execute(null);
+        shell.RenameGroupCommand.Press();
         Assert.False(shell.HasGroupMenu);
         Assert.True(entries.IsRenamingGroup);
         Assert.Equal("Work", entries.DraftGroupName);
 
         shell.OpenGroupMenu(work);
-        shell.NewGroupInsideCommand.Execute(null);
+        shell.NewGroupInsideCommand.Press();
         Assert.True(entries.IsCreatingGroup);
         Assert.False(entries.IsRenamingGroup);
         Assert.Equal("A new group inside Work.", entries.CreateGroupPrompt);
 
         shell.OpenGroupMenu(work);
-        shell.MoveGroupCommand.Execute(null);
+        shell.MoveGroupCommand.Press();
         Assert.True(entries.IsMovingGroup);
 
         shell.OpenGroupMenu(work);
-        shell.DeleteGroupCommand.Execute(null);
+        shell.DeleteGroupCommand.Press();
         Assert.True(entries.IsConfirmingGroupDelete);
         Assert.Contains("the 1 item in it", entries.GroupDeletePrompt, StringComparison.Ordinal);
 
@@ -138,9 +138,9 @@ public sealed class ShellViewModelTests : IDisposable
         using var shell = Shell();
 
         shell.OpenGroupMenu(shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "Work"));
-        shell.DeleteGroupCommand.Execute(null);
+        shell.DeleteGroupCommand.Press();
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-        entries.ConfirmDeleteGroupCommand.Execute(null);
+        entries.ConfirmDeleteGroupCommand.Press();
 
         Assert.Null(entries.Error);
         Assert.Equal(["Items", "env", "Projects", "billing", "Agents"], Titles(shell));
@@ -188,12 +188,12 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal("Advanced", shell.BackTitle);
         Assert.False(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
 
-        shell.BackCommand.Execute(null);
+        shell.BackCommand.Press();
         Assert.IsType<AdvancedViewModel>(shell.Content);
         Assert.Equal("Settings", shell.SelectedFooter?.Title);
         Assert.Equal("Settings", shell.BackTitle);
 
-        shell.BackCommand.Execute(null);
+        shell.BackCommand.Press();
         Assert.IsType<SettingsViewModel>(shell.Content);
         Assert.False(shell.HasBack);
 
@@ -210,7 +210,7 @@ public sealed class ShellViewModelTests : IDisposable
         using var shell = Shell();
         shell.GoTo(4);
 
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Press();
 
         Assert.IsType<AdvancedViewModel>(shell.Content);
         Assert.Equal("Advanced", shell.CurrentTitle);
@@ -218,7 +218,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal("Back to Settings", $"Back to {shell.BackTitle}");
         Assert.Equal(0, shell.Current.Shortcut);
 
-        shell.BackCommand.Execute(null);
+        shell.BackCommand.Press();
         Assert.IsType<SettingsViewModel>(shell.Content);
         Assert.False(shell.HasBack);
     }
@@ -228,13 +228,13 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
         shell.GoTo(4);
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Press();
 
-        Assert.IsType<AdvancedViewModel>(shell.Content).OpenActivityLogCommand.Execute(null);
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenActivityLogCommand.Press();
         Assert.IsType<LogViewModel>(shell.Content);
 
-        shell.BackCommand.Execute(null);
-        Assert.IsType<AdvancedViewModel>(shell.Content).OpenShareLinksCommand.Execute(null);
+        shell.BackCommand.Press();
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenShareLinksCommand.Press();
         Assert.IsType<SharingViewModel>(shell.Content);
         Assert.Equal("Share links", shell.CurrentTitle);
     }
@@ -244,15 +244,15 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
         shell.GoTo(4);
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Press();
 
-        Assert.IsType<AdvancedViewModel>(shell.Content).OpenScopedTokensCommand.Execute(null);
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenScopedTokensCommand.Press();
         Assert.IsType<ScopedTokensViewModel>(shell.Content);
         Assert.Equal("Back to Advanced", $"Back to {shell.BackTitle}");
         Assert.Equal("Settings", shell.SelectedFooter?.Title);
 
-        shell.BackCommand.Execute(null);
-        Assert.IsType<AdvancedViewModel>(shell.Content).OpenDiagnosticsCommand.Execute(null);
+        shell.BackCommand.Press();
+        Assert.IsType<AdvancedViewModel>(shell.Content).OpenDiagnosticsCommand.Press();
         Assert.IsType<DiagnosticsViewModel>(shell.Content);
         Assert.Equal("Diagnostics", shell.CurrentTitle);
     }
@@ -263,7 +263,7 @@ public sealed class ShellViewModelTests : IDisposable
         using var shell = Shell();
         shell.GoTo(2);
 
-        Assert.IsType<AgentActivityViewModel>(shell.Content).OpenHistoryCommand.Execute(null);
+        Assert.IsType<AgentActivityViewModel>(shell.Content).OpenHistoryCommand.Press();
 
         Assert.True(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
     }
@@ -333,7 +333,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal(new ProjectRow("billing", 2), shell.SelectedSidebarRow);
         Assert.Equal("Items", shell.BackTitle);
 
-        shell.BackCommand.Execute(null);
+        shell.BackCommand.Press();
 
         Assert.IsType<EntriesViewModel>(shell.Content);
         Assert.Equal("Items", Assert.IsType<NavItem>(shell.SelectedSidebarRow).Title);
@@ -344,11 +344,11 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        shell.NewProjectCommand.Execute(null);
+        shell.NewProjectCommand.Press();
         Assert.True(Assert.IsType<EnvSetsViewModel>(shell.Content).IsAdding);
 
         shell.GoTo(1);
-        shell.ImportEnvCommand.Execute(null);
+        shell.ImportEnvCommand.Press();
         Assert.Equal("billing", Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject?.Name);
     }
 
@@ -377,7 +377,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal("Work", shell.SearchScope);
         Assert.Equal("Search in this group", shell.SearchPlaceholder);
 
-        shell.ClearScopeCommand.Execute(null);
+        shell.ClearScopeCommand.Press();
 
         Assert.Null(shell.SearchScope);
         Assert.True(entries.SelectedGroup?.IsEverything);
@@ -418,20 +418,20 @@ public sealed class ShellViewModelTests : IDisposable
             ShareTransport = server,
         };
 
-        shell.ShareCommand.Execute("env/billing/STRIPE_KEY");
+        shell.ShareCommand.Press("env/billing/STRIPE_KEY");
         Assert.True(shell.HasShare);
         Assert.IsType<EntriesViewModel>(shell.Content);
         var share = shell.Share!;
         Assert.Equal("env/billing/STRIPE_KEY", share.SelectedWhat);
 
-        await share.CreateCommand.ExecuteAsync();
+        await share.CreateCommand.PressAsync();
 
         Assert.Equal("Link copied. Expires in 24h, 1 view.", shell.Toast);
         Assert.False(shell.HasShare);
 
         shell.Current = Destinations.Of(DestinationKind.Sharing);
         var links = Assert.IsType<SharingViewModel>(shell.Content);
-        await links.RefreshCommand.ExecuteAsync();
+        await links.RefreshCommand.PressAsync();
         Assert.Single(links.Rows);
         Assert.False(shell.ShowsHeader);
     }
@@ -441,8 +441,8 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        shell.ShareCommand.Execute("Work/github");
-        shell.Share!.CancelCommand.Execute(null);
+        shell.ShareCommand.Press("Work/github");
+        shell.Share!.CancelCommand.Press();
 
         Assert.False(shell.HasShare);
         Assert.Null(shell.Share);

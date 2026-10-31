@@ -290,7 +290,7 @@ public sealed class AgentSettingsViewModelTests
         Assert.Equal("All projects", Chosen(model.SeeScopes));
         Assert.False(model.IsOnly);
 
-        model.ToggleAdvancedCommand.Execute(null);
+        model.ToggleAdvancedCommand.Press();
         Assert.True(model.IsAdvancedOpen);
         model.SeePattern = "api/**, tag:env:billing:dev";
         await model.ApplySeeAsync();

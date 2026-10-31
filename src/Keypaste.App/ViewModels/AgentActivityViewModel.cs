@@ -40,7 +40,7 @@ namespace Keypaste.App.ViewModels;
 /// when its length or write time has moved.
 /// </para>
 /// </remarks>
-internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
+internal sealed partial class AgentActivityViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -58,20 +58,14 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private readonly ObservableCollection<AgentRow> _rows = [];
     private IReadOnlyList<McpToolFinding> _findings = [];
     private string _clientsSignature = string.Empty;
-    private string _clientsProblem = string.Empty;
     private readonly Action<Action> _post;
     private readonly Action<string> _toast;
     private readonly ITimer _timer;
     private readonly CancellationTokenSource _closing = new();
-    private bool _isResetting;
-    private bool _isLooking;
     private bool _looked;
     private int _looks;
     private AgentRow? _connecting;
 
-    private string _status = string.Empty;
-    private string _serving = string.Empty;
-    private string _unavailable = string.Empty;
     private readonly ObservableCollection<ActivityRow> _waiting = [];
     private readonly ObservableCollection<ActivityRow> _grants = [];
     private string _historyHeading = string.Empty;
@@ -111,31 +105,14 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _clientsPath = KeypasteHome.ClientsPath(home);
         _clock = clock ?? TimeProvider.System;
         _post = post ?? (run => run());
-        ResetClientsCommand = new RelayCommand(() => Resetting = ResetClientsAsync(), () => _clientsProblem.Length > 0 && _authority is not null && !_isResetting);
+        ResetClientsCommand = new RelayCommand(() => Resetting = ResetClientsAsync(), () => ClientsProblem.Length > 0 && _authority is not null && !IsResetting);
         ConnectCommand = new RelayCommand<AgentRow>(row => Open(row, removes: false), row => row is { OffersConnect: true } && CanConnect);
         ConnectAgainCommand = new RelayCommand<AgentRow>(row => Open(row, removes: false), row => row is { OffersConnectAgain: true } && CanConnect);
         DisconnectCommand = new RelayCommand<AgentRow>(row => Open(row, removes: true), row => row is { OffersDisconnect: true } && CanConnect);
         CloseConnectionCommand = new RelayCommand(CloseConnection, () => Connection is { IsBusy: false });
 
-        RefreshCommand = new RelayCommand(Refresh);
-        ShowPromptCommand = new RelayCommand(ShowPrompt, () => HasWaiting);
         EndCommand = new RelayCommand<ActivityRow>(End, row => row?.Id is not null);
         EndAllCommand = new RelayCommand(EndAll, () => _grants.Count > 0);
-
-        DependsOn(nameof(HasClientsProblem), nameof(ClientsProblem));
-        DependsOn(nameof(FormsArePrimary), nameof(HasWaiting));
-        DependsOn(nameof(IsServing), nameof(Serving));
-        DependsOn(nameof(IsAvailable), nameof(Unavailable));
-        DependsOn(nameof(IsUnavailable), nameof(IsAvailable));
-        DependsOn(nameof(NothingWaiting), nameof(IsAvailable), nameof(HasWaiting));
-        DependsOn(nameof(NoGrants), nameof(IsAvailable), nameof(HasGrants));
-        DependsOn(nameof(HasHistory), nameof(History));
-        DependsOn(nameof(HasHistoryMessage), nameof(HistoryMessage));
-        DependsOn(nameof(HasNoTools), nameof(IsLooking));
-        DependsOn(ResetClientsCommand, nameof(ClientsProblem), nameof(IsResetting));
-        DependsOn(ShowPromptCommand, nameof(HasWaiting));
-        DependsOn(EndAllCommand, nameof(HasGrants));
-        DependsOn(CloseConnectionCommand, nameof(Connection));
 
         Refresh();
         Look();
@@ -147,17 +124,15 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<AgentRow> Rows => _rows;
 
     /// <summary>Whether the tools on this computer are being looked for.</summary>
-    internal bool IsLooking
-    {
-        get => _isLooking;
-        private set => Set(ref _isLooking, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoTools))]
+    internal partial bool IsLooking { get; private set; }
 
     /// <summary>The look in progress or the last one, finished once what it found is posted.</summary>
     internal Task Looking { get; private set; } = Task.CompletedTask;
 
     /// <summary>Whether the last look found none of the tools keypaste connects.</summary>
-    internal bool HasNoTools => _connector is not null && _looked && !_isLooking && _findings.Count == 0;
+    internal bool HasNoTools => _connector is not null && _looked && !IsLooking && _findings.Count == 0;
 
     /// <summary>The tools keypaste looks for on this computer, named when none was found.</summary>
     internal string NoTools => _connector is null
@@ -192,20 +167,17 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal Task Resetting { get; private set; } = Task.CompletedTask;
 
     /// <summary>Whether a reset is waiting for the person's answer.</summary>
-    internal bool IsResetting
-    {
-        get => _isResetting;
-        private set => Set(ref _isResetting, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetClientsCommand))]
+    internal partial bool IsResetting { get; private set; }
 
     /// <summary>Why <c>clients.toml</c> cannot be used, or empty. While it is set, every agent request is refused.</summary>
-    internal string ClientsProblem
-    {
-        get => _clientsProblem;
-        private set => Set(ref _clientsProblem, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasClientsProblem))]
+    [NotifyCanExecuteChangedFor(nameof(ResetClientsCommand))]
+    internal partial string ClientsProblem { get; private set; } = string.Empty;
 
-    internal bool HasClientsProblem => _clientsProblem.Length > 0;
+    internal bool HasClientsProblem => ClientsProblem.Length > 0;
 
     /// <summary>Whether a pane's own action may be primary: not while a request waits, whose countdown is the live signal (D-0375).</summary>
     internal bool FormsArePrimary => !HasWaiting;
@@ -216,29 +188,22 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal bool OffersHistory { get; }
 
     /// <summary>One true sentence about what agents can do with this vault.</summary>
-    internal string Status
-    {
-        get => _status;
-        private set => Set(ref _status, value);
-    }
+    [ObservableProperty]
+    internal partial string Status { get; private set; } = string.Empty;
 
     /// <summary>Which process and session answer agents, as the line after "Answering agents from this app" names them, or empty when none does.</summary>
-    internal string Serving
-    {
-        get => _serving;
-        private set => Set(ref _serving, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsServing))]
+    internal partial string Serving { get; private set; } = string.Empty;
 
-    internal bool IsServing => _serving.Length > 0;
+    internal bool IsServing => Serving.Length > 0;
 
     /// <summary>Why waiting requests and allowances cannot be read, or empty when they were.</summary>
-    internal string Unavailable
-    {
-        get => _unavailable;
-        private set => Set(ref _unavailable, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAvailable), nameof(IsUnavailable), nameof(NothingWaiting), nameof(NoGrants))]
+    internal partial string Unavailable { get; private set; } = string.Empty;
 
-    internal bool IsAvailable => _unavailable.Length == 0;
+    internal bool IsAvailable => Unavailable.Length == 0;
 
     internal bool IsUnavailable => !IsAvailable;
 
@@ -272,12 +237,6 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     internal bool HasHistoryMessage => _historyMessage.Length > 0;
 
-    /// <summary>Reads everything again, the log included.</summary>
-    internal RelayCommand RefreshCommand { get; }
-
-    /// <summary>Brings the waiting prompt's window forward with Deny focused and its allows disarmed for a second.</summary>
-    internal RelayCommand ShowPromptCommand { get; }
-
     /// <summary>Ends the allowance a row lists, so the next matching request asks again.</summary>
     internal RelayCommand<ActivityRow> EndCommand { get; }
 
@@ -287,6 +246,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private bool CanConnect => _connector is not null && _authority is not null && Connection is not { IsBusy: true };
 
     /// <summary>Reads the authority and the log again.</summary>
+    [RelayCommand]
     internal void Refresh() => Read(forceHistory: true);
 
     /// <summary>The status as the screen says it, with no agent Automatic.</summary>
@@ -382,8 +342,13 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         Relist(_waiting, waiting);
         Relist(_grants, grants);
-        Raise(nameof(HasWaiting));
-        Raise(nameof(HasGrants));
+        OnPropertyChanged(nameof(HasWaiting));
+        OnPropertyChanged(nameof(HasGrants));
+        OnPropertyChanged(nameof(FormsArePrimary));
+        OnPropertyChanged(nameof(NothingWaiting));
+        ShowPromptCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(NoGrants));
+        EndAllCommand.NotifyCanExecuteChanged();
 
         ReadHistory(session, forceHistory);
         var (caps, records) = ReadClients(forceHistory);
@@ -667,7 +632,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             _looked = true;
             IsLooking = false;
             ReadClients(force: false);
-            Raise(nameof(HasNoTools));
+            OnPropertyChanged(nameof(HasNoTools));
         });
     }
 
@@ -685,7 +650,8 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         pane.PropertyChanged += OnConnectionChanged;
         _connecting = row;
         row.Connection = pane;
-        Raise(nameof(Connection));
+        OnPropertyChanged(nameof(Connection));
+        CloseConnectionCommand.NotifyCanExecuteChanged();
         RaiseConnectCommands();
         Opening = pane.PreviewAsync();
     }
@@ -713,7 +679,8 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             pane.Dispose();
         }
 
-        Raise(nameof(Connection));
+        OnPropertyChanged(nameof(Connection));
+        CloseConnectionCommand.NotifyCanExecuteChanged();
         RaiseConnectCommands();
     }
 
@@ -727,10 +694,10 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     private void RaiseConnectCommands()
     {
-        ConnectCommand.RaiseCanExecuteChanged();
-        ConnectAgainCommand.RaiseCanExecuteChanged();
-        DisconnectCommand.RaiseCanExecuteChanged();
-        CloseConnectionCommand.RaiseCanExecuteChanged();
+        ConnectCommand.NotifyCanExecuteChanged();
+        ConnectAgainCommand.NotifyCanExecuteChanged();
+        DisconnectCommand.NotifyCanExecuteChanged();
+        CloseConnectionCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Asks the authority to reset the clients file, which the person confirms, then reads it again.</summary>
@@ -811,12 +778,15 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _historyHeading = lines.Count > 0 ? lines[0] : string.Empty;
         _history = string.Join(Environment.NewLine, lines.Skip(1));
         _historyMessage = message;
-        Raise(nameof(HistoryHeading));
-        Raise(nameof(History));
-        Raise(nameof(HistoryMessage));
+        OnPropertyChanged(nameof(HistoryHeading));
+        OnPropertyChanged(nameof(History));
+        OnPropertyChanged(nameof(HistoryMessage));
+        OnPropertyChanged(nameof(HasHistory));
+        OnPropertyChanged(nameof(HasHistoryMessage));
     }
 
-    /// <summary>Brings the prompt forward; only the person's press reaches it, never a message on the pipe (D-0456).</summary>
+    /// <summary>Brings the waiting prompt's window forward with Deny focused and its allows disarmed for a second; only the person's press reaches it, never a message on the pipe (D-0456).</summary>
+    [RelayCommand(CanExecute = nameof(HasWaiting))]
     private void ShowPrompt()
     {
         if (_authority?.ShowPrompt() != true)

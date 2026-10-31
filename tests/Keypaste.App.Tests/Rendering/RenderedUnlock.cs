@@ -81,7 +81,7 @@ internal sealed class RenderedUnlock : IDisposable
         Model.SelectedPath = null;
         Assert.True(Model.Offer(_fixture.Path_));
 
-        Model.StartRestoreCommand.Execute(null);
+        Model.StartRestoreCommand.Press();
         Assert.NotNull(Model.Restore);
     }
 }

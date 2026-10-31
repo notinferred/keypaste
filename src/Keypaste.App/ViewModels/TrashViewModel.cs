@@ -23,7 +23,7 @@ namespace Keypaste.App.ViewModels;
 /// told apart from a screen that held nothing, which is what <c>SecretHygieneTests</c> refuses.
 /// </para>
 /// </remarks>
-internal sealed class TrashViewModel : ObservableObject, IDisposable
+internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 {
     internal const string RecycledNote =
         "Deleting an item in keypaste moves it here, to the vault's own recycle bin. KeePassXC "
@@ -40,13 +40,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
 
     private readonly AppVaultSession _session;
 
-    private IReadOnlyList<TrashRow> _rows = [];
     private TrashRow? _selected;
-    private bool _isConfirmingPurge;
-    private bool _isConfirmingEmpty;
-    private string? _restoreAs;
-    private string? _notice;
-    private string? _error;
 
     internal TrashViewModel(AppVaultSession session)
     {
@@ -55,44 +49,24 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
         _session = session;
 
         RestoreCommand = new RelayCommand(Restore, () => _selected is not null && !IsConfirming);
-        RestoreAsCommand = new RelayCommand(RestoreAs, () => _selected is not null && _restoreAs is not null && !IsConfirming);
+        RestoreAsCommand = new RelayCommand(RestoreAs, () => _selected is not null && RestoreAsTitle is not null && !IsConfirming);
         PurgeCommand = new RelayCommand(
             () => IsConfirmingPurge = true,
             () => _selected is not null && !IsConfirming);
         ConfirmPurgeCommand = new RelayCommand(Purge, () => IsConfirmingPurge);
         CancelPurgeCommand = new RelayCommand(() => IsConfirmingPurge = false, () => IsConfirmingPurge);
-        EmptyCommand = new RelayCommand(() => IsConfirmingEmpty = true, () => _rows.Count > 0 && !IsConfirming);
+        EmptyCommand = new RelayCommand(() => IsConfirmingEmpty = true, () => Rows.Count > 0 && !IsConfirming);
         ConfirmEmptyCommand = new RelayCommand(Empty, () => IsConfirmingEmpty);
         CancelEmptyCommand = new RelayCommand(() => IsConfirmingEmpty = false, () => IsConfirmingEmpty);
-
-        DependsOn(nameof(IsEmpty), nameof(Rows));
-        DependsOn(nameof(AwaitsSelection), nameof(Rows), nameof(Selected));
-        DependsOn(nameof(PurgePrompt), nameof(Selected));
-        DependsOn(nameof(EmptyPrompt), nameof(Rows));
-        DependsOn(nameof(OffersRestoreAs), nameof(RestoreAsTitle));
-        DependsOn(nameof(RestoreAsLabel), nameof(RestoreAsTitle));
-        DependsOn(nameof(Note), nameof(RecyclesDeletedEntries));
-        DependsOn(nameof(EmptyNote), nameof(RecyclesDeletedEntries));
-        DependsOn(nameof(HasNotice), nameof(Notice));
-        DependsOn(nameof(HasError), nameof(Error));
-        DependsOn(RestoreCommand, nameof(Selected), nameof(IsConfirmingPurge), nameof(IsConfirmingEmpty));
-        DependsOn(RestoreAsCommand, nameof(Selected), nameof(RestoreAsTitle), nameof(IsConfirmingPurge), nameof(IsConfirmingEmpty));
-        DependsOn(PurgeCommand, nameof(Selected), nameof(IsConfirmingPurge), nameof(IsConfirmingEmpty));
-        DependsOn(ConfirmPurgeCommand, nameof(IsConfirmingPurge));
-        DependsOn(CancelPurgeCommand, nameof(IsConfirmingPurge));
-        DependsOn(EmptyCommand, nameof(Rows), nameof(IsConfirmingPurge), nameof(IsConfirmingEmpty));
-        DependsOn(ConfirmEmptyCommand, nameof(IsConfirmingEmpty));
-        DependsOn(CancelEmptyCommand, nameof(IsConfirmingEmpty));
 
         Load();
     }
 
     /// <summary>What is in the bin, most recently deleted first.</summary>
-    internal IReadOnlyList<TrashRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(AwaitsSelection), nameof(EmptyPrompt))]
+    [NotifyCanExecuteChangedFor(nameof(EmptyCommand))]
+    internal partial IReadOnlyList<TrashRow> Rows { get; private set; } = [];
 
     /// <summary>The row a restore or a permanent deletion would act on, or null.</summary>
     internal TrashRow? Selected
@@ -102,8 +76,13 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
         {
             // A confirmation is armed for one row, and so is an offer of another title. Moving the
             // selection while either is showing would leave its button pointing at another entry.
-            if (Set(ref _selected, value))
+            if (SetProperty(ref _selected, value))
             {
+                OnPropertyChanged(nameof(AwaitsSelection));
+                OnPropertyChanged(nameof(PurgePrompt));
+                RestoreCommand.NotifyCanExecuteChanged();
+                RestoreAsCommand.NotifyCanExecuteChanged();
+                PurgeCommand.NotifyCanExecuteChanged();
                 IsConfirmingPurge = false;
 
                 // The refusal beside an offer names its button, so it goes with it.
@@ -117,10 +96,10 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Whether there is nothing to recover.</summary>
-    internal bool IsEmpty => _rows.Count == 0;
+    internal bool IsEmpty => Rows.Count == 0;
 
     /// <summary>Whether the bin holds entries but none is picked, so Restore and Delete wait on one.</summary>
-    internal bool AwaitsSelection => _rows.Count > 0 && _selected is null;
+    internal bool AwaitsSelection => Rows.Count > 0 && _selected is null;
 
     /// <summary>Whether this vault recycles a deleted entry at all.</summary>
     internal bool RecyclesDeletedEntries => _session.Unlocked?.RecyclesDeletedEntries == true;
@@ -147,11 +126,10 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     /// The second of the two deliberate acts, and with <see cref="IsConfirmingEmpty"/> where
     /// <c>KpDanger</c> appears on this screen: a restore is ordinary, and erasing a value is not.
     /// </remarks>
-    internal bool IsConfirmingPurge
-    {
-        get => _isConfirmingPurge;
-        private set => Set(ref _isConfirmingPurge, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RestoreCommand), nameof(RestoreAsCommand), nameof(PurgeCommand), nameof(ConfirmPurgeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelPurgeCommand), nameof(EmptyCommand))]
+    internal partial bool IsConfirmingPurge { get; private set; }
 
     /// <summary>What that confirmation asks.</summary>
     internal string PurgePrompt => _selected is { } row
@@ -160,14 +138,13 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether emptying the whole bin is waiting to be confirmed.</summary>
     /// <remarks>The same second act as <see cref="IsConfirmingPurge"/>, for every row at once.</remarks>
-    internal bool IsConfirmingEmpty
-    {
-        get => _isConfirmingEmpty;
-        private set => Set(ref _isConfirmingEmpty, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RestoreCommand), nameof(RestoreAsCommand), nameof(PurgeCommand), nameof(EmptyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmEmptyCommand), nameof(CancelEmptyCommand))]
+    internal partial bool IsConfirmingEmpty { get; private set; }
 
     /// <summary>What that confirmation asks, naming how many items go.</summary>
-    internal string EmptyPrompt => _rows.Count switch
+    internal string EmptyPrompt => Rows.Count switch
     {
         0 => string.Empty,
         1 => "Delete the one item in the trash and its history for good? This cannot be undone.",
@@ -175,34 +152,29 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     };
 
     /// <summary>The title a restore refused for a taken name can put the selected entry back under, or null.</summary>
-    internal string? RestoreAsTitle
-    {
-        get => _restoreAs;
-        private set => Set(ref _restoreAs, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersRestoreAs), nameof(RestoreAsLabel))]
+    [NotifyCanExecuteChangedFor(nameof(RestoreAsCommand))]
+    internal partial string? RestoreAsTitle { get; private set; }
 
-    internal bool OffersRestoreAs => _restoreAs is not null;
+    internal bool OffersRestoreAs => RestoreAsTitle is not null;
 
     /// <summary>The offer's button: <c>Restore as production (restored)</c>.</summary>
-    internal string RestoreAsLabel => _restoreAs is { } title ? $"Restore as {title}" : string.Empty;
+    internal string RestoreAsLabel => RestoreAsTitle is { } title ? $"Restore as {title}" : string.Empty;
 
     /// <summary>What the last action did, or null.</summary>
-    internal string? Notice
-    {
-        get => _notice;
-        private set => Set(ref _notice, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotice))]
+    internal partial string? Notice { get; private set; }
 
-    internal bool HasNotice => _notice is not null;
+    internal bool HasNotice => Notice is not null;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
-    internal string? Error
-    {
-        get => _error;
-        private set => Set(ref _error, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    internal partial string? Error { get; private set; }
 
-    internal bool HasError => _error is not null;
+    internal bool HasError => Error is not null;
 
     /// <summary>Puts the selected entry back where it was deleted from.</summary>
     internal RelayCommand RestoreCommand { get; }
@@ -227,7 +199,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     internal RelayCommand CancelEmptyCommand { get; }
 
     /// <summary>Whether either permanent deletion is waiting to be confirmed, which holds every other action.</summary>
-    private bool IsConfirming => _isConfirmingPurge || _isConfirmingEmpty;
+    private bool IsConfirming => IsConfirmingPurge || IsConfirmingEmpty;
 
     /// <summary>Reads the bin again, keeping the selection if its entry is still in there.</summary>
     internal void Load()
@@ -251,7 +223,9 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
 
         Selected = wanted is { } id ? Rows.FirstOrDefault(row => row.Id == id) : null;
 
-        Raise(nameof(RecyclesDeletedEntries));
+        OnPropertyChanged(nameof(RecyclesDeletedEntries));
+        OnPropertyChanged(nameof(Note));
+        OnPropertyChanged(nameof(EmptyNote));
     }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>
@@ -325,7 +299,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     /// <summary>Puts the selected entry back under the first free <c>(restored)</c> title, its own being taken.</summary>
     private void RestoreAs()
     {
-        if (_selected is not { } row || _restoreAs is null)
+        if (_selected is not { } row || RestoreAsTitle is null)
         {
             return;
         }
@@ -399,7 +373,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
     /// </remarks>
     private void Empty()
     {
-        var shown = _rows.Select(row => row.Id).ToHashSet();
+        var shown = Rows.Select(row => row.Id).ToHashSet();
         var write = _session.Write(
             vault => shown.SetEquals(vault.ReadRecycled().Select(recycled => recycled.Id)) ? vault.EmptyRecycleBin() : (int?)null,
             removed => removed > 0);

@@ -40,7 +40,7 @@ public sealed partial class BrowserPairingTests
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
         Assert.True(browserFill.HasNoRows);
 
-        browserFill.PairCommand.Execute(null);
+        browserFill.PairCommand.Press();
 
         Assert.True(browserFill.IsArmed);
         Assert.False(browserFill.PairCommand.CanExecute(null));
@@ -78,7 +78,7 @@ public sealed partial class BrowserPairingTests
         await PairAsync(app, "work laptop");
 
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Execute(null);
+        browserFill.PairCommand.Press();
         await using var link = await AttachAsync(app, BrowserIdentity.FirefoxAddOns);
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync(2));
@@ -125,7 +125,7 @@ public sealed partial class BrowserPairingTests
         Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "work laptop"), Token))?.Outcome);
 
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.RemoveCommand.Execute(Assert.Single(browserFill.Rows));
+        browserFill.RemoveCommand.Press(Assert.Single(browserFill.Rows));
 
         Assert.Empty(browserFill.Rows);
         Assert.StartsWith("Removed the pairing work laptop.", browserFill.Message, StringComparison.Ordinal);
@@ -141,7 +141,7 @@ public sealed partial class BrowserPairingTests
     {
         await using var app = await PromptedApp.StartAsync();
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Execute(null);
+        browserFill.PairCommand.Press();
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync());
@@ -168,7 +168,7 @@ public sealed partial class BrowserPairingTests
         await using var app = await PromptedApp.StartAsync();
         await PairAsync(app, "work laptop");
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Execute(null);
+        browserFill.PairCommand.Press();
         using var settings = new SettingsViewModel(app.Authority.Session, app.Home, new DesktopPreferences(app.Home), _ => { }) { BrowserFill = browserFill };
         var window = new Window { Content = new SettingsView { DataContext = settings } };
         window.Show();
@@ -207,7 +207,7 @@ public sealed partial class BrowserPairingTests
     private static async Task PairAsync(PromptedApp app, string name)
     {
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.PairCommand.Execute(null);
+        browserFill.PairCommand.Press();
         await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = await app.PromptAsync(app.Windows.Count + 1);

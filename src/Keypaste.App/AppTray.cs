@@ -64,7 +64,7 @@ internal sealed class AppTray : IDisposable
 
             // The menu bar draws a template image in its own ink, light or dark.
             MacOSProperties.SetIsTemplateIcon(_icon, OperatingSystem.IsMacOS());
-            _icon.Clicked += (_, _) => _open.Command?.Execute(null);
+            _icon.Clicked += (_, _) => _open.Command?.Press();
         }
 
         if (_icon is not null)

@@ -69,14 +69,14 @@ public sealed class CurrentStateTests : IDisposable
         OnScreen(entries =>
         {
             var detail = Select(entries, _token);
-            detail.EditCommand.Execute(null);
+            detail.EditCommand.Press();
 
             foreach (var c in "v2")
             {
                 detail.NewPassword.Type(c);
             }
 
-            detail.SaveCommand.Execute(null);
+            detail.SaveCommand.Press();
             Assert.False(detail.IsEditing, entries.Error);
         });
 
@@ -103,8 +103,8 @@ public sealed class CurrentStateTests : IDisposable
             {
                 case "delete":
                     Select(entries, _token);
-                    entries.DeleteCommand.Execute(null);
-                    entries.ConfirmDeleteCommand.Execute(null);
+                    entries.DeleteCommand.Press();
+                    entries.ConfirmDeleteCommand.Press();
                     break;
 
                 case "move":
@@ -170,7 +170,7 @@ public sealed class CurrentStateTests : IDisposable
                 access.TypeConfirm(c);
             }
 
-            access.ReviewCommand.Execute(null);
+            access.ReviewCommand.Press();
             await access.ChangeAsync();
             Assert.StartsWith("Changed.", access.Message, StringComparison.Ordinal);
         }
@@ -205,9 +205,9 @@ public sealed class CurrentStateTests : IDisposable
         OnScreen(entries =>
         {
             var detail = Select(entries, _token);
-            detail.EditCommand.Execute(null);
+            detail.EditCommand.Press();
             detail.NewPassword.Type('x');
-            detail.SaveCommand.Execute(null);
+            detail.SaveCommand.Press();
             Assert.False(detail.IsEditing, entries.Error);
         });
 
@@ -279,7 +279,7 @@ public sealed class CurrentStateTests : IDisposable
         Assert.Contains("could not merge it: the file now holds another vault.", shell.VaultChanged, StringComparison.Ordinal);
         Assert.Equal(AuditMethod.VaultChanged, (await agent.RequestAsync(_token)).Method);
 
-        shell.ReloadCommand.Execute(null);
+        shell.ReloadCommand.Press();
 
         Assert.False(shell.HasVaultChanged);
         Assert.Equal(session, _session.SessionId);
@@ -361,18 +361,18 @@ public sealed class CurrentStateTests : IDisposable
     {
         var row = entries.Rows.Single(candidate => candidate.Path == path);
         entries.Selected = row;
-        entries.OrganizeCommand.Execute(null);
+        entries.OrganizeCommand.Press();
         entries.DraftTitle = title ?? row.Title;
         entries.MoveTarget = entries.MoveTargets.Single(node => node.Path == group);
-        entries.ConfirmOrganizeCommand.Execute(null);
+        entries.ConfirmOrganizeCommand.Press();
     }
 
     private static void RenameGroup(EntriesViewModel entries, string group, string name)
     {
         entries.SelectedGroup = entries.Groups.Single(node => node.Path == group);
-        entries.BeginRenameGroupCommand.Execute(null);
+        entries.BeginRenameGroupCommand.Press();
         entries.DraftGroupName = name;
-        entries.ConfirmRenameGroupCommand.Execute(null);
+        entries.ConfirmRenameGroupCommand.Press();
     }
 
     /// <summary>An agent attached to the app's session over its real endpoint.</summary>

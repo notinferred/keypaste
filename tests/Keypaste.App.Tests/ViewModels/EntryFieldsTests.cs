@@ -92,18 +92,18 @@ public sealed class EntryFieldsTests : IDisposable
         var detail = context.Open(_checking);
         var revisions = Revisions();
 
-        detail.Fields.Single(field => field.Name == "PIN").ReplaceCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "PIN").ReplaceCommand.Press();
         foreach (var c in "9876")
         {
             detail.ReplacementFieldValue.Type(c);
         }
 
-        detail.ConfirmReplaceFieldCommand.Execute(null);
+        detail.ConfirmReplaceFieldCommand.Press();
         Assert.False(detail.IsReplacingField);
         Assert.Equal("9876", Read("PIN"));
         Assert.Contains(new EntryField("PIN", true, false), Fields());
 
-        detail.Fields.Single(field => field.Name == "PIN").ToggleProtectionCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "PIN").ToggleProtectionCommand.Press();
         Assert.Contains(new EntryField("PIN", false, false), Fields());
         Assert.Equal("9876", Read("PIN"));
         Assert.Equal(revisions + 2, Revisions());
@@ -117,11 +117,11 @@ public sealed class EntryFieldsTests : IDisposable
         var detail = context.Open(_checking);
         var revisions = Revisions();
 
-        detail.Fields.Single(field => field.Name == "PIN").RemoveCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "PIN").RemoveCommand.Press();
         Assert.True(detail.IsRemovingField);
         Assert.Equal(revisions, Revisions());
 
-        detail.ConfirmRemoveFieldCommand.Execute(null);
+        detail.ConfirmRemoveFieldCommand.Press();
 
         Assert.False(detail.IsRemovingField);
         Assert.Equal(["otp"], detail.Fields.Select(field => field.Name));
@@ -140,12 +140,12 @@ public sealed class EntryFieldsTests : IDisposable
         Add(detail, "Region", "eu", protect: false);
         var revisions = Revisions();
 
-        detail.Fields.Single(field => field.Name == "Region").RenameCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "Region").RenameCommand.Press();
         Assert.True(detail.IsRenamingField);
         Assert.Equal("Region", detail.DraftFieldRename);
 
         detail.DraftFieldRename = "Zone";
-        detail.ConfirmRenameFieldCommand.Execute(null);
+        detail.ConfirmRenameFieldCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.False(detail.IsRenamingField);
@@ -166,13 +166,13 @@ public sealed class EntryFieldsTests : IDisposable
         using var context = new Context(_vaultPath);
         var detail = context.Open(_checking);
         detail.DraftTag = "env:billing:staging";
-        detail.AddTagCommand.Execute(null);
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.AddTagCommand.Press();
+        detail.ConfirmTagChangeCommand.Press();
         var before = File.ReadAllBytes(_vaultPath);
 
-        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Press();
         detail.DraftFieldRename = "PIN_CODE";
-        detail.ConfirmRenameFieldCommand.Execute(null);
+        detail.ConfirmRenameFieldCommand.Press();
 
         Assert.True(detail.IsConfirmingFieldRename);
         Assert.Equal(
@@ -182,14 +182,14 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.All(detail.FieldRenameLines, line => Assert.DoesNotContain("4321", line, StringComparison.Ordinal));
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
 
-        detail.CancelRenameFieldCommand.Execute(null);
+        detail.CancelRenameFieldCommand.Press();
         Assert.False(detail.IsRenamingField);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
 
-        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Press();
         detail.DraftFieldRename = "PIN_CODE";
-        detail.ConfirmRenameFieldCommand.Execute(null);
-        detail.ConfirmRenameFieldCommand.Execute(null);
+        detail.ConfirmRenameFieldCommand.Press();
+        detail.ConfirmRenameFieldCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.False(detail.IsRenamingField);
@@ -207,10 +207,10 @@ public sealed class EntryFieldsTests : IDisposable
         var detail = context.Open(_checking);
         var before = File.ReadAllBytes(_vaultPath);
 
-        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Execute(null);
+        detail.Fields.Single(field => field.Name == "PIN").RenameCommand.Press();
         detail.DraftFieldRename = name;
-        detail.ConfirmRenameFieldCommand.Execute(null);
-        detail.ConfirmRenameFieldCommand.Execute(null);
+        detail.ConfirmRenameFieldCommand.Press();
+        detail.ConfirmRenameFieldCommand.Press();
 
         Assert.NotNull(context.Entries.Error);
         Assert.True(detail.IsRenamingField);
@@ -240,16 +240,16 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.False(detail.ShowsEnvironments);
 
         detail.DraftTag = "env:billing:staging";
-        detail.AddTagCommand.Execute(null);
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.AddTagCommand.Press();
+        detail.ConfirmTagChangeCommand.Press();
 
         var staged = Assert.Single(detail.Environments);
         Assert.True(detail.ShowsEnvironments);
         Assert.Equal(("billing · staging", "set", false), (staged.Label, staged.Status, staged.RequiresApproval));
 
         detail.DraftTag = "env:billing:prod";
-        detail.AddTagCommand.Execute(null);
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.AddTagCommand.Press();
+        detail.ConfirmTagChangeCommand.Press();
 
         Assert.Equal(["billing · prod", "billing · staging"], detail.Environments.Select(row => row.Label).Order(StringComparer.Ordinal));
         Assert.All(detail.Environments, row => Assert.Equal("approval required", row.Status));
@@ -263,11 +263,11 @@ public sealed class EntryFieldsTests : IDisposable
         var revisions = Revisions();
 
         detail.DraftTag = "env:billing:prod";
-        detail.AddTagCommand.Execute(null);
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.AddTagCommand.Press();
+        detail.ConfirmTagChangeCommand.Press();
         detail.DraftTag = "env:billing:Prod";
-        detail.AddTagCommand.Execute(null);
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.AddTagCommand.Press();
+        detail.ConfirmTagChangeCommand.Press();
 
         var project = detail.Tags.Single(chip => chip.Tag == "env:billing:prod");
         Assert.Equal(("billing · prod", true, true), (project.Display, project.IsProject, project.IsProtected));
@@ -278,8 +278,8 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.False(plain.IsProtected);
         Assert.Null(plain.Tip);
 
-        project.RemoveCommand.Execute(null);
-        detail.ConfirmTagChangeCommand.Execute(null);
+        project.RemoveCommand.Press();
+        detail.ConfirmTagChangeCommand.Press();
 
         Assert.Equal(["env:billing:Prod", "finance"], Tags().Order(StringComparer.Ordinal));
         Assert.Equal(revisions + 3, Revisions());
@@ -294,7 +294,7 @@ public sealed class EntryFieldsTests : IDisposable
         var before = File.ReadAllBytes(_vaultPath);
 
         detail.DraftTag = "env:billing:staging";
-        detail.AddTagCommand.Execute(null);
+        detail.AddTagCommand.Press();
 
         Assert.True(detail.IsConfirmingTagChange);
         Assert.Equal(
@@ -303,27 +303,27 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.Equal("Add tag", detail.TagChangeAction);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
 
-        detail.CancelTagChangeCommand.Execute(null);
+        detail.CancelTagChangeCommand.Press();
         Assert.False(detail.IsConfirmingTagChange);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
         Assert.DoesNotContain("env:billing:staging", Tags());
 
-        detail.AddTagCommand.Execute(null);
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.AddTagCommand.Press();
+        detail.ConfirmTagChangeCommand.Press();
         Assert.Contains("env:billing:staging", Tags());
         Assert.Empty(detail.DraftTag);
 
         before = File.ReadAllBytes(_vaultPath);
-        detail.Tags.Single(chip => chip.Tag == "env:billing:staging").RemoveCommand.Execute(null);
+        detail.Tags.Single(chip => chip.Tag == "env:billing:staging").RemoveCommand.Press();
         Assert.Equal(
             ["Removing env:billing:staging takes Banking/Checking out of billing/staging.", "Leaving billing/staging: PIN."],
             detail.TagChangeLines);
         Assert.Equal("Remove tag", detail.TagChangeAction);
-        detail.CancelTagChangeCommand.Execute(null);
+        detail.CancelTagChangeCommand.Press();
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
 
         detail.DraftTag = "work";
-        detail.AddTagCommand.Execute(null);
+        detail.AddTagCommand.Press();
         Assert.False(detail.IsConfirmingTagChange);
         Assert.Contains("work", Tags());
     }
@@ -345,7 +345,7 @@ public sealed class EntryFieldsTests : IDisposable
         var detail = context.Open(_checking);
 
         detail.DraftTag = "env:billing:staging";
-        detail.AddTagCommand.Execute(null);
+        detail.AddTagCommand.Press();
 
         Assert.True(detail.IsConfirmingTagChange);
         Assert.Equal(
@@ -366,11 +366,11 @@ public sealed class EntryFieldsTests : IDisposable
         var before = File.ReadAllBytes(_vaultPath);
 
         detail.DraftTag = "a,b";
-        detail.AddTagCommand.Execute(null);
+        detail.AddTagCommand.Press();
         Assert.NotNull(context.Entries.Error);
 
         detail.DraftTag = "finance";
-        detail.AddTagCommand.Execute(null);
+        detail.AddTagCommand.Press();
         Assert.Contains("already has that tag", context.Entries.Error, StringComparison.Ordinal);
 
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
@@ -407,8 +407,8 @@ public sealed class EntryFieldsTests : IDisposable
         detail.SaveCommand.CanExecuteChanged += (_, _) => asked.Add("save");
         detail.ConfirmReplaceFieldCommand.CanExecuteChanged += (_, _) => asked.Add("replace");
 
-        detail.EditCommand.Execute(null);
-        detail.Fields.Single(field => field.Name == "PIN").ReplaceCommand.Execute(null);
+        detail.EditCommand.Press();
+        detail.Fields.Single(field => field.Name == "PIN").ReplaceCommand.Press();
 
         Assert.Equal(["replace", "rotate", "save"], asked.Order(StringComparer.Ordinal));
         Assert.False(detail.RotateCommand.CanExecute(null));
@@ -424,7 +424,7 @@ public sealed class EntryFieldsTests : IDisposable
         using var context = new Context(_vaultPath);
         var detail = context.Open(_checking);
 
-        await detail.Fields.Single(field => field.Name == "PIN").CopyValueCommand.ExecuteAsync();
+        await detail.Fields.Single(field => field.Name == "PIN").CopyValueCommand.PressAsync();
 
         Assert.Equal("4321", context.Clipboard.Content);
         Assert.True(context.Countdown.IsCounting);
@@ -435,7 +435,7 @@ public sealed class EntryFieldsTests : IDisposable
     {
         using var context = new Context(_vaultPath);
         var detail = context.Open(_checking);
-        detail.BeginAddFieldCommand.Execute(null);
+        detail.BeginAddFieldCommand.Press();
         detail.NewFieldValue.Type('x');
 
         detail.Dispose();
@@ -447,7 +447,7 @@ public sealed class EntryFieldsTests : IDisposable
 
     private static void Add(EntryDetailViewModel detail, string name, string value, bool protect)
     {
-        detail.BeginAddFieldCommand.Execute(null);
+        detail.BeginAddFieldCommand.Press();
         detail.DraftFieldName = name;
         detail.NewFieldProtected = protect;
 
@@ -456,7 +456,7 @@ public sealed class EntryFieldsTests : IDisposable
             detail.NewFieldValue.Type(c);
         }
 
-        detail.ConfirmAddFieldCommand.Execute(null);
+        detail.ConfirmAddFieldCommand.Press();
     }
 
     private int Revisions()
@@ -514,12 +514,12 @@ public sealed class EntryFieldsTests : IDisposable
         var detail = context.Open(_checking);
 
         detail.DraftTag = "env:billing:staging";
-        detail.AddTagCommand.Execute(null);
+        detail.AddTagCommand.Press();
 
         Assert.True(detail.IsConfirmingTagChange);
         Assert.Equal(said, detail.TagChangeLines[^1]);
 
-        detail.ConfirmTagChangeCommand.Execute(null);
+        detail.ConfirmTagChangeCommand.Press();
         Assert.Contains("env:billing:staging", Tags());
     }
 

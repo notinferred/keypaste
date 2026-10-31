@@ -392,8 +392,8 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
             return;
         }
 
-        Raise(nameof(SecondsLeft));
-        Raise(nameof(Fraction));
+        OnPropertyChanged(nameof(SecondsLeft));
+        OnPropertyChanged(nameof(Fraction));
     }
 
     private void Fail(string message)
@@ -406,12 +406,12 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
 
     private void RaiseEverything()
     {
-        Raise(nameof(IsCounting));
-        Raise(nameof(IsVisible));
-        Raise(nameof(Label));
-        Raise(nameof(SecondsLeft));
-        Raise(nameof(Fraction));
-        Raise(nameof(Failure));
-        ClearNowCommand.RaiseCanExecuteChanged();
+        OnPropertyChanged(nameof(IsCounting));
+        OnPropertyChanged(nameof(IsVisible));
+        OnPropertyChanged(nameof(Label));
+        OnPropertyChanged(nameof(SecondsLeft));
+        OnPropertyChanged(nameof(Fraction));
+        OnPropertyChanged(nameof(Failure));
+        ClearNowCommand.NotifyCanExecuteChanged();
     }
 }

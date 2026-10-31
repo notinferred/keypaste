@@ -196,12 +196,12 @@ public sealed class SecretCopyParityTests
         var entries = screen.OpenRevision("github");
         var stale = entries.Detail!.History.Selected!;
 
-        entries.Detail.EditCommand.Execute(null);
+        entries.Detail.EditCommand.Press();
         entries.Detail.DraftUsername = "someone else";
-        entries.Detail.SaveCommand.Execute(null);
+        entries.Detail.SaveCommand.Press();
         ShellScreen.Drain();
 
-        await stale.CopyPasswordCommand.ExecuteAsync();
+        await stale.CopyPasswordCommand.PressAsync();
         await screen.Settle();
 
         Assert.False(screen.Shell.Clipboard.IsCounting);
@@ -362,7 +362,7 @@ public sealed class SecretCopyParityTests
         internal EntriesViewModel OpenRevision(string title)
         {
             var entries = OpenEntry(title);
-            entries.Detail!.History.ToggleCommand.Execute(null);
+            entries.Detail!.History.ToggleCommand.Press();
             Drain();
             entries.Detail.History.Selected = entries.Detail.History.Rows[0];
             Drain();
@@ -413,7 +413,7 @@ public sealed class SecretCopyParityTests
             Drain();
 
             var env = Assert.IsType<EnvSetsViewModel>(Shell.Content);
-            env.OpenCommand.Execute(project);
+            env.OpenCommand.Press(project);
             Drain();
 
             return Window.GetVisualDescendants().OfType<Button>()

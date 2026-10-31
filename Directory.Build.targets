@@ -4,9 +4,8 @@
        (D-0611, D-0675). It runs before any other target, so it sees only the references a project declares. -->
   <PropertyGroup>
     <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Infrastructure'">-</KeypasteReferences>
-    <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Mvvm'">-</KeypasteReferences>
     <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Core'">KeePassLib;Keypaste.Infrastructure</KeypasteReferences>
-    <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.App'">Keypaste.Core;Keypaste.Mvvm</KeypasteReferences>
+    <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.App'">Keypaste.Core</KeypasteReferences>
     <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Mcp'">Keypaste.Core</KeypasteReferences>
     <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Browser'">Keypaste.Core</KeypasteReferences>
     <KeypasteReferences Condition="'$(MSBuildProjectName)' == 'Keypaste.Cli'">Keypaste.Core;Keypaste.Mcp;Keypaste.Browser</KeypasteReferences>

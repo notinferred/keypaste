@@ -66,7 +66,7 @@ internal sealed partial class ExportImportView : UserControl
             return;
         }
 
-        model.CancelCommand.Execute(null);
+        model.CancelCommand.Press();
         e.Handled = true;
     }
 

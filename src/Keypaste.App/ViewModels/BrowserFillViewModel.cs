@@ -18,7 +18,7 @@ internal sealed record PairingItem(string Name, string Identity, string Used);
 /// Only a press here arms pairing; nothing a browser or a pipe sends does. While armed, the card counts down each second and
 /// reads the pairings again once the arming is spent or runs out, so a pairing just made appears.
 /// </remarks>
-internal sealed class BrowserFillViewModel : ObservableObject, IDisposable
+internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -26,9 +26,6 @@ internal sealed class BrowserFillViewModel : ObservableObject, IDisposable
     private readonly TimeProvider _clock;
     private readonly Action<Action> _post;
     private ITimer? _timer;
-    private IReadOnlyList<PairingItem> _rows = [];
-    private DateTimeOffset? _armedUntil;
-    private string _message = string.Empty;
 
     /// <param name="authority">The app's authority, which pairs browsers for each unlock.</param>
     /// <param name="clock">What the countdown runs on.</param>
@@ -42,16 +39,7 @@ internal sealed class BrowserFillViewModel : ObservableObject, IDisposable
         _post = post ?? (run => run());
 
         PairCommand = new RelayCommand(Pair, () => !IsArmed);
-        StopCommand = new RelayCommand(Stop, () => IsArmed);
         RemoveCommand = new RelayCommand<PairingItem>(Remove, row => row is not null);
-
-        DependsOn(nameof(IsArmed), nameof(ArmedUntil));
-        DependsOn(nameof(ArmedText), nameof(ArmedUntil));
-        DependsOn(nameof(HasRows), nameof(Rows));
-        DependsOn(nameof(HasNoRows), nameof(Rows));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(PairCommand, nameof(ArmedUntil));
-        DependsOn(StopCommand, nameof(ArmedUntil));
 
         ArmedUntil = _authority.PairingArmedUntil;
         Rows = Read();
@@ -65,32 +53,27 @@ internal sealed class BrowserFillViewModel : ObservableObject, IDisposable
     /// <summary>Arms pairing for two minutes and one pairing.</summary>
     internal RelayCommand PairCommand { get; }
 
-    /// <summary>Ends the arming before its two minutes are up.</summary>
-    internal RelayCommand StopCommand { get; }
-
     /// <summary>Removes one pairing, so the browser holding it is refused from its next check.</summary>
     internal RelayCommand<PairingItem> RemoveCommand { get; }
 
     /// <summary>The pairings the vault holds, by name.</summary>
-    internal IReadOnlyList<PairingItem> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRows), nameof(HasNoRows))]
+    internal partial IReadOnlyList<PairingItem> Rows { get; private set; } = [];
 
-    internal bool HasRows => _rows.Count > 0;
+    internal bool HasRows => Rows.Count > 0;
 
-    internal bool HasNoRows => _rows.Count == 0;
+    internal bool HasNoRows => Rows.Count == 0;
 
     /// <summary>Whether a browser may ask to pair now.</summary>
-    internal bool IsArmed => _armedUntil is not null;
+    internal bool IsArmed => ArmedUntil is not null;
 
     /// <summary>What the card says while armed, with the time left.</summary>
     internal string ArmedText
     {
         get
         {
-            if (_armedUntil is not { } until)
+            if (ArmedUntil is not { } until)
             {
                 return string.Empty;
             }
@@ -104,19 +87,16 @@ internal sealed class BrowserFillViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>What the last act here did, or empty.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
-    private DateTimeOffset? ArmedUntil
-    {
-        get => _armedUntil;
-        set => Set(ref _armedUntil, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsArmed), nameof(ArmedText))]
+    [NotifyCanExecuteChangedFor(nameof(PairCommand), nameof(StopCommand))]
+    private partial DateTimeOffset? ArmedUntil { get; set; }
 
     public void Dispose() => StopCounting();
 
@@ -133,6 +113,8 @@ internal sealed class BrowserFillViewModel : ObservableObject, IDisposable
         StartCounting();
     }
 
+    /// <summary>Ends the arming before its two minutes are up.</summary>
+    [RelayCommand(CanExecute = nameof(IsArmed))]
     private void Stop()
     {
         _authority.DisarmPairing();
@@ -157,7 +139,7 @@ internal sealed class BrowserFillViewModel : ObservableObject, IDisposable
     {
         var before = Rows.Count;
         ArmedUntil = _authority.PairingArmedUntil;
-        Raise(nameof(ArmedText));
+        OnPropertyChanged(nameof(ArmedText));
 
         if (IsArmed)
         {

@@ -35,7 +35,7 @@ internal sealed record FolderChoice(string Path, string Label, int Depth)
 /// read once, when Create is pressed. A database's or a server's host is a plain custom field named
 /// <see cref="HostField"/>, since KeePass has no standard field for one.
 /// </remarks>
-internal sealed class NewItemViewModel : ObservableObject, IDisposable
+internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 {
     /// <summary>The custom field a database's or a server's host is kept in.</summary>
     internal const string HostField = "Host";
@@ -44,16 +44,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     private IReadOnlyList<string> _projectTags;
     private ItemTemplate _template = ItemTemplate.Login;
     private FolderChoice _folder;
-    private string _title = string.Empty;
-    private string _username = string.Empty;
-    private string _url = string.Empty;
-    private string _host = string.Empty;
-    private string _keyName = string.Empty;
-    private string _notes = string.Empty;
-    private string _draftTag = string.Empty;
     private bool _generatePassword = true;
-    private IReadOnlyList<EntryTagChip> _tags = [];
-    private string? _error;
 
     /// <param name="session">The unlocked vault the item is made in.</param>
     /// <param name="clipboard">What the masked fields paste from.</param>
@@ -77,17 +68,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
 
         Password = new SecretField(clipboard);
         KeyValue = new SecretField(clipboard);
-        AddTagCommand = new RelayCommand(AddTag, () => _draftTag.Trim().Length > 0);
-
-        DependsOn(nameof(SelectedTemplate), nameof(Template));
-        DependsOn(nameof(ShowsUsername), nameof(Template));
-        DependsOn(nameof(ShowsPassword), nameof(ShowsUsername));
-        DependsOn(nameof(ShowsUrl), nameof(Template));
-        DependsOn(nameof(ShowsHost), nameof(Template));
-        DependsOn(nameof(ShowsKey), nameof(Template));
-        DependsOn(nameof(HasError), nameof(Error));
-        DependsOn(nameof(TagSuggestions), nameof(Tags));
-        DependsOn(AddTagCommand, nameof(DraftTag));
+        AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
     }
 
     /// <summary>The five things a new item can be.</summary>
@@ -106,8 +87,14 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         get => _template;
         set
         {
-            if (Set(ref _template, value))
+            if (SetProperty(ref _template, value))
             {
+                OnPropertyChanged(nameof(SelectedTemplate));
+                OnPropertyChanged(nameof(ShowsUsername));
+                OnPropertyChanged(nameof(ShowsUrl));
+                OnPropertyChanged(nameof(ShowsHost));
+                OnPropertyChanged(nameof(ShowsKey));
+                OnPropertyChanged(nameof(ShowsPassword));
                 Error = null;
             }
         }
@@ -136,11 +123,8 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
 
     internal bool ShowsKey => _template == ItemTemplate.ApiKey;
 
-    internal string Title
-    {
-        get => _title;
-        set => Set(ref _title, value);
-    }
+    [ObservableProperty]
+    internal partial string Title { get; set; } = string.Empty;
 
     /// <summary>The vault's groups a new item may go in, the top level first.</summary>
     internal IReadOnlyList<FolderChoice> Folders { get; }
@@ -152,41 +136,26 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         {
             if (value is not null)
             {
-                Set(ref _folder, value);
+                SetProperty(ref _folder, value);
             }
         }
     }
 
-    internal string Username
-    {
-        get => _username;
-        set => Set(ref _username, value);
-    }
+    [ObservableProperty]
+    internal partial string Username { get; set; } = string.Empty;
 
-    internal string Url
-    {
-        get => _url;
-        set => Set(ref _url, value);
-    }
+    [ObservableProperty]
+    internal partial string Url { get; set; } = string.Empty;
 
-    internal string Host
-    {
-        get => _host;
-        set => Set(ref _host, value);
-    }
+    [ObservableProperty]
+    internal partial string Host { get; set; } = string.Empty;
 
     /// <summary>An API key's name, as the environment variable a project would read it under.</summary>
-    internal string KeyName
-    {
-        get => _keyName;
-        set => Set(ref _keyName, value);
-    }
+    [ObservableProperty]
+    internal partial string KeyName { get; set; } = string.Empty;
 
-    internal string Notes
-    {
-        get => _notes;
-        set => Set(ref _notes, value);
-    }
+    [ObservableProperty]
+    internal partial string Notes { get; set; } = string.Empty;
 
     /// <summary>Whether the password is generated, which it is unless the person has one to enter.</summary>
     internal bool GeneratePassword
@@ -194,7 +163,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         get => _generatePassword;
         set
         {
-            if (Set(ref _generatePassword, value) && value)
+            if (SetProperty(ref _generatePassword, value) && value)
             {
                 Password.Clear();
             }
@@ -209,37 +178,31 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>An API key's value.</summary>
     internal SecretField KeyValue { get; }
 
-    internal IReadOnlyList<EntryTagChip> Tags
-    {
-        get => _tags;
-        private set => Set(ref _tags, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TagSuggestions))]
+    internal partial IReadOnlyList<EntryTagChip> Tags { get; private set; } = [];
 
-    internal string DraftTag
-    {
-        get => _draftTag;
-        set => Set(ref _draftTag, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddTagCommand))]
+    internal partial string DraftTag { get; set; } = string.Empty;
 
     /// <summary>The vault's project tags not yet added, which the tag box offers as a tag is typed; choosing one only fills <see cref="DraftTag"/>.</summary>
-    internal IReadOnlyList<string> TagSuggestions => [.. _projectTags.Except(_tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
+    internal IReadOnlyList<string> TagSuggestions => [.. _projectTags.Except(Tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
 
     internal RelayCommand AddTagCommand { get; }
 
     /// <summary>Why the last Create wrote nothing, or null.</summary>
-    internal string? Error
-    {
-        get => _error;
-        set => Set(ref _error, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    internal partial string? Error { get; set; }
 
-    internal bool HasError => _error is not null;
+    internal bool HasError => Error is not null;
 
     /// <summary>Creates the item with one core call and one save.</summary>
     /// <returns>The item's name, or null when it was refused and <see cref="Error"/> says why; nothing is written then.</returns>
     internal EntryName? Create()
     {
-        var title = _title.Trim();
+        var title = Title.Trim();
 
         if (title.Length == 0)
         {
@@ -259,7 +222,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
 
         if (ShowsKey)
         {
-            var key = _keyName.Trim();
+            var key = KeyName.Trim();
 
             if (!EnvConvention.IsEnvNamedField(key))
             {
@@ -278,9 +241,9 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
             fields.Add(new FieldWrite(key, value, Protect: true));
         }
 
-        if (ShowsHost && _host.Trim().Length > 0)
+        if (ShowsHost && Host.Trim().Length > 0)
         {
-            fields.Add(new FieldWrite(HostField, _host.Trim(), Protect: false));
+            fields.Add(new FieldWrite(HostField, Host.Trim(), Protect: false));
         }
 
         var password = string.Empty;
@@ -298,13 +261,13 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
                     {
                         Title = title,
                         GroupPath = _folder.Path,
-                        Username = ShowsUsername ? _username.Trim() : string.Empty,
+                        Username = ShowsUsername ? Username.Trim() : string.Empty,
                         Password = password,
-                        Url = ShowsUrl ? _url.Trim() : string.Empty,
-                        Notes = _notes,
+                        Url = ShowsUrl ? Url.Trim() : string.Empty,
+                        Notes = Notes,
                     },
                     fields,
-                    [.. _tags.Select(chip => chip.Tag)]);
+                    [.. Tags.Select(chip => chip.Tag)]);
                 return true;
             },
             created => created);
@@ -320,14 +283,14 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Removes a draft tag before the item exists.</summary>
-    internal void RemoveTag(EntryTagChip chip) => Tags = [.. _tags.Where(tag => !ReferenceEquals(tag, chip))];
+    internal void RemoveTag(EntryTagChip chip) => Tags = [.. Tags.Where(tag => !ReferenceEquals(tag, chip))];
 
     public void Dispose()
     {
         Password.Dispose();
         KeyValue.Dispose();
         _projectTags = [];
-        Raise(nameof(TagSuggestions));
+        OnPropertyChanged(nameof(TagSuggestions));
     }
 
     private bool TryNewPassword(out string password)
@@ -354,7 +317,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
 
     private void AddTag()
     {
-        var tag = _draftTag.Trim();
+        var tag = DraftTag.Trim();
 
         if (!TagRules.IsValid(tag, out var error))
         {
@@ -362,13 +325,13 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_tags.Any(chip => string.Equals(chip.Tag, tag, StringComparison.Ordinal)))
+        if (Tags.Any(chip => string.Equals(chip.Tag, tag, StringComparison.Ordinal)))
         {
             Error = $"The item already has the tag {EntryNameSanitizer.Sanitize(tag).Text}.";
             return;
         }
 
-        Tags = [.. _tags, new EntryTagChip(tag, RemoveTag)];
+        Tags = [.. Tags, new EntryTagChip(tag, RemoveTag)];
         DraftTag = string.Empty;
         Error = null;
     }

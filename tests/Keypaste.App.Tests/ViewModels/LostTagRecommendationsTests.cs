@@ -84,7 +84,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         var bytes = File.ReadAllBytes(_fixture.Path_);
         var history = _session.Unlocked!.ReadHistory(_billing)!.Count;
 
-        lost.RestoreCommand.Execute(null);
+        lost.RestoreCommand.Press();
 
         Assert.True(lost.IsConfirming);
         Assert.Equal(
@@ -92,7 +92,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
             lost.Confirmation);
         Assert.Equal(bytes, File.ReadAllBytes(_fixture.Path_));
 
-        lost.ConfirmRestoreCommand.Execute(null);
+        lost.ConfirmRestoreCommand.Press();
         await shell.Recommendations.Checking;
 
         var vault = _session.Unlocked!;
@@ -110,7 +110,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         {
             await shell.Recommendations.Checking;
 
-            Assert.Single(shell.Recommendations.LostTags).DismissCommand.Execute(null);
+            Assert.Single(shell.Recommendations.LostTags).DismissCommand.Press();
 
             Assert.Equal(string.Empty, Settings(shell).Count);
             Assert.Equal("Dismissed", Assert.Single(shell.Recommendations.LostTags).StateLabel);
@@ -130,7 +130,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         var dismissed = Assert.Single(again.Recommendations.LostTags);
         Assert.True(dismissed.IsDismissed);
 
-        dismissed.ReviewAgainCommand.Execute(null);
+        dismissed.ReviewAgainCommand.Press();
 
         Assert.Equal("1", Settings(again).Count);
     }

@@ -145,7 +145,7 @@ public sealed class EntriesViewModelTests : IDisposable
         using var context = New();
 
         var form = NewItemForm.Open(context.Entries, "servers/database");
-        context.Entries.ConfirmAddCommand.Execute(null);
+        context.Entries.ConfirmAddCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.Contains(context.Entries.Rows, row => row.Path == "servers/database");
@@ -164,7 +164,7 @@ public sealed class EntriesViewModelTests : IDisposable
 
         var form = NewItemForm.Open(context.Entries, "blank");
         form.GeneratePassword = false;
-        context.Entries.ConfirmAddCommand.Execute(null);
+        context.Entries.ConfirmAddCommand.Press();
 
         using var reopened = Vault.Open(_vaultPath, Master);
         Assert.Equal(string.Empty, reopened.Find("blank")?.Password);
@@ -176,7 +176,7 @@ public sealed class EntriesViewModelTests : IDisposable
         using var context = New();
 
         var form = NewItemForm.Open(context.Entries, "github");
-        context.Entries.ConfirmAddCommand.Execute(null);
+        context.Entries.ConfirmAddCommand.Press();
 
         Assert.NotNull(form.Error);
         Assert.Equal(4, context.Entries.TotalCount);
@@ -188,7 +188,7 @@ public sealed class EntriesViewModelTests : IDisposable
         using var context = New();
 
         var form = NewItemForm.Open(context.Entries, "   ");
-        context.Entries.ConfirmAddCommand.Execute(null);
+        context.Entries.ConfirmAddCommand.Press();
 
         Assert.Equal("An item needs a title.", form.Error);
         Assert.True(context.Entries.IsAdding);
@@ -203,7 +203,7 @@ public sealed class EntriesViewModelTests : IDisposable
         using var context = New();
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "staging");
-        context.Entries.DeleteCommand.Execute(null);
+        context.Entries.DeleteCommand.Press();
 
         Assert.True(context.Entries.IsConfirmingDelete);
         Assert.Contains("servers/staging", context.Entries.DeletePrompt, StringComparison.Ordinal);
@@ -214,7 +214,7 @@ public sealed class EntriesViewModelTests : IDisposable
             Assert.NotNull(untouched.Find("servers/staging"));
         }
 
-        context.Entries.ConfirmDeleteCommand.Execute(null);
+        context.Entries.ConfirmDeleteCommand.Press();
 
         Assert.DoesNotContain(context.Entries.Rows, row => row.Title == "staging");
 
@@ -234,8 +234,8 @@ public sealed class EntriesViewModelTests : IDisposable
         using var context = new Context(path);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "nested/TOKEN");
-        context.Entries.DeleteCommand.Execute(null);
-        context.Entries.ConfirmDeleteCommand.Execute(null);
+        context.Entries.DeleteCommand.Press();
+        context.Entries.ConfirmDeleteCommand.Press();
 
         Assert.Null(context.Entries.Error);
 
@@ -267,8 +267,8 @@ public sealed class EntriesViewModelTests : IDisposable
 
         using var context = new Context(path);
         context.Entries.Selected = context.Entries.Rows[0];
-        context.Entries.DeleteCommand.Execute(null);
-        context.Entries.ConfirmDeleteCommand.Execute(null);
+        context.Entries.DeleteCommand.Press();
+        context.Entries.ConfirmDeleteCommand.Press();
 
         Assert.NotNull(context.Entries.Error);
         Assert.Equal(before, Digest(path), StringComparer.Ordinal);
@@ -283,8 +283,8 @@ public sealed class EntriesViewModelTests : IDisposable
         using var context = New();
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "staging");
-        context.Entries.DeleteCommand.Execute(null);
-        context.Entries.CancelDeleteCommand.Execute(null);
+        context.Entries.DeleteCommand.Press();
+        context.Entries.CancelDeleteCommand.Press();
 
         Assert.False(context.Entries.IsConfirmingDelete);
 
@@ -300,10 +300,10 @@ public sealed class EntriesViewModelTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
         var detail = context.Entries.Detail!;
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         detail.DraftUsername = "someone-else";
         detail.DraftUrl = "https://github.example";
-        detail.SaveCommand.Execute(null);
+        detail.SaveCommand.Press();
 
         Assert.False(detail.IsEditing);
         Assert.Equal("someone-else", detail.Username);
@@ -333,9 +333,9 @@ public sealed class EntriesViewModelTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/dev/nested");
         var detail = context.Entries.Detail!;
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         detail.DraftUsername = "chosen";
-        detail.SaveCommand.Execute(null);
+        detail.SaveCommand.Press();
 
         Assert.Null(context.Entries.Error);
 
@@ -357,7 +357,7 @@ public sealed class EntriesViewModelTests : IDisposable
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/dev/nested");
 
-        await context.Entries.Detail!.CopyPasswordCommand.ExecuteAsync();
+        await context.Entries.Detail!.CopyPasswordCommand.PressAsync();
 
         Assert.Equal("nested", context.Clipboard.Content);
     }
@@ -370,9 +370,9 @@ public sealed class EntriesViewModelTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
         var detail = context.Entries.Detail!;
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         detail.DraftUsername = "someone-else";
-        detail.CancelCommand.Execute(null);
+        detail.CancelCommand.Press();
 
         Assert.Equal("me", detail.Username);
 
@@ -402,9 +402,9 @@ public sealed class EntriesViewModelTests : IDisposable
             elsewhere.Save();
         }
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         detail.DraftUsername = "someone-else";
-        detail.SaveCommand.Execute(null);
+        detail.SaveCommand.Press();
 
         Assert.NotNull(context.Entries.Error);
         Assert.Contains("changed this vault", context.Entries.Error, StringComparison.Ordinal);

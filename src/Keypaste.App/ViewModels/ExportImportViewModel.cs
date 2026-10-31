@@ -23,7 +23,7 @@ namespace Keypaste.App.ViewModels;
 /// by its part and why (D-0565).
 /// </para>
 /// </remarks>
-internal sealed class ExportImportViewModel : ObservableObject, IDisposable
+internal sealed partial class ExportImportViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly string _path;
@@ -34,14 +34,7 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
 
     private Task? _reading;
     private ExportSource? _source;
-    private ExportPlan? _plan;
-    private ExportDialogState _state = ExportDialogState.Reading;
-    private string _format = string.Empty;
-    private int _itemCount;
-    private int _imported;
     private string _into = string.Empty;
-    private bool _skipHeld;
-    private string _message = string.Empty;
 
     /// <summary>Waits for <see cref="ReadAsync"/> to read the file.</summary>
     /// <param name="session">The session whose vault the export is copied into.</param>
@@ -69,29 +62,8 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
         _chooseAnother = chooseAnother;
         _post = post;
 
-        ConfirmCommand = new RelayCommand(Confirm, () => CanConfirm);
         CancelCommand = new RelayCommand(Dispose);
         ChooseAnotherCommand = new AsyncRelayCommand(() => _chooseAnother!(), () => CanChooseAnother);
-
-        DependsOn(nameof(IsReading), nameof(State));
-        DependsOn(nameof(IsUnreadable), nameof(State));
-        DependsOn(nameof(IsPreviewing), nameof(State));
-        DependsOn(nameof(IsImported), nameof(State));
-        DependsOn(nameof(CanChooseAnother), nameof(State));
-        DependsOn(nameof(CardDetail), nameof(State), nameof(Format), nameof(ItemCount));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(HasTrailingMessage), nameof(HasMessage), nameof(State));
-        DependsOn(nameof(HeldCount), nameof(Plan));
-        DependsOn(nameof(HasHeld), nameof(HeldCount), nameof(State));
-        DependsOn(nameof(HeldLabel), nameof(HeldCount));
-        DependsOn(nameof(KeepHeld), nameof(SkipHeld));
-        DependsOn(nameof(NotImportedLabel), nameof(Plan));
-        DependsOn(nameof(HasNotImported), nameof(Plan), nameof(State));
-        DependsOn(nameof(ConfirmText), nameof(Plan));
-        DependsOn(nameof(ImportedText), nameof(Imported));
-        DependsOn(nameof(CanConfirm), nameof(State), nameof(Plan));
-        DependsOn(ConfirmCommand, nameof(CanConfirm));
-        DependsOn(ChooseAnotherCommand, nameof(CanChooseAnother));
 
         _session.Locked += OnLocked;
     }
@@ -105,16 +77,16 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
     /// <summary>Where the export is on disk, so the person can find it to delete it.</summary>
     internal string FilePath => DisplayTextSanitizer.Sanitize(_path).Text;
 
-    internal bool IsReading => _state == ExportDialogState.Reading;
+    internal bool IsReading => State == ExportDialogState.Reading;
 
     /// <summary>Whether the file was refused: the card says why, and only another file or Cancel is offered.</summary>
-    internal bool IsUnreadable => _state == ExportDialogState.Unreadable;
+    internal bool IsUnreadable => State == ExportDialogState.Unreadable;
 
     /// <summary>Whether the preview shows: the file is read and nothing is imported yet.</summary>
-    internal bool IsPreviewing => _state == ExportDialogState.Previewing;
+    internal bool IsPreviewing => State == ExportDialogState.Previewing;
 
     /// <summary>Whether the import is done and the dialog says what it did.</summary>
-    internal bool IsImported => _state == ExportDialogState.Imported;
+    internal bool IsImported => State == ExportDialogState.Imported;
 
     internal bool CanChooseAnother => IsUnreadable && _chooseAnother is not null;
 
@@ -122,21 +94,17 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
     internal AsyncRelayCommand ChooseAnotherCommand { get; }
 
     /// <summary>The format, as its reader names it, such as <c>Bitwarden JSON</c>.</summary>
-    internal string Format
-    {
-        get => _format;
-        private set => Set(ref _format, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CardDetail))]
+    internal partial string Format { get; private set; } = string.Empty;
 
     /// <summary>How many items the export holds.</summary>
-    internal int ItemCount
-    {
-        get => _itemCount;
-        private set => Set(ref _itemCount, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CardDetail))]
+    internal partial int ItemCount { get; private set; }
 
     /// <summary>The file card's second line.</summary>
-    internal string CardDetail => _state switch
+    internal string CardDetail => State switch
     {
         ExportDialogState.Reading => "Reading…",
         ExportDialogState.Previewing or ExportDialogState.Imported => $"{Format} · {Items(ItemCount)}",
@@ -149,7 +117,7 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
         get => _into;
         set
         {
-            if (Set(ref _into, value ?? string.Empty) && IsPreviewing)
+            if (SetProperty(ref _into, value ?? string.Empty) && IsPreviewing)
             {
                 Lay(_into);
             }
@@ -163,7 +131,7 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
     internal ObservableCollection<ExportLossRow> NotImported { get; } = [];
 
     /// <summary>How many items have a name the vault already has.</summary>
-    internal int HeldCount => _plan?.Rows.Count(row => row.Collision == ExportCollision.VaultItem) ?? 0;
+    internal int HeldCount => Plan?.Rows.Count(row => row.Collision == ExportCollision.VaultItem) ?? 0;
 
     /// <summary>Whether the choice between keeping both and skipping shows.</summary>
     internal bool HasHeld => IsPreviewing && HeldCount > 0;
@@ -175,7 +143,7 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
     /// <summary>Whether an item whose name the vault already has lands beside it, the default (D-0566).</summary>
     internal bool KeepHeld
     {
-        get => !_skipHeld;
+        get => !SkipHeld;
         set => SkipHeld = !value;
     }
 
@@ -183,15 +151,15 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
     /// Whether an item whose name the vault already has is skipped, as <c>keypaste import --skip-existing</c> skips it. An
     /// item the export holds twice is kept beside the other either way, since neither copy is in the vault yet.
     /// </summary>
-    internal bool SkipHeld
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeepHeld))]
+    internal partial bool SkipHeld { get; set; }
+
+    partial void OnSkipHeldChanged(bool value)
     {
-        get => _skipHeld;
-        set
+        if (IsPreviewing)
         {
-            if (Set(ref _skipHeld, value) && IsPreviewing)
-            {
-                Lay(_into);
-            }
+            Lay(_into);
         }
     }
 
@@ -200,51 +168,45 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
     internal bool HasNotImported => (IsPreviewing || IsImported) && NotImported.Count > 0;
 
     /// <summary>What stops the import, or why it failed, or empty.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage), nameof(HasTrailingMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     /// <summary>Whether the message shows below the dialog's body rather than on the card, which says why a file is refused.</summary>
     internal bool HasTrailingMessage => HasMessage && !IsUnreadable;
 
     /// <summary><c>Import 142 items</c>, counting the items that land.</summary>
-    internal string ConfirmText => $"Import {Items(_plan?.Landing ?? 0)}";
+    internal string ConfirmText => $"Import {Items(Plan?.Landing ?? 0)}";
 
     /// <summary>False while the plan is refused, nothing lands or the vault is locked.</summary>
-    internal bool CanConfirm => IsPreviewing && _plan is { Refusal: null, Landing: > 0 } && _session.IsUnlocked;
-
-    internal RelayCommand ConfirmCommand { get; }
+    internal bool CanConfirm => IsPreviewing && Plan is { Refusal: null, Landing: > 0 } && _session.IsUnlocked;
 
     /// <summary>Closes the dialog: before an import, nothing is copied; after it, the dialog says what it did as it goes.</summary>
     internal RelayCommand CancelCommand { get; }
 
     /// <summary>How many items the import copied.</summary>
-    internal int Imported
-    {
-        get => _imported;
-        private set => Set(ref _imported, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ImportedText))]
+    internal partial int Imported { get; private set; }
 
     internal string ImportedText => $"Imported {Items(Imported)} into {Show(_into)}";
 
     /// <summary>The export while it is held. A test seam for when its attachments go.</summary>
     internal ExportSource? Source => _source;
 
-    private ExportDialogState State
-    {
-        get => _state;
-        set => Set(ref _state, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReading), nameof(IsUnreadable), nameof(IsPreviewing), nameof(IsImported), nameof(CanChooseAnother))]
+    [NotifyPropertyChangedFor(nameof(CardDetail), nameof(HasTrailingMessage), nameof(HasHeld), nameof(HasNotImported), nameof(CanConfirm))]
+    [NotifyCanExecuteChangedFor(nameof(ChooseAnotherCommand), nameof(ConfirmCommand))]
+    private partial ExportDialogState State { get; set; } = ExportDialogState.Reading;
 
-    private ExportPlan? Plan
-    {
-        get => _plan;
-        set => Set(ref _plan, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeldCount), nameof(NotImportedLabel), nameof(HasNotImported), nameof(ConfirmText), nameof(CanConfirm))]
+    [NotifyPropertyChangedFor(nameof(HasHeld), nameof(HeldLabel))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    private partial ExportPlan? Plan { get; set; }
 
     /// <summary>The formats as one list a sentence can end on: <c>A, B or C</c>.</summary>
     internal static string Either(IReadOnlyList<string> names)
@@ -260,7 +222,7 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
     /// <summary>Drops the export and whatever was shown of it; after an import, says what it copied.</summary>
     public void Dispose()
     {
-        if (_state == ExportDialogState.Closed)
+        if (State == ExportDialogState.Closed)
         {
             return;
         }
@@ -334,7 +296,7 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
 
         var plan = source.Plan(vault, into);
 
-        if (_skipHeld)
+        if (SkipHeld)
         {
             plan = source.Plan(
                 vault,
@@ -343,7 +305,7 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
         }
 
         _into = plan.Into;
-        Raise(nameof(Into));
+        OnPropertyChanged(nameof(Into));
 
         Rows.Clear();
         NotImported.Clear();
@@ -368,9 +330,10 @@ internal sealed class ExportImportViewModel : ObservableObject, IDisposable
         Plan = plan;
     }
 
+    [RelayCommand(CanExecute = nameof(CanConfirm))]
     private void Confirm()
     {
-        if (!CanConfirm || _source is not { } source || _plan is not { } plan)
+        if (!CanConfirm || _source is not { } source || Plan is not { } plan)
         {
             return;
         }

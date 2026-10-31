@@ -6,7 +6,6 @@
   <PropertyGroup>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Core'">NoNetwork</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.App'">NoKeePassLib;NoNetwork;NoFileWrites</KeypasteBans>
-    <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Mvvm'">NoKeePassLib;NoFileWrites</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Cli'">NoKeePassLib;NoCrashReports</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Mcp'">NoKeePassLib;NoCrashReports;NoVault</KeypasteBans>
     <KeypasteBans Condition="'$(MSBuildProjectName)' == 'Keypaste.Browser'">NoKeePassLib;NoCrashReports;NoVault</KeypasteBans>

@@ -23,7 +23,7 @@ namespace Keypaste.App.ViewModels;
 /// exactly the mutation the consistency tests exist to catch.
 /// </para>
 /// </remarks>
-internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
+internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposable
 {
     private const int _shownCandidates = 50;
 
@@ -33,30 +33,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private readonly IVaultFilePicker? _picker;
     private readonly Action _projectsChanged;
 
-    private IReadOnlyList<EnvVariableRow> _variables = [];
     private ProjectCatalog? _catalog;
-    private IReadOnlyList<EnvEnvironmentEntries> _environments = [];
-    private string? _addingEntryTo;
-    private string _entryFilter = string.Empty;
-    private IReadOnlyList<EnvEntryCandidate> _candidates = [];
     private EnvEntryCandidate? _chosenEntry;
-    private ProjectTagChange? _tagChange;
-    private IReadOnlyList<EnvEntryChoice> _entryChoices = [];
-    private EnvEntryChoice? _newEntry;
-    private IReadOnlyList<EnvProfileColumn> _columns = [];
-    private IReadOnlyList<EnvKeyRow> _rows = [];
-    private IReadOnlyList<EnvProfileInfo> _profiles = [];
     private IReadOnlyList<string> _referenceKeys = [];
-    private EnvMatrix? _matrix;
     private string _selectedProfile = EnvProfileNames.Default;
-    private EnvVariableRow? _revealed;
-    private EnvVariableRow? _removing;
-    private EnvVariableRow? _replacing;
-    private bool _isAdding;
     private bool _generateValue = true;
-    private string _newKey = string.Empty;
-    private bool _isAddingProfile;
-    private string _newProfile = string.Empty;
 
     internal EnvProjectViewModel(
         AppVaultSession session,
@@ -81,7 +62,6 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Clipboard = clipboard;
         Name = name;
 
-        CopyRunCommandCommand = new AsyncRelayCommand(CopyRunCommandAsync, () => HasRunCommand);
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
@@ -96,44 +76,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         BeginAddProfileCommand = new RelayCommand(BeginAddProfile, () => !IsAddingProfile);
         ConfirmAddProfileCommand = new RelayCommand(ConfirmAddProfile, () => IsAddingProfile);
         CancelAddProfileCommand = new RelayCommand(() => IsAddingProfile = false, () => IsAddingProfile);
-        CancelAddEntryCommand = new RelayCommand(CancelAddEntry, () => IsAddingEntry);
         ConfirmTagChangeCommand = new RelayCommand(ConfirmTagChange, () => PendingTagChange is not null);
         CancelTagChangeCommand = new RelayCommand(CancelTagChange, () => PendingTagChange is not null);
-
-        DependsOn(nameof(Count), nameof(Variables));
-        DependsOn(nameof(Summary), nameof(Count));
-        DependsOn(nameof(RunCommand), nameof(SelectedProfile));
-        DependsOn(nameof(HasRows), nameof(Rows));
-        DependsOn(nameof(SelectedIsProtected), nameof(SelectedProfile));
-        DependsOn(nameof(ReferencePreview), nameof(SelectedProfile));
-        DependsOn(nameof(ReferenceLines), nameof(ReferencePreview));
-        DependsOn(nameof(RevealedKey), nameof(Revealed));
-        DependsOn(nameof(RemovePrompt), nameof(Removing));
-        DependsOn(nameof(IsRemoving), nameof(Removing));
-        DependsOn(nameof(ReplacePrompt), nameof(Replacing));
-        DependsOn(nameof(IsReplacing), nameof(Replacing));
-        DependsOn(nameof(IsAddingEntry), nameof(AddingEntryTo));
-        DependsOn(nameof(AddEntryTitle), nameof(AddingEntryTo));
-        DependsOn(nameof(EntryCandidates), nameof(EntryFilter), nameof(Candidates));
-        DependsOn(nameof(CandidateNote), nameof(EntryFilter), nameof(Candidates));
-        DependsOn(nameof(IsConfirmingTagChange), nameof(PendingTagChange));
-        DependsOn(nameof(TagChangeLines), nameof(PendingTagChange));
-        DependsOn(nameof(TagChangeAdds), nameof(PendingTagChange));
-        DependsOn(nameof(TagChangeAction), nameof(PendingTagChange));
-        DependsOn(nameof(TagChangeCancel), nameof(TagChangeAdds));
-        DependsOn(BeginAddCommand, nameof(IsAdding));
-        DependsOn(CancelAddCommand, nameof(IsAdding));
-        DependsOn(ConfirmAddCommand, nameof(IsAdding));
-        DependsOn(ConfirmRemoveCommand, nameof(Removing));
-        DependsOn(CancelRemoveCommand, nameof(Removing));
-        DependsOn(ConfirmReplaceCommand, nameof(Replacing));
-        DependsOn(CancelReplaceCommand, nameof(Replacing));
-        DependsOn(BeginAddProfileCommand, nameof(IsAddingProfile));
-        DependsOn(ConfirmAddProfileCommand, nameof(IsAddingProfile));
-        DependsOn(CancelAddProfileCommand, nameof(IsAddingProfile));
-        DependsOn(CancelAddEntryCommand, nameof(IsAddingEntry));
-        DependsOn(ConfirmTagChangeCommand, nameof(PendingTagChange));
-        DependsOn(CancelTagChangeCommand, nameof(PendingTagChange));
 
         Import = new EnvImportViewModel(session, name, picker, report, _announce, imported ?? Reload);
         Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(authority: null), report, _announce);
@@ -164,14 +108,12 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal ClipboardCountdown Clipboard { get; }
 
     /// <summary>The variables, masked.</summary>
-    internal IReadOnlyList<EnvVariableRow> Variables
-    {
-        get => _variables;
-        private set => Set(ref _variables, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Count), nameof(Summary))]
+    internal partial IReadOnlyList<EnvVariableRow> Variables { get; private set; } = [];
 
     /// <summary>How many variables this project holds.</summary>
-    internal int Count => _variables.Count;
+    internal int Count => Variables.Count;
 
     /// <summary>What the card says under its name.</summary>
     internal string Summary => Count == 1 ? "1 variable" : $"{Count} variables";
@@ -190,47 +132,34 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal string RunCommandNote => HasRunCommand ? string.Empty : CopiedRunCommand.NoCommandNote;
 
     /// <summary>The project's profiles: <c>dev</c> first, protected ones last.</summary>
-    internal IReadOnlyList<EnvProfileInfo> Profiles
-    {
-        get => _profiles;
-        private set => Set(ref _profiles, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<EnvProfileInfo> Profiles { get; private set; } = [];
 
     /// <summary>
     /// The matrix columns and the preview's toggle: <see cref="Profiles"/>, plus the selected
     /// profile while it has no key yet, placed before any protected one.
     /// </summary>
-    internal IReadOnlyList<EnvProfileColumn> Columns
-    {
-        get => _columns;
-        private set => Set(ref _columns, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<EnvProfileColumn> Columns { get; private set; } = [];
 
     /// <summary>Every key against <see cref="Columns"/>. Holds no value.</summary>
-    internal IReadOnlyList<EnvKeyRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRows))]
+    internal partial IReadOnlyList<EnvKeyRow> Rows { get; private set; } = [];
 
-    internal bool HasRows => _rows.Count > 0;
+    internal bool HasRows => Rows.Count > 0;
 
     /// <summary>Whether the selected profile is protected, so every release of it is asked live (D-0348).</summary>
     internal bool SelectedIsProtected => EnvProfileNames.IsProtected(SelectedProfile);
 
     /// <summary>Whether the new-profile form is open.</summary>
-    internal bool IsAddingProfile
-    {
-        get => _isAddingProfile;
-        private set => Set(ref _isAddingProfile, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(BeginAddProfileCommand), nameof(ConfirmAddProfileCommand), nameof(CancelAddProfileCommand))]
+    internal partial bool IsAddingProfile { get; private set; }
 
     /// <summary>The name of the profile being started.</summary>
-    internal string NewProfile
-    {
-        get => _newProfile;
-        set => Set(ref _newProfile, value);
-    }
+    [ObservableProperty]
+    internal partial string NewProfile { get; set; } = string.Empty;
 
     internal RelayCommand BeginAddProfileCommand { get; }
 
@@ -243,11 +172,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal AsyncRelayCommand ExportReferencesCommand { get; }
 
     /// <summary>Every key against every profile. Holds no value.</summary>
-    internal EnvMatrix? Matrix
-    {
-        get => _matrix;
-        private set => Set(ref _matrix, value);
-    }
+    [ObservableProperty]
+    internal partial EnvMatrix? Matrix { get; private set; }
 
     /// <summary>The profile the table shows and every add, replace, remove, import and launch goes to.</summary>
     /// <remarks>A profile that does not exist yet may be chosen: the first variable added to it creates it, as <c>env set -p</c> does.</remarks>
@@ -262,8 +188,12 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            if (Set(ref _selectedProfile, value))
+            if (SetProperty(ref _selectedProfile, value))
             {
+                OnPropertyChanged(nameof(RunCommand));
+                OnPropertyChanged(nameof(SelectedIsProtected));
+                OnPropertyChanged(nameof(ReferencePreview));
+                OnPropertyChanged(nameof(ReferenceLines));
                 Import.Profile = value;
                 Launch.Profile = value;
                 Revealed = null;
@@ -334,20 +264,17 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// </remarks>
     internal string? RevealedKey => Revealed?.Key;
 
-    private EnvVariableRow? Revealed
-    {
-        get => _revealed;
-        set => Set(ref _revealed, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RevealedKey))]
+    private partial EnvVariableRow? Revealed { get; set; }
 
     /// <summary>The variable a confirmation is pending for, or null.</summary>
-    internal EnvVariableRow? Removing
-    {
-        get => _removing;
-        private set => Set(ref _removing, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RemovePrompt), nameof(IsRemoving))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmRemoveCommand), nameof(CancelRemoveCommand))]
+    internal partial EnvVariableRow? Removing { get; private set; }
 
-    internal bool IsRemoving => _removing is not null;
+    internal bool IsRemoving => Removing is not null;
 
     /// <summary>The variable whose value is being replaced, or null.</summary>
     /// <remarks>
@@ -356,17 +283,16 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// per row would mean one live <see cref="SecretField"/> per variable, and a screen holding
     /// thirty buffers in order to use one of them.
     /// </remarks>
-    internal EnvVariableRow? Replacing
-    {
-        get => _replacing;
-        private set => Set(ref _replacing, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ReplacePrompt), nameof(IsReplacing))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmReplaceCommand), nameof(CancelReplaceCommand))]
+    internal partial EnvVariableRow? Replacing { get; private set; }
 
-    internal bool IsReplacing => _replacing is not null;
+    internal bool IsReplacing => Replacing is not null;
 
     /// <summary>What the replace form is headed with.</summary>
     /// <remarks>An entry several environments read is named with each of them, since every one gets the new value.</remarks>
-    internal string ReplacePrompt => _replacing is { } row
+    internal string ReplacePrompt => Replacing is { } row
         ? $"New value for {row.DisplayKey} on {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}. The old one stays in the item's history."
         : string.Empty;
 
@@ -386,7 +312,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         get => _generateValue;
         set
         {
-            if (Set(ref _generateValue, value) && value)
+            if (SetProperty(ref _generateValue, value) && value)
             {
                 NewValue.Clear();
             }
@@ -412,7 +338,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>What the confirmation asks.</summary>
-    internal string RemovePrompt => _removing is { } row
+    internal string RemovePrompt => Removing is { } row
         ? $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}? Its value stays in the item's history."
         : string.Empty;
 
@@ -439,34 +365,21 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             : $", which {string.Join(", ", environments[..^1])} and {environments[^1]} read";
     }
 
-    internal bool IsAdding
-    {
-        get => _isAdding;
-        private set => Set(ref _isAdding, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(BeginAddCommand), nameof(CancelAddCommand), nameof(ConfirmAddCommand))]
+    internal partial bool IsAdding { get; private set; }
 
     /// <summary>The name of the variable being added.</summary>
-    internal string NewKey
-    {
-        get => _newKey;
-        set => Set(ref _newKey, value);
-    }
+    [ObservableProperty]
+    internal partial string NewKey { get; set; } = string.Empty;
 
     /// <summary>The entries a new key can go on: the selected profile's home entry first, then the entries tagged into it.</summary>
-    internal IReadOnlyList<EnvEntryChoice> EntryChoices
-    {
-        get => _entryChoices;
-        private set => Set(ref _entryChoices, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<EnvEntryChoice> EntryChoices { get; private set; } = [];
 
     /// <summary>The entry the new key goes on.</summary>
-    internal EnvEntryChoice? NewEntry
-    {
-        get => _newEntry;
-        set => Set(ref _newEntry, value);
-    }
-
-    internal AsyncRelayCommand CopyRunCommandCommand { get; }
+    [ObservableProperty]
+    internal partial EnvEntryChoice? NewEntry { get; set; }
 
     internal RelayCommand BeginAddCommand { get; }
 
@@ -479,31 +392,25 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     internal RelayCommand CancelRemoveCommand { get; }
 
     /// <summary>Each environment of <see cref="Columns"/> with the entries tagged into it.</summary>
-    internal IReadOnlyList<EnvEnvironmentEntries> Environments
-    {
-        get => _environments;
-        private set => Set(ref _environments, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<EnvEnvironmentEntries> Environments { get; private set; } = [];
 
     /// <summary>Whether the form that tags an entry into an environment is open.</summary>
     internal bool IsAddingEntry => AddingEntryTo is not null;
 
-    private string? AddingEntryTo
-    {
-        get => _addingEntryTo;
-        set => Set(ref _addingEntryTo, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAddingEntry), nameof(AddEntryTitle))]
+    [NotifyCanExecuteChangedFor(nameof(CancelAddEntryCommand))]
+    private partial string? AddingEntryTo { get; set; }
 
     internal string AddEntryTitle => AddingEntryTo is { } environment
         ? $"Add an item to {EntryNameSanitizer.Sanitize(environment).Text}"
         : string.Empty;
 
     /// <summary>What the add form's list is narrowed to: part of an entry's path, in any case.</summary>
-    internal string EntryFilter
-    {
-        get => _entryFilter;
-        set => Set(ref _entryFilter, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EntryCandidates), nameof(CandidateNote))]
+    internal partial string EntryFilter { get; set; } = string.Empty;
 
     /// <summary>
     /// The entries the add form offers for <see cref="EntryFilter"/>: never one already in the
@@ -511,11 +418,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// </summary>
     internal IReadOnlyList<EnvEntryCandidate> EntryCandidates => [.. Matching().Take(_shownCandidates)];
 
-    private IReadOnlyList<EnvEntryCandidate> Candidates
-    {
-        get => _candidates;
-        set => Set(ref _candidates, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EntryCandidates), nameof(CandidateNote))]
+    private partial IReadOnlyList<EnvEntryCandidate> Candidates { get; set; } = [];
 
     /// <summary>What the add form says under its list: that nothing matches, or how many more the filter hides.</summary>
     internal string CandidateNote
@@ -536,30 +441,28 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         get => _chosenEntry;
         set
         {
-            if (Set(ref _chosenEntry, value))
+            if (SetProperty(ref _chosenEntry, value))
             {
                 PreviewAdd(value);
             }
         }
     }
 
-    internal RelayCommand CancelAddEntryCommand { get; }
-
     /// <summary>The tag change waiting for the person's answer, as the entry pane asks it (D-0415).</summary>
-    internal ProjectTagChange? PendingTagChange
-    {
-        get => _tagChange;
-        private set => Set(ref _tagChange, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingTagChange), nameof(TagChangeLines), nameof(TagChangeAdds), nameof(TagChangeAction))]
+    [NotifyPropertyChangedFor(nameof(TagChangeCancel))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmTagChangeCommand), nameof(CancelTagChangeCommand))]
+    internal partial ProjectTagChange? PendingTagChange { get; private set; }
 
-    internal bool IsConfirmingTagChange => _tagChange is not null;
+    internal bool IsConfirmingTagChange => PendingTagChange is not null;
 
     /// <summary>What the change does: the environment it reaches and the fields that join or leave it, never a value.</summary>
-    internal IReadOnlyList<string> TagChangeLines => _tagChange?.Describe() ?? [];
+    internal IReadOnlyList<string> TagChangeLines => PendingTagChange?.Describe() ?? [];
 
-    internal bool TagChangeAdds => _tagChange?.Adding ?? false;
+    internal bool TagChangeAdds => PendingTagChange?.Adding ?? false;
 
-    internal string TagChangeAction => _tagChange is { Read.Environment: { } environment } change
+    internal string TagChangeAction => PendingTagChange is { Read.Environment: { } environment } change
         ? change.Adding
             ? $"Add to {EntryNameSanitizer.Sanitize(environment).Text}"
             : $"Remove from {EntryNameSanitizer.Sanitize(environment).Text}"
@@ -595,7 +498,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             ReplacementValue.Clear();
             IsAdding = false;
             Replacing = null;
-            Raise(nameof(ReferencePreview));
+            OnPropertyChanged(nameof(ReferencePreview));
+            OnPropertyChanged(nameof(ReferenceLines));
             return;
         }
 
@@ -638,7 +542,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         Layout();
         ListEnvironments(vault);
-        Raise(nameof(ReferencePreview));
+        OnPropertyChanged(nameof(ReferencePreview));
+        OnPropertyChanged(nameof(ReferenceLines));
     }
 
     /// <summary>The entries tagged into one of this project's environments.</summary>
@@ -786,7 +691,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         if (e.PropertyName == nameof(ProjectLaunchViewModel.Mapping))
         {
-            Raise(nameof(RunCommand));
+            OnPropertyChanged(nameof(RunCommand));
         }
     }
 
@@ -800,7 +705,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>Notes that a row's hold ended.</summary>
     internal void Conceal(EnvVariableRow row)
     {
-        if (ReferenceEquals(_revealed, row))
+        if (ReferenceEquals(Revealed, row))
         {
             Revealed = null;
         }
@@ -872,7 +777,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>Nothing read out of the vault outlives this.</summary>
     public void Dispose()
     {
-        _revealed = null;
+        Revealed = null;
         Variables = [];
         Profiles = [];
         Matrix = null;
@@ -890,6 +795,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Launch.Dispose();
     }
 
+    [RelayCommand(CanExecute = nameof(HasRunCommand))]
     private async Task CopyRunCommandAsync()
     {
         if (RunCommand is { } command)
@@ -1114,6 +1020,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _report(null);
     }
 
+    [RelayCommand(CanExecute = nameof(IsAddingEntry))]
     private void CancelAddEntry()
     {
         CloseEntryForms();
@@ -1124,7 +1031,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         PendingTagChange = null;
 
-        if (_addingEntryTo is null)
+        if (AddingEntryTo is null)
         {
             return;
         }
@@ -1137,7 +1044,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     private IEnumerable<EnvEntryCandidate> Matching()
     {
-        var filter = _entryFilter.Trim();
+        var filter = EntryFilter.Trim();
 
         return filter.Length == 0
             ? Candidates
@@ -1147,7 +1054,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>Says what tagging the chosen entry into the environment does; nothing is written until it is confirmed.</summary>
     private void PreviewAdd(EnvEntryCandidate? chosen)
     {
-        if (chosen is null || _addingEntryTo is not { } environment || _session.Unlocked is not { } vault)
+        if (chosen is null || AddingEntryTo is not { } environment || _session.Unlocked is not { } vault)
         {
             PendingTagChange = null;
             return;

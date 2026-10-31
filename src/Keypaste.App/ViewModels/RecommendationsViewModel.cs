@@ -25,7 +25,7 @@ namespace Keypaste.App.ViewModels;
 /// refuses once the notes have changed since this check.
 /// </para>
 /// </remarks>
-internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
+internal sealed partial class RecommendationsViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly Action<EntryName>? _open;
@@ -38,10 +38,6 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
     private IReadOnlyList<NoteKeyFinding> _noteKeys = [];
     private IReadOnlyList<LostProjectTag> _lost = [];
     private IReadOnlyList<PasswordFinding> _weakReusedExpired = [];
-    private IReadOnlyList<RecommendationRow> _rows = [];
-    private IReadOnlyList<LostTagRow> _lostTags = [];
-    private IReadOnlyList<PasswordRow> _passwords = [];
-    private string _message = string.Empty;
     private bool _disposed;
     private int _generation;
 
@@ -60,64 +56,46 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         _dismissalsReadable = RecommendationDismissals.TryLoad(_dismissalsPath, out var dismissals);
         _dismissals = [.. dismissals];
 
-        MoveSelectedCommand = new RelayCommand(() => Move([.. _rows.Where(row => row.IsSelected && !row.IsDismissed)]));
-        SelectAllCommand = new RelayCommand(SelectAll);
-
-        DependsOn(nameof(NeedsReview), nameof(Rows), nameof(LostTags), nameof(Passwords));
-        DependsOn(nameof(IsEmpty), nameof(Rows), nameof(LostTags), nameof(Passwords));
-        DependsOn(nameof(HasNoteKeys), nameof(Rows));
-        DependsOn(nameof(HasLostTags), nameof(LostTags));
-        DependsOn(nameof(HasPasswords), nameof(Passwords));
-        DependsOn(nameof(HasMessage), nameof(Message));
+        MoveSelectedCommand = new RelayCommand(() => Move([.. Rows.Where(row => row.IsSelected && !row.IsDismissed)]));
 
         Check();
     }
 
     /// <summary>Every finding: those needing review first, then those dismissed.</summary>
-    internal IReadOnlyList<RecommendationRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasNoteKeys))]
+    internal partial IReadOnlyList<RecommendationRow> Rows { get; private set; } = [];
 
     /// <summary>Every project tag an entry lost in another app: those needing review first, then those dismissed.</summary>
-    internal IReadOnlyList<LostTagRow> LostTags
-    {
-        get => _lostTags;
-        private set => Set(ref _lostTags, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasLostTags))]
+    internal partial IReadOnlyList<LostTagRow> LostTags { get; private set; } = [];
 
     /// <summary>Every weak, reused or expired password: those needing review first, then those dismissed.</summary>
-    internal IReadOnlyList<PasswordRow> Passwords
-    {
-        get => _passwords;
-        private set => Set(ref _passwords, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasPasswords))]
+    internal partial IReadOnlyList<PasswordRow> Passwords { get; private set; } = [];
 
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
     internal int NeedsReview =>
-        _rows.Count(row => !row.IsDismissed) + _lostTags.Count(row => !row.IsDismissed) + _passwords.Count(row => !row.IsDismissed);
+        Rows.Count(row => !row.IsDismissed) + LostTags.Count(row => !row.IsDismissed) + Passwords.Count(row => !row.IsDismissed);
 
-    internal bool IsEmpty => _rows.Count == 0 && _lostTags.Count == 0 && _passwords.Count == 0;
+    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0;
 
-    internal bool HasNoteKeys => _rows.Count > 0;
+    internal bool HasNoteKeys => Rows.Count > 0;
 
-    internal bool HasLostTags => _lostTags.Count > 0;
+    internal bool HasLostTags => LostTags.Count > 0;
 
-    internal bool HasPasswords => _passwords.Count > 0;
+    internal bool HasPasswords => Passwords.Count > 0;
 
     /// <summary>What the last act did or why it was refused, or empty.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     internal RelayCommand MoveSelectedCommand { get; }
-
-    internal RelayCommand SelectAllCommand { get; }
 
     /// <summary>The latest check, complete once its findings are shown, or handed to the UI thread, or dropped.</summary>
     internal Task Checking { get; private set; } = Task.CompletedTask;
@@ -375,11 +353,12 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         Show();
     }
 
+    [RelayCommand]
     private void SelectAll()
     {
-        var select = _rows.Any(row => !row.IsDismissed && !row.IsSelected);
+        var select = Rows.Any(row => !row.IsDismissed && !row.IsSelected);
 
-        foreach (var row in _rows.Where(row => !row.IsDismissed))
+        foreach (var row in Rows.Where(row => !row.IsDismissed))
         {
             row.IsSelected = select;
         }

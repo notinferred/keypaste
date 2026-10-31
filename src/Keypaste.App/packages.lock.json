@@ -45,6 +45,12 @@
           "Avalonia": "12.1.0"
         }
       },
+      "CommunityToolkit.Mvvm": {
+        "type": "Direct",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
+      },
       "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
         "type": "Direct",
         "requested": "[5.6.0, )",
@@ -436,9 +442,6 @@
           "System.CommandLine": "[2.0.14, )"
         }
       },
-      "keypaste.mvvm": {
-        "type": "Project"
-      },
       "Polly.Core": {
         "type": "CentralTransitive",
         "requested": "[8.9.0, )",
@@ -695,6 +698,12 @@
         "dependencies": {
           "Avalonia": "12.1.0"
         }
+      },
+      "CommunityToolkit.Mvvm": {
+        "type": "Direct",
+        "requested": "[8.4.2, )",
+        "resolved": "8.4.2",
+        "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
       },
       "Microsoft.CodeAnalysis.BannedApiAnalyzers": {
         "type": "Direct",
@@ -1074,9 +1083,6 @@
         "dependencies": {
           "System.CommandLine": "[2.0.14, )"
         }
-      },
-      "keypaste.mvvm": {
-        "type": "Project"
       },
       "Polly.Core": {
         "type": "CentralTransitive",

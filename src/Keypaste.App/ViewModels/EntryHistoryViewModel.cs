@@ -26,7 +26,7 @@ namespace Keypaste.App.ViewModels;
 /// and length — and refuses rather than acting on a number that now names a different revision.
 /// </para>
 /// </remarks>
-internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
+internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposable
 {
     private const string _stale =
         "This item changed since its history was read. The list has been refreshed — choose again.";
@@ -36,11 +36,7 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     private readonly EntryDetailViewModel _owner;
     private readonly Action<EntryName> _restored;
 
-    private IReadOnlyList<EntryRevisionRow> _rows = [];
     private EntryRevisionRow? _selected;
-    private EntryRevisionRow? _revealed;
-    private RestoreQuestion? _asking;
-    private bool _isOpen;
     private bool _read;
     private int _countAtRead;
 
@@ -60,38 +56,23 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         _owner = owner;
         _restored = restored;
 
-        ToggleCommand = new RelayCommand(Toggle);
         RestoreCommand = new RelayCommand(() => Restore(_selected, confirmed: null), () => _selected is not null);
         ConfirmRestoreCommand = new RelayCommand(ConfirmRestore, () => Asking is not null);
         CancelRestoreCommand = new RelayCommand(() => Asking = null, () => Asking is not null);
-
-        DependsOn(nameof(ToggleLabel), nameof(IsOpen));
-        DependsOn(nameof(ShowsEmptyNote), nameof(IsOpen), nameof(Rows));
-        DependsOn(nameof(HasSelection), nameof(Selected));
-        DependsOn(nameof(RevealedWhen), nameof(Revealed));
-        DependsOn(nameof(IsConfirmingRestore), nameof(Asking));
-        DependsOn(nameof(RestoreLines), nameof(Asking));
-        DependsOn(RestoreCommand, nameof(Selected));
-        DependsOn(ConfirmRestoreCommand, nameof(Asking));
-        DependsOn(CancelRestoreCommand, nameof(Asking));
     }
 
     /// <summary>Whether the history section is showing.</summary>
-    internal bool IsOpen
-    {
-        get => _isOpen;
-        private set => Set(ref _isOpen, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ToggleLabel), nameof(ShowsEmptyNote))]
+    internal partial bool IsOpen { get; private set; }
 
     /// <summary>What the toggle says.</summary>
     internal string ToggleLabel => IsOpen ? "Hide history" : "Show history";
 
     /// <summary>The revisions, newest first, in the order the vault answered.</summary>
-    internal IReadOnlyList<EntryRevisionRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsEmptyNote))]
+    internal partial IReadOnlyList<EntryRevisionRow> Rows { get; private set; } = [];
 
     /// <summary>The revision being compared with the current values, or null.</summary>
     internal EntryRevisionRow? Selected
@@ -99,8 +80,10 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         get => _selected;
         set
         {
-            if (Set(ref _selected, value))
+            if (SetProperty(ref _selected, value))
             {
+                OnPropertyChanged(nameof(HasSelection));
+                RestoreCommand.NotifyCanExecuteChanged();
                 Asking = null;
             }
         }
@@ -113,10 +96,10 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     /// Whether a restore waits for the person to confirm what it does to the projects the item is in, because the
     /// revision's project tags differ from the item's and a restore puts them back (D-0510).
     /// </summary>
-    internal bool IsConfirmingRestore => _asking is not null;
+    internal bool IsConfirmingRestore => Asking is not null;
 
     /// <summary>What the waiting restore does to the item's projects, in the sentences a tag change shows (D-0415); names only, never a value.</summary>
-    internal IReadOnlyList<string> RestoreLines => _asking?.Lines ?? [];
+    internal IReadOnlyList<string> RestoreLines => Asking?.Lines ?? [];
 
     /// <summary>
     /// Whether to say the entry has never been changed.
@@ -135,20 +118,14 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
     /// <summary>Which revision is revealed, named by its time. Never by its value.</summary>
     internal string RevealedWhen => Revealed?.When ?? string.Empty;
 
-    private EntryRevisionRow? Revealed
-    {
-        get => _revealed;
-        set => Set(ref _revealed, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RevealedWhen))]
+    private partial EntryRevisionRow? Revealed { get; set; }
 
-    private RestoreQuestion? Asking
-    {
-        get => _asking;
-        set => Set(ref _asking, value);
-    }
-
-    /// <summary>Opens and closes the section.</summary>
-    internal RelayCommand ToggleCommand { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingRestore), nameof(RestoreLines))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmRestoreCommand), nameof(CancelRestoreCommand))]
+    private partial RestoreQuestion? Asking { get; set; }
 
     /// <summary>Makes the selected revision the entry's current values, first asking when that changes the item's projects.</summary>
     internal RelayCommand RestoreCommand { get; }
@@ -284,6 +261,8 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         Forget();
     }
 
+    /// <summary>Opens and closes the section.</summary>
+    [RelayCommand]
     private void Toggle()
     {
         if (IsOpen)

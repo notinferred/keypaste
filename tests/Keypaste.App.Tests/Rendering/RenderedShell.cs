@@ -140,11 +140,11 @@ internal sealed class RenderedShell : IDisposable
                 var editing = Show<EntriesViewModel>(DestinationKind.Entries);
                 editing.Selected = editing.Rows.Single(row => row.Title == "github");
                 Drain();
-                editing.Detail!.EditCommand.Execute(null);
+                editing.Detail!.EditCommand.Press();
                 break;
 
             case "NewFieldValue":
-                OpenPane().BeginAddFieldCommand.Execute(null);
+                OpenPane().BeginAddFieldCommand.Press();
                 break;
 
             case "ReplacementFieldValue":
@@ -153,7 +153,7 @@ internal sealed class RenderedShell : IDisposable
 
             case "NewEnvValue":
                 var project = OpenProject();
-                project.BeginAddCommand.Execute(null);
+                project.BeginAddCommand.Press();
                 project.GenerateValue = false;
                 break;
 
@@ -163,7 +163,7 @@ internal sealed class RenderedShell : IDisposable
                 break;
 
             case "SharePassphrase":
-                Shell.ShareCommand.Execute("github");
+                Shell.ShareCommand.Press("github");
                 Drain();
                 Shell.Share!.RequirePassphrase = true;
                 break;
@@ -259,7 +259,7 @@ internal sealed class RenderedShell : IDisposable
     {
         OpenEntry("CurrentPassword");
         var history = Assert.IsType<EntriesViewModel>(Shell.Content).Detail!.History;
-        history.ToggleCommand.Execute(null);
+        history.ToggleCommand.Press();
         Drain();
         history.Selected = history.Rows[0];
         Drain();
@@ -270,7 +270,7 @@ internal sealed class RenderedShell : IDisposable
     private EnvProjectViewModel OpenProject()
     {
         var env = Show<EnvSetsViewModel>(DestinationKind.EnvSets);
-        env.OpenCommand.Execute("billing");
+        env.OpenCommand.Press("billing");
         Drain();
 
         return env.OpenProject!;

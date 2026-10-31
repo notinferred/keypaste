@@ -31,18 +31,15 @@ internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, str
 /// token back once. The form keeps it in <see cref="Minted"/> only until it is dismissed or the
 /// screen closes, drawn while held and copied through the clipboard countdown, never in a property.
 /// </remarks>
-internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
+internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown? _clipboard;
     private readonly Action<string> _toast;
-    private IReadOnlyList<ScopedTokenRow> _rows = [];
     private bool _isFormOpen;
     private string _name = string.Empty;
     private string _scope = string.Empty;
     private string _expiry = ExpiryOptions[1];
-    private string _formError = string.Empty;
-    private string _message = string.Empty;
     private MintedToken? _minted;
 
     internal ScopedTokensViewModel(AppVaultSession session, ClipboardCountdown? clipboard = null, Action<string>? toast = null)
@@ -63,14 +60,6 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         CancelRevokeCommand = new RelayCommand(() => Confirm(null));
         SetExpiryCommand = new RelayCommand<string>(chosen => Expiry = chosen!);
 
-        DependsOn(nameof(HasFormError), nameof(FormError));
-        DependsOn(nameof(HasMessage), nameof(Message));
-        DependsOn(nameof(HasMinted), nameof(Minted));
-        DependsOn(nameof(HasNoRows), nameof(Rows));
-        DependsOn(nameof(CanOpenForm), nameof(IsFormOpen), nameof(Minted));
-        DependsOn(OpenFormCommand, nameof(CanOpenForm));
-        DependsOn(CopyMintedCommand, nameof(Minted));
-
         Refresh();
     }
 
@@ -85,8 +74,10 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         get => _isFormOpen;
         private set
         {
-            if (Set(ref _isFormOpen, value))
+            if (SetProperty(ref _isFormOpen, value))
             {
+                OnPropertyChanged(nameof(CanOpenForm));
+                OpenFormCommand.NotifyCanExecuteChanged();
                 FormError = string.Empty;
             }
         }
@@ -96,14 +87,14 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     internal string Name
     {
         get => _name;
-        set => Set(ref _name, value ?? string.Empty);
+        set => SetProperty(ref _name, value ?? string.Empty);
     }
 
     /// <summary>The new token's scopes, comma-separated, as <c>--scope</c> takes them.</summary>
     internal string Scope
     {
         get => _scope;
-        set => Set(ref _scope, value ?? string.Empty);
+        set => SetProperty(ref _scope, value ?? string.Empty);
     }
 
     /// <summary>One of <see cref="ExpiryOptions"/>.</summary>
@@ -114,35 +105,31 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         {
             if (value is not null && ExpiryOptions.Contains(value))
             {
-                Set(ref _expiry, value);
+                SetProperty(ref _expiry, value);
             }
         }
     }
 
     /// <summary>Why the form made no token, or empty.</summary>
-    internal string FormError
-    {
-        get => _formError;
-        private set => Set(ref _formError, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFormError))]
+    internal partial string FormError { get; private set; } = string.Empty;
 
-    internal bool HasFormError => _formError.Length > 0;
+    internal bool HasFormError => FormError.Length > 0;
 
     /// <summary>Why a revoke did nothing, or empty.</summary>
-    internal string Message
-    {
-        get => _message;
-        private set => Set(ref _message, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMessage))]
+    internal partial string Message { get; private set; } = string.Empty;
 
-    internal bool HasMessage => _message.Length > 0;
+    internal bool HasMessage => Message.Length > 0;
 
     /// <summary>The token just minted, until it is dismissed; it hands its value only to a hold or a copy.</summary>
     internal MintedToken? Minted => _minted;
 
     internal bool HasMinted => _minted is not null;
 
-    internal bool HasNoRows => _rows.Count == 0;
+    internal bool HasNoRows => Rows.Count == 0;
 
     /// <summary>Whether New token is offered: not while the form or a minted token is showing.</summary>
     internal bool CanOpenForm => !_isFormOpen && _minted is null;
@@ -169,11 +156,9 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     internal RelayCommand CancelRevokeCommand { get; }
 
     /// <summary>Every token, by name.</summary>
-    internal IReadOnlyList<ScopedTokenRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoRows))]
+    internal partial IReadOnlyList<ScopedTokenRow> Rows { get; private set; } = [];
 
     /// <summary>Reads the vault's tokens again.</summary>
     internal void Refresh()
@@ -284,7 +269,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         }
 
         CloseForm();
-        var prefix = _rows.FirstOrDefault(row => row.Name == name)?.Prefix ?? TokenSecret.Prefix;
+        var prefix = Rows.FirstOrDefault(row => row.Name == name)?.Prefix ?? TokenSecret.Prefix;
         SetMinted(new MintedToken(token, name, $"keypaste keeps only a verifier of {prefix}, so nobody can show you this token later."));
         _toast($"Created {name}");
     }
@@ -322,10 +307,17 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     private void SetMinted(MintedToken? minted)
     {
         _minted?.Forget();
-        Set(ref _minted, minted, nameof(Minted));
+
+        if (SetProperty(ref _minted, minted, nameof(Minted)))
+        {
+            OnPropertyChanged(nameof(HasMinted));
+            OnPropertyChanged(nameof(CanOpenForm));
+            CopyMintedCommand.NotifyCanExecuteChanged();
+            OpenFormCommand.NotifyCanExecuteChanged();
+        }
     }
 
-    private void Confirm(string? id) => Rows = [.. _rows.Select(row => row with { IsConfirming = row.Id == id })];
+    private void Confirm(string? id) => Rows = [.. Rows.Select(row => row with { IsConfirming = row.Id == id })];
 
     private static string Remaining(TokenInfo info, DateTimeOffset now)
     {

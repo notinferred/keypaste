@@ -19,7 +19,7 @@ namespace Keypaste.App.ViewModels;
 /// screen share or a recording would carry it.
 /// </para>
 /// </remarks>
-internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposable
+internal sealed partial class EntryTotpRow : ObservableObject, IRevealSource, IDisposable
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -27,7 +27,6 @@ internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposabl
     private readonly TimeProvider _clock;
     private readonly TimeSpan _period;
     private readonly ITimer _timer;
-    private int _secondsLeft;
     private long _step;
 
     internal EntryTotpRow(EntryDetailViewModel owner, TimeProvider clock, Action<Action> post, int digits, TimeSpan period)
@@ -40,9 +39,6 @@ internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposabl
         _clock = clock;
         _period = period;
         MaskedLength = digits;
-        CopyCommand = new AsyncRelayCommand(CopyAsync);
-
-        DependsOn(nameof(Countdown), nameof(SecondsLeft));
 
         Tick();
         _timer = clock.CreateTimer(_ => post(Tick), null, _tick, _tick);
@@ -55,17 +51,12 @@ internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposabl
     public int MaskedLength { get; }
 
     /// <summary>Whole seconds until the next code, read from the clock rather than counted down.</summary>
-    internal int SecondsLeft
-    {
-        get => _secondsLeft;
-        private set => Set(ref _secondsLeft, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Countdown))]
+    internal partial int SecondsLeft { get; private set; }
 
     /// <summary>The countdown as the pane draws it.</summary>
     internal string Countdown => $"{SecondsLeft}s";
-
-    /// <summary>Copies the current code, with the clipboard's clearing countdown.</summary>
-    internal AsyncRelayCommand CopyCommand { get; }
 
     /// <inheritdoc/>
     public string? Reveal() => _owner.ReadTotpCode();
@@ -95,6 +86,8 @@ internal sealed class EntryTotpRow : ObservableObject, IRevealSource, IDisposabl
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Copies the current code, with the clipboard's clearing countdown.</summary>
+    [RelayCommand]
     private async Task CopyAsync()
     {
         if (_owner.ReadTotpCode() is { } code)

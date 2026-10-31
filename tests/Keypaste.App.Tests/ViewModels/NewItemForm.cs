@@ -10,7 +10,7 @@ internal static class NewItemForm
     /// <returns>The open form.</returns>
     internal static NewItemViewModel Open(EntriesViewModel entries, string path = "")
     {
-        entries.BeginAddCommand.Execute(null);
+        entries.BeginAddCommand.Press();
         var form = entries.NewItem ?? throw new Xunit.Sdk.XunitException($"New item did not open: {entries.Error}");
 
         if (path.Length > 0)

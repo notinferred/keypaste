@@ -41,7 +41,7 @@ internal enum StatusTone
     Muted = 3,
 }
 
-internal sealed class ShellViewModel : ObservableObject, IDisposable
+internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 {
     /// <summary>How long a toast stays up.</summary>
     internal static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(2.8);
@@ -63,29 +63,18 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private TimeSpan _lockWindow;
     private DateTimeOffset _warnedWall;
     private long _warnedStamp;
-    private string? _notice;
     private Destination _current;
-    private object? _content;
-    private string _countdown = string.Empty;
-    private string _countdownAnnouncement = string.Empty;
     private string _search = string.Empty;
-    private string? _toast;
     private static readonly SidebarHeading _projectsHeading = new("Projects");
 
     private readonly HashSet<string> _expanded = new(StringComparer.Ordinal);
     private IReadOnlyList<ProjectRow> _projects = [];
     private IReadOnlyList<GroupNode> _groups = [];
-    private IReadOnlyList<object> _sidebarRows = [];
     private string? _openProject;
     private bool _rebuildingSidebar;
     private bool _agentsServing;
     private bool _agentsRefusing;
     private string _agentsDetail = string.Empty;
-    private SharingViewModel? _share;
-    private string _vaultStatus = string.Empty;
-    private StatusTone _vaultStatusTone;
-    private string _vaultStatusDetail = string.Empty;
-    private string? _vaultChanged;
     private string? _reloadFailure;
     private Task _merging = Task.CompletedTask;
     private bool _isMerging;
@@ -93,10 +82,6 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private bool _noticeNamesAConflict;
     private int _ticks;
     private readonly Action<string, string?, int?>? _openInPlace;
-    private KdbxImportViewModel? _import;
-    private ExportImportViewModel? _exportImport;
-    private GroupRow? _groupMenu;
-    private bool _waitingForTouch;
     private bool _disposed;
 
     internal ShellViewModel(
@@ -117,7 +102,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         _session = session;
         _web = web;
-        _notice = notice;
+        Notice = notice;
         _picker = picker;
         _openInPlace = openInPlace;
         Home = home;
@@ -136,54 +121,21 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             post);
 
         LockCommand = new AsyncRelayCommand(() => _session.LockAsync(VaultLockReason.Manual));
-        DismissNoticeCommand = new RelayCommand(DismissNotice);
-        ReloadCommand = new RelayCommand(Reload);
         DismissToastCommand = new RelayCommand(() => Toast = null);
-        OpenProjectCommand = new RelayCommand<string>(OpenProject);
         BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
-        NewProjectCommand = new RelayCommand(NewProject);
-        ImportEnvCommand = new RelayCommand(ImportEnv);
-        ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && _share is null);
-        CloseShareCommand = new RelayCommand(CloseShare);
-        ClearScopeCommand = new RelayCommand(() => (Content as EntriesViewModel)?.ClearScopeCommand.Execute(null));
+        ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && Share is null);
+        ClearScopeCommand = new RelayCommand(() => (Content as EntriesViewModel)?.ClearScopeCommand.Press());
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && !HasImport);
-        CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
+        CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => IsWaitingForTouch);
         NewGroupInsideCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginCreateGroupCommand));
         RenameGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginRenameGroupCommand));
         MoveGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginMoveGroupCommand));
         DeleteGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginDeleteGroupCommand));
 
-        DependsOn(nameof(HasGroupMenu), nameof(GroupMenu));
-        DependsOn(nameof(HasNotice), nameof(Notice));
-        DependsOn(nameof(HasVaultChanged), nameof(VaultChanged));
-        DependsOn(CancelTouchCommand, nameof(IsWaitingForTouch));
-        DependsOn(nameof(HasProjects), nameof(Projects));
-        DependsOn(nameof(HasShare), nameof(Share));
-        DependsOn(ShareCommand, nameof(Share));
-        DependsOn(nameof(HasKdbxImport), nameof(Import));
-        DependsOn(nameof(HasExportImport), nameof(ExportImport));
-        DependsOn(nameof(HasImport), nameof(Import), nameof(ExportImport));
-        DependsOn(ImportCommand, nameof(HasImport));
-        DependsOn(nameof(VaultStatusOk), nameof(VaultStatusTone));
-        DependsOn(nameof(VaultStatusAccent), nameof(VaultStatusTone));
-        DependsOn(nameof(VaultStatusDanger), nameof(VaultStatusTone));
-        DependsOn(nameof(HasToast), nameof(Toast));
-        DependsOn(nameof(CurrentTitle), nameof(Current));
-        DependsOn(nameof(ShowsHeader), nameof(Current));
-        DependsOn(nameof(HasBack), nameof(Current));
-        DependsOn(nameof(BackTitle), nameof(Current));
-        DependsOn(BackCommand, nameof(HasBack));
-        DependsOn(nameof(SelectedMain), nameof(Current));
-        DependsOn(nameof(SelectedFooter), nameof(Current));
-        DependsOn(nameof(SearchScope), nameof(Content));
-        DependsOn(nameof(HasSearchScope), nameof(SearchScope));
-        DependsOn(nameof(SearchPlaceholder), nameof(SearchScope));
-        DependsOn(nameof(HasCountdown), nameof(Countdown));
-
         FoldCommand = new RelayCommand<object>(row => Fold(row, open: null));
         MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity, IsExpandable = d.Kind == DestinationKind.Entries })];
         FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
-        _sidebarRows = SidebarOf();
+        SidebarRows = SidebarOf();
 
         _current = Destinations.Places[0];
         _session.LockingSoon += OnLockingSoon;
@@ -232,37 +184,26 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// Said after the fact as well as before it, because only afterwards is it known whether the
     /// replaced file was kept, was already kept, or was never there.
     /// </remarks>
-    internal string? Notice
-    {
-        get => _notice;
-        private set => Set(ref _notice, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotice))]
+    internal partial string? Notice { get; private set; }
 
-    internal bool HasNotice => _notice is not null;
-
-    internal RelayCommand DismissNoticeCommand { get; }
+    internal bool HasNotice => Notice is not null;
 
     /// <summary>What the notice says while the file holds another program's save that keypaste did not merge, or null.</summary>
-    internal string? VaultChanged
-    {
-        get => _vaultChanged;
-        private set => Set(ref _vaultChanged, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasVaultChanged))]
+    internal partial string? VaultChanged { get; private set; }
 
-    internal bool HasVaultChanged => _vaultChanged is not null;
-
-    /// <summary>Opens what the file holds now in place of the open copy (D-0412), offered once a merge was refused (D-0543).</summary>
-    internal RelayCommand ReloadCommand { get; }
+    internal bool HasVaultChanged => VaultChanged is not null;
 
     /// <summary>The merge of another program's save the poll or the folder watch started, or a completed task when none runs.</summary>
     internal Task Merging => _merging;
 
     /// <summary>Whether a save is waiting for the vault's YubiKey to be touched.</summary>
-    internal bool IsWaitingForTouch
-    {
-        get => _waitingForTouch;
-        private set => Set(ref _waitingForTouch, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelTouchCommand))]
+    internal partial bool IsWaitingForTouch { get; private set; }
 
     /// <summary>Stops waiting for the YubiKey, so the save fails and writes nothing.</summary>
     internal RelayCommand CancelTouchCommand { get; }
@@ -318,11 +259,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// One list rather than several, so the arrow keys walk the sidebar as a person reads it; Left and
     /// Right fold and unfold a row, as they do in KeePassXC's tree.
     /// </remarks>
-    internal IReadOnlyList<object> SidebarRows
-    {
-        get => _sidebarRows;
-        private set => Set(ref _sidebarRows, value);
-    }
+    [ObservableProperty]
+    internal partial IReadOnlyList<object> SidebarRows { get; private set; } = [];
 
     /// <summary>
     /// The sidebar row for where the shell is: the open project's row on its Env profiles, the group
@@ -339,7 +277,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             }
 
             if (_current.Kind == DestinationKind.Entries && (Content as EntriesViewModel)?.SelectedGroup is { IsEverything: false } group
-                && _sidebarRows.OfType<GroupRow>().FirstOrDefault(row => row.Path == group.Path) is { } shown)
+                && SidebarRows.OfType<GroupRow>().FirstOrDefault(row => row.Path == group.Path) is { } shown)
             {
                 return shown;
             }
@@ -410,7 +348,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             }
 
             _projects = value;
-            Raise();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasProjects));
             RebuildSidebar();
         }
     }
@@ -457,13 +396,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal bool HasProjects => _projects.Count > 0;
 
     /// <summary>The group whose menu is open in the sidebar, or null.</summary>
-    internal GroupRow? GroupMenu
-    {
-        get => _groupMenu;
-        private set => Set(ref _groupMenu, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasGroupMenu))]
+    internal partial GroupRow? GroupMenu { get; private set; }
 
-    internal bool HasGroupMenu => _groupMenu is not null;
+    internal bool HasGroupMenu => GroupMenu is not null;
 
     /// <summary>The group menu's New group: a group inside the one the menu is for.</summary>
     internal RelayCommand NewGroupInsideCommand { get; }
@@ -514,12 +451,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         if (Content is EntriesViewModel entries)
         {
-            form(entries).Execute(null);
+            form(entries).Press();
         }
     }
-
-    /// <summary>Opens Env profiles on a project.</summary>
-    internal RelayCommand<string> OpenProjectCommand { get; }
 
     /// <summary>Goes up from a screen to the screen or place it sits under.</summary>
     internal RelayCommand BackCommand { get; }
@@ -530,49 +464,38 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>What Back says: the screen or place it returns to.</summary>
     internal string BackTitle => Destinations.UpOf(_current).Title;
 
-    /// <summary>Items' "+" menu: New project, on Env profiles.</summary>
-    internal RelayCommand NewProjectCommand { get; }
-
-    /// <summary>Items' "+" menu: Import .env, into the first project.</summary>
-    internal RelayCommand ImportEnvCommand { get; }
-
     /// <summary>An item's ⋯ menu: Share…, as a dialog over the screen.</summary>
     internal RelayCommand<string> ShareCommand { get; }
 
-    internal RelayCommand CloseShareCommand { get; }
-
     /// <summary>The share dialog while it is open, or null.</summary>
-    internal SharingViewModel? Share
-    {
-        get => _share;
-        private set => Set(ref _share, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasShare))]
+    [NotifyCanExecuteChangedFor(nameof(ShareCommand))]
+    internal partial SharingViewModel? Share { get; private set; }
 
-    internal bool HasShare => _share is not null;
+    internal bool HasShare => Share is not null;
 
     /// <summary>Asks which file to import, a KeePass database or another app's export, then shows its dialog over the shell.</summary>
     internal AsyncRelayCommand ImportCommand { get; }
 
     /// <summary>The KeePass database import dialog while it is open, or null.</summary>
-    internal KdbxImportViewModel? Import
-    {
-        get => _import;
-        private set => Set(ref _import, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasKdbxImport), nameof(HasImport))]
+    [NotifyCanExecuteChangedFor(nameof(ImportCommand))]
+    internal partial KdbxImportViewModel? Import { get; private set; }
 
     /// <summary>The export import dialog while it is open, or null.</summary>
-    internal ExportImportViewModel? ExportImport
-    {
-        get => _exportImport;
-        private set => Set(ref _exportImport, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasExportImport), nameof(HasImport))]
+    [NotifyCanExecuteChangedFor(nameof(ImportCommand))]
+    internal partial ExportImportViewModel? ExportImport { get; private set; }
 
-    internal bool HasKdbxImport => _import is not null;
+    internal bool HasKdbxImport => Import is not null;
 
-    internal bool HasExportImport => _exportImport is not null;
+    internal bool HasExportImport => ExportImport is not null;
 
     /// <summary>Whether either import dialog is open.</summary>
-    internal bool HasImport => _import is not null || _exportImport is not null;
+    internal bool HasImport => Import is not null || ExportImport is not null;
 
     /// <summary>
     /// Shows the import dialog for <paramref name="path"/>, replacing one already open: the KeePass database dialog for a file
@@ -588,8 +511,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _import?.Dispose();
-        _exportImport?.Dispose();
+        Import?.Dispose();
+        ExportImport?.Dispose();
 
         var readers = Core.Import.ExportImport.Readers;
 
@@ -660,31 +583,23 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal string VaultPath => _session.VaultPath ?? string.Empty;
 
     /// <summary>The titlebar's status line: whether the file holds what is open.</summary>
-    internal string VaultStatus
-    {
-        get => _vaultStatus;
-        private set => Set(ref _vaultStatus, value);
-    }
+    [ObservableProperty]
+    internal partial string VaultStatus { get; private set; } = string.Empty;
 
     /// <summary>The colour of the titlebar's dot.</summary>
-    internal StatusTone VaultStatusTone
-    {
-        get => _vaultStatusTone;
-        private set => Set(ref _vaultStatusTone, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VaultStatusOk), nameof(VaultStatusAccent), nameof(VaultStatusDanger))]
+    internal partial StatusTone VaultStatusTone { get; private set; }
 
-    internal bool VaultStatusOk => _vaultStatusTone == StatusTone.Ok;
+    internal bool VaultStatusOk => VaultStatusTone == StatusTone.Ok;
 
-    internal bool VaultStatusAccent => _vaultStatusTone == StatusTone.Accent;
+    internal bool VaultStatusAccent => VaultStatusTone == StatusTone.Accent;
 
-    internal bool VaultStatusDanger => _vaultStatusTone == StatusTone.Danger;
+    internal bool VaultStatusDanger => VaultStatusTone == StatusTone.Danger;
 
     /// <summary>The titlebar's tooltip: when the file was saved, and where it is.</summary>
-    internal string VaultStatusDetail
-    {
-        get => _vaultStatusDetail;
-        private set => Set(ref _vaultStatusDetail, value);
-    }
+    [ObservableProperty]
+    internal partial string VaultStatusDetail { get; private set; } = string.Empty;
 
     /// <summary>Locks now, off the UI thread, so the window keeps painting until the endpoint has stopped.</summary>
     internal AsyncRelayCommand LockCommand { get; }
@@ -695,7 +610,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         get => _agentsServing;
         private set
         {
-            if (Set(ref _agentsServing, value))
+            if (SetProperty(ref _agentsServing, value))
             {
                 ShowAgentsDot();
             }
@@ -711,7 +626,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         get => _agentsRefusing;
         private set
         {
-            if (Set(ref _agentsRefusing, value))
+            if (SetProperty(ref _agentsRefusing, value))
             {
                 ShowAgentsDot();
             }
@@ -724,7 +639,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         get => _agentsDetail;
         private set
         {
-            if (Set(ref _agentsDetail, value))
+            if (SetProperty(ref _agentsDetail, value))
             {
                 MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity).Detail = value;
             }
@@ -737,7 +652,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         get => _search;
         set
         {
-            if (!Set(ref _search, value ?? string.Empty))
+            if (!SetProperty(ref _search, value ?? string.Empty))
             {
                 return;
             }
@@ -773,13 +688,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     public static string SearchShortcut => OperatingSystem.IsMacOS() ? "⌘K" : "Ctrl K";
 
     /// <summary>A short confirmation in the bottom-right corner, or null.</summary>
-    internal string? Toast
-    {
-        get => _toast;
-        private set => Set(ref _toast, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasToast))]
+    internal partial string? Toast { get; private set; }
 
-    internal bool HasToast => _toast is not null;
+    internal bool HasToast => Toast is not null;
 
     internal RelayCommand DismissToastCommand { get; }
 
@@ -808,15 +721,23 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         get => _current;
         set
         {
-            if (value is not null && Set(ref _current, value))
+            if (value is not null && SetProperty(ref _current, value))
             {
+                OnPropertyChanged(nameof(CurrentTitle));
+                OnPropertyChanged(nameof(ShowsHeader));
+                OnPropertyChanged(nameof(HasBack));
+                OnPropertyChanged(nameof(BackTitle));
+                OnPropertyChanged(nameof(SelectedMain));
+                OnPropertyChanged(nameof(SelectedFooter));
+                BackCommand.NotifyCanExecuteChanged();
+
                 if (value.Kind != DestinationKind.EnvSets)
                 {
                     _openProject = null;
                 }
 
                 Show(value);
-                Raise(nameof(SelectedSidebarRow));
+                OnPropertyChanged(nameof(SelectedSidebarRow));
             }
         }
     }
@@ -828,11 +749,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal bool ShowsHeader => !_current.OwnsHeader;
 
     /// <summary>Whatever the current destination shows.</summary>
-    internal object? Content
-    {
-        get => _content;
-        private set => Set(ref _content, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SearchScope), nameof(HasSearchScope), nameof(SearchPlaceholder))]
+    internal partial object? Content { get; private set; }
 
     /// <summary>
     /// A quiet line that appears shortly before the vault locks, counts the whole seconds left, rounded
@@ -843,20 +762,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// are asked of the clock at each tick, as <see cref="ClipboardCountdown"/> asks it, so a late tick
     /// never shows more time than is left.
     /// </remarks>
-    internal string Countdown
-    {
-        get => _countdown;
-        private set => Set(ref _countdown, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCountdown))]
+    internal partial string Countdown { get; private set; } = string.Empty;
 
-    internal bool HasCountdown => _countdown.Length > 0;
+    internal bool HasCountdown => Countdown.Length > 0;
 
     /// <summary>What a screen reader is told about the countdown: its first line, set once per warning, so it is announced once rather than every second.</summary>
-    internal string CountdownAnnouncement
-    {
-        get => _countdownAnnouncement;
-        private set => Set(ref _countdownAnnouncement, value);
-    }
+    [ObservableProperty]
+    internal partial string CountdownAnnouncement { get; private set; } = string.Empty;
 
     /// <summary>Clears the countdown, because somebody is evidently still here.</summary>
     internal void ClearCountdown()
@@ -953,7 +867,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     {
         if (e.PropertyName == nameof(EntriesViewModel.SearchScope))
         {
-            Raise(nameof(SearchScope));
+            OnPropertyChanged(nameof(SearchScope));
+            OnPropertyChanged(nameof(HasSearchScope));
+            OnPropertyChanged(nameof(SearchPlaceholder));
         }
 
         // A group made, renamed, moved or deleted on Items is in the tree at once, even one holding no item,
@@ -966,7 +882,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
         {
-            Raise(nameof(SelectedSidebarRow));
+            OnPropertyChanged(nameof(SelectedSidebarRow));
         }
     }
 
@@ -1031,7 +947,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Opens the share dialog on one entry, over whatever screen is showing.</summary>
     internal void OpenShare(string? path)
     {
-        if (_disposed || path is null || _share is not null)
+        if (_disposed || path is null || Share is not null)
         {
             return;
         }
@@ -1041,25 +957,28 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Share = share;
     }
 
+    [RelayCommand]
     private void CloseShare()
     {
-        var share = _share;
+        var share = Share;
         Share = null;
         share?.Dispose();
     }
 
     /// <summary>New project, from Items' "+" menu: Env profiles, with its create form open.</summary>
+    [RelayCommand]
     private void NewProject()
     {
         Current = Destinations.Of(DestinationKind.EnvSets);
 
         if (Content is EnvSetsViewModel env)
         {
-            env.BeginAddCommand.Execute(null);
+            env.BeginAddCommand.Press();
         }
     }
 
     /// <summary>Import .env, from Items' "+" menu: into the first project; with none, create one first.</summary>
+    [RelayCommand]
     private void ImportEnv()
     {
         if (_projects.Count == 0)
@@ -1072,10 +991,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         if ((Content as EnvSetsViewModel)?.OpenProject is { } open)
         {
-            open.Import.ChooseCommand.Execute(null);
+            open.Import.ChooseCommand.Press();
         }
     }
 
+    /// <summary>Opens Env profiles on a project.</summary>
+    [RelayCommand]
     private void OpenProject(string? project)
     {
         if (project is null)
@@ -1088,10 +1009,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         if (Content is EnvSetsViewModel env)
         {
-            env.OpenCommand.Execute(project);
+            env.OpenCommand.Press(project);
         }
 
-        Raise(nameof(SelectedSidebarRow));
+        OnPropertyChanged(nameof(SelectedSidebarRow));
     }
 
     /// <summary>Items showing <paramref name="name"/>'s group with it selected, the search cleared so the list holds it.</summary>
@@ -1118,7 +1039,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             entries.SelectedGroup = node;
         }
 
-        Raise(nameof(SelectedSidebarRow));
+        OnPropertyChanged(nameof(SelectedSidebarRow));
     }
 
     /// <summary>Shows <paramref name="path"/> when the group Items shows is folded away inside it.</summary>
@@ -1176,7 +1097,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     {
         var rows = SidebarOf();
 
-        if (rows.SequenceEqual(_sidebarRows))
+        if (rows.SequenceEqual(SidebarRows))
         {
             return;
         }
@@ -1192,7 +1113,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             _rebuildingSidebar = false;
         }
 
-        Raise(nameof(SelectedSidebarRow));
+        OnPropertyChanged(nameof(SelectedSidebarRow));
     }
 
     /// <summary>Counts entries and projects for the sidebar.</summary>
@@ -1522,6 +1443,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ReadVaultStatus();
     }
 
+    [RelayCommand]
     private void DismissNotice()
     {
         Notice = null;
@@ -1553,6 +1475,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         };
     }
 
+    /// <summary>Opens what the file holds now in place of the open copy (D-0412), offered once a merge was refused (D-0543).</summary>
+    [RelayCommand]
     private void Reload()
     {
         var result = _session.Reload();
@@ -1715,9 +1639,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _toastTimer?.Dispose();
         _countdownTimer?.Dispose();
         EntryActivity?.Dispose();
-        _import?.Dispose();
+        Import?.Dispose();
         Import = null;
-        _exportImport?.Dispose();
+        ExportImport?.Dispose();
         ExportImport = null;
         GroupMenu = null;
         Notice = null;

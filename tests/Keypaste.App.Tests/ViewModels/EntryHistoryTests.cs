@@ -87,7 +87,7 @@ public sealed class EntryHistoryTests : IDisposable
         Assert.Empty(history.Rows);
         Assert.False(history.ShowsEmptyNote);
 
-        history.ToggleCommand.Execute(null);
+        history.ToggleCommand.Press();
 
         Assert.True(history.IsOpen);
         Assert.Equal(3, history.Rows.Count);
@@ -220,7 +220,7 @@ public sealed class EntryHistoryTests : IDisposable
         var detail = context.Entries.Detail!;
 
         history.Selected = history.Rows[^1];
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.Equal("u0", detail.DisplayUsername);
@@ -248,7 +248,7 @@ public sealed class EntryHistoryTests : IDisposable
         {
             var history = Opened("servers/production", context);
             history.Selected = history.Rows[^1];
-            history.RestoreCommand.Execute(null);
+            history.RestoreCommand.Press();
         }
 
         using var reopened = Vault.Open(_vaultPath, _master);
@@ -273,7 +273,7 @@ public sealed class EntryHistoryTests : IDisposable
         }
 
         var before = Digest(_vaultPath);
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         Assert.NotNull(context.Entries.Error);
         Assert.Contains("changed this vault", context.Entries.Error, StringComparison.Ordinal);
@@ -309,7 +309,7 @@ public sealed class EntryHistoryTests : IDisposable
             Password = "v4",
         });
 
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         Assert.NotNull(context.Entries.Error);
         Assert.Contains("changed since its history was read", context.Entries.Error, StringComparison.Ordinal);
@@ -341,9 +341,9 @@ public sealed class EntryHistoryTests : IDisposable
 
         Assert.Equal(3, history.Rows.Count);
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         detail.DraftUsername = "u4";
-        detail.SaveCommand.Execute(null);
+        detail.SaveCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.Equal(4, history.Rows.Count);
@@ -359,9 +359,9 @@ public sealed class EntryHistoryTests : IDisposable
         var history = Select("servers/production", context);
         var detail = context.Entries.Detail!;
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
         detail.DraftUsername = "u4";
-        detail.SaveCommand.Execute(null);
+        detail.SaveCommand.Press();
 
         Assert.False(history.IsOpen);
         Assert.Empty(history.Rows);
@@ -377,7 +377,7 @@ public sealed class EntryHistoryTests : IDisposable
         var asked = 0;
         history.RestoreCommand.CanExecuteChanged += (_, _) => asked++;
 
-        history.ToggleCommand.Execute(null);
+        history.ToggleCommand.Press();
         history.Selected = history.Rows[0];
         Assert.Equal("v2", history.Rows[0].Reveal());
 
@@ -397,7 +397,7 @@ public sealed class EntryHistoryTests : IDisposable
         history.Selected = history.Rows[^1];
 
         context.Session.Lock(VaultLockReason.Manual);
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         Assert.Equal("The vault is locked.", context.Entries.Error);
     }
@@ -410,7 +410,7 @@ public sealed class EntryHistoryTests : IDisposable
         history.Selected = history.Rows[^1];
 
         context.Session.Unlocked!.RemoveEntry(_production);
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         Assert.NotNull(context.Entries.Error);
         Assert.Contains("no longer in this vault", context.Entries.Error, StringComparison.Ordinal);
@@ -459,7 +459,7 @@ public sealed class EntryHistoryTests : IDisposable
             Password = "a second one",
         });
 
-        history.ToggleCommand.Execute(null);
+        history.ToggleCommand.Press();
 
         Assert.Empty(history.Rows);
         Assert.False(history.ShowsEmptyNote);
@@ -490,7 +490,7 @@ public sealed class EntryHistoryTests : IDisposable
         var history = Opened("servers/production", context);
         history.Selected = history.Rows[0];
 
-        history.ToggleCommand.Execute(null);
+        history.ToggleCommand.Press();
 
         Assert.False(history.IsOpen);
         Assert.Empty(history.Rows);
@@ -529,7 +529,7 @@ public sealed class EntryHistoryTests : IDisposable
         Assert.Equal(10, history.Rows.Count);
 
         history.Selected = history.Rows[9];
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         using var reopened = Vault.Open(path, _master);
         var revisions = reopened.ReadHistory(new EntryName(string.Empty, "long-lived"));
@@ -597,7 +597,7 @@ public sealed class EntryHistoryTests : IDisposable
         Assert.Equal("env:billing", tagged.TagsSummary);
 
         history.Selected = tagged;
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         Assert.True(history.IsConfirmingRestore);
         Assert.Equal(
@@ -609,13 +609,13 @@ public sealed class EntryHistoryTests : IDisposable
             history.RestoreLines);
         Assert.Equal(before, Digest(_vaultPath));
 
-        history.CancelRestoreCommand.Execute(null);
+        history.CancelRestoreCommand.Press();
         Assert.False(history.IsConfirmingRestore);
         Assert.Equal(before, Digest(_vaultPath));
 
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
         Assert.True(history.IsConfirmingRestore);
-        history.ConfirmRestoreCommand.Execute(null);
+        history.ConfirmRestoreCommand.Press();
 
         Assert.Null(context.Entries.Error);
         using var reopened = Vault.Open(_vaultPath, _master);
@@ -635,7 +635,7 @@ public sealed class EntryHistoryTests : IDisposable
         Assert.Equal(string.Empty, untagged.TagsSummary);
 
         history.Selected = untagged;
-        history.RestoreCommand.Execute(null);
+        history.RestoreCommand.Press();
 
         Assert.False(history.IsConfirmingRestore);
         Assert.Null(context.Entries.Error);
@@ -664,7 +664,7 @@ public sealed class EntryHistoryTests : IDisposable
     private static EntryHistoryViewModel Opened(string path, Context context)
     {
         var history = Select(path, context);
-        history.ToggleCommand.Execute(null);
+        history.ToggleCommand.Press();
 
         return history;
     }

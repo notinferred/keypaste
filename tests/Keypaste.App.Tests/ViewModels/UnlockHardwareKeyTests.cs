@@ -48,7 +48,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         Assert.Equal(0, _unlockedCalls);
         Assert.Equal("That password didn't open this vault.", model.Message);
 
-        model.UseHardwareKeyCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
         Assert.Equal("YubiKey, slot 2", model.HardwareKeyLabel);
         Type(model, _master);
         await model.UnlockAsync();
@@ -71,7 +71,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: new SoftwareYubiKey(new byte[20]));
         using var model = new UnlockViewModel(session, _home.Path, _picker, () => _unlockedCalls++);
         model.Offer(path);
-        model.UseHardwareKeyCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
 
         Type(model, _master);
         await model.UnlockAsync();
@@ -88,16 +88,16 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         var path = MakeVault();
         using var model = NewModel();
         model.Offer(path);
-        model.UseHardwareKeyCommand.Execute(null);
-        model.SwitchSlotCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
+        model.SwitchSlotCommand.Press();
         Assert.Equal(1, model.HardwareKeySlot);
 
         using var slotOnlyTwo = new AppVaultSession(
             new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: new SoftwareYubiKey(_secret) { Slots = [2] });
         using var empty = new UnlockViewModel(slotOnlyTwo, _home.Path, _picker, () => _unlockedCalls++);
         empty.Offer(path);
-        empty.UseHardwareKeyCommand.Execute(null);
-        empty.SwitchSlotCommand.Execute(null);
+        empty.UseHardwareKeyCommand.Press();
+        empty.SwitchSlotCommand.Press();
         Type(empty, _master);
         await empty.UnlockAsync();
         Assert.Equal(
@@ -105,7 +105,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
             empty.Message);
 
         _device.Connected = false;
-        model.SwitchSlotCommand.Execute(null);
+        model.SwitchSlotCommand.Press();
         Type(model, _master);
         await model.UnlockAsync();
 
@@ -121,14 +121,14 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         _device.NeverTouched = true;
         using var model = NewModel();
         model.Offer(path);
-        model.UseHardwareKeyCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
         Type(model, _master);
 
         var unlocking = model.UnlockAsync();
         await Until(() => model.IsWaitingForTouch);
         Assert.True(model.CancelTouchCommand.CanExecute(null));
 
-        model.CancelTouchCommand.Execute(null);
+        model.CancelTouchCommand.Press();
         await unlocking;
 
         Assert.False(model.IsWaitingForTouch);
@@ -146,7 +146,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
 
         await model.StartCreateAsync();
         Assert.False(model.UsesHardwareKey);
-        model.UseHardwareKeyCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
         Assert.Equal("YubiKey, slot 2", model.HardwareKeyLabel);
         TypeNew(model, _master);
         await model.CreateAsync();
@@ -172,7 +172,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         _picker.NewPath = path;
 
         await model.StartCreateAsync();
-        model.UseHardwareKeyCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
         TypeNew(model, _master);
         await model.CreateAsync();
 
@@ -194,12 +194,12 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         _picker.NewPath = path;
 
         await model.StartCreateAsync();
-        model.UseHardwareKeyCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
         TypeNew(model, _master);
 
         var creating = model.CreateAsync();
         await Until(() => model.IsWaitingForTouch);
-        model.CancelTouchCommand.Execute(null);
+        model.CancelTouchCommand.Press();
         await creating;
 
         Assert.Equal("Stopped waiting for the YubiKey. No vault was created.", model.Message);
@@ -214,7 +214,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         var path = MakeVault();
         using var model = NewModel();
         model.Offer(path);
-        model.UseHardwareKeyCommand.Execute(null);
+        model.UseHardwareKeyCommand.Press();
         Type(model, _master);
         await model.UnlockAsync();
         _session.Lock(VaultLockReason.Manual);

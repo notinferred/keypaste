@@ -58,7 +58,7 @@ public sealed class ShellImportTests : IDisposable
     {
         using var shell = NewShell();
 
-        await shell.ImportCommand.ExecuteAsync();
+        await shell.ImportCommand.PressAsync();
 
         Assert.Equal(1, _picker.ExistingCalls);
         Assert.Null(shell.Import);
@@ -70,7 +70,7 @@ public sealed class ShellImportTests : IDisposable
         using var shell = NewShell();
         _picker.ExistingPath = _source;
 
-        await shell.ImportCommand.ExecuteAsync();
+        await shell.ImportCommand.PressAsync();
 
         var import = Assert.IsType<KdbxImportViewModel>(shell.Import);
         Assert.True(shell.HasImport);
@@ -78,7 +78,7 @@ public sealed class ShellImportTests : IDisposable
         Assert.True(import.NeedsUnlock);
         Assert.False(shell.ImportCommand.CanExecute(null));
 
-        import.CancelCommand.Execute(null);
+        import.CancelCommand.Press();
 
         Assert.Null(shell.Import);
         Assert.False(shell.HasImport);
@@ -96,7 +96,7 @@ public sealed class ShellImportTests : IDisposable
         Assert.True(import.ShowsRows);
         Assert.Equal("KeePass database 4.0 · Argon2id · 3 items · key file + password", import.CardDetail);
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Null(shell.Import);
         Assert.Equal("Imported 3 items from foreign.kdbx", shell.Toast);
@@ -115,7 +115,7 @@ public sealed class ShellImportTests : IDisposable
         Assert.False(import.NeedsUnlock);
         Assert.Contains("opens as the vault", import.InPlaceNote, StringComparison.Ordinal);
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Equal([(Path.GetFullPath(_source), (string?)_keyfile)], _opened);
         Assert.Null(shell.Import);
@@ -157,17 +157,17 @@ public sealed class ShellImportTests : IDisposable
         shell.OpenImport(_source);
         var import = shell.Import!;
 
-        import.ClearKeyfileCommand.Execute(null);
+        import.ClearKeyfileCommand.Press();
         Assert.False(import.HasKeyfile);
 
         _picker.KeyfilePath = _vault.Path_;
-        await import.ChooseKeyfileCommand.ExecuteAsync();
+        await import.ChooseKeyfileCommand.PressAsync();
         Assert.Equal(1, _picker.KeyfileCalls);
         Assert.False(import.HasKeyfile);
         Assert.Equal("That's a KeePass vault, not a keyfile.", import.Message);
 
         _picker.KeyfilePath = _keyfile;
-        await import.ChooseKeyfileCommand.ExecuteAsync();
+        await import.ChooseKeyfileCommand.PressAsync();
         Assert.Equal(_keyfile, import.KeyfilePath);
         Assert.Equal("foreign.keyx", import.KeyfileName);
         Assert.False(import.HasMessage);
@@ -202,7 +202,7 @@ public sealed class ShellImportTests : IDisposable
         using var shell = NewShell();
         _picker.ExistingPath = KeePassXcExport();
 
-        await shell.ImportCommand.ExecuteAsync();
+        await shell.ImportCommand.PressAsync();
 
         var export = Assert.IsType<ExportImportViewModel>(shell.ExportImport);
         Assert.Null(shell.Import);
@@ -234,14 +234,14 @@ public sealed class ShellImportTests : IDisposable
         var export = shell.ExportImport!;
         await export.ReadAsync();
 
-        export.ConfirmCommand.Execute(null);
+        export.ConfirmCommand.Press();
 
         Assert.True(export.IsImported, export.Message);
         Assert.True(shell.HasImport);
         Assert.Null(shell.Toast);
         Assert.NotNull(_session.Unlocked!.Find(new EntryName("keepassxc", "site")));
 
-        export.CancelCommand.Execute(null);
+        export.CancelCommand.Press();
 
         Assert.False(shell.HasImport);
         Assert.Equal("Imported 1 item from keepassxc.csv", shell.Toast);

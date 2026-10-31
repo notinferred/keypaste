@@ -39,7 +39,7 @@ public sealed class SettingsViewModelTests
         Assert.False(model.IsThisVaultChosen);
         Assert.Contains("each needs --vault", model.ChosenVaultText, StringComparison.Ordinal);
 
-        model.UseThisVaultCommand.Execute(null);
+        model.UseThisVaultCommand.Press();
         model.Theme = AppTheme.Dark;
 
         Assert.True(model.IsThisVaultChosen);
@@ -156,7 +156,7 @@ public sealed class SettingsViewModelTests
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = Screen(session, fixture);
 
-        model.ForgetAllCommand.Execute(null);
+        model.ForgetAllCommand.Press();
 
         Assert.Empty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
         Assert.True(model.HasMessage);

@@ -58,7 +58,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         var bytes = Encoding.UTF8.GetBytes("-----BEGIN KEY-----");
         context.Picker.AttachmentPath = Chosen("deploy-key.pem", bytes);
 
-        await attachments.AddCommand.ExecuteAsync();
+        await attachments.AddCommand.PressAsync();
 
         Assert.Equal(1, context.Picker.AttachmentCalls);
         Assert.Null(context.Entries.Error);
@@ -76,9 +76,9 @@ public sealed class EntryAttachmentsTests : IDisposable
         var attachments = context.Open(_checking).Attachments;
         var before = File.ReadAllBytes(_vaultPath);
 
-        await attachments.AddCommand.ExecuteAsync();
-        await attachments.Rows[0].ReplaceCommand.ExecuteAsync();
-        await attachments.Rows[0].SaveCommand.ExecuteAsync();
+        await attachments.AddCommand.PressAsync();
+        await attachments.Rows[0].ReplaceCommand.PressAsync();
+        await attachments.Rows[0].SaveCommand.PressAsync();
 
         Assert.Equal(2, context.Picker.AttachmentCalls);
         Assert.Equal(1, context.Picker.AttachmentDestinationCalls);
@@ -94,15 +94,15 @@ public sealed class EntryAttachmentsTests : IDisposable
         var before = File.ReadAllBytes(_vaultPath);
 
         context.Picker.AttachmentPath = Chosen("large.bin", new byte[EntryAttachment.MaximumSize + 1]);
-        await attachments.AddCommand.ExecuteAsync();
+        await attachments.AddCommand.PressAsync();
         Assert.Equal("That file is larger than 5 MiB, the most keypaste attaches.", context.Entries.Error);
 
         context.Picker.AttachmentPath = Chosen("statement.txt", [1, 2, 3]);
-        await attachments.AddCommand.ExecuteAsync();
+        await attachments.AddCommand.PressAsync();
         Assert.Equal("This item already has an attachment called statement.txt. Replace it instead.", context.Entries.Error);
 
         context.Picker.AttachmentPath = Path.Combine(_directory, "missing.bin");
-        await attachments.AddCommand.ExecuteAsync();
+        await attachments.AddCommand.PressAsync();
         Assert.Equal("keypaste couldn't read missing.bin. Check that it's still there and that you can open it, then choose it again.", context.Entries.Error);
 
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
@@ -118,7 +118,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         var bytes = Encoding.UTF8.GetBytes("the new statement");
         context.Picker.AttachmentPath = Chosen("march.txt", bytes);
 
-        await attachments.Rows[0].ReplaceCommand.ExecuteAsync();
+        await attachments.Rows[0].ReplaceCommand.PressAsync();
 
         Assert.Null(context.Entries.Error);
         Assert.Null(attachments.Note);
@@ -136,18 +136,18 @@ public sealed class EntryAttachmentsTests : IDisposable
         var revisions = Revisions();
         var before = File.ReadAllBytes(_vaultPath);
 
-        attachments.Rows[0].RemoveCommand.Execute(null);
+        attachments.Rows[0].RemoveCommand.Press();
         Assert.True(attachments.IsRemoving);
         Assert.Equal(
             "Remove statement.txt from this item? History keeps it unless the item is larger than this vault's history size limit.",
             attachments.RemovePrompt);
 
-        attachments.CancelRemoveCommand.Execute(null);
+        attachments.CancelRemoveCommand.Press();
         Assert.False(attachments.IsRemoving);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
 
-        attachments.Rows[0].RemoveCommand.Execute(null);
-        attachments.ConfirmRemoveCommand.Execute(null);
+        attachments.Rows[0].RemoveCommand.Press();
+        attachments.ConfirmRemoveCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.False(attachments.IsRemoving);
@@ -167,7 +167,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         var destination = Path.Combine(Directory.CreateDirectory(Path.Combine(_directory, "saved")).FullName, "statement.txt");
         context.Picker.AttachmentDestination = destination;
 
-        await attachments.Rows[0].SaveCommand.ExecuteAsync();
+        await attachments.Rows[0].SaveCommand.PressAsync();
 
         Assert.Equal("statement.txt", context.Picker.SuggestedAttachmentName);
         Assert.Null(context.Entries.Error);
@@ -190,7 +190,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         var occupied = Chosen("statement.txt", Encoding.UTF8.GetBytes("keep me"));
         context.Picker.AttachmentDestination = occupied;
 
-        await attachments.Rows[0].SaveCommand.ExecuteAsync();
+        await attachments.Rows[0].SaveCommand.PressAsync();
 
         Assert.Equal("keep me", File.ReadAllText(occupied));
         Assert.Equal("There's already a file there, and keypaste won't replace it. Save again and choose a name that isn't taken.", context.Entries.Error);
@@ -213,8 +213,8 @@ public sealed class EntryAttachmentsTests : IDisposable
         using var context = new Context(_vaultPath);
         var attachments = context.Open(_checking).Attachments;
 
-        attachments.Rows.Single(row => row.Name == "a.bin").RemoveCommand.Execute(null);
-        attachments.ConfirmRemoveCommand.Execute(null);
+        attachments.Rows.Single(row => row.Name == "a.bin").RemoveCommand.Press();
+        attachments.ConfirmRemoveCommand.Press();
 
         Assert.Null(context.Entries.Error);
         Assert.Equal(
@@ -243,7 +243,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         Assert.Equal(".. .. .ssh txt.exe", row.SuggestedFileName);
 
         context.Picker.AttachmentDestination = Path.Combine(saved, row.SuggestedFileName);
-        await row.SaveCommand.ExecuteAsync();
+        await row.SaveCommand.PressAsync();
 
         Assert.Null(context.Entries.Error);
         Assert.Equal([".. .. .ssh txt.exe"], Directory.EnumerateFileSystemEntries(saved).Select(path => Path.GetFileName(path)));
@@ -276,7 +276,7 @@ public sealed class EntryAttachmentsTests : IDisposable
             context.Entries.Dispose();
         };
 
-        await attachments.AddCommand.ExecuteAsync();
+        await attachments.AddCommand.PressAsync();
 
         Assert.Equal(1, context.Picker.AttachmentCalls);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));

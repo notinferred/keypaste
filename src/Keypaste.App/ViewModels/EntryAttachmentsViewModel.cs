@@ -16,7 +16,7 @@ namespace Keypaste.App.ViewModels;
 /// (D-0534); the app's <c>BannedSymbols.txt</c> and <c>AttachmentSourceRulesTests</c> hold that.
 /// </para>
 /// </remarks>
-internal sealed class EntryAttachmentsViewModel : ObservableObject, IDisposable
+internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDisposable
 {
     /// <summary>Why an edit's revision is not in the item's history (D-0533).</summary>
     private const string _notKept = "the item as it was is larger than this vault's history size limit, so history doesn't keep it.";
@@ -26,9 +26,6 @@ internal sealed class EntryAttachmentsViewModel : ObservableObject, IDisposable
     private readonly IVaultFilePicker? _picker;
     private readonly Action<string?> _report;
     private readonly Action _changed;
-    private IReadOnlyList<EntryAttachmentRow> _rows = [];
-    private EntryAttachmentRow? _removing;
-    private string? _note;
     private bool _picking;
     private bool _disposed;
 
@@ -50,59 +47,40 @@ internal sealed class EntryAttachmentsViewModel : ObservableObject, IDisposable
         _report = report;
         _changed = changed;
 
-        AddCommand = new AsyncRelayCommand(AddAsync, () => CanPick);
-        ConfirmRemoveCommand = new RelayCommand(ConfirmRemove, () => IsRemoving);
         CancelRemoveCommand = new RelayCommand(() => Removing = null, () => IsRemoving);
-
-        DependsOn(nameof(HasRows), nameof(Rows));
-        DependsOn(nameof(IsRemoving), nameof(Removing));
-        DependsOn(nameof(RemovePrompt), nameof(Removing));
-        DependsOn(nameof(HasNote), nameof(Note));
-        DependsOn(ConfirmRemoveCommand, nameof(Removing));
-        DependsOn(CancelRemoveCommand, nameof(Removing));
 
         Read();
     }
 
     /// <summary>The item's attachments, in ordinal order of name.</summary>
-    internal IReadOnlyList<EntryAttachmentRow> Rows
-    {
-        get => _rows;
-        private set => Set(ref _rows, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRows))]
+    internal partial IReadOnlyList<EntryAttachmentRow> Rows { get; private set; } = [];
 
-    internal bool HasRows => _rows.Count > 0;
+    internal bool HasRows => Rows.Count > 0;
 
     /// <summary>Whether a file can be chosen here, which adding, replacing and saving all need.</summary>
     internal bool CanPick => _picker is not null;
 
-    /// <summary>Asks for a file and attaches it under its own name.</summary>
-    internal AsyncRelayCommand AddCommand { get; }
-
     /// <summary>The attachment the remove confirmation is for, or null.</summary>
-    internal EntryAttachmentRow? Removing
-    {
-        get => _removing;
-        private set => Set(ref _removing, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRemoving), nameof(RemovePrompt))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmRemoveCommand), nameof(CancelRemoveCommand))]
+    internal partial EntryAttachmentRow? Removing { get; private set; }
 
-    internal bool IsRemoving => _removing is not null;
+    internal bool IsRemoving => Removing is not null;
 
     internal string RemovePrompt =>
-        $"Remove {_removing?.DisplayName} from this item? History keeps it unless the item is larger than this vault's history size limit.";
-
-    internal RelayCommand ConfirmRemoveCommand { get; }
+        $"Remove {Removing?.DisplayName} from this item? History keeps it unless the item is larger than this vault's history size limit.";
 
     internal RelayCommand CancelRemoveCommand { get; }
 
     /// <summary>What the last save or edit leaves the person to know, such as that a saved copy is not encrypted; null otherwise.</summary>
-    internal string? Note
-    {
-        get => _note;
-        private set => Set(ref _note, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNote))]
+    internal partial string? Note { get; private set; }
 
-    internal bool HasNote => _note is not null;
+    internal bool HasNote => Note is not null;
 
     /// <summary>Reads the item's attachments again, by name and size, closing a confirmation for one no longer there.</summary>
     internal void Read()
@@ -122,7 +100,7 @@ internal sealed class EntryAttachmentsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_removing is { } removing && !_rows.Any(row => string.Equals(row.Name, removing.Name, StringComparison.Ordinal)))
+        if (Removing is { } removing && !Rows.Any(row => string.Equals(row.Name, removing.Name, StringComparison.Ordinal)))
         {
             Removing = null;
         }
@@ -215,6 +193,8 @@ internal sealed class EntryAttachmentsViewModel : ObservableObject, IDisposable
         Note = null;
     }
 
+    /// <summary>Asks for a file and attaches it under its own name.</summary>
+    [RelayCommand(CanExecute = nameof(CanPick))]
     private async Task AddAsync()
     {
         if (await PickAsync(picker => picker.PickAttachmentAsync()).ConfigureAwait(true) is { } path)
@@ -276,9 +256,10 @@ internal sealed class EntryAttachmentsViewModel : ObservableObject, IDisposable
             kept);
     }
 
+    [RelayCommand(CanExecute = nameof(IsRemoving))]
     private void ConfirmRemove()
     {
-        if (_removing is not { } row)
+        if (Removing is not { } row)
         {
             return;
         }

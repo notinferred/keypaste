@@ -14,13 +14,8 @@ namespace Keypaste.App.ViewModels;
 /// label and the item once, so the list says exactly what the prompt said. Read again, the same request
 /// or allowance updates its row in place, so the row's buttons are not made again while it counts down.
 /// </remarks>
-internal sealed class ActivityRow : ObservableObject
+internal sealed partial class ActivityRow : ObservableObject
 {
-    private int _number;
-    private string _left;
-    private string _leftText = string.Empty;
-    private double _fraction;
-
     private ActivityRow(int number, ApprovalPrompt prompt, TimeSpan remaining, string lifetime, GrantKey? grant)
         : this(number, prompt.Client, prompt.Label ?? "none configured", prompt.Entry, prompt.Field, lifetime + " " + Seconds(remaining))
     {
@@ -33,20 +28,17 @@ internal sealed class ActivityRow : ObservableObject
 
     private ActivityRow(int number, string client, string label, string entry, string field, string left)
     {
-        _number = number;
+        Number = number;
         Client = client;
         Label = label;
         Entry = entry;
         Field = field;
-        _left = left;
+        Left = left;
     }
 
     /// <summary>The row's place in its list, from 1, which is how the driver names one to revoke.</summary>
-    internal int Number
-    {
-        get => _number;
-        private set => Set(ref _number, value);
-    }
+    [ObservableProperty]
+    internal partial int Number { get; private set; }
 
     internal string Client { get; }
 
@@ -57,11 +49,8 @@ internal sealed class ActivityRow : ObservableObject
     internal string Field { get; }
 
     /// <summary>How long is left, and of what.</summary>
-    internal string Left
-    {
-        get => _left;
-        private set => Set(ref _left, value);
-    }
+    [ObservableProperty]
+    internal partial string Left { get; private set; }
 
     /// <summary>The agent's grant to revoke, or null for a waiting request or a run's grant.</summary>
     internal GrantKey? Grant { get; }
@@ -73,18 +62,12 @@ internal sealed class ActivityRow : ObservableObject
     internal string Detail { get; private init; } = string.Empty;
 
     /// <summary>A grant's or a waiting request's time left as the Agents screen says it: <c>42m left</c>.</summary>
-    internal string LeftText
-    {
-        get => _leftText;
-        private set => Set(ref _leftText, value);
-    }
+    [ObservableProperty]
+    internal partial string LeftText { get; private set; } = string.Empty;
 
     /// <summary>The share of a grant's length still to run, from 0 to 1, for its bar.</summary>
-    internal double Fraction
-    {
-        get => _fraction;
-        private set => Set(ref _fraction, value);
-    }
+    [ObservableProperty]
+    internal partial double Fraction { get; private set; }
 
     /// <summary>What the same request or allowance is known by when it is read again: a grant's id, else what the row names.</summary>
     internal string Key => Id ?? string.Join('\n', Client, Label, Entry, Field);

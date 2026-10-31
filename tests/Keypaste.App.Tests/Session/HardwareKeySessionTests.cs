@@ -69,7 +69,7 @@ public sealed class HardwareKeySessionTests : IDisposable
         var saving = Task.Run(_session.Unlocked.Save, TestContext.Current.CancellationToken);
 
         await Until(() => shell.IsWaitingForTouch);
-        shell.CancelTouchCommand.Execute(null);
+        shell.CancelTouchCommand.Press();
 
         var refused = await Assert.ThrowsAsync<HardwareKeyException>(() => saving);
         Assert.Equal(HardwareKeyFailure.Cancelled, refused.Failure);

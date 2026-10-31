@@ -145,11 +145,11 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         List<string> said = [];
         using var screen = new ScopedTokensViewModel(_session, countdown, said.Add);
 
-        screen.OpenFormCommand.Execute(null);
+        screen.OpenFormCommand.Press();
         screen.Name = "ci-staging";
         screen.Scope = "read:acme-api/staging/*";
-        screen.SetExpiryCommand.Execute("7d");
-        screen.CreateCommand.Execute(null);
+        screen.SetExpiryCommand.Press("7d");
+        screen.CreateCommand.Press();
 
         Assert.False(screen.IsFormOpen);
         var minted = Assert.IsType<MintedToken>(screen.Minted);
@@ -160,13 +160,13 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         Assert.DoesNotContain(token[13..], Shown(screen), StringComparison.Ordinal);
         Assert.DoesNotContain(token[13..], string.Join('\n', said), StringComparison.Ordinal);
 
-        await screen.CopyMintedCommand.ExecuteAsync();
+        await screen.CopyMintedCommand.PressAsync();
         await countdown.SettledAsync();
         Assert.Equal(token, clipboard.Content);
         Assert.True(clipboard.ContentWasSetAsASecret);
         Assert.Equal("Copied ci-staging", said[^1]);
 
-        screen.DoneMintedCommand.Execute(null);
+        screen.DoneMintedCommand.Press();
 
         Assert.Null(screen.Minted);
         Assert.Null(minted.Reveal());
@@ -178,10 +178,10 @@ public sealed class ScopedTokensViewModelTests : IDisposable
     {
         using var screen = new ScopedTokensViewModel(_session);
 
-        screen.OpenFormCommand.Execute(null);
+        screen.OpenFormCommand.Press();
         screen.Name = "prod";
         screen.Scope = "read:acme-api/prod/*";
-        screen.CreateCommand.Execute(null);
+        screen.CreateCommand.Press();
 
         Assert.True(screen.IsFormOpen);
         Assert.True(screen.HasFormError);
@@ -198,7 +198,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         using var screen = new ScopedTokensViewModel(_session, toast: said.Add);
         Assert.True(screen.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
 
-        screen.RevokeCommand.Execute(Assert.Single(screen.Rows));
+        screen.RevokeCommand.Press(Assert.Single(screen.Rows));
 
         Assert.Empty(screen.Rows);
         Assert.True(screen.HasNoRows);
@@ -211,13 +211,13 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         using var screen = new ScopedTokensViewModel(_session);
         Assert.True(screen.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
 
-        screen.AskRevokeCommand.Execute(Assert.Single(screen.Rows));
+        screen.AskRevokeCommand.Press(Assert.Single(screen.Rows));
 
         var asking = Assert.Single(screen.Rows);
         Assert.True(asking.IsConfirming);
         Assert.Equal("Revoke ci? Anything using it stops working.", asking.ConfirmText);
 
-        screen.CancelRevokeCommand.Execute(null);
+        screen.CancelRevokeCommand.Press();
 
         Assert.False(Assert.Single(screen.Rows).IsConfirming);
         Assert.Single(new TokenStore(_session.Unlocked!).List());
@@ -229,16 +229,16 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         using var screen = new ScopedTokensViewModel(_session);
         Assert.True(screen.CanOpenForm);
 
-        screen.OpenFormCommand.Execute(null);
+        screen.OpenFormCommand.Press();
         Assert.False(screen.OpenFormCommand.CanExecute(null));
 
         screen.Name = "ci-staging";
         screen.Scope = "read:acme-api/staging/*";
-        screen.CreateCommand.Execute(null);
+        screen.CreateCommand.Press();
         Assert.True(screen.HasMinted);
         Assert.False(screen.CanOpenForm);
 
-        screen.DoneMintedCommand.Execute(null);
+        screen.DoneMintedCommand.Press();
         Assert.True(screen.CanOpenForm);
     }
 

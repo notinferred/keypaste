@@ -18,25 +18,19 @@ namespace Keypaste.App.ViewModels;
 /// delay. The timed allow exists only when the prompt offers a timed grant.
 /// </para>
 /// </remarks>
-internal abstract class PromptViewModel : ObservableObject
+internal abstract partial class PromptViewModel : ObservableObject
 {
     /// <summary>How long the prompt is shown before either allow button can be pressed.</summary>
     internal static readonly TimeSpan ArmingDelay = TimeSpan.FromSeconds(1);
 
     private readonly TaskCompletionSource<ApprovalAnswer> _answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private bool _armed;
     private int _arming;
-    private string _countdown = string.Empty;
 
     protected PromptViewModel()
     {
-        ApproveCommand = new RelayCommand(() => Decide(ApprovalAnswer.Approved), () => _armed && OffersTimed && !IsAnswered);
-        AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => _armed && !IsAnswered);
+        ApproveCommand = new RelayCommand(() => Decide(ApprovalAnswer.Approved), () => IsArmed && OffersTimed && !IsAnswered);
+        AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && !IsAnswered);
         DenyCommand = new RelayCommand(() => Decide(ApprovalAnswer.Denied), () => !IsAnswered);
-
-        DependsOn(ApproveCommand, nameof(IsArmed), nameof(IsAnswered));
-        DependsOn(AllowOnceCommand, nameof(IsArmed), nameof(IsAnswered));
-        DependsOn(DenyCommand, nameof(IsAnswered));
     }
 
     /// <summary>Allows this request and keeps the timed grant the prompt offers.</summary>
@@ -54,11 +48,8 @@ internal abstract class PromptViewModel : ObservableObject
     internal virtual string TimedLabel => $"Allow for {ApprovalLimits.Describe(TimedSeconds)}";
 
     /// <summary>How long is left to answer, as <c>m:ss</c>.</summary>
-    internal string Countdown
-    {
-        get => _countdown;
-        private set => Set(ref _countdown, value);
-    }
+    [ObservableProperty]
+    internal partial string Countdown { get; private set; } = string.Empty;
 
     /// <summary>The person's answer, or a denial for every way the prompt went away without one.</summary>
     internal Task<ApprovalAnswer> Answer => _answer.Task;
@@ -69,11 +60,11 @@ internal abstract class PromptViewModel : ObservableObject
     protected abstract int TimedSeconds { get; }
 
     /// <summary>Whether the prompt has been up long enough for an allow to be pressed.</summary>
-    protected bool IsArmed
-    {
-        get => _armed;
-        private set => Set(ref _armed, value);
-    }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApproveCommand), nameof(AllowOnceCommand))]
+    protected partial bool IsArmed { get; private set; }
+
+    partial void OnIsArmedChanged(bool value) => OnAllowsChanged();
 
     /// <summary>Which wait to arm the prompt is current; <see cref="Disarm"/> begins another.</summary>
     internal int Arming => _arming;
@@ -120,7 +111,16 @@ internal abstract class PromptViewModel : ObservableObject
     {
         if (_answer.TrySetResult(answer))
         {
-            Raise(nameof(IsAnswered));
+            OnPropertyChanged(nameof(IsAnswered));
+            ApproveCommand.NotifyCanExecuteChanged();
+            AllowOnceCommand.NotifyCanExecuteChanged();
+            DenyCommand.NotifyCanExecuteChanged();
+            OnAllowsChanged();
         }
+    }
+
+    /// <summary>Asks a prompt's own allow commands again, once arming or an answer changes what can be pressed.</summary>
+    protected virtual void OnAllowsChanged()
+    {
     }
 }

@@ -96,7 +96,7 @@ internal sealed class DiagnosticsViewModel : ObservableObject
             Reports.Add(new CrashReportRow(report, Delete));
         }
 
-        Raise(nameof(ReportsSummary));
+        OnPropertyChanged(nameof(ReportsSummary));
     }
 
     private void Delete(CrashReportRow row)

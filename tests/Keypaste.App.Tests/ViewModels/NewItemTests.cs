@@ -72,7 +72,7 @@ public sealed class NewItemTests : IDisposable
         Assert.Equal(["env:billing", "env:billing:prod"], form.TagSuggestions);
 
         form.DraftTag = form.TagSuggestions[1];
-        form.AddTagCommand.Execute(null);
+        form.AddTagCommand.Press();
 
         Assert.Equal(["env:billing:prod"], form.Tags.Select(chip => chip.Tag));
         Assert.Equal(["env:billing"], form.TagSuggestions);
@@ -86,8 +86,8 @@ public sealed class NewItemTests : IDisposable
         form.Url = "https://gitlab.com";
         form.Notes = "the work account";
         form.DraftTag = "work";
-        form.AddTagCommand.Execute(null);
-        _entries.ConfirmAddCommand.Execute(null);
+        form.AddTagCommand.Press();
+        _entries.ConfirmAddCommand.Press();
 
         Assert.False(_entries.IsAdding);
         Assert.Equal("gitlab", _entries.Selected?.Title);
@@ -107,8 +107,8 @@ public sealed class NewItemTests : IDisposable
         form.KeyName = "OPENAI_API_KEY";
         Type(form.KeyValue, "sk-proj-n4");
         form.DraftTag = "env:acme";
-        form.AddTagCommand.Execute(null);
-        _entries.ConfirmAddCommand.Execute(null);
+        form.AddTagCommand.Press();
+        _entries.ConfirmAddCommand.Press();
 
         var item = Reopened(new EntryName("Work", "OpenAI"));
         Assert.Equal([new EntryField("OPENAI_API_KEY", true, false)], item.Fields);
@@ -129,7 +129,7 @@ public sealed class NewItemTests : IDisposable
         form.Username = "admin";
         form.GeneratePassword = false;
         Type(form.Password, "box-pw");
-        _entries.ConfirmAddCommand.Execute(null);
+        _entries.ConfirmAddCommand.Press();
 
         var item = Reopened(new EntryName("Work", "box"));
         Assert.Equal([new EntryField(NewItemViewModel.HostField, false, false)], item.Fields);
@@ -145,7 +145,7 @@ public sealed class NewItemTests : IDisposable
         form.Template = ItemTemplate.SecureNote;
         form.Username = "left over from the login";
         form.Notes = "1234-5678";
-        _entries.ConfirmAddCommand.Execute(null);
+        _entries.ConfirmAddCommand.Press();
 
         var item = Reopened(new EntryName(string.Empty, "recovery codes"));
         Assert.Equal("1234-5678", item.Entry.Notes);
@@ -159,7 +159,7 @@ public sealed class NewItemTests : IDisposable
         var form = NewItemForm.Open(_entries, "Work/thing");
         form.Notes = "kept";
         form.DraftTag = "kept";
-        form.AddTagCommand.Execute(null);
+        form.AddTagCommand.Press();
 
         form.Template = ItemTemplate.Server;
         form.SelectedTemplate = form.Templates.Single(choice => choice.Template == ItemTemplate.SecureNote);
@@ -193,7 +193,7 @@ public sealed class NewItemTests : IDisposable
         Assert.Equal(shown.Order(StringComparer.Ordinal), raised.Order(StringComparer.Ordinal));
 
         form.DraftTag = "a,b";
-        form.AddTagCommand.Execute(null);
+        form.AddTagCommand.Press();
 
         Assert.Equal(1, asked);
         Assert.Contains(nameof(NewItemViewModel.HasError), raised);
@@ -213,7 +213,7 @@ public sealed class NewItemTests : IDisposable
         form.Template = title == "github" ? ItemTemplate.Login : ItemTemplate.ApiKey;
         form.KeyName = key;
         Type(form.KeyValue, "sk-refused");
-        _entries.ConfirmAddCommand.Execute(null);
+        _entries.ConfirmAddCommand.Press();
 
         Assert.True(_entries.IsAdding);
         Assert.Contains(says, form.Error, StringComparison.Ordinal);
@@ -227,7 +227,7 @@ public sealed class NewItemTests : IDisposable
         form.Template = ItemTemplate.ApiKey;
         Type(form.KeyValue, "sk-typed");
 
-        _entries.CancelAddCommand.Execute(null);
+        _entries.CancelAddCommand.Press();
 
         Assert.Null(_entries.NewItem);
         Assert.True(form.KeyValue.IsZeroed);

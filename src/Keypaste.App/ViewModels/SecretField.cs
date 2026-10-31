@@ -34,12 +34,11 @@ namespace Keypaste.App.ViewModels;
 /// way in and cannot be wiped (THREATS.md T-18).
 /// </para>
 /// </remarks>
-internal sealed class SecretField(ClipboardCountdown clipboard) : ObservableObject, ISecretSink, IDisposable
+internal sealed partial class SecretField(ClipboardCountdown clipboard) : ObservableObject, ISecretSink, IDisposable
 {
     private readonly SecretBuffer _buffer = new();
 
     private bool _disposed;
-    private string _note = string.Empty;
 
     /// <summary>How many characters have been entered, which is all a screen may know.</summary>
     internal int MaskedLength => _disposed ? 0 : _buffer.Length;
@@ -58,11 +57,8 @@ internal sealed class SecretField(ClipboardCountdown clipboard) : ObservableObje
     /// and quietly dropping whatever could not be typed — stores a secret that differs from the one
     /// on the clipboard, and nothing on screen would ever show the difference.
     /// </remarks>
-    internal string Note
-    {
-        get => _note;
-        private set => Set(ref _note, value);
-    }
+    [ObservableProperty]
+    internal partial string Note { get; private set; } = string.Empty;
 
     /// <inheritdoc/>
     public void Type(char value)
@@ -151,16 +147,16 @@ internal sealed class SecretField(ClipboardCountdown clipboard) : ObservableObje
 
         _buffer.Dispose();
         _disposed = true;
-        _note = string.Empty;
+        Note = string.Empty;
 
-        Raise(nameof(MaskedLength));
-        Raise(nameof(HasValue));
-        Raise(nameof(Note));
+        OnPropertyChanged(nameof(MaskedLength));
+        OnPropertyChanged(nameof(HasValue));
+        OnPropertyChanged(nameof(Note));
     }
 
     private void Changed()
     {
-        Raise(nameof(MaskedLength));
-        Raise(nameof(HasValue));
+        OnPropertyChanged(nameof(MaskedLength));
+        OnPropertyChanged(nameof(HasValue));
     }
 }

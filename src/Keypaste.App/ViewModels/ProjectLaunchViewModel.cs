@@ -33,7 +33,7 @@ namespace Keypaste.App.ViewModels;
 /// be written starts nothing (D-0496).
 /// </para>
 /// </remarks>
-internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
+internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan _openerWait = TimeSpan.FromSeconds(10);
 
@@ -45,15 +45,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
     private readonly Action<string?> _announce;
     private readonly CancellationTokenSource _withdrawn = new();
 
-    private ProjectMapping? _mapping;
-    private string _directory = string.Empty;
-    private string _command = string.Empty;
     private TaskCompletionSource<bool>? _answer;
-    private string _confirmTitle = string.Empty;
-    private string _confirmStarts = string.Empty;
-    private string _confirmDirectory = string.Empty;
-    private string _confirmKeys = string.Empty;
-    private string _confirmSources = string.Empty;
 
     internal ProjectLaunchViewModel(
         AppVaultSession session,
@@ -77,50 +69,36 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         _announce = announce;
 
         ChooseDirectoryCommand = new AsyncRelayCommand(ChooseDirectoryAsync, () => _picker is not null);
-        SaveCommand = new RelayCommand(Save);
         RunProjectCommand = new AsyncRelayCommand(() => LaunchAsync(run: true), CanLaunch);
         OpenTerminalCommand = new AsyncRelayCommand(() => LaunchAsync(run: false), CanLaunch);
         ConfirmLaunchCommand = new RelayCommand(() => _answer?.TrySetResult(true), () => IsConfirming);
         CancelLaunchCommand = new RelayCommand(() => _answer?.TrySetResult(false), () => IsConfirming);
-
-        DependsOn(nameof(IsMapped), nameof(Mapping));
-        DependsOn(RunProjectCommand, nameof(IsMapped), nameof(IsConfirming));
-        DependsOn(OpenTerminalCommand, nameof(IsMapped), nameof(IsConfirming));
-        DependsOn(ConfirmLaunchCommand, nameof(IsConfirming));
-        DependsOn(CancelLaunchCommand, nameof(IsConfirming));
 
         if (ProjectMappings.TryLoad(MappingsPath, out var mappings)
             && _session.VaultPath is { } vault
             && ProjectMappings.Find(mappings, vault, project) is { } mapping)
         {
             Mapping = mapping;
-            _directory = mapping.Directory;
-            _command = mapping.Command;
+            Directory = mapping.Directory;
+            Command = mapping.Command;
         }
     }
 
     /// <summary>The directory the project runs in, as typed or chosen.</summary>
-    internal string Directory
-    {
-        get => _directory;
-        set => Set(ref _directory, value);
-    }
+    [ObservableProperty]
+    internal partial string Directory { get; set; } = string.Empty;
 
     /// <summary>The command, as a person would type it in that directory.</summary>
-    internal string Command
-    {
-        get => _command;
-        set => Set(ref _command, value);
-    }
+    [ObservableProperty]
+    internal partial string Command { get; set; } = string.Empty;
 
     /// <summary>The saved mapping Run and Open terminal use, or null until one is saved.</summary>
-    internal ProjectMapping? Mapping
-    {
-        get => _mapping;
-        private set => Set(ref _mapping, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMapped))]
+    [NotifyCanExecuteChangedFor(nameof(RunProjectCommand), nameof(OpenTerminalCommand))]
+    internal partial ProjectMapping? Mapping { get; private set; }
 
-    internal bool IsMapped => _mapping is not null;
+    internal bool IsMapped => Mapping is not null;
 
     /// <summary>The profile Run and Open terminal start with; the project card sets it.</summary>
     internal string Profile { get; set; } = EnvProfileNames.Default;
@@ -135,46 +113,29 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
     internal bool IsConfirming => _answer is not null;
 
     /// <summary>What the card asks.</summary>
-    internal string ConfirmTitle
-    {
-        get => _confirmTitle;
-        private set => Set(ref _confirmTitle, value);
-    }
+    [ObservableProperty]
+    internal partial string ConfirmTitle { get; private set; } = string.Empty;
 
     /// <summary>Exactly what starts: the command for Run, the terminal for Open terminal.</summary>
-    internal string ConfirmStarts
-    {
-        get => _confirmStarts;
-        private set => Set(ref _confirmStarts, value);
-    }
+    [ObservableProperty]
+    internal partial string ConfirmStarts { get; private set; } = string.Empty;
 
     /// <summary>The directory it starts in.</summary>
-    internal string ConfirmDirectory
-    {
-        get => _confirmDirectory;
-        private set => Set(ref _confirmDirectory, value);
-    }
+    [ObservableProperty]
+    internal partial string ConfirmDirectory { get; private set; } = string.Empty;
 
     /// <summary>The names of the variables it gets, never their values.</summary>
-    internal string ConfirmKeys
-    {
-        get => _confirmKeys;
-        private set => Set(ref _confirmKeys, value);
-    }
+    [ObservableProperty]
+    internal partial string ConfirmKeys { get; private set; } = string.Empty;
 
     /// <summary>The entries the values come from, each once.</summary>
-    internal string ConfirmSources
-    {
-        get => _confirmSources;
-        private set => Set(ref _confirmSources, value);
-    }
+    [ObservableProperty]
+    internal partial string ConfirmSources { get; private set; } = string.Empty;
 
     /// <summary>How the last start went, for a test to find the child it started.</summary>
     internal ChildResult? LastStart { get; private set; }
 
     internal AsyncRelayCommand ChooseDirectoryCommand { get; }
-
-    internal RelayCommand SaveCommand { get; }
 
     internal AsyncRelayCommand RunProjectCommand { get; }
 
@@ -204,6 +165,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         }
     }
 
+    [RelayCommand]
     private void Save()
     {
         if (_session.VaultPath is not { } vault)
@@ -255,7 +217,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
     {
         _report(null);
 
-        if (_mapping is not { } mapping)
+        if (Mapping is not { } mapping)
         {
             _report("Save a directory and a command first.");
             return;
@@ -486,7 +448,11 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
             : "From " + string.Join(", ", preview.Sources.Select(source => source.Entry).Distinct().Select(ApprovalPrompt.Shown));
 
         _answer = answer;
-        Raise(nameof(IsConfirming));
+        OnPropertyChanged(nameof(IsConfirming));
+        RunProjectCommand.NotifyCanExecuteChanged();
+        OpenTerminalCommand.NotifyCanExecuteChanged();
+        ConfirmLaunchCommand.NotifyCanExecuteChanged();
+        CancelLaunchCommand.NotifyCanExecuteChanged();
 
         return await answer.Task.ConfigureAwait(true);
     }
@@ -499,7 +465,11 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         ConfirmDirectory = string.Empty;
         ConfirmKeys = string.Empty;
         ConfirmSources = string.Empty;
-        Raise(nameof(IsConfirming));
+        OnPropertyChanged(nameof(IsConfirming));
+        RunProjectCommand.NotifyCanExecuteChanged();
+        OpenTerminalCommand.NotifyCanExecuteChanged();
+        ConfirmLaunchCommand.NotifyCanExecuteChanged();
+        CancelLaunchCommand.NotifyCanExecuteChanged();
     }
 
     private static string Refused(EnvResolved resolved) => resolved.Outcome switch

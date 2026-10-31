@@ -50,7 +50,7 @@ internal sealed class RecommendationRow : ObservableObject
     internal bool IsSelected
     {
         get => _isSelected;
-        set => Set(ref _isSelected, value && !IsDismissed);
+        set => SetProperty(ref _isSelected, value && !IsDismissed);
     }
 
     internal RelayCommand MoveCommand { get; }

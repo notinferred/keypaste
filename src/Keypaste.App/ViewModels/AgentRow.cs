@@ -13,16 +13,13 @@ namespace Keypaste.App.ViewModels;
 /// agent's and has no Settings of its own (T-36). A row is kept by its key and updated in place, so an
 /// open disclosure, its unsaved edits and an open pane survive each refresh.
 /// </remarks>
-internal sealed class AgentRow : ObservableObject, IDisposable
+internal sealed partial class AgentRow : ObservableObject, IDisposable
 {
     private readonly Func<string, AgentSettingsViewModel?> _openSettings;
     private McpClientCard _card;
-    private string _status = string.Empty;
-    private bool _isLive;
     private string _summary = string.Empty;
     private bool _isOpen;
     private AgentSettingsViewModel? _settings;
-    private ConnectClientViewModel? _connection;
 
     /// <param name="card">What Core built for this key.</param>
     /// <param name="now">What "last asked" is measured from.</param>
@@ -41,13 +38,6 @@ internal sealed class AgentRow : ObservableObject, IDisposable
         Title = IsEveryOther ? card.Name : card.Tool?.DisplayName ?? card.Label ?? card.Name;
         Initials = IsEveryOther ? "*" : HasSettings ? InitialsOf(Title) : "?";
 
-        DependsOn(nameof(HasSummary), nameof(Summary));
-        DependsOn(nameof(HasConnection), nameof(Connection));
-        DependsOn(nameof(OffersConnect), nameof(Presence));
-        DependsOn(nameof(OffersConnectAgain), nameof(Presence));
-        DependsOn(nameof(OffersDisconnect), nameof(Presence));
-        DependsOn(nameof(OffersToolActions), nameof(Presence));
-
         Update(card, now);
     }
 
@@ -65,24 +55,24 @@ internal sealed class AgentRow : ObservableObject, IDisposable
     internal string Initials { get; }
 
     /// <summary>What it is now: whether its tool holds keypaste, whether it is in use, or when it last asked.</summary>
-    internal string Status
-    {
-        get => _status;
-        private set => Set(ref _status, value);
-    }
+    [ObservableProperty]
+    internal partial string Status { get; private set; } = string.Empty;
 
     /// <summary>Whether its status dot says all is well: its tool holds keypaste, or one of its bridges is attached now.</summary>
-    internal bool IsLive
-    {
-        get => _isLive;
-        private set => Set(ref _isLive, value);
-    }
+    [ObservableProperty]
+    internal partial bool IsLive { get; private set; }
 
     /// <summary>What its settings give it, in a line, or empty.</summary>
     internal string Summary
     {
         get => _summary;
-        set => Set(ref _summary, value ?? string.Empty);
+        set
+        {
+            if (SetProperty(ref _summary, value ?? string.Empty))
+            {
+                OnPropertyChanged(nameof(HasSummary));
+            }
+        }
     }
 
     internal bool HasSummary => _summary.Length > 0;
@@ -113,13 +103,13 @@ internal sealed class AgentRow : ObservableObject, IDisposable
         get => _isOpen;
         set
         {
-            if (!HasSettings || !Set(ref _isOpen, value) || !value || _settings is not null || Label is null)
+            if (!HasSettings || !SetProperty(ref _isOpen, value) || !value || _settings is not null || Label is null)
             {
                 return;
             }
 
             _settings = _openSettings(Label);
-            Raise(nameof(Settings));
+            OnPropertyChanged(nameof(Settings));
         }
     }
 
@@ -127,13 +117,11 @@ internal sealed class AgentRow : ObservableObject, IDisposable
     internal AgentSettingsViewModel? Settings => _settings;
 
     /// <summary>The Connect or Disconnect pane open under this row, or null.</summary>
-    internal ConnectClientViewModel? Connection
-    {
-        get => _connection;
-        set => Set(ref _connection, value);
-    }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasConnection))]
+    internal partial ConnectClientViewModel? Connection { get; set; }
 
-    internal bool HasConnection => _connection is not null;
+    internal bool HasConnection => Connection is not null;
 
     /// <summary>Takes what Core built for this key again, keeping what is open.</summary>
     internal void Update(McpClientCard card, DateTimeOffset now)
@@ -145,7 +133,11 @@ internal sealed class AgentRow : ObservableObject, IDisposable
 
         if (presence)
         {
-            Raise(nameof(Presence));
+            OnPropertyChanged(nameof(Presence));
+            OnPropertyChanged(nameof(OffersConnect));
+            OnPropertyChanged(nameof(OffersConnectAgain));
+            OnPropertyChanged(nameof(OffersDisconnect));
+            OnPropertyChanged(nameof(OffersToolActions));
         }
 
         var inUse = card.Connections > 0;
@@ -205,6 +197,6 @@ internal sealed class AgentRow : ObservableObject, IDisposable
     public void Dispose()
     {
         _settings?.Dispose();
-        _connection?.Dispose();
+        Connection?.Dispose();
     }
 }

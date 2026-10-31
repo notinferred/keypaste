@@ -19,13 +19,13 @@ public sealed class AppTrayTests
         Assert.Equal(new[] { AppTray.OpenHeader, AppTray.LockHeader, AppTray.QuitHeader }, items.Keys.ToArray());
         Assert.True(items[AppTray.LockHeader].IsEnabled);
 
-        items[AppTray.LockHeader].Command!.Execute(null);
+        items[AppTray.LockHeader].Command!.Press();
         tray.Refresh();
         Assert.False(unlocked);
         Assert.False(items[AppTray.LockHeader].IsEnabled);
 
-        items[AppTray.OpenHeader].Command!.Execute(null);
-        items[AppTray.QuitHeader].Command!.Execute(null);
+        items[AppTray.OpenHeader].Command!.Press();
+        items[AppTray.QuitHeader].Command!.Press();
         Assert.True(open);
         Assert.True(quit);
 

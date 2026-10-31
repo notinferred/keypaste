@@ -80,7 +80,7 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.Equal(_vaultPath, unlock.SelectedPath);
         Assert.True(unlock.OffersRestore);
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = Assert.IsType<RestoreBackupViewModel>(unlock.Restore);
         Assert.False(unlock.IsOpening);
 
@@ -148,7 +148,7 @@ public sealed class RestoreBackupTests : IDisposable
         await RestoreNewest(unlock);
 
         using var shell = new ShellViewModel(session, _home, null, notice: unlock.Notice);
-        shell.DismissNoticeCommand.Execute(null);
+        shell.DismissNoticeCommand.Press();
 
         Assert.False(shell.HasNotice);
     }
@@ -216,7 +216,7 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.Equal(_vaultPath, unlock.SelectedPath);
         Assert.True(unlock.IsRestoreOnly);
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         Enter(unlock.Restore!, _master);
         await unlock.Restore!.CheckAsync();
 
@@ -255,20 +255,20 @@ public sealed class RestoreBackupTests : IDisposable
         using var session = new AppVaultSession(_clock);
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = unlock.Restore!;
         Enter(restore, _master);
         await restore.CheckAsync();
         Assert.True(restore.IsConfirming);
 
-        restore.CancelCommand.Execute(null);
+        restore.CancelCommand.Press();
 
         Assert.True(restore.IsChoosing);
         Assert.Equal(0, restore.MaskedLength);
         Assert.Equal(digest, Digest(_vaultPath));
         Assert.Single(VaultBackups.List(_vaultPath));
 
-        unlock.CloseRestoreCommand.Execute(null);
+        unlock.CloseRestoreCommand.Press();
 
         Assert.Null(unlock.Restore);
         Assert.True(unlock.IsOpening);
@@ -284,7 +284,7 @@ public sealed class RestoreBackupTests : IDisposable
         using var session = new AppVaultSession(_clock);
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = unlock.Restore!;
 
         Enter(restore, "not the password");
@@ -319,7 +319,7 @@ public sealed class RestoreBackupTests : IDisposable
         using var session = new AppVaultSession(_clock);
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = unlock.Restore!;
 
         var row = Assert.Single(restore.Rows);
@@ -343,7 +343,7 @@ public sealed class RestoreBackupTests : IDisposable
         var landed = 0;
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => landed++);
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = unlock.Restore!;
         Enter(restore, _master);
         await restore.CheckAsync();
@@ -372,7 +372,7 @@ public sealed class RestoreBackupTests : IDisposable
         using var session = new AppVaultSession(_clock);
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = unlock.Restore!;
         Enter(restore, _master);
         await restore.CheckAsync();
@@ -397,7 +397,7 @@ public sealed class RestoreBackupTests : IDisposable
         using var session = new AppVaultSession(_clock);
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         Enter(unlock.Restore!, _master);
 
         _clock.Advance(session.IdleTimeout + TimeSpan.FromSeconds(1));
@@ -413,7 +413,7 @@ public sealed class RestoreBackupTests : IDisposable
         using var session = new AppVaultSession(_clock);
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = unlock.Restore!;
         Enter(restore, _master);
         await restore.CheckAsync();
@@ -434,7 +434,7 @@ public sealed class RestoreBackupTests : IDisposable
         using var session = new AppVaultSession(_clock);
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = unlock.Restore!;
         Assert.Equal(2, restore.Rows.Count);
 
@@ -458,7 +458,7 @@ public sealed class RestoreBackupTests : IDisposable
 
         using (var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { }))
         {
-            unlock.StartRestoreCommand.Execute(null);
+            unlock.StartRestoreCommand.Press();
             restore = unlock.Restore!;
             Enter(restore, _master);
             await restore.CheckAsync();
@@ -493,7 +493,7 @@ public sealed class RestoreBackupTests : IDisposable
         unlock.BrowseCommand.CanExecuteChanged += (_, _) => asked.Add("browse");
         unlock.CloseRestoreCommand.CanExecuteChanged += (_, _) => asked.Add("close");
 
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
 
         string[] opened =
         [
@@ -547,14 +547,14 @@ public sealed class RestoreBackupTests : IDisposable
         entries.Selected = entries.Rows.Single(row => row.Path == _entry);
         var detail = entries.Detail!;
 
-        detail.EditCommand.Execute(null);
+        detail.EditCommand.Press();
 
         foreach (var c in password)
         {
             detail.NewPassword.Type(c);
         }
 
-        detail.SaveCommand.Execute(null);
+        detail.SaveCommand.Press();
 
         session.Lock(VaultLockReason.Manual);
 
@@ -563,7 +563,7 @@ public sealed class RestoreBackupTests : IDisposable
 
     private static async Task RestoreNewest(UnlockViewModel unlock)
     {
-        unlock.StartRestoreCommand.Execute(null);
+        unlock.StartRestoreCommand.Press();
         var restore = Assert.IsType<RestoreBackupViewModel>(unlock.Restore);
 
         Enter(restore, _master);

@@ -57,7 +57,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
         Assert.False(import.IsDecrypted);
         Assert.Equal("That password does not open yubikey.kdbx.", import.Message);
 
-        import.UseHardwareKeyCommand.Execute(null);
+        import.UseHardwareKeyCommand.Press();
         Assert.Equal("YubiKey, slot 2", import.HardwareKeyLabel);
         await Unlock(import);
 
@@ -66,7 +66,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
         Assert.Single(_device.Challenges);
         Assert.False(import.SwitchSlotCommand.CanExecute(null));
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Equal(["Imported 1 item from yubikey.kdbx"], _announced);
         _session.Lock(VaultLockReason.Manual);
@@ -80,7 +80,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
         using var other = new TempVault();
         using var session = Unlocked(other, new SoftwareYubiKey(new byte[20]));
         using var import = new KdbxImportViewModel(session, _source, (_, _, _) => { }, _ => { });
-        import.UseHardwareKeyCommand.Execute(null);
+        import.UseHardwareKeyCommand.Press();
 
         await Unlock(import);
 
@@ -96,8 +96,8 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
         using var slotTwoOnly = Unlocked(other, new SoftwareYubiKey(_secret) { Slots = [2] });
         using (var empty = new KdbxImportViewModel(slotTwoOnly, _source, (_, _, _) => { }, _ => { }))
         {
-            empty.UseHardwareKeyCommand.Execute(null);
-            empty.SwitchSlotCommand.Execute(null);
+            empty.UseHardwareKeyCommand.Press();
+            empty.SwitchSlotCommand.Press();
             Assert.Equal(1, empty.HardwareKeySlot);
             Assert.Equal("Use slot 2", empty.OtherSlotLabel);
 
@@ -110,7 +110,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
 
         _device.Connected = false;
         using var import = NewImport();
-        import.UseHardwareKeyCommand.Execute(null);
+        import.UseHardwareKeyCommand.Press();
 
         await Unlock(import);
 
@@ -125,7 +125,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
         _session.WaitingForTouch += (_, waiting) => shellAsked |= waiting;
         _device.NeverTouched = true;
         using var import = NewImport();
-        import.UseHardwareKeyCommand.Execute(null);
+        import.UseHardwareKeyCommand.Press();
         Type(import);
 
         var unlocking = import.UnlockAsync();
@@ -133,7 +133,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
         Assert.False(import.UnlockIsPrimary);
         Assert.True(import.CancelTouchCommand.CanExecute(null));
 
-        import.CancelTouchCommand.Execute(null);
+        import.CancelTouchCommand.Press();
         await unlocking;
 
         Assert.False(import.IsWaitingForTouch);
@@ -149,12 +149,12 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
     {
         _device.NeverTouched = true;
         using var import = NewImport();
-        import.UseHardwareKeyCommand.Execute(null);
+        import.UseHardwareKeyCommand.Press();
         Type(import);
 
         var unlocking = import.UnlockAsync();
         await Until(() => import.IsWaitingForTouch);
-        import.CancelCommand.Execute(null);
+        import.CancelCommand.Press();
 
         await unlocking.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(import.IsWaitingForTouch);
@@ -165,11 +165,11 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
     public void Keeping_the_file_in_place_hands_its_slot_to_the_unlock_screen()
     {
         using var import = NewImport();
-        import.UseHardwareKeyCommand.Execute(null);
-        import.SwitchSlotCommand.Execute(null);
+        import.UseHardwareKeyCommand.Press();
+        import.SwitchSlotCommand.Press();
         import.KeepEditingInPlace = true;
 
-        import.ConfirmCommand.Execute(null);
+        import.ConfirmCommand.Press();
 
         Assert.Equal([(Path.GetFullPath(_source), (string?)null, (int?)1)], _opened);
 

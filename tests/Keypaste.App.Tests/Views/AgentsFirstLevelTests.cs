@@ -90,9 +90,9 @@ public sealed class AgentsFirstLevelTests
         focused.Focus();
         Assert.Same(focused, agents.Window.FocusManager?.GetFocusedElement());
 
-        model.ConnectCommand.Execute(cursor);
+        model.ConnectCommand.Press(cursor);
         await model.Opening.WaitAsync(_wait, Token);
-        model.ConnectCommand.Execute(gemini);
+        model.ConnectCommand.Press(gemini);
         await model.Opening.WaitAsync(_wait, Token);
         agents.Settle();
 
@@ -156,7 +156,7 @@ public sealed class AgentsFirstLevelTests
         Disclosure(agents.Window, claude).IsExpanded = true;
         agents.Settle();
         var settings = Assert.IsType<AgentSettingsViewModel>(claude.Settings);
-        settings.ToggleAdvancedCommand.Execute(null);
+        settings.ToggleAdvancedCommand.Press();
         agents.Settle();
 
         Assert.True(settings.OffersLimits, "no limits to show");

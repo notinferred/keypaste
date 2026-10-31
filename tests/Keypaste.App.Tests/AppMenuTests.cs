@@ -41,7 +41,7 @@ public sealed class AppMenuTests
         {
             Assert.True(AppMenu.CanImport(shell));
 
-            import.Command!.Execute(null);
+            import.Command!.Press();
 
             Assert.True(shell.HasImport);
             Assert.False(AppMenu.CanImport(shell), "Import is on while an import is open");

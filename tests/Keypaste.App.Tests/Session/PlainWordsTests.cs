@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
@@ -18,7 +19,6 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
-using Keypaste.Mvvm;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -75,14 +75,14 @@ public sealed partial class PlainWordsTests
         })
         {
             Assert.True(open.CanExecute(null), state);
-            open.Execute(null);
+            open.Press();
             RenderedShell.Drain();
             said.AddRange(Shown(shell.Window, state));
-            close.Execute(null);
+            close.Press();
             RenderedShell.Drain();
         }
 
-        detail.History.ToggleCommand.Execute(null);
+        detail.History.ToggleCommand.Press();
         RenderedShell.Drain();
         detail.History.Selected = detail.History.Rows[0];
         RenderedShell.Drain();
@@ -95,12 +95,12 @@ public sealed partial class PlainWordsTests
             said.AddRange(Shown(shell.Window, kind.ToString()));
         }
 
-        shell.Shell.OpenProjectCommand.Execute("billing");
+        shell.Shell.OpenProjectCommand.Press("billing");
         RenderedShell.Drain();
         said.AddRange(Shown(shell.Window, "a project"));
 
         var project = Assert.IsType<EnvSetsViewModel>(shell.Shell.Content).OpenProject!;
-        project.Environments[0].AddEntry.Execute(null);
+        project.Environments[0].AddEntry.Press();
         RenderedShell.Drain();
         said.AddRange(Shown(shell.Window, "a project's add-item form"));
 
@@ -137,7 +137,7 @@ public sealed partial class PlainWordsTests
 
         foreach (var settings in model.Rows.Select(row => row.Settings).OfType<AgentSettingsViewModel>())
         {
-            settings.ToggleAdvancedCommand.Execute(null);
+            settings.ToggleAdvancedCommand.Press();
         }
 
         agents.Settle();
@@ -147,13 +147,13 @@ public sealed partial class PlainWordsTests
         {
             var target = model.Rows.Single(row => row.Key == key);
             Assert.True(open.CanExecute(target), key);
-            open.Execute(target);
+            open.Press(target);
             await model.Opening.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             agents.Settle();
             said.AddRange(Shown(agents.Window, $"Agents, {key}'s pane"));
         }
 
-        await model.Connection!.ConfirmCommand.ExecuteAsync();
+        await model.Connection!.ConfirmCommand.PressAsync();
         await model.Looking.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         agents.Settle();
         said.AddRange(Shown(agents.Window, "Agents, after Run it"));
@@ -176,7 +176,7 @@ public sealed partial class PlainWordsTests
         var firstRun = new FirstRunViewModel(TermsOfUse.Carried, _ => true, () => { });
         var notice = Show(new FirstRunView { DataContext = firstRun });
         said.AddRange(Shown(notice, "the first run's terms"));
-        firstRun.ContinueCommand.Execute(null);
+        firstRun.ContinueCommand.Press();
         RenderedShell.Drain();
         said.AddRange(Shown(notice, "the first run's crash-report choice"));
         notice.Close();
@@ -209,7 +209,7 @@ public sealed partial class PlainWordsTests
 
         using (var locked = new UnlockViewModel(vaultSession, fixture.Home, picker, () => { }, lockedBy: VaultLockReason.Idle))
         {
-            locked.ShowMoreOptionsCommand.Execute(null);
+            locked.ShowMoreOptionsCommand.Press();
             said.AddRange(Seen(new UnlockView { DataContext = locked }, "the lock screen, More options open"));
 
             picker.NewPath = Path.Combine(fixture.Home, "created.kdbx");
@@ -313,7 +313,7 @@ public sealed partial class PlainWordsTests
 
             exported.Into = "imported";
             exported.KeepHeld = true;
-            exported.ConfirmCommand.Execute(null);
+            exported.ConfirmCommand.Press();
             RenderedShell.Drain();
             Assert.True(exported.IsImported, exported.Message);
             said.AddRange(Shown(exportDialog, "the export dialog, its report"));

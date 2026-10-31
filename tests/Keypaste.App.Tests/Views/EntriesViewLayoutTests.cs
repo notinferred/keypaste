@@ -54,7 +54,7 @@ public sealed class EntriesViewLayoutTests
             if (comparing)
             {
                 var history = entries.Detail!.History;
-                history.ToggleCommand.Execute(null);
+                history.ToggleCommand.Press();
                 RenderedShell.Drain();
                 history.Selected = history.Rows[0];
                 RenderedShell.Drain();

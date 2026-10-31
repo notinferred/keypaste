@@ -89,7 +89,7 @@ public sealed class SecondStartTests
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
 
-            app.Tray!.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == AppTray.QuitHeader).Command!.Execute(null);
+            app.Tray!.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == AppTray.QuitHeader).Command!.Press();
 
             using var stderr = new StringWriter();
             Assert.Equal(1, await SecondStartAsync([], home, stderr, _settle));

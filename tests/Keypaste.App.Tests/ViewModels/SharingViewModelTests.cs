@@ -93,7 +93,7 @@ public sealed class SharingViewModelTests : IDisposable
         screen.Views = 3;
         screen.Recipient = "sam@acme.dev";
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         Assert.Null(screen.Error);
         Assert.NotNull(_clipboard.Content);
@@ -124,7 +124,7 @@ public sealed class SharingViewModelTests : IDisposable
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
         screen.RequirePassphrase = true;
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
         Assert.NotNull(screen.Error);
         Assert.Empty(_server.Requests);
 
@@ -133,7 +133,7 @@ public sealed class SharingViewModelTests : IDisposable
             screen.Passphrase.Type(c);
         }
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         Assert.Null(screen.Error);
         Assert.True(ShareLink.TryParse(_clipboard.Content!, out var id, out var key));
@@ -149,7 +149,7 @@ public sealed class SharingViewModelTests : IDisposable
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         Assert.Equal("The link could not be copied, so it was withdrawn.", screen.Error);
         Assert.Empty(_server.Shares);
@@ -166,7 +166,7 @@ public sealed class SharingViewModelTests : IDisposable
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         Assert.True(screen.IsUnavailable);
         Assert.Equal("keypaste.com is not accepting shares right now.", screen.Unavailable);
@@ -178,7 +178,7 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.Empty(screen.Rows);
 
         _server.Answer = null;
-        await screen.RetryCommand.ExecuteAsync();
+        await screen.RetryCommand.PressAsync();
 
         Assert.False(screen.IsUnavailable);
         Assert.True(screen.CreateCommand.CanExecute(null));
@@ -193,7 +193,7 @@ public sealed class SharingViewModelTests : IDisposable
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         Assert.Equal("The share server could not be reached.", screen.Unavailable);
         Assert.False(screen.CreateCommand.CanExecute(null));
@@ -208,7 +208,7 @@ public sealed class SharingViewModelTests : IDisposable
         using var screen = Screen();
         screen.SelectedWhat = "Work/no-password";
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         Assert.Equal("'Work/no-password' has no password to share.", screen.Error);
         Assert.False(screen.IsUnavailable);
@@ -222,7 +222,7 @@ public sealed class SharingViewModelTests : IDisposable
         using var screen = Screen(unavailable: "Sharing is off: KEYPASTE_SHARE_URL may only name a local development server.");
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
 
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         Assert.True(screen.IsUnavailable);
         Assert.False(screen.CanRetry);
@@ -235,10 +235,10 @@ public sealed class SharingViewModelTests : IDisposable
     {
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         screen.Selected = Assert.Single(screen.Rows);
-        await screen.RevokeCommand.ExecuteAsync();
+        await screen.RevokeCommand.PressAsync();
 
         Assert.Equal("Revoked. The link no longer opens.", _toasts[^1]);
         Assert.Empty(screen.Rows);
@@ -251,12 +251,12 @@ public sealed class SharingViewModelTests : IDisposable
     {
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
-        await screen.CreateCommand.ExecuteAsync();
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
+        await screen.CreateCommand.PressAsync();
         Assert.Equal(2, screen.Rows.Count);
         var target = screen.Rows[1];
 
-        screen.RevokeRowCommand.Execute(target);
+        screen.RevokeRowCommand.Press(target);
         await Until(() => screen.Rows.Count == 1);
 
         Assert.DoesNotContain(screen.Rows, row => row.Id == target.Id);
@@ -269,11 +269,11 @@ public sealed class SharingViewModelTests : IDisposable
     {
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
         _server.Unreachable = true;
 
         screen.Selected = Assert.Single(screen.Rows);
-        await screen.RevokeCommand.ExecuteAsync();
+        await screen.RevokeCommand.PressAsync();
 
         Assert.Equal("The share server could not be reached. The link still opens.", screen.Error);
         Assert.Single(screen.Rows);
@@ -285,10 +285,10 @@ public sealed class SharingViewModelTests : IDisposable
     {
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
         _server.OpenAll(Assert.Single(screen.Rows).Id);
 
-        await screen.RefreshCommand.ExecuteAsync();
+        await screen.RefreshCommand.PressAsync();
 
         var row = Assert.Single(screen.Rows);
         Assert.Equal("Opened or revoked", row.Status);
@@ -302,11 +302,11 @@ public sealed class SharingViewModelTests : IDisposable
         using var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
         screen.Views = 3;
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
         var id = Assert.Single(screen.Rows).Id;
         _server.Shares[id] = _server.Shares[id] with { ViewsLeft = 2 };
 
-        await screen.RefreshCommand.ExecuteAsync();
+        await screen.RefreshCommand.PressAsync();
 
         var row = Assert.Single(screen.Rows);
         Assert.Equal("1 of 3 views used", row.Status);
@@ -320,7 +320,7 @@ public sealed class SharingViewModelTests : IDisposable
         using (var first = Screen())
         {
             first.SelectedWhat = "env/acme-api/STRIPE_KEY";
-            await first.CreateCommand.ExecuteAsync();
+            await first.CreateCommand.PressAsync();
         }
 
         var asked = _server.Requests.Count;
@@ -338,7 +338,7 @@ public sealed class SharingViewModelTests : IDisposable
     {
         var screen = Screen();
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
-        await screen.CreateCommand.ExecuteAsync();
+        await screen.CreateCommand.PressAsync();
 
         screen.Dispose();
 
