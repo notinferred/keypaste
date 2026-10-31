@@ -129,6 +129,7 @@ public sealed class TomlTests
             Takes(limits, $"[[s]]\nk = \"{new string('a', limits.StringLength)}\"", 1);
             Refuses(limits, $"[[s]]\nk = \"{new string('a', limits.StringLength + 1)}\"", $"line 2: a value may be at most {limits.StringLength} characters");
             Refuses(limits, $"[[s]]\nk = [\"{new string('a', limits.StringLength + 1)}\"]", $"line 2: a value may be at most {limits.StringLength} characters");
+            Refuses(limits, "[[s]]\nk = \"C:\\Users\"", "line 2: a backslash is not allowed inside a value");
 
             Takes(limits, Lines("[[s]]", limits.Tables), limits.Tables);
             Refuses(limits, Lines("[[s]]", limits.Tables + 1), $"line {limits.Tables + 1}: at most {limits.Tables} sections are allowed");
@@ -153,13 +154,12 @@ public sealed class TomlTests
         var anything = Gen.Choose(0, 70).SelectMany(n => Gen.Frequency(
             (12, Gen.Elements(_units)),
             (1, Gen.Elements("\"", "\\", "\n", "\t", "\r", "\u0007", "\ud800", "\udc00", "\ud83d"))).ArrayOf(n)).Select(string.Concat);
-        var values = Gen.OneOf(anything, Gen.Choose(0, 135).Select(n => new string('a', n)));
         var items = Gen.Choose(0, 9).SelectMany(n => Gen.Frequency((4, Text(12)), (1, anything)).ArrayOf(n));
         var comments = Gen.OneOf(Gen.Constant<string?>(null), Text(30).Select(text => (string?)("\"" + text)), Gen.Choose(0, 270).Select(n => (string?)new string('c', n)));
         var cases =
             from limits in _limits
             from key in _bare
-            from value in values
+            from value in Gen.OneOf(anything, Gen.Choose(-1, 1).Select(offset => new string('a', limits.StringLength + offset)))
             from comment in comments
             from strings in items
             select (limits, key, value, comment, items: strings);

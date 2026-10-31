@@ -102,4 +102,3 @@ D-0678.
   - `lock`, `doctor`, `use`, `approve`, `clients`, `grants` and `generate` used to print their usage after a usage error; they now print the `see` line.
 - **System.CommandLine reaches the desktop app's output** through Infrastructure, unused there, as `CommandLine.cs` did.
 - **The `mcp` summary is written twice:** in `CliApp`'s list and in the bridge's own help. The CLI may not reference `Keypaste.Mcp` outside `Program.cs`.
-- **K.11's Verify snapshots** for help text would now snapshot the generated help.
