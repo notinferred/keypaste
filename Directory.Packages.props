@@ -16,8 +16,12 @@
   <!-- The MCP bridge's one package, in its narrowest form: ModelContextProtocol.Core rather than
        ModelContextProtocol, which costs four transitive packages on net10.0 instead of about twelve
        and brings no generic host. Justified in DECISIONS.md D-0019 for the bridge and D-0419 for its
-       place in the keypaste binary, as docs/PRODUCT.md law 3.9 requires. Keypaste.Core — the vault and
-       crypto path — still has no runtime package. -->
+       place in the keypaste binary, as docs/PRODUCT.md law 3.9 requires. -->
+  <!-- Keypaste.Core's retries, deadlines and polls (D-0677). -->
+  <ItemGroup Label="Resilience">
+    <PackageVersion Include="Polly.Core" Version="8.9.0" />
+  </ItemGroup>
+
   <ItemGroup Label="MCP bridge">
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
   </ItemGroup>
@@ -58,8 +62,7 @@
        appsettings.json from the working directory and writes to the console.
 
        The CLI does not reference it: its NativeAOT publish would statically link the shim and
-       OpenSSL and, on Linux, require libpcsclite at start-up for every user. Keypaste.Core still has
-       no runtime package. -->
+       OpenSSL and, on Linux, require libpcsclite at start-up for every user. -->
   <ItemGroup Label="Desktop hardware keys">
     <PackageVersion Include="Yubico.YubiKey" Version="1.18.0" />
   </ItemGroup>

@@ -25,6 +25,7 @@
     -->
     <ProjectReference Include="../../third_party/KeePassLib/KeePassLib.csproj" Aliases="KeePass" />
     <ProjectReference Include="../Keypaste.Infrastructure/Keypaste.Infrastructure.csproj" />
+    <PackageReference Include="Polly.Core" />
   </ItemGroup>
 
   <ItemGroup>

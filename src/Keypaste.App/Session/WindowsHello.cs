@@ -1,5 +1,7 @@
 #if WINDOWS
 using System.Runtime.InteropServices;
+using Polly;
+using Polly.Retry;
 using Windows.Security.Credentials;
 using Windows.Security.Cryptography;
 #endif
@@ -45,6 +47,15 @@ internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQui
     private const int _promptChecks = 4;
 
     private static readonly TimeSpan _promptCheck = TimeSpan.FromMilliseconds(500);
+
+    private static readonly ResiliencePipeline _findingPrompt = new ResiliencePipelineBuilder()
+        .AddRetry(new RetryStrategyOptions
+        {
+            ShouldHandle = args => ValueTask.FromResult(args.Outcome is { Exception: null, Result: nint and 0 }),
+            MaxRetryAttempts = _promptChecks,
+            Delay = _promptCheck,
+        })
+        .Build();
 
     public string Name => "Windows Hello";
 
@@ -127,17 +138,11 @@ internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQui
 
     private static void BringPromptForward() => _ = Task.Run(async () =>
     {
-        for (var check = 0; check < _promptChecks; check++)
+        var prompt = await _findingPrompt.ExecuteAsync(static _ => ValueTask.FromResult(FindWindow(_promptWindowClass, null))).ConfigureAwait(false);
+
+        if (prompt != 0)
         {
-            await Task.Delay(_promptCheck).ConfigureAwait(false);
-
-            var prompt = FindWindow(_promptWindowClass, null);
-
-            if (prompt != 0)
-            {
-                _ = SetForegroundWindow(prompt);
-                return;
-            }
+            _ = SetForegroundWindow(prompt);
         }
     });
 

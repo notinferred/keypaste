@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.Versioning;
 using Keypaste.Core.Internal;
+using Polly;
 
 namespace Keypaste.Core;
 
@@ -475,34 +476,16 @@ public static class VaultBackups
     /// </remarks>
     private static (bool Exists, byte[]? Digest) ObserveReadable(string vaultPath, Action<int>? waitBetweenAttempts)
     {
-        for (var attempt = 1; ; attempt++)
-        {
-            var observed = Observe(vaultPath);
-            if (!observed.Exists || observed.Digest is not null)
-            {
-                return observed;
-            }
+        var observed = Retrying(outcome => outcome.Result is (true, null), waitBetweenAttempts).Execute(() => Observe(vaultPath));
 
-            if (attempt >= KeePassInterop.SaveAttempts)
-            {
-                throw new VaultRestoreException($"'{vaultPath}' could not be read, so it was not replaced.");
-            }
-
-            Wait(attempt, waitBetweenAttempts);
-        }
+        return observed is (true, null)
+            ? throw new VaultRestoreException($"'{vaultPath}' could not be read, so it was not replaced.")
+            : observed;
     }
 
-    private static void Wait(int attempt, Action<int>? waitBetweenAttempts)
-    {
-        if (waitBetweenAttempts is not null)
-        {
-            waitBetweenAttempts(attempt);
-        }
-        else
-        {
-            Thread.Sleep(KeePassInterop.SaveRetryDelayMilliseconds * attempt);
-        }
-    }
+    /// <summary>A save's retries: <see cref="KeePassInterop.SaveAttempts"/> attempts, sleeping as a save does unless a test waits instead.</summary>
+    private static ResiliencePipeline Retrying(Func<Outcome<object>, bool> again, Action<int>? waitBetweenAttempts) =>
+        Retries.OnThisThread(KeePassInterop.SaveAttempts, again, waitBetweenAttempts ?? KeePassInterop.SleepAfter);
 
     /// <summary>The listed backup already holding exactly these bytes, if one does.</summary>
     private static VaultBackup? HeldBy(string vaultPath, byte[] liveDigest)
@@ -528,40 +511,43 @@ public static class VaultBackups
     private static void MoveIntoPlace(
         string staged, string vaultPath, (bool Exists, byte[]? Digest) observed, Action<int>? waitBetweenAttempts)
     {
-        for (var attempt = 1; ; attempt++)
+        Exception? refusal = null;
+
+        if (!Retrying(outcome => outcome is { Exception: null, Result: false } && (refusal is null || MayClear(refusal)), waitBetweenAttempts)
+            .Execute(() => TryMove(staged, vaultPath, observed, out refusal)))
         {
-            var now = Observe(vaultPath);
-            var unreadable = now.Exists && now.Digest is null;
+            throw new VaultRestoreException(
+                $"Could not replace '{vaultPath}': {refusal?.Message ?? "it could not be read"}", refusal!);
+        }
+    }
 
-            if (!unreadable && (now.Exists != observed.Exists
-                || (now.Digest is { } digest && !CryptographicOperations.FixedTimeEquals(digest, observed.Digest!))))
-            {
-                throw new VaultChangedOnDiskException(
-                    "The vault file changed while the backup was being restored, so it was not replaced.");
-            }
+    /// <summary>One rename; false with the reason it was refused, or with none while the vault cannot be read.</summary>
+    private static bool TryMove(string staged, string vaultPath, (bool Exists, byte[]? Digest) observed, out Exception? refusal)
+    {
+        refusal = null;
+        var now = Observe(vaultPath);
 
-            Exception? refusal = null;
+        if (now is (true, null))
+        {
+            return false;
+        }
 
-            if (!unreadable)
-            {
-                try
-                {
-                    File.Move(staged, vaultPath, overwrite: true);
-                    return;
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-                {
-                    refusal = ex;
-                }
-            }
+        if (now.Exists != observed.Exists
+            || (now.Digest is { } digest && !CryptographicOperations.FixedTimeEquals(digest, observed.Digest!)))
+        {
+            throw new VaultChangedOnDiskException(
+                "The vault file changed while the backup was being restored, so it was not replaced.");
+        }
 
-            if (attempt >= KeePassInterop.SaveAttempts || (refusal is not null && !MayClear(refusal)))
-            {
-                throw new VaultRestoreException(
-                    $"Could not replace '{vaultPath}': {refusal?.Message ?? "it could not be read"}", refusal!);
-            }
-
-            Wait(attempt, waitBetweenAttempts);
+        try
+        {
+            File.Move(staged, vaultPath, overwrite: true);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            refusal = ex;
+            return false;
         }
     }
 

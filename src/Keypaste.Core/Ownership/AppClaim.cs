@@ -3,6 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipes;
 using System.Net.Sockets;
 using System.Security.Principal;
+using Polly;
+using Polly.Retry;
 
 namespace Keypaste.Core.Ownership;
 
@@ -140,20 +142,23 @@ public sealed class AppClaim : IDisposable
         var endpoint = EndpointFor(home);
         var asked = Stopwatch.GetTimestamp();
 
-        while (true)
+        (var reply, claim) = new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
+            {
+                ShouldHandle = args => ValueTask.FromResult(
+                    args.Outcome is { Exception: null, Result: (Reply.NotYet, null) } && Stopwatch.GetElapsedTime(asked) < wait),
+                MaxRetryAttempts = int.MaxValue,
+                Delay = TimeSpan.Zero,
+            })
+            .Build()
+            .Execute(AskThenTake);
+
+        return reply == Reply.Shown;
+
+        (Reply, AppClaim?) AskThenTake()
         {
             var reply = Ask(endpoint, wait - Stopwatch.GetElapsedTime(asked));
-
-            if (reply == Reply.Shown)
-            {
-                claim = null;
-                return true;
-            }
-
-            if (TryAcquire(home, out claim) || reply == Reply.Refused || Stopwatch.GetElapsedTime(asked) >= wait)
-            {
-                return false;
-            }
+            return reply != Reply.Shown && TryAcquire(home, out var taken) ? (reply, taken) : (reply, null);
         }
     }
 

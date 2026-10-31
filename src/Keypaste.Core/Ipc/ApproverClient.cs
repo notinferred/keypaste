@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Security.Principal;
 using Keypaste.Infrastructure;
+using Polly;
+using Polly.Retry;
 
 namespace Keypaste.Core.Ipc;
 
@@ -133,25 +135,20 @@ public sealed class ApproverClient : IAsyncDisposable
         NamedPipeClientStream pipe,
         long asked,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var remaining = timeout - Stopwatch.GetElapsedTime(asked);
-
-            try
+        CancellationToken cancellationToken) =>
+        new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
             {
-                pipe.Connect((int)Math.Clamp(remaining.TotalMilliseconds, 0, _cancellationSlice.TotalMilliseconds));
-                return;
-            }
-            catch (TimeoutException) when (Stopwatch.GetElapsedTime(asked) < timeout)
+                ShouldHandle = args => ValueTask.FromResult(args.Outcome.Exception is TimeoutException && Stopwatch.GetElapsedTime(asked) < timeout),
+                MaxRetryAttempts = int.MaxValue,
+                Delay = TimeSpan.Zero,
+            })
+            .Build()
+            .Execute(() =>
             {
-                // Still inside the budget: another slice.
-            }
-        }
-    }
+                cancellationToken.ThrowIfCancellationRequested();
+                pipe.Connect((int)Math.Clamp((timeout - Stopwatch.GetElapsedTime(asked)).TotalMilliseconds, 0, _cancellationSlice.TotalMilliseconds));
+            });
 
     /// <summary>Whether the pipe is still up and carries no withdrawn request. False does not mean the approver is gone for good.</summary>
     public bool IsConnected => !_disposed && !_withdrawn && _pipe.IsConnected;

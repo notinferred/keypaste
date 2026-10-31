@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
+using Keypaste.Core.Internal;
+using Polly;
 
 namespace Keypaste.Core.Audit;
 
@@ -95,6 +97,9 @@ public sealed class AuditLog : IDisposable
 
     /// <summary>How long to wait between attempts, in milliseconds.</summary>
     internal const int LockWaitMilliseconds = 20;
+
+    private static readonly ResiliencePipeline _lockRetries = Retries.OnThisThread(
+        LockAttempts, outcome => outcome.Exception is IOException or UnauthorizedAccessException, _ => Thread.Sleep(LockWaitMilliseconds));
 
     /// <summary>
     /// The timestamp format. Its width is fixed, which is what lets
@@ -462,23 +467,14 @@ public sealed class AuditLog : IDisposable
     /// </remarks>
     private FileStream? AcquireWriteLock()
     {
-        for (var attempt = 0; attempt < LockAttempts; attempt++)
+        try
         {
-            try
-            {
-                return new FileStream(
-                    _lockPath,
-                    FileMode.OpenOrCreate,
-                    FileAccess.Write,
-                    FileShare.None);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                Thread.Sleep(LockWaitMilliseconds);
-            }
+            return _lockRetries.Execute(static path => new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None), _lockPath);
         }
-
-        return null;
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static void CreateDirectory(string? directory)

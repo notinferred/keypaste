@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
+using Polly;
 
 namespace Keypaste.Core.CrashReports;
 
@@ -29,6 +30,7 @@ public sealed class CrashSender
     private readonly Uri _endpoint;
     private readonly CrashOutbox _outbox;
     private readonly TimeProvider _clock;
+    private readonly ResiliencePipeline _requestTime;
     private DateTimeOffset _notBefore = DateTimeOffset.MinValue;
 
     /// <summary>Sends one outbox's reports.</summary>
@@ -52,6 +54,7 @@ public sealed class CrashSender
         _endpoint = endpoint;
         _outbox = outbox;
         _clock = clock ?? TimeProvider.System;
+        _requestTime = new ResiliencePipelineBuilder { TimeProvider = _clock }.AddTimeout(RequestTime).Build();
     }
 
     /// <summary>keypaste.com.</summary>
@@ -148,14 +151,13 @@ public sealed class CrashSender
     {
         try
         {
-            using var timeout = new CancellationTokenSource(RequestTime, _clock);
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
             using var invoker = new HttpMessageInvoker(_handler, disposeHandler: false);
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(_endpoint, _path));
             request.Content = new ReadOnlyMemoryContent(report.Json);
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-            using var response = await invoker.SendAsync(request, linked.Token).ConfigureAwait(false);
+            using var response = await _requestTime.ExecuteAsync(
+                token => new ValueTask<HttpResponseMessage>(invoker.SendAsync(request, token)), ct).ConfigureAwait(false);
 
             switch (response.StatusCode)
             {

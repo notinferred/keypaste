@@ -2984,24 +2984,14 @@ internal sealed class KeePassInterop : IDisposable
 
         clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
-        for (int attempt = 1;
-            !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt, ref beforeReplacing, keyChange, cancellationToken);
-            attempt++)
-        {
-            var retry = attempt;
-            clock.Wait(() =>
-            {
-                if (waitBetweenAttempts is null)
-                {
-                    Thread.Sleep(SaveRetryDelayMilliseconds * retry);
-                }
-                else
-                {
-                    waitBetweenAttempts(retry);
-                }
-            });
-        }
+        var wait = waitBetweenAttempts ?? SleepAfter;
+        var attempt = 0;
+        Retries.OnThisThread(attempts, outcome => outcome is { Exception: null, Result: false }, retry => clock.Wait(() => wait(retry)))
+            .Execute(() => TryAttempt(hasChangedOnDisk, clock, ++attempt, attempts, duringAttempt, ref beforeReplacing, keyChange, cancellationToken));
     }
+
+    /// <summary>Sleeps after a refused save attempt, <see cref="SaveRetryDelayMilliseconds"/> times its number.</summary>
+    internal static void SleepAfter(int attempt) => Thread.Sleep(SaveRetryDelayMilliseconds * attempt);
 
     /// <summary>One attempt, gated if it can transact; false if it was refused and may be retried.</summary>
     /// <remarks>

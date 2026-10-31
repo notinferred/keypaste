@@ -2,6 +2,8 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Polly;
+using Polly.Retry;
 
 namespace Keypaste.Mcp;
 
@@ -79,34 +81,29 @@ internal static class McpAudit
         ArgumentNullException.ThrowIfNull(complete);
         ArgumentNullException.ThrowIfNull(clock);
 
-        // Asked once before any waiting, so the ordinary call pays nothing for this.
-        if (complete())
-        {
-            return true;
-        }
-
         var started = clock.GetTimestamp();
 
-        while (clock.GetElapsedTime(started) < grace)
+        try
         {
-            try
-            {
-                await Task.Delay(HandshakePoll, clock, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // The caller stopped waiting. Answer with what is known rather than throwing: the
-                // call still needs a verdict, and an unanswered one is recorded as nothing at all.
-                return complete();
-            }
-
-            if (complete())
-            {
-                return true;
-            }
+            // The first ask is at once, so the ordinary call pays nothing for this.
+            return await new ResiliencePipelineBuilder { TimeProvider = clock }
+                .AddRetry(new RetryStrategyOptions
+                {
+                    ShouldHandle = args => ValueTask.FromResult(
+                        args.Outcome is { Exception: null, Result: false } && clock.GetElapsedTime(started) < grace),
+                    MaxRetryAttempts = int.MaxValue,
+                    Delay = HandshakePoll,
+                })
+                .Build()
+                .ExecuteAsync(_ => ValueTask.FromResult(complete()), cancellationToken)
+                .ConfigureAwait(false);
         }
-
-        return complete();
+        catch (OperationCanceledException)
+        {
+            // The caller stopped waiting. Answer with what is known rather than throwing: the
+            // call still needs a verdict, and an unanswered one is recorded as nothing at all.
+            return complete();
+        }
     }
 
     /// <summary>Works out who is calling, once the handshake that names them has completed or the wait for it has run out.</summary>

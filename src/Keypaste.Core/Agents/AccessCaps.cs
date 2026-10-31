@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using Keypaste.Core.Internal;
 using Keypaste.Infrastructure;
+using Polly;
 
 namespace Keypaste.Core.Agents;
 
@@ -121,8 +123,6 @@ public sealed class AccessCaps
     /// <summary>The suffix of the file beside it that a reset keeps a malformed file under.</summary>
     public const string KeptSuffix = ".unreadable";
 
-    private const int _lockAttempts = 50;
-    private const int _lockWaitMilliseconds = 20;
     private const string _section = "client";
     private const string _labelKey = "label";
     private const string _projectKey = "project";
@@ -136,6 +136,9 @@ public sealed class AccessCaps
     private const string _no = "no";
     private const string _on = "on";
     private const string _off = "off";
+
+    private static readonly ResiliencePipeline _lockRetries = Retries.OnThisThread(
+        50, outcome => outcome.Exception is IOException, _ => Thread.Sleep(20));
 
     private static readonly TomlLimits _limits = TomlLimits.Policy with
     {
@@ -764,27 +767,22 @@ public sealed class AccessCaps
             return null;
         }
 
-        for (var attempt = 1; attempt <= _lockAttempts; attempt++)
+        try
         {
-            try
-            {
-                var held = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
-                problem = string.Empty;
-                return held;
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                problem = ex.Message;
-                return null;
-            }
-            catch (IOException)
-            {
-                Thread.Sleep(_lockWaitMilliseconds);
-            }
+            var held = _lockRetries.Execute(static path => new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None), lockPath);
+            problem = string.Empty;
+            return held;
         }
-
-        problem = $"{lockPath} is held by another keypaste process changing it";
-        return null;
+        catch (UnauthorizedAccessException ex)
+        {
+            problem = ex.Message;
+            return null;
+        }
+        catch (IOException)
+        {
+            problem = $"{lockPath} is held by another keypaste process changing it";
+            return null;
+        }
     }
 
     private static bool TryRead(TomlTable table, [NotNullWhen(true)] out CapsRow? row, out string problem)

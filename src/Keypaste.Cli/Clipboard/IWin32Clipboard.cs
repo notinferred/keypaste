@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Polly;
+using Polly.Retry;
 
 namespace Keypaste.Cli.Clipboard;
 
@@ -80,24 +82,25 @@ internal sealed class Win32Clipboard : IWin32Clipboard
         return written > 0 ? new string(buffer, 0, written) : null;
     }
 
-    /// <inheritdoc/>
-    public bool Open()
-    {
-        // Another process can hold the clipboard for a few milliseconds at a time. Retrying is
-        // the documented approach; failing on the first attempt would make copying flaky in a
-        // way the user would read as keypaste being broken.
-        for (var attempt = 0; attempt < 10; attempt++)
+    // Another process can hold the clipboard for a few milliseconds at a time. Retrying is the documented approach; failing
+    // on the first attempt would make copying flaky in a way the user would read as keypaste being broken. The wait blocks
+    // this thread rather than waiting on a pool timer, as Keypaste.Core's retries do (F.9).
+    private static readonly ResiliencePipeline _opening = new ResiliencePipelineBuilder()
+        .AddRetry(new RetryStrategyOptions
         {
-            if (OpenClipboard(IntPtr.Zero))
+            ShouldHandle = args => ValueTask.FromResult(args.Outcome is { Exception: null, Result: false }),
+            MaxRetryAttempts = 9,
+            Delay = TimeSpan.Zero,
+            OnRetry = _ =>
             {
-                return true;
-            }
+                Thread.Sleep(10);
+                return default;
+            },
+        })
+        .Build();
 
-            Thread.Sleep(10);
-        }
-
-        return false;
-    }
+    /// <inheritdoc/>
+    public bool Open() => _opening.Execute(static () => OpenClipboard(IntPtr.Zero));
 
     /// <inheritdoc/>
     public bool Empty() => EmptyClipboard();

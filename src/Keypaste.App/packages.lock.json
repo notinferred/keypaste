@@ -426,7 +426,8 @@
         "type": "Project",
         "dependencies": {
           "KeePassLib": "[1.0.0, )",
-          "Keypaste.Infrastructure": "[0.5.0, )"
+          "Keypaste.Infrastructure": "[0.5.0, )",
+          "Polly.Core": "[8.9.0, )"
         }
       },
       "keypaste.infrastructure": {
@@ -434,6 +435,12 @@
       },
       "keypaste.mvvm": {
         "type": "Project"
+      },
+      "Polly.Core": {
+        "type": "CentralTransitive",
+        "requested": "[8.9.0, )",
+        "resolved": "8.9.0",
+        "contentHash": "Imm3q+XvH+8fiOdCkp+GggDQuxN3e4VznbRxODjjJxCurmAIfUEO4dKcPx8RCwocTkvP6Udw2DyXtC+45tu3jA=="
       }
     },
     "net10.0/linux-arm64": {
@@ -1049,7 +1056,8 @@
         "type": "Project",
         "dependencies": {
           "KeePassLib": "[1.0.0, )",
-          "Keypaste.Infrastructure": "[0.5.0, )"
+          "Keypaste.Infrastructure": "[0.5.0, )",
+          "Polly.Core": "[8.9.0, )"
         }
       },
       "keypaste.infrastructure": {
@@ -1057,6 +1065,12 @@
       },
       "keypaste.mvvm": {
         "type": "Project"
+      },
+      "Polly.Core": {
+        "type": "CentralTransitive",
+        "requested": "[8.9.0, )",
+        "resolved": "8.9.0",
+        "contentHash": "Imm3q+XvH+8fiOdCkp+GggDQuxN3e4VznbRxODjjJxCurmAIfUEO4dKcPx8RCwocTkvP6Udw2DyXtC+45tu3jA=="
       }
     },
     "net10.0-windows10.0.19041/linux-arm64": {

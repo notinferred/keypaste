@@ -54,6 +54,7 @@ only_expected_copyrights() {
   while IFS= read -r line; do
     case "$line" in
       "$PROJECT_COPYRIGHT"*|"$UPSTREAM_COPYRIGHT"*|'Copyright (c) .NET Foundation'*|'Copyright (c) Microsoft'*) ;;
+      'Copyright (c) 2015-'[0-9][0-9][0-9][0-9]', App vNext'*) ;; # Polly.Core, Keypaste.Core's retries (D-0677)
       *) die "$file carries an unexpected copyright: $line" ;;
     esac
   done < <(readable "$file" | LC_ALL=C grep -oE 'Copyright \(c\) [0-9]{4}[ -][^ ].{0,48}' | sort -u)
