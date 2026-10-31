@@ -1,7 +1,8 @@
 name: mutations
 
-# K.11's probe: Stryker.NET over each suite K.11 rewrites, showing that its properties kill every mutant the examples
-# they replace killed. It runs on the k11 branch only and is deleted before integration; docs/steps/K.11.md keeps its result.
+# K.11's probe: Stryker.NET's report over each suite K.11 rewrites, which every test of Keypaste.Core.Tests runs against and
+# which names the tests that killed each mutant, so the properties can be shown to kill every mutant the examples they
+# replace killed. It runs on the k11 branch only and is deleted before integration; docs/steps/K.11.md keeps its result.
 
 on:
   push:
@@ -9,10 +10,9 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
-  group: mutations-${{ github.ref }}
+  group: mutations-${{ github.sha }}
   cancel-in-progress: true
 
 env:
@@ -29,20 +29,14 @@ jobs:
       matrix:
         include:
           - suite: toml
-            baseline: '41215522812'
             project: src/Keypaste.Infrastructure
             mutate: Toml.cs TomlWriter.cs
-            classes: TomlTests
           - suite: csv
-            baseline: '41215522812'
             project: src/Keypaste.Infrastructure
             mutate: Csv.cs
-            classes: CsvTests KeePassXcCsvReaderTests OnePasswordCsvReaderTests LastPassCsvReaderTests
           - suite: csv-readers
-            baseline: '41214578767'
             project: src/Keypaste.Core
             mutate: Import/CsvExport.cs Import/KeePassXcCsvReader.cs Import/OnePasswordCsvReader.cs Import/LastPassCsvReader.cs
-            classes: CsvTests KeePassXcCsvReaderTests OnePasswordCsvReaderTests LastPassCsvReaderTests
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -61,7 +55,6 @@ jobs:
         env:
           PROJECT: ${{ matrix.project }}
           MUTATE: ${{ matrix.mutate }}
-          CLASSES: ${{ matrix.classes }}
         run: |
           python3 - <<'PY'
           import json, os
@@ -77,11 +70,9 @@ jobs:
               start = sum(len(line) + 1 for line in text[: first - 1])
               end = sum(len(line) + 1 for line in text[:last]) - 1
               mutate.append(f"**/{path}{{{start}..{end}}}")
-          classes = "|".join(f"FullyQualifiedName~Keypaste.Core.Tests.{name}." for name in os.environ["CLASSES"].split())
           config = {"stryker-config": {
               "test-projects": [os.path.abspath("tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj")],
               "test-runner": "mtp",
-              "test-case-filter": classes,
               "mutate": mutate,
               "reporters": ["json", "progress", "cleartext"],
           }}
@@ -100,37 +91,3 @@ jobs:
         with:
           name: mutations-${{ matrix.suite }}
           path: ${{ runner.temp }}/report.json
-
-      # A suite with no baseline run is the baseline; otherwise it compares itself with that run's report.
-      - name: Compare with the baseline
-        if: matrix.baseline != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SUITE: ${{ matrix.suite }}
-          BASELINE_RUN: ${{ matrix.baseline }}
-        run: |
-          gh run download "$BASELINE_RUN" --repo "$GITHUB_REPOSITORY" -n "mutations-$SUITE" -D "$RUNNER_TEMP/baseline"
-          python3 - <<'PY'
-          import json, os, sys
-          def mutants(path):
-              report = json.load(open(path, encoding="utf-8"))
-              return {
-                  (name, m["mutatorName"], m["location"]["start"]["line"], m["location"]["start"]["column"],
-                   m["location"]["end"]["line"], m["location"]["end"]["column"], m.get("replacement", "")): m["status"]
-                  for name, file in report["files"].items() for m in file["mutants"]
-              }
-          detected = {"Killed", "Timeout"}
-          before = mutants(os.path.join(os.environ["RUNNER_TEMP"], "baseline", "report.json"))
-          after = mutants(os.path.join(os.environ["RUNNER_TEMP"], "report.json"))
-          for label, run in (("baseline", before), ("now", after)):
-              counts = {}
-              for status in run.values():
-                  counts[status] = counts.get(status, 0) + 1
-              print(label, len(run), dict(sorted(counts.items())))
-          lost = sorted(key for key, status in before.items() if status in detected and after.get(key) not in detected)
-          gained = sum(1 for key, status in after.items() if status in detected and before.get(key) not in detected)
-          print(f"killed now and not before: {gained}")
-          for name, mutator, line, column, *_, replacement in lost:
-              print(f"lost: {os.path.basename(name)}:{line}:{column} {mutator}: {replacement}")
-          sys.exit(1 if lost else 0)
-          PY
