@@ -8,7 +8,7 @@ For a task, read this file, the [code map](docs/ARCHITECTURE.md) and the STEPS r
 
 Write clean, minimal, self-documenting code. Prefer clear names and structure. Default to no comments; add a single line only to explain a non-obvious constraint or decision the code cannot express. Never restate the code or duplicate a document's explanation. Take a capability from the platform, the ecosystem's standard or an established library before writing it, behind an interface keypaste owns, in the order PRODUCT §4.9 sets (D-0670).
 
-Tests exercise product behavior. A rule test over source or workflows holds a security or build invariant the compiler cannot, such as where the clipboard is read or that every Action is pinned to a commit; a test that a workflow, script or document still contains particular text is not written.
+Tests exercise product behavior. A rule test over source or workflows holds a security or build invariant the compiler cannot, such as that every Action is pinned to a commit; a test that a workflow, script or document still contains particular text is not written.
 
 Write concise, connected prose without hard wrapping. Use headings, lists, tables and emphasis only when they help navigation or comparison. Preserve code blocks, transcripts and structured records. Remove repetition, filler, rhetorical contrasts, formulaic introductions and conclusions, and unnecessary qualifications. State what the evidence establishes and keep unresolved questions explicit. Do not invent facts or expand the task's scope.
 
