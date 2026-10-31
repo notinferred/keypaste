@@ -13,6 +13,12 @@
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
 
+  <!-- Keypaste.Core.Tests' properties over the parsers and the merge (D-0679). -->
+  <ItemGroup Label="Property tests">
+    <PackageVersion Include="FsCheck" Version="3.6.0" />
+    <PackageVersion Include="FSharp.Core" Version="11.0.100" />
+  </ItemGroup>
+
   <!-- Keypaste.Core's retries, deadlines and polls (D-0677). -->
   <ItemGroup Label="Resilience">
     <PackageVersion Include="Polly.Core" Version="8.9.0" />

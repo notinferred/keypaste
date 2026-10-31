@@ -14,9 +14,6 @@ These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672
 - [ ] **B.6 — Repeat no green branch run on `main`.** Needs: none.
   - A push run on `main` whose commit already has green dispatched `ci` and `app` runs ends at once, naming them, while `require-green-gates.sh` still finds a full green run for a release tag (D-0403).
   - Accepted when an integration push of a verified commit spends under a minute per workflow and an unverified commit still runs every job.
-- [ ] **K.11 — Test parsers by property and outputs by snapshot.** Needs: none.
-  - CsCheck properties replace example suites wherever a property states the rule, for TOML, CSV, placeholders, the Public Suffix List matcher and the merge, and Verify snapshots hold help text and listings.
-  - Accepted when each property suite catches every mutation its example suite caught, and the examples it replaces are deleted.
 - [ ] **K.12 — Move the view models onto CommunityToolkit.Mvvm.** Needs: none.
   - Its source-generated properties and commands replace `Keypaste.Mvvm`'s base, `DependsOn` becoming its `NotifyPropertyChangedFor`.
   - Accepted when the App tests pass on the three runners and `Keypaste.Mvvm` is removed.
