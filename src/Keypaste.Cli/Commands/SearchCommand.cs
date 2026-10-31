@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
@@ -14,34 +15,25 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class SearchCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    private static readonly Argument<string> _text = Syntax.Operand("text", "what to look for; quote words that go together");
 
-    internal static int Execute(string[] args, CliContext context)
+    /// <summary>The words after the first, which only a missing pair of quotes puts there.</summary>
+    private static readonly Argument<string[]> _unquoted = new("unquoted") { Arity = ArgumentArity.ZeroOrMore, Hidden = true };
+
+    internal static CliVerb Command { get; } = new("search", "find items by title, group, username or URL", Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste search: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _text, _unquoted, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste search <text> [--json]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 1)
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        if (line.GetValue(_unquoted) is { Length: > 0 })
         {
             context.Stderr.WriteLine("keypaste search: expected one text to look for; quote words that go together");
             return CliApp.ExitUsageError;
         }
 
-        var query = line.Operands[0];
+        var query = line.GetValue(_text)!;
         if (string.IsNullOrWhiteSpace(query))
         {
             context.Stderr.WriteLine("keypaste search: the text cannot be empty; ls lists every item");
@@ -54,7 +46,7 @@ internal static class SearchCommand
             return CliApp.ExitUsageError;
         }
 
-        var json = line.HasFlag(CliJson.Option);
+        var json = line.GetValue(CliOptions.Json);
 
         return VaultSession.Open(path, line, context, vault =>
         {

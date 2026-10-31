@@ -895,7 +895,7 @@ selftest() {
   trap 'rm -rf "$work"' RETURN
   local folder='C:\Users\runner\AppData\Local\Programs\keypaste' link=/home/runner/.local/bin/keypaste mac_link=/usr/local/bin/keypaste
   local path_before='%USERPROFILE%\AppData\Local\Microsoft\WindowsApps;C:\work\upgrade-desktop\user-path-entry'
-  local bridge='usage: keypaste mcp [--vault <path>]'
+  local bridge='the MCP server your AI tools start'
   local run_line="\"$folder\\keypaste-app.exe\" --background"
 
   # A complete, passing Windows run's records; each fixture below changes one thing.

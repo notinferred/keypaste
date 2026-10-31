@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using Keypaste.Core;
 using Keypaste.Infrastructure;
@@ -30,20 +31,18 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class GenerateOption
 {
-    /// <summary>What to add to a verb's own option list.</summary>
-    internal static OptionSpec[] Specs { get; } =
-    [
-        new("generate", TakesValue: false),
-        new("length", TakesValue: true),
-        new("no-symbols", TakesValue: false),
-        new("no-lookalikes", TakesValue: false),
-        new("words", TakesValue: true),
-        new("separator", TakesValue: true),
-    ];
+    private static readonly Option<bool> _generate = Syntax.Flag("--generate", "generate the value");
+    private static readonly Option<string> _length = Syntax.Value("--length", "N", $"that many characters, {PasswordGenerator.DefaultLength} by default");
+    private static readonly Option<string> _words = Syntax.Value("--words", "N", "a passphrase of that many words instead");
+    private static readonly Option<string> _separator = Syntax.Value("--separator", "C", $"between the words, {PasswordGenerator.DefaultSeparator} by default");
+    private static readonly Option<bool> _noSymbols = Syntax.Flag("--no-symbols", "letters and digits only");
+    private static readonly Option<bool> _noLookalikes = Syntax.Flag("--no-lookalikes", "leave out characters that look alike");
 
-    /// <summary>What to add to a verb's usage line.</summary>
-    internal const string Usage =
-        "[--generate] [--length N | --words N] [--separator C] [--no-symbols] [--no-lookalikes]";
+    /// <summary>The options that shape a generated secret, for a verb's initializer.</summary>
+    internal static Option[] Options { get; } = [_generate, _length, _words, _separator, _noSymbols, _noLookalikes];
+
+    /// <summary>The same options without <c>--generate</c>, for a verb that always generates.</summary>
+    internal static Option[] Shape { get; } = [_length, _words, _separator, _noSymbols, _noLookalikes];
 
     /// <summary>Reads the generator flags.</summary>
     /// <param name="line">The parsed command line.</param>
@@ -56,7 +55,7 @@ internal static class GenerateOption
     /// flags with <c>--words</c> is an error for the same reason: the two describe different kinds
     /// of secret, and silently honouring one of them is a guess.
     /// </remarks>
-    internal static bool TryRead(CommandLine line, out SecretRecipe? recipe, out string error) =>
+    internal static bool TryRead(ParseResult line, out SecretRecipe? recipe, out string error) =>
         TryRead(line, implied: false, out recipe, out error);
 
     /// <summary>Reads the generator flags, as though <c>--generate</c> were given when <paramref name="implied"/>.</summary>
@@ -65,20 +64,20 @@ internal static class GenerateOption
     /// <param name="recipe">What to generate, or null when nothing is.</param>
     /// <param name="error">A message naming the problem, or empty.</param>
     /// <returns><see langword="false"/> on a usage mistake.</returns>
-    internal static bool TryRead(CommandLine line, bool implied, out SecretRecipe? recipe, out string error)
+    internal static bool TryRead(ParseResult line, bool implied, out SecretRecipe? recipe, out string error)
     {
         recipe = null;
 
-        var lengthText = line.Value("length");
-        var wordsText = line.Value("words");
-        var separatorText = line.Value("separator");
+        var lengthText = line.GetValue(_length);
+        var wordsText = line.GetValue(_words);
+        var separatorText = line.GetValue(_separator);
 
         var shapedAsCharacters = lengthText is not null
-            || line.HasFlag("no-symbols")
-            || line.HasFlag("no-lookalikes");
+            || line.GetValue(_noSymbols)
+            || line.GetValue(_noLookalikes);
         var shapedAsWords = wordsText is not null || separatorText is not null;
 
-        if (!implied && !line.HasFlag("generate"))
+        if (!implied && !line.GetValue(_generate))
         {
             if (shapedAsCharacters || shapedAsWords)
             {
@@ -108,7 +107,7 @@ internal static class GenerateOption
     }
 
     private static bool TryReadCharacters(
-        CommandLine line,
+        ParseResult line,
         string? lengthText,
         out SecretRecipe? recipe,
         out string error)
@@ -123,7 +122,7 @@ internal static class GenerateOption
             return false;
         }
 
-        var alphabet = line.HasFlag("no-symbols")
+        var alphabet = line.GetValue(_noSymbols)
             ? PasswordAlphabet.Lowercase | PasswordAlphabet.Uppercase | PasswordAlphabet.Digits
             : PasswordAlphabet.Default;
 
@@ -131,7 +130,7 @@ internal static class GenerateOption
         {
             Length = length,
             Alphabet = alphabet,
-            ExcludeLookalikes = line.HasFlag("no-lookalikes"),
+            ExcludeLookalikes = line.GetValue(_noLookalikes),
         };
 
         if (!candidate.TryValidate(out error))

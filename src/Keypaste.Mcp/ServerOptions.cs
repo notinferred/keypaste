@@ -1,4 +1,6 @@
+using System.CommandLine;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
@@ -13,7 +15,7 @@ namespace Keypaste.Mcp;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Read with <see cref="CommandLine"/>, the parser every verb uses, and every rule this configures
+/// Read with <see cref="Syntax"/>, the syntax every verb uses, and every rule this configures
 /// (<see cref="EntryExposure"/>, <see cref="VaultLocation"/>, <see cref="KeypasteHome"/>) lives in the core.
 /// </para>
 /// <para>
@@ -24,53 +26,56 @@ namespace Keypaste.Mcp;
 /// </remarks>
 internal sealed record ServerOptions
 {
-    internal const string Usage = """
-        usage: keypaste mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
-                            [--allow-run] [--audit-log <path>] [--clients <path>] [--approver <name>]
+    private static readonly Option<string> _vault = Syntax.Value(
+        "--vault", "path", "which vault to ask, or set KEYPASTE_VAULT; without either, the vault chosen in the keypaste app or with `keypaste use`");
 
-        An MCP server that lets an AI agent ask for one credential, with your approval and a full
-        audit trail. An AI tool starts it; you do not run it yourself. `keypaste setup` connects this
-        computer's AI tools to your vault. See docs/mcp-setup.md.
+    private static readonly Option<string[]> _expose = Syntax.Values(
+        "--expose",
+        "glob",
+        "what this agent can see at most: a group/title glob reaches whole items, tag:env:<project>[:<environment>] the "
+            + "variables of items tagged into it; tag:env:* by default");
 
-          --vault <path>        which vault to ask, or set KEYPASTE_VAULT. Without either,
-                                the vault chosen in the keypaste app or with `keypaste use`
-          --expose <glob>       what this agent can see at most, repeatable: a group/title glob
-                                reaches whole items, tag:env:<project>[:<environment>] the
-                                variables of items tagged into it. Defaults to tag:env:*
-          --client-label <name> the agent's name: its settings follow it, and the audit log uses it
-          --allow-run           offer the run tool: start a command you approve with secrets
-                                in its environment, if the agent's settings let it run commands.
-                                A command can still reveal them.
-          --audit-log <path>    where this bridge records a call it refuses itself or that
-                                nothing holding the vault answered, or set KEYPASTE_HOME; the
-                                app or keypaste approve records the calls it answers in its own log
-          --clients <path>      this computer's ceilings, clients.toml, which an agent's change that
-                                gives it less lowers while nothing holds the vault; or set KEYPASTE_HOME
-          --approver <name>     which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER
-          -h, --help            print this help
+    private static readonly Option<string> _clientLabel =
+        Syntax.Value("--client-label", "name", "the agent's name: its settings follow it, and the audit log uses it");
 
-        Nothing is released unless a person says yes to that specific request, or set this agent to
-        Automatic for it. Requests go to whichever keypaste process holds the vault unlocked: the
-        desktop app or `keypaste approve` in the person's own terminal - so no agent can cause a
-        master password prompt to appear. With nothing holding the vault, every request is denied
-        but an agent's change that gives it less. `keypaste clients` shows or changes each agent's
-        settings. An agent may ask for a change to its own; one that gives it more waits for the
-        person to confirm it, and one that gives it less applies at once on this computer.
-        """;
+    private static readonly Option<bool> _allowRun = Syntax.Flag(
+        "--allow-run", "offer the run tool, which starts a command you approve with secrets in its environment if the agent's settings let it run commands; a command can still reveal them");
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("expose", TakesValue: true, Repeats: true),
-        new("client-label", TakesValue: true),
-        new("allow-run", TakesValue: false),
-        new("audit-log", TakesValue: true),
-        new("clients", TakesValue: true),
-        new("approver", TakesValue: true),
-    ];
+    private static readonly Option<string> _auditLog = Syntax.Value(
+        "--audit-log",
+        "path",
+        "where this bridge records a call it refuses itself or that nothing holding the vault answered, or set KEYPASTE_HOME; "
+            + "the app or `keypaste approve` records the calls it answers in its own log");
 
-    /// <summary>The vault to ask about. Empty when none was configured, which is not fatal: every
-    /// request is then refused, saying so.</summary>
+    private static readonly Option<string> _clients = Syntax.Value(
+        "--clients", "path", "this computer's ceilings, clients.toml, which an agent's change that gives it less lowers while nothing holds the vault; or set KEYPASTE_HOME");
+
+    private static readonly Option<string> _approver =
+        Syntax.Value("--approver", "name", "which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER");
+
+    private static readonly Argument<string?> _help = new("help") { Arity = ArgumentArity.ZeroOrOne, Hidden = true };
+
+    private static readonly Command _root = new("keypaste")
+    {
+        Syntax.Help,
+        new Verb(
+            "mcp",
+            "the MCP server your AI tools start\n\n"
+                + "it lets an AI agent ask for one credential, with your approval and a full audit trail. an AI tool starts it; "
+                + "you do not run it yourself, and `keypaste setup` connects this computer's AI tools to your vault.\n\n"
+                + "nothing is released unless a person says yes to that specific request, or set this agent to Automatic for "
+                + "it. requests go to whichever keypaste process holds the vault unlocked, the desktop app or `keypaste approve` "
+                + "in the person's own terminal, so no agent can cause a master password prompt to appear. with nothing holding "
+                + "the vault, every request is denied but an agent's change that gives it less. `keypaste clients` shows or "
+                + "changes each agent's settings.")
+        {
+            _help, _vault, _expose, _clientLabel, _allowRun, _auditLog, _clients, _approver,
+        },
+    };
+
+    /// <summary>What <c>keypaste mcp --help</c> prints.</summary>
+    internal static string Usage { get; } = Render();
+
     internal required string VaultPath { get; init; }
 
     /// <summary>What this server may name at all.</summary>
@@ -140,34 +145,40 @@ internal sealed record ServerOptions
 
         options = null;
 
-        if (!CommandLine.TryParse(argv, 0, _options, out var line, out error))
+        string[] args = ["mcp", .. argv];
+        var line = _root.Parse(args, Syntax.Parsing);
+
+        if (Syntax.Problem(line, args) is { } problem)
         {
+            error = problem;
             return false;
         }
 
-        if (line.WantsHelp || line.Operands is ["help"])
+        error = string.Empty;
+
+        if (line.GetValue(Syntax.Help) || line.GetValue(_help) is "help")
         {
             options = Help();
             return true;
         }
 
-        if (line.Operands.Count > 0)
+        if (line.GetValue(_help) is { } unexpected)
         {
-            error = $"unexpected argument '{line.Operands[0]}'";
+            error = $"unexpected argument '{unexpected}'";
             return false;
         }
 
-        var vault = line.Value("vault");
-        var label = line.Value("client-label");
-        var auditPath = line.Value("audit-log");
-        var clientsPath = line.Value("clients");
-        var approver = line.Value("approver");
-        var allowRun = line.HasFlag("allow-run");
-        var globs = line.Values("expose");
+        var vault = line.GetValue(_vault);
+        var label = line.GetValue(_clientLabel);
+        var auditPath = line.GetValue(_auditLog);
+        var clientsPath = line.GetValue(_clients);
+        var approver = line.GetValue(_approver);
+        var allowRun = line.GetValue(_allowRun);
+        var globs = line.GetValue(_expose) ?? [];
 
         // No globs means the default, applied here and on purpose. EntryExposure itself treats an
         // empty set as "nothing", so "the user said nothing" can never collapse into "everything".
-        if (!EntryExposure.TryCreate(globs.Count == 0 ? [EntryExposure.DefaultGlob] : globs,
+        if (!EntryExposure.TryCreate(globs.Length == 0 ? [EntryExposure.DefaultGlob] : globs,
                 out var exposure, out var globError))
         {
             error = $"--expose: {globError}";
@@ -219,6 +230,13 @@ internal sealed record ServerOptions
         };
 
         return true;
+    }
+
+    private static string Render()
+    {
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        Syntax.WriteHelp(writer, _root.Parse(["mcp"], Syntax.Parsing), text => text, text => text);
+        return writer.ToString().TrimEnd();
     }
 
     private static ServerOptions Help() => new()

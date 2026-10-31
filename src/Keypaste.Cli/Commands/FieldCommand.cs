@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
@@ -15,85 +16,30 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class FieldCommand
 {
-    private static readonly OptionSpec[] _listOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item's name");
+    private static readonly Argument<string> _name = Syntax.Operand("name", "the field's name");
+    private static readonly Argument<string> _newName = Syntax.Operand("new-name", "its new name");
 
-    private static readonly OptionSpec[] _removeOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-    ];
-
-    private static readonly OptionSpec[] _renameOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static Verb Command { get; } = new(
+        "field",
+        "list, rename or remove an item's custom fields\n\n"
+            + "to read one: `keypaste get <item> --field <name>`. to set one: `keypaste set <item> --field <name> [--plain]`.")
     {
-        if (args.Length < 2)
-        {
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
+        new CliVerb("ls", "list custom fields by name and protection, never by value", List) { _item, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("mv", "rename a custom field; the old name stays in history", Rename) { _item, _name, _newName, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("rm", "remove a custom field; its value stays in history", Remove) { _item, _name, CliOptions.Vault, CliOptions.Keyfile },
+    };
 
-        switch (args[1])
-        {
-            case "ls":
-                return List(args, context);
-
-            case "mv":
-                return Rename(args, context);
-
-            case "rm":
-                return Remove(args, context);
-
-            case "help":
-            case "--help":
-            case "-h":
-                WriteUsage(context.Stdout);
-                return CliApp.ExitSuccess;
-
-            default:
-                context.Stderr.WriteLine($"keypaste field: unknown subcommand '{args[1]}'");
-                WriteUsage(context.Stderr);
-                return CliApp.ExitUsageError;
-        }
-    }
-
-    private static int List(string[] args, CliContext context)
+    private static int List(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 2, _listOptions, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste field ls: {error}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste field ls <item> [--json]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 1)
-        {
-            context.Stderr.WriteLine("keypaste field ls: expected exactly one item name");
-            return CliApp.ExitUsageError;
-        }
-
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
             context.Stderr.WriteLine($"keypaste field ls: {locateError}");
             return CliApp.ExitUsageError;
         }
 
-        var entryPath = line.Operands[0];
-        var json = line.HasFlag(CliJson.Option);
+        var entryPath = line.GetValue(_item)!;
+        var json = line.GetValue(CliOptions.Json);
 
         return VaultSession.Open(path, line, context, vault =>
         {
@@ -142,27 +88,9 @@ internal static class FieldCommand
         });
     }
 
-    private static int Remove(string[] args, CliContext context)
+    private static int Remove(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 2, _removeOptions, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste field rm: {error}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste field rm <item> <name>");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 2)
-        {
-            context.Stderr.WriteLine("keypaste field rm: expected an item name and a field name");
-            return CliApp.ExitUsageError;
-        }
-
-        var (entryPath, field) = (line.Operands[0], line.Operands[1]);
+        var (entryPath, field) = (line.GetValue(_item)!, line.GetValue(_name)!);
 
         if (!FieldNameRules.IsWritable(field, out var nameError))
         {
@@ -192,27 +120,9 @@ internal static class FieldCommand
         });
     }
 
-    private static int Rename(string[] args, CliContext context)
+    private static int Rename(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 2, _renameOptions, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste field mv: {error}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste field mv <item> <name> <new-name>");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 3)
-        {
-            context.Stderr.WriteLine("keypaste field mv: expected an item name, a field name and its new name");
-            return CliApp.ExitUsageError;
-        }
-
-        var (entryPath, field, newName) = (line.Operands[0], line.Operands[1], line.Operands[2]);
+        var (entryPath, field, newName) = (line.GetValue(_item)!, line.GetValue(_name)!, line.GetValue(_newName)!);
 
         if (!FieldNameRules.IsWritable(field, out var nameError) || !FieldNameRules.IsWritable(newName, out nameError))
         {
@@ -272,19 +182,6 @@ internal static class FieldCommand
             $"  {mark} removed {EntryNameSanitizer.Sanitize(done.Names[0]).Text} from {Shown(done.Item)} {style.Glyph(context.Stderr, Mark.Dot)} its value stays in history");
 
         return CliApp.ExitSuccess;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste field <command>");
-        writer.WriteLine();
-        writer.WriteLine("commands:");
-        writer.WriteLine("  ls <item>                  list custom fields by name and protection, never by value");
-        writer.WriteLine("  mv <item> <name> <new>     rename a custom field; the old name stays in history");
-        writer.WriteLine("  rm <item> <name>           remove a custom field; its value stays in history");
-        writer.WriteLine();
-        writer.WriteLine("to read one: keypaste get <item> --field <name>");
-        writer.WriteLine("to set one:  keypaste set <item> --field <name> [--plain]");
     }
 
     private static string Shown(string path) => EntryNameSanitizer.SanitizePath(path).Text;

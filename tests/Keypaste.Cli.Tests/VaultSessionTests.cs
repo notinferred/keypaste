@@ -1,12 +1,12 @@
+using System.CommandLine;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
-using Keypaste.Infrastructure;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <see cref="VaultSession.OpenHeld(string, CommandLine, CliContext, Func{Keypaste.Core.Vault, int}, bool)"/>: a verb that saves takes the vault's claim before it asks for
+/// <see cref="VaultSession.OpenHeld(string, ParseResult, CliContext, Func{Keypaste.Core.Vault, int}, bool)"/>: a verb that saves takes the vault's claim before it asks for
 /// the password, so it never saves under a running owner (D-0317), and gives the claim back after.
 /// </summary>
 public sealed class VaultSessionTests : IDisposable
@@ -19,11 +19,7 @@ public sealed class VaultSessionTests : IDisposable
 
     private string Home => KeypasteHome.Resolve(_harness.Environment[KeypasteHome.EnvironmentVariable]);
 
-    private static CommandLine Line()
-    {
-        Assert.True(CommandLine.TryParse([], 0, [], out var line, out var error), error);
-        return line;
-    }
+    private static ParseResult Line() => CliApp.Parse([]);
 
     [Fact]
     public void OpenHeld_RefusesAHeldVault_NamingTheHolder_WithoutAskingForThePassword()

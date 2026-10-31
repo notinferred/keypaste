@@ -167,7 +167,10 @@
         }
       },
       "keypaste.infrastructure": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "System.CommandLine": "[2.0.14, )"
+        }
       },
       "keypaste.mcp": {
         "type": "Project",
@@ -191,6 +194,12 @@
         "requested": "[8.9.0, )",
         "resolved": "8.9.0",
         "contentHash": "Imm3q+XvH+8fiOdCkp+GggDQuxN3e4VznbRxODjjJxCurmAIfUEO4dKcPx8RCwocTkvP6Udw2DyXtC+45tu3jA=="
+      },
+      "System.CommandLine": {
+        "type": "CentralTransitive",
+        "requested": "[2.0.14, )",
+        "resolved": "2.0.14",
+        "contentHash": "15fyVO4aG6poR6IKmhM74zf7PUzaU6FZAGm2d3SQSO9yIyGAeo44e6t9qeKjjaqyMEqYdqcb2G1B0gpLoDU2cA=="
       }
     }
   }

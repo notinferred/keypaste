@@ -1,8 +1,8 @@
+using System.CommandLine;
 using System.Globalization;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Import;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -17,8 +17,6 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class ImportFromExport
 {
-    internal const string SkipExistingOption = "skip-existing";
-
     /// <summary>Imports <paramref name="path"/> when one of the context's readers recognizes it.</summary>
     /// <param name="path">The file, which is not a KeePass database.</param>
     /// <param name="line">The parsed command line.</param>
@@ -26,7 +24,7 @@ internal static class ImportFromExport
     /// <param name="into">The group to copy into, or null for the file's name.</param>
     /// <param name="context">Where prompts, output and errors go.</param>
     /// <returns>The exit code, or null when no reader recognizes the file.</returns>
-    internal static int? Execute(string path, CommandLine line, string? target, string? into, CliContext context)
+    internal static int? Execute(string path, ParseResult line, string? target, string? into, CliContext context)
     {
         ExportSource? opened = null;
 
@@ -46,9 +44,9 @@ internal static class ImportFromExport
         }
     }
 
-    private static int Import(ExportSource source, CommandLine line, string? target, string? into, CliContext context)
+    private static int Import(ExportSource source, ParseResult line, string? target, string? into, CliContext context)
     {
-        if (line.HasFlag("in-place") || line.Value("source-keyfile") is not null)
+        if (line.GetValue(ImportCommand.InPlace) || line.GetValue(ImportCommand.SourceKeyfile) is not null)
         {
             context.Stderr.WriteLine("keypaste import: --in-place and --source-keyfile are for a KeePass file; an export is copied into your vault");
             return CliApp.ExitUsageError;
@@ -68,9 +66,9 @@ internal static class ImportFromExport
 
         context.Stderr.WriteLine($"  {Prose(string.Join(Dot(context), source.FileName, source.Format, Count(source.Items.Count, "item", "items")))}");
 
-        var skip = line.HasFlag(SkipExistingOption);
+        var skip = line.GetValue(ImportCommand.SkipExisting);
 
-        return line.HasFlag("dry-run")
+        return line.GetValue(ImportCommand.DryRun)
             ? VaultSession.Open(target, line, context, vault => Preview(source, vault, into, skip, context))
             : VaultSession.OpenHeld(target, line, context, vault => Apply(source, vault, into, skip, context));
     }

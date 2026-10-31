@@ -20,7 +20,7 @@
 #                                      nvm setup adds, would hide ~/.profile, so each is set aside and its text
 #                                      recorded; ~/.profile is seeded from /etc/skel when the account has none.
 
-readonly BRIDGE_USAGE='usage: keypaste mcp'
+readonly BRIDGE_HELP='the MCP server your AI tools start'
 readonly MAC_CLI_LINK=/usr/local/bin/keypaste
 
 terminal_keypaste() {
@@ -69,7 +69,7 @@ terminal_mismatch() {
   if [ "$platform" = windows ]; then found="$(lower "$path")"; wanted="$(lower "$want")"; fi
   if [ "$found" != "$wanted" ]; then echo "a new terminal runs keypaste from $path, not $want"
   elif [ "$reported" != "$version" ]; then echo "a new terminal runs keypaste $reported, not $version"
-  elif [[ $bridge != "$BRIDGE_USAGE"* ]]; then echo "keypaste mcp --help in a new terminal printed '$bridge'"
+  elif [[ $bridge != "$BRIDGE_HELP"* ]]; then echo "keypaste mcp --help in a new terminal printed '$bridge'"
   fi
 }
 

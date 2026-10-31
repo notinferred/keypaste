@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Output;
 using Keypaste.Core;
 using Keypaste.Infrastructure;
@@ -23,45 +24,26 @@ internal static class EnvListCommand
     /// <summary>The longest name drawn. Generous: this is a listing of the reader's own vault.</summary>
     private const int _displayLength = 512;
 
-    private const string _profilesOption = "profiles";
+    private static readonly Argument<string?> _project = Syntax.Optional("project", "one project's environments, items and variables");
+    private static readonly Option<bool> _profiles = Syntax.Flag("--profiles", "the project's environments only");
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        EnvCommand.ProfileOption,
-        new(_profilesOption, TakesValue: false),
-        new(CliJson.Option, TakesValue: false),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("ls", "list projects and tagged items, or variables", Execute)
     {
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var error))
-        {
-            return Fail(context, error);
-        }
+        _project, CliOptions.Profile, _profiles, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste env ls [project] [-p <environment>] [--profiles] [--json]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 1)
-        {
-            return Fail(context, "expected at most one project name");
-        }
-
+    private static int Execute(ParseResult line, CliContext context)
+    {
         if (!EnvCommand.TryProfile(line, out _, out var profileError))
         {
             return Fail(context, profileError);
         }
 
-        var project = line.Operands.Count == 1 ? line.Operands[0] : null;
-        var profiles = line.HasFlag(_profilesOption);
-        var json = line.HasFlag(CliJson.Option);
+        var project = line.GetValue(_project);
+        var profiles = line.GetValue(_profiles);
+        var json = line.GetValue(CliOptions.Json);
 
-        if (project is null && (profiles || line.Value(EnvCommand.ProfileOption.Name) is not null))
+        if (project is null && (profiles || line.GetValue(CliOptions.Profile) is not null))
         {
             return Fail(context, "-p and --profiles are about one project; name it");
         }
@@ -87,7 +69,7 @@ internal static class EnvListCommand
                 return CliApp.ExitNotFound;
             }
 
-            return Project(listing, Keys(vault, listing), line.Value(EnvCommand.ProfileOption.Name), profiles, json, context);
+            return Project(listing, Keys(vault, listing), line.GetValue(CliOptions.Profile), profiles, json, context);
         });
     }
 

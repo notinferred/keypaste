@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
@@ -31,33 +32,30 @@ internal static class EnvExportCommand
     /// <summary>The file used when the command is given no path.</summary>
     internal const string DefaultFileName = ".env";
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("dotenv", TakesValue: false),
-        new("stdout", TakesValue: false),
-        new("yes", TakesValue: false),
-        new("force", TakesValue: false),
-        EnvCommand.ProfileOption,
-    ];
+    private static readonly Argument<string?> _project = Syntax.Optional("project", "the project, or the one projects.json maps this directory to");
+    private static readonly Argument<string?> _file = Syntax.Optional("file", "where to write");
+    private static readonly Option<bool> _dotenv = Syntax.Flag("--dotenv", $"write the values instead, as a .env file, ./{DefaultFileName} by default");
+    private static readonly Option<bool> _stdout = Syntax.Flag("--stdout", "print the values rather than write them");
+    private static readonly Option<bool> _force = Syntax.Flag("--force", "replace a file that is there");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "export",
+        "write kp:// references, safe to commit; --dotenv for plain text\n\n"
+            + $"writes a kp:// reference for every variable of an environment, as a {EnvReferenceFile.FileName} that holds "
+            + "no value and is safe to commit, which `keypaste run` resolves. --dotenv puts your secrets on disk in plain "
+            + "text, and asks first; prefer `keypaste run <project> -- <command>`, which needs no file at all.",
+        Execute)
     {
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var error))
-        {
-            return Fail(context, error);
-        }
+        _project, _file, CliOptions.Profile, _dotenv, _stdout, CliOptions.Yes, _force, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        var dotenv = line.GetValue(_dotenv);
+        var named = line.GetValue(_project);
+        var file = line.GetValue(_file);
 
-        var dotenv = line.HasFlag("dotenv");
-
-        if (line.Operands.Count > 2 || (dotenv && line.Operands.Count == 0))
+        if (dotenv && named is null)
         {
             return Fail(context, "expected a project and an optional path to write");
         }
@@ -67,10 +65,10 @@ internal static class EnvExportCommand
             return Fail(context, profileError);
         }
 
-        var toStdout = line.HasFlag("stdout");
-        var force = line.HasFlag("force");
+        var toStdout = line.GetValue(_stdout);
+        var force = line.GetValue(_force);
 
-        if (toStdout && line.Operands.Count == 2)
+        if (toStdout && file is not null)
         {
             return Fail(context, "--stdout and a file path are two destinations; pick one");
         }
@@ -80,12 +78,12 @@ internal static class EnvExportCommand
             return Fail(context, "--force only means anything when writing a file");
         }
 
-        if (line.Operands.Count > 0 && !EnvConvention.IsValidProject(line.Operands[0], out var projectError))
+        if (named is not null && !EnvConvention.IsValidProject(named, out var projectError))
         {
             return Fail(context, projectError);
         }
 
-        var assumeYes = line.HasFlag("yes");
+        var assumeYes = line.GetValue(CliOptions.Yes);
 
         // Same rule as `rm` and `env pull`. --stdout is exempt: naming that flag is the consent,
         // exactly as `get --reveal` is, and there is nothing left behind to answer for.
@@ -101,9 +99,9 @@ internal static class EnvExportCommand
 
         string project;
 
-        if (line.Operands.Count > 0)
+        if (named is not null)
         {
-            project = line.Operands[0];
+            project = named;
         }
         else if (EnvCommand.TryInferProject(context, vaultPath, out var inferred, out var inferError))
         {
@@ -122,7 +120,7 @@ internal static class EnvExportCommand
         string? targetPath = null;
         if (!toStdout)
         {
-            targetPath = Path.GetFullPath(line.Operands.Count == 2 ? line.Operands[1] : DefaultFileName);
+            targetPath = Path.GetFullPath(file ?? DefaultFileName);
 
             // Before the check below, which would otherwise answer a vault with the one sentence
             // that must never be said about it: pass --force to overwrite it.
@@ -145,9 +143,9 @@ internal static class EnvExportCommand
 
     /// <summary>Writes a reference for every key of the profile, to a file or to stdout, and never a value.</summary>
     private static int ExportReferences(
-        CommandLine line, CliContext context, string vaultPath, string project, string profile, bool toStdout, bool force)
+        ParseResult line, CliContext context, string vaultPath, string project, string profile, bool toStdout, bool force)
     {
-        var targetPath = !toStdout && line.Operands.Count == 2 ? Path.GetFullPath(line.Operands[1]) : null;
+        var targetPath = !toStdout && line.GetValue(_file) is { } file ? Path.GetFullPath(file) : null;
 
         if (targetPath is not null
             && (!TryRefuseTheVault(vaultPath, targetPath, context, out var exit) || !TryClearTheWay(targetPath, force, context, out exit)))
@@ -416,20 +414,5 @@ internal static class EnvExportCommand
     {
         context.Stderr.WriteLine($"keypaste env export: {message}");
         return CliApp.ExitUsageError;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste env export [project] [file] [-p <environment>] [--force]");
-        writer.WriteLine("       keypaste env export <project> [file] [-p <environment>] --dotenv [--stdout] [--yes] [--force]");
-        writer.WriteLine();
-        writer.WriteLine($"writes a kp:// reference for every variable of an environment, to the file or stdout, as a");
-        writer.WriteLine($"{EnvReferenceFile.FileName} that holds no value and is safe to commit. `keypaste run` resolves it.");
-        writer.WriteLine("with no project, the one projects.json maps this directory to is used.");
-        writer.WriteLine();
-        writer.WriteLine($"--dotenv writes the values instead, as a .env file defaulting to ./{DefaultFileName}.");
-        writer.WriteLine("this is the escape hatch: it puts your secrets on disk in plain text, and asks");
-        writer.WriteLine("before it does. --stdout prints them instead, for piping.");
-        writer.WriteLine("prefer `keypaste run <project> -- <command>`, which needs no file at all.");
     }
 }

@@ -379,9 +379,9 @@ public sealed class LogVerbTests : IDisposable
     {
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--help"));
 
-        Assert.Contains("keypaste log verify", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("  verify ", _cli.Out, StringComparison.Ordinal);
         Assert.Contains("--denied", _cli.Out, StringComparison.Ordinal);
-        Assert.Contains("A broken chain exits 5", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("a broken chain exits 5", _cli.Out, StringComparison.Ordinal);
     }
 
     [Fact]

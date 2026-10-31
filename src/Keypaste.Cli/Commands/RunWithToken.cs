@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Security.Cryptography;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
@@ -28,15 +29,17 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class RunWithToken
 {
-    internal const string TokenOption = "token";
-    internal const string BundleOption = "bundle";
-    internal const string ProfileOption = "profile";
     internal const string EnvironmentVariable = "KEYPASTE_TOKEN";
+
+    internal static Option<string> Token { get; } = Syntax.Value(
+        "--token", "token|-|env", $"a scoped token, which the process holding the vault checks; - reads it from stdin, env from {EnvironmentVariable}");
+
+    internal static Option<string> Bundle { get; } = Syntax.Value("--bundle", "file", "a token bundle, which needs no vault at all");
 
     /// <summary>How long to wait for the owner's answer: its longest window, for a protected profile, and time for the reply.</summary>
     private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
 
-    internal static int Execute(CommandLine line, IReadOnlyList<string> command, CliContext context)
+    internal static int Execute(ParseResult line, IReadOnlyList<string> command, CliContext context)
     {
         ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(command);
@@ -49,31 +52,31 @@ internal static class RunWithToken
             return Fail(context, "expected at most one project name");
         }
 
-        if (line.Value("keyfile") is not null)
+        if (line.GetValue(CliOptions.Keyfile) is not null)
         {
             return Fail(context, "a token opens no vault here, so it takes no --keyfile");
         }
 
-        if (line.Value(RunCommand.EnvFileOption) is not null)
+        if (line.GetValue(RunCommand.EnvFile) is not null)
         {
-            return Fail(context, $"a token names its set, so it takes no --{RunCommand.EnvFileOption}");
+            return Fail(context, $"a token names its set, so it takes no {RunCommand.EnvFile.Name}");
         }
 
-        var profile = line.Value(ProfileOption);
+        var profile = line.GetValue(CliOptions.Profile);
 
         if (profile is not null && !EnvProfileNames.IsValid(profile, out var invalid))
         {
             return Fail(context, invalid);
         }
 
-        if (!TryReadToken(line.Value(TokenOption) ?? "env", "keypaste run", context, out var token, out var id, out var exit))
+        if (!TryReadToken(line.GetValue(Token) ?? "env", "keypaste run", context, out var token, out var id, out var exit))
         {
             return exit;
         }
 
         var project = projects.Count == 1 ? projects[0] : null;
 
-        return line.Value(BundleOption) is { } bundle
+        return line.GetValue(Bundle) is { } bundle
             ? FromBundle(bundle, token, id, project, profile, command, context)
             : FromSession(line, token, id, project, profile ?? EnvProfileNames.Default, command, context);
     }
@@ -192,7 +195,7 @@ internal static class RunWithToken
     }
 
     private static int FromSession(
-        CommandLine line,
+        ParseResult line,
         string token,
         string id,
         string? project,
@@ -216,13 +219,13 @@ internal static class RunWithToken
         {
             var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
             pipe = ApproverEndpoint.Resolve(
-                line.Value(RunCommand.ApproverOption),
+                line.GetValue(CliOptions.Approver),
                 context.Environment.Get(ApproverEndpoint.EnvironmentVariable),
                 VaultIdentity.Of(home, vaultPath))!;
         }
         catch (ArgumentException ex)
         {
-            return Fail(context, $"--{RunCommand.ApproverOption}: {ex.Message}");
+            return Fail(context, $"{CliOptions.Approver.Name}: {ex.Message}");
         }
 
         var request = new TokenEnvRequest(token, project, profile, command, Environment.CurrentDirectory);

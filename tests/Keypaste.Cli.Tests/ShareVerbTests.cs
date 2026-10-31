@@ -46,7 +46,7 @@ public sealed class ShareVerbTests : IDisposable
     private int Share(params string[] args)
     {
         _cli.Prompt.Enqueue(_master);
-        return ShareCommand.Execute(["share", .. args, "--vault", _cli.VaultPath], _cli.NewContext(), _server);
+        return CliApp.Run(["share", .. args, "--vault", _cli.VaultPath], _cli.NewContext(shareTransport: _server));
     }
 
     private string CreatePrinted(params string[] args)
@@ -146,7 +146,7 @@ public sealed class ShareVerbTests : IDisposable
         _cli.Prompt.Interactive = true;
         _cli.Prompt.Enqueue(_master, "a long enough passphrase", "a long enough passphrase");
 
-        var exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
+        var exit = CliApp.Run(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(shareTransport: _server));
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal(["Master password: ", "Passphrase: ", "Repeat passphrase: "], _cli.Prompt.SecretPrompts);
@@ -158,7 +158,7 @@ public sealed class ShareVerbTests : IDisposable
 
         Clear();
         _cli.Prompt.Enqueue(_master, "a long enough passphrase", "another long passphrase");
-        exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
+        exit = CliApp.Run(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(shareTransport: _server));
 
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("the passphrases do not match", _cli.Err, StringComparison.Ordinal);
@@ -166,7 +166,7 @@ public sealed class ShareVerbTests : IDisposable
 
         Clear();
         _cli.Prompt.Enqueue(_master, "nineteen characters", "nineteen characters");
-        exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
+        exit = CliApp.Run(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(shareTransport: _server));
 
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("at least 20 characters; `keypaste generate --words 6` makes one", _cli.Err, StringComparison.Ordinal);
@@ -465,6 +465,6 @@ public sealed class ShareVerbTests : IDisposable
     public void Share_IsDispatchedByTheApp()
     {
         Assert.Equal(CliApp.ExitUsageError, _cli.Run("share"));
-        Assert.Contains("usage: keypaste share", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("see keypaste share --help", _cli.Err, StringComparison.Ordinal);
     }
 }

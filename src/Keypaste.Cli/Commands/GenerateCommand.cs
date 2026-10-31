@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using Keypaste.Core;
 using Keypaste.Infrastructure;
@@ -30,45 +31,41 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class GenerateCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("words", TakesValue: true),
-        new("separator", TakesValue: true),
-    ];
+    private static readonly Option<string> _words = Syntax.Value("--words", "n", "how many words; required");
+    private static readonly Option<string> _separator = Syntax.Value("--separator", "C", $"between the words, {PasswordGenerator.DefaultSeparator} by default");
+
+    internal static CliVerb Command { get; } = new(
+        "generate",
+        "print a passphrase (--words N); it is not stored\n\n"
+            + string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} to {1} words from the {2} of {3:N0}, about {4:F1} bits each. the passphrase goes to stdout and is not "
+                    + "stored; to keep one, use `keypaste add <item> --generate --words <n>` instead.",
+                PasswordGenerator.MinimumWords,
+                PasswordGenerator.MaximumWords,
+                WordList.Provenance,
+                WordList.Count,
+                WordList.BitsPerWord),
+        Execute)
+    {
+        _words, _separator,
+    };
 
     /// <summary>Runs the verb.</summary>
-    /// <param name="args">The whole command line, starting at the verb.</param>
+    /// <param name="line">The parsed command line.</param>
     /// <param name="context">Where to write, and what to prompt with.</param>
     /// <returns>An exit code: success, or a usage error.</returns>
-    internal static int Execute(string[] args, CliContext context)
+    private static int Execute(ParseResult line, CliContext context)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
 
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste generate: {error}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteHelp(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine("keypaste generate: expected no arguments besides its options");
-            return CliApp.ExitUsageError;
-        }
-
-        var wordsText = line.Value("words");
+        var wordsText = line.GetValue(_words);
 
         if (wordsText is null)
         {
             context.Stderr.WriteLine("keypaste generate: --words <n> is required");
-            WriteHelp(context.Stderr);
+            context.Stderr.WriteLine("see keypaste generate --help");
             return CliApp.ExitUsageError;
         }
 
@@ -78,7 +75,7 @@ internal static class GenerateCommand
             return CliApp.ExitUsageError;
         }
 
-        var separatorText = line.Value("separator");
+        var separatorText = line.GetValue(_separator);
 
         if (separatorText is { Length: not 1 })
         {
@@ -115,20 +112,5 @@ internal static class GenerateCommand
             recipe.Bits));
 
         return CliApp.ExitSuccess;
-    }
-
-    private static void WriteHelp(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste generate --words <n> [--separator C]");
-        writer.WriteLine(string.Format(
-            CultureInfo.InvariantCulture,
-            "       {0} to {1} words from the {2} of {3:N0}, about {4:F1} bits each.",
-            PasswordGenerator.MinimumWords,
-            PasswordGenerator.MaximumWords,
-            WordList.Provenance,
-            WordList.Count,
-            WordList.BitsPerWord));
-        writer.WriteLine("       the passphrase goes to stdout and is not stored; to keep one, use");
-        writer.WriteLine("       `keypaste add <item> --generate --words <n>` instead.");
     }
 }

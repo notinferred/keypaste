@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Editing;
@@ -22,43 +23,32 @@ internal static class EnvPullCommand
     /// <summary>The file used when the command is given no path.</summary>
     internal const string DefaultFileName = ".env";
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("yes", TakesValue: false),
-        new("delete-source", TakesValue: false),
-        new("keep", TakesValue: false),
-        EnvCommand.ProfileOption,
-        EnvCommand.EntryOption,
-    ];
+    private static readonly Argument<string> _project = Syntax.Operand("project", "the project");
+    private static readonly Argument<string?> _file = Syntax.Optional("file", $"the .env file, ./{DefaultFileName} by default");
+    private static readonly Option<bool> _deleteSource = Syntax.Flag("--delete-source", "delete the file afterwards without asking");
+    private static readonly Option<bool> _keep = Syntax.Flag("--keep", "keep the file without asking");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "pull",
+        "import a .env file, then offer to delete it\n\n"
+            + "a key the project has is updated where it lives; a new one becomes a protected field of --entry, or of the "
+            + "environment's home item env/<project>/.env, created tagged. if any line is malformed, every problem is "
+            + "reported and nothing is imported. values are stored exactly as written: ${VAR} is not expanded.",
+        Execute)
     {
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var error))
-        {
-            return Fail(context, error);
-        }
+        _project, _file, CliOptions.Profile, CliOptions.Entry, CliOptions.Yes, _deleteSource, _keep, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count is 0 or > 2)
-        {
-            return Fail(context, "expected a project and an optional path to a .env file");
-        }
-
-        var deleteSource = line.HasFlag("delete-source");
-        var keep = line.HasFlag("keep");
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        var deleteSource = line.GetValue(_deleteSource);
+        var keep = line.GetValue(_keep);
         if (deleteSource && keep)
         {
             return Fail(context, "--delete-source and --keep contradict each other");
         }
 
-        var project = line.Operands[0];
+        var project = line.GetValue(_project)!;
         if (!EnvConvention.IsValidProject(project, out var projectError))
         {
             return Fail(context, projectError);
@@ -69,7 +59,7 @@ internal static class EnvPullCommand
             return Fail(context, profileError);
         }
 
-        var assumeYes = line.HasFlag("yes");
+        var assumeYes = line.GetValue(CliOptions.Yes);
 
         // Same rule as `rm`: a piped run has to ask for the write explicitly rather than have a
         // confirmation answered by whatever the next line of stdin happens to be.
@@ -83,7 +73,7 @@ internal static class EnvPullCommand
             return Fail(context, locateError);
         }
 
-        var sourcePath = Path.GetFullPath(line.Operands.Count == 2 ? line.Operands[1] : DefaultFileName);
+        var sourcePath = Path.GetFullPath(line.GetValue(_file) ?? DefaultFileName);
 
         // Everything about the file is settled before the master password is asked for: a typo in
         // the path should not cost a password entry and a key derivation to discover.
@@ -97,7 +87,7 @@ internal static class EnvPullCommand
             context.Stderr.WriteLine(advisory);
         }
 
-        var edit = new EnvPullFile(project, profile, line.Value(EnvCommand.EntryOption.Name), text);
+        var edit = new EnvPullFile(project, profile, line.GetValue(CliOptions.Entry), text);
         var route = new OwnerRoute("env pull", _ => edit, Done);
         var exit = VaultSession.OpenHeld(vaultPath, line, context, route, vault => Import(vault, edit, assumeYes, context));
 
@@ -461,16 +451,5 @@ internal static class EnvPullCommand
     {
         context.Stderr.WriteLine($"keypaste env pull: {message}");
         return exit;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste env pull <project> [file] [-p <environment>] [--entry <item>] [--yes] [--delete-source | --keep]");
-        writer.WriteLine();
-        writer.WriteLine($"imports a .env file, defaulting to ./{DefaultFileName}, then offers to delete it.");
-        writer.WriteLine("a key the project has is updated where it lives; a new one becomes a protected field of");
-        writer.WriteLine("--entry, or of the environment's home item env/<project>/.env, created tagged.");
-        writer.WriteLine("if any line is malformed, every problem is reported and nothing is imported.");
-        writer.WriteLine("values are stored exactly as written -- ${VAR} is not expanded.");
     }
 }

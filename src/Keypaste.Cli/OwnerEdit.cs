@@ -1,10 +1,10 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Editing;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli;
 
@@ -47,7 +47,7 @@ internal static class OwnerEdit
     /// <param name="route">How the verb reads its values and says what was done.</param>
     /// <param name="refusal">What the verb says when nothing answers on the pipe.</param>
     /// <returns>The verb's exit code.</returns>
-    internal static int Ask(string vaultPath, CommandLine line, CliContext context, VaultOwner holder, OwnerRoute route, string refusal)
+    internal static int Ask(string vaultPath, ParseResult line, CliContext context, VaultOwner holder, OwnerRoute route, string refusal)
     {
         if (!SessionPipe.TryResolve(line, vaultPath, context, out var pipe, out var pipeError))
         {

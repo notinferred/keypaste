@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Infrastructure;
 
@@ -6,30 +7,14 @@ namespace Keypaste.Cli.Commands;
 /// <summary>Creates a new vault: <c>keypaste init &lt;vault.kdbx&gt;</c>.</summary>
 internal static class InitCommand
 {
-    private static readonly OptionSpec[] _options = [new("vault", TakesValue: true)];
+    private static readonly Argument<string?> _path = Syntax.Optional("vault.kdbx", "where to create it, or --vault");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("init", "create a new vault", Execute) { _path, CliOptions.Vault };
+
+    private static int Execute(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste init: {error}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste init <vault.kdbx>");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 1)
-        {
-            context.Stderr.WriteLine("keypaste init: expected at most one vault path");
-            return CliApp.ExitUsageError;
-        }
-
-        var positional = line.Operands.Count == 1 ? line.Operands[0] : null;
-        var flag = line.Value("vault");
+        var positional = line.GetValue(_path);
+        var flag = line.GetValue(CliOptions.Vault);
 
         if (positional is not null && flag is not null)
         {

@@ -76,8 +76,8 @@ public sealed class CliAppTests
     }
 
     [Theory]
-    [InlineData("approve", "usage: keypaste approve ")]
-    [InlineData("clients", "usage: keypaste clients ")]
+    [InlineData("approve", "approve agents' requests in this terminal")]
+    [InlineData("clients", "show or change what each agent can see and do")]
     public void ApproveAndClients_AreVerbsOfTheirOwn(string verb, string usage)
     {
         using var harness = new CliHarness();
@@ -118,6 +118,50 @@ public sealed class CliAppTests
         Assert.Empty(harness.ProcessRunner.Calls);
         Assert.Empty(harness.ProcessLauncher.Started);
         Assert.False(File.Exists(KeypasteHome.ClientsPath(harness.Environment[KeypasteHome.EnvironmentVariable])));
+    }
+
+    /// <summary>
+    /// What the parser would otherwise accept is a usage error that runs nothing (D-0678): an undeclared option an operand
+    /// could take, a flag given a value or twice, and a first argument in brackets, which it reads as a directive.
+    /// </summary>
+    [Theory]
+    [InlineData("keypaste get: unknown option '--bogus'", "get", "solo", "--bogus")]
+    [InlineData("keypaste get: option '--reveal' does not take a value", "get", "solo", "--reveal=yes")]
+    [InlineData("keypaste get: option '--reveal' given more than once", "get", "solo", "--reveal", "--reveal")]
+    [InlineData("keypaste get: unknown command '[diagram]'", "[diagram]", "get", "solo")]
+    public void WhatTheParserWouldTolerate_IsRefused_AndRunsNothing(string refusal, params string[] args)
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault("tolerated-master", ("solo", "solo-secret"));
+        var asked = harness.Prompt.PromptsSeen.Count;
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run([.. args, "--vault", harness.VaultPath]));
+
+        Assert.Equal(refusal + Environment.NewLine + "see keypaste get --help" + Environment.NewLine, harness.Err);
+        Assert.Empty(harness.Out);
+        Assert.Equal(asked, harness.Prompt.PromptsSeen.Count);
+        Assert.Equal(0, harness.Clipboard.SetCount);
+    }
+
+    /// <summary>
+    /// An argument starting with <c>@</c> names no response file and one like <c>-pdev</c> is no bundle, so neither adds
+    /// an option the person did not type, such as a <c>--reveal</c> (D-0678).
+    /// </summary>
+    [Fact]
+    public void AnAtSignOrABundle_IsAnArgumentAsWritten()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault("written-master", ("solo", "solo-secret"));
+        var responses = Path.Combine(harness.Directory, "reveal.rsp");
+        File.WriteAllText(responses, "--reveal");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("get", "solo", "@" + responses, "--vault", harness.VaultPath));
+        Assert.Empty(harness.Out);
+        Assert.Contains("only totp may follow", harness.Err, StringComparison.Ordinal);
+
+        var bundled = CliApp.Parse(["run", "-pdev", "--", "true"]);
+        Assert.Equal(["-pdev"], Commands.RunCommand.Projects(bundled));
+        Assert.Null(bundled.GetValue(CliOptions.Profile));
     }
 
     [Fact]

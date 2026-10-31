@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Infrastructure;
 
@@ -13,41 +14,26 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class AccessCommand
 {
-    private const string _usage =
-        "usage: keypaste access [--password] [--new-keyfile <path> | --remove-keyfile] [--vault V] [--keyfile K]";
+    private static readonly Option<bool> _password = Syntax.Flag("--password", "set a new master password");
+    private static readonly Option<string> _newKeyfile = Syntax.Value("--new-keyfile", "path", "require this existing keyfile, adding or replacing one");
+    private static readonly Option<bool> _removeKeyfile = Syntax.Flag("--remove-keyfile", "stop requiring the current keyfile");
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("password", TakesValue: false),
-        new("new-keyfile", TakesValue: true),
-        new("remove-keyfile", TakesValue: false),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "access",
+        "change the master password or keyfile\n\n"
+            + "asks for the current master password, then the new one twice when --password is given; piped, one line "
+            + "each, in that order. it never creates a keyfile or takes a vault's password away, and the file the change "
+            + "replaces is kept, still opening with the old credentials.",
+        Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste access: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _password, _newKeyfile, _removeKeyfile, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine($"keypaste access: unexpected argument '{line.Operands[0]}'");
-            return CliApp.ExitUsageError;
-        }
-
-        var newKeyfile = line.Value("new-keyfile");
-        var removeKeyfile = line.HasFlag("remove-keyfile");
-        var setPassword = line.HasFlag("password");
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        var newKeyfile = line.GetValue(_newKeyfile);
+        var removeKeyfile = line.GetValue(_removeKeyfile);
+        var setPassword = line.GetValue(_password);
 
         if (newKeyfile is not null && removeKeyfile)
         {
@@ -178,20 +164,4 @@ internal static class AccessCommand
             $"'{keyfile}' is this vault or one of its backups, not a keyfile",
         _ => "the change was refused",
     };
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine(_usage);
-        writer.WriteLine();
-        writer.WriteLine("Changes what unlocks the vault. Asks for the current master password, then the new");
-        writer.WriteLine("one twice when --password is given; piped, one line each, in that order.");
-        writer.WriteLine();
-        writer.WriteLine("  --password               set a new master password");
-        writer.WriteLine("  --new-keyfile <path>     require this existing keyfile, adding or replacing one");
-        writer.WriteLine("  --remove-keyfile         stop requiring the current keyfile");
-        writer.WriteLine($"  --keyfile <path>         the keyfile that opens the vault now, or set {VaultLocator.KeyfileEnvironmentVariable}");
-        writer.WriteLine();
-        writer.WriteLine("keypaste access never creates a keyfile or takes a vault's password away. The file");
-        writer.WriteLine("the change replaces is kept, and still opens with the old credentials.");
-    }
 }

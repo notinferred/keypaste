@@ -366,7 +366,7 @@ public sealed class SecretHygieneTests
 
         harness.Prompt.Enqueue(Master);
         string[] args = ["share", "secrets/target", "--field", "login", "--vault", harness.VaultPath];
-        var exit = Commands.ShareCommand.Execute(print ? [.. args, "--print"] : args, harness.NewContext(), server);
+        var exit = CliApp.Run(print ? [.. args, "--print"] : args, harness.NewContext(shareTransport: server));
 
         Assert.Equal(CliApp.ExitSuccess, exit);
         var link = print ? harness.Out.Trim() : copied;

@@ -1,6 +1,6 @@
+using System.CommandLine;
 using System.Text;
 using System.Text.Json;
-using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
@@ -22,91 +22,76 @@ namespace Keypaste.Cli.Commands;
 internal static class ClientsCommand
 {
     private const string _verb = "keypaste clients";
-    private const string _projectOption = "project";
-    private const string _modeOption = "mode";
-    private const string _seeOption = "see";
-    private const string _valuesOption = "values";
-    private const string _runOption = "run";
-    private const string _perHourOption = "per-hour";
-    private const string _untilOption = "until";
-    private const string _resetOption = "reset";
-
     private const string _noAnswer =
         "the keypaste process holding the vault did not answer; it may be older than this keypaste";
-
-    private static readonly string[] _changeOptions = [_projectOption, _modeOption, _valuesOption, _runOption, _perHourOption, _untilOption];
 
     private static readonly TimeSpan _listBound = TimeSpan.FromSeconds(10);
 
     // Long enough for the person to answer the longest window the owner can have, and a little more.
     private static readonly TimeSpan _changeBound = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
 
-    private static readonly OptionSpec[] _options =
-    [
-        new(CliJson.Option, TakesValue: false),
-        new("vault", TakesValue: true),
-        new(SessionPipe.ApproverOption, TakesValue: true),
-        new(_projectOption, TakesValue: true),
-        new(_modeOption, TakesValue: true),
-        new(_seeOption, TakesValue: true, Repeats: true),
-        new(_valuesOption, TakesValue: true),
-        new(_runOption, TakesValue: true),
-        new(_perHourOption, TakesValue: true),
-        new(_untilOption, TakesValue: true),
-        new(_resetOption, TakesValue: false),
-    ];
+    private static readonly Argument<string?> _agent = Syntax.Optional("agent", "the agent whose settings to change; \"*\" is every other agent");
+    private static readonly Option<string> _project = Syntax.Value("--project", "project[:environment]", "the project row to change");
+    private static readonly Option<string> _mode = Syntax.Value("--mode", "ask|allow-for-a-while|automatic", "how it is asked");
+    private static readonly Option<string[]> _see = Syntax.Values("--see", "selector", "what it can see, as often as you like");
+    private static readonly Option<string> _values = Syntax.Value("--values", "yes|no", "whether it may read values");
+    private static readonly Option<string> _run = Syntax.Value("--run", "on|off", "whether it may run commands");
+    private static readonly Option<string> _perHour = Syntax.Value("--per-hour", "n|none", "how many releases an hour");
+    private static readonly Option<string> _until = Syntax.Value(
+        "--until", "date|time|none", "when Automatic ends: a date at its close, a time on this computer's clock unless it ends in Z or an offset");
+    private static readonly Option<bool> _reset = Syntax.Flag("--reset", "go back to the defaults");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "clients",
+        "show or change what each agent can see and do\n\n"
+            + "shows each agent's settings, from the vault through the app or `keypaste approve` holding it, and this "
+            + "computer's ceilings in clients.toml; with an agent's name, changes them. settings follow the name an "
+            + "agent's bridge was given with --client-label. a change that gives the agent nothing more applies at once; "
+            + "one that gives more waits for you to confirm it where the vault is unlocked, and with nothing holding it, "
+            + "only a change that lowers this computer's ceilings can be made.",
+        Execute)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        _agent, _project, _mode, _see, _values, _run, _perHour, _until, _reset, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
+    };
+
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
-
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            return Usage(context, error);
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
 
         var clients = KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
 
-        if (line.Operands.Count == 0)
+        if (line.GetValue(_agent) is not { } agent)
         {
             return HasChange(line) ? Usage(context, "name the agent to change") : List(line, clients, context);
         }
 
-        if (line.Operands.Count != 1 || line.HasFlag(CliJson.Option))
+        if (line.GetValue(CliOptions.Json))
         {
             return Usage(context, "give one agent's name and what to change, or nothing to list them");
         }
-
-        var agent = line.Operands[0];
 
         if (!AgentNames.IsValid(agent, out var nameError))
         {
             return Usage(context, nameError);
         }
 
-        var see = line.Values(_seeOption);
+        var see = line.GetValue(_see) ?? [];
 
-        if (!UntilTime.TryRecord(line.Value(_untilOption), context.Clock, out var until, out var untilError))
+        if (!UntilTime.TryRecord(line.GetValue(_until), context.Clock, out var until, out var untilError))
         {
             return Usage(context, untilError);
         }
 
         if (!AccessEdit.TryCreate(
-                line.Value(_projectOption),
-                line.Value(_modeOption),
-                see.Count == 0 ? null : see,
-                line.Value(_valuesOption),
-                line.Value(_runOption),
-                line.Value(_perHourOption),
+                line.GetValue(_project),
+                line.GetValue(_mode),
+                see.Length == 0 ? null : see,
+                line.GetValue(_values),
+                line.GetValue(_run),
+                line.GetValue(_perHour),
                 until,
-                line.HasFlag(_resetOption),
+                line.GetValue(_reset),
                 out var edit,
                 out var editError))
         {
@@ -116,47 +101,25 @@ internal static class ClientsCommand
         var request = new AccessChangeRequest(agent, string.Empty)
         {
             Origin = AccessOrigin.Terminal,
-            Project = line.Value(_projectOption),
-            Mode = line.Value(_modeOption),
-            See = see.Count == 0 ? null : see,
-            Values = line.Value(_valuesOption),
-            Run = line.Value(_runOption),
-            PerHour = line.Value(_perHourOption),
+            Project = line.GetValue(_project),
+            Mode = line.GetValue(_mode),
+            See = see.Length == 0 ? null : see,
+            Values = line.GetValue(_values),
+            Run = line.GetValue(_run),
+            PerHour = line.GetValue(_perHour),
             Until = until,
-            Reset = line.HasFlag(_resetOption),
+            Reset = line.GetValue(_reset),
         };
 
         return ChangeAsync(line, clients, agent, edit, request, context).GetAwaiter().GetResult();
     }
 
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine($"usage: {_verb} [--json] [--vault <path>] [--approver <name>]");
-        writer.WriteLine($"       {_verb} <agent> [--project <project>[:<environment>]]");
-        writer.WriteLine("                        [--mode ask|allow-for-a-while|automatic] [--see <selector>]...");
-        writer.WriteLine("                        [--values yes|no] [--run on|off] [--per-hour <n>|none]");
-        writer.WriteLine("                        [--until <date>|<time>|none] [--reset]");
-        writer.WriteLine("                        [--vault <path>] [--approver <name>]");
-        writer.WriteLine();
-        writer.WriteLine("shows each agent's settings, from the vault through the app or `keypaste approve` holding it,");
-        writer.WriteLine("and this computer's ceilings in clients.toml; with an agent's name, changes them. Settings");
-        writer.WriteLine("follow the name an agent's bridge was given with --client-label; \"*\" is every other agent.");
-        writer.WriteLine();
-        writer.WriteLine("A change that gives the agent nothing more applies at once. One that gives more waits for");
-        writer.WriteLine("you to confirm it where the vault is unlocked; with nothing holding it, only a change that");
-        writer.WriteLine("lowers this computer's ceilings can be made.");
-        writer.WriteLine();
-        writer.WriteLine("--until ends Automatic: a date such as 2026-12-31 ends at the close of that day, and a time");
-        writer.WriteLine("such as 2026-12-31 18:00 is on this computer's clock unless it ends in Z or an offset such");
-        writer.WriteLine("as +02:00.");
-    }
+    private static bool HasChange(ParseResult line) =>
+        new[] { _project, _mode, _values, _run, _perHour, _until }.Any(option => line.GetValue(option) is not null)
+        || line.GetValue(_see) is { Length: > 0 }
+        || line.GetValue(_reset);
 
-    private static bool HasChange(CommandLine line) =>
-        _changeOptions.Any(option => line.Value(option) is not null)
-        || line.Values(_seeOption).Count > 0
-        || line.HasFlag(_resetOption);
-
-    private static int List(CommandLine line, string clients, CliContext context)
+    private static int List(ParseResult line, string clients, CliContext context)
     {
         if (!AccessCaps.TryLoad(clients, out var caps, out var problem))
         {
@@ -170,7 +133,7 @@ internal static class ClientsCommand
             return exit;
         }
 
-        if (line.HasFlag(CliJson.Option))
+        if (line.GetValue(CliOptions.Json))
         {
             WriteJson(context.Stdout, agents, caps);
         }
@@ -198,7 +161,7 @@ internal static class ClientsCommand
     /// The vault's records through its owner, asked for in turns until the listing ends, or none with a
     /// note saying why they are not shown.
     /// </summary>
-    private static async Task<(IReadOnlyList<AccessRow> Agents, string? Note, int Exit)> ListAsync(CommandLine line, CliContext context)
+    private static async Task<(IReadOnlyList<AccessRow> Agents, string? Note, int Exit)> ListAsync(ParseResult line, CliContext context)
     {
         if (!TryPipe(line, context, out var vault, out var pipe, out var why))
         {
@@ -255,7 +218,7 @@ internal static class ClientsCommand
     }
 
     private static async Task<int> ChangeAsync(
-        CommandLine line,
+        ParseResult line,
         string clients,
         string agent,
         AccessEdit edit,
@@ -538,7 +501,7 @@ internal static class ClientsCommand
         writer.WriteLine(Encoding.UTF8.GetString(buffer.ToArray()));
     }
 
-    private static bool TryPipe(CommandLine line, CliContext context, out string vault, out string pipe, out string why)
+    private static bool TryPipe(ParseResult line, CliContext context, out string vault, out string pipe, out string why)
     {
         pipe = string.Empty;
 
@@ -570,7 +533,7 @@ internal static class ClientsCommand
     private static int Usage(CliContext context, string error)
     {
         context.Stderr.WriteLine($"{_verb}: {error}");
-        WriteUsage(context.Stderr);
+        context.Stderr.WriteLine($"see {_verb} --help");
         return CliApp.ExitUsageError;
     }
 }

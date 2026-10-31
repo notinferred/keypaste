@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, Mozilla's Public Suffix List, the Instrument Sans and Fragment Mono typefaces and Lucide icons, and links Polly. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database.
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, BouncyCastle's Twofish, the Argon2 reference implementation, libsodium, the EFF long word list, SecLists' list of common passwords, Mozilla's Public Suffix List, the Instrument Sans and Fragment Mono typefaces and Lucide icons, and links Polly and System.CommandLine. Its desktop app also links Yubico's .NET SDK, and its Windows package the Windows SDK's .NET projection, and its tests carry one KeePassXC test database.
 
 ## KeePassLib
 
@@ -91,6 +91,12 @@ Copyright (c) 2015-2025, App vNext. Licensed under the BSD 3-Clause License, who
 > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 `Keypaste.Core` references `Polly.Core` 8.9.0 from NuGet for its retries and timeouts ([Directory.Packages.props](Directory.Packages.props), D-0677), so the desktop app, the CLI and the MCP bridge contain it. It is not vendored or modified. The BSD 3-Clause License permits combining it into this AGPL-3.0-only distribution, and the library remains available under it.
+
+## System.CommandLine
+
+Copyright (c) .NET Foundation and Contributors. Licensed under the MIT License; the text is at <https://github.com/dotnet/command-line-api/blob/main/LICENSE.md>.
+
+`keypaste` parses the arguments of its verbs and of the MCP bridge with `System.CommandLine` 2.0.14 (D-0678), which reaches the desktop app through Keypaste.Infrastructure without being called there. It is not vendored or modified.
 
 ## Yubico .NET SDK
 

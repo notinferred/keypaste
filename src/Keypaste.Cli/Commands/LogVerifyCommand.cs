@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core.Audit;
 using Keypaste.Infrastructure;
 
@@ -22,38 +23,19 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class LogVerifyCommand
 {
-    internal const string ExpectOption = "expect";
+    private static readonly Option<string> _expect = Syntax.Value("--expect", "hash", "a hash from an earlier run, which the chain must still hold");
 
-    private static readonly OptionSpec[] _options =
-    [
-        new(LogCommand.LogOption, TakesValue: true),
-        new(ExpectOption, TakesValue: true),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("verify", "check the whole chain and report it in full", Execute)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        _expect, CliOptions.AuditLog,
+    };
+
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
 
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var parseError))
-        {
-            context.Stderr.WriteLine($"keypaste log verify: {parseError}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            LogCommand.WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine($"keypaste log verify: unexpected argument '{line.Operands[0]}'");
-            return CliApp.ExitUsageError;
-        }
-
-        var expected = line.Value(ExpectOption);
+        var expected = line.GetValue(_expect);
         if (expected is not null && !AuditChainVerifier.IsHash(expected))
         {
             context.Stderr.WriteLine(
@@ -62,7 +44,7 @@ internal static class LogVerifyCommand
             return CliApp.ExitUsageError;
         }
 
-        var path = LogCommand.Resolve(line.Value(LogCommand.LogOption), context);
+        var path = LogCommand.Resolve(line.GetValue(CliOptions.AuditLog), context);
 
         if (!File.Exists(path))
         {

@@ -33,7 +33,7 @@ dotnet publish "$ROOT/src/Keypaste.Cli/Keypaste.Cli.csproj" -c Release -r "$rid"
 
 [ -f "$work/$name" ] || die "publishing keypaste for $rid left no $name"
 cp "$work/$name" "$payload/$name"
-case "$("$payload/$name" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the copied $name does not answer mcp --help" ;; esac
+case "$("$payload/$name" mcp --help 2>&1)" in "the MCP server your AI tools start"*) ;; *) die "the copied $name does not answer mcp --help" ;; esac
 selftest="$("$payload/$name" --selftest 2>&1)" || die "the copied $name failed its selftest: $selftest"
 echo "$selftest" >&2
 echo "$payload/$name"

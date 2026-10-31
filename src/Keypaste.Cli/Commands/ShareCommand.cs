@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Output;
@@ -23,107 +24,64 @@ internal static class ShareCommand
 {
     private static readonly TimeSpan _defaultTtl = TimeSpan.FromHours(24);
 
-    private static readonly OptionSpec[] _vaultOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item, or a kp:// reference, which names its own field");
+    private static readonly Option<string> _field = Syntax.Value("--field", "name", $"which field: {ShareService.FieldRule}; the password by default");
+    private static readonly Option<string> _ttl = Syntax.Value("--ttl", "5m-7d", $"how long the link works, {_defaultTtl.TotalHours:0}h by default");
+    private static readonly Option<string> _expires = new("--expires") { Hidden = true };
+    private static readonly Option<string> _views = Syntax.Value("--views", "1-10", "how many times it opens, 1 by default");
+    private static readonly Option<bool> _passphrase = Syntax.Flag(
+        "--passphrase", "ask for one the recipient must also type, of at least 20 characters; `keypaste generate --words 6` makes one");
+    private static readonly Option<string> _to = Syntax.Value("--to", "label", "a label for your own list, never sent");
+    private static readonly Option<bool> _print = Syntax.Flag("--print", "print the link rather than copy it");
+    private static readonly Option<string> _endpoint = Syntax.Value("--endpoint", "url", $"the share service, or set {ShareEndpoint.EnvironmentVariable}");
+    private static readonly Option<bool> _offline = Syntax.Flag("--offline", "what this vault recorded, without asking the service");
+    private static readonly Argument<string?> _id = Syntax.Optional("id", "the share's id, at least its first 6 characters");
+    private static readonly Option<bool> _expired = Syntax.Flag("--expired", "every expired link instead");
 
-    private static readonly OptionSpec[] _createOptions =
-    [
-        .. _vaultOptions,
-        new("field", TakesValue: true),
-        new("ttl", TakesValue: true),
-        new("expires", TakesValue: true),
-        new("views", TakesValue: true),
-        new("passphrase", TakesValue: false),
-        new("to", TakesValue: true),
-        new("print", TakesValue: false),
-        new("endpoint", TakesValue: true),
-    ];
-
-    private static readonly OptionSpec[] _listOptions =
-    [
-        .. _vaultOptions,
-        new("offline", TakesValue: false),
-        new(CliJson.Option, TakesValue: false),
-    ];
-
-    private static readonly OptionSpec[] _revokeOptions =
-    [
-        .. _vaultOptions,
-        new("expired", TakesValue: false),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "share",
+        "create an encrypted, expiring link\n\n"
+            + "encrypts one item's field on this machine and uploads only ciphertext. the link holds the key, so it is "
+            + "copied to the clipboard; --print writes it to stdout instead.",
+        (line, context) => Sending(line, context, Create))
     {
+        new CliVerb("ls", "list your share links", (line, context) => Sending(line, context, List))
+        {
+            _offline, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile,
+        },
+        new CliVerb("revoke", "end a share link, or every expired one", (line, context) => Sending(line, context, Revoke))
+        {
+            _id, _expired, CliOptions.Vault, CliOptions.Keyfile,
+        },
+        _item, _field, _ttl, _expires, _views, _passphrase, _to, _print, _endpoint, CliOptions.Vault, CliOptions.Keyfile,
+    };
+
+    /// <summary>Runs a subcommand over the context's transport, or a new one of its own.</summary>
+    private static int Sending(ParseResult line, CliContext context, Func<ParseResult, CliContext, HttpMessageHandler, int> body)
+    {
+        if (context.ShareTransport is { } given)
+        {
+            return body(line, context, given);
+        }
+
         using var handler = ShareClient.CreateTransport();
-
-        return Execute(args, context, handler);
+        return body(line, context, handler);
     }
 
-    /// <summary>The verb over a given transport, so tests speak to a fake server.</summary>
-    internal static int Execute(string[] args, CliContext context, HttpMessageHandler handler)
+    private static int Create(ParseResult line, CliContext context, HttpMessageHandler handler)
     {
-        ArgumentNullException.ThrowIfNull(args);
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(handler);
-
-        return args.Length > 1 ? args[1] switch
-        {
-            "ls" => List(args, context, handler),
-            "revoke" => Revoke(args, context, handler),
-            "help" or "--help" or "-h" => Usage(context.Stdout, CliApp.ExitSuccess),
-            _ => Create(args, context, handler),
-        } : Usage(context.Stderr, CliApp.ExitUsageError);
-    }
-
-    private static int Usage(TextWriter writer, int exit)
-    {
-        writer.WriteLine("usage: keypaste share <item> [--field password|username|url|notes|login|<ENV_NAME>]");
-        writer.WriteLine("                      [--ttl 1h|24h|7d] [--views 1|3|10] [--passphrase] [--to <label>]");
-        writer.WriteLine("                      [--print] [--endpoint <url>]");
-        writer.WriteLine("       keypaste share ls [--offline] [--json]");
-        writer.WriteLine("       keypaste share revoke <id> | --expired");
-        writer.WriteLine();
-        writer.WriteLine("Encrypts one item's field on this machine and uploads only ciphertext. The link");
-        writer.WriteLine("holds the key, so it is copied to the clipboard; --print writes it to stdout instead.");
-        writer.WriteLine("--ttl takes 5m to 7d (default 24h), --views 1 to 10 (default 1). --to is a label");
-        writer.WriteLine("for your own list and is never sent. <item> may be a kp:// reference, which names");
-        writer.WriteLine("its own field. --passphrase asks for one the recipient must also type; whoever holds");
-        writer.WriteLine("the link can guess it offline, so it has at least 20 characters, and");
-        writer.WriteLine("`keypaste generate --words 6` makes one.");
-        return exit;
-    }
-
-    private static int Create(string[] args, CliContext context, HttpMessageHandler handler)
-    {
-        if (!CommandLine.TryParse(args, 1, _createOptions, out var line, out var error))
-        {
-            return Refuse(context, error, CliApp.ExitUsageError);
-        }
-
-        if (line.WantsHelp)
-        {
-            return Usage(context.Stdout, CliApp.ExitSuccess);
-        }
-
-        if (line.Operands.Count != 1)
-        {
-            return Refuse(context, "expected exactly one item", CliApp.ExitUsageError);
-        }
-
-        var field = line.Value("field") ?? "password";
+        var item = line.GetValue(_item)!;
+        var field = line.GetValue(_field) ?? "password";
         KpReference? reference = null;
 
-        if (line.Operands[0].StartsWith(KpReferences.Scheme, StringComparison.Ordinal))
+        if (item.StartsWith(KpReferences.Scheme, StringComparison.Ordinal))
         {
-            if (!KpReferences.TryParse(line.Operands[0], out reference, out var referenceError))
+            if (!KpReferences.TryParse(item, out reference, out var referenceError))
             {
                 return Refuse(context, referenceError, CliApp.ExitUsageError);
             }
 
-            if (line.Value("field") is not null)
+            if (line.GetValue(_field) is not null)
             {
                 return Refuse(context, "a kp:// reference names its field, so it takes no --field", CliApp.ExitUsageError);
             }
@@ -136,12 +94,12 @@ internal static class ShareCommand
             return Refuse(context, $"--field is one of {ShareService.FieldRule}", CliApp.ExitUsageError);
         }
 
-        if (line.Value("ttl") is not null && line.Value("expires") is not null)
+        if (line.GetValue(_ttl) is not null && line.GetValue(_expires) is not null)
         {
             return Refuse(context, "give --ttl or --expires, not both", CliApp.ExitUsageError);
         }
 
-        var ttlText = line.Value("ttl") ?? line.Value("expires");
+        var ttlText = line.GetValue(_ttl) ?? line.GetValue(_expires);
         var ttl = _defaultTtl;
         if (ttlText is not null && !TryTtl(ttlText, out ttl))
         {
@@ -149,20 +107,20 @@ internal static class ShareCommand
         }
 
         var views = 1;
-        if (line.Value("views") is { } viewsText
+        if (line.GetValue(_views) is { } viewsText
             && (!int.TryParse(viewsText, NumberStyles.None, CultureInfo.InvariantCulture, out views)
                 || !ShareService.IsValidViews(views)))
         {
             return Refuse(context, $"--views takes a whole number from 1 to {ShareService.MaximumViews}", CliApp.ExitUsageError);
         }
 
-        var recipient = line.Value("to");
+        var recipient = line.GetValue(_to);
         if (!ShareService.IsValidRecipient(recipient))
         {
             return Refuse(context, $"--to takes a label of at most {ShareService.MaximumRecipientLength} characters", CliApp.ExitUsageError);
         }
 
-        if (!ShareEndpoint.TryResolve(line.Value("endpoint"), context.Environment.Get(ShareEndpoint.EnvironmentVariable), out var endpoint, out var endpointError))
+        if (!ShareEndpoint.TryResolve(line.GetValue(_endpoint), context.Environment.Get(ShareEndpoint.EnvironmentVariable), out var endpoint, out var endpointError))
         {
             return Refuse(context, endpointError, CliApp.ExitUsageError);
         }
@@ -173,21 +131,21 @@ internal static class ShareCommand
         }
 
         var service = Service(context, handler, endpoint);
-        var print = line.HasFlag("print");
+        var print = line.GetValue(_print);
         var copied = false;
 
         var exit = VaultSession.OpenHeld(path, line, context, vault =>
         {
             var entry = reference is null
-                ? Resolve(vault, line.Operands[0], context, out var resolveExit)
+                ? Resolve(vault, item, context, out var resolveExit)
                 : Resolve(vault, reference, context, out resolveExit);
             if (entry is null)
             {
                 return resolveExit;
             }
 
-            using var passphrase = line.HasFlag("passphrase") ? ReadPassphrase(context) : null;
-            if (line.HasFlag("passphrase") && passphrase is null)
+            using var passphrase = line.GetValue(_passphrase) ? ReadPassphrase(context) : null;
+            if (line.GetValue(_passphrase) && passphrase is null)
             {
                 return CliApp.ExitUsageError;
             }
@@ -229,23 +187,8 @@ internal static class ShareCommand
         return exit;
     }
 
-    private static int List(string[] args, CliContext context, HttpMessageHandler handler)
+    private static int List(ParseResult line, CliContext context, HttpMessageHandler handler)
     {
-        if (!CommandLine.TryParse(args, 2, _listOptions, out var line, out var error))
-        {
-            return Refuse(context, error, CliApp.ExitUsageError);
-        }
-
-        if (line.WantsHelp)
-        {
-            return Usage(context.Stdout, CliApp.ExitSuccess);
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            return Refuse(context, $"unexpected argument '{line.Operands[0]}'", CliApp.ExitUsageError);
-        }
-
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
             return Refuse(context, locateError, CliApp.ExitUsageError);
@@ -255,9 +198,9 @@ internal static class ShareCommand
 
         return VaultSession.Open(path, line, context, vault =>
         {
-            var rows = service.ListAsync(vault, online: !line.HasFlag("offline"), CancellationToken.None).GetAwaiter().GetResult();
+            var rows = service.ListAsync(vault, online: !line.GetValue(_offline), CancellationToken.None).GetAwaiter().GetResult();
 
-            if (line.HasFlag(CliJson.Option))
+            if (line.GetValue(CliOptions.Json))
             {
                 CliJson.WriteArray(context.Stdout, rows, WriteJson);
             }
@@ -274,25 +217,16 @@ internal static class ShareCommand
         });
     }
 
-    private static int Revoke(string[] args, CliContext context, HttpMessageHandler handler)
+    private static int Revoke(ParseResult line, CliContext context, HttpMessageHandler handler)
     {
-        if (!CommandLine.TryParse(args, 2, _revokeOptions, out var line, out var error))
-        {
-            return Refuse(context, error, CliApp.ExitUsageError);
-        }
-
-        if (line.WantsHelp)
-        {
-            return Usage(context.Stdout, CliApp.ExitSuccess);
-        }
-
-        var expired = line.HasFlag("expired");
-        if (expired == (line.Operands.Count == 1) || line.Operands.Count > 1)
+        var expired = line.GetValue(_expired);
+        var id = line.GetValue(_id);
+        if (expired == (id is not null))
         {
             return Refuse(context, "give one share id, or --expired", CliApp.ExitUsageError);
         }
 
-        if (!expired && line.Operands[0].Length < 6)
+        if (!expired && id!.Length < 6)
         {
             return Refuse(context, "give at least the first 6 characters of the id", CliApp.ExitUsageError);
         }
@@ -324,7 +258,7 @@ internal static class ShareCommand
                 return CliApp.ExitSuccess;
             }
 
-            var prefix = line.Operands[0];
+            var prefix = id!;
             var info = store.Find(prefix, out var ambiguous);
             if (info is null)
             {

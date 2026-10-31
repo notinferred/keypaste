@@ -620,7 +620,7 @@ selftest() {
       '{"fact":"audit_method","value":"prompt"}' \
       '{"fact":"terminal_expected","value":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe"}' \
       '{"fact":"path_entries","value":"1"}' \
-      '{"fact":"terminal","value":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tusage: keypaste mcp [--vault <path>]"}' \
+      '{"fact":"terminal","value":"C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tthe MCP server your AI tools start"}' \
       '{"fact":"finished","value":"true"}' > "$dir/facts.jsonl"
   }
   # The passing run on Linux, where the first session links keypaste from Settings.
@@ -633,7 +633,7 @@ selftest() {
     set_fact "$1" platform linux
     set_fact "$1" installed_app /home/runner/work/keypaste/install-desktop/app/keypaste-app-0.5.0-rc.1-linux-x64-internal-unsigned.AppImage
     set_fact "$1" terminal_expected /home/runner/.local/bin/keypaste
-    set_fact "$1" terminal $'/home/runner/.local/bin/keypaste\t0.5.0-rc.1\tusage: keypaste mcp [--vault <path>]'
+    set_fact "$1" terminal $'/home/runner/.local/bin/keypaste\t0.5.0-rc.1\tthe MCP server your AI tools start'
     set_fact "$1" shell_profile /home/runner/.profile
   }
   # The passing run on macOS: Gatekeeper refuses the quarantined copy, and Settings links keypaste once sudo made the link.
@@ -651,7 +651,7 @@ selftest() {
     set_fact "$1" gatekeeper_after ''
     set_fact "$1" terminal_expected /usr/local/bin/keypaste
     set_fact "$1" link_target /Applications/keypaste.app/Contents/MacOS/keypaste
-    set_fact "$1" terminal $'/usr/local/bin/keypaste\t0.5.0-rc.1\tusage: keypaste mcp [--vault <path>]'
+    set_fact "$1" terminal $'/usr/local/bin/keypaste\t0.5.0-rc.1\tthe MCP server your AI tools start'
   }
   refuse_action() { jq -c --arg a "$2" --arg d "$3" 'if .action == $a then .status = "refused" | .detail = $d else . end' "$work/$1/driver.jsonl" > "$work/t" && mv "$work/t" "$work/$1/driver.jsonl"; }
   drop_action() { jq -c --arg a "$2" 'select(.action != $a)' "$work/$1/driver.jsonl" > "$work/t" && mv "$work/t" "$work/$1/driver.jsonl"; }
@@ -711,11 +711,11 @@ selftest() {
   passing unfinished
   jq -c 'select(.fact != "finished")' "$work/unfinished/facts.jsonl" > "$work/t" && mv "$work/t" "$work/unfinished/facts.jsonl"
   passing terminal-other-version
-  set_fact terminal-other-version terminal $'C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.4.0\tusage: keypaste mcp'
+  set_fact terminal-other-version terminal $'C:\\Users\\runner\\AppData\\Local\\Programs\\keypaste\\keypaste.exe\t0.4.0\tthe MCP server your AI tools start'
   passing terminal-elsewhere
-  set_fact terminal-elsewhere terminal $'C:\\tools\\keypaste.exe\t0.5.0-rc.1\tusage: keypaste mcp'
+  set_fact terminal-elsewhere terminal $'C:\\tools\\keypaste.exe\t0.5.0-rc.1\tthe MCP server your AI tools start'
   passing terminal-other-case
-  set_fact terminal-other-case terminal $'c:\\users\\runner\\appdata\\local\\programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tusage: keypaste mcp'
+  set_fact terminal-other-case terminal $'c:\\users\\runner\\appdata\\local\\programs\\keypaste\\keypaste.exe\t0.5.0-rc.1\tthe MCP server your AI tools start'
   passing terminal-two-entries
   set_fact terminal-two-entries path_entries 2
   passing terminal-no-bridge

@@ -77,7 +77,7 @@ executable="$contents/MacOS/$(plist CFBundleExecutable)"
 reported="$("$executable" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the binary in $name reports $reported, not $binary_version"
 [ -x "$contents/MacOS/keypaste" ] || die "$name carries no executable keypaste"
-case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the keypaste in $name does not answer mcp --help" ;; esac
+case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "the MCP server your AI tools start"*) ;; *) die "the keypaste in $name does not answer mcp --help" ;; esac
 
 : > "$work/launched"
 open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$volume/keypaste.app" --args --selftest

@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Text.Json;
 using Keypaste.Cli.Output;
 using Keypaste.Core;
@@ -28,96 +29,28 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class LogCommand
 {
-    internal const string LogOption = "audit-log";
-    internal const string DeniedOption = "denied";
-    internal const string ClientOption = "client";
-    internal const string SinceOption = "since";
+    private static readonly Option<bool> _denied = Syntax.Flag("--denied", "only the calls that were refused");
+    private static readonly Option<string> _client = Syntax.Value("--client", "text", "only agents whose label or name contains this");
+    private static readonly Option<string> _since = Syntax.Value("--since", "when", AuditSince.Expected);
 
-    private static readonly OptionSpec[] _options =
-    [
-        new(LogOption, TakesValue: true),
-        new(DeniedOption, TakesValue: false),
-        new(ClientOption, TakesValue: true),
-        new(SinceOption, TakesValue: true),
-        new(CliJson.Option, TakesValue: false),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "log",
+        "show the hash-chained activity log\n\n"
+            + "shows every call an AI agent made through the bridge: when, which agent, which item, whether it was "
+            + "allowed, and how that was decided. every record is linked to the one before it by a hash, so an edit to "
+            + "the file is detectable; both commands check that, and verify reports it in full.\n\n"
+            + $"a broken chain exits {CliApp.ExitTamperDetected}.",
+        List)
     {
-        ArgumentNullException.ThrowIfNull(args);
-        ArgumentNullException.ThrowIfNull(context);
-
-        if (args.Length >= 2)
-        {
-            switch (args[1])
-            {
-                case "verify":
-                    return LogVerifyCommand.Execute(args, context);
-
-                case "help":
-                    WriteUsage(context.Stdout);
-                    return CliApp.ExitSuccess;
-
-                default:
-                    // Anything that is not a subcommand falls through to the listing, which is what
-                    // parses options. An unknown word lands there as an unexpected operand.
-                    break;
-            }
-        }
-
-        return List(args, context);
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        ArgumentNullException.ThrowIfNull(writer);
-
-        writer.WriteLine("usage: keypaste log [--denied] [--client <text>] [--since <when>] [--json]");
-        writer.WriteLine("       keypaste log verify [--expect <hash>]");
-        writer.WriteLine();
-        writer.WriteLine("Shows every call an AI agent made through the bridge: when, which agent,");
-        writer.WriteLine("which item, whether it was allowed, and how that was decided.");
-        writer.WriteLine();
-        writer.WriteLine("filters:");
-        writer.WriteLine("  --denied            only the calls that were refused");
-        writer.WriteLine("  --client <text>     only agents whose label or name contains this");
-        writer.WriteLine($"  --since <when>      {AuditSince.Expected}");
-        writer.WriteLine("  --json              the records as one JSON array, each saying whether the chain vouches for it");
-        writer.WriteLine();
-        writer.WriteLine("the file:");
-        writer.WriteLine($"  --audit-log <path>  which log to read, or set {KeypasteHome.EnvironmentVariable}");
-        writer.WriteLine($"                      (default ~/{KeypasteHome.DirectoryName}/{KeypasteHome.AuditFileName})");
-        writer.WriteLine();
-        writer.WriteLine("Every record is linked to the one before it by a hash, so an edit to the file");
-        writer.WriteLine("is detectable. Both commands check that; `verify` reports it in full.");
-        writer.WriteLine($"A broken chain exits {CliApp.ExitTamperDetected}.");
-    }
+        LogVerifyCommand.Command, _denied, _client, _since, CliOptions.Json, CliOptions.AuditLog,
+    };
 
     /// <summary>Which log to read: the option if given, otherwise the one keypaste writes.</summary>
     internal static string Resolve(string? option, CliContext context) =>
         option ?? KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
 
-    private static int List(string[] args, CliContext context)
+    private static int List(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var parseError))
-        {
-            context.Stderr.WriteLine($"keypaste log: {parseError}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine($"keypaste log: unexpected argument '{line.Operands[0]}'");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
-
         // Before looking at the file, so that a mistyped filter is a usage error whether or not a
         // log happens to exist yet.
         if (!TryFilters(line, context, out var filters, out var wanted))
@@ -125,8 +58,8 @@ internal static class LogCommand
             return CliApp.ExitUsageError;
         }
 
-        var path = Resolve(line.Value(LogOption), context);
-        var json = line.HasFlag(CliJson.Option);
+        var path = Resolve(line.GetValue(CliOptions.AuditLog), context);
+        var json = line.GetValue(CliOptions.Json);
 
         // An absent log is not a failure: it is what a machine looks like before any agent has
         // asked for anything. `verify` treats the same absence as an error, because there it is the
@@ -283,14 +216,14 @@ internal static class LogCommand
 
     /// <summary>Turns the filter options into a predicate, and into words for the heading.</summary>
     private static bool TryFilters(
-        CommandLine line,
+        ParseResult line,
         CliContext context,
         out IReadOnlyList<string> filters,
         out Func<AuditEntry, bool> wanted)
     {
         var described = new List<string>();
-        var denied = line.HasFlag(DeniedOption);
-        var client = line.Value(ClientOption);
+        var denied = line.GetValue(_denied);
+        var client = line.GetValue(_client);
         DateTimeOffset? since = null;
 
         if (denied)
@@ -306,7 +239,7 @@ internal static class LogCommand
             described.Add($"agent containing '{EntryNameSanitizer.Sanitize(client, 40).Text}'");
         }
 
-        if (line.Value(SinceOption) is { } text)
+        if (line.GetValue(_since) is { } text)
         {
             if (!AuditSince.TryParse(text, context.Clock.GetUtcNow(), out var from, out var error))
             {

@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
@@ -8,15 +9,6 @@ using Keypaste.Core.Ownership;
 using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
-
-/// <summary>Where keypaste's own arguments end and the child's command begins.</summary>
-/// <param name="Left">Everything up to, and excluding, the first bare <c>--</c>.</param>
-/// <param name="Command">Everything after it, verbatim. Empty when there was no separator.</param>
-/// <param name="HasSeparator">Whether a bare <c>--</c> was present at all.</param>
-internal readonly record struct RunArguments(
-    string[] Left,
-    IReadOnlyList<string> Command,
-    bool HasSeparator);
 
 /// <summary>
 /// Runs a command with a project's variables in its environment:
@@ -50,10 +42,33 @@ internal readonly record struct RunArguments(
 /// </remarks>
 internal static class RunCommand
 {
-    internal const string SessionOption = "session";
-    internal const string ApproverOption = "approver";
-    internal const string EnvFileOption = "env-file";
-    internal const string ProjectOption = "project";
+    /// <summary>The project's name, even one starting with <c>-</c>, which an operand cannot carry (D-0453).</summary>
+    internal static Option<string> Project { get; } = Syntax.Value("--project", "name", "the project, even one whose name starts with -");
+
+    internal static Option<string> EnvFile { get; } = Syntax.Value("--env-file", "file", "run with the variables a reference file names");
+
+    internal static Option<bool> Session { get; } =
+        Syntax.Flag("--session", "ask the keypaste app or `keypaste approve`, which hold the vault unlocked, and type no password here");
+
+    /// <summary>Every operand, the child's command included, which <see cref="Projects"/> takes back out.</summary>
+    private static readonly Argument<string[]> _operands = Syntax.Operands("project", "the project, or the one projects.json maps this directory to");
+
+    internal static CliVerb Command { get; } = new(
+        "run",
+        "run a command with secrets in its environment\n\n"
+            + "nothing is written to disk, and the vault is closed before the command starts. with no project, the one "
+            + $"projects.json maps this directory to is used, and its {EnvReferenceFile.FileName} only when that file names "
+            + "nothing but that project's variables.\n\n"
+            + "with --session or --token, the process holding the vault unlocked shows you the project, its variable names, "
+            + "the command and this directory, and a token releases only what its scope covers. everything after the -- "
+            + "belongs to the command, and once it starts, its exit code is keypaste's: 127 means there is no such command "
+            + "and 126 that it is not executable, as in a shell.",
+        Execute,
+        tail: "-- <command> [args...]")
+    {
+        _operands, CliOptions.Profile, Project, EnvFile, Session, CliOptions.Approver, RunWithToken.Token, RunWithToken.Bundle,
+        CliOptions.Vault, CliOptions.Keyfile,
+    };
 
     private const int _nameColumn = 20;
     private const int _shownReferences = 3;
@@ -63,49 +78,21 @@ internal static class RunCommand
     /// <remarks>The owner decides the timeout; this only bounds an owner that never answers.</remarks>
     private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new(SessionOption, TakesValue: false),
-        new(ApproverOption, TakesValue: true),
-        new(EnvFileOption, TakesValue: true),
-        new(ProjectOption, TakesValue: true),
-        EnvCommand.ProfileOption,
-        new(RunWithToken.TokenOption, TakesValue: true),
-        new(RunWithToken.BundleOption, TakesValue: true),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    private static int Execute(ParseResult line, CliContext context)
     {
-        var split = Split(args);
-
-        if (!CommandLine.TryParse(split.Left, 1, _options, out var line, out var error))
-        {
-            return Fail(context, error);
-        }
-
-        // Checked before the separator, so `keypaste run --help` prints usage instead of
-        // complaining that a command is missing.
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (!split.HasSeparator)
+        if (Syntax.Passed(line) is not { } command)
         {
             return Fail(context, "expected -- followed by a command, as in: keypaste run dev -- npm start");
         }
 
-        if (split.Command.Count == 0)
+        if (command.Length == 0)
         {
             return Fail(context, "no command given after --");
         }
 
-        if (line.Value(RunWithToken.TokenOption) is not null || line.Value(RunWithToken.BundleOption) is not null)
+        if (line.GetValue(RunWithToken.Token) is not null || line.GetValue(RunWithToken.Bundle) is not null)
         {
-            return RunWithToken.Execute(line, split.Command, context);
+            return RunWithToken.Execute(line, command, context);
         }
 
         var projects = Projects(line);
@@ -115,11 +102,11 @@ internal static class RunCommand
             return Fail(context, "expected at most one project name");
         }
 
-        var envFile = line.Value(EnvFileOption);
+        var envFile = line.GetValue(EnvFile);
 
         if (envFile is not null && projects.Count == 1)
         {
-            return Fail(context, $"--{EnvFileOption} names the variables to run with, so it takes no project");
+            return Fail(context, $"{EnvFile.Name} names the variables to run with, so it takes no project");
         }
 
         if (!EnvCommand.TryProfile(line, out var profile, out var profileError))
@@ -132,14 +119,14 @@ internal static class RunCommand
             return Fail(context, locateError);
         }
 
-        var session = line.HasFlag(SessionOption);
+        var session = line.GetValue(Session);
 
-        if (session && line.Value("keyfile") is not null)
+        if (session && line.GetValue(CliOptions.Keyfile) is not null)
         {
             return Fail(context, "--session uses the vault another keypaste process has unlocked, so it takes no --keyfile");
         }
 
-        if (!session && line.Value(ApproverOption) is not null)
+        if (!session && line.GetValue(CliOptions.Approver) is not null)
         {
             return Fail(context, "--approver names the process to ask, which only --session does");
         }
@@ -178,7 +165,7 @@ internal static class RunCommand
 
         if (session)
         {
-            return FromSession(path, line.Value(ApproverOption), set, split.Command, launch, context);
+            return FromSession(path, line.GetValue(CliOptions.Approver), set, command, launch, context);
         }
 
         return VaultSession.OpenThen(
@@ -186,41 +173,16 @@ internal static class RunCommand
             line,
             context,
             vault => Admit(Resolve(vault, set, context), set, refusal: null, context),
-            resolved => Start(split.Command, resolved, set, context));
-    }
-
-    /// <summary>
-    /// Splits at the first bare <c>--</c> after the verb, before any option parsing happens.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Done here rather than in <see cref="CommandLine"/> because <c>run</c> needs something the
-    /// parser cannot express at any severity: the right-hand side must be exempt from option
-    /// parsing <em>entirely</em>, so that <c>keypaste run p -- mytool --vault x</c> gives
-    /// <c>mytool</c> its own <c>--vault</c>. A parser that returns "the operands after <c>--</c>"
-    /// has already decided that flag was keypaste's.
-    /// </para>
-    /// <para>
-    /// Only the first separator is a boundary; every later one belongs to the child verbatim,
-    /// which is what makes <c>keypaste run p -- git log -- path</c> mean what it looks like.
-    /// </para>
-    /// </remarks>
-    internal static RunArguments Split(string[] args)
-    {
-        for (var i = 1; i < args.Length; i++)
-        {
-            if (string.Equals(args[i], "--", StringComparison.Ordinal))
-            {
-                return new RunArguments(args[..i], args[(i + 1)..], HasSeparator: true);
-            }
-        }
-
-        return new RunArguments(args, [], HasSeparator: false);
+            resolved => Start(command, resolved, set, context));
     }
 
     /// <summary>Every project the line names: its operands and <c>--project</c>'s value, which is taken whole even when it starts with <c>-</c> (D-0453).</summary>
-    internal static IReadOnlyList<string> Projects(CommandLine line) =>
-        line.Value(ProjectOption) is { } named ? [.. line.Operands, named] : line.Operands;
+    internal static IReadOnlyList<string> Projects(ParseResult line)
+    {
+        var operands = line.GetValue(_operands) ?? [];
+        var given = operands[..^(Syntax.Passed(line)?.Length ?? 0)];
+        return line.GetValue(Project) is { } named ? [.. given, named] : given;
+    }
 
     /// <summary>
     /// Decides what runs: the named project, else <c>--env-file</c>, else the project
@@ -228,11 +190,11 @@ internal static class RunCommand
     /// names nothing but env references to that project and literals.
     /// </summary>
     private static bool TryChoose(
-        CommandLine line, IReadOnlyList<string> projects, string? envFile, string profile, string vaultPath, CliContext context, out RunSet set, out int exit)
+        ParseResult line, IReadOnlyList<string> projects, string? envFile, string profile, string vaultPath, CliContext context, out RunSet set, out int exit)
     {
         set = null!;
         exit = CliApp.ExitSuccess;
-        var profileGiven = line.Value(EnvCommand.ProfileOption.Name) is not null;
+        var profileGiven = line.GetValue(CliOptions.Profile) is not null;
 
         if (projects.Count == 1)
         {
@@ -269,7 +231,7 @@ internal static class RunCommand
             vaultPath,
             out var project,
             out var inferError,
-            hasFile ? $"pass --{EnvFileOption} {EnvReferenceFile.FileName} or name a project" : EnvCommand.NameAProject))
+            hasFile ? $"pass {EnvFile.Name} {EnvReferenceFile.FileName} or name a project" : EnvCommand.NameAProject))
         {
             exit = Fail(context, inferError);
             return false;
@@ -291,7 +253,7 @@ internal static class RunCommand
             exit = Fail(
                 context,
                 $"{EnvReferenceFile.FileName} names {Shown(what)}, not this directory's project {project}; " +
-                $"pass --{EnvFileOption} {EnvReferenceFile.FileName} to use it");
+                $"pass {EnvFile.Name} {EnvReferenceFile.FileName} to use it");
             return false;
         }
 
@@ -399,7 +361,7 @@ internal static class RunCommand
         }
         catch (ArgumentException ex)
         {
-            return (Fail(context, $"--{ApproverOption}: {ex.Message}"), null);
+            return (Fail(context, $"{CliOptions.Approver.Name}: {ex.Message}"), null);
         }
 
         if (!TryRequest(set, command, vaultPath, launch, context, out var request, out var exit))
@@ -734,37 +696,6 @@ internal static class RunCommand
     {
         context.Stderr.WriteLine($"keypaste run: {message}");
         return CliApp.ExitUsageError;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste run [--vault <path>] [--keyfile <path>] [-p <environment>] [project] -- <command> [args...]");
-        writer.WriteLine("       keypaste run [--vault <path>] [--keyfile <path>] [-p <environment>] --env-file <file> -- <command> [args...]");
-        writer.WriteLine("       keypaste run --session [--vault <path>] [--approver <name>] [-p <environment>] [project] -- <command> [args...]");
-        writer.WriteLine("       keypaste run --token <token|-|env> [--vault <path>] [--approver <name>] [-p <environment>] <project> -- <command> [args...]");
-        writer.WriteLine("       keypaste run --bundle <file> [--token <token|-|env>] [-p <environment>] [project] -- <command> [args...]");
-        writer.WriteLine();
-        writer.WriteLine("runs a command with the project's variables in its environment. nothing is");
-        writer.WriteLine("written to disk, and the vault is closed before the command starts.");
-        writer.WriteLine($"-p picks the environment, {EnvProfileNames.Default} by default. with no project, the one projects.json");
-        writer.WriteLine($"maps this directory to is used, and its {EnvReferenceFile.FileName} only when that file names");
-        writer.WriteLine("nothing but that project's variables; --env-file uses any reference file you name.");
-        writer.WriteLine("--project <name> names the project as the operand does, and takes a name that");
-        writer.WriteLine("starts with -.");
-        writer.WriteLine();
-        writer.WriteLine("with --session, no password is asked for here: the keypaste app or `keypaste approve`");
-        writer.WriteLine("holding the vault unlocked shows you the project, its variable names, the command");
-        writer.WriteLine("and this directory, and the command starts only if you allow it there.");
-        writer.WriteLine();
-        writer.WriteLine($"with --token, a scoped token (default: {RunWithToken.EnvironmentVariable}) is checked by the process");
-        writer.WriteLine("holding the vault, which releases what its scope covers without asking, except a");
-        writer.WriteLine("protected environment. --bundle opens a token bundle with no vault at all.");
-        writer.WriteLine();
-        writer.WriteLine("the -- is required: without it, 'keypaste run dev npm start' cannot be told");
-        writer.WriteLine("apart from a project called 'npm'. everything after it belongs to the command.");
-        writer.WriteLine();
-        writer.WriteLine("once the command starts, its exit code is keypaste's. 127 means there is no");
-        writer.WriteLine("such command and 126 means it is not executable, as in a shell.");
     }
 
     /// <summary>What a run injects: one profile of a project, or a reference file.</summary>

@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core.Editing;
 using Keypaste.Infrastructure;
 
@@ -6,35 +7,17 @@ namespace Keypaste.Cli.Commands;
 /// <summary>Removes an entry: <c>keypaste rm &lt;entry&gt;</c>.</summary>
 internal static class RemoveCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("yes", TakesValue: false),
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item's name");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("rm", "remove an item", Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste rm: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _item, CliOptions.Yes, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste rm <item> [--yes]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 1)
-        {
-            context.Stderr.WriteLine("keypaste rm: expected exactly one item name");
-            return CliApp.ExitUsageError;
-        }
-
-        var entryPath = line.Operands[0];
-        var assumeYes = line.HasFlag("yes");
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        var entryPath = line.GetValue(_item)!;
+        var assumeYes = line.GetValue(CliOptions.Yes);
 
         // A delete is not something to have answered by whatever the next line of stdin happens
         // to be, so a piped run says so explicitly. In a vault with no recycle bin it is still

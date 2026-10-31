@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Commands;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Tests;
@@ -39,56 +40,47 @@ public sealed class RunCommandTests
         return harness;
     }
 
-    // ---- the split ---------------------------------------------------------------------
+    // ---- the separator -----------------------------------------------------------------
 
     [Fact]
-    public void Split_WithNoSeparator_ReportsSo()
+    public void WithNoSeparator_NothingIsPassed()
     {
-        var split = RunCommand.Split(["run", "dev"]);
-
-        Assert.False(split.HasSeparator);
-        Assert.Empty(split.Command);
+        Assert.Null(Syntax.Passed(CliApp.Parse(["run", "dev"])));
     }
 
     [Fact]
-    public void Split_TakesEverythingAfterTheFirstSeparator()
+    public void EverythingAfterTheFirstSeparator_IsPassed_AndOnlyWhatIsBeforeItIsKeypastes()
     {
-        var split = RunCommand.Split(["run", "dev", "--vault", "v.kdbx", "--", "npm", "start"]);
+        var line = CliApp.Parse(["run", "dev", "--vault", "v.kdbx", "--", "npm", "start"]);
 
-        Assert.True(split.HasSeparator);
-        Assert.Equal(["run", "dev", "--vault", "v.kdbx"], split.Left);
-        Assert.Equal(["npm", "start"], split.Command);
+        Assert.Equal(["npm", "start"], Syntax.Passed(line)!);
+        Assert.Equal(["dev"], RunCommand.Projects(line));
+        Assert.Equal("v.kdbx", line.GetValue(CliOptions.Vault));
     }
 
     /// <summary>
-    /// The whole reason the split is here and not in <see cref="CommandLine"/>: the right-hand
-    /// side is exempt from option parsing, so a flag keypaste also understands still belongs to
-    /// the child.
+    /// The right-hand side is exempt from option parsing, so a flag keypaste also understands still belongs to the child.
     /// </summary>
     [Fact]
-    public void Split_LeavesTheChildsOwnFlagsAlone()
+    public void TheChildsOwnFlags_AreLeftAlone()
     {
-        var split = RunCommand.Split(["run", "dev", "--vault", "mine", "--", "mytool", "--vault", "theirs"]);
+        var line = CliApp.Parse(["run", "dev", "--vault", "mine", "--", "mytool", "--vault", "theirs"]);
 
-        Assert.Equal(["mytool", "--vault", "theirs"], split.Command);
+        Assert.Equal(["mytool", "--vault", "theirs"], Syntax.Passed(line)!);
+        Assert.Equal("mine", line.GetValue(CliOptions.Vault));
     }
 
     /// <summary>Only the first separator is a boundary; <c>git log -- path</c> has to survive.</summary>
     [Fact]
-    public void Split_KeepsALaterSeparatorInTheChildsCommand()
+    public void ALaterSeparator_StaysInTheChildsCommand()
     {
-        var split = RunCommand.Split(["run", "dev", "--", "git", "log", "--", "src/"]);
-
-        Assert.Equal(["git", "log", "--", "src/"], split.Command);
+        Assert.Equal(["git", "log", "--", "src/"], Syntax.Passed(CliApp.Parse(["run", "dev", "--", "git", "log", "--", "src/"]))!);
     }
 
     [Fact]
-    public void Split_WithNothingAfterTheSeparator_HasSeparatorButNoCommand()
+    public void WithNothingAfterTheSeparator_ThereIsASeparatorButNoCommand()
     {
-        var split = RunCommand.Split(["run", "dev", "--"]);
-
-        Assert.True(split.HasSeparator);
-        Assert.Empty(split.Command);
+        Assert.Equal([], Syntax.Passed(CliApp.Parse(["run", "dev", "--"]))!);
     }
 
     // ---- usage -------------------------------------------------------------------------
@@ -101,8 +93,9 @@ public sealed class RunCommandTests
         var exit = harness.Run("run", "--help");
 
         Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Contains("usage: keypaste run", harness.Out, StringComparison.Ordinal);
-        Assert.Contains("--project <name> names the project as the operand does", harness.Out, StringComparison.Ordinal);
+        Assert.StartsWith("run a command with secrets in its environment", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("keypaste run [<project>] [flags] -- <command> [args...]", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("--project <name>", harness.Out, StringComparison.Ordinal);
         Assert.Empty(harness.Err);
     }
 

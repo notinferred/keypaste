@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Core.Editing;
 using Keypaste.Infrastructure;
@@ -12,47 +13,27 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class AddCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("username", TakesValue: true),
-        new("url", TakesValue: true),
-        new("notes", TakesValue: true),
-        new("group", TakesValue: true),
-        .. GenerateOption.Specs,
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "its name, after its group as in work/github if you like");
+    private static readonly Option<string> _group = Syntax.Value("--group", "group", "the group to put it in");
+    private static readonly Option<string> _username = Syntax.Value("--username", "name", "its username, or you are asked");
+    private static readonly Option<string> _url = Syntax.Value("--url", "url", "its URL, or you are asked");
+    private static readonly Option<string> _notes = Syntax.Value("--notes", "text", "its notes, or you are asked");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("add", "add an item", Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste add: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _item, _group, _username, _url, _notes, GenerateOption.Options, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine(
-                "usage: keypaste add <item> [--group G] [--username U] [--url X] [--notes N]");
-            context.Stdout.WriteLine($"       {GenerateOption.Usage}");
-            return CliApp.ExitSuccess;
-        }
-
+    private static int Execute(ParseResult line, CliContext context)
+    {
         if (!GenerateOption.TryRead(line, out var recipe, out var recipeError))
         {
             context.Stderr.WriteLine($"keypaste add: {recipeError}");
             return CliApp.ExitUsageError;
         }
 
-        if (line.Operands.Count != 1)
-        {
-            context.Stderr.WriteLine("keypaste add: expected exactly one item name");
-            return CliApp.ExitUsageError;
-        }
-
-        var target = line.Operands[0];
-        var groupFlag = line.Value("group");
+        var target = line.GetValue(_item)!;
+        var groupFlag = line.GetValue(_group);
 
         var pathNamesGroup = target.Contains('/', StringComparison.Ordinal);
         if (pathNamesGroup && groupFlag is not null)
@@ -92,9 +73,9 @@ internal static class AddCommand
         // /proc/<pid>/cmdline. It is prompted, read from stdin when piped, or generated.
         AddItem? Read(CliContext asked)
         {
-            var username = line.Value("username") ?? Ask(asked, "Username: ");
-            var url = line.Value("url") ?? Ask(asked, "URL: ");
-            var notes = line.Value("notes") ?? Ask(asked, "Notes: ");
+            var username = line.GetValue(_username) ?? Ask(asked, "Username: ");
+            var url = line.GetValue(_url) ?? Ask(asked, "URL: ");
+            var notes = line.GetValue(_notes) ?? Ask(asked, "Notes: ");
 
             if (recipe is { } wanted)
             {

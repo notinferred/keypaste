@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
@@ -11,24 +12,22 @@ namespace Keypaste.Cli.Commands;
 /// </summary>
 internal static class UseCommand
 {
-    internal static int Execute(string[] args, CliContext context)
+    private static readonly Argument<string?> _path = Syntax.Optional("vault.kdbx", "the vault; with none, prints the chosen one");
+
+    internal static CliVerb Command { get; } = new(
+        "use",
+        "choose the vault used when no --vault is given\n\n"
+            + $"agents and the CLI use it when neither --vault nor {VaultLocation.EnvironmentVariable} names one.",
+        Execute)
     {
-        if (!CommandLine.TryParse(args, 1, [], out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste use: {error}");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
+        _path,
+    };
 
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
+    private static int Execute(ParseResult line, CliContext context)
+    {
         var home = context.Environment.Get(KeypasteHome.EnvironmentVariable);
 
-        if (line.Operands.Count == 0)
+        if (line.GetValue(_path) is not { } named)
         {
             if (ChosenVault.Read(home) is not { } chosen)
             {
@@ -40,13 +39,7 @@ internal static class UseCommand
             return CliApp.ExitSuccess;
         }
 
-        if (line.Operands.Count > 1)
-        {
-            context.Stderr.WriteLine("keypaste use: expected one vault path");
-            return CliApp.ExitUsageError;
-        }
-
-        var path = Path.GetFullPath(line.Operands[0]);
+        var path = Path.GetFullPath(named);
 
         if (!File.Exists(path))
         {
@@ -73,13 +66,5 @@ internal static class UseCommand
                 context.Stderr.WriteLine($"keypaste use: {KeypasteHome.SettingsPath(home)} could not be written.");
                 return CliApp.ExitInternalError;
         }
-    }
-
-    private static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste use [<vault.kdbx>]");
-        writer.WriteLine();
-        writer.WriteLine("Chooses the vault agents and the CLI use when neither --vault nor");
-        writer.WriteLine($"{VaultLocation.EnvironmentVariable} names one. With no path, prints the chosen vault.");
     }
 }

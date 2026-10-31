@@ -79,7 +79,8 @@ internal sealed class CliHarness : IDisposable
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
     /// <param name="stderr">Where its errors go instead of <see cref="Stderr"/>, for a verb a test runs on another thread.</param>
-    internal CliContext NewContext(TextWriter? stderr = null) => new()
+    /// <param name="shareTransport">What carries <c>share</c>'s requests, for a test that serves them itself.</param>
+    internal CliContext NewContext(TextWriter? stderr = null, HttpMessageHandler? shareTransport = null) => new()
     {
         Stdout = Stdout,
         Stderr = stderr ?? Stderr,
@@ -96,6 +97,7 @@ internal sealed class CliHarness : IDisposable
         AppImage = () => AppImage,
         StdoutIsTerminal = StdoutIsTerminal,
         ExportReaders = ExportReaders,
+        ShareTransport = shareTransport,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>

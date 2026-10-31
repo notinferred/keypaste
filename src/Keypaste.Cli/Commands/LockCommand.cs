@@ -1,7 +1,7 @@
+using System.CommandLine;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Ipc;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -15,36 +15,20 @@ internal static class LockCommand
 {
     private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds(10);
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new(SessionPipe.ApproverOption, TakesValue: true),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "lock",
+        "lock now and pause all agents\n\n"
+            + "asks the keypaste app or `keypaste approve` holding the vault unlocked to lock it now. every allowance ends "
+            + "and every agent is refused until somebody unlocks it again.",
+        Execute)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        CliOptions.Vault, CliOptions.Approver,
+    };
+
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
-
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste lock: {error}");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine($"keypaste lock: unexpected argument '{line.Operands[0]}'");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
 
         if (!VaultLocator.TryResolve(line, context.Environment, out var vault, out var locateError))
         {
@@ -96,12 +80,4 @@ internal static class LockCommand
 
     /// <summary>Another process's words, made safe for this terminal.</summary>
     private static string Shown(string text) => EntryNameSanitizer.SanitizeProse(text, 512).Text;
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste lock [--vault <path>] [--approver <name>]");
-        writer.WriteLine();
-        writer.WriteLine("asks the keypaste app or `keypaste approve` holding the vault unlocked to lock it now.");
-        writer.WriteLine("every allowance ends and every agent is refused until somebody unlocks it again.");
-    }
 }

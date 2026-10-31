@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -29,108 +30,45 @@ internal static class TokenCommand
 {
     private static readonly TimeSpan _defaultLifetime = TimeSpan.FromDays(30);
 
-    private static readonly OptionSpec[] _createOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("scope", TakesValue: true),
-        new("ttl", TakesValue: true),
-        new("expires", TakesValue: true),
-        new("allow-prod", TakesValue: false),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    private static readonly Argument<string> _name = Syntax.Operand("name", "the token's name");
+    private static readonly Argument<string> _target = Syntax.Operand("name|id", "the token's name or id");
+    private static readonly Option<string> _scope = Syntax.Value(
+        "--scope", "scopes", "what it may inject: read:<project>/<environment>/<KEY or *>, several separated by commas; required");
+    private static readonly Option<string> _ttl = Syntax.Value("--ttl", "n(m|h|d)", $"how long it works, {_defaultLifetime.TotalDays:0}d by default");
+    private static readonly Option<string> _expires = new("--expires") { Hidden = true };
+    private static readonly Option<bool> _allowProd = Syntax.Flag("--allow-prod", "let it reach a protected environment, which then asks you live every time");
+    private static readonly Option<string> _output = Syntax.Value("--output", "file", "where to write the bundle; required", "-o");
+    private static readonly Option<bool> _force = Syntax.Flag("--force", "replace a file that is there");
 
-    private static readonly OptionSpec[] _listOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new(CliJson.Option, TakesValue: false),
-    ];
-
-    private static readonly OptionSpec[] _revokeOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-    ];
-
-    private static readonly OptionSpec[] _bundleOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("output", TakesValue: true, 'o'),
-        new("force", TakesValue: false),
-        new(RunWithToken.TokenOption, TakesValue: true),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static Verb Command { get; } = new(
+        "token",
+        "create scoped, inject-only tokens\n\n"
+            + "a token only feeds `keypaste run --token` or `--bundle`: it injects a set into a command and never prints a value. "
+            + $"pass it in {RunWithToken.EnvironmentVariable}. create and revoke change the vault, so lock it in the app or "
+            + "`keypaste approve` first.")
     {
-        ArgumentNullException.ThrowIfNull(args);
-        ArgumentNullException.ThrowIfNull(context);
-
-        if (args.Length < 2)
+        new CliVerb("create", "mint a token; it is printed once and never stored", Create)
         {
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
-
-        switch (args[1])
+            _name, _scope, _ttl, _expires, _allowProd, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile,
+        },
+        new CliVerb("ls", "list tokens: name, prefix, scope and expiry, never a secret", List) { CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("revoke", "stop a token working, for good", Revoke) { _target, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("bundle", "seal the token's sets into a file for CI; never a protected environment", Bundle)
         {
-            case "create":
-                return Parsed(args, _createOptions, "create", context, line => Create(line, context));
+            _name, _output, _force, RunWithToken.Token, CliOptions.Vault, CliOptions.Keyfile,
+        },
+    };
 
-            case "ls":
-                return Parsed(args, _listOptions, "ls", context, line => List(line, context));
-
-            case "revoke":
-                return Parsed(args, _revokeOptions, "revoke", context, line => Revoke(line, context));
-
-            case "bundle":
-                return Parsed(args, _bundleOptions, "bundle", context, line => Bundle(line, context));
-
-            case "help":
-            case "--help":
-            case "-h":
-                WriteUsage(context.Stdout);
-                return CliApp.ExitSuccess;
-
-            default:
-                context.Stderr.WriteLine($"keypaste token: unknown subcommand '{args[1]}'");
-                WriteUsage(context.Stderr);
-                return CliApp.ExitUsageError;
-        }
-    }
-
-    private static int Parsed(string[] args, OptionSpec[] options, string verb, CliContext context, Func<CommandLine, int> body)
+    private static int Create(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 2, options, out var line, out var error))
-        {
-            return Fail(context, verb, error);
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        return body(line);
-    }
-
-    private static int Create(CommandLine line, CliContext context)
-    {
-        if (line.Operands.Count != 1)
-        {
-            return Fail(context, "create", "expected exactly one token name");
-        }
-
-        var name = line.Operands[0];
+        var name = line.GetValue(_name)!;
 
         if (!TokenStore.IsValidName(name, out var nameError))
         {
             return Fail(context, "create", nameError);
         }
 
-        if (line.Value("scope") is not { } scopeText)
+        if (line.GetValue(_scope) is not { } scopeText)
         {
             return Fail(context, "create", "--scope is required, as in --scope 'read:acme-api/staging/*'");
         }
@@ -140,19 +78,19 @@ internal static class TokenCommand
             return Fail(context, "create", scopeError);
         }
 
-        if (line.Value("ttl") is not null && line.Value("expires") is not null)
+        if (line.GetValue(_ttl) is not null && line.GetValue(_expires) is not null)
         {
             return Fail(context, "create", "give --ttl or --expires, not both");
         }
 
         var ttl = _defaultLifetime;
 
-        if ((line.Value("ttl") ?? line.Value("expires")) is { } span && !TryLifetime(span, out ttl))
+        if ((line.GetValue(_ttl) ?? line.GetValue(_expires)) is { } span && !TryLifetime(span, out ttl))
         {
             return Fail(context, "create", "--ttl takes a number and m, h or d, from 1m to 365d, as in 30d");
         }
 
-        var allowProd = line.HasFlag("allow-prod");
+        var allowProd = line.GetValue(_allowProd);
 
         if (!allowProd && scopes.FirstOrDefault(scope => scope.IsProtected) is { } protectedScope)
         {
@@ -176,7 +114,7 @@ internal static class TokenCommand
 
             vault.Save();
 
-            if (line.HasFlag(CliJson.Option))
+            if (line.GetValue(CliOptions.Json))
             {
                 WriteCreated(context.Stdout, info, token);
                 return CliApp.ExitSuccess;
@@ -212,13 +150,8 @@ internal static class TokenCommand
         writer.WriteLine(Encoding.UTF8.GetString(buffer.ToArray()));
     }
 
-    private static int List(CommandLine line, CliContext context)
+    private static int List(ParseResult line, CliContext context)
     {
-        if (line.Operands.Count > 0)
-        {
-            return Fail(context, "ls", $"unexpected argument '{line.Operands[0]}'");
-        }
-
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
             return Fail(context, "ls", locateError);
@@ -229,7 +162,7 @@ internal static class TokenCommand
             var tokens = new TokenStore(vault).List();
             var now = context.Clock.GetUtcNow();
 
-            if (line.HasFlag(CliJson.Option))
+            if (line.GetValue(CliOptions.Json))
             {
                 CliJson.WriteArray(context.Stdout, tokens, (json, info) =>
                 {
@@ -277,14 +210,9 @@ internal static class TokenCommand
         });
     }
 
-    private static int Revoke(CommandLine line, CliContext context)
+    private static int Revoke(ParseResult line, CliContext context)
     {
-        if (line.Operands.Count != 1)
-        {
-            return Fail(context, "revoke", "expected exactly one token name or id");
-        }
-
-        var target = line.Operands[0];
+        var target = line.GetValue(_target)!;
 
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
@@ -316,16 +244,11 @@ internal static class TokenCommand
     /// audit line is appended, and only then is it moved into place, so an unwritable log leaves no
     /// bundle behind.
     /// </remarks>
-    private static int Bundle(CommandLine line, CliContext context)
+    private static int Bundle(ParseResult line, CliContext context)
     {
-        if (line.Operands.Count != 1)
-        {
-            return Fail(context, "bundle", "expected exactly one token name");
-        }
+        var name = line.GetValue(_name)!;
 
-        var name = line.Operands[0];
-
-        if (line.Value("output") is not { Length: > 0 } output)
+        if (line.GetValue(_output) is not { Length: > 0 } output)
         {
             return Fail(context, "bundle", "-o <file> is required");
         }
@@ -335,7 +258,7 @@ internal static class TokenCommand
             return Fail(context, "bundle", locateError);
         }
 
-        if (!RunWithToken.TryReadToken(line.Value(RunWithToken.TokenOption) ?? "env", "keypaste token bundle", context, out var token, out _, out var tokenExit))
+        if (!RunWithToken.TryReadToken(line.GetValue(RunWithToken.Token) ?? "env", "keypaste token bundle", context, out var token, out _, out var tokenExit))
         {
             return tokenExit;
         }
@@ -347,7 +270,7 @@ internal static class TokenCommand
             return refused;
         }
 
-        if (File.Exists(destination) && !line.HasFlag("force"))
+        if (File.Exists(destination) && !line.GetValue(_force))
         {
             context.Stderr.WriteLine($"keypaste token bundle: '{output}' already exists; --force replaces it");
             return CliApp.ExitInternalError;
@@ -566,26 +489,5 @@ internal static class TokenCommand
     {
         context.Stderr.WriteLine($"keypaste token {verb}: {message}");
         return CliApp.ExitUsageError;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste token <command>");
-        writer.WriteLine();
-        writer.WriteLine("commands:");
-        writer.WriteLine("  create <name> --scope <scopes> [--ttl <n>m|h|d] [--allow-prod] [--json]");
-        writer.WriteLine("                             mint a token; it is printed once and never stored");
-        writer.WriteLine("  ls [--json]                list tokens: name, prefix, scope and expiry, never a secret");
-        writer.WriteLine("  revoke <name|id>           stop a token working, for good");
-        writer.WriteLine("  bundle <name> -o <file> [--force] [--token <token|-|env>]");
-        writer.WriteLine("                             seal the token's sets into a file for CI");
-        writer.WriteLine();
-        writer.WriteLine("a scope is read:<project>/<environment>/<KEY or *>; separate several with commas.");
-        writer.WriteLine("a token only feeds `keypaste run --token` or `--bundle`: it injects a set into a");
-        writer.WriteLine($"command and never prints a value. --ttl defaults to 30d. pass the token in {RunWithToken.EnvironmentVariable}.");
-        writer.WriteLine();
-        writer.WriteLine("create and revoke change the vault, so lock it in the app or `keypaste approve` first.");
-        writer.WriteLine("a protected environment (prod) needs --allow-prod, then asks you live every time,");
-        writer.WriteLine("and is never put in a bundle.");
     }
 }

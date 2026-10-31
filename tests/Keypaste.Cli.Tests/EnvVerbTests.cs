@@ -408,7 +408,8 @@ public sealed class EnvVerbTests
         var exit = harness.Run(args);
 
         Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Contains("usage: keypaste env", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("USAGE", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("  keypaste env", harness.Out, StringComparison.Ordinal);
         Assert.Empty(harness.Err);
     }
 

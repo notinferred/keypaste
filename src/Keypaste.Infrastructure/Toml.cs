@@ -209,11 +209,9 @@ public sealed record TomlLimits
 /// dates, singular <c>[table]</c> headers — is a parse error naming the construct.
 /// </para>
 /// <para>
-/// Hand-rolled rather than taken as a package because <c>Keypaste.Core</c> carries no dependencies
-/// at all (docs/PRODUCT.md law 3.9, DECISIONS.md D-0004 and D-0019), and because the strictness is the
-/// point rather than a limitation: a policy file is an authorization document, so a construct
-/// keypaste would have to guess the meaning of is one it must refuse. The same argument produced
-/// the <c>.env</c> reader, <see cref="MessageFramer"/> and <see cref="CommandLine"/>.
+/// Hand-rolled because the strictness is the point rather than a limitation: a policy file is an
+/// authorization document, so a construct keypaste would have to guess the meaning of is one it must
+/// refuse. The same argument produced the <c>.env</c> reader and <see cref="MessageFramer"/>.
 /// <see cref="TomlWriter"/> writes what this reads.
 /// </para>
 /// <para>

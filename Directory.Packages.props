@@ -13,15 +13,20 @@
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
 
-  <!-- The MCP bridge's one package, in its narrowest form: ModelContextProtocol.Core rather than
-       ModelContextProtocol, which costs four transitive packages on net10.0 instead of about twelve
-       and brings no generic host. Justified in DECISIONS.md D-0019 for the bridge and D-0419 for its
-       place in the keypaste binary, as docs/PRODUCT.md law 3.9 requires. -->
   <!-- Keypaste.Core's retries, deadlines and polls (D-0677). -->
   <ItemGroup Label="Resilience">
     <PackageVersion Include="Polly.Core" Version="8.9.0" />
   </ItemGroup>
 
+  <!-- The CLI's and the bridge's arguments and help (D-0678). -->
+  <ItemGroup Label="Command line">
+    <PackageVersion Include="System.CommandLine" Version="2.0.14" />
+  </ItemGroup>
+
+  <!-- The MCP bridge's one package, in its narrowest form: ModelContextProtocol.Core rather than
+       ModelContextProtocol, which costs four transitive packages on net10.0 instead of about twelve
+       and brings no generic host. Justified in DECISIONS.md D-0019 for the bridge and D-0419 for its
+       place in the keypaste binary, as docs/PRODUCT.md law 3.9 requires. -->
   <ItemGroup Label="MCP bridge">
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
   </ItemGroup>

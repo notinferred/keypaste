@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
@@ -18,46 +19,28 @@ internal static class ShowCommand
 {
     private const string _mask = "********";
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("reveal", TakesValue: false),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item's name");
+    private static readonly Option<bool> _reveal = Syntax.Flag("--reveal", "show the values too");
+
+    internal static CliVerb Command { get; } = new("show", "show an item's fields and tags; values only with --reveal", Execute)
+    {
+        _item, _reveal, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
     /// <summary>One field as shown: its name in the vault, its label, whether it is custom, and its flags when it is.</summary>
     private sealed record ShownField(string Name, string Label, EntryField? Custom, string? Value);
 
-    internal static int Execute(string[] args, CliContext context)
+    private static int Execute(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste show: {error}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste show <item> [--reveal] [--json]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 1)
-        {
-            context.Stderr.WriteLine("keypaste show: expected exactly one item name");
-            return CliApp.ExitUsageError;
-        }
-
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
             context.Stderr.WriteLine($"keypaste show: {locateError}");
             return CliApp.ExitUsageError;
         }
 
-        var entryPath = line.Operands[0];
-        var reveal = line.HasFlag("reveal");
-        var json = line.HasFlag(CliJson.Option);
+        var entryPath = line.GetValue(_item)!;
+        var reveal = line.GetValue(_reveal);
+        var json = line.GetValue(CliOptions.Json);
 
         return VaultSession.Open(path, line, context, vault =>
         {

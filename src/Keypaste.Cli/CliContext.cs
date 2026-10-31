@@ -71,6 +71,9 @@ internal sealed class CliContext
     /// <summary>The readers <c>import</c> asks about a file that is not a KeePass database.</summary>
     internal IReadOnlyList<IExportReader> ExportReaders { get; init; } = ExportImport.Readers;
 
+    /// <summary>What carries <c>share</c>'s requests; null for a transport of its own each run.</summary>
+    internal HttpMessageHandler? ShareTransport { get; init; }
+
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the

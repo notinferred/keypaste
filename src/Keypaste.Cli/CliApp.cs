@@ -1,6 +1,8 @@
+using System.CommandLine;
 using Keypaste.Cli.Commands;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli;
 
@@ -68,122 +70,80 @@ internal static class CliApp
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(context);
 
-        if (args.Length == 0)
+        switch (args)
         {
-            if (context.StdoutIsTerminal)
-            {
+            case [] when context.StdoutIsTerminal:
                 return StatusCommand.Execute(context);
-            }
 
+            case []:
+                WriteUsage(context.Stderr, context.ConsoleStyle);
+                return ExitUsageError;
+
+            case ["version" or "--version", ..]:
+                context.Stdout.WriteLine(CoreInfo.Version);
+                return ExitSuccess;
+
+            case ["help" or "--help" or "-h", ..]:
+                WriteUsage(context.Stdout, context.ConsoleStyle);
+                return ExitSuccess;
+
+            // `keypaste env help` asks for a group's help, as `keypaste help` asks for the top level's.
+            case [var group, "help"] when _root.Subcommands.Any(verb => verb.Name == group && verb.Subcommands.Count > 0):
+                WriteHelp(context.Stdout, Parse([group]), context.ConsoleStyle);
+                return ExitSuccess;
+
+            // The removed spellings are refused before anything parses, their help included (D-0470).
+            case ["agent", ..]:
+                return Renamed(context, "keypaste agent", "keypaste approve");
+
+            case ["mcp", "serve", ..]:
+                return Renamed(context, "keypaste mcp serve", "keypaste approve");
+
+            case ["mcp", "setup", ..]:
+                return Renamed(context, "keypaste mcp setup", "keypaste setup");
+
+            case ["mcp", "policy", ..]:
+                return Renamed(context, "keypaste mcp policy", "keypaste clients");
+
+            case ["get", ..] when args.TakeWhile(arg => arg != "--").Contains("--show"):
+                context.Stderr.WriteLine("keypaste get: --show is now --reveal");
+                return ExitUsageError;
+        }
+
+        var line = Parse(args);
+
+        if (line.CommandResult.Command == _root)
+        {
+            context.Stderr.WriteLine($"keypaste: unknown command '{args[0]}'");
             WriteUsage(context.Stderr, context.ConsoleStyle);
             return ExitUsageError;
         }
 
-        var command = args[0];
-
-        switch (command)
+        if (Syntax.Problem(line, args) is { } problem)
         {
-            case "init":
-                return InitCommand.Execute(args, context);
-
-            case "use":
-                return UseCommand.Execute(args, context);
-
-            case "add":
-                return AddCommand.Execute(args, context);
-
-            case "get":
-                return GetCommand.Execute(args, context);
-
-            case "show":
-                return ShowCommand.Execute(args, context);
-
-            case "generate":
-                return GenerateCommand.Execute(args, context);
-
-            case "ls":
-                return ListCommand.Execute(args, context);
-
-            case "search":
-                return SearchCommand.Execute(args, context);
-
-            case "rm":
-                return RemoveCommand.Execute(args, context);
-
-            case "access":
-                return AccessCommand.Execute(args, context);
-
-            case "env":
-                return EnvCommand.Execute(args, context);
-
-            case "run":
-                return RunCommand.Execute(args, context);
-
-            case "token":
-                return TokenCommand.Execute(args, context);
-
-            case "approve":
-                return ApproveCommand.Execute(args, context);
-
-            case "clients":
-                return ClientsCommand.Execute(args, context);
-
-            case "agent":
-                return Renamed(context, "keypaste agent", "keypaste approve");
-
-            case "setup":
-                return SetupCommand.Execute(args, context);
-
-            case "log":
-                return LogCommand.Execute(args, context);
-
-            case "rotate":
-                return RotateCommand.Execute(args, context);
-
-            case "set":
-                return SetCommand.Execute(args, context);
-
-            case "field":
-                return FieldCommand.Execute(args, context);
-
-            case "attachment":
-                return AttachmentCommand.Execute(args, context);
-
-            case "grants":
-                return GrantsCommand.Execute(args, context);
-
-            case "lock":
-                return LockCommand.Execute(args, context);
-
-            case "mcp":
-                return McpCommand.Execute(args, context);
-
-            case "doctor":
-                return DoctorCommand.Execute(args, context);
-
-            case "share":
-                return ShareCommand.Execute(args, context);
-
-            case "import":
-                return ImportCommand.Execute(args, context);
-
-            case "version":
-            case "--version":
-                context.Stdout.WriteLine(CoreInfo.Version);
-                return ExitSuccess;
-
-            case "help":
-            case "--help":
-            case "-h":
-                WriteUsage(context.Stdout, context.ConsoleStyle);
-                return ExitSuccess;
-
-            default:
-                context.Stderr.WriteLine($"keypaste: unknown command '{command}'");
-                WriteUsage(context.Stderr, context.ConsoleStyle);
-                return ExitUsageError;
+            var path = Syntax.Path(line);
+            context.Stderr.WriteLine($"{path}: {problem}");
+            context.Stderr.WriteLine($"see {path} --help");
+            return ExitUsageError;
         }
+
+        if (line.GetValue(Syntax.Help))
+        {
+            WriteHelp(context.Stdout, line, context.ConsoleStyle);
+            return ExitSuccess;
+        }
+
+        if (line.CommandResult.Command is not CliVerb verb)
+        {
+            WriteHelp(context.Stderr, line, context.ConsoleStyle);
+            return ExitUsageError;
+        }
+
+        return verb.Run(line, context);
     }
+
+    /// <summary>Parses a whole command line, its verb first, without running anything.</summary>
+    internal static ParseResult Parse(string[] args) => _root.Parse(args, Syntax.Parsing);
 
     /// <summary>Refuses a removed spelling, naming the one that replaced it, and runs nothing (D-0470).</summary>
     internal static int Renamed(CliContext context, string removed, string replacement)
@@ -192,46 +152,54 @@ internal static class CliApp
         return ExitUsageError;
     }
 
+    /// <summary>A verb's help: its name amber and its headings grey on a terminal, plain anywhere else.</summary>
+    internal static void WriteHelp(TextWriter writer, ParseResult line, IConsoleStyle style) =>
+        Syntax.WriteHelp(writer, line, text => style.Paint(writer, Tone.Accent, text), text => style.Paint(writer, Tone.Muted, text));
+
+    /// <summary>
+    /// Every other <c>keypaste mcp</c> is the bridge, which <see cref="Program.StartsBridge"/> sends there before this class
+    /// is reached; this one is only its line in the help.
+    /// </summary>
+    private static readonly CliVerb _mcp = new("mcp", "the MCP server your AI tools start", (_, context) =>
+    {
+        context.Stderr.WriteLine("keypaste mcp: your AI tools start it; keypaste setup connects them");
+        return ExitUsageError;
+    });
+
     /// <summary>The verbs, grouped as a person looks for them, in the order they are printed.</summary>
-    private static readonly (string Heading, (string Verb, string Summary)[] Verbs)[] _groups =
+    private static readonly (string Heading, Command[] Verbs)[] _groups =
     [
         ("SECRETS",
         [
-            ("get", "copy a secret to the clipboard, or print it with --reveal"),
-            ("show", "show an item's fields and tags; values only with --reveal"),
-            ("set", "create or update a secret, or its custom fields"),
-            ("field", "list, rename or remove an item's custom fields"),
-            ("attachment", "list, add, replace, remove or save an item's attachments"),
-            ("rotate", "replace a secret with a new generated one"),
-            ("run", "run a command with secrets in its environment"),
-            ("env", "import, export and diff .env environments"),
+            GetCommand.Command, ShowCommand.Command, SetCommand.Command, FieldCommand.Command, AttachmentCommand.Command,
+            RotateCommand.Command, RunCommand.Command, EnvCommand.Command,
         ]),
         ("AGENTS",
         [
-            ("setup", "connect this computer's AI tools to your vault"),
-            ("mcp", "the MCP server your AI tools start"),
-            ("approve", "approve agents' requests in this terminal"),
-            ("clients", "show or change what each agent can see and do"),
-            ("doctor", "check the vault, the AI tools and the app, and say what to fix"),
-            ("grants", "list or revoke time-boxed access"),
-            ("token", "create scoped, inject-only tokens"),
-            ("log", "show the hash-chained activity log"),
+            SetupCommand.Command, _mcp, ApproveCommand.Command, ClientsCommand.Command, DoctorCommand.Command,
+            GrantsCommand.Command, TokenCommand.Command, LogCommand.Command,
         ]),
         ("VAULT",
         [
-            ("import", "copy in an export or a KeePass database, or edit it in place"),
-            ("share", "create an encrypted, expiring link"),
-            ("lock", "lock now and pause all agents"),
-            ("init", "create a new vault"),
-            ("use", "choose the vault used when no --vault is given"),
-            ("add", "add an item"),
-            ("ls", "list groups and items"),
-            ("search", "find items by title, group, username or URL"),
-            ("rm", "remove an item"),
-            ("generate", "print a passphrase (--words N); it is not stored"),
-            ("access", "change the master password or keyfile"),
+            ImportCommand.Command, ShareCommand.Command, LockCommand.Command, InitCommand.Command, UseCommand.Command,
+            AddCommand.Command, ListCommand.Command, SearchCommand.Command, RemoveCommand.Command, GenerateCommand.Command,
+            AccessCommand.Command,
         ]),
     ];
+
+    private static readonly Command _root = Root();
+
+    private static Command Root()
+    {
+        var root = new Command("keypaste") { Syntax.Help };
+
+        foreach (var verb in _groups.SelectMany(group => group.Verbs))
+        {
+            root.Subcommands.Add(verb);
+        }
+
+        return root;
+    }
 
     /// <summary>The top-level help: verbs amber and headings grey on a terminal, plain anywhere else.</summary>
     internal static void WriteUsage(TextWriter writer, IConsoleStyle style)
@@ -239,7 +207,7 @@ internal static class CliApp
         ArgumentNullException.ThrowIfNull(writer);
         ArgumentNullException.ThrowIfNull(style);
 
-        var column = _groups.SelectMany(group => group.Verbs).Max(verb => verb.Verb.Length) + 2;
+        var column = _groups.SelectMany(group => group.Verbs).Max(verb => verb.Name.Length) + 2;
         string Muted(string text) => style.Paint(writer, Tone.Muted, text);
 
         writer.WriteLine($"keypaste {CoreInfo.Version}{Muted($" {style.Glyph(writer, Mark.Dot)} a simple, local password manager on your KeePass file")}");
@@ -252,9 +220,10 @@ internal static class CliApp
             writer.WriteLine();
             writer.WriteLine(Muted(heading));
 
-            foreach (var (verb, summary) in verbs)
+            foreach (var verb in verbs)
             {
-                writer.WriteLine($"  {style.Paint(writer, Tone.Accent, verb)}{new string(' ', column - verb.Length)}{summary}");
+                var summary = (verb.Description ?? "").Split('\n')[0];
+                writer.WriteLine($"  {style.Paint(writer, Tone.Accent, verb.Name)}{new string(' ', column - verb.Name.Length)}{summary}");
             }
         }
 

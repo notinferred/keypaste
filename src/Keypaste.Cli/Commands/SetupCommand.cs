@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
@@ -32,50 +33,45 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class SetupCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("client", TakesValue: true),
-        new("label", TakesValue: true),
-        new("expose", TakesValue: true),
-        new("dry-run", TakesValue: false),
-        new("remove", TakesValue: false),
-        new("yes", TakesValue: false),
-        new("link", TakesValue: false),
-    ];
+    private static readonly Option<string> _client =
+        Syntax.Value("--client", "a,b", "only these, from: " + KnownClientIds(McpClientMachine.CurrentPlatform));
 
-    internal static int Execute(string[] args, CliContext context)
+    private static readonly Option<string> _label = Syntax.Value("--label", "name", "what the audit log calls the agent, its id by default");
+    private static readonly Option<string> _expose = Syntax.Value("--expose", "globs", "narrow what agents may see through these tools; by default their settings decide");
+    private static readonly Option<bool> _dryRun = Syntax.Flag("--dry-run", "print every step and change nothing");
+    private static readonly Option<bool> _remove = Syntax.Flag("--remove", "take keypaste out again, leaving everything else alone");
+    private static readonly Option<bool> _link = Syntax.Flag("--link", "print links that have Cursor and VS Code add keypaste");
+
+    internal static CliVerb Command { get; } = new(
+        "setup",
+        "connect this computer's AI tools to your vault\n\n"
+            + "finds the AI tools on this machine and points them at your vault. one that ships its own command is "
+            + "configured with it; for one that does not, keypaste changes only its own part of the tool's configuration "
+            + "file and keeps the first original beside it.",
+        Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste: {error}");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
+        CliOptions.Vault, _client, _label, _expose, _dryRun, _remove, CliOptions.Yes, _link,
+    };
 
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
+    private static int Execute(ParseResult line, CliContext context)
+    {
         var platform = McpClientMachine.CurrentPlatform;
 
-        if (!TrySelectClients(line.Value("client"), platform, out var clients, out var unknown))
+        if (!TrySelectClients(line.GetValue(_client), platform, out var clients, out var unknown))
         {
             context.Stderr.WriteLine($"keypaste: no AI tool called '{unknown}'.");
             context.Stderr.WriteLine("keypaste: known AI tools: " + KnownClientIds(platform));
             return CliApp.ExitUsageError;
         }
 
-        if (line.HasFlag("link"))
+        if (line.GetValue(_link))
         {
             return WriteLinks(line, context, clients, platform);
         }
 
-        var removing = line.HasFlag("remove");
-        var dryRun = line.HasFlag("dry-run");
-        var assumeYes = line.HasFlag("yes");
+        var removing = line.GetValue(_remove);
+        var dryRun = line.GetValue(_dryRun);
+        var assumeYes = line.GetValue(CliOptions.Yes);
 
         // A change to other programs' configuration is not something to have answered by whatever the next line of stdin is.
         if (!dryRun && !assumeYes && !context.Prompt.IsInteractive)
@@ -166,7 +162,7 @@ internal static class SetupCommand
     }
 
     private static bool TryRegister(
-        CommandLine line,
+        ParseResult line,
         CliContext context,
         McpClientMachine machine,
         IReadOnlyList<McpClient> clients,
@@ -194,7 +190,7 @@ internal static class SetupCommand
         }
 
         // The label is filled in per client; a single run wires several, and the audit log exists to tell them apart.
-        IReadOnlyList<string> expose = line.Value("expose") is { Length: > 0 } globs
+        IReadOnlyList<string> expose = line.GetValue(_expose) is { Length: > 0 } globs
             ? globs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             : [];
 
@@ -241,15 +237,15 @@ internal static class SetupCommand
     }
 
     /// <summary>Prints each selected tool's install link, composed from the registration a run would write, and changes nothing.</summary>
-    private static int WriteLinks(CommandLine line, CliContext context, IReadOnlyList<McpClient> clients, McpClientPlatform platform)
+    private static int WriteLinks(ParseResult line, CliContext context, IReadOnlyList<McpClient> clients, McpClientPlatform platform)
     {
-        if (line.HasFlag("remove"))
+        if (line.GetValue(_remove))
         {
             context.Stderr.WriteLine("keypaste: --link prints links that add keypaste; it does not go with --remove");
             return CliApp.ExitUsageError;
         }
 
-        if (line.Value("client") is { Length: > 0 } && clients.FirstOrDefault(client => !TakesLink(client)) is { } unlinked)
+        if (line.GetValue(_client) is { Length: > 0 } && clients.FirstOrDefault(client => !TakesLink(client)) is { } unlinked)
         {
             context.Stderr.WriteLine($"keypaste: {unlinked.Id} takes no install link; {LinkedClientIds(platform)} do");
             return CliApp.ExitUsageError;
@@ -516,32 +512,11 @@ internal static class SetupCommand
     private static string Formatted(string id, string text) => $"  {id,-16} {text}";
 
     /// <summary>What the audit log will call this client: <c>--label</c>, else the client's own id.</summary>
-    private static string Label(CommandLine line, McpClient client) =>
-        line.Value("label") is { Length: > 0 } explicitLabel ? explicitLabel : client.Id;
+    private static string Label(ParseResult line, McpClient client) =>
+        line.GetValue(_label) is { Length: > 0 } explicitLabel ? explicitLabel : client.Id;
 
     private static string KnownClientIds(McpClientPlatform platform) =>
         string.Join(", ", McpClientCatalog.For(platform).Select(client => client.Id));
-
-    private static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste setup [--vault <path>] [--client <a,b>] [--label <name>]");
-        writer.WriteLine("                      [--expose <globs>] [--dry-run] [--remove] [--yes] [--link]");
-        writer.WriteLine();
-        writer.WriteLine("Finds the AI tools on this machine and points them at your vault.");
-        writer.WriteLine();
-        writer.WriteLine("  --vault <path>      pin the AI tools to this vault instead of the chosen one");
-        writer.WriteLine("  --client <a,b>      only these, from: " + KnownClientIds(McpClientMachine.CurrentPlatform));
-        writer.WriteLine("  --label <name>      what the audit log calls the agent (default: its id)");
-        writer.WriteLine("  --expose <globs>    narrow what agents may see through these tools; by default their settings decide");
-        writer.WriteLine("  --dry-run           print every step and change nothing");
-        writer.WriteLine("  --remove            take keypaste out again, leaving everything else alone");
-        writer.WriteLine("  --yes               change without asking; required when stdin is not a terminal");
-        writer.WriteLine("  --link              print links that have Cursor and VS Code add keypaste");
-        writer.WriteLine();
-        writer.WriteLine("An AI tool that ships its own command is configured with it. For one that does not,");
-        writer.WriteLine("keypaste changes only its own part of the tool's configuration file and keeps");
-        writer.WriteLine("the first original beside it.");
-    }
 
     /// <summary>One selected client: whether it is installed, the plan for it or why it is skipped, and the link that has it add keypaste itself.</summary>
     private sealed record Tool(McpClient Client, bool Installed, McpSetupPlan? Plan, string? Skipped, string? InstallLink = null);

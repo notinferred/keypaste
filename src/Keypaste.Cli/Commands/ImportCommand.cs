@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
@@ -28,50 +29,48 @@ internal static class ImportCommand
 {
     private const string _none = "none";
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("into", TakesValue: true),
-        new("dry-run", TakesValue: false),
-        new("in-place", TakesValue: false),
-        new("source-keyfile", TakesValue: true),
-        new(ImportFromExport.SkipExistingOption, TakesValue: false),
-    ];
+    private static readonly Argument<string> _file = Syntax.Operand("file", "a KeePass database or another password manager's export");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static Option<string> Into { get; } = Syntax.Value("--into", "group", "the group to copy into, the file's name by default");
+
+    internal static Option<bool> DryRun { get; } = Syntax.Flag("--dry-run", "show where everything would land, and write nothing");
+
+    internal static Option<bool> SkipExisting { get; } =
+        Syntax.Flag("--skip-existing", "skip an exported item whose name your vault already has, rather than keeping both");
+
+    internal static Option<bool> InPlace { get; } = Syntax.Flag("--in-place", "keep editing the KeePass file where it is instead of copying it");
+
+    internal static Option<string> SourceKeyfile { get; } = Syntax.Value(
+        "--source-keyfile", "path|none", "the KeePass file's keyfile; a <name>.keyx or <name>.key beside it is used unless this says none");
+
+    internal static CliVerb Command { get; } = new(
+        "import",
+        "copy in an export or a KeePass database, or edit it in place\n\n"
+            + "copies every item of another KeePass file into your vault, with its fields, attachments and history, under "
+            + "a group named after the file; the file itself is never changed and its recycle bin is left behind. with no "
+            + "vault configured, or --in-place, the file is kept where it is and remembered as a vault to open.\n\n"
+            + "another password manager's export is copied the same way, all of it or nothing, and every part of it that "
+            + $"cannot be copied is named with why. exports it reads: {string.Join(", ", ExportImport.Readers.Select(reader => reader.Format))}.",
+        Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste import: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _file, Into, DryRun, SkipExisting, InPlace, SourceKeyfile, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            WriteHelp(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 1)
-        {
-            context.Stderr.WriteLine("keypaste import: expected exactly one KeePass database or export file");
-            return CliApp.ExitUsageError;
-        }
-
-        var into = line.Value("into");
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        var into = line.GetValue(Into);
         var hasTarget = VaultLocator.TryResolve(line, context.Environment, out var target, out _);
-        var inPlace = line.HasFlag("in-place") || !hasTarget;
+        var inPlace = line.GetValue(InPlace) || !hasTarget;
 
         if (inPlace && into is not null)
         {
-            context.Stderr.WriteLine(line.HasFlag("in-place")
+            context.Stderr.WriteLine(line.GetValue(InPlace)
                 ? "keypaste import: --into copies into a vault, and --in-place keeps editing the file itself; choose one"
                 : $"keypaste import: --into needs a vault to copy into: pass --vault or set {VaultLocator.EnvironmentVariable}");
             return CliApp.ExitUsageError;
         }
 
-        var source = Path.GetFullPath(line.Operands[0]);
+        var source = Path.GetFullPath(line.GetValue(_file)!);
         if (!File.Exists(source))
         {
             context.Stderr.WriteLine($"keypaste import: no file at '{source}'");
@@ -89,7 +88,7 @@ internal static class ImportCommand
             return CliApp.ExitInternalError;
         }
 
-        if (line.HasFlag(ImportFromExport.SkipExistingOption))
+        if (line.GetValue(SkipExisting))
         {
             context.Stderr.WriteLine("keypaste import: --skip-existing is for another password manager's export; a KeePass file's items are all copied");
             return CliApp.ExitUsageError;
@@ -118,12 +117,12 @@ internal static class ImportCommand
         context.Stderr.WriteLine($"  {Describe(probe, keyfile, Dot(context))}");
 
         return inPlace
-            ? KeepInPlace(probe, keyfile, line.HasFlag("dry-run"), context)
+            ? KeepInPlace(probe, keyfile, line.GetValue(DryRun), context)
             : Copy(probe, keyfile, target, line, into, context);
     }
 
-    private static int Copy(KdbxProbe probe, string? keyfile, string target, CommandLine line, string? into, CliContext context) =>
-        line.HasFlag("dry-run")
+    private static int Copy(KdbxProbe probe, string? keyfile, string target, ParseResult line, string? into, CliContext context) =>
+        line.GetValue(DryRun)
             ? WithSource(probe, keyfile, context, opened => VaultSession.Open(target, line, context, vault => Preview(opened, vault, into, context)))
             : VaultSession.OpenHeld<ImportSource>(
                 target,
@@ -298,9 +297,9 @@ internal static class ImportCommand
         return blocked;
     }
 
-    private static bool TrySourceKeyfile(CommandLine line, KdbxProbe probe, CliContext context, out string? keyfile)
+    private static bool TrySourceKeyfile(ParseResult line, KdbxProbe probe, CliContext context, out string? keyfile)
     {
-        var given = line.Value("source-keyfile");
+        var given = line.GetValue(SourceKeyfile);
         keyfile = given switch
         {
             null => probe.SiblingKeyfile,
@@ -340,30 +339,4 @@ internal static class ImportCommand
 
     private static string Count(int value, string one, string many) =>
         value == 1 ? $"1 {one}" : string.Create(CultureInfo.InvariantCulture, $"{value} {many}");
-
-    /// <summary>The glyph where the writer's encoding carries it, otherwise its ASCII stand-in.</summary>
-    private static void WriteHelp(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste import <file> [--into <group>] [--dry-run] [--in-place] [--skip-existing]");
-        writer.WriteLine("                       [--source-keyfile <path|none>] [--vault <path>] [--keyfile <path>]");
-        writer.WriteLine("       keypaste import <export> [--into <group>] [--dry-run] [--skip-existing]");
-        writer.WriteLine("                       [--vault <path>] [--keyfile <path>]");
-        writer.WriteLine();
-        writer.WriteLine("  copies every item of another KeePass file into your vault, with its fields, attachments");
-        writer.WriteLine("  and history, under a group named after the file. The file itself is never changed. Its");
-        writer.WriteLine("  recycle bin is left behind. With no vault configured, or --in-place, the file is kept");
-        writer.WriteLine("  where it is and remembered as a vault to open.");
-        writer.WriteLine();
-        writer.WriteLine("  Another password manager's export is copied into your vault the same way, all of it or");
-        writer.WriteLine("  nothing, and every part of it that cannot be copied is named with why. Exports it reads:");
-        writer.WriteLine($"  {string.Join(", ", ExportImport.Readers.Select(reader => reader.Format))}.");
-        writer.WriteLine();
-        writer.WriteLine("  --into <group>            the group to copy into (default: the file's name)");
-        writer.WriteLine("  --dry-run                 show where everything would land, and write nothing");
-        writer.WriteLine("  --skip-existing           skip an exported item whose name your vault already has, rather");
-        writer.WriteLine("                            than keeping both");
-        writer.WriteLine("  --in-place                keep editing the file where it is instead of copying it");
-        writer.WriteLine("  --source-keyfile <path>   the file's keyfile; a <name>.keyx or <name>.key beside it is used");
-        writer.WriteLine("                            unless this says none");
-    }
 }

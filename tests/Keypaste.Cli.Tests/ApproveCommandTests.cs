@@ -88,10 +88,10 @@ public sealed class ApproveCommandTests : IDisposable
     {
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("approve", "--policy", "rules.toml", "--vault", _harness.VaultPath));
 
-        using var usage = new StringWriter();
-        ApproveCommand.WriteUsage(usage);
-        Assert.DoesNotContain("--policy", usage.ToString(), StringComparison.Ordinal);
-        Assert.Contains("keypaste clients", usage.ToString(), StringComparison.Ordinal);
+        using var help = new CliHarness();
+        help.Run("approve", "--help");
+        Assert.DoesNotContain("--policy", help.Out, StringComparison.Ordinal);
+        Assert.Contains("keypaste clients", help.Out, StringComparison.Ordinal);
     }
 
     /// <summary>Pairing is armed only by the person who starts it, with a name a pairing can have (D-0634).</summary>
@@ -101,9 +101,9 @@ public sealed class ApproveCommandTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("approve", "--pair-browser", "work/laptop", "--vault", _harness.VaultPath));
         Assert.Contains("--pair-browser: the name cannot contain '/'", _harness.Err, StringComparison.Ordinal);
 
-        using var usage = new StringWriter();
-        ApproveCommand.WriteUsage(usage);
-        Assert.Contains("--pair-browser <name>", usage.ToString(), StringComparison.Ordinal);
+        using var help = new CliHarness();
+        help.Run("approve", "--help");
+        Assert.Contains("--pair-browser <name>", help.Out, StringComparison.Ordinal);
     }
 
     /// <summary>No mode releases an entry in a protected profile: the person at the terminal is shown it, with no timed choice.</summary>

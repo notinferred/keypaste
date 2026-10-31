@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Output;
 using Keypaste.Core;
 using Keypaste.Infrastructure;
@@ -54,42 +55,23 @@ internal static class ListCommand
     /// <summary>The longest path drawn, for the same reason.</summary>
     private const int _displayLength = 512;
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("flat", TakesValue: false),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    private static readonly Option<bool> _flat = Syntax.Flag("--flat", "one path per line, without the tree");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("ls", "list groups and items", Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste ls: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _flat, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste ls [--flat | --json]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine("keypaste ls: unexpected argument");
-            return CliApp.ExitUsageError;
-        }
-
+    private static int Execute(ParseResult line, CliContext context)
+    {
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
             context.Stderr.WriteLine($"keypaste ls: {locateError}");
             return CliApp.ExitUsageError;
         }
 
-        var flat = line.HasFlag("flat");
-        var json = line.HasFlag(CliJson.Option);
+        var flat = line.GetValue(_flat);
+        var json = line.GetValue(CliOptions.Json);
 
         return VaultSession.Open(path, line, context, vault =>
         {

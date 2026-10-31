@@ -1,7 +1,7 @@
+using System.CommandLine;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli;
 
@@ -12,18 +12,16 @@ namespace Keypaste.Cli;
 /// </remarks>
 internal static class SessionPipe
 {
-    internal const string ApproverOption = "approver";
-
     private static readonly TimeSpan _connectTimeout = TimeSpan.FromMilliseconds(500);
 
     /// <summary>The pipe the owner of <paramref name="vaultPath"/> listens on.</summary>
-    internal static bool TryResolve(CommandLine line, string vaultPath, CliContext context, out string pipe, out string error)
+    internal static bool TryResolve(ParseResult line, string vaultPath, CliContext context, out string pipe, out string error)
     {
         try
         {
             var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
             pipe = ApproverEndpoint.Resolve(
-                line.Value(ApproverOption),
+                line.GetValue(CliOptions.Approver),
                 context.Environment.Get(ApproverEndpoint.EnvironmentVariable),
                 VaultIdentity.Of(home, vaultPath))!;
             error = string.Empty;
@@ -32,7 +30,7 @@ internal static class SessionPipe
         catch (ArgumentException ex)
         {
             pipe = string.Empty;
-            error = $"--{ApproverOption}: {ex.Message}";
+            error = $"{CliOptions.Approver.Name}: {ex.Message}";
             return false;
         }
     }

@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Core;
@@ -24,50 +25,28 @@ internal static class GetCommand
     internal static readonly int DefaultTimeoutSeconds =
         (int)Core.Clipboard.ClipboardClear.DefaultWindow.TotalSeconds;
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("field", TakesValue: true),
-        new("show", TakesValue: false),
-        new("reveal", TakesValue: false),
-        new("timeout", TakesValue: true),
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item's name");
+    private static readonly Argument<string?> _totp = Syntax.Keyword(CredentialFields.Totp, "its current TOTP code instead");
+    private static readonly Option<string> _field = Syntax.Value("--field", "name", "a custom field instead");
+    private static readonly Option<bool> _reveal = Syntax.Flag("--reveal", "print it rather than copy it");
+    private static readonly Option<string> _timeout = Syntax.Value("--timeout", "seconds", $"clear the clipboard after this long, {DefaultTimeoutSeconds} by default; 0 never");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("get", "copy a secret to the clipboard, or print it with --reveal", Execute)
     {
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste get: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _item, _totp, _field, _reveal, _timeout, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.HasFlag("show"))
-        {
-            context.Stderr.WriteLine("keypaste get: --show is now --reveal");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste get <item> [totp | --field <name>] [--reveal] [--timeout <seconds>]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count is < 1 or > 2)
-        {
-            context.Stderr.WriteLine("keypaste get: expected exactly one item name");
-            return CliApp.ExitUsageError;
-        }
-
-        var totp = line.Operands.Count == 2;
-        if (totp && !string.Equals(line.Operands[1], CredentialFields.Totp, StringComparison.Ordinal))
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        var word = line.GetValue(_totp);
+        var totp = word is not null;
+        if (totp && !string.Equals(word, CredentialFields.Totp, StringComparison.Ordinal))
         {
             context.Stderr.WriteLine($"keypaste get: after the item name only {CredentialFields.Totp} may follow; --field <name> reads a custom field");
             return CliApp.ExitUsageError;
         }
 
-        var field = line.Value("field");
+        var field = line.GetValue(_field);
         if (totp && field is not null)
         {
             context.Stderr.WriteLine($"keypaste get: {CredentialFields.Totp} and --field cannot be used together");
@@ -87,7 +66,7 @@ internal static class GetCommand
         }
 
         var timeout = DefaultTimeoutSeconds;
-        var timeoutText = line.Value("timeout");
+        var timeoutText = line.GetValue(_timeout);
         if (timeoutText is not null
             && (!int.TryParse(timeoutText, NumberStyles.None, CultureInfo.InvariantCulture, out timeout)
                 || timeout < 0))
@@ -102,8 +81,8 @@ internal static class GetCommand
             return CliApp.ExitUsageError;
         }
 
-        var entryPath = line.Operands[0];
-        var reveal = line.HasFlag("reveal");
+        var entryPath = line.GetValue(_item)!;
+        var reveal = line.GetValue(_reveal);
 
         return VaultSession.Open(path, line, context, vault =>
         {

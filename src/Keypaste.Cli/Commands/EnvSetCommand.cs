@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Editing;
@@ -25,30 +26,16 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class EnvSetCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        EnvCommand.ProfileOption,
-        EnvCommand.EntryOption,
-        .. GenerateOption.Specs,
-    ];
+    private static readonly Argument<string> _project = Syntax.Operand("project", "the project");
+    private static readonly Argument<string> _assignment = Syntax.Operand("KEY[=value]", "the variable, and its value unless you are asked for it");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("set", "set a variable, prompting for the value", Execute)
     {
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste env set: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _project, _assignment, CliOptions.Profile, CliOptions.Entry, GenerateOption.Options, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value] [-p <environment>] [--entry <item>]");
-            context.Stdout.WriteLine($"       {GenerateOption.Usage}");
-            return CliApp.ExitSuccess;
-        }
-
+    private static int Execute(ParseResult line, CliContext context)
+    {
         if (!GenerateOption.TryRead(line, out var recipe, out var recipeError))
         {
             context.Stderr.WriteLine($"keypaste env set: {recipeError}");
@@ -61,14 +48,8 @@ internal static class EnvSetCommand
             return CliApp.ExitUsageError;
         }
 
-        if (line.Operands.Count != 2)
-        {
-            context.Stderr.WriteLine("keypaste env set: expected a project and a variable");
-            return CliApp.ExitUsageError;
-        }
-
-        var project = line.Operands[0];
-        var assignment = line.Operands[1];
+        var project = line.GetValue(_project)!;
+        var assignment = line.GetValue(_assignment)!;
 
         // Split on the first '=' only, so a value containing one survives intact.
         var equals = assignment.IndexOf('=');
@@ -94,7 +75,7 @@ internal static class EnvSetCommand
             return CliApp.ExitUsageError;
         }
 
-        var edit = new EnvSetKey(project, profile, key, line.Value(EnvCommand.EntryOption.Name), null);
+        var edit = new EnvSetKey(project, profile, key, line.GetValue(CliOptions.Entry), null);
 
         EnvSetKey? Read(CliContext asked)
         {

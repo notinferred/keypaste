@@ -48,7 +48,7 @@ public sealed class DoctorVerbTests : IDisposable
     {
         _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("doctor", "--help"));
 
-        Assert.StartsWith("usage: keypaste doctor [--vault <path>] [--json]", _harness.Out, StringComparison.Ordinal);
+        Assert.StartsWith("check the vault, the AI tools and the app, and say what to fix", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("exits 0 when nothing needs fixing and 7 when something does.", _harness.Out, StringComparison.Ordinal);
         Assert.Empty(_harness.ProcessRunner.Calls);
     }

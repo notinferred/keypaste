@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using System.Text.Json;
 using Keypaste.Cli.Output;
@@ -19,8 +20,6 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class GrantsCommand
 {
-    private const string _allOption = "all";
-
     private const string _noAnswer =
         "the keypaste process holding the vault did not answer; it may be older than this keypaste";
 
@@ -29,54 +28,31 @@ internal static class GrantsCommand
 
     private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds(10);
 
-    private static readonly OptionSpec[] _listOptions =
-    [
-        new("vault", TakesValue: true),
-        new(SessionPipe.ApproverOption, TakesValue: true),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    private static readonly Argument<string?> _target = Syntax.Optional("id|agent", "one allowance by its id, or every one an agent holds by its name");
+    private static readonly Option<bool> _all = Syntax.Flag("--all", "all of them");
 
-    private static readonly OptionSpec[] _revokeOptions =
-    [
-        new("vault", TakesValue: true),
-        new(SessionPipe.ApproverOption, TakesValue: true),
-        new(_allOption, TakesValue: false),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "grants",
+        "list or revoke time-boxed access\n\n"
+            + "lists the time-boxed access the keypaste app or `keypaste approve` holding the vault has given, names only, "
+            + "and ends it.",
+        List)
     {
-        ArgumentNullException.ThrowIfNull(args);
-        ArgumentNullException.ThrowIfNull(context);
+        new CliVerb("revoke", "end an allowance, an agent's allowances or all of them", Revoke)
+        {
+            _target, _all, CliOptions.Vault, CliOptions.Approver,
+        },
+        CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
+    };
 
-        return args.Length >= 2 && string.Equals(args[1], "revoke", StringComparison.Ordinal)
-            ? Revoke(args, context)
-            : List(args, context);
-    }
-
-    private static int List(string[] args, CliContext context)
+    private static int List(ParseResult line, CliContext context)
     {
-        if (!CommandLine.TryParse(args, 1, _listOptions, out var line, out var error))
-        {
-            return Usage(context, "keypaste grants", error);
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            return Usage(context, "keypaste grants", $"unexpected argument '{line.Operands[0]}'");
-        }
-
         if (!TryPipe(line, context, "keypaste grants", out var vault, out var pipe))
         {
             return CliApp.ExitUsageError;
         }
 
-        return ListAsync(vault, pipe, line.HasFlag(CliJson.Option), context).GetAwaiter().GetResult();
+        return ListAsync(vault, pipe, line.GetValue(CliOptions.Json), context).GetAwaiter().GetResult();
     }
 
     private static async Task<int> ListAsync(string vault, string pipe, bool json, CliContext context)
@@ -179,24 +155,14 @@ internal static class GrantsCommand
         }
     }
 
-    private static int Revoke(string[] args, CliContext context)
+    private static int Revoke(ParseResult line, CliContext context)
     {
         const string verb = "keypaste grants revoke";
 
-        if (!CommandLine.TryParse(args, 2, _revokeOptions, out var line, out var error))
-        {
-            return Usage(context, verb, error);
-        }
+        var all = line.GetValue(_all);
+        var target = line.GetValue(_target);
 
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        var all = line.HasFlag(_allOption);
-
-        if (all ? line.Operands.Count != 0 : line.Operands.Count != 1)
+        if (all == (target is not null))
         {
             return Usage(context, verb, all
                 ? "give --all or one id or agent, not both"
@@ -208,7 +174,6 @@ internal static class GrantsCommand
             return CliApp.ExitUsageError;
         }
 
-        var target = all ? null : line.Operands[0];
         var request = target is null
             ? new RevokeGrantsRequest([], null, All: true)
             : GrantId.IsId(target)
@@ -282,7 +247,7 @@ internal static class GrantsCommand
     private static string Cut(string text) =>
         text.Length <= _entryWidth ? text : text[..(_entryWidth - 1)] + "…";
 
-    private static bool TryPipe(CommandLine line, CliContext context, string verb, out string vault, out string pipe)
+    private static bool TryPipe(ParseResult line, CliContext context, string verb, out string vault, out string pipe)
     {
         pipe = string.Empty;
 
@@ -307,17 +272,7 @@ internal static class GrantsCommand
     private static int Usage(CliContext context, string verb, string error)
     {
         context.Stderr.WriteLine($"{verb}: {error}");
-        WriteUsage(context.Stderr);
+        context.Stderr.WriteLine($"see {verb} --help");
         return CliApp.ExitUsageError;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste grants [--json] [--vault <path>] [--approver <name>]");
-        writer.WriteLine("       keypaste grants revoke (<id> | <agent> | --all) [--vault <path>] [--approver <name>]");
-        writer.WriteLine();
-        writer.WriteLine("lists the time-boxed access the keypaste app or `keypaste approve` holding the vault");
-        writer.WriteLine("has given, names only, and ends it: one allowance by its id, every allowance an agent");
-        writer.WriteLine("holds by its name, or all of them.");
     }
 }

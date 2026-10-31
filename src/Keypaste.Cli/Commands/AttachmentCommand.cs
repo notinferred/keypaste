@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
@@ -16,73 +17,29 @@ internal static class AttachmentCommand
     /// <summary>What an edit says when the vault's history limits dropped the revision it made (D-0533).</summary>
     private const string _notKept = "too large for this vault's history to keep the item as it was";
 
-    private static readonly OptionSpec[] _listOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item's name");
+    private static readonly Argument<string> _name = Syntax.Operand("name", "the attachment's name");
+    private static readonly Argument<string> _file = Syntax.Operand("file", "the file");
+    private static readonly Option<string> _named = Syntax.Value("--name", "name", "name the attachment this rather than after its file");
 
-    private static readonly OptionSpec[] _addOptions =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("name", TakesValue: true),
-    ];
-
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-    ];
-
-    internal static int Execute(string[] args, CliContext context)
+    internal static Verb Command { get; } = new("attachment", "list, add, replace, remove or save an item's attachments")
     {
-        if (args.Length < 2)
-        {
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
+        new CliVerb("ls", "list attachments by name and size", List) { _item, CliOptions.Json, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("add", $"attach a file of up to {EntryAttachment.MaximumSize / (1024 * 1024)} MiB", Add) { _item, _file, _named, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("replace", "replace an attachment; history keeps the old one", Replace) { _item, _name, _file, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("rm", "remove an attachment; history keeps it", Remove) { _item, _name, CliOptions.Vault, CliOptions.Keyfile },
+        new CliVerb("save", "write an attachment to a new file, unencrypted", Save) { _item, _name, _file, CliOptions.Vault, CliOptions.Keyfile },
+    };
 
-        switch (args[1])
-        {
-            case "ls":
-                return List(args, context);
-
-            case "add":
-                return Add(args, context);
-
-            case "replace":
-                return Replace(args, context);
-
-            case "rm":
-                return Remove(args, context);
-
-            case "save":
-                return Save(args, context);
-
-            case "help":
-            case "--help":
-            case "-h":
-                WriteUsage(context.Stdout);
-                return CliApp.ExitSuccess;
-
-            default:
-                context.Stderr.WriteLine($"keypaste attachment: unknown subcommand '{args[1]}'");
-                WriteUsage(context.Stderr);
-                return CliApp.ExitUsageError;
-        }
-    }
-
-    private static int List(string[] args, CliContext context)
+    private static int List(ParseResult line, CliContext context)
     {
-        if (!TryParse(args, "ls", "<item> [--json]", _listOptions, 1, "exactly one item name", context, out var line, out var path, out var exit))
+        if (!TryLocate(line, "ls", context, out var path, out var exit))
         {
             return exit;
         }
 
-        var entryPath = line.Operands[0];
-        var json = line.HasFlag(CliJson.Option);
+        var entryPath = line.GetValue(_item)!;
+        var json = line.GetValue(CliOptions.Json);
 
         return VaultSession.Open(path, line, context, vault =>
         {
@@ -128,15 +85,15 @@ internal static class AttachmentCommand
         });
     }
 
-    private static int Add(string[] args, CliContext context)
+    private static int Add(ParseResult line, CliContext context)
     {
-        if (!TryParse(args, "add", "<item> <file> [--name <name>]", _addOptions, 2, "an item name and a file", context, out var line, out var path, out var exit))
+        if (!TryLocate(line, "add", context, out var path, out var exit))
         {
             return exit;
         }
 
-        var (entryPath, file) = (line.Operands[0], Path.GetFullPath(line.Operands[1], context.WorkingDirectory));
-        var attachment = line.Value("name") ?? Path.GetFileName(file);
+        var (entryPath, file) = (line.GetValue(_item)!, Path.GetFullPath(line.GetValue(_file)!, context.WorkingDirectory));
+        var attachment = line.GetValue(_named) ?? Path.GetFileName(file);
 
         if (!VaultNameRules.IsValidAttachmentName(attachment, out var nameError))
         {
@@ -187,14 +144,14 @@ internal static class AttachmentCommand
         });
     }
 
-    private static int Replace(string[] args, CliContext context)
+    private static int Replace(ParseResult line, CliContext context)
     {
-        if (!TryParse(args, "replace", "<item> <name> <file>", _options, 3, "an item name, an attachment name and a file", context, out var line, out var path, out var exit))
+        if (!TryLocate(line, "replace", context, out var path, out var exit))
         {
             return exit;
         }
 
-        var (entryPath, attachment, file) = (line.Operands[0], line.Operands[1], Path.GetFullPath(line.Operands[2], context.WorkingDirectory));
+        var (entryPath, attachment, file) = (line.GetValue(_item)!, line.GetValue(_name)!, Path.GetFullPath(line.GetValue(_file)!, context.WorkingDirectory));
 
         if (!Readable(file, "replace", context, out exit))
         {
@@ -239,14 +196,14 @@ internal static class AttachmentCommand
         });
     }
 
-    private static int Remove(string[] args, CliContext context)
+    private static int Remove(ParseResult line, CliContext context)
     {
-        if (!TryParse(args, "rm", "<item> <name>", _options, 2, "an item name and an attachment name", context, out var line, out var path, out var exit))
+        if (!TryLocate(line, "rm", context, out var path, out var exit))
         {
             return exit;
         }
 
-        var (entryPath, attachment) = (line.Operands[0], line.Operands[1]);
+        var (entryPath, attachment) = (line.GetValue(_item)!, line.GetValue(_name)!);
 
         return VaultSession.OpenHeld(path, line, context, vault =>
         {
@@ -280,14 +237,14 @@ internal static class AttachmentCommand
         });
     }
 
-    private static int Save(string[] args, CliContext context)
+    private static int Save(ParseResult line, CliContext context)
     {
-        if (!TryParse(args, "save", "<item> <name> <file>", _options, 3, "an item name, an attachment name and a file", context, out var line, out var path, out var exit))
+        if (!TryLocate(line, "save", context, out var path, out var exit))
         {
             return exit;
         }
 
-        var (entryPath, attachment, file) = (line.Operands[0], line.Operands[1], Path.GetFullPath(line.Operands[2], context.WorkingDirectory));
+        var (entryPath, attachment, file) = (line.GetValue(_item)!, line.GetValue(_name)!, Path.GetFullPath(line.GetValue(_file)!, context.WorkingDirectory));
 
         if (File.Exists(file) || Directory.Exists(file))
         {
@@ -330,42 +287,9 @@ internal static class AttachmentCommand
         });
     }
 
-    /// <summary>Parses a subcommand's line and resolves its vault, answering <c>--help</c> and a wrong count of operands itself.</summary>
-    private static bool TryParse(
-        string[] args,
-        string subcommand,
-        string usage,
-        OptionSpec[] options,
-        int operands,
-        string expected,
-        CliContext context,
-        out CommandLine line,
-        out string path,
-        out int exit)
+    /// <summary>Resolves a subcommand's vault.</summary>
+    private static bool TryLocate(ParseResult line, string subcommand, CliContext context, out string path, out int exit)
     {
-        path = string.Empty;
-
-        if (!CommandLine.TryParse(args, 2, options, out line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste attachment {subcommand}: {error}");
-            exit = CliApp.ExitUsageError;
-            return false;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine($"usage: keypaste attachment {subcommand} {usage}");
-            exit = CliApp.ExitSuccess;
-            return false;
-        }
-
-        if (line.Operands.Count != operands)
-        {
-            context.Stderr.WriteLine($"keypaste attachment {subcommand}: expected {expected}");
-            exit = CliApp.ExitUsageError;
-            return false;
-        }
-
         if (!VaultLocator.TryResolve(line, context.Environment, out path, out var locateError))
         {
             context.Stderr.WriteLine($"keypaste attachment {subcommand}: {locateError}");
@@ -412,20 +336,6 @@ internal static class AttachmentCommand
 
         context.Stderr.WriteLine(string.Join(dot, new[] { $"  {mark} {what}", size, history }.OfType<string>()));
         return CliApp.ExitSuccess;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste attachment <command>");
-        writer.WriteLine();
-        writer.WriteLine("commands:");
-        writer.WriteLine("  ls <item>                     list attachments by name and size");
-        writer.WriteLine($"  add <item> <file>             attach a file of up to {EntryAttachment.MaximumSize / (1024 * 1024)} MiB");
-        writer.WriteLine("  replace <item> <name> <file>  replace an attachment; history keeps the old one");
-        writer.WriteLine("  rm <item> <name>              remove an attachment; history keeps it");
-        writer.WriteLine("  save <item> <name> <file>     write an attachment to a new file, unencrypted");
-        writer.WriteLine();
-        writer.WriteLine("add names the attachment after its file, or --name <name>.");
     }
 
     private static string Shown(string path) => EntryNameSanitizer.SanitizePath(path).Text;

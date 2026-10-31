@@ -1,9 +1,9 @@
+using System.CommandLine;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Health;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli.Commands;
 
@@ -20,49 +20,35 @@ internal static class DoctorCommand
 {
     private const int _subjectWidth = 16;
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new(CliJson.Option, TakesValue: false),
-    ];
+    internal static CliVerb Command { get; } = new(
+        "doctor",
+        "check the vault, the AI tools and the app, and say what to fix\n\n"
+            + "checks, reading only, that this keypaste and its Argon2, your vault, the keypaste app or `keypaste approve` "
+            + "holding it, your AI tools' connections, keypaste's settings files and PATH work together. it opens no "
+            + "vault, asks for no password and changes nothing.\n\n"
+            + $"exits {CliApp.ExitSuccess} when nothing needs fixing and {CliApp.ExitNeedsFixing} when something does.",
+        Execute)
+    {
+        CliOptions.Json, CliOptions.Vault,
+    };
 
     /// <summary>Where a finding's path and fix start: under its text, past the margin, the mark and the subject.</summary>
     private static readonly string _underText = new(' ', 4 + _subjectWidth + 1);
 
-    internal static int Execute(string[] args, CliContext context)
+    private static int Execute(ParseResult line, CliContext context)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
-
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste doctor: {error}");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine($"keypaste doctor: unexpected argument '{line.Operands[0]}'");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
 
         var scope = new HealthScope(
             McpClientMachine.From(context.Environment.Get, McpClientMachine.CurrentPlatform),
             context.Environment.Get,
-            line.Value("vault"),
+            line.GetValue(CliOptions.Vault),
             context.ProcessPath,
             context.AppImage());
         var findings = HealthCheck.RunAsync(scope, context.ProcessRunner, CancellationToken.None).GetAwaiter().GetResult();
 
-        if (line.HasFlag(CliJson.Option))
+        if (line.GetValue(CliOptions.Json))
         {
             WriteJson(context.Stdout, findings);
         }
@@ -141,19 +127,4 @@ internal static class DoctorCommand
     // Not EntryNameSanitizer, which would blank a fix's backticks and a Windows path's backslashes: only what repaints or breaks the line goes.
     internal static string Shown(string text, int maximumLength = DisplayTextSanitizer.MaximumLength) =>
         DisplayTextSanitizer.Sanitize(text, maximumLength).Text.Replace('\n', ' ').Replace('\t', ' ');
-
-    private static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste doctor [--vault <path>] [--json]");
-        writer.WriteLine();
-        writer.WriteLine("Checks, reading only, that this keypaste and its Argon2, your vault, the");
-        writer.WriteLine("keypaste app or `keypaste approve` holding it, your AI tools' connections,");
-        writer.WriteLine("keypaste's settings files and PATH work together, and says what to fix. It");
-        writer.WriteLine("opens no vault, asks for no password and changes nothing.");
-        writer.WriteLine();
-        writer.WriteLine("  --vault <path>   check this vault instead of the chosen one");
-        writer.WriteLine("  --json           one object per finding");
-        writer.WriteLine();
-        writer.WriteLine("exits 0 when nothing needs fixing and 7 when something does.");
-    }
 }

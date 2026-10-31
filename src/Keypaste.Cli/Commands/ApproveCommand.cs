@@ -1,3 +1,4 @@
+using System.CommandLine;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using Keypaste.Cli.Approval;
@@ -52,56 +53,44 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class ApproveCommand
 {
-    internal const string ApproverOption = "approver";
-    internal const string TimeoutOption = "approval-timeout";
-    internal const string MaxTtlOption = "max-ttl";
-    internal const string PairBrowserOption = "pair-browser";
+    private static readonly Option<string> _timeout = Syntax.Value(
+        "--approval-timeout",
+        "seconds",
+        $"how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, {ApprovalLimits.DefaultWindowSeconds} by default");
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new(ApproverOption, TakesValue: true),
-        new(TimeoutOption, TakesValue: true),
-        new(MaxTtlOption, TakesValue: true),
-        new(PairBrowserOption, TakesValue: true),
-    ];
+    private static readonly Option<string> _maxTtl =
+        Syntax.Value("--max-ttl", "seconds", $"how long an [h] allowance lasts, {ApprovalLimits.DefaultMaximumTtlSeconds} by default");
 
-    internal static int Execute(string[] args, CliContext context)
+    private static readonly Option<string> _pairBrowser =
+        Syntax.Value("--pair-browser", "name", "pair KeePassXC-Browser under this name in the first 2 minutes");
+
+    internal static CliVerb Command { get; } = new(
+        "approve",
+        "approve agents' requests in this terminal\n\n"
+            + "unlocks your vault and waits. when an AI agent asks keypaste mcp for a credential, the request appears here "
+            + "and nothing is released until you say yes; Ctrl+C locks the vault again. each agent's settings, kept in "
+            + "the vault, decide what it can see and how it is asked, and every release is recorded; `keypaste clients` "
+            + "shows and changes them. your master password is typed here, never in a window an agent caused to appear.",
+        Execute)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout, _maxTtl, _pairBrowser,
+    };
+
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
-
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var parseError))
-        {
-            context.Stderr.WriteLine($"keypaste: {parseError}");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            WriteUsage(context.Stdout);
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count > 0)
-        {
-            context.Stderr.WriteLine($"keypaste: unexpected argument '{line.Operands[0]}'");
-            WriteUsage(context.Stderr);
-            return CliApp.ExitUsageError;
-        }
 
         if (!TryLimits(line, context, out var limits))
         {
             return CliApp.ExitUsageError;
         }
 
-        var pairing = line.Value(PairBrowserOption);
+        var pairing = line.GetValue(_pairBrowser);
 
         if (pairing is not null && PairingNames.Problem(pairing, []) is { } badName)
         {
-            context.Stderr.WriteLine($"keypaste: --{PairBrowserOption}: {badName}");
+            context.Stderr.WriteLine($"keypaste: {_pairBrowser.Name}: {badName}");
             return CliApp.ExitUsageError;
         }
 
@@ -117,7 +106,7 @@ internal static class ApproveCommand
         try
         {
             pipeName = ApproverEndpoint.Resolve(
-                line.Value(ApproverOption),
+                line.GetValue(CliOptions.Approver),
                 context.Environment.Get(ApproverEndpoint.EnvironmentVariable),
                 VaultIdentity.Of(home, vaultPath))!;
         }
@@ -394,13 +383,13 @@ internal static class ApproveCommand
                 : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
     }
 
-    private static bool TryLimits(CommandLine line, CliContext context, out ApprovalLimits limits)
+    private static bool TryLimits(ParseResult line, CliContext context, out ApprovalLimits limits)
     {
         limits = ApprovalLimits.Default;
 
         if (!TrySeconds(
-                line.Value(TimeoutOption),
-                TimeoutOption,
+                line.GetValue(_timeout),
+                _timeout.Name,
                 ApprovalLimits.MinimumWindowSeconds,
                 ApprovalLimits.MaximumWindowSeconds,
                 context,
@@ -409,7 +398,7 @@ internal static class ApproveCommand
             return false;
         }
 
-        if (!TrySeconds(line.Value(MaxTtlOption), MaxTtlOption, 1, ToolTtlCeiling, context, out var maxTtl))
+        if (!TrySeconds(line.GetValue(_maxTtl), _maxTtl.Name, 1, ToolTtlCeiling, context, out var maxTtl))
         {
             return false;
         }
@@ -448,35 +437,11 @@ internal static class ApproveCommand
             || parsed < minimum
             || parsed > maximum)
         {
-            context.Stderr.WriteLine($"keypaste: --{option} must be a whole number of seconds between {minimum} and {maximum}");
+            context.Stderr.WriteLine($"keypaste: {option} must be a whole number of seconds between {minimum} and {maximum}");
             return false;
         }
 
         value = parsed;
         return true;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        writer.WriteLine("usage: keypaste approve [--vault <path>] [--keyfile <path>] [--approver <name>]");
-        writer.WriteLine("                        [--approval-timeout <seconds>] [--max-ttl <seconds>]");
-        writer.WriteLine("                        [--pair-browser <name>]");
-        writer.WriteLine();
-        writer.WriteLine("Unlocks your vault and waits. When an AI agent asks keypaste mcp for a");
-        writer.WriteLine("credential, the request appears here and nothing is released until you say yes.");
-        writer.WriteLine("Leave this running in its own terminal; Ctrl+C locks the vault again.");
-        writer.WriteLine();
-        writer.WriteLine($"  --vault <path>             which vault to unlock, or set {VaultLocator.EnvironmentVariable}");
-        writer.WriteLine($"  --keyfile <path>           the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
-        writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
-        writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
-        writer.WriteLine($"  --max-ttl <secs>           how long an [h] allowance lasts, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
-        writer.WriteLine("  --pair-browser <name>      pair KeePassXC-Browser under this name in the first 2 minutes");
-        writer.WriteLine();
-        writer.WriteLine("Each agent's settings, kept in the vault, decide what it can see and how it is");
-        writer.WriteLine("asked; an agent you set to Automatic is answered without asking you, and every");
-        writer.WriteLine("release is recorded. `keypaste clients` shows and changes them.");
-        writer.WriteLine();
-        writer.WriteLine("Your master password is typed here, never in a window an agent caused to appear.");
     }
 }

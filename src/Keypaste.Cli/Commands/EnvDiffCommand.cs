@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Infrastructure;
@@ -14,36 +15,25 @@ internal static class EnvDiffCommand
 {
     private const int _keyColumn = 18;
 
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-    ];
+    private static readonly Argument<string?> _first = Syntax.Optional("project", "the project, or the one projects.json maps this directory to");
+    private static readonly Argument<string?> _second = Syntax.Optional("environment", "an environment to compare");
+    private static readonly Argument<string?> _third = Syntax.Optional("other", "the environment to compare it with");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "diff",
+        "compare environments by name, never by value\n\n"
+            + $"with no environments, compares {EnvProfileNames.Default} with every other environment.",
+        Execute)
     {
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var error))
-        {
-            return Fail(context, error);
-        }
+        _first, _second, _third, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste env diff [project] [<environmentA> <environmentB>]");
-            context.Stdout.WriteLine();
-            context.Stdout.WriteLine($"with no environments, compares {EnvProfileNames.Default} with every other environment. names only, never values.");
-            return CliApp.ExitSuccess;
-        }
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        string[] operands = [.. new[] { line.GetValue(_first), line.GetValue(_second), line.GetValue(_third) }.OfType<string>()];
 
-        var operands = line.Operands;
-
-        if (operands.Count > 3)
-        {
-            return Fail(context, "expected a project and two environments at most");
-        }
-
-        var named = operands.Count is 1 or 3 ? operands[0] : null;
-        var pair = operands.Count >= 2 ? (A: operands[^2], B: operands[^1]) : ((string A, string B)?)null;
+        var named = operands.Length is 1 or 3 ? operands[0] : null;
+        var pair = operands.Length >= 2 ? (A: operands[^2], B: operands[^1]) : ((string A, string B)?)null;
 
         if (pair is { } profiles
             && (!EnvProfileNames.IsValid(profiles.A, out var invalid) || !EnvProfileNames.IsValid(profiles.B, out invalid)))

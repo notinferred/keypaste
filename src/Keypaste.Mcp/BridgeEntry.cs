@@ -48,8 +48,7 @@ public static class BridgeEntry
                 out var error))
         {
             await Console.Error.WriteLineAsync($"keypaste mcp: {error}").ConfigureAwait(false);
-            await Console.Error.WriteLineAsync().ConfigureAwait(false);
-            await Console.Error.WriteLineAsync(ServerOptions.Usage).ConfigureAwait(false);
+            await Console.Error.WriteLineAsync("see keypaste mcp --help").ConfigureAwait(false);
             return ExitRefusedToStart;
         }
 

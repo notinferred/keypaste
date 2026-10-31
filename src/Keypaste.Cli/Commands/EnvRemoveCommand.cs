@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Editing;
 using Keypaste.Infrastructure;
@@ -8,44 +9,25 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>The field leaves the entry tagged into the environment, whose history keeps the value; no entry is deleted.</remarks>
 internal static class EnvRemoveCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("yes", TakesValue: false),
-        EnvCommand.ProfileOption,
-        EnvCommand.EntryOption,
-    ];
+    private static readonly Argument<string> _project = Syntax.Operand("project", "the project");
+    private static readonly Argument<string> _key = Syntax.Operand("KEY", "the variable");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new("rm", "remove a variable", Execute)
     {
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste env rm: {error}");
-            return CliApp.ExitUsageError;
-        }
+        _project, _key, CliOptions.Profile, CliOptions.Entry, CliOptions.Yes, CliOptions.Vault, CliOptions.Keyfile,
+    };
 
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste env rm <project> <KEY> [-p <environment>] [--entry <item>] [--yes]");
-            return CliApp.ExitSuccess;
-        }
-
+    private static int Execute(ParseResult line, CliContext context)
+    {
         if (!EnvCommand.TryProfile(line, out var profile, out var profileError))
         {
             context.Stderr.WriteLine($"keypaste env rm: {profileError}");
             return CliApp.ExitUsageError;
         }
 
-        if (line.Operands.Count != 2)
-        {
-            context.Stderr.WriteLine("keypaste env rm: expected a project and a variable");
-            return CliApp.ExitUsageError;
-        }
-
-        var project = line.Operands[0];
-        var key = line.Operands[1];
-        var assumeYes = line.HasFlag("yes");
+        var project = line.GetValue(_project)!;
+        var key = line.GetValue(_key)!;
+        var assumeYes = line.GetValue(CliOptions.Yes);
 
         // Same rule as `keypaste rm`: a piped run must ask for the deletion explicitly rather than
         // have a confirmation answered by whatever the next line of stdin happens to be.
@@ -61,7 +43,7 @@ internal static class EnvRemoveCommand
             return CliApp.ExitUsageError;
         }
 
-        var edit = new EnvRemoveKey(project, profile, key, line.Value(EnvCommand.EntryOption.Name));
+        var edit = new EnvRemoveKey(project, profile, key, line.GetValue(CliOptions.Entry));
         var route = new OwnerRoute("env rm", _ => edit, Done);
 
         return VaultSession.OpenHeld(path, line, context, route, vault =>

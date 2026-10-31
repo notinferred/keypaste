@@ -133,7 +133,7 @@ reported="$("$host" --version | tr -d '[:space:]')"
 [ -x "$root/usr/bin/keypaste" ] || die "the image carries no keypaste binary for a connected client to start"
 cli="$("$root/AppRun" cli --version | tr -d '[:space:]')"
 [ "$cli" = "$binary_version" ] || die "the image's AppRun cli --version reports $cli, expected $binary_version"
-case "$("$root/AppRun" cli mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the image's AppRun cli does not start the bridge for mcp" ;; esac
+case "$("$root/AppRun" cli mcp --help 2>&1)" in "the MCP server your AI tools start"*) ;; *) die "the image's AppRun cli does not start the bridge for mcp" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$root/usr/bin"
 
 echo "$(basename "$image"): keypaste $version, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files unpack byte-identical at offset $offset and pass --selftest."

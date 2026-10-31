@@ -1,8 +1,8 @@
+using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Cli;
 
@@ -38,7 +38,7 @@ internal static class VaultSession
     /// app opening with a hardware key.
     /// </param>
     internal static int Open(
-        string path, CommandLine line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false)
+        string path, ParseResult line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false)
     {
         if (!File.Exists(path))
         {
@@ -114,7 +114,7 @@ internal static class VaultSession
     /// <param name="body">What to do with the open vault.</param>
     /// <param name="namesHardwareKeys">As for <see cref="Open"/>.</param>
     internal static int OpenHeld(
-        string path, CommandLine line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false) =>
+        string path, ParseResult line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false) =>
         Held(path, context, () => Open(path, line, context, body, namesHardwareKeys));
 
     /// <summary>
@@ -123,14 +123,14 @@ internal static class VaultSession
     /// </summary>
     /// <remarks>
     /// The holder asks the person and saves the edit under its own claim, so no master password is read
-    /// here on that path; with nothing answering on its pipe the verb is refused as <see cref="OpenHeld(string, CommandLine, CliContext, Func{Vault, int}, bool)"/> refuses it.
+    /// here on that path; with nothing answering on its pipe the verb is refused as <see cref="OpenHeld(string, ParseResult, CliContext, Func{Vault, int}, bool)"/> refuses it.
     /// </remarks>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
     /// <param name="line">The parsed command line, for <c>--keyfile</c> and <c>--approver</c>.</param>
     /// <param name="context">Where prompts and errors go.</param>
     /// <param name="route">How the verb reads its values and says what was done, for the holder's path.</param>
     /// <param name="body">What to do with the open vault.</param>
-    internal static int OpenHeld(string path, CommandLine line, CliContext context, OwnerRoute route, Func<Vault, int> body) =>
+    internal static int OpenHeld(string path, ParseResult line, CliContext context, OwnerRoute route, Func<Vault, int> body) =>
         Held(path, context, () => Open(path, line, context, body), (holder, refusal) => OwnerEdit.Ask(path, line, context, holder, route, refusal));
 
     /// <summary>
@@ -147,7 +147,7 @@ internal static class VaultSession
     /// <param name="first">Obtains the value and hands it on, returning the exit code of what it was handed.</param>
     /// <param name="body">What to do with the value and the open vault.</param>
     internal static int OpenHeld<T>(
-        string path, CommandLine line, CliContext context, Func<Func<T, int>, int> first, Func<T, Vault, int> body) =>
+        string path, ParseResult line, CliContext context, Func<Func<T, int>, int> first, Func<T, Vault, int> body) =>
         Held(path, context, () => first(value => Open(path, line, context, vault => body(value, vault))));
 
     /// <summary>
@@ -162,7 +162,7 @@ internal static class VaultSession
     /// <param name="kind">What kind of owner takes the claim.</param>
     /// <param name="body">What to do with the claim and the open vault.</param>
     internal static int OpenHeld(
-        string path, CommandLine line, CliContext context, OwnerKind kind, Func<VaultClaim, Vault, int> body)
+        string path, ParseResult line, CliContext context, OwnerKind kind, Func<VaultClaim, Vault, int> body)
     {
         var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
 
@@ -236,7 +236,7 @@ internal static class VaultSession
     /// <see cref="Announce"/> already follows.
     /// </para>
     /// </remarks>
-    private static bool TryKeyfile(CommandLine line, CliContext context, out string? keyfile)
+    private static bool TryKeyfile(ParseResult line, CliContext context, out string? keyfile)
     {
         if (!VaultLocator.TryResolveKeyfile(line, context.Environment, out keyfile))
         {
@@ -337,7 +337,7 @@ internal static class VaultSession
     /// <param name="use">Runs after the vault has been disposed.</param>
     internal static int OpenThen<T>(
         string path,
-        CommandLine line,
+        ParseResult line,
         CliContext context,
         Func<Vault, (int Exit, T? Loaded)> load,
         Func<T, int> use)

@@ -69,7 +69,7 @@ cmp -s "$ROOT/packaging/macos/keypaste-launch.command" "$contents/Resources/keyp
 
 reported="$("$executable" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the bundle's binary reports $reported, not $binary_version"
-case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "usage: keypaste mcp"*) ;; *) die "the bundle's keypaste does not answer mcp --help" ;; esac
+case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "the MCP server your AI tools start"*) ;; *) die "the bundle's keypaste does not answer mcp --help" ;; esac
 
 # LaunchServices, not a shell, reads Info.plist and starts the app from Finder or `open`; its exit code is not open's.
 : > "$work/launched"

@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Editing;
@@ -24,41 +25,26 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class SetCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("field", TakesValue: true, Repeats: true),
-        new("plain", TakesValue: false),
-        .. GenerateOption.Specs,
-    ];
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item's name");
+    private static readonly Option<string[]> _fields = Syntax.Values("--field", "name", "set this custom field of an existing item instead, as often as you like");
+    private static readonly Option<bool> _plain = Syntax.Flag("--plain", "leave a new field unprotected");
 
-    internal static int Execute(string[] args, CliContext context)
+    internal static CliVerb Command { get; } = new(
+        "set",
+        "create or update a secret, or its custom fields\n\n"
+            + "creates the item, or replaces the password of the one already there; the old password stays in its "
+            + "history. the value is asked for, read from stdin, or generated, and never printed. with --field it sets "
+            + "custom fields of an existing item instead, asking for each value in turn. a new field is protected unless "
+            + "--plain; an existing one keeps its protection.",
+        Execute)
     {
-        ArgumentNullException.ThrowIfNull(args);
+        _item, _fields, _plain, GenerateOption.Options, CliOptions.Vault, CliOptions.Keyfile,
+    };
+
+    private static int Execute(ParseResult line, CliContext context)
+    {
+        ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(context);
-
-        if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste set: {error}");
-            return CliApp.ExitUsageError;
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine("usage: keypaste set <item> [--vault <path>] [--keyfile <path>]");
-            context.Stdout.WriteLine($"       {GenerateOption.Usage}");
-            context.Stdout.WriteLine("       keypaste set <item> --field <name> [--field <name> ...] [--plain]");
-            context.Stdout.WriteLine();
-            context.Stdout.WriteLine("creates the item, or replaces the password of the one already there;");
-            context.Stdout.WriteLine("the old password stays in its history. The value is asked for, read");
-            context.Stdout.WriteLine("from stdin, or generated, and never printed.");
-            context.Stdout.WriteLine();
-            context.Stdout.WriteLine("with --field it sets custom fields of an existing item instead, asking");
-            context.Stdout.WriteLine("for each value in turn. A new field is protected unless --plain; an");
-            context.Stdout.WriteLine("existing one keeps its protection.");
-            return CliApp.ExitSuccess;
-        }
 
         if (!GenerateOption.TryRead(line, out var recipe, out var recipeError))
         {
@@ -66,14 +52,8 @@ internal static class SetCommand
             return CliApp.ExitUsageError;
         }
 
-        if (line.Operands.Count != 1)
-        {
-            context.Stderr.WriteLine("keypaste set: expected exactly one item name");
-            return CliApp.ExitUsageError;
-        }
-
-        var fields = line.Values("field");
-        var plain = line.HasFlag("plain");
+        var fields = line.GetValue(_fields) ?? [];
+        var plain = line.GetValue(_plain);
 
         if (!TryCheckFields(fields, plain, recipe is not null, out var fieldError))
         {
@@ -81,7 +61,7 @@ internal static class SetCommand
             return CliApp.ExitUsageError;
         }
 
-        var typed = EntryName.Parse(line.Operands[0]);
+        var typed = EntryName.Parse(line.GetValue(_item)!);
         var name = new EntryName(WrittenGroup.Normalize(typed.GroupPath), typed.Title);
         var entryPath = name.GroupPath.Length == 0 ? name.Title : name.GroupPath + "/" + name.Title;
 
@@ -105,7 +85,7 @@ internal static class SetCommand
 
         TerminalEdit? Read(CliContext asked)
         {
-            if (fields.Count > 0)
+            if (fields.Length > 0)
             {
                 return ReadFields(asked, name, fields, plain);
             }
@@ -123,7 +103,7 @@ internal static class SetCommand
 
         return VaultSession.OpenHeld(path, line, context, route, vault =>
         {
-            TerminalEdit named = fields.Count > 0
+            TerminalEdit named = fields.Length > 0
                 ? new SetFields(name, [.. fields.Select(field => new FieldWrite(field, null, plain ? false : null))])
                 : new SetPassword(name, null);
 
@@ -166,11 +146,11 @@ internal static class SetCommand
         return CliApp.ExitSuccess;
     }
 
-    private static bool TryCheckFields(IReadOnlyList<string> fields, bool plain, bool generating, out string error)
+    private static bool TryCheckFields(string[] fields, bool plain, bool generating, out string error)
     {
         error = string.Empty;
 
-        if (fields.Count == 0)
+        if (fields.Length == 0)
         {
             error = plain ? "--plain applies to --field" : string.Empty;
             return !plain;
@@ -202,7 +182,7 @@ internal static class SetCommand
     }
 
     /// <summary>Reads each field's value in turn, as the item's custom fields.</summary>
-    private static SetFields? ReadFields(CliContext context, EntryName name, IReadOnlyList<string> fields, bool plain)
+    private static SetFields? ReadFields(CliContext context, EntryName name, string[] fields, bool plain)
     {
         List<FieldWrite> writes = [];
 

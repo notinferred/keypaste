@@ -1,3 +1,4 @@
+using System.CommandLine;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Editing;
@@ -18,43 +19,32 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class EnvTagCommand
 {
-    private static readonly OptionSpec[] _options =
-    [
-        new("vault", TakesValue: true),
-        new("keyfile", TakesValue: true),
-        new("yes", TakesValue: false),
-        EnvCommand.ProfileOption,
-    ];
+    private static readonly Argument<string> _project = Syntax.Operand("project", "the project");
+    private static readonly Argument<string> _item = Syntax.Operand("item", "the item");
 
-    internal static int Execute(string[] args, CliContext context, bool tagging)
+    internal static CliVerb Tag { get; } = new("tag", "put an item in a project through its env: tag", (line, context) => Execute(line, context, tagging: true))
+    {
+        _project, _item, CliOptions.Profile, CliOptions.Yes, CliOptions.Vault, CliOptions.Keyfile,
+    };
+
+    internal static CliVerb Untag { get; } = new("untag", "take it out again", (line, context) => Execute(line, context, tagging: false))
+    {
+        _project, _item, CliOptions.Profile, CliOptions.Yes, CliOptions.Vault, CliOptions.Keyfile,
+    };
+
+    private static int Execute(ParseResult line, CliContext context, bool tagging)
     {
         var verb = tagging ? "tag" : "untag";
 
-        if (!CommandLine.TryParse(args, 2, _options, out var line, out var error))
-        {
-            return Fail(context, verb, error);
-        }
-
-        if (line.WantsHelp)
-        {
-            context.Stdout.WriteLine($"usage: keypaste env {verb} <project> <item> [-p <environment>] [--yes]");
-            return CliApp.ExitSuccess;
-        }
-
-        if (line.Operands.Count != 2)
-        {
-            return Fail(context, verb, "expected a project and an item");
-        }
-
-        var (project, entryPath) = (line.Operands[0], line.Operands[1]);
-        var environment = line.Value(EnvCommand.ProfileOption.Name) ?? EnvProfileNames.Default;
+        var (project, entryPath) = (line.GetValue(_project)!, line.GetValue(_item)!);
+        var environment = line.GetValue(CliOptions.Profile) ?? EnvProfileNames.Default;
 
         if (!ProjectTag.TryFor(project, environment, out _, out var tagError))
         {
             return Fail(context, verb, tagError);
         }
 
-        var assumeYes = line.HasFlag("yes");
+        var assumeYes = line.GetValue(CliOptions.Yes);
 
         // Same rule as `rm`: a piped run asks for the change explicitly rather than have a
         // confirmation answered by whatever the next line of stdin happens to be.
