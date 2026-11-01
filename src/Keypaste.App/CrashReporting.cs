@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Keypaste.App.Navigation;
 using Keypaste.App.Terms;
 using Keypaste.Core.Audit;
@@ -43,6 +44,7 @@ internal sealed class CrashReporting : IDisposable
     private readonly Func<HttpMessageHandler> _transport;
     private readonly string _terms;
     private readonly Lock _gate = new();
+    private readonly ConditionalWeakTable<Exception, object> _reported = new();
     private HttpMessageHandler? _handler;
     private CancellationTokenSource? _sending;
     private string? _screen;
@@ -181,10 +183,18 @@ internal sealed class CrashReporting : IDisposable
 
     /// <summary>Keeps a report of an exception nothing caught.</summary>
     /// <returns>Whether a report was kept.</returns>
-    internal bool Crash(Exception exception) => Keep(() => CrashScrubber.Crash(exception, Context()));
+    internal bool Crash(Exception exception)
+    {
+        Remember(exception);
+        return Keep(() => CrashScrubber.Crash(exception, Context()));
+    }
 
     /// <summary>Keeps a report of an exception a catch-everything block caught at <paramref name="site"/>, one of this class's constants.</summary>
-    internal void Unexpected(Exception exception, string site) => Keep(() => CrashScrubber.Unexpected(exception, site, Context()));
+    internal void Unexpected(Exception exception, string site)
+    {
+        Remember(exception);
+        Keep(() => CrashScrubber.Unexpected(exception, site, Context()));
+    }
 
     /// <summary>The reports waiting, oldest first.</summary>
     internal IReadOnlyList<CrashReport> Waiting() => _outbox.Waiting();
@@ -308,10 +318,25 @@ internal sealed class CrashReporting : IDisposable
     }
 
     /// <summary>What <see cref="Hook"/> has a failed task nobody awaited do: keep its report, and the app runs on.</summary>
+    /// <remarks>
+    /// Work posted to the UI thread that throws is the run's crash, and the dispatcher also faults that work's task
+    /// with the same exception, which nobody awaits; a task whose every exception was reported already is that crash
+    /// again, so it is not reported twice.
+    /// </remarks>
     internal void OnUnobserved(object? sender, UnobservedTaskExceptionEventArgs e)
     {
         ArgumentNullException.ThrowIfNull(e);
 
+        if (e.Exception.InnerExceptions.Count > 0 && e.Exception.InnerExceptions.All(Reported))
+        {
+            e.SetObserved();
+            return;
+        }
+
         Keep(() => CrashScrubber.UnobservedTask(e.Exception, Context()));
     }
+
+    private void Remember(Exception exception) => _reported.AddOrUpdate(exception, _reported);
+
+    private bool Reported(Exception exception) => _reported.TryGetValue(exception, out _);
 }

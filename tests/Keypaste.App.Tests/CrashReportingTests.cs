@@ -122,6 +122,24 @@ public sealed partial class CrashReportingTests : IDisposable
     }
 
     [Fact]
+    public void A_crash_whose_failed_task_goes_unobserved_is_reported_once()
+    {
+        using var crashes = Reporting();
+        crashes.Choose(send: true);
+        var crash = Thrown("SENTINEL-POSTED");
+
+        // Work posted to the UI thread that throws is reported as the crash, and its task fails with that exception.
+        crashes.Crash(crash);
+        crashes.OnUnobserved(null, new UnobservedTaskExceptionEventArgs(new AggregateException(crash)));
+
+        Assert.Single(crashes.Waiting());
+
+        crashes.OnUnobserved(null, new UnobservedTaskExceptionEventArgs(new AggregateException(crash, Thrown("SENTINEL-ANOTHER"))));
+
+        Assert.Equal(2, crashes.Waiting().Count);
+    }
+
+    [Fact]
     public void Dont_send_is_saved_and_deletes_the_reports_waiting_and_the_marker()
     {
         using var crashes = Reporting();
