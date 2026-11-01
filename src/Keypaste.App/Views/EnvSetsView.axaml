@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="using:Keypaste.App"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.EnvSetsView"
@@ -552,7 +553,7 @@
                                      MaskedLength="{Binding NewValue.MaskedLength}"
                                      Placeholder="Existing value" />
                     <TextBlock Classes="caption" IsVisible="{Binding !GenerateValue}"
-                               Text="Type it or press Ctrl/Cmd+V to paste." />
+                               Text="{x:Static app:ShortcutText.Paste}" />
                     <TextBlock Classes="caption" IsVisible="{Binding NewValue.Note.Length}"
                                Text="{Binding NewValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">

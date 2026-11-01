@@ -1,0 +1,42 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.AboutWindow"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="About keypaste"
+                    Width="360"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- About keypaste, from the app menu on macOS and the menu button elsewhere (Q.2): the icon alone, never beside
+       the wordmark (BRAND), what this copy is, and Close as its default. -->
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
+      <ctl:BrandMark Width="56" HorizontalAlignment="Center" />
+
+      <StackPanel Spacing="4" HorizontalAlignment="Center">
+        <TextBlock Classes="prompt-title" Text="keypaste" HorizontalAlignment="Center" />
+        <TextBlock Name="VersionText" Classes="mono" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
+      </StackPanel>
+
+      <StackPanel Spacing="2" HorizontalAlignment="Center">
+        <TextBlock Name="CopyrightText" Classes="prompt-note" HorizontalAlignment="Center" TextAlignment="Center" />
+        <TextBlock Classes="prompt-note" HorizontalAlignment="Center" TextAlignment="Center"
+                   Text="Free software under the GNU Affero General Public License, version 3." />
+      </StackPanel>
+
+      <Button Name="Dismiss" Classes="prompt ghost" Content="Close" HorizontalAlignment="Center" IsCancel="True" IsDefault="True" />
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

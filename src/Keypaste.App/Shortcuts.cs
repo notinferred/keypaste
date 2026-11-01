@@ -7,45 +7,44 @@ using Keypaste.App.ViewModels;
 namespace Keypaste.App;
 
 /// <summary>
-/// The chords, built from the platform's own command modifier rather than a hardcoded Ctrl.
+/// The window's chords, read from <see cref="AppCommands"/>: a chord runs the command whose key it is, with exactly
+/// its modifiers, while that command can run.
 /// </summary>
 /// <remarks>
-/// Handled at the window, on the tunnelling pass, so a focused list or text field cannot eat
-/// them first. <c>Ctrl/Cmd+L</c> is the honest counterweight to a five-minute idle timeout:
-/// a default that short is only defensible when locking now is one keystroke. <c>Ctrl/Cmd+K</c>
-/// goes to the titlebar search and a digit to the sidebar row in that position.
+/// Handled at the window, on the tunnelling pass, so a focused list or text field cannot eat them first; a text
+/// field's own Copy, Paste and Undo are left to it. Exact modifiers matter: Windows reports AltGr as Ctrl+Alt, so a
+/// chord with an extra modifier is a character being typed (Q.1). <c>Ctrl/Cmd+L</c> is the honest counterweight to a
+/// five-minute idle timeout: a default that short is only defensible when locking now is one keystroke.
 /// </remarks>
 internal sealed class Shortcuts : IDisposable
 {
     private readonly Window _window;
-    private readonly AppVaultSession _session;
-    private readonly Func<UnlockViewModel?> _unlock;
-    private readonly Func<ShellViewModel?> _shell;
+    private readonly AppCommands _commands;
     private bool _disposed;
 
-    /// <summary>Binds the chords to a window.</summary>
+    /// <summary>Binds the chords of <paramref name="commands"/> to a window.</summary>
+    internal Shortcuts(Window window, AppCommands commands)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        ArgumentNullException.ThrowIfNull(commands);
+
+        _window = window;
+        _commands = commands;
+        _window.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
+    }
+
+    /// <summary>Binds the chords of the commands that reach the session, the unlock screen and the shell alone.</summary>
     /// <param name="window">The window a person types into.</param>
     /// <param name="session">The session <c>Ctrl/Cmd+L</c> locks.</param>
     /// <param name="unlock">The unlock screen, while it is showing.</param>
     /// <param name="shell">The unlocked shell, while it is showing.</param>
-    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
     internal Shortcuts(
         Window window,
         AppVaultSession session,
         Func<UnlockViewModel?> unlock,
         Func<ShellViewModel?> shell)
+        : this(window, new AppCommands(new AppCommandHost { Session = session, Unlock = unlock, Shell = shell, Window = () => window }))
     {
-        ArgumentNullException.ThrowIfNull(window);
-        ArgumentNullException.ThrowIfNull(session);
-        ArgumentNullException.ThrowIfNull(unlock);
-        ArgumentNullException.ThrowIfNull(shell);
-
-        _window = window;
-        _session = session;
-        _unlock = unlock;
-        _shell = shell;
-
-        _window.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     /// <summary>Unbinds. Doing it twice is not an error.</summary>
@@ -62,59 +61,9 @@ internal sealed class Shortcuts : IDisposable
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        // Cmd on macOS, Ctrl everywhere else — which is what a platform hotkey configuration
-        // resolves to, without depending on where Avalonia keeps that configuration this version.
-        var command = OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;
-
-        // Exactly that modifier: Windows reports AltGr as Ctrl+Alt, so a chord with Alt is a character being typed.
-        if (e.KeyModifiers != command)
+        if (_commands.ForChord(e.Key, e.KeyModifiers) is { } command)
         {
-            return;
-        }
-
-        if (_shell() is not { } shell)
-        {
-            if (e.Key == Key.O && _unlock() is { } unlock && unlock.BrowseCommand.CanExecute(null))
-            {
-                unlock.BrowseCommand.Execute(null);
-                e.Handled = true;
-            }
-
-            return;
-        }
-
-        if (e.Key == Key.L)
-        {
-            _ = _session.LockAsync(VaultLockReason.Manual);
-            e.Handled = true;
-            return;
-        }
-
-        // The import and share dialogs are modal: nothing may move focus or the page out from under
-        // them. So is a save waiting for the YubiKey, which Lock cancels.
-        if (shell.HasImport || shell.HasShare || shell.IsWaitingForTouch)
-        {
-            return;
-        }
-
-        if (e.Key == Key.K)
-        {
-            shell.FocusSearch();
-            e.Handled = true;
-            return;
-        }
-
-        var digit = e.Key switch
-        {
-            Key.D1 or Key.NumPad1 => 1,
-            Key.D2 or Key.NumPad2 => 2,
-            Key.D3 or Key.NumPad3 => 3,
-            Key.D4 or Key.NumPad4 => 4,
-            _ => 0,
-        };
-
-        if (digit > 0 && shell.GoTo(digit))
-        {
+            command.Run();
             e.Handled = true;
         }
     }

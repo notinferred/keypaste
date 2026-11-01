@@ -20,6 +20,7 @@ public sealed class BanExemptionsTests
 
     private static readonly Dictionary<string, int> _exemptions = new(StringComparer.Ordinal)
     {
+        ["src/Keypaste.App/App.axaml.cs"] = 1,
         ["src/Keypaste.App/Clipboard/AvaloniaClipboard.cs"] = 2,
         ["src/Keypaste.App/CrashReporting.cs"] = 2,
         ["src/Keypaste.App/ViewModels/ConnectClientViewModel.cs"] = 1,

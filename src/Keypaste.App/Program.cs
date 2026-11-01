@@ -162,9 +162,10 @@ internal static class Program
     internal static AppBuilder BuildAvaloniaApp() => Configured(() => new App());
 
     // Avalonia applies ShowInDock as its run loop starts, after Launch has set the Dock icon, so the two must agree.
+    // Its own app menu items go too: keypaste's name its Hide and Quit and put Hide others on ⌥⌘H (Q.2).
     private static AppBuilder Configured(Func<App> app, bool showsInDock = true) =>
         AppBuilder.Configure(app)
             .UsePlatformDetect()
-            .With(new MacOSPlatformOptions { ShowInDock = showsInDock })
+            .With(new MacOSPlatformOptions { ShowInDock = showsInDock, DisableDefaultApplicationMenuItems = true })
             .WithInterFont();
 }

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app has menus: on macOS a full menu bar, keypaste, File, Edit, View, Window and Help, with About keypaste, Settings… on ⌘, and a Dock menu, and on Windows and Linux the same menus from a button at the window's top left. The standard shortcuts work, among them ⌘N or Ctrl+N for a new item, ⌘F or Ctrl+F to search, ⌘W or Ctrl+W to close the window and ⌘Q or Ctrl+Q to quit, and outside a text field ⌘C or Ctrl+C copies the chosen item's password ([Q.2](docs/steps/Q.2.md)).
+
 The desktop app's shortcuts now take Ctrl alone, or ⌘ alone on macOS, so typing a character with AltGr on Windows, such as "ł" on a Polish keyboard, no longer locks the vault, opens the file picker or changes place ([Q.1](docs/steps/Q.1.md)).
 
 Every command's `--help` now has the layout of `keypaste --help`: what the command does, then its usage, commands, arguments and flags, each with a line saying what it is for. A mistyped command line names what is wrong and the `--help` to read ([K.10](docs/steps/K.10.md)).

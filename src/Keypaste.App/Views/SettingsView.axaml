@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="using:Keypaste.App"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.SettingsView"
@@ -264,7 +265,7 @@
                 <StackPanel Grid.Column="0" Spacing="4">
                   <TextBlock Classes="row-label" Text="Lock the vault after" />
                   <TextBlock Classes="caption"
-                             Text="Counted from the last key or click. A machine that sleeps for longer than this wakes locked. Ctrl+L locks now." />
+                             Text="{x:Static app:ShortcutText.IdleLock}" />
                 </StackPanel>
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding IdleChoices}"

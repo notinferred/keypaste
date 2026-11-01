@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Keypaste.App.App">
+             x:Class="Keypaste.App.App"
+             Name="keypaste">
 
   <!-- Both palettes are first-class (BRAND). With no ~/.keypaste/app.toml the app follows the
        system's light or dark setting, as it changes (AppSettings.Default); Settings' Light or Dark

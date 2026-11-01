@@ -41,7 +41,10 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp -R "$payload"/. "$app/Contents/MacOS/"
 mv "$app/Contents/MacOS/LICENSE" "$app/Contents/MacOS/THIRD_PARTY_NOTICES.md" "$app/Contents/Resources/"
 cp "$ROOT/packaging/macos/keypaste.icns" "$ROOT/packaging/macos/keypaste-launch.command" "$app/Contents/Resources/"
-sed "s/{version}/$bundle_version/g" "$ROOT/packaging/macos/Info.plist" > "$app/Contents/Info.plist"
+# The copyright the assemblies carry, from Directory.Build.props, so About keypaste and Finder say the same.
+copyright=$(sed -n 's:.*<Copyright>\(.*\)</Copyright>.*:\1:p' "$ROOT/Directory.Build.props")
+[ -n "$copyright" ] || die 'Directory.Build.props names no Copyright'
+sed -e "s/{version}/$bundle_version/g" -e "s/{copyright}/$copyright/g" "$ROOT/packaging/macos/Info.plist" > "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >&2
 # The runtime pack's files arrive 0744, and only a Mach-O executable and the launcher Terminal runs need an exec bit.
 find "$app" -type d -exec chmod 755 {} +

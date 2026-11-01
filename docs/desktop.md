@@ -138,16 +138,26 @@ Switching windows leaves the vault unlocked and its idle countdown running, and 
 
 Locking disposes the desktop vault session and clears its visible entry state. You type your password again to reopen it, except on Windows, in source, after a lock you made, the idle lock, minimize-lock or closing into the tray: once Windows Hello kept your last unlock with the master password, which it asks to do after each, the unlock screen offers Unlock with Windows Hello above the password, and a YubiKey vault asks for its touch again. `keypaste lock`, opening another vault, a changed password or keyfile and quitting need the master password ([SECURITY](../SECURITY.md#what-unlocks-a-vault)). In source, every lock and quitting also deny an agent's request still waiting at the app and clear the grants agents were given, and a request that arrives after the machine slept past the timeout locks the app and is refused. An agent's requests never count as activity. Values already delivered to a client are not recalled. This does not lock a separate terminal approver or erase immutable strings and external copies; see [SECURITY](../SECURITY.md) for memory and clipboard limits.
 
-## Keyboard
+## Keyboard and menus
 
-The app provides these shortcuts and focus navigation. Verify the full keyboard-only journey on each native platform using the checklist below; logic tests alone do not establish accessibility. When a vault is selected, the unlock field accepts the password followed by Enter.
+Every command is in the menus: the menu bar on macOS, with keypaste, File, Edit, View, Window and Help, and a Dock menu with Lock and Open vault…; on Windows and Linux the same menus open from the menu button at the window's top left. The app provides these shortcuts and focus navigation. Verify the full keyboard-only journey on each native platform using the checklist below; logic tests alone do not establish accessibility. When a vault is selected, the unlock field accepts the password followed by Enter.
 
 | | |
 |---|---|
 | `Ctrl/Cmd+1` … `4` | Items, Agents, Trash, Settings |
-| `Ctrl/Cmd+K` | The titlebar search, which filters Items |
-| `Ctrl/Cmd+O` | Open a vault, on the unlock screen |
+| `Ctrl/Cmd+,` | Settings |
+| `Ctrl/Cmd+N` | New item |
+| `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | The titlebar search, which filters Items; `Option+Cmd+F` too on macOS |
+| `Ctrl/Cmd+O` | Open a vault; with one open, it locks first |
 | `Ctrl/Cmd+L` | Lock now |
+| `Ctrl/Cmd+W` | Close the window, which locks the vault and leaves the app in the menu bar or tray, or quits where that is off |
+| `Ctrl/Cmd+Q` | Quit |
+| `Ctrl/Cmd+C` | Outside a text field, copy the chosen item's password |
+| `Delete`, `Cmd+Delete` on macOS | Outside a text field, delete the chosen item, after asking |
+| `Ctrl/Cmd+Z` | Outside a text field, put back the item just deleted |
+| `Ctrl/Cmd+M` | Minimize |
+| `F11`, `Ctrl+Cmd+F` on macOS | Full screen |
+| `Cmd+H`, `Option+Cmd+H` | On macOS, hide keypaste or the other apps |
 | `Tab` / `Shift+Tab` | Move between controls |
 | `↑` `↓` | Move within the sidebar or the recent list |
 | `Enter` | Unlock |

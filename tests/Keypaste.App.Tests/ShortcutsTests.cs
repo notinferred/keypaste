@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Tests;
@@ -85,6 +86,47 @@ public sealed class ShortcutsTests : IDisposable
 
         Assert.Equal(1, picker.ExistingCalls);
         Assert.Single(reached);
+        window.Close();
+    });
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public Task A_chord_runs_its_command_under_its_platforms_key_and_not_the_other(bool mac) => HeadlessSession.On(() =>
+    {
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, _session.TryUnlock(_vault.Path_, master.Value));
+        }
+
+        using var shell = new ShellViewModel(_session, _vault.Home, null, clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker());
+        var window = new Window();
+        var commands = new AppCommands(new AppCommandHost { Session = _session, Shell = () => shell, Unlock = () => null, Window = () => window }, mac);
+        using var shortcuts = new Shortcuts(window, commands);
+        var reached = Reached(window);
+        window.Show();
+        var searched = 0;
+        shell.SearchFocusRequested += (_, _) => searched++;
+        var key = mac ? RawInputModifiers.Meta : RawInputModifiers.Control;
+        var other = mac ? RawInputModifiers.Control : RawInputModifiers.Meta;
+
+        window.KeyPressQwerty(PhysicalKey.K, other);
+        window.KeyPressQwerty(PhysicalKey.Comma, other);
+
+        Assert.Equal([Key.K, Key.OemComma], reached);
+        Assert.Equal(0, searched);
+        Assert.Equal(DestinationKind.Entries, shell.Current.Kind);
+
+        window.KeyPressQwerty(PhysicalKey.K, key);
+        window.KeyPressQwerty(PhysicalKey.F, key);
+        Assert.Equal(2, searched);
+
+        window.KeyPressQwerty(PhysicalKey.Digit3, key);
+        Assert.Equal(DestinationKind.Trash, shell.Current.Kind);
+
+        window.KeyPressQwerty(PhysicalKey.Comma, key);
+        Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
+        Assert.Equal(2, reached.Count);
         window.Close();
     });
 

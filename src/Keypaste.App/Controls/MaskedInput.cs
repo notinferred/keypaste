@@ -177,8 +177,8 @@ internal sealed class MaskedInput : TemplatedControl
 
         switch (e.Key)
         {
-            case Key.V when AllowsPaste && e.KeyModifiers == CommandModifier() && PasteTarget() is { } paste:
-                PasteCompleted = paste();
+            case Key.V when e.KeyModifiers == CommandModifier() && CanPaste:
+                Paste();
                 e.Handled = true;
                 break;
 
@@ -204,6 +204,18 @@ internal sealed class MaskedInput : TemplatedControl
         }
 
         base.OnKeyDown(e);
+    }
+
+    /// <summary>Whether the paste gesture would paste here.</summary>
+    internal bool CanPaste => AllowsPaste && PasteTarget() is not null;
+
+    /// <summary>Pastes as the paste gesture does, for the Edit menu, which takes that gesture on macOS before the field sees it.</summary>
+    internal void Paste()
+    {
+        if (AllowsPaste && PasteTarget() is { } paste)
+        {
+            PasteCompleted = paste();
+        }
     }
 
     private Func<Task>? PasteTarget() => Sink is { } sink ? sink.Paste : Pasting;

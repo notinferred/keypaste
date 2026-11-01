@@ -40,6 +40,10 @@ internal sealed partial class App : Application, IDisposable
     private MinimizeLock? _minimize;
     private ActivityWatch? _activity;
     private Shortcuts? _shortcuts;
+    private AppCommands? _commands;
+    private NativeMenu? _appMenu;
+    private AboutWindow? _about;
+    private Action<UnlockViewModel>? _afterLock;
     private MainWindow? _window;
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
@@ -57,7 +61,17 @@ internal sealed partial class App : Application, IDisposable
     private Core.Settings.AppTheme _theme = Core.Settings.AppTheme.System;
     private PlatformThemeVariant _platformTheme = PlatformThemeVariant.Dark;
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+
+        // macOS reads the app menu once, as the platform starts and before Launch, so it is made here and filled there (Q.2).
+        if (OperatingSystem.IsMacOS())
+        {
+            _appMenu = new NativeMenu();
+            NativeMenu.SetMenu(this, _appMenu);
+        }
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -105,13 +119,24 @@ internal sealed partial class App : Application, IDisposable
 
         _window = new MainWindow();
         _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
-        _shortcuts = Bind(_window, _session, () => _firstRun is null ? _unlock : null, () => _shell);
+        _commands = Commands(_window, _session, home);
+        _shortcuts = new Shortcuts(_window, _commands);
         _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
 
-        // A Mac user looks for an import under File (D-0374); elsewhere it is on Items' "+".
-        if (OperatingSystem.IsMacOS())
+        // The menus (Q.2): the menu bar and the Dock's on macOS, the titlebar's menu button elsewhere.
+        if (_commands.Mac)
         {
-            NativeMenu.SetMenu(_window, AppMenu.Build(() => _shell));
+            NativeMenu.SetMenu(_window, AppMenu.Bar(_commands));
+            NativeDock.SetMenu(this, AppMenu.Native(_commands.Dock));
+
+            if (_appMenu is { Items.Count: 0 })
+            {
+                AppMenu.Fill(_appMenu, _commands.AppMenu);
+            }
+        }
+        else
+        {
+            _window.UseMenuButton(AppMenu.Flyout(_commands));
         }
 
         // While locked, the app that holds its home tells the person once that an agent asked for a vault it would open (D-0466).
@@ -156,6 +181,9 @@ internal sealed partial class App : Application, IDisposable
         desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
         desktop.ShutdownRequested += OnShutdownRequested;
     }
+
+    /// <summary>The commands of the menus and the window's chords, as <see cref="Launch"/> composed them.</summary>
+    internal AppCommands? Menus => _commands;
 
     /// <summary>The authority <see cref="Launch"/> composed, or null before it or after quitting.</summary>
     internal AppAuthority? Authority => _authority;
@@ -287,6 +315,62 @@ internal sealed partial class App : Application, IDisposable
 
         e.Cancel = true;
         CloseToTray();
+    }
+
+    private AppCommands Commands(MainWindow window, AppVaultSession session, string? home)
+    {
+        var mac = OperatingSystem.IsMacOS();
+
+        return new AppCommands(new AppCommandHost
+        {
+            Session = session,
+            Shell = () => _shell,
+            Unlock = () => _firstRun is null ? _unlock : null,
+            Window = () => _window,
+            Focused = mac ? null : () => window.EditTarget,
+            Home = home,
+            About = ShowAbout,
+            Quit = Quit,
+            OpenAnother = OpenAnother,
+            OpenWindow = OpenWindow,
+            ShowPrompt = () => _authority?.ShowPrompt() == true,
+            OpenWeb = OpenWeb,
+            Hide = mac ? MacDock.Hide : null,
+            HideOthers = mac ? MacDock.HideOthers : null,
+            ShowAll = mac ? MacDock.ShowAll : null,
+        });
+    }
+
+    private void ShowAbout()
+    {
+        if (_about is { } open)
+        {
+            open.Activate();
+            return;
+        }
+
+        _about = new AboutWindow();
+        _about.Closed += (_, _) => _about = null;
+        _about.Show();
+    }
+
+    private void OpenWeb(Uri address)
+    {
+        if (_window is null)
+        {
+            return;
+        }
+
+#pragma warning disable RS0030 // Help's own pages, which the person asked to open from the Help menu.
+        _ = WebLaunchers(_window).OpenAsync(address);
+#pragma warning restore RS0030
+    }
+
+    /// <summary>File › Open vault… or Open recent with a vault open: locks it, then picks or offers the file on the unlock screen.</summary>
+    private void OpenAnother(string? path)
+    {
+        _afterLock = path is null ? unlock => unlock.BrowseCommand.Press() : unlock => _ = unlock.Offer(path);
+        _ = _session?.LockAsync(VaultLockReason.Manual);
     }
 
     private void Quit()
@@ -647,6 +731,14 @@ internal sealed partial class App : Application, IDisposable
         if (_firstRun is null)
         {
             ShowUnlockScreen();
+
+            var then = _afterLock;
+            _afterLock = null;
+
+            if (then is not null && _unlock is { } unlock)
+            {
+                then(unlock);
+            }
         }
     }
 

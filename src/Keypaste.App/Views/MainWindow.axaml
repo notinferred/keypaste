@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="using:Keypaste.App.Views"
+        xmlns:ctl="using:Keypaste.App.Controls"
         x:Class="Keypaste.App.Views.MainWindow"
         Title="keypaste"
         Icon="avares://keypaste-app/Assets/keypaste.ico"
@@ -25,6 +26,20 @@
             VerticalAlignment="Top"
             Background="Transparent"
             WindowDecorationProperties.ElementRole="TitleBar" />
+
+    <!-- Windows and Linux have no menu bar, so the menus open from here, over the titlebar's empty first column
+         and the drag strip alike (Q.2); macOS draws its traffic lights where this would sit. -->
+    <Button Name="MenuButton"
+            Classes="icon ghost sm"
+            IsVisible="False"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Margin="8,6,0,0"
+            ToolTip.Tip="Menu"
+            AutomationProperties.Name="Menu"
+            WindowDecorationProperties.ElementRole="User">
+      <ctl:KpIcon Icon="menu" Size="16" />
+    </Button>
   </Panel>
 
 </Window>

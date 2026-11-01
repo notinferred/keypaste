@@ -1,0 +1,33 @@
+# Q.2 — The app's menus and the standard shortcuts
+
+Completed 2026-11-01 at `9a039b01` on `q2-menus`, source only; runs ci 41303419674 and app 41303427495 at that commit. The integrated commit differs from `9a039b01` only in this record.
+
+## What changed
+
+- **One table of commands** (`AppCommands.cs`): each command's label, its chords on macOS and elsewhere, when it can run and what it does, written once. `AppMenu` draws it as the macOS menu bar, app menu and Dock menu, and as the menu button's flyout on Windows and Linux; `Shortcuts` runs its chords, matched on the key and exactly its modifiers, which keeps Q.1's AltGr rule.
+- **The menus**: keypaste (About keypaste, Settings… ⌘,, Hide keypaste, Hide others ⌥⌘H, Show all, Quit keypaste ⌘Q), File (New item ⌘N, New group, Open vault… ⌘O, Open recent with Clear menu, Close window ⌘W, Lock ⌘L, Import from another app…, Import .env…, Export…), Edit (Undo, Redo, Cut, Copy, Paste, Select all, Delete, Find ⌘F with ⌥⌘F and ⌘K), View (the four places ⌘1 to ⌘4, Enter full screen ⌃⌘F, F11 elsewhere), Window (Minimize ⌘M, Zoom, Bring all to front) and Help (keypaste help, Report a problem). Every command but Lock, Quit, About, Help and the Window ones is off behind the import, share and YubiKey-touch dialogs, as the chords were.
+- **macOS takes a menu item's chord before any control sees it**, as Avalonia 12.1's source and AppKit's key-equivalent order show, so the Edit commands act on the focused control and are on only while it can act: a TextBox's own Cut, Copy, Paste, Select all, Undo and Redo, asking `CanCopy` and `CanCut` first, which refuse a password character; a masked field's paste through its own path, now `MaskedInput.Paste`, which its key handler also calls; and, outside a text field, Copy, Delete and Undo on Items' chosen item: its password through the clearing countdown, the delete confirmation and the last delete put back. On Windows and Linux the window's chords reach the same item commands, and a field keeps its own keys.
+- **Avalonia's own app menu is off** (`DisableDefaultApplicationMenuItems`), so Hide, Hide others and Show all call AppKit through `MacDock`, Quit is the app's own quit, and `App.axaml` names the app keypaste. The app menu is made in `App.Initialize`, which macOS reads before launch, and filled at launch.
+- **Windows and Linux** get a 28px ghost menu button with Lucide's `menu` icon at the window's top left, over the titlebar's empty first column and the drag strip, opening keypaste, File, Edit, View, Window and Help; it shows each chord without binding it, and Edit acts on the control focused before the menu opened (`MainWindow.EditTarget`).
+- **About keypaste** is a card of the prompts' kind: the icon, the name, `CoreInfo.Version`, the copyright the assemblies carry and the licence. `Info.plist` gains `NSHumanReadableCopyright`, filled from `Directory.Build.props` by `build-macos-app.sh`.
+- **Copy that names a chord** says the platform's key (`ShortcutText`): Settings' idle-lock caption and the masked fields' paste captions read ⌘ on macOS and Ctrl elsewhere.
+- The desktop guide's Keyboard section and the design handoff's titlebar and menus say the same.
+
+Choices settled in the step, each reversible:
+- **No Services submenu**: Avalonia offers it only inside its own app menu, which also named Quit without the app and put Hide others on ⌥⌘Q.
+- **Open vault… and Open recent with a vault open lock it first**, then pick or offer the file on the unlock screen, as keeping an imported file in place already did.
+- **No "Show the waiting prompt" item**: nothing tells whether a prompt waits without bringing it forward, so Bring all to front opens the window and brings a waiting prompt forward through its disarming path (D-0456).
+- The row's Items keys on Windows and Linux go through the command table's chords rather than `EntriesView`'s key handler.
+- Changing place from a menu drops drafts as the sidebar does; Q.4 keeps them.
+
+## Evidence
+
+- `AppCommandsTests` (8), `AppMenuTests` (3) and `ShortcutsTests` (4): each platform's menus, labels and chords, no Windows chord holding Alt; each command's result, among them Settings…, New item, the places, Find, Open vault… with a vault open, Bring all to front and Lock; the vault commands off while locked and behind the import dialog; Copy, Delete and Undo on a chosen item; a password TextBox refusing Copy and Cut; a paste into the master-password field pasting once with nothing in the automation tree; Open recent naming the vault, offering it and clearing; About naming keypaste, the version and the copyright; the macOS bar's and the flyout's items running their commands and showing their chords; the Dock menu; each chord running under its platform's key and not the other's.
+- On the founder's Mac (macOS 26.6, arm64): `verify.sh test` passed those classes with `AppTrayTests`, `ShellImportTests`, `FourPlacesJourneyTests`, `ClosingTheMainWindowTests`, `UnlockOpenShortcutTests`, `MaskedInputAutomationTests` and `Keypaste.Core.Tests.BanExemptionsTests`, 71 tests, and `verify.sh compile` passed.
+- CI at `9a039b01`, which also carries Q.1: ci 41303419674 passed every job, and app 41303427495 passed every job but `keepassxc first run (macos-15)`, which failed as F.74 does: KeePassXC exited before opening the vaults after Qt's font message, this time with no `Trace/BPT trap` line in the log.
+- The founder started the built app from source on a throwaway `KEYPASTE_HOME` and found the menu bar right. A paste into a masked field pasting once on a real Mac was not checked separately; the headless test pastes once, and Avalonia's source shows the menu and the field never both receive one chord.
+
+## Limits and follow-ups
+
+- AppKit may add its own Enter Full Screen to View on some macOS versions; the founder saw no problem on 26.6.
+- The founder's check found, outside this step: two items with one name cannot be opened (F.75), an unlock that needs a key file or YubiKey only says the password failed (Q.6), and a password generator on its own and for a field is wanted (V.12); the sidebar's wordmark taking room in the unlocked app is in BACKLOG.

@@ -872,6 +872,13 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             "This vault opens with the master password that backup was made under.";
     }
 
+    /// <summary>Forgets every vault, as File › Open recent › Clear menu asks.</summary>
+    internal void ForgetAll()
+    {
+        RecentVaults.Save(KeypasteHome.RecentPath(_home), []);
+        Reload();
+    }
+
     /// <summary>Forgets one vault and rewrites the list.</summary>
     internal void Forget(string path)
     {

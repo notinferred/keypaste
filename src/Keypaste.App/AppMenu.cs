@@ -1,36 +1,168 @@
 using Avalonia.Controls;
-using Keypaste.App.ViewModels;
 
 namespace Keypaste.App;
 
-/// <summary>The macOS menu bar's File menu, where a Mac user looks for an import (N.1a1).</summary>
+/// <summary>
+/// Draws <see cref="AppCommands"/> as the macOS menu bar and Dock menu, or as the menu button's flyout on Windows and
+/// Linux (Q.2).
+/// </summary>
 /// <remarks>
-/// Built from the shell of the moment rather than one captured at launch, because a lock disposes
-/// the shell and an unlock builds another. With no shell, or while a dialog is open, the item is off.
+/// Each item's command asks its <see cref="AppCommand.CanRun"/> again just before macOS shows a menu or matches a
+/// chord against it, and before the flyout opens, so an item is on exactly while its command can run.
 /// </remarks>
 internal static class AppMenu
 {
-    internal const string ImportHeader = "Import from another app…";
-
-    internal static NativeMenu Build(Func<ShellViewModel?> shell)
+    /// <summary>Fills a menu in place: the macOS app menu, which Avalonia reads once at start, is made empty early and filled here.</summary>
+    internal static void Fill(NativeMenu menu, IReadOnlyList<AppMenuEntry> entries)
     {
-        ArgumentNullException.ThrowIfNull(shell);
+        ArgumentNullException.ThrowIfNull(menu);
+        ArgumentNullException.ThrowIfNull(entries);
 
-        var import = new NativeMenuItem(ImportHeader)
+        foreach (var item in NativeItems(entries))
         {
-            Command = new RelayCommand(() => shell()?.ImportCommand.Press()),
-        };
+            menu.Add(item);
+        }
 
-        var file = new NativeMenu();
-        file.Add(import);
-        file.NeedsUpdate += (_, _) => import.IsEnabled = CanImport(shell());
-        import.IsEnabled = CanImport(shell());
+        menu.NeedsUpdate += (_, _) => Refresh(menu);
+    }
+
+    /// <summary>A menu of <paramref name="entries"/>, as the Dock's.</summary>
+    internal static NativeMenu Native(IReadOnlyList<AppMenuEntry> entries)
+    {
+        var menu = new NativeMenu();
+        Fill(menu, entries);
+        return menu;
+    }
+
+    /// <summary>The main window's menus on macOS: File, Edit, View, Window and Help, after the app menu.</summary>
+    internal static NativeMenu Bar(AppCommands commands)
+    {
+        ArgumentNullException.ThrowIfNull(commands);
 
         var bar = new NativeMenu();
-        bar.Add(new NativeMenuItem("File") { Menu = file });
+
+        foreach (var group in commands.Menus)
+        {
+            bar.Add(new NativeMenuItem(group.Header) { Menu = Native(group.Entries) });
+        }
+
         return bar;
     }
 
-    internal static bool CanImport(ShellViewModel? shell) =>
-        shell is { HasShare: false } && shell.ImportCommand.CanExecute(null);
+    /// <summary>The menu button's flyout on Windows and Linux: keypaste, then File, Edit, View, Window and Help.</summary>
+    /// <remarks>A chord is shown, never bound: the window's chords already run it.</remarks>
+    internal static MenuFlyout Flyout(AppCommands commands)
+    {
+        ArgumentNullException.ThrowIfNull(commands);
+
+        var made = new List<RelayCommand>();
+        var flyout = new MenuFlyout();
+        flyout.Items.Add(Group("keypaste", commands.AppMenu, made));
+
+        foreach (var group in commands.Menus)
+        {
+            flyout.Items.Add(Group(group.Header, group.Entries, made));
+        }
+
+        flyout.Opening += (_, _) => made.ForEach(command => command.NotifyCanExecuteChanged());
+        return flyout;
+    }
+
+    private static IEnumerable<NativeMenuItemBase> NativeItems(IReadOnlyList<AppMenuEntry> entries) =>
+        entries.Select(entry => entry switch
+        {
+            AppCommand command => new NativeMenuItem(command.Header)
+            {
+                Command = new RelayCommand(command.Run, command.CanRun),
+                Gesture = command.Shown,
+            },
+            AppSubmenu submenu => NativeSubmenu(submenu),
+            _ => (NativeMenuItemBase)new NativeMenuItemSeparator(),
+        });
+
+    // Its entries are read again as it is about to show, so Open recent lists what recent.toml holds now.
+    private static NativeMenuItem NativeSubmenu(AppSubmenu submenu)
+    {
+        var menu = new NativeMenu();
+        IReadOnlyList<string> shown = [];
+
+        void Read()
+        {
+            var entries = submenu.Entries();
+            var headers = entries.Select(Header).ToList();
+
+            if (!headers.SequenceEqual(shown))
+            {
+                menu.Items.Clear();
+
+                foreach (var item in NativeItems(entries))
+                {
+                    menu.Add(item);
+                }
+
+                shown = headers;
+            }
+
+            Refresh(menu);
+        }
+
+        Read();
+        menu.NeedsUpdate += (_, _) => Read();
+        return new NativeMenuItem(submenu.Header) { Menu = menu };
+    }
+
+    private static void Refresh(NativeMenu menu)
+    {
+        foreach (var item in menu.Items.OfType<NativeMenuItem>())
+        {
+            (item.Command as RelayCommand)?.NotifyCanExecuteChanged();
+        }
+    }
+
+    private static MenuItem Group(string header, IReadOnlyList<AppMenuEntry> entries, List<RelayCommand> made)
+    {
+        var group = new MenuItem { Header = header };
+        AddItems(group, entries, made);
+        return group;
+    }
+
+    private static void AddItems(MenuItem parent, IReadOnlyList<AppMenuEntry> entries, List<RelayCommand> made)
+    {
+        foreach (var entry in entries)
+        {
+            parent.Items.Add(entry switch
+            {
+                AppCommand command => Item(command, made),
+                AppSubmenu submenu => Submenu(submenu, made),
+                _ => new Separator(),
+            });
+        }
+    }
+
+    private static MenuItem Item(AppCommand command, List<RelayCommand> made)
+    {
+        var relay = new RelayCommand(command.Run, command.CanRun);
+        made.Add(relay);
+        return new MenuItem { Header = command.Header, Command = relay, InputGesture = command.Shown };
+    }
+
+    private static MenuItem Submenu(AppSubmenu submenu, List<RelayCommand> made)
+    {
+        var item = new MenuItem { Header = submenu.Header };
+        AddItems(item, submenu.Entries(), made);
+        item.SubmenuOpened += (_, _) =>
+        {
+            item.Items.Clear();
+            AddItems(item, submenu.Entries(), made);
+        };
+
+        return item;
+    }
+
+    private static string Header(AppMenuEntry entry) => entry switch
+    {
+        AppCommand command => command.Header,
+        AppSubmenu submenu => submenu.Header,
+        _ => "-",
+    };
 }

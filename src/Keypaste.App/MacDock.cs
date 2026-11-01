@@ -2,7 +2,10 @@ using System.Runtime.InteropServices;
 
 namespace Keypaste.App;
 
-/// <summary>Gives the app its Dock icon on macOS only while its window is open (D-0385).</summary>
+/// <summary>
+/// Gives the app its Dock icon on macOS only while its window is open (D-0385), and answers the app menu's Hide
+/// keypaste, Hide others and Show all, which Avalonia offers no call for once its own app menu is off (Q.2).
+/// </summary>
 /// <remarks>
 /// Avalonia sets the activation policy once, at start; this changes it while the app runs. A regular app has a Dock
 /// icon and its own menu bar, an accessory app has neither and keeps its windows and its menu bar icon.
@@ -30,6 +33,26 @@ internal static class MacDock
         if (shown)
         {
             _ = Send(app, Selector("activateIgnoringOtherApps:\0"u8.ToArray()), 1);
+        }
+    }
+
+    /// <summary>Hides the app's windows, as Hide keypaste does.</summary>
+    internal static void Hide() => Tell("hide:\0"u8.ToArray());
+
+    /// <summary>Hides every other app's windows, as Hide others does.</summary>
+    internal static void HideOthers() => Tell("hideOtherApplications:\0"u8.ToArray());
+
+    /// <summary>Shows every app's hidden windows again, as Show all does.</summary>
+    internal static void ShowAll() => Tell("unhideAllApplications:\0"u8.ToArray());
+
+    // Each takes a sender, which AppKit lets be nil.
+    private static void Tell(byte[] selector)
+    {
+        var app = Send(GetClass("NSApplication\0"u8.ToArray()), Selector("sharedApplication\0"u8.ToArray()));
+
+        if (app != IntPtr.Zero)
+        {
+            _ = Send(app, Selector(selector), 0);
         }
     }
 
