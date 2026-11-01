@@ -91,11 +91,12 @@ quit_app() {
 # The reports waiting in home $1, one file a line.
 waiting() { find "$1/crash-reports" -name '*.json' -type f 2>/dev/null | sort; }
 
-# What each report waiting in home $1 is, for a count that came out wrong: its file, kind and site.
+# What each report waiting in home $1 is, for a count that came out wrong: its file, kind, site, screen and the
+# exception's types and frames, which the scrubber leaves with no message, path or value.
 kinds() {
   local file
   waiting "$1" | while read -r file; do
-    printf '%s %s\n' "${file##*/}" "$(jq -c '{kind, site}' "$file" 2>/dev/null)"
+    printf '%s %s\n' "${file##*/}" "$(jq -c '{kind, site, screen, exception}' "$file" 2>/dev/null)"
   done
 }
 
