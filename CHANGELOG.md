@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app generates a password where it goes: New item opens with one in its password field, ready to copy before you create the item, and Generate beside every password and protected field, in the forms and on an item, puts a new one there, with the old value kept in the item's history once you save. Generate password…, in File and Items' New menu, makes one on its own to copy, to start a new item with or to add to the chosen item as a field ([V.12](docs/steps/V.12.md)).
+
 The desktop app has menus: on macOS a full menu bar, keypaste, File, Edit, View, Window and Help, with About keypaste, Settings… on ⌘, and a Dock menu, and on Windows and Linux the same menus from a button at the window's top left. The standard shortcuts work, among them ⌘N or Ctrl+N for a new item, ⌘F or Ctrl+F to search, ⌘W or Ctrl+W to close the window and ⌘Q or Ctrl+Q to quit, and outside a text field ⌘C or Ctrl+C copies the chosen item's password ([Q.2](docs/steps/Q.2.md)).
 
 The desktop app's shortcuts now take Ctrl alone, or ⌘ alone on macOS, so typing a character with AltGr on Windows, such as "ł" on a Polish keyboard, no longer locks the vault, opens the file picker or changes place ([Q.1](docs/steps/Q.1.md)).

@@ -450,6 +450,10 @@
       <views:ShareDialogView DataContext="{Binding Share}" />
     </Border>
 
+    <Border Classes="backdrop" IsVisible="{Binding HasGeneratorDialog}" Padding="24">
+      <views:GeneratePasswordView DataContext="{Binding GeneratorDialog}" />
+    </Border>
+
     <!-- The import dialogs, modal over the whole window: a KeePass database's, or another app's export's. -->
     <Border Classes="backdrop" IsVisible="{Binding HasKdbxImport}" Padding="24">
       <views:KdbxImportView DataContext="{Binding Import}" />

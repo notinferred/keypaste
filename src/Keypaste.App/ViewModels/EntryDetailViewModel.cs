@@ -35,6 +35,7 @@ namespace Keypaste.App.ViewModels;
 /// </remarks>
 internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
 {
+    private SecretField? _generatedInto;
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
     private readonly Action<EntryName> _restored;
@@ -88,6 +89,15 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         CancelAddFieldCommand = new RelayCommand(CancelAddField, () => IsAddingField);
         ConfirmReplaceFieldCommand = new RelayCommand(ConfirmReplaceField, () => ReplacingField is not null);
         CancelReplaceFieldCommand = new RelayCommand(() => ReplacingField = null, () => ReplacingField is not null);
+        GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
+        GeneratePasswordCommand = new RelayCommand(GeneratePassword, () => !IsEditing);
+        Generator.PropertyChanged += (_, _) =>
+        {
+            if (_generatedInto is { IsGenerated: true } field)
+            {
+                GenerateInto(field);
+            }
+        };
         ConfirmRemoveFieldCommand = new RelayCommand(ConfirmRemoveField, () => RemovingField is not null);
         CancelRemoveFieldCommand = new RelayCommand(() => RemovingField = null, () => RemovingField is not null);
         ConfirmRenameFieldCommand = new RelayCommand(ConfirmRenameField, () => RenamingField is not null && DraftFieldRename.Trim().Length > 0);
@@ -439,6 +449,58 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             ? DisplayTextSanitizer.Sanitize($"{what} {refusal}, so it was not {refused}.").Text + " Edit the item so keypaste can fill it in."
             : $"{what} fills in as empty, so it was not {refused}.");
         return null;
+    }
+
+    /// <summary>What a value generated in the pane's forms is made of (V.12).</summary>
+    internal GeneratorViewModel Generator { get; } = new();
+
+    /// <summary>Generate, beside a form's secret field: a generated value in place of what the field holds.</summary>
+    internal RelayCommand<SecretField> GenerateIntoCommand { get; }
+
+    /// <summary>Generate, on the saved password: Edit fields with a generated password, which Save writes and history keeps the old one of.</summary>
+    internal RelayCommand GeneratePasswordCommand { get; }
+
+    /// <summary>Adds a generated value as a new protected field, as Generate password's Add as a field asks, through Add a field's own write.</summary>
+    internal void AddGeneratedField(string name, SecretField value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        BeginAddField();
+        DraftFieldName = name;
+        NewFieldValue.TakeFrom(value);
+        NewFieldProtected = true;
+        ConfirmAddFieldCommand.Press();
+    }
+
+    /// <summary>Generate, on a protected field: its replace form with a generated value, which Save writes and history keeps the old one of.</summary>
+    internal void GenerateField(EntryFieldRow row)
+    {
+        BeginReplaceField(row);
+        GenerateInto(ReplacementFieldValue);
+    }
+
+    private void GeneratePassword()
+    {
+        BeginEdit();
+        GenerateInto(NewPassword);
+    }
+
+    private void GenerateInto(SecretField? field)
+    {
+        if (field is null)
+        {
+            return;
+        }
+
+        if (Generator.Recipe is { } recipe)
+        {
+            field.Generate(recipe);
+            _generatedInto = field;
+        }
+        else
+        {
+            Report(Generator.Error);
+        }
     }
 
     /// <summary>Opens the form that writes a new value over one field's.</summary>

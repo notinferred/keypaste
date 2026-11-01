@@ -38,6 +38,7 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
 
         CopyValueCommand = new AsyncRelayCommand(CopyAsync);
         ReplaceCommand = new RelayCommand(() => _owner.BeginReplaceField(this), () => !IsReadOnly);
+        GenerateCommand = new RelayCommand(() => _owner.GenerateField(this), () => !IsReadOnly && IsProtected);
         RenameCommand = new RelayCommand(() => _owner.BeginRenameField(this), () => !IsReadOnly);
         ToggleProtectionCommand = new RelayCommand(() => _owner.ToggleProtection(this), () => !IsReadOnly);
         RemoveCommand = new RelayCommand(() => _owner.BeginRemoveField(this), () => !IsReadOnly);
@@ -57,6 +58,9 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
     /// <summary>Whether the field can be changed from here.</summary>
     internal bool IsWritable => !IsReadOnly;
 
+    /// <summary>Whether Generate is offered: on a protected field keypaste may write (V.12).</summary>
+    internal bool CanGenerate => !IsReadOnly && IsProtected;
+
     /// <summary>What the row says about the field beside its name.</summary>
     internal string Kind => IsReadOnly ? "KeePassXC" : IsProtected ? "protected" : "plain";
 
@@ -75,6 +79,9 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
     internal AsyncRelayCommand CopyValueCommand { get; }
 
     internal RelayCommand ReplaceCommand { get; }
+
+    /// <summary>Generate, on a protected field: its replace form with a generated value (V.12).</summary>
+    internal RelayCommand GenerateCommand { get; }
 
     /// <summary>Opens the form that gives the field another name, keeping its value and protection.</summary>
     internal RelayCommand RenameCommand { get; }

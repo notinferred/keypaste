@@ -88,11 +88,6 @@ The founder's check of Q.2 on 2026-11-01 found these, and they gate 1.0.0 (D-068
   - The desktop reaches an item by its group path and title (`EntryRow`, `EntryName`), and `Vault.Find(EntryName)` refuses a name more than one entry answers to, so two items with one title in one group, such as two logins for one site, each show "More than one entry answers to that name" in place of their pane, at every `Find(name)` in `EntriesViewModel` and `EntryDetailViewModel`. KeePass and KeePassXC allow such a pair, and imported vaults often hold one.
   - Rows, the pane and what it does (copy, reveal, history, edit, rename or move, delete), Trash, the agent-access card and Recommendations reach their entry by its KeePass UUID, and a row whose title another row in its group shares shows its username after the title. Agents keep today's rule for a name more than one entry answers to.
   - Accepted when tests over a vault holding two items with one title in one group open, copy, edit, rename, delete and restore each as itself.
-- [ ] **V.12 — Generate a password where it goes, or on its own.** Needs: Q.2.
-  - Today a password is generated only in New item's form, Projects' new-variable form and Rotate. As KeePassXC's dice in its password field does, a generate button beside the password and every protected field, in the item pane and the forms, opens the generator (`GeneratorViewModel`: characters or words, and its length) and puts its value into that field, asking first when the field holds one and keeping the old value in history as Rotate does, so no list of fields to choose from is needed.
-  - Generate password…, in File and Items' New menu, opens the generator on its own: Copy copies through the clearing countdown, New item opens the form with it as the password, and Add as a field adds it to the chosen item as a new protected field named there. It has no chord, since ⌘G is the platform's Find next.
-  - The value stays masked, revealed and copied as every secret is, and nothing generated reaches the automation tree (D-0232).
-  - Accepted when tests generate into an empty and a filled password and protected field, the filled one only after the question and with its old value in history, copy one through the countdown, start New item with one and add one as a field.
 
 ## T3 — AI requests in the app
 

@@ -60,6 +60,50 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
     [ObservableProperty]
     internal partial string Note { get; private set; } = string.Empty;
 
+    /// <summary>Whether the value was generated, so the next key typed or pasted replaces it whole rather than adding to it (V.12).</summary>
+    [ObservableProperty]
+    internal partial bool IsGenerated { get; private set; }
+
+    /// <summary>A key typed or pasted replaced a generated value.</summary>
+    internal event EventHandler? GeneratedValueReplaced;
+
+    /// <summary>Fills the field with a value drawn from <paramref name="recipe"/>, straight into its buffer.</summary>
+    internal void Generate(SecretRecipe recipe)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _buffer.Clear();
+        PasswordGenerator.Append(recipe, _buffer);
+        Note = string.Empty;
+        IsGenerated = true;
+        Changed();
+    }
+
+    /// <summary>Takes <paramref name="source"/>'s value, character by character, as a generated one that is moved to the form that keeps it.</summary>
+    internal void TakeFrom(SecretField source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (_disposed || source._disposed)
+        {
+            return;
+        }
+
+        _buffer.Clear();
+
+        foreach (var character in source._buffer.Value)
+        {
+            _buffer.Append(character);
+        }
+
+        Note = string.Empty;
+        IsGenerated = source.IsGenerated;
+        Changed();
+    }
+
     /// <inheritdoc/>
     public void Type(char value)
     {
@@ -68,6 +112,7 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
             return;
         }
 
+        ReplaceGenerated();
         _buffer.Append(value);
         Changed();
     }
@@ -80,7 +125,11 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
             return;
         }
 
-        _buffer.Backspace();
+        if (!ReplaceGenerated())
+        {
+            _buffer.Backspace();
+        }
+
         Changed();
     }
 
@@ -94,6 +143,7 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
 
         _buffer.Clear();
         Note = string.Empty;
+        IsGenerated = false;
         Changed();
     }
 
@@ -105,6 +155,7 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
             return;
         }
 
+        ReplaceGenerated();
         var outcome = await clipboard.TryPasteIntoAsync(_buffer).ConfigureAwait(true);
 
         if (_disposed)
@@ -152,6 +203,20 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
         OnPropertyChanged(nameof(MaskedLength));
         OnPropertyChanged(nameof(HasValue));
         OnPropertyChanged(nameof(Note));
+    }
+
+    // A generated value is replaced whole by what the person enters, never added to.
+    private bool ReplaceGenerated()
+    {
+        if (!IsGenerated)
+        {
+            return false;
+        }
+
+        _buffer.Clear();
+        IsGenerated = false;
+        GeneratedValueReplaced?.Invoke(this, EventArgs.Empty);
+        return true;
     }
 
     private void Changed()

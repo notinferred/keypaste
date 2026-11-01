@@ -210,7 +210,7 @@ public sealed class ExistingSecretTests : IDisposable
     }
 
     [Fact]
-    public void Turning_generation_back_on_discards_what_was_typed()
+    public void Turning_generation_back_on_replaces_what_was_typed_with_a_generated_password()
     {
         using var context = New();
 
@@ -220,8 +220,9 @@ public sealed class ExistingSecretTests : IDisposable
 
         form.GeneratePassword = true;
 
-        Assert.False(form.Password.HasValue);
-        Assert.True(form.Password.IsZeroed);
+        Assert.True(form.Password.IsGenerated);
+        Assert.Equal(Keypaste.Core.PasswordGenerator.DefaultLength, form.Password.MaskedLength);
+        Assert.DoesNotContain(_typed, form.Password.Compose(), StringComparison.Ordinal);
     }
 
     [Fact]

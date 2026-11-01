@@ -70,6 +70,22 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         NewValue = new SecretField(clipboard);
         ReplacementValue = new SecretField(clipboard);
+        GenerateCommand = new RelayCommand(() => GenerateValue = true);
+        GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
+
+        // A generated value is in its field, where it can be seen and replaced, and follows the choices (V.12).
+        NewValue.GeneratedValueReplaced += (_, _) => SetProperty(ref _generateValue, false, nameof(GenerateValue));
+        Generator.PropertyChanged += (_, _) =>
+        {
+            if (_generateValue && IsAdding)
+            {
+                GenerateInto(NewValue);
+            }
+            else if (ReplacementValue.IsGenerated)
+            {
+                GenerateInto(ReplacementValue);
+            }
+        };
         ConfirmReplaceCommand = new RelayCommand(ConfirmReplace, () => Replacing is not null);
         CancelReplaceCommand = new RelayCommand(CancelReplace, () => Replacing is not null);
         ExportReferencesCommand = new AsyncRelayCommand(ExportReferencesAsync, () => _picker is not null);
@@ -312,10 +328,40 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         get => _generateValue;
         set
         {
-            if (SetProperty(ref _generateValue, value) && value)
+            var changed = SetProperty(ref _generateValue, value);
+
+            if (value && IsAdding)
+            {
+                GenerateInto(NewValue);
+            }
+            else if (!value && changed)
             {
                 NewValue.Clear();
             }
+        }
+    }
+
+    /// <summary>Generate, beside the new value: a generated value in place of what it holds.</summary>
+    internal RelayCommand GenerateCommand { get; }
+
+    /// <summary>Generate, beside a form's value: a generated value in place of what the field holds.</summary>
+    internal RelayCommand<SecretField> GenerateIntoCommand { get; }
+
+    private void GenerateInto(SecretField? field)
+    {
+        if (field is null)
+        {
+            return;
+        }
+
+        if (Generator.Recipe is { } recipe)
+        {
+            field.Generate(recipe);
+        }
+        else
+        {
+            field.Clear();
+            _report(Generator.Error);
         }
     }
 
@@ -812,6 +858,11 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         NewValue.Clear();
         IsAdding = true;
         _report(null);
+
+        if (_generateValue)
+        {
+            GenerateInto(NewValue);
+        }
     }
 
     private void CancelAdd()
@@ -850,24 +901,13 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             return;
         }
 
-        string value;
-
-        if (GenerateValue)
+        if (GenerateValue && Generator.Recipe is null)
         {
-            if (Generator.Recipe is not { } recipe)
-            {
-                _report(Generator.Error ?? string.Empty);
-                return;
-            }
+            _report(Generator.Error ?? string.Empty);
+            return;
+        }
 
-            using var buffer = new SecretBuffer();
-            PasswordGenerator.Append(recipe, buffer);
-            value = new string(buffer.Value);
-        }
-        else
-        {
-            value = NewValue.Compose();
-        }
+        var value = NewValue.Compose();
 
         // Core's rules, not ones written next to this message: keypaste env set refuses the same
         // names and entries for the same reasons, and the two must not drift.

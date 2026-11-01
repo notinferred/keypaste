@@ -205,6 +205,15 @@
                   <TextBlock Text="New group" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
+              <Button x:Name="NewGeneratedPassword"
+                      Classes="ghost menu-item"
+                      Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).OpenGeneratorCommand, FallbackValue={x:Null}}"
+                      AutomationProperties.Name="Generate password">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <ctl:KpIcon Icon="wand-2" Size="14" />
+                  <TextBlock Text="Generate password…" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
               <Button x:Name="NewProject"
                       Classes="ghost menu-item"
                       Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).NewProjectCommand, FallbackValue={x:Null}}"
@@ -540,41 +549,29 @@
 
               <StackPanel Spacing="10" IsVisible="{Binding ShowsPassword}">
                 <TextBlock Classes="label" Text="Password" />
-                <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
-                <StackPanel Spacing="10" IsVisible="{Binding GeneratePassword}">
-                  <Border Classes="segmented inset">
-                    <StackPanel Orientation="Horizontal">
-                      <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
-                      <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
-                    </StackPanel>
-                  </Border>
-                  <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Generator.UseWords}">
-                    <NumericUpDown Width="104"
-                                   Minimum="{Binding Generator.MinimumWords}"
-                                   Maximum="{Binding Generator.MaximumWords}"
-                                   Increment="1"
-                                   FormatString="0"
-                                   Value="{Binding Generator.WordCount}" />
-                    <TextBox Width="44"
-                             MaxLength="1"
-                             Classes="mono"
-                             ToolTip.Tip="Separator"
-                             Text="{Binding Generator.Separator}" />
-                  </StackPanel>
-                  <TextBlock Classes="mono muted" FontSize="12" Text="{Binding Generator.Strength}" />
-                  <TextBlock Classes="caption"
-                             IsVisible="{Binding Generator.UseWords}"
-                             Text="{Binding Generator.Provenance}" />
-                  <TextBlock Classes="caption secondary"
-                             IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
-                             Text="{Binding Generator.Error}" />
-                </StackPanel>
-                <ctl:MaskedInput x:Name="NewEntryPassword"
-                                 IsVisible="{Binding !GeneratePassword}"
-                                 AllowsPaste="True"
-                                 Sink="{Binding Password}"
-                                 MaskedLength="{Binding Password.MaskedLength}"
-                                 Placeholder="Existing password" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <ctl:MaskedInput x:Name="NewEntryPassword"
+                                   Grid.Column="0"
+                                   AllowsPaste="True"
+                                   Sink="{Binding Password}"
+                                   MaskedLength="{Binding Password.MaskedLength}"
+                                   Placeholder="Password" />
+                  <Button x:Name="NewEntryGenerate"
+                          Grid.Column="1"
+                          Classes="icon ghost"
+                          VerticalAlignment="Center"
+                          Command="{Binding GenerateCommand}"
+                          ToolTip.Tip="Generate a password"
+                          AutomationProperties.Name="Generate a password">
+                    <ctl:KpIcon Icon="wand-2" Size="16" />
+                  </Button>
+                </Grid>
+                <Panel IsVisible="{Binding GeneratePassword}">
+                  <views:GeneratorOptions DataContext="{Binding Generator}" />
+                </Panel>
+                <TextBlock Classes="caption"
+                           IsVisible="{Binding GeneratePassword}"
+                           Text="Generated. Type or paste to use your own instead." />
                 <TextBlock Classes="caption"
                            IsVisible="{Binding !GeneratePassword}"
                            Text="{x:Static app:ShortcutText.PastePassword}" />
@@ -1074,7 +1071,7 @@
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
                       <TextBlock Grid.Column="0" Classes="label" Text="Password" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
                           <!-- Not a TextBlock: its automation peer publishes its text as the element's name.
                                RevealedValue draws the characters itself, only while Reveal is held. -->
                           <ctl:RevealedValue Grid.Column="0"
@@ -1098,6 +1095,18 @@
                               <TextBlock Text="Reveal" VerticalAlignment="Center" />
                             </StackPanel>
                           </ctl:RevealButton>
+                          <!-- Generate opens Edit fields with a generated password; Save writes it and history keeps the old one (V.12). -->
+                          <Button Grid.Column="2"
+                                  x:Name="GeneratePassword"
+                                  Classes="ghost in-field"
+                                  Command="{Binding GeneratePasswordCommand}"
+                                  ToolTip.Tip="Generate a new password"
+                                  AutomationProperties.Name="Generate a new password">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <ctl:KpIcon Icon="wand-2" Size="14" />
+                              <TextBlock Text="Generate" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
                         </Grid>
                       </Border>
                     </Grid>
@@ -1283,6 +1292,13 @@
                                         ToolTip.Tip="Replace the value"
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding ReplaceCommand}" />
+                                <Button Classes="ghost row-action"
+                                        ToolTip.Tip="Generate a new value"
+                                        AutomationProperties.Name="Generate a new value"
+                                        IsVisible="{Binding CanGenerate}"
+                                        Command="{Binding GenerateCommand}">
+                                  <ctl:KpIcon Icon="wand-2" Size="13" />
+                                </Button>
                                 <Button Classes="ghost row-action" Content="Rename" ContentTemplate="{StaticResource FieldRenameGlyph}"
                                         ToolTip.Tip="{Binding RenameLabel}"
                                         AutomationProperties.Name="{Binding RenameLabel}"
@@ -1313,13 +1329,26 @@
                                  PlaceholderText="STRIPE_SECRET_KEY"
                                  Width="320"
                                  HorizontalAlignment="Left" />
-                        <ctl:MaskedInput x:Name="NewFieldValue"
-                                         AllowsPaste="True"
-                                         Width="420"
-                                         HorizontalAlignment="Left"
-                                         Sink="{Binding NewFieldValue}"
-                                         MaskedLength="{Binding NewFieldValue.MaskedLength}"
-                                         Placeholder="Field value" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <ctl:MaskedInput x:Name="NewFieldValue"
+                                           AllowsPaste="True"
+                                           Width="420"
+                                           Sink="{Binding NewFieldValue}"
+                                           MaskedLength="{Binding NewFieldValue.MaskedLength}"
+                                           Placeholder="Field value" />
+                          <Button x:Name="NewFieldGenerate"
+                                Classes="icon ghost"
+                                VerticalAlignment="Center"
+                                Command="{Binding GenerateIntoCommand}"
+                                CommandParameter="{Binding NewFieldValue}"
+                                ToolTip.Tip="Generate a value"
+                                AutomationProperties.Name="Generate a value">
+                          <ctl:KpIcon Icon="wand-2" Size="16" />
+                        </Button>
+                        </StackPanel>
+                        <Panel IsVisible="{Binding NewFieldValue.IsGenerated}">
+                          <views:GeneratorOptions DataContext="{Binding Generator}" />
+                        </Panel>
                         <TextBlock Classes="caption" IsVisible="{Binding NewFieldValue.Note.Length}" Text="{Binding NewFieldValue.Note}" />
                         <ToggleSwitch x:Name="NewFieldProtected"
                                       IsChecked="{Binding NewFieldProtected}"
@@ -1336,13 +1365,26 @@
                     <Border Classes="form" IsVisible="{Binding IsReplacingField}" ctl:ShowInView.OnShow="True">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding ReplaceFieldPrompt}" TextWrapping="Wrap" />
-                        <ctl:MaskedInput x:Name="ReplacementFieldValue"
-                                         AllowsPaste="True"
-                                         Width="420"
-                                         HorizontalAlignment="Left"
-                                         Sink="{Binding ReplacementFieldValue}"
-                                         MaskedLength="{Binding ReplacementFieldValue.MaskedLength}"
-                                         Placeholder="New field value" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <ctl:MaskedInput x:Name="ReplacementFieldValue"
+                                           AllowsPaste="True"
+                                           Width="420"
+                                           Sink="{Binding ReplacementFieldValue}"
+                                           MaskedLength="{Binding ReplacementFieldValue.MaskedLength}"
+                                           Placeholder="New field value" />
+                          <Button x:Name="ReplacementFieldGenerate"
+                                Classes="icon ghost"
+                                VerticalAlignment="Center"
+                                Command="{Binding GenerateIntoCommand}"
+                                CommandParameter="{Binding ReplacementFieldValue}"
+                                ToolTip.Tip="Generate a value"
+                                AutomationProperties.Name="Generate a value">
+                          <ctl:KpIcon Icon="wand-2" Size="16" />
+                        </Button>
+                        </StackPanel>
+                        <Panel IsVisible="{Binding ReplacementFieldValue.IsGenerated}">
+                          <views:GeneratorOptions DataContext="{Binding Generator}" />
+                        </Panel>
                         <TextBlock Classes="caption" IsVisible="{Binding ReplacementFieldValue.Note.Length}" Text="{Binding ReplacementFieldValue.Note}" />
                         <TextBlock Classes="caption" Text="The old value stays in the item's history." />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -1619,11 +1661,27 @@
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Password" />
-                        <ctl:MaskedInput x:Name="ReplacementPassword"
-                                         AllowsPaste="True"
-                                         Sink="{Binding NewPassword}"
-                                         MaskedLength="{Binding NewPassword.MaskedLength}"
-                                         Placeholder="New password" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                          <ctl:MaskedInput x:Name="ReplacementPassword"
+                                           Grid.Column="0"
+                                           AllowsPaste="True"
+                                           Sink="{Binding NewPassword}"
+                                           MaskedLength="{Binding NewPassword.MaskedLength}"
+                                           Placeholder="New password" />
+                          <Button x:Name="ReplacementPasswordGenerate"
+                                  Grid.Column="1"
+                                  Classes="icon ghost"
+                                  VerticalAlignment="Center"
+                                  Command="{Binding GenerateIntoCommand}"
+                                  CommandParameter="{Binding NewPassword}"
+                                  ToolTip.Tip="Generate a password"
+                                  AutomationProperties.Name="Generate a password">
+                            <ctl:KpIcon Icon="wand-2" Size="16" />
+                          </Button>
+                        </Grid>
+                        <Panel IsVisible="{Binding NewPassword.IsGenerated}">
+                          <views:GeneratorOptions DataContext="{Binding Generator}" />
+                        </Panel>
                         <TextBlock Classes="caption" Text="Leave this empty to keep the current password. A replacement keeps the old one in this item's history." TextWrapping="Wrap" />
                         <TextBlock Classes="caption"
                                    IsVisible="{Binding NewPassword.Note.Length}"

@@ -85,6 +85,7 @@ internal sealed class AppCommandHost
 internal sealed class AppCommands
 {
     internal const string ImportHeader = "Import from another app…";
+    internal const string GenerateHeader = "Generate password…";
     internal const string HelpAddress = "https://keypaste.com/docs/";
     internal const string ProblemAddress = "https://github.com/notinferred/keypaste/issues";
 
@@ -122,6 +123,7 @@ internal sealed class AppCommands
         [
             new AppCommand("New item", Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
             new AppCommand("New group", [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press())),
+            new AppCommand(GenerateHeader, [], () => Unmodal() is not null, () => Unmodal()?.OpenGeneratorCommand.Press()),
             _line,
             _openVault,
             new AppSubmenu("Open recent", RecentEntries),
@@ -215,7 +217,7 @@ internal sealed class AppCommands
 
     // The import, share and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
     private ShellViewModel? Unmodal() =>
-        _host.Shell() is { HasImport: false, HasShare: false, IsWaitingForTouch: false } shell ? shell : null;
+        _host.Shell() is { HasImport: false, HasShare: false, HasGeneratorDialog: false, IsWaitingForTouch: false } shell ? shell : null;
 
     private EntriesViewModel? Items() => Unmodal()?.Content as EntriesViewModel;
 

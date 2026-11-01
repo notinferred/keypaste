@@ -944,6 +944,50 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             cancel);
     }
 
+    /// <summary>Generate password…, as a dialog over whatever screen is showing (V.12).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasGeneratorDialog))]
+    internal partial GeneratePasswordViewModel? GeneratorDialog { get; private set; }
+
+    internal bool HasGeneratorDialog => GeneratorDialog is not null;
+
+    [RelayCommand]
+    private void OpenGenerator()
+    {
+        if (_disposed || GeneratorDialog is not null)
+        {
+            return;
+        }
+
+        var detail = (Content as EntriesViewModel)?.Detail;
+        GeneratorDialog = new GeneratePasswordViewModel(
+            Clipboard,
+            NewItemWith,
+            detail is null ? null : (value, name) => detail.AddGeneratedField(name, value),
+            detail?.Name.Title,
+            CloseGenerator);
+    }
+
+    // New item with the generated value as its password, taken character by character into the form's own field.
+    private void NewItemWith(SecretField value)
+    {
+        Current = Destinations.Of(DestinationKind.Entries);
+
+        if (Content is EntriesViewModel items)
+        {
+            items.BeginAddCommand.Press();
+            items.NewItem?.Password.TakeFrom(value);
+        }
+    }
+
+    [RelayCommand]
+    private void CloseGenerator()
+    {
+        var generator = GeneratorDialog;
+        GeneratorDialog = null;
+        generator?.Dispose();
+    }
+
     /// <summary>Opens the share dialog on one entry, over whatever screen is showing.</summary>
     internal void OpenShare(string? path)
     {
@@ -1632,6 +1676,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         Recommendations.Dispose();
         CloseShare();
+        CloseGenerator();
 
         _statusTimer?.Dispose();
         _fileWatch?.Dispose();

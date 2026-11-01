@@ -69,6 +69,18 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         Password = new SecretField(clipboard);
         KeyValue = new SecretField(clipboard);
         AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
+        GenerateCommand = new RelayCommand(Generate);
+
+        // A new item starts with a generated password in its field, where it can be copied before Create (V.12).
+        Password.GeneratedValueReplaced += (_, _) => SetProperty(ref _generatePassword, false, nameof(GeneratePassword));
+        Generator.PropertyChanged += (_, _) =>
+        {
+            if (_generatePassword)
+            {
+                FillPassword();
+            }
+        };
+        FillPassword();
     }
 
     /// <summary>The five things a new item can be.</summary>
@@ -157,22 +169,34 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     internal partial string Notes { get; set; } = string.Empty;
 
-    /// <summary>Whether the password is generated, which it is unless the person has one to enter.</summary>
+    /// <summary>Whether the password field holds a generated password, which it does unless the person enters their own.</summary>
     internal bool GeneratePassword
     {
         get => _generatePassword;
         set
         {
-            if (SetProperty(ref _generatePassword, value) && value)
+            if (!SetProperty(ref _generatePassword, value))
+            {
+                return;
+            }
+
+            if (value)
+            {
+                FillPassword();
+            }
+            else
             {
                 Password.Clear();
             }
         }
     }
 
+    /// <summary>Generate, beside the password: a new generated password, replacing what the field holds.</summary>
+    internal RelayCommand GenerateCommand { get; }
+
     internal GeneratorViewModel Generator { get; } = new();
 
-    /// <summary>A password typed or pasted, while <see cref="GeneratePassword"/> is off.</summary>
+    /// <summary>The password: generated, or typed or pasted once <see cref="GeneratePassword"/> is off.</summary>
     internal SecretField Password { get; }
 
     /// <summary>An API key's value.</summary>
@@ -295,24 +319,40 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     private bool TryNewPassword(out string password)
     {
-        if (!_generatePassword)
-        {
-            // Empty is allowed: KDBX permits an entry with no password.
-            password = Password.Compose();
-            return true;
-        }
-
-        if (Generator.Recipe is not { } recipe)
+        if (_generatePassword && Generator.Recipe is null)
         {
             password = string.Empty;
             Error = Generator.Error;
             return false;
         }
 
-        using var buffer = new SecretBuffer();
-        PasswordGenerator.Append(recipe, buffer);
-        password = new string(buffer.Value);
+        // Empty is allowed: KDBX permits an entry with no password.
+        password = Password.Compose();
         return true;
+    }
+
+    private void Generate()
+    {
+        if (_generatePassword)
+        {
+            FillPassword();
+        }
+        else
+        {
+            GeneratePassword = true;
+        }
+    }
+
+    private void FillPassword()
+    {
+        if (Generator.Recipe is { } recipe)
+        {
+            Password.Generate(recipe);
+        }
+        else
+        {
+            Password.Clear();
+        }
     }
 
     private void AddTag()

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Keypaste.App.Views"
              xmlns:app="using:Keypaste.App"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
@@ -520,38 +521,27 @@
                         </ComboBox.ItemTemplate>
                       </ComboBox>
                     </StackPanel>
-                    <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
-                    <StackPanel Spacing="6" IsVisible="{Binding GenerateValue}">
-                      <StackPanel Orientation="Horizontal" Spacing="12">
-                        <RadioButton GroupName="NewVariableSecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
-                        <RadioButton GroupName="NewVariableSecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
-                        <NumericUpDown Width="104"
-                                       IsVisible="{Binding Generator.UseWords}"
-                                       Minimum="{Binding Generator.MinimumWords}"
-                                       Maximum="{Binding Generator.MaximumWords}"
-                                       Increment="1"
-                                       FormatString="0"
-                                       Value="{Binding Generator.WordCount}" />
-                        <TextBox Width="44"
-                                 MaxLength="1"
-                                 IsVisible="{Binding Generator.UseWords}"
-                                 Text="{Binding Generator.Separator}" />
-                      </StackPanel>
-                      <TextBlock Classes="caption" Text="{Binding Generator.Strength}" />
-                      <TextBlock Classes="caption" IsVisible="{Binding Generator.UseWords}" Text="{Binding Generator.Provenance}" />
-                      <TextBlock Classes="caption"
-                                 IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                 Foreground="{DynamicResource KpTextSecondary}"
-                                 Text="{Binding Generator.Error}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <ctl:MaskedInput x:Name="NewEnvValue"
+                                       AllowsPaste="True"
+                                       Width="420"
+                                       Sink="{Binding NewValue}"
+                                       MaskedLength="{Binding NewValue.MaskedLength}"
+                                       Placeholder="Value" />
+                      <Button x:Name="NewEnvGenerate"
+                              Classes="icon ghost"
+                              VerticalAlignment="Center"
+                              Command="{Binding GenerateCommand}"
+                              ToolTip.Tip="Generate a value"
+                              AutomationProperties.Name="Generate a value">
+                        <ctl:KpIcon Icon="wand-2" Size="16" />
+                      </Button>
                     </StackPanel>
-                    <ctl:MaskedInput x:Name="NewEnvValue"
-                                     IsVisible="{Binding !GenerateValue}"
-                                     AllowsPaste="True"
-                                     Width="420"
-                                     HorizontalAlignment="Left"
-                                     Sink="{Binding NewValue}"
-                                     MaskedLength="{Binding NewValue.MaskedLength}"
-                                     Placeholder="Existing value" />
+                    <Panel IsVisible="{Binding GenerateValue}">
+                      <views:GeneratorOptions DataContext="{Binding Generator}" />
+                    </Panel>
+                    <TextBlock Classes="caption" IsVisible="{Binding GenerateValue}"
+                               Text="Generated. Type or paste to use your own instead." />
                     <TextBlock Classes="caption" IsVisible="{Binding !GenerateValue}"
                                Text="{x:Static app:ShortcutText.Paste}" />
                     <TextBlock Classes="caption" IsVisible="{Binding NewValue.Note.Length}"
@@ -566,13 +556,26 @@
                 <Border Classes="card filled" IsVisible="{Binding IsReplacing}" ctl:ShowInView.OnShow="True">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding ReplacePrompt}" TextWrapping="Wrap" />
-                    <ctl:MaskedInput x:Name="ReplacementEnvValue"
-                                     AllowsPaste="True"
-                                     Width="420"
-                                     HorizontalAlignment="Left"
-                                     Sink="{Binding ReplacementValue}"
-                                     MaskedLength="{Binding ReplacementValue.MaskedLength}"
-                                     Placeholder="New value" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <ctl:MaskedInput x:Name="ReplacementEnvValue"
+                                       AllowsPaste="True"
+                                       Width="420"
+                                       Sink="{Binding ReplacementValue}"
+                                       MaskedLength="{Binding ReplacementValue.MaskedLength}"
+                                       Placeholder="New value" />
+                      <Button x:Name="ReplacementEnvGenerate"
+                              Classes="icon ghost"
+                              VerticalAlignment="Center"
+                              Command="{Binding GenerateIntoCommand}"
+                              CommandParameter="{Binding ReplacementValue}"
+                              ToolTip.Tip="Generate a value"
+                              AutomationProperties.Name="Generate a value">
+                        <ctl:KpIcon Icon="wand-2" Size="16" />
+                      </Button>
+                    </StackPanel>
+                    <Panel IsVisible="{Binding ReplacementValue.IsGenerated}">
+                      <views:GeneratorOptions DataContext="{Binding Generator}" />
+                    </Panel>
                     <TextBlock Classes="caption" IsVisible="{Binding ReplacementValue.Note.Length}"
                                Text="{Binding ReplacementValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
