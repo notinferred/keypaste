@@ -26,6 +26,7 @@ Choices settled in the step, each reversible:
 - On the founder's Mac (macOS 26.6, arm64): `verify.sh test` passed those classes with `AppTrayTests`, `ShellImportTests`, `FourPlacesJourneyTests`, `ClosingTheMainWindowTests`, `UnlockOpenShortcutTests`, `MaskedInputAutomationTests` and `Keypaste.Core.Tests.BanExemptionsTests`, 71 tests, and `verify.sh compile` passed.
 - CI at `9a039b01`, which also carries Q.1: ci 41303419674 passed every job, and app 41303427495 passed every job but `keepassxc first run (macos-15)`, which failed as F.74 does: KeePassXC exited before opening the vaults after Qt's font message, this time with no `Trace/BPT trap` line in the log.
 - The founder started the built app from source on a throwaway `KEYPASTE_HOME` and found the menu bar right. A paste into a masked field pasting once on a real Mac was not checked separately; the headless test pastes once, and Avalonia's source shows the menu and the field never both receive one chord.
+- On `main` at `d890066b`, integrated with Q.1: ci 41306249160 passed every job, and app 41306249270 passed every job but `keepassxc first run (macos-15)`, which failed as F.74 does, KeePassXC stopping with `Trace/BPT trap: 5` before opening the vaults.
 
 ## Limits and follow-ups
 

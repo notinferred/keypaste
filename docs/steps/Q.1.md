@@ -11,6 +11,7 @@ Completed 2026-10-31 at `8e05a94a` on `q1-exact-shortcuts`, source only; runs ci
 - `ShortcutsTests`, two tests: Ctrl+Alt, or ⌘⌥ on macOS, with L, K, 2 and 3 on the unlocked window and with O on the unlock screen reaches the window unhandled, and nothing locks, searches, moves or opens the picker; the plain chords still move and open it. Both failed against the old check, Ctrl+Alt+O opening the picker.
 - On the founder's Mac (macOS 26.6, arm64): `verify.sh test` passed `ShortcutsTests`, `ShellImportTests` and `FourPlacesJourneyTests`, 16 tests, and `verify.sh compile` passed.
 - CI at `8e05a94a`: ci 41268051883 passed every job, and app 41268060657 passed every job but `keepassxc first run (macos-15)`, which failed as F.74 does: KeePassXC exited with `Trace/BPT trap: 5` after Qt's font message, before opening the vaults.
+- On `main` at `d890066b`, integrated with Q.2: ci 41306249160 passed every job, and app 41306249270 passed every job but `keepassxc first run (macos-15)`, which failed as F.74 does, KeePassXC stopping with `Trace/BPT trap: 5` before opening the vaults.
 
 ## Limits and follow-ups
 
