@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's shortcuts now take Ctrl alone, or ⌘ alone on macOS, so typing a character with AltGr on Windows, such as "ł" on a Polish keyboard, no longer locks the vault, opens the file picker or changes place ([Q.1](docs/steps/Q.1.md)).
+
 Every command's `--help` now has the layout of `keypaste --help`: what the command does, then its usage, commands, arguments and flags, each with a line saying what it is for. A mistyped command line names what is wrong and the `--help` to read ([K.10](docs/steps/K.10.md)).
 
 When another program, such as KeePassXC or a sync tool, saves the vault the desktop app holds open, the app now merges that save with its own copy within five seconds, or at once when it is saving an edit of yours, instead of refusing agents until you reload: items are matched by identity and kept as whole versions, the older of two changes to one item goes into its History, an item deleted in one copy after the other changed it is kept with the change, in Trash, and the file the merge replaces is kept in `<vault>.backups`. The title bar says the vault is merging, and then that it was updated, or a notice names your changes it saved and the items both changed, never a value, until you dismiss it; agents are served from the merged copy in the same session and asked again. Reload is now offered only for a file the app will not merge, such as one that holds another vault ([1.4b3](docs/steps/1.4b3.md)).

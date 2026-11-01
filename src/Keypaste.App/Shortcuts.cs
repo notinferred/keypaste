@@ -66,7 +66,8 @@ internal sealed class Shortcuts : IDisposable
         // resolves to, without depending on where Avalonia keeps that configuration this version.
         var command = OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;
 
-        if ((e.KeyModifiers & command) != command)
+        // Exactly that modifier: Windows reports AltGr as Ctrl+Alt, so a chord with Alt is a character being typed.
+        if (e.KeyModifiers != command)
         {
             return;
         }
