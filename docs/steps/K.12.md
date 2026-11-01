@@ -64,6 +64,9 @@ Completed 2026-10-31 at `aa51f79c` on `k12`; runs ci 41251799496 and app 4125180
 - **CI at `aa51f79c`:**
   - ci 41251799496 passed every job.
   - app 41251806377 passed the desktop tests, the desktop gates, which drive the app through the driver, and publish and selftest on all three runners. It failed only `keepassxc first run (macos-15)`, as F.74 does: KeePassXC exited before opening the vaults after the Qt font-alias warning.
+- **On `main` at `69266af5`:**
+  - app 41253132771 failed only as F.74 does.
+  - ci 41253132559's `aot publish (linux-x64)` ran past its 10-minute limit on its first attempt with every step passed: installing the native toolchain took 2 min 48 s and installing KeePassXC 4 min, where the job's other runs took 2.5 to 3.5 min in all. A rerun of that job passed in 5 min 44 s. This is its first occurrence (D-0673).
 
 ## Decisions
 
