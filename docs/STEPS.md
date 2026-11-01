@@ -38,6 +38,7 @@ The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guid
   - The toast (`Views/ShellView.axaml`) shows a green check for every message, a cancellation or a failure included, lasts 2.8 seconds, cannot be pointed at and is replaced by the next. It carries its tone (success, information or warning), lasts at least four seconds and longer for longer text, waits while the pointer is on it and closes with ×.
   - A moving indicator sits beside each wait, with its own label: Unlocking…, Create vault while its key is derived, Looking for AI tools…, Run it, Create and copy link and Check status.
   - Every error ends with what to do next (BRAND § Voice), among them "That password didn't open this vault.", "The vault is locked.", "The link could not be copied, so it was withdrawn." and "That preference could not be saved, so it will not survive a restart."
+  - When the master password alone does not open a vault, the error says it may also need a key file or a YubiKey and opens More options: a KDBX file does not record that it needs one, so today the person meets only "That password didn't open this vault." (founder, 2026-11-01, D-0683).
   - An empty list offers its next step: a search with no match Search all items and Clear search, an empty log filter Show all, no tokens New token.
   - Accepted when tests show each tone, each busy label and the next step of each error named here.
 - [ ] **Q.7 — Work with assistive technology.** Needs: none.
@@ -79,6 +80,20 @@ The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guid
 - [ ] **Q.17 — Finish the polish.** Needs: Q.5.
   - Window titles name the place; the pointing hand appears only on links; a prompt is drawn inactive while another window has focus and is disarmed again on activation; toasts sit under the titlebar; scroll bars follow the system's setting; End is drawn plain and End all confirms; a delete into Trash asks nothing once undo exists, while a delete for good still asks; buttons are named by their result ("Connect Claude Code", "Reset clients.toml") and every command that opens a form ends in an ellipsis; tooltips say what a control does, with Learn more beside selectors and token scopes; and Appearance's Theme gives way to the system's setting, kept only where a Linux desktop reports none.
 
+## T1 — Everyday vault use and recovery
+
+The founder's check of Q.2 on 2026-11-01 found these, and they gate 1.0.0 (D-0683).
+
+- [ ] **F.75 — Open two items that share a name.** Needs: none.
+  - The desktop reaches an item by its group path and title (`EntryRow`, `EntryName`), and `Vault.Find(EntryName)` refuses a name more than one entry answers to, so two items with one title in one group, such as two logins for one site, each show "More than one entry answers to that name" in place of their pane, at every `Find(name)` in `EntriesViewModel` and `EntryDetailViewModel`. KeePass and KeePassXC allow such a pair, and imported vaults often hold one.
+  - Rows, the pane and what it does (copy, reveal, history, edit, rename or move, delete), Trash, the agent-access card and Recommendations reach their entry by its KeePass UUID, and a row whose title another row in its group shares shows its username after the title. Agents keep today's rule for a name more than one entry answers to.
+  - Accepted when tests over a vault holding two items with one title in one group open, copy, edit, rename, delete and restore each as itself.
+- [ ] **V.12 — Generate a password where it goes, or on its own.** Needs: Q.2.
+  - Today a password is generated only in New item's form, Projects' new-variable form and Rotate. As KeePassXC's dice in its password field does, a generate button beside the password and every protected field, in the item pane and the forms, opens the generator (`GeneratorViewModel`: characters or words, and its length) and puts its value into that field, asking first when the field holds one and keeping the old value in history as Rotate does, so no list of fields to choose from is needed.
+  - Generate password…, in File and Items' New menu, opens the generator on its own: Copy copies through the clearing countdown, New item opens the form with it as the password, and Add as a field adds it to the chosen item as a new protected field named there. It has no chord, since ⌘G is the platform's Find next.
+  - The value stays masked, revealed and copied as every secret is, and nothing generated reaches the automation tree (D-0232).
+  - Accepted when tests generate into an empty and a filled password and protected field, the filled one only after the question and with its old value in history, copy one through the countdown, start New item with one and add one as a field.
+
 ## T3 — AI requests in the app
 
 Every release still needs a person's answer or a rule they set, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
@@ -104,7 +119,7 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **H-0028 — Make the crash-report database and switch the route on.** Human. Needs: 4.11b.
   - Follow [Switching crash reports on](../site/README.md#switching-crash-reports-on-h-0028) in `site/README.md`: create the D1 database, add its `CRASH_DB` binding and `CRASH_ENABLED` to `wrangler.jsonc`, apply `crash-schema.sql`, and integrate that one commit ([4.11b](steps/4.11b.md)).
   - Acceptance: before it, `verify-site-endpoint.sh` sees the deployed route answer 503; after its deploy, the script sees the route's refusals, and a probe report is stored, read back with `wrangler d1 execute` and deleted.
-- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12, B.5 and B.6 (D-0672), every T6 task but 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, Q.1 to Q.12 (D-0682), and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12, B.5 and B.6 (D-0672), every T6 task but 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, Q.1 to Q.12 (D-0682), F.75 and V.12 (D-0683), and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
   - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.
