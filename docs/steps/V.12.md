@@ -1,6 +1,6 @@
 # V.12 — A password generated where it goes, or on its own
 
-Completed 2026-11-01 on `v12-generator`, source only.
+Completed 2026-11-01 at `1dd60f32` on `v12-generator`, source only; runs ci 41315184059 and app 41315192622 at that commit, which also carries the crash-report repair below. The integrated commits differ from `1dd60f32` only in this record.
 
 ## What changed
 
@@ -18,6 +18,9 @@ Choices settled in the step, each reversible: Rotate stays as it was, a replacem
 - `GeneratePasswordTests` (6): a generated value fills its field and what is typed replaces it whole; Generate on the saved password opens Edit with one and Save writes it with the old one in history; Generate on a protected field fills its Replace, follows a change to Words and writes on Replace, and a KeePassXC attribute offers none; Generate password copies through the countdown as a secret and starts New item with exactly that value, wiping its own; it adds its value to the chosen item as a protected field; and while open it holds the shell's commands off and puts no value in the automation tree.
 - `ExistingSecretTests`' turning generation back on now replaces what was typed with a generated password.
 - On the founder's Mac (macOS 26.6, arm64): `verify.sh test` passed those classes with `AppCommandsTests`, `AppMenuTests`, `NewItemTests`, `EntryFieldsTests`, `SecretFieldAutomationTests`, `DrawnMaskTests`, `SecretHygieneTests`, `GeneratedPassphraseTests`, `EnvProfilesTests`, `ShellViewModelTests`, `TrashTests` and the Projects, plain-words, accessible-drive and launch journeys, and `Keypaste.Consistency.Tests.ExistingSecretIsVisibleToTheCliTests`; `verify.sh compile` passed.
+- CI at `6a02bc0b`: ci 41311876919 passed every job; app 41311884646 failed `desktop gates (macos-15)` in `verify-crash-report.sh` on its first attempt and on a rerun of its failed jobs, "the crash in the held endpoint's home left no single report", and `keepassxc first run (macos-15)` as F.74 does.
+- **The double crash report, found and repaired here.** The gate learned to name each waiting report when its count is wrong (`bdb25e2d`, `477ab192`), and two `dev.sh --profile desktop-gates --os macos` probes (41313707110, 41314336004) showed two reports for one crash: the `crash`, and an `unobserved-task` whose `InvalidOperationException` and `IOException` came from the driver's posted throw at `DispatcherOperation.InvokeCore`. Work posted to the UI thread that throws is reported as the run's crash, and Avalonia also faults that work's task with the same exception, which nobody awaits; once the collector finalizes it before the hook comes off, the runtime reports it again. V.12's extra objects only made that collection likely enough to happen on every macOS run. `CrashReporting` now remembers, weakly, what it reported as a crash or an unexpected failure, and an unobserved task holding only those is marked observed and not reported again (`1dd60f32`); `CrashReportingTests.A_crash_whose_failed_task_goes_unobserved_is_reported_once` failed against the unrepaired class and passes. It explains the two reports BACKLOG recorded on `windows-2025` (app 41190894923, main's app 41205756958), so that investigation candidate is closed, and the gate now names a report's kind and frames should a count be wrong again.
+- CI at `1dd60f32`: ci 41315184059 passed every job, and app 41315192622 passed every job, `desktop gates (macos-15)` included, but `keepassxc first run (macos-15)`, which failed as F.74 does.
 
 ## Limits and follow-ups
 
