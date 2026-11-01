@@ -8,7 +8,7 @@ user-invocable: true
 
 Read these before changing anything a person sees:
 
-- [docs/BRAND.md](../../../docs/BRAND.md) owns the marks, palette, type, shape, icons, terminal rules, voice and usage rules.
+- [docs/BRAND.md](../../../docs/BRAND.md) owns the marks, palette, type, shape, icons, terminal rules, voice, interaction and usage rules.
 - [docs/design/README.md](../../../docs/design/README.md) holds the exact values for every desktop screen, overlay and CLI view, and the prototype state and interactions.
 - The prototypes in `docs/design/design/` are the high-fidelity reference: `keypaste Desktop.dc.html` for the app, `keypaste CLI.dc.html` for terminal output and `keypaste Brand System.dc.html` for components and voice. Styles are inline, so read px, colours and copy from the markup; demo data and handlers are in the desktop file's `<script data-dc-script>`. Open one in a browser with `support.js` beside it.
 - `docs/design/tokens/` is the CSS token source. The marks are in `assets/brand/`.
@@ -33,6 +33,7 @@ Brand never overrides security behaviour: a secret stays masked until revealed, 
 - Depth is lightness; shadows only on dialogs, toasts and popovers.
 - Icons are Lucide at 1.5px, muted unless their object is live. No emoji, no filled icons.
 - Copy names the actor and the object, gives every grant a duration, uses sentence case and "you", has no exclamation marks and says what to do next after an error. "keypaste" is always lowercase.
+- BRAND § Interaction holds: the command is in `AppCommands.cs` and so in the menus, with the platform's chord and an ellipsis when it opens more; a confirmation puts Cancel first, answers Return and Escape, and asks only when the action cannot be undone; a draft survives a change of place; every field has a visible label and its error under it; a wait shows a moving indicator; every control has an accessible name that holds no secret, contrast is 4.5:1 for text and 3:1 for focus, edges and status, and targets are at least 20 by 20.
 
 ## Throwaway visuals
 

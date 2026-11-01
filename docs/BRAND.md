@@ -2,7 +2,7 @@
 
 Owns the marks, the palette, the type, the shape, the voice and the usage rules. Every surface (desktop app, CLI, site, README, store listing, installer) takes its visual values from here. The design handoff in [docs/design](design/README.md) holds the exact values for every screen and the high-fidelity prototypes they come from; where this page and a prototype disagree, the prototype's markup is the reference for that screen and this page for everything else, including the marks, which the CLI and brand-system prototypes still draw as the earlier monogram. Where a value also has to exist as code, the file named below holds it.
 
-**Status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values; later that day the founder chose a lighter cut of both marks. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below.
+**Status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values; later that day the founder chose a lighter cut of both marks. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below. Amended 2026-11-01 by the founder: the interaction rules below, from the audit against Apple's Human Interface Guidelines (D-0682).
 
 ## Colour
 
@@ -63,6 +63,19 @@ The CLI keeps to 80 columns. Amber means it needs you: the `›` prompt, command
 ## Voice
 
 Plain and calm; precise where it protects you. Name the actor and the object: "claude-code wants DATABASE_URL". Always give a duration: "Allow for 1 hour", never "Trust". Use sentence case, "you" for the person and the agent's real client name for the agent. No exclamation marks and no emoji. An error says what to do next.
+
+## Interaction
+
+The desktop follows Apple's Human Interface Guidelines on every platform, with Ctrl where macOS uses ⌘ (PRODUCT §7.8, D-0682). Where they differ from this page, this page wins, and the security behaviour of the prompts and masked fields wins over both. The Q tasks in [STEPS](STEPS.md) bring the existing screens into line; a new screen starts there.
+
+1. **Every command is in the menus**: the macOS menu bar, the menu button on Windows and Linux, and a row's context menu where the command acts on that row. A new command goes into `AppCommands.cs`, which draws the menus and the chords. A menu item says what it does in sentence case, ends in an ellipsis when it opens a form, a picker or a window, and is off while its command cannot run.
+2. **Chords are the platform's own**: ⌘ on macOS and Ctrl elsewhere, matched with exactly their modifiers. None on Windows or Linux holds Ctrl+Alt, which is AltGr, and a standard chord keeps its standard meaning, so ⌘G stays Find next.
+3. **A confirmation** puts Cancel first and the action last, names the action by its result ("Delete for good"), draws a destructive action as danger, answers Return with the action unless it is destructive, and Escape with Cancel. An action the person can undo does not ask; one that cannot be undone does.
+4. **Work survives**: a draft is kept when the person changes place, or the app asks before discarding it. A lock still discards it.
+5. **Every field has a visible label** above it, and a placeholder is only an example. An error appears under the field it concerns, as the field is typed.
+6. **Feedback is honest**: anything that takes more than a moment shows a moving indicator and says what it is doing, a toast's icon says whether it reports a success, a warning or information, and every error says what to do next.
+7. **Accessible to everyone**: every control has an accessible name, never a secret. Text keeps 4.5:1 against its ground, and focus rings, control edges and status marks 3:1, in both palettes. A control's target is at least 20 by 20, status is never shown by colour alone, what a screen announces goes through one live line, and text enlarges to 200%.
+8. **Prompts keep their own rules** (D-0326, D-0456, D-0634): no default button, focus on Deny, the allows disarmed for a second, and a fixed layout.
 
 ## The marks
 
