@@ -10,7 +10,7 @@ The public release is CLI/MCP `0.3.0` ([RELEASE](docs/RELEASE.md)). The desktop 
 
 The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md). They ship as `1.0.0`, the first public desktop release; `0.4.0` and `0.5.0` are never published (D-0530).
 
-[PRODUCT](docs/PRODUCT.md) v1.8 (D-0367) refocuses keypaste on people who already keep their passwords in KeePass and write software:
+[PRODUCT](docs/PRODUCT.md) v1.8 (D-0367) refocused keypaste on people who keep their passwords in KeePass and write software, and v1.20 (D-0681) opens it to anyone who keeps credentials and values with their AI agents, needing no KeePass knowledge to start:
 
 - keys become fields on ordinary entries;
 - tags put those fields into projects;
@@ -46,6 +46,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. The terminal finds items and shows their fields without printing a value unless asked. | V.7a, V.7b, C.2, N.13 |
 | A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project, and nothing else does: keypaste keeps no compatibility with its own releases before 0.5.0. An entry that loses its tag in another app is flagged, and a value's `{PASSWORD}`-style placeholders fill in from its own entry. | C.1a, C.1b, C.1c, C.6, C.4, V.11, P.3b1 |
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. It says at once when another program saved the vault. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14, N.16 |
+| The app is at home on every platform and works for anyone: the menus, shortcuts, context menus and window behaviour Apple's Human Interface Guidelines describe, with Ctrl for ⌘; named, announced, legible and enlargeable for assistive technology; unsaved work kept and mistakes undone; and a first run for someone who has never used KeePass (D-0681, D-0682). | Q.1, Q.2, Q.3, Q.4, Q.5, Q.6, Q.7, Q.8, Q.9, Q.10, Q.11, Q.12 |
 | An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose, and the app, not the agent's own configuration, sets what each agent may see and run, and the owner records every request itself. The app stays in the menu bar or tray, nothing saves the vault behind its owner, and a terminal's edit is approved where the vault is unlocked. The app tells the person when an agent finds it locked, and `keypaste doctor` says what stands in the way. | C.5a, C.5b, G.1, G.2, N.3, G.4a, G.8, G.9, N.10, N.11, G.4b, G.3, N.8, N.9 |
 | A project runs from the app on macOS, and every desktop install puts the CLI on PATH. | E.1d, G.5 |
 | Development builds and tests in short bursts on the founder's machine (D-0468, D-0671), CI runs every check in parallel on every run (D-0423) and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, K.6c, F.27, F.28, B.1, B.2, B.3, F.35, F.36, F.37, B.4a, B.4b, F.48, F.66 |
@@ -74,6 +75,7 @@ These follow 1.0.0. Local use keeps working without an account or network (PRODU
 
 | Outcome | Tasks |
 |---|---|
+| The rest of the 2026-10-31 audit against Apple's Human Interface Guidelines: files taken by drag and from the system, the system's notifications, sortable tables, any language and region, and the remaining polish (D-0682). | Q.13, Q.14, Q.15, Q.16, Q.17 |
 | An agent calls an API with a credential it never holds: the unlocked app attaches it for the hosts its entry names, under a grant the person approved, and writes the audit record. An agent organizes the vault without seeing its values: it sees names and structure, plus note text where the person allows it, and proposes changes such as classifying notes, moving keys into fields or tagging entries for projects, each approved in the app. | X.1, X.17 |
 | An end-to-end protocol for accounts, a person's vault and shared projects, reviewed against PRODUCT §3 before any relay code | X.2 |
 | A relay on keypaste.com, and one a team runs itself, that stores only ciphertext and wrapped keys | X.3 |

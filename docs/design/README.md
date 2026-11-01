@@ -1,7 +1,7 @@
 # Handoff: keypaste — desktop app, CLI, brand system
 
 ## Overview
-keypaste is an open-source, local password manager on a KeePass database, for people who keep their passwords in KeePass and write software ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes: `keypaste Desktop.dc.html` draws the app as the decisions in force on 2026-10-21 have it, and the CLI and brand-system prototypes are older. Core ideas:
+keypaste is an open-source, local password manager on a KeePass database, for anyone who keeps credentials and values with their AI agents, needing no KeePass knowledge to start ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes: `keypaste Desktop.dc.html` draws the app as the decisions in force on 2026-10-21 have it, and the CLI and brand-system prototypes are older. Core ideas:
 - **Agents**: an agent in an AI tool (Claude Code, Cursor, Codex, …) asks keypaste for an item over MCP. You answer each request in its own prompt window (Deny, Allow once, Allow for 1 hour), an **allowance** with a duration covers it, or that agent's settings make it Automatic.
 - **Inject first**: agents list item *names*; a value reaches an agent only through a request you allow, and `keypaste run -p dev acme-api -- cmd` injects values into a child process instead.
 - **Projects**: an item's `env:` tags put it in a project, with a value for each environment (dev / staging / prod); no group makes a project (D-0416). A protected environment such as prod is asked about every time.

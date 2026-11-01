@@ -1,6 +1,6 @@
 # Build plan
 
-This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.19 (D-0667). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
+This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.20 (D-0681). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,6 +14,79 @@ These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672
 - [ ] **B.6 — Repeat no green branch run on `main`.** Needs: none.
   - A push run on `main` whose commit already has green dispatched `ci` and `app` runs ends at once, naming them, while `require-green-gates.sh` still finds a full green run for a release tag (D-0403).
   - Accepted when an integration push of a verified commit spends under a minute per workflow and an unverified commit still runs every job.
+
+## Q — At home on every platform
+
+The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines (PRODUCT §7.8, D-0682). Q.1 to Q.12 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and BRAND's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [the design handoff](design/README.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
+
+- [ ] **Q.1 — Match shortcuts exactly.** Needs: none.
+  - `Shortcuts.cs` takes any chord that contains Ctrl or ⌘, on the window's tunnelling pass, so on Windows AltGr, which arrives as Ctrl+Alt, fires them: AltGr+L ("ł") locks the vault and drops an edit, AltGr+O ("ó") opens the file picker while the master password is typed, and AltGr+2 and AltGr+3 change place. Chords match the modifier exactly, as `MaskedInput` already does, and a chord with Alt is not one.
+  - Accepted when a test sends Ctrl+Alt+L, Ctrl+Alt+O and Ctrl+Alt+2 to the locked and the unlocked window and nothing locks, opens or moves.
+- [ ] **Q.2 — Give the app its menus and the standard shortcuts.** Needs: Q.1.
+  - The macOS menu bar holds only File › Import from another app… (`AppMenu.cs`), set on the window, so the app menu is Avalonia's default, with "About Avalonia", an unnamed Quit and Hide Others on ⌥⌘Q, and Windows and Linux have no menus.
+  - An application-level menu: keypaste (About keypaste with the version and copyright, Settings… ⌘,, Hide keypaste, Hide others ⌥⌘H, Quit keypaste), File (New item ⌘N, New group, Open vault… ⌘O, also while unlocked, Open recent with Clear menu, Close window ⌘W, Lock ⌘L, the imports and Export…), Edit (Undo, Cut, Copy, Paste reaching a masked field through its own paste path, Select all, Delete, Find on ⌘F and ⌥⌘F beside ⌘K), View (the four places on ⌘1 to ⌘4, Enter full screen ⌃⌘F), Window (Minimize ⌘M, Zoom, Bring all to front, a prompt only through `WindowApprovalChannel.BringForward`) and Help; and a Dock menu with Lock and Open vault…. Windows and Linux reach the same menus from a menu button in the titlebar's empty first column (D-0508). Labels are in sentence case (BRAND). While locked, Settings… is off.
+  - On a focused Items row ⌘C copies the password, Delete and ⌘Delete delete, and ⌘Z undoes (Q.5); text fields keep their own.
+  - Shortcut text names the platform's key, including Settings' "Ctrl+L locks now." and the masked fields' "Ctrl/Cmd+V to paste.", and `packaging/macos/Info.plist` gains `NSHumanReadableCopyright`.
+  - Accepted when headless tests run each menu item's command and each chord under both modifiers, the About item names keypaste, and the desktop guide's Keyboard table lists them.
+- [ ] **Q.3 — Add context menus.** Needs: Q.2.
+  - Only a sidebar group row opens a menu, on a right-button release (`Views/ShellView.axaml.cs`); item, Trash, project, agent and revision rows have none, and an item's actions sit only in its preview's ⋯ menu.
+  - Each row gets a context flyout of its existing commands: an item's Copy username, Copy password, Open URL, Edit fields, Rename or move, Duplicate, Share… and Delete; Trash's Restore and Delete for good; a project's Open; an agent's Settings and Disconnect. The group menu moves onto the context-request event, so right-click, Control-click, Shift+F10 and the menu key share one path, and every entry is also in the menu bar.
+  - Accepted when headless tests open each flyout from the pointer and the keyboard and run a command from it.
+- [ ] **Q.4 — Keep unsaved work.** Needs: none.
+  - Changing place disposes the screen (`ShellViewModel.Show`), which drops the New item form, Edit fields' drafts and agent limits not yet applied, asking nothing. A screen holding a draft asks "Discard …?" with Cancel and Discard before the place changes, from the sidebar, a shortcut or a search typed elsewhere. A lock still discards drafts.
+  - In-pane forms answer Return with their confirm, never a danger one, and Escape with Cancel, as the import dialogs do (`ExportImportView.OnRootEscape`); the Share dialog gains Escape and a Cancel button. Escape in a masked field clears it and then reaches the form (`MaskedInput.OnKeyDown`).
+  - An error appears under the field it concerns as the field is typed, as the pairing prompt's name does: New item's title, key name and tags, Rename or move's name and Projects' key name. Create waits for a title.
+  - Accepted when tests show a draft kept after Cancel and gone after Discard, Return and Escape on each form, and each error under its field.
+- [ ] **Q.5 — Make destructive actions consistent and undoable.** Needs: Q.2.
+  - A terminal's `keypaste rm` on a vault with no recycle bin is approved with the ordinary amber Allow (`Views/TerminalEditWindow.axaml`). The prompt carries `EditPreview.Recycles`, and when it is false the Allow is drawn as danger and reads "Delete for good", the layout, focus on Deny and arming unchanged.
+  - Edit › Undo and ⌘Z reverse the last delete, rename or move, duplicate, and group create, rename, move or delete, each through the inverse write; the Restore link stays. Trash restores several selected rows at once.
+  - Every confirmation puts Cancel first and the action last, and its cancel button reads Cancel: item and group delete, the in-pane forms, token revoke, Projects' Remove, Settings' access change and key file replace, Connect and Restore backup.
+  - Settings' "Forget them all" and a pairing's Remove confirm in place.
+  - Accepted when tests show the danger Allow for an edit that does not recycle, each undo returning the vault to its state before, and the button order of every confirmation.
+- [ ] **Q.6 — Say what is happening.** Needs: none.
+  - The toast (`Views/ShellView.axaml`) shows a green check for every message, a cancellation or a failure included, lasts 2.8 seconds, cannot be pointed at and is replaced by the next. It carries its tone (success, information or warning), lasts at least four seconds and longer for longer text, waits while the pointer is on it and closes with ×.
+  - A moving indicator sits beside each wait, with its own label: Unlocking…, Create vault while its key is derived, Looking for AI tools…, Run it, Create and copy link and Check status.
+  - Every error ends with what to do next (BRAND § Voice), among them "That password didn't open this vault.", "The vault is locked.", "The link could not be copied, so it was withdrawn." and "That preference could not be saved, so it will not survive a restart."
+  - An empty list offers its next step: a search with no match Search all items and Clear search, an empty log filter Show all, no tokens New token.
+  - Accepted when tests show each tone, each busy label and the next step of each error named here.
+- [ ] **Q.7 — Work with assistive technology.** Needs: none.
+  - About 32 fields and four choice lists sit under a visible label with no accessible name (New item, Settings' idle lock and theme, the Share dialog, Projects), and Avalonia 12.1 does not implement `LabeledBy`: each takes its label as `AutomationProperties.Name`. A field labelled only by its placeholder (Settings' three master-password fields, an agent's limits, Projects' new project, environment and key, New group, the generator's separator) gains a visible label.
+  - Only the idle warning is announced (D-0527). The unlock and form errors, the banner saying another program saved the vault, each toast and a prompt's opening with its time limit are announced once, through the same hidden live text.
+  - Headings carry `AutomationProperties.HeadingLevel` from their Typography class; Items, Trash and log rows are named from their columns, never a secret or a field D-0488 keeps out of the columns; fold buttons say Show or Hide and tree rows their level; repeated row buttons name their field ("Copy DATABASE_URL"); and the Agents dot and a tag chip's protected or malformed state gain an icon or words beside their colour.
+  - Accepted when the headless automation tree names every field and row, and a screen reader on each platform reads an unlock error, a toast and a prompt (the desktop guide's checklist).
+- [ ] **Q.8 — Make focus, edges and targets visible.** Needs: none.
+  - In the light palette the amber focus ring, focused field, selection bar and warn dot are 1.5 to 1.8:1 against their grounds: they take `#8A5A00`, BRAND's amber on light, in the theme dictionaries, and dark keeps its values. Muted text on hover and selected rows takes the secondary colour where it falls under 4.5:1 (sidebar counts, the toast's countdown, the keycap), and unchecked checkbox and radio edges and field borders reach 3:1.
+  - A high-contrast dark and light variant follows macOS's Increase Contrast and Windows' contrast themes through the platform's contrast preference.
+  - Fold, chip-remove and clear-scope buttons, drawn 16×16, take at least 20×20 without moving the layout, and row action buttons sit 8 apart.
+  - Accepted when a test computes every text and edge pair of `Theme/Tokens.axaml` on its grounds in each variant, against 4.5:1 for text and 3:1 for edges, and the screen renderer draws every screen in each variant.
+- [ ] **Q.9 — Let people enlarge text.** Needs: Q.2.
+  - Nothing enlarges text, font sizes are fixed on about 180 lines of the views, and the 960×520 minimum window does not fit a 1366×768 screen at 150% Windows scaling. View › Zoom in, Zoom out and Actual size (⌘+, ⌘− and ⌘0) scale the interface up to 200%, kept in `app.toml`; view-level sizes move onto the Typography classes; and the minimum window and the prompt windows scale with it.
+  - Accepted when the screen renderer draws every screen at 100%, 150% and 200% with nothing cut off, masked text staying at 14px or larger.
+- [ ] **Q.10 — Pick up where the person left off.** Needs: none.
+  - The window opens at 1000×680 in the middle of the screen every time, and the split between the list and the preview resets at each unlock. The window's bounds, its maximized or full-screen state and the split are kept in `app.toml` on close, lock and quit, and restored within the screen's working area.
+  - The 960 minimum width (D-0344) rules out two windows side by side on most laptops. It falls to about 720, where Items drops its Username and URL columns and the sidebar collapses, and View › Hide sidebar hides it at any width.
+  - Accepted when tests restore saved bounds, bring bounds off the screen back onto it, and lay out Items at 720 wide.
+- [ ] **Q.11 — Open on a first run anyone understands.** Needs: none. Input: H-0027 for where the terms appear.
+  - With no vault and no KeePassXC database found, the welcome's first action is Create a vault, with one plain sentence on what a vault and its master password are; someone with KeePassXC databases still sees them first (D-0681).
+  - The terms of use leave the first launch (D-0594), whose own copy says running keypaste needs no agreement, and appear where their two services start: the Share… dialog, and the crash-report choice, asked once on the unlock screen with Send crash reports and Don't send as two equal buttons and no default.
+  - One word list beside BRAND § Voice: Trash, Group, Title, key file, top level and Disconnect, replacing recycle bin, Folder, Name, keyfile and the root where the copy uses them for these; and the words a new person cannot know are rewritten: `--client-label`, ceilings, selectors as `--expose` takes them, unlock ID and the relay.
+  - Accepted when the first-run tests reach the vault with no terms screen, Share… and the crash-report choice show the terms, and the copy reads against the word list.
+- [ ] **Q.12 — Calm the reveal and the agent settings.** Needs: none.
+  - Reveal is held (D-0300), which a person with a motor impairment, switch control or a screen reader's single activation cannot do. It becomes a toggle that hides again after a short time, on leaving the item, when the window loses focus and on lock, the value still drawn and never put in the accessibility tree (D-0232).
+  - An agent's settings show Mode, Can see and May run commands; its project rows, patterns and limits sit behind one More, open whenever any of them is set, and "Advanced: patterns" becomes a disclosure.
+  - Every choice of one among several is the log filter's segmented control, in place of chips and ghost buttons that wrap (an agent's Mode, Give values and May run commands), with durations in words ("1 hour", "7 days").
+  - Accepted when the reveal tests, D-0232's surface check among them, pass for the toggle and each way it hides, and an agent's settings open on those three controls.
+- [ ] **Q.13 — Take files by drag and from the system.** Needs: none.
+  - Only the unlock screen takes a dropped file, of any kind, with nothing highlighted. A `.kdbx`, another app's export, a `.env` or an attachment dropped anywhere goes to its import or attachment flow, highlighted only when it is accepted, and an item dropped on a group moves there.
+  - `.kdbx` is declared to macOS as an alternate handler, so KeePassXC stays the default, to Linux by its MIME type and to Windows by a ProgId; a file the system hands the app, or a path argument passed on through the second start's pipe (D-0397), opens on the unlock screen.
+- [ ] **Q.14 — Use the system's notifications.** Needs: none.
+  - A request that arrives while keypaste is in the background also posts a time-sensitive notification that names no item, whose action brings the prompt forward through `BringForward` (D-0456), and the locked notice becomes an ordinary notification with Open keypaste (D-0466).
+- [ ] **Q.15 — Sort and size the tables.** Needs: none.
+  - Items, Trash and the activity log sort by a column head, again to reverse, and resize their columns; heads stay in capitals (BRAND).
+- [ ] **Q.16 — Read in any language and region.** Needs: none.
+  - Dates and times people read follow the current culture and machine text stays invariant; strings move to resources; right-to-left layout follows the culture, with a chevron-left icon for Back and secrets kept left to right.
+- [ ] **Q.17 — Finish the polish.** Needs: Q.5.
+  - Window titles name the place; the pointing hand appears only on links; a prompt is drawn inactive while another window has focus and is disarmed again on activation; toasts sit under the titlebar; scroll bars follow the system's setting; End is drawn plain and End all confirms; a delete into Trash asks nothing once undo exists, while a delete for good still asks; buttons are named by their result ("Connect Claude Code", "Reset clients.toml") and every command that opens a form ends in an ellipsis; tooltips say what a control does, with Learn more beside selectors and token scopes; and Appearance's Theme gives way to the system's setting, kept only where a Linux desktop reports none.
 
 ## T3 — AI requests in the app
 
@@ -40,7 +113,7 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **H-0028 — Make the crash-report database and switch the route on.** Human. Needs: 4.11b.
   - Follow [Switching crash reports on](../site/README.md#switching-crash-reports-on-h-0028) in `site/README.md`: create the D1 database, add its `CRASH_DB` binding and `CRASH_ENABLED` to `wrangler.jsonc`, apply `crash-schema.sql`, and integrate that one commit ([4.11b](steps/4.11b.md)).
   - Acceptance: before it, `verify-site-endpoint.sh` sees the deployed route answer 503; after its deploy, the script sees the route's refusals, and a probe report is stored, read back with `wrangler d1 execute` and deleted.
-- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12, B.5 and B.6 (D-0672), every T6 task but 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
+- [ ] **4.7c2 — Publish and verify the first desktop release as 1.0.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a, the engineering rows K.7 to K.12, B.5 and B.6 (D-0672), every T6 task but 1.4b4 (D-0669), V.8a and V.8b, 4.11a to 4.11c, Q.1 to Q.12 (D-0682), and the fixes still marked for 1.0.0 (D-0669). Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, 3.5a's Apple credentials, the approved terms of use (H-0027) and the crash-report database switched on (H-0028).
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
   - `osx-arm64` publishes the DMG alone; the `.app.zip` it is built from is a build intermediate, not a declared package (D-0513).
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 1.0.0. This renames CHANGELOG's Unreleased section and sets the version: `VersionPrefix`, release-targets.json, the site's labels and every other place that still names 0.5.0.
@@ -49,7 +122,7 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **R.1b — Round-trip a tagged entry through the phone apps (H-0024).** Human. Needs: none.
   - Tag an entry and give it a protected env field in keypaste, edit that entry in KeePassium, Strongbox and KeePassDX, and confirm keypaste still reads the tag, the field and its protection; record each app's version.
 - [ ] **L.1 — Make the released app understandable and reachable.** Needs: 4.7c2, L.3.
-  - README, keypaste.com and the guides lead with the v1.8 positioning and name 1.0.0.
+  - README, keypaste.com and the guides lead with the v1.20 positioning (D-0681) and name 1.0.0.
   - They link its three desktop downloads, hashes and verification steps.
   - They take a new user from the download to a working vault, a project run and a connected agent, as that version behaves.
   - README's demo GIF and every screenshot are re-rendered from the 1.0.0 binaries.
