@@ -91,6 +91,14 @@ quit_app() {
 # The reports waiting in home $1, one file a line.
 waiting() { find "$1/crash-reports" -name '*.json' -type f 2>/dev/null | sort; }
 
+# What each report waiting in home $1 is, for a count that came out wrong: its file, kind and site.
+kinds() {
+  local file
+  waiting "$1" | while read -r file; do
+    printf '%s %s\n' "${file##*/}" "$(jq -c '{kind, site}' "$file" 2>/dev/null)"
+  done
+}
+
 # The first report waiting in home $1 whose kind is $2, or nothing.
 report_of() {
   local file
@@ -161,7 +169,7 @@ step 'Send crash reports, then a crash on the UI thread with a password copied'
 ON="$WORK/on"
 crash_with_copy "$ON" send "$ENDPOINT"
 chose "$ON" 1
-[ "$(waiting "$ON" | wc -l | tr -d ' ')" = 1 ] || die "the crash left $(waiting "$ON" | wc -l | tr -d ' ') reports, not one: $(waiting "$ON")"
+[ "$(waiting "$ON" | wc -l | tr -d ' ')" = 1 ] || die "the crash left $(waiting "$ON" | wc -l | tr -d ' ') reports, not one: $(kinds "$ON")"
 REPORT="$(waiting "$ON")"
 cp "$REPORT" "$WORK/sent.json"
 holds_nothing "$REPORT" "the crash report"
@@ -188,7 +196,7 @@ say 6 "unlock $VAULT"
 wait_for '^screen shell' "$APP_OUT"
 say 6 "crash $MESSAGE"
 wait_for '^shut down with exit code 70' "$APP_OUT"
-[ "$(waiting "$HELD" | wc -l | tr -d ' ')" = 1 ] || die "the crash in the held endpoint's home left no single report"
+[ "$(waiting "$HELD" | wc -l | tr -d ' ')" = 1 ] || die "the crash in the held endpoint's home left $(waiting "$HELD" | wc -l | tr -d ' ') reports, not one: $(kinds "$HELD")"
 
 # ------------------------------------------------------------- next starts, side by side past the first pass
 step 'A report put where the switch is off, which its next start deletes unsent'
