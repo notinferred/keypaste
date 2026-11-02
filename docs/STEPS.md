@@ -101,6 +101,7 @@ The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. E
 Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
 - [ ] **3.5a — Enable the macOS signing identity (H-0015).** Human. Needs: none.
+  - Start by 2026-11-02: ROADMAP's 2026-12-08 date for 1.0.0 holds only if the outside inputs start by then (D-0668), and enrollment can take days to weeks.
   - External Apple Developer enrollment as keypaste.
   - Repository-scoped Developer ID Application and notarization credentials.
 - [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 4.7a2. Input: 3.5a's credentials.
