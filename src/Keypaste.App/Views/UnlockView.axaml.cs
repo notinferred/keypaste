@@ -59,6 +59,7 @@ internal sealed partial class UnlockView : UserControl
             if (_watched is not null)
             {
                 _watched.PropertyChanged -= OnModelChanged;
+                _watched.FileChosen -= OnFileChosen;
             }
 
             _watched = Model;
@@ -66,6 +67,7 @@ internal sealed partial class UnlockView : UserControl
             if (_watched is not null)
             {
                 _watched.PropertyChanged += OnModelChanged;
+                _watched.FileChosen += OnFileChosen;
             }
         };
     }
@@ -87,6 +89,17 @@ internal sealed partial class UnlockView : UserControl
         }
     }
 
+    // A vault picked in the open panel or dropped here is opened by typing its password, so that is where focus goes.
+    private void OnFileChosen(object? sender, EventArgs e) => FocusPassword();
+
+    private void FocusPassword()
+    {
+        if (this.FindControl<MaskedInput>("Password") is { } password)
+        {
+            Dispatcher.UIThread.Post(() => password.Focus(), DispatcherPriority.Background);
+        }
+    }
+
     private UnlockViewModel? Model => DataContext as UnlockViewModel;
 
     private static void OnDragOver(object? sender, DragEventArgs e)
@@ -104,7 +117,10 @@ internal sealed partial class UnlockView : UserControl
         // reason "drag a .kdbx" is achievable here at all.
         if (e.DataTransfer.TryGetFile() is { } file && file.TryGetLocalPath() is { } path)
         {
-            Model?.Offer(path);
+            if (Model?.Offer(path) == true)
+            {
+                FocusPassword();
+            }
         }
 
         e.Handled = true;

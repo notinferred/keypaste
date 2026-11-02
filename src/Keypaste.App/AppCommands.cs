@@ -154,20 +154,19 @@ internal sealed class AppCommands
                 () => Unmodal()?.FocusSearch()),
         ]);
 
-        var view = new AppMenuGroup("View",
+        AppMenuEntry[] places =
         [
             .. Destinations.Places.Select(place => new AppCommand(
                 place.Title,
                 [new(DigitKey(place.Shortcut), command), new(NumPadKey(place.Shortcut), command)],
                 () => Unmodal() is not null,
                 () => Unmodal()?.GoTo(place.Shortcut))),
-            _line,
-            new AppCommand(
-                "Enter full screen",
-                Mac ? [new(Key.F, KeyModifiers.Control | KeyModifiers.Meta)] : [new(Key.F11)],
-                () => host.Window() is { IsVisible: true },
-                ToggleFullScreen),
-        ]);
+        ];
+
+        // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
+        var view = new AppMenuGroup("View", Mac
+            ? places
+            : [.. places, _line, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen)]);
 
         var window = new AppMenuGroup("Window",
         [

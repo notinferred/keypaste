@@ -56,7 +56,7 @@ public sealed class AppCommandsTests : IDisposable
         Assert.Equal(new KeyGesture(Key.H, KeyModifiers.Meta | KeyModifiers.Alt), Find(mac, "Hide others").Shown);
         Assert.Equal(new KeyGesture(Key.Back, KeyModifiers.Meta), Find(mac, "Delete").Shown);
         Assert.Equal(new KeyGesture(Key.Delete), Find(other, "Delete").Shown);
-        Assert.Equal(new KeyGesture(Key.F, KeyModifiers.Control | KeyModifiers.Meta), Find(mac, "Enter full screen").Shown);
+        Assert.DoesNotContain(mac.Menus.Single(menu => menu.Header == "View").Entries.OfType<AppCommand>(), command => command.Header == "Enter full screen");
         Assert.Equal(new KeyGesture(Key.F11), Find(other, "Enter full screen").Shown);
         Assert.Contains(new KeyGesture(Key.K, KeyModifiers.Meta), Find(mac, "Find").Keys);
         Assert.Contains(new KeyGesture(Key.K, KeyModifiers.Control), Find(other, "Find").Keys);

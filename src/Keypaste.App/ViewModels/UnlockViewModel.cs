@@ -981,11 +981,14 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (await _picker.PickExistingAsync().ConfigureAwait(true) is { } path)
+        if (await _picker.PickExistingAsync().ConfigureAwait(true) is { } path && Offer(path))
         {
-            Offer(path);
+            FileChosen?.Invoke(this, EventArgs.Empty);
         }
     }
+
+    /// <summary>A vault was picked in the system's open panel, which took the keyboard while it was up.</summary>
+    internal event EventHandler? FileChosen;
 
     /// <summary>
     /// Asks where a new vault should go, and opens the create fields if somewhere came back.
