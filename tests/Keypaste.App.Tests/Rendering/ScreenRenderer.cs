@@ -429,6 +429,17 @@ public sealed class ScreenRenderer
         Save(window, output, "20-secrets-edit");
         entries.Detail.CancelCommand.Press();
 
+        // V.12: Generate on the saved password opens Edit fields with one, and Generate password… stands on its own.
+        entries.Detail.GeneratePasswordCommand.Press();
+        Save(window, output, "20b-secrets-edit-generated");
+        entries.Detail.CancelCommand.Press();
+
+        shell.OpenGeneratorCommand.Press();
+        Save(window, output, "13b-secrets-generate");
+        shell.GeneratorDialog!.Generator.UseWords = true;
+        Save(window, output, "13c-secrets-generate-words");
+        shell.CloseGeneratorCommand.Press();
+
         // A filter that matches nothing.
         entries.Search = "no-such-secret";
         Save(window, output, "23-secrets-no-match");

@@ -1682,7 +1682,8 @@
                         <Panel IsVisible="{Binding NewPassword.IsGenerated}">
                           <views:GeneratorOptions DataContext="{Binding Generator}" />
                         </Panel>
-                        <TextBlock Classes="caption" Text="Leave this empty to keep the current password. A replacement keeps the old one in this item's history." TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" IsVisible="{Binding !NewPassword.IsGenerated}" Text="Leave this empty to keep the current password. A replacement keeps the old one in this item's history." TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" IsVisible="{Binding NewPassword.IsGenerated}" Text="Generated. Save puts it in place of the current password, which stays in this item's history." TextWrapping="Wrap" />
                         <TextBlock Classes="caption"
                                    IsVisible="{Binding NewPassword.Note.Length}"
                                    Text="{Binding NewPassword.Note}" />
