@@ -1,8 +1,28 @@
-# Brand
+# Design
 
-Owns the marks, the palette, the type, the shape, the voice and the usage rules. Every surface (desktop app, CLI, site, README, store listing, installer) takes its visual values from here. The design handoff in [docs/design](design/README.md) holds the exact values for every screen and the high-fidelity prototypes they come from; where this page and a prototype disagree, the prototype's markup is the reference for that screen and this page for everything else, including the marks, which the CLI and brand-system prototypes still draw as the earlier monogram. Where a value also has to exist as code, the file named below holds it.
+The system every keypaste surface is designed from, the desktop app, the CLI, the site, the README, the store listings and the installers, written down before a screen is designed ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6). This page owns how a screen is put together, the marks, the palette, the type, the shape, the icons, the terminal rules, the voice, the interaction rules and the usage rules. Where a value also has to exist as code, the file named below holds it, and the app's views hold each screen's exact sizes.
 
-**Status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values; later that day the founder chose a lighter cut of both marks. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below. Amended 2026-11-01 by the founder: the interaction rules below, from the audit against Apple's Human Interface Guidelines (D-0682).
+**Brand status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values; later that day the founder chose a lighter cut of both marks. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below. Amended 2026-11-01 by the founder: the interaction rules below, from the audit against Apple's Human Interface Guidelines (D-0682).
+
+## The desktop's places
+
+The app has four places, Items, Agents, Trash and Settings, on Ctrl/⌘+1–4, and every other screen sits under one of them, its Back going up to it (D-0374). The window has three regions:
+
+| Region | Holds |
+|---|---|
+| Title bar | The search, the idle-lock countdown, the vault's save state and Lock |
+| Sidebar | The wordmark; Items with the vault's group tree, the projects and Agents; Trash and Settings at the bottom |
+| Content | The place in view: on Items, the list and the selected item's pane |
+
+## Information
+
+1. **Each fact once in a view.** A name, a state or a location appears in one place in a view, the place the person looks for it; another place links to it or leaves it out. The vault's file name, the group in view and the save state are each such a fact.
+2. **The main job gets the room.** On Items that is finding an item and using it: the list and the pane take the space, and what serves the whole window stays in the title bar and the sidebar.
+3. **A control sits by what it acts on.** A command that acts on a row is in that row's menu and the menu bar ([§ Interaction](#interaction)), and a field that filters a list is read as part of that list.
+
+## States
+
+Every screen designs each state it can reach: first use, empty, loading, filled, error and locked. An empty state offers the next step, a wait says what it is doing, and an error says what to do next ([§ Interaction](#interaction)). A prompt that releases a value keeps its own rules (D-0326, D-0456, D-0634).
 
 ## Colour
 
@@ -24,7 +44,7 @@ The single accent is amber `#F2B544` (hover `#F7C566`, press `#D99D2E`, tint 10�
 
 Status colours: ok `oklch(0.80 0.13 155)`, danger `oklch(0.74 0.14 25)` with a 12% tint behind danger buttons, info `oklch(0.78 0.10 245)`. On the light palette the same hues sit at lightness 0.50, `oklch(0.50 0.13 155)`, `oklch(0.50 0.17 25)` and `oklch(0.50 0.10 245)`, so a status read as text keeps 4.5:1 on every light surface. Warn is amber, and an idle dot is `#55575C`. The app draws them as `#72D699`, `#F7857D` and `#7FBEF3`, and on light as `#007840`, `#B02A2D` and `#296898`, because Avalonia has no oklch.
 
-The app's values are in [Tokens.axaml](../src/Keypaste.App/Theme/Tokens.axaml); the CSS source is [docs/design/tokens](design/tokens/tokens/colors.css).
+The app's values are in [Tokens.axaml](../src/Keypaste.App/Theme/Tokens.axaml); the CSS copy, for mocks, is [docs/design/tokens](design/tokens/styles.css).
 
 ## Type
 
@@ -58,7 +78,7 @@ Lucide at a 1.5px stroke: 16px in lists, 14px in fields, 20px in the sidebar. Ic
 
 ## Terminal
 
-The CLI keeps to 80 columns. Amber means it needs you: the `›` prompt, commands in help, a pending box, the cursor. Green `✓` is done, red is refused or missing, grey is everything else. Its box and list characters are `┌ │ └ ›`. A value is never printed without `--reveal`, and `--json` is there for piping. The exact output of each command is in the [CLI design](design/design/keypaste%20CLI.dc.html).
+The CLI keeps to 80 columns. Amber means it needs you: the `›` prompt, commands in help, a pending box, the cursor. Green `✓` is done, red is refused or missing, grey is everything else. Its box and list characters are `┌ │ └ ›`. A value is never printed without `--reveal`, and `--json` is there for piping. The CLI's own output is the reference, and `scripts/verify-demo.sh` checks the transcripts in the README and the guides against the built binaries.
 
 ## Voice
 
@@ -66,7 +86,7 @@ Plain and calm; precise where it protects you. Name the actor and the object: "c
 
 ## Interaction
 
-The desktop follows Apple's Human Interface Guidelines on every platform, with Ctrl where macOS uses ⌘ (PRODUCT §7.8, D-0682). Where they differ from this page, this page wins, and the security behaviour of the prompts and masked fields wins over both. The Q tasks in [STEPS](STEPS.md) bring the existing screens into line; a new screen starts there.
+The desktop follows Apple's Human Interface Guidelines on every platform, with Ctrl where macOS uses ⌘ ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Where they differ from this page, this page wins, and the security behaviour of the prompts and masked fields wins over both. The Q tasks in [STEPS](STEPS.md) bring the existing screens into line; a new screen starts there.
 
 1. **Every command is in the menus**: the macOS menu bar, the menu button on Windows and Linux, and a row's context menu where the command acts on that row. A new command goes into `AppCommands.cs`, which draws the menus and the chords. A menu item says what it does in sentence case, ends in an ellipsis when it opens a form, a picker or a window, and is off while its command cannot run.
 2. **Chords are the platform's own**: ⌘ on macOS and Ctrl elsewhere, matched with exactly their modifiers. None on Windows or Linux holds Ctrl+Alt, which is AltGr, and a standard chord keeps its standard meaning, so ⌘G stays Find next.
@@ -100,3 +120,7 @@ The icon is "k." and the wordmark "keypaste.": the letters in ink, `#F2F2F0` on 
 5. **Machine-readable text is mono**, everything else is Instrument Sans.
 6. **Depth is lightness.** Shadows belong to overlays only.
 7. **Every grant names its duration**, in the interface and in the copy about it.
+
+## Checking a screen
+
+`KEYPASTE_SCREENS_OUT=<dir> bash scripts/verify.sh test Keypaste.App.Tests.Rendering.ScreenRenderer` draws every screen with a demo vault; a screen is checked against this page and the principles' tests.

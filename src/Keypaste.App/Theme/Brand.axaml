@@ -3,7 +3,7 @@
                     xmlns:ctl="using:Keypaste.App.Controls">
 
   <!-- The icon and the wordmark, drawn from Theme/BrandOutlines.axaml: the ink in KpMarkInk, the dot
-       amber. They are never set side by side (BRAND). -->
+       amber. They are never set side by side (DESIGN). -->
   <ControlTheme x:Key="{x:Type ctl:BrandMark}" TargetType="ctl:BrandMark">
     <Setter Property="InkGeometry" Value="{DynamicResource KpGlyphInkGeometry}" />
     <Setter Property="DotGeometry" Value="{DynamicResource KpGlyphDotGeometry}" />

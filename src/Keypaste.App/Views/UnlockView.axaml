@@ -575,7 +575,7 @@
           </StackPanel>
         </StackPanel>
 
-        <!-- Waiting is an amber dot with its halo (BRAND). -->
+        <!-- Waiting is an amber dot with its halo (DESIGN). -->
         <StackPanel x:Name="TouchPrompt"
                     Orientation="Horizontal"
                     Spacing="10"

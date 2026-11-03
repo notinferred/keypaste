@@ -2,7 +2,7 @@
 """Outlines the keypaste marks from Hepta Slab and writes every file drawn from them.
 
 The icon is "k." and the wordmark "keypaste.", each ending in a square amber dot; they are never
-set side by side (docs/BRAND.md). The wordmark is Hepta Slab at weight 500 tracked -1.5%, so it sits
+set side by side (docs/DESIGN.md). The wordmark is Hepta Slab at weight 500 tracked -1.5%, so it sits
 beside the interface's Instrument Sans; the icon is 580 tracked -1%, so it holds its weight on a
 tile and at 16 px. Each dot's side is a multiple of that weight's stem, set a fixed share of an em
 after the last letter's ink. Outlines are the source of truth, so no font is vendored: this writes

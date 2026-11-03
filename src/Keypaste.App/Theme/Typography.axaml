@@ -97,7 +97,7 @@
     <Setter Property="LetterSpacing" Value="-0.22" />
   </Style>
 
-  <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size (BRAND).
+  <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size (DESIGN).
        A variable's key is machine text and stays mono.lg / mono.xl. -->
   <Style Selector=":is(TextBlock).title">
     <Setter Property="FontSize" Value="22" />

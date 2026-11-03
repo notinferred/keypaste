@@ -18,7 +18,7 @@
   </Window.Styles>
 
   <!-- About keypaste, from the app menu on macOS and the menu button elsewhere (Q.2): the icon alone, never beside
-       the wordmark (BRAND), what this copy is, and Close as its default. -->
+       the wordmark (DESIGN), what this copy is, and Close as its default. -->
 
   <Border Classes="prompt">
     <StackPanel Spacing="16">

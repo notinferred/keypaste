@@ -12,7 +12,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// The amber elements in a frame the app drew: what BRAND rule 4 allows once per view (D-0375).
+/// The amber elements in a frame the app drew: what DESIGN rule 4 allows once per view (D-0375).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,7 +27,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// are one; and at least eight pixels large, so an anti-aliased fleck is none. Only the topmost surface counts: with a dialog up, what the backdrop dims is not in view.
 /// </para>
 /// <para>
-/// <b>Not counted</b>, because BRAND gives them amber as identity or state rather than as a signal:
+/// <b>Not counted</b>, because DESIGN gives them amber as identity or state rather than as a signal:
 /// the marks, a selected row's inset bar and the keyboard's focus ring.
 /// </para>
 /// </remarks>

@@ -5,7 +5,7 @@
   <!--
     Lists. Every ListBoxItem is a row: radius 7, hover raises one ink step, selected gets a 10%
     amber tint and a 2px amber bar on the left, and a KpIcon in a selected row takes the text's
-    colour: an icon is amber only while its object is live (BRAND), and a view has one amber element.
+    colour: an icon is amber only while its object is live (DESIGN), and a view has one amber element.
     Classes:
       ListBox.nav   the sidebar: 34px rows, selected is #2A2C30 with no bar
       ListBox.rows  a tall list such as Secrets (52px rows); the default look, named for intent

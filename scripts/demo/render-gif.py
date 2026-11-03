@@ -36,7 +36,7 @@ MIN_FRAME = 0.03
 
 
 def oklch(lightness, chroma, hue):
-    """An sRGB colour from OKLCH, for the brand's status colours (docs/BRAND.md)."""
+    """An sRGB colour from OKLCH, for the brand's status colours (docs/DESIGN.md)."""
     a, b = chroma * math.cos(math.radians(hue)), chroma * math.sin(math.radians(hue))
     l_ = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
     m_ = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3

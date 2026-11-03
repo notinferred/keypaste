@@ -67,7 +67,7 @@
       <SolidColorBrush x:Key="KpAccentText" Color="#8A5A00" />
       <SolidColorBrush x:Key="KpFocusGap" Color="#FFFFFF" />
       <SolidColorBrush x:Key="KpMarkInk" Color="#111214" />
-      <!-- BRAND's status hues at oklch lightness 0.50, so a status read as text keeps 4.5:1 on every light surface. -->
+      <!-- DESIGN's status hues at oklch lightness 0.50, so a status read as text keeps 4.5:1 on every light surface. -->
       <SolidColorBrush x:Key="KpOk" Color="#007840" />
       <SolidColorBrush x:Key="KpDanger" Color="#B02A2D" />
       <SolidColorBrush x:Key="KpInfo" Color="#296898" />

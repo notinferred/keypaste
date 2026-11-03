@@ -23,7 +23,8 @@ Documents fall into four layers that change at different rates. A base document 
 | Base | [ARCHITECTURE](docs/ARCHITECTURE.md) | Code map: projects, entry points, processes and where each concern lives | A project, entry point or process boundary changes |
 | Base | [DECISIONS](DECISIONS.md) | Decisions that constrain later work, one line each. Superseded wording lives in [decisions-archive](docs/decisions-archive.md) as history, not requirements | A step makes a decision a later change could undo |
 | Base | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits | A guarantee, threat or limit changes |
-| Base | [BRAND](docs/BRAND.md) | The marks, the three colours, the type and the usage rules | Founder direction |
+| Base | [DESIGN-PRINCIPLES](docs/DESIGN-PRINCIPLES.md) | The seven design principles, in priority order, and each one's test | Founder direction, with PRODUCT's re-ratification |
+| Base | [DESIGN](docs/DESIGN.md) | The design system: how a screen is put together, the marks, the three colours, the type, the shape, the voice, the interaction and usage rules; `docs/design/tokens` holds its CSS copy | Founder direction |
 | Plan | [ROADMAP](ROADMAP.md) | Track order and milestones: which tasks each release or later stage needs | A milestone, its tasks or the track order changes |
 | Plan | [STEPS](docs/STEPS.md) | Open tasks by product track: dependencies, detail and acceptance | A task is selected, finished or re-planned |
 | Plan | [BACKLOG](docs/BACKLOG.md) | Optional ideas, investigation candidates and conditions for reconsideration; no delivery commitments | An idea is added, selected or dropped |

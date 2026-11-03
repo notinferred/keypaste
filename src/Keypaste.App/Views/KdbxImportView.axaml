@@ -268,7 +268,7 @@
                     AutomationProperties.Name="Unlock without a YubiKey" />
           </StackPanel>
         </Grid>
-        <!-- Waiting is an amber dot with its halo, the dialog's one amber element while it shows (BRAND). -->
+        <!-- Waiting is an amber dot with its halo, the dialog's one amber element while it shows (DESIGN). -->
         <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsWaitingForTouch}">
           <Border Classes="dot waiting" VerticalAlignment="Center" />
           <TextBlock Text="Touch your YubiKey" FontSize="13" VerticalAlignment="Center"

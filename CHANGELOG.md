@@ -214,7 +214,7 @@ When another program saves the vault the desktop has open, such as KeePassXC or 
 
 An agent can now ask for one custom field of an entry it may see, such as `OPENAI_API_KEY`: the prompt names the field, and a grant for it serves none of the entry's other fields. The same field can be named in `kp:///<group>/<title>#OPENAI_API_KEY` for `keypaste run --env-file` and the `run` tool, in `policy.toml`'s `fields` and in `keypaste share --field`. Only a field named like an environment variable leaves; any other, such as `Recovery codes` or `otp`, is refused before anyone is asked or anything is read ([C.5a1](docs/steps/C.5a1.md)).
 
-keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
+keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([DESIGN](docs/DESIGN.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
 Closing the desktop app's window on Windows or macOS now locks it and leaves it in the tray or menu bar, whose icon offers Open, Lock and Quit; on Linux that is a choice in Settings › Startup. Settings › Startup can also open keypaste at login, locked, and with no window while it stays in the tray ([G.4a](docs/steps/G.4a.md)).
 

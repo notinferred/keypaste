@@ -1,4 +1,4 @@
-/* keypaste's brand (docs/BRAND.md) on Starlight's variables. The fonts are the files site/public/fonts serves. */
+/* keypaste's brand (docs/DESIGN.md) on Starlight's variables. The fonts are the files site/public/fonts serves. */
 @font-face {
   font-family: "Instrument Sans";
   src: url("/fonts/InstrumentSans-Regular.woff2") format("woff2");

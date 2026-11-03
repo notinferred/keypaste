@@ -11,7 +11,7 @@ namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
 /// The wordmark alone at the top of the sidebar and the icon alone on the lock screen, never both
-/// (BRAND), each drawn in the palette's ink with its amber dot at the end (N.7).
+/// (DESIGN), each drawn in the palette's ink with its amber dot at the end (N.7).
 /// </summary>
 public sealed class BrandMarksTests
 {

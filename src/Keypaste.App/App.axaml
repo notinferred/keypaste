@@ -3,7 +3,7 @@
              x:Class="Keypaste.App.App"
              Name="keypaste">
 
-  <!-- Both palettes are first-class (BRAND). With no ~/.keypaste/app.toml the app follows the
+  <!-- Both palettes are first-class (DESIGN). With no ~/.keypaste/app.toml the app follows the
        system's light or dark setting, as it changes (AppSettings.Default); Settings' Light or Dark
        wins over it. Resources come before styles because the styles read tokens as static resources. -->
 
