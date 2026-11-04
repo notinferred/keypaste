@@ -172,6 +172,12 @@ internal sealed partial class LogViewModel : ObservableObject
 
     internal bool FilterEmpty => HasTable && _rows.Count == 0;
 
+    /// <summary>Whether a filter hides every line, so widening it would show some.</summary>
+    internal bool OffersShowAll => FilterEmpty && ShowsFilters && _filter.Filter != LogFilter.All;
+
+    [RelayCommand]
+    private void ShowWholeLog() => ShowAll = true;
+
     /// <summary>How many records the table shows of how many the file holds, and under which filter.</summary>
     internal string Summary => _summary;
 
@@ -236,8 +242,8 @@ internal sealed partial class LogViewModel : ObservableObject
         _message = _history.Kind switch
         {
             AuditReadKind.Missing => NothingYet,
-            AuditReadKind.Unreadable => $"That log couldn't be read: {_history.Error}",
-            AuditReadKind.Unchecked => "That log couldn't be checked, so nothing from it is shown here.",
+            AuditReadKind.Unreadable => $"That log couldn't be read: {_history.Error.TrimEnd('.')}. Check the file, then open this screen again.",
+            AuditReadKind.Unchecked => "That log couldn't be checked, so nothing from it is shown here. Check the file, then open this screen again.",
             AuditReadKind.Broken => $"This log has been edited since keypaste wrote it. {ChainSays("where")}",
             _ => string.Empty,
         };
@@ -253,6 +259,7 @@ internal sealed partial class LogViewModel : ObservableObject
         OnPropertyChanged(nameof(UnreadableNote));
         OnPropertyChanged(nameof(OffersVerify));
         OnPropertyChanged(nameof(FilterEmpty));
+        OnPropertyChanged(nameof(OffersShowAll));
         OnPropertyChanged(nameof(HasUnreadableNote));
         OnPropertyChanged(nameof(HasNotes));
         OnPropertyChanged(nameof(VerifyLabel));
@@ -304,6 +311,7 @@ internal sealed partial class LogViewModel : ObservableObject
         OnPropertyChanged(nameof(HasUnreadNote));
         OnPropertyChanged(nameof(HasRows));
         OnPropertyChanged(nameof(FilterEmpty));
+        OnPropertyChanged(nameof(OffersShowAll));
         OnPropertyChanged(nameof(HasNotes));
     }
 

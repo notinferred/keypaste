@@ -43,9 +43,6 @@ internal enum StatusTone
 
 internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 {
-    /// <summary>How long a toast stays up.</summary>
-    internal static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(2.8);
-
     private static readonly TimeSpan _statusTick = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan _countdownTick = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan _fileSettle = TimeSpan.FromMilliseconds(250);
@@ -58,7 +55,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private readonly ITimer? _statusTimer;
     private readonly ITimer? _fileTimer;
     private readonly FileSystemWatcher? _fileWatch;
-    private ITimer? _toastTimer;
     private ITimer? _countdownTimer;
     private TimeSpan _lockWindow;
     private DateTimeOffset _warnedWall;
@@ -123,7 +119,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             post);
 
         LockCommand = new AsyncRelayCommand(() => _session.LockAsync(VaultLockReason.Manual));
-        DismissToastCommand = new RelayCommand(() => Toast = null);
+        Toasts = new ToastStack(_clock, Post);
         BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
         ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && Share is null);
         ClearScopeCommand = new RelayCommand(() => Leave(() => (Content as EntriesViewModel)?.ClearScopeCommand.Press()));
@@ -501,7 +497,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        ShowToast(message);
+        ShowDone(message);
 
         if (Content is not IHoldsDraft { UnsavedDraft: not null })
         {
@@ -637,21 +633,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The shortcut hint on the search field, in the platform's own spelling.</summary>
     public static string SearchShortcut => OperatingSystem.IsMacOS() ? "⌘K" : "Ctrl K";
 
-    /// <summary>A short confirmation in the bottom-right corner, or null.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasToast))]
-    internal partial string? Toast { get; private set; }
+    /// <summary>What the bottom-right corner is saying.</summary>
+    internal ToastStack Toasts { get; }
 
-    internal bool HasToast => Toast is not null;
+    internal void ShowDone(string message) => ShowToast(message, ToastTone.Success);
 
-    internal RelayCommand DismissToastCommand { get; }
-
-    /// <summary>
-    /// Says <paramref name="message"/> in a toast for <see cref="ToastDuration"/>. A second call
-    /// replaces the first and restarts the time.
-    /// </summary>
-    /// <remarks>Never put a secret in it: a toast is a line of plain text on screen.</remarks>
-    internal void ShowToast(string message)
+    internal void ShowToast(string message, ToastTone tone)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
@@ -660,9 +647,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _toastTimer?.Dispose();
-        Toast = message;
-        _toastTimer = _clock.CreateTimer(_ => Post(() => Toast = null), null, ToastDuration, Timeout.InfiniteTimeSpan);
+        Toasts.Show(message, tone);
     }
 
     /// <summary>Where the sidebar is.</summary>
@@ -855,7 +840,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(Authority), ShowToast),
             DestinationKind.Trash => new TrashViewModel(_session),
             DestinationKind.Sharing => Sharing(),
-            DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowToast),
+            DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowDone),
             DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes),
             DestinationKind.Advanced => new AdvancedViewModel(_session, kind => Current = Destinations.Of(kind)),
             _ => null,
@@ -872,6 +857,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private EntriesViewModel Entries()
     {
         var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker) { AskDiscard = AskDiscard };
+
+        entries.ClearSearchBox = () => Search = string.Empty;
+        entries.WidenSearch = () => ClearScopeCommand.Press();
 
         if (_search.Length > 0)
         {
@@ -967,8 +955,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _session,
             Clipboard,
             service,
-            ShowToast,
-            resolved ? null : $"Sharing is off: {ShareEndpoint.EnvironmentVariable} may only name a local development server.",
+            ShowDone,
+            resolved ? null : $"Sharing is off: {ShareEndpoint.EnvironmentVariable} may only name a local development server. Unset it, then restart keypaste.",
             what,
             cancel);
     }
@@ -1613,7 +1601,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        ShowToast($"Saved keypaste {TerminalEdit.VerbOf(done.Action)} for {EntryNameSanitizer.SanitizePath(done.Item).Text}");
+        ShowDone($"Saved keypaste {TerminalEdit.VerbOf(done.Action)} for {EntryNameSanitizer.SanitizePath(done.Item).Text}");
 
         switch (Content)
         {
@@ -1734,7 +1722,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         _statusTimer?.Dispose();
         _fileWatch?.Dispose();
         _fileTimer?.Dispose();
-        _toastTimer?.Dispose();
+        Toasts.Dispose();
         _countdownTimer?.Dispose();
         EntryActivity?.Dispose();
         Import?.Dispose();
@@ -1742,7 +1730,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         ExportImport?.Dispose();
         ExportImport = null;
         Notice = null;
-        Toast = null;
         Projects = [];
         (Content as IDisposable)?.Dispose();
         Content = null;

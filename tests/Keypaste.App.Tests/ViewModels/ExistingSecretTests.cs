@@ -410,7 +410,7 @@ public sealed class ExistingSecretTests : IDisposable
         Enter(project.ReplacementValue, _typed);
         project.ConfirmReplaceCommand.Press();
 
-        Assert.Equal("STRIPE_KEY is no longer on env/billing/.env, so nothing was written.", context.EnvSets.Error);
+        Assert.Equal("STRIPE_KEY is no longer on env/billing/.env, so nothing was written. Check the list, then try again.", context.EnvSets.Error);
         Assert.False(project.IsReplacing);
         Assert.DoesNotContain(project.Variables, variable => variable.Key == "STRIPE_KEY");
         Assert.Null(RereadHomeField("STRIPE_KEY"));

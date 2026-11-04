@@ -404,7 +404,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
         }
         catch (ObjectDisposedException)
         {
-            message = "The vault locked before the change was made. Nothing was changed.";
+            message = "The vault locked before the change was made. Nothing was changed. Unlock it, then try again.";
         }
         finally
         {
@@ -446,14 +446,14 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
     {
         AccessChangeOutcome.Changed =>
             $"Changed. {Factors} The previous version is kept at {result.Result?.Kept?.Path}, and opens with the old password, keyfile and YubiKey.",
-        AccessChangeOutcome.WrongCurrentSecret => "That isn't the vault's current password. Nothing was changed.",
-        AccessChangeOutcome.Locked => "The vault locked before the change was made. Nothing was changed.",
+        AccessChangeOutcome.WrongCurrentSecret => "That isn't the vault's current password. Nothing was changed. Type it again.",
+        AccessChangeOutcome.Locked => "The vault locked before the change was made. Nothing was changed. Unlock it, then try again.",
         AccessChangeOutcome.ChangedAndLocked => string.Empty,
         _ => result.Result?.Outcome switch
         {
             VaultAccessOutcome.NothingToChange => "Nothing would change.",
-            VaultAccessOutcome.EmptyPassword => "A new master password can't be empty. Nothing was changed.",
-            VaultAccessOutcome.PasswordsDoNotMatch => "Those two new passwords aren't the same. Nothing was changed.",
+            VaultAccessOutcome.EmptyPassword => "A new master password can't be empty. Nothing was changed. Type one.",
+            VaultAccessOutcome.PasswordsDoNotMatch => "Those two new passwords aren't the same. Nothing was changed. Type them again.",
             VaultAccessOutcome.WouldLeaveNoPassword when Keyfile == KeyfileChoice.Remove =>
                 "This vault's keyfile is all that opens it, so it can go only if a master password is set in the same change. Nothing was changed.",
             VaultAccessOutcome.WouldLeaveNoPassword =>
@@ -465,8 +465,8 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
             VaultAccessOutcome.KeyfileUnusable => $"{UnlockViewModel.ExplainKeyfile(result.Result.Keyfile.Outcome)} Nothing was changed.",
             VaultAccessOutcome.KeyfileIsFragile =>
                 "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile. Nothing was changed.",
-            VaultAccessOutcome.KeyfileIsThisVault => "A vault can't be its own keyfile, or a copy of itself. Nothing was changed.",
-            _ => "Nothing was changed.",
+            VaultAccessOutcome.KeyfileIsThisVault => "A vault can't be its own keyfile, or a copy of itself. Nothing was changed. Choose another file.",
+            _ => "Nothing was changed. Try again.",
         },
     };
 

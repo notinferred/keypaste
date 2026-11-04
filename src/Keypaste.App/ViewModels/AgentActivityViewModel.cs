@@ -59,7 +59,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private IReadOnlyList<McpToolFinding> _findings = [];
     private string _clientsSignature = string.Empty;
     private readonly Action<Action> _post;
-    private readonly Action<string> _toast;
+    private readonly Action<string, ToastTone> _toast;
     private readonly ITimer _timer;
     private readonly CancellationTokenSource _closing = new();
     private bool _looked;
@@ -89,7 +89,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         TimeProvider? clock = null,
         Action<Action>? post = null,
         ClientConnector? connector = null,
-        Action<string>? toast = null,
+        Action<string, ToastTone>? toast = null,
         Action? openHistory = null,
         ClipboardCountdown? clipboard = null,
         IWebLauncher? web = null)
@@ -99,7 +99,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         _clipboard = clipboard;
         _web = web;
         OpenHistoryCommand = new RelayCommand(() => openHistory?.Invoke(), () => openHistory is not null);
-        _toast = toast ?? (_ => { });
+        _toast = toast ?? ((_, _) => { });
         OffersHistory = openHistory is not null;
         _auditPath = KeypasteHome.AuditPath(home);
         _clientsPath = KeypasteHome.ClientsPath(home);
@@ -266,9 +266,9 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             + (automatic.Count == 0
                 ? "or you set that agent to Automatic for it in its settings."
                 : $"except what these agents are Automatic for: {string.Join("; ", automatic)}."),
-        AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason}",
+        AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason.TrimEnd('.')}. Lock and unlock the vault to try again.",
         AuthorityStatus.HeldBy held => held.Sentence,
-        _ => "Agents cannot reach this vault right now.",
+        _ => "Agents cannot reach this vault right now. Lock and unlock the vault to try again.",
     };
 
     /// <inheritdoc/>
@@ -340,7 +340,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
         else
         {
-            Unavailable = "Waiting requests and allowances can't be read, because this app is not answering agents for this vault.";
+            Unavailable = "Waiting requests and allowances can't be read, because this app is not answering agents for this vault. Lock and unlock the vault to try again.";
         }
 
         Relist(_waiting, waiting);
@@ -662,7 +662,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private void Cancelled()
     {
         CloseConnection();
-        _toast("Cancelled. Nothing was changed.");
+        _toast("Cancelled. Nothing was changed.", ToastTone.Information);
     }
 
     private void CloseConnection()
@@ -713,17 +713,19 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
         IsResetting = true;
         string said;
+        var tone = ToastTone.Warning;
 
         try
         {
             var reply = await _authority.ResetCapsAsync(_closing.Token).ConfigureAwait(true);
+            tone = reply.Decision == AuditDecision.Granted ? ToastTone.Success : ToastTone.Warning;
             said = reply.Decision == AuditDecision.Granted
                 ? $"Reset: {_clientsPath} was set aside as {Path.GetFileName(reply.Kept ?? _clientsPath + AccessCaps.KeptSuffix)}, and every agent gets what the vault's settings say."
-                : $"Not reset: {reply.Reason}.";
+                : $"Not reset: {reply.Reason}. Try Reset again.";
         }
         catch (OperationCanceledException)
         {
-            said = "Not reset: the screen closed before the reset had an answer.";
+            said = "Not reset: the screen closed before the reset had an answer. Open Agents and reset again.";
         }
         finally
         {
@@ -733,7 +735,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         if (!_disposed)
         {
             ReadClients(force: true);
-            _toast(said);
+            _toast(said, tone);
         }
     }
 
@@ -751,7 +753,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
         if (session is null)
         {
-            Show([], "History can't be shown, because this app is not answering agents for this vault.");
+            Show([], "History can't be shown, because this app is not answering agents for this vault. Lock and unlock the vault to try again.");
             return;
         }
 
@@ -769,8 +771,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
         Show(history.Lines, history.Kind switch
         {
-            AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error}",
-            AuditReadKind.Unchecked => "History unavailable: the audit log couldn't be checked, so nothing from it is shown here.",
+            AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error.TrimEnd('.')}. Check the file, then open this screen again.",
+            AuditReadKind.Unchecked => "History unavailable: the audit log couldn't be checked, so nothing from it is shown here. Check the file, then open this screen again.",
             AuditReadKind.Broken => "This log has been edited since keypaste wrote it. The activity log in Settings › Advanced says where.",
             _ => string.Empty,
         });
@@ -794,7 +796,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         if (_authority?.ShowPrompt() != true)
         {
-            _toast("The prompt window is no longer open.");
+            _toast("The prompt window is no longer open.", ToastTone.Information);
         }
 
         Read(forceHistory: false);
@@ -809,7 +811,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
             if (ended)
             {
-                _toast($"Ended {row.Client}'s allowance.");
+                _toast($"Ended {row.Client}'s allowance.", ToastTone.Success);
             }
         }
     }
@@ -818,7 +820,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     {
         _authority?.RevokeAll();
         Read(forceHistory: false);
-        _toast("Ended every allowance.");
+        _toast("Ended every allowance.", ToastTone.Success);
     }
 
     public void Dispose()

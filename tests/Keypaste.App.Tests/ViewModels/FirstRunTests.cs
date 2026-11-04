@@ -121,7 +121,7 @@ public sealed class FirstRunTests : IDisposable
 
         Assert.False(model.HasSelection);
         Assert.True(model.HasLooseError);
-        Assert.Equal("That isn't a KeePass vault.", model.Message);
+        Assert.Equal("That isn't a KeePass vault. Choose a .kdbx file.", model.Message);
     }
 
     [Fact]

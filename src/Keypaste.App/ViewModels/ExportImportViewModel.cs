@@ -359,7 +359,7 @@ internal sealed partial class ExportImportViewModel : ObservableObject, IDisposa
                 // since the preview is laid out again, for the person to look at before importing.
                 var reason = Prose(write.Reason ?? string.Empty);
                 Lay(_into);
-                Message = reason.StartsWith("Nothing was imported", StringComparison.Ordinal) ? reason : $"{reason} Nothing was imported.";
+                Message = reason.StartsWith("Nothing was imported", StringComparison.Ordinal) ? reason : $"{reason} Nothing was imported. Correct that, then choose the file again.";
                 return;
         }
     }

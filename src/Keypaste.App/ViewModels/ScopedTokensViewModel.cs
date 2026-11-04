@@ -200,7 +200,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
 
         if (!_session.IsUnlocked)
         {
-            return (false, null, "The vault is locked.");
+            return (false, null, "The vault is locked. Unlock it, then try again.");
         }
 
         if (!TokenScope.TryParseList(scopes, out var parsed, out var scopeError))
@@ -244,7 +244,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
         ArgumentNullException.ThrowIfNull(row);
 
         var write = _session.Write(vault => new TokenStore(vault).RevokeId(row.Id, _session.Clock.GetUtcNow()), revoked => revoked);
-        var failure = write.Outcome == WriteOutcome.NothingToSave ? "That token is no longer in the vault." : write.Problem("try again");
+        var failure = write.Outcome == WriteOutcome.NothingToSave ? "That token is no longer in the vault. Create another." : write.Problem("try again");
         Refresh();
         return failure;
     }

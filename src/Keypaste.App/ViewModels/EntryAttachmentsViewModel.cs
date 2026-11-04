@@ -139,7 +139,7 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
 
         if (_session.Unlocked is not { } vault)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -158,7 +158,7 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
         }
         catch (ObjectDisposedException)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -174,7 +174,7 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
                 break;
 
             case AttachmentSaveOutcome.NotFound:
-                _report($"{row.DisplayName} is no longer on this item.");
+                _report($"{row.DisplayName} is no longer on this item. Check the list, then try again.");
                 Read();
                 break;
 
@@ -251,7 +251,7 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
         var shown = EntryNameSanitizer.Sanitize(attachment).Text;
         Finish(
             write,
-            replacing ? $"{shown} is no longer on this item." : "This item is no longer in this vault.",
+            replacing ? $"{shown} is no longer on this item. Add it again." : "This item is no longer in this vault. Choose another.",
             replacing ? $"{shown} is replaced, and what it held is gone: {_notKept}" : $"{shown} is attached, but {_notKept}",
             kept);
     }

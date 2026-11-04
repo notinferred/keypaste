@@ -46,7 +46,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         Type(model, _master);
         await model.UnlockAsync();
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal("That password didn't open this vault.", model.Message);
+        Assert.Equal("That password didn't open this vault. It may also need a key file or a YubiKey: add one below, or type the password again.", model.Message);
 
         model.UseHardwareKeyCommand.Press();
         Assert.Equal("YubiKey, slot 2", model.HardwareKeyLabel);

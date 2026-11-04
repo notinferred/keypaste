@@ -394,7 +394,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             if (spec is null)
             {
                 Report(refusal is null
-                    ? "This item's TOTP could not be read. The vault may have locked."
+                    ? "This item's TOTP could not be read. The vault may have locked: unlock it, then try again."
                     : TotpRefusal(refusal));
                 return null;
             }
@@ -416,7 +416,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         if (ReadField(row.Name) is not { Length: > 0 } value)
         {
-            Report($"{row.DisplayName} is empty, or could not be read. The vault may have locked.");
+            Report($"{row.DisplayName} is empty, or could not be read. The vault may have locked: unlock it, then try again.");
             return null;
         }
 
@@ -445,7 +445,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         if (filled is null)
         {
-            Report("That item could not be read. The vault may have locked.");
+            Report("That item could not be read. The vault may have locked: unlock it, then try again.");
             return null;
         }
 
@@ -989,7 +989,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         if (found is not { Length: > 0 } stored)
         {
-            Report("That item could not be read. The vault may have locked.");
+            Report("That item could not be read. The vault may have locked: unlock it, then try again.");
             return;
         }
 
@@ -1079,7 +1079,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         var write = _session.Write(vault => EntryRotation.Rotate(vault, Name, SecretRecipe.Default), outcome => outcome == RotateOutcome.Rotated);
         var problem = write.Outcome == WriteOutcome.NothingToSave
-            ? $"'{_entryPath}' could not be rotated here."
+            ? $"'{_entryPath}' could not be rotated here. Generate a new password in its edit form instead."
             : write.Problem("make your change again");
 
         if (problem is not null)
@@ -1136,7 +1136,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     {
         var write = _session.Write(change, changed => changed);
         var problem = write.Outcome == WriteOutcome.NothingToSave
-            ? unchanged ?? $"'{_entryPath}' is no longer in this vault."
+            ? unchanged ?? $"'{_entryPath}' is no longer in this vault. Choose another item."
             : write.Problem("make your change again");
 
         if (problem is not null)
@@ -1408,7 +1408,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             },
             updated => updated);
         var problem = write.Outcome == WriteOutcome.NothingToSave
-            ? $"'{_entryPath}' is no longer in this vault."
+            ? $"'{_entryPath}' is no longer in this vault. Choose another item."
             : write.Problem("make your change again");
 
         if (problem is not null)

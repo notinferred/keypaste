@@ -244,7 +244,7 @@ public sealed class RestoreBackupTests : IDisposable
         unlock.SelectedRecent = Assert.Single(unlock.Recent);
 
         Assert.Null(unlock.SelectedPath);
-        Assert.Equal("That file isn't there any more.", unlock.Message);
+        Assert.Equal("That file isn't there any more. Choose it from where it is now.", unlock.Message);
         Assert.False(unlock.StartRestoreCommand.CanExecute(null));
     }
 

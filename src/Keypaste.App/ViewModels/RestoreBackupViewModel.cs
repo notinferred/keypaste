@@ -51,7 +51,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
     private const string _refusedWithKeyfile =
         "That password and keyfile don't open this backup, or the backup is damaged. Try another copy.";
 
-    private const string _expired = "That was left waiting a while, so the password was cleared. Nothing was changed.";
+    private const string _expired = "That was left waiting a while, so the password was cleared. Nothing was changed. Type it again.";
 
     private readonly string _vaultPath;
     private readonly TimeProvider _clock;
@@ -292,11 +292,11 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         }
         catch (VaultChangedOnDiskException)
         {
-            Forget("The vault file changed while the backup was being restored, so it was left alone. Nothing was replaced.");
+            Forget("The vault file changed while the backup was being restored, so it was left alone. Nothing was replaced. Try again.");
         }
         catch (VaultException e)
         {
-            Forget($"{e.Message} Nothing was replaced.");
+            Forget($"{e.Message} Nothing was replaced. Try again.");
         }
         finally
         {

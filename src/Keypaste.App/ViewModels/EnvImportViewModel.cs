@@ -32,7 +32,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
     private readonly string _project;
     private readonly IVaultFilePicker? _picker;
     private readonly Action<string?> _report;
-    private readonly Action<string?> _announce;
+    private readonly Action<string?, ToastTone> _announce;
     private readonly Action _imported;
 
     private string _planned = EnvProfileNames.Default;
@@ -46,7 +46,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
         string project,
         IVaultFilePicker? picker,
         Action<string?> report,
-        Action<string?> announce,
+        Action<string?, ToastTone> announce,
         Action imported)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -138,7 +138,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
 
         if (_session.Unlocked is not { } vault)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -146,16 +146,16 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
         {
             _report(failure switch
             {
-                DotEnvFileFailure.Missing => $"There is no file at {path}, so nothing was imported.",
-                DotEnvFileFailure.TooLarge => $"{path} is larger than a .env file can be, so nothing was imported.",
-                _ => $"{path} could not be read: {readError}",
+                DotEnvFileFailure.Missing => $"There is no file at {path}, so nothing was imported. Choose another file.",
+                DotEnvFileFailure.TooLarge => $"{path} is larger than a .env file can be, so nothing was imported. Choose another file.",
+                _ => $"{path} could not be read: {readError?.TrimEnd('.')}. Check the file, then choose it again.",
             });
             return;
         }
 
         if (!DotEnv.TryDecode(bytes, out var text, out var decodeError))
         {
-            _report($"{path}: {decodeError} Nothing was imported.");
+            _report($"{path}: {decodeError} Nothing was imported. Save the file as UTF-8, then choose it again.");
             return;
         }
 
@@ -164,7 +164,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
             var problems = document.Problems.Take(_problemsShown)
                 .Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text);
             var more = document.Problems.Count > _problemsShown ? $" ({document.Problems.Count - _problemsShown} more not shown)" : string.Empty;
-            _report($"{path} has problems, so nothing was imported: {string.Join("; ", problems)}{more}.");
+            _report($"{path} has problems, so nothing was imported: {string.Join("; ", problems)}{more}. Fix the file, then choose it again.");
             return;
         }
 
@@ -182,7 +182,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
 
         if (plan.Refusal is { } refusal)
         {
-            _report($"Nothing was imported: {EntryNameSanitizer.SanitizeProse(refusal, 1024).Text}.");
+            _report($"Nothing was imported: {EntryNameSanitizer.SanitizeProse(refusal, 1024).Text}. Correct that, then choose the file again.");
             return;
         }
 
@@ -221,7 +221,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
         switch (write.Outcome)
         {
             case WriteOutcome.Locked:
-                _report("The vault is locked.");
+                _report("The vault is locked. Unlock it, then try again.");
                 Clear();
                 return;
 
@@ -233,12 +233,12 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
                 else if (write.Value.Rejection is { } rejection)
                 {
                     // Checked before anybody was asked, so nothing has been saved. Say so and stop.
-                    _report($"{rejection} Nothing was imported.");
+                    _report($"{rejection} Nothing was imported. Correct that, then choose the file again.");
                 }
                 else
                 {
                     var unchanged = OfferToDelete(path, read);
-                    _announce($"{Where} already matches the file; nothing was written.{unchanged}");
+                    _announce($"{Where} already matches the file; nothing was written.{unchanged}", ToastTone.Information);
                 }
 
                 Clear();
@@ -247,7 +247,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
             case WriteOutcome.Saved:
                 var written = write.Value.Plan.Created.Count + write.Value.Plan.Updated.Count;
                 var kept = OfferToDelete(path, read);
-                _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}.{kept}");
+                _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {Where}.{kept}", ToastTone.Success);
                 Clear();
                 _imported();
                 return;
@@ -309,11 +309,11 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
         switch (outcome)
         {
             case SourceCleanup.Deleted:
-                _announce($"Deleted {path}.");
+                _announce($"Deleted {path}.", ToastTone.Success);
                 return;
 
             case SourceCleanup.Missing:
-                _announce($"{path} was already gone, so nothing was deleted.");
+                _announce($"{path} was already gone, so nothing was deleted.", ToastTone.Information);
                 return;
 
             case SourceCleanup.Stranded:

@@ -99,7 +99,7 @@ public sealed class ShellImportTests : IDisposable
         import.ConfirmCommand.Press();
 
         Assert.Null(shell.Import);
-        Assert.Equal("Imported 3 items from foreign.kdbx", shell.Toast);
+        Assert.Equal("Imported 3 items from foreign.kdbx", shell.Toasts.Shown.Last().Message);
         Assert.Equal(VaultSaveStatus.Saved, _session.Unlocked!.SaveState().Status);
         Assert.NotNull(_session.Unlocked!.Find(new EntryName("foreign/Banking", "Checking")));
     }
@@ -238,13 +238,13 @@ public sealed class ShellImportTests : IDisposable
 
         Assert.True(export.IsImported, export.Message);
         Assert.True(shell.HasImport);
-        Assert.Null(shell.Toast);
+        Assert.Empty(shell.Toasts.Shown);
         Assert.NotNull(_session.Unlocked!.Find(new EntryName("keepassxc", "site")));
 
         export.CancelCommand.Press();
 
         Assert.False(shell.HasImport);
-        Assert.Equal("Imported 1 item from keepassxc.csv", shell.Toast);
+        Assert.Equal("Imported 1 item from keepassxc.csv", shell.Toasts.Shown.Last().Message);
         Assert.True(shell.ImportCommand.CanExecute(null));
     }
 
@@ -260,7 +260,7 @@ public sealed class ShellImportTests : IDisposable
 
         Assert.Null(shell.ExportImport);
         Assert.Null(export.Source);
-        Assert.Null(shell.Toast);
+        Assert.Empty(shell.Toasts.Shown);
     }
 
     [Fact]

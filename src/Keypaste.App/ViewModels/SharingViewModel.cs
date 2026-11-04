@@ -231,7 +231,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 
         if (_session.Unlocked is not { } vault)
         {
-            Error = "The vault is locked.";
+            Error = "The vault is locked. Unlock it, then try again.";
             return;
         }
 
@@ -270,7 +270,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         {
             var withdrawn = await _service.RevokeAsync(vault, outcome.Info!.Id, CancellationToken.None).ConfigureAwait(true);
             Error = withdrawn.Ok
-                ? "The link could not be copied, so it was withdrawn."
+                ? "The link could not be copied, so it was withdrawn. Create the link again."
                 : $"The link could not be copied, and withdrawing it failed: {withdrawn.Message}. Revoke it from the list.";
             await LoadAsync(online: false).ConfigureAwait(true);
             return;
@@ -308,7 +308,7 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 
         if (_session.Unlocked is not { } vault)
         {
-            Error = "The vault is locked.";
+            Error = "The vault is locked. Unlock it, then try again.";
             return;
         }
 

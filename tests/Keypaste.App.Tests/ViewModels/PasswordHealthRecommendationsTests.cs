@@ -81,7 +81,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
 
         Assert.Equal("4", Settings(shell).Count);
         Assert.Null(shell.Notice);
-        Assert.Null(shell.Toast);
+        Assert.Empty(shell.Toasts.Shown);
     }
 
     [Fact]
@@ -210,7 +210,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         weak.OpenCommand.Press();
 
         Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
-        Assert.Equal("services/Mail is no longer in this vault.", shell.Recommendations.Message);
+        Assert.Equal("services/Mail is no longer in this vault. Check the list, then try again.", shell.Recommendations.Message);
     }
 
     private static void Add(Vault vault, EntryName name, string password) =>

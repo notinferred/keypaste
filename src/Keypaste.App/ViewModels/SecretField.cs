@@ -177,8 +177,8 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
         PasteOutcome.Pasted => string.Empty,
         PasteOutcome.Empty => "There was nothing to paste.",
         PasteOutcome.Refused =>
-            "That could not be pasted: it contains something no keyboard can type. Nothing was added.",
-        _ => "The clipboard could not be read.",
+            "That could not be pasted: it contains something no keyboard can type. Nothing was added. Type it instead.",
+        _ => "The clipboard could not be read. Copy it again, then paste.",
     };
 
     /// <summary>The entered characters, as the one string the vault write needs.</summary>

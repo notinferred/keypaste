@@ -1,31 +1,42 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Tests.Rendering;
+using Keypaste.App.ViewModels;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// A plain toast says something and takes no press, so a click where it is drawn reaches the control
-/// under it; the clipboard toast keeps its Clear now (C.4).
+/// A toast can be pointed at: it holds while the pointer is on it and closes with its ×, and the
+/// clipboard toast keeps its Clear now.
 /// </summary>
 public sealed class ToastHitTests
 {
     [Fact]
-    public Task A_plain_toast_lets_a_press_reach_what_it_covers() => HeadlessSession.On(() =>
+    public Task A_toast_waits_while_the_pointer_is_on_it_and_closes_with_its_button() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-toast-hit-");
-        shell.Shell.ShowToast("Saved billing.");
+        shell.Shell.ShowToast("Saved billing.", ToastTone.Success);
         RenderedShell.Drain();
         shell.Frame();
 
-        var toast = shell.Named<Border>("Toast");
+        var toast = shell.Window.GetVisualDescendants().OfType<Border>().Single(border => border.Classes.Contains("toast") && border.DataContext is Toast);
         Assert.True(toast.IsEffectivelyVisible);
         var hit = Hit(shell.Window, toast);
+        Assert.True(hit is Visual visual && (visual == toast || toast.IsVisualAncestorOf(visual)), $"the toast did not take the pointer: {hit}");
 
-        Assert.False(hit is Visual visual && (visual == toast || toast.IsVisualAncestorOf(visual)), $"the toast took the press: {hit}");
+        WindowInput.Hover(shell.Window, toast);
+        Assert.True(toast.IsPointerOver);
+
+        var close = toast.GetVisualDescendants().OfType<Button>().Single();
+        Assert.Equal("Close this message", AutomationProperties.GetName(close));
+        close.Command!.Execute(null);
+        RenderedShell.Drain();
+
+        Assert.Empty(shell.Shell.Toasts.Shown);
     });
 
     [Fact]

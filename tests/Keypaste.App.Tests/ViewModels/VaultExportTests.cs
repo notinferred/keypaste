@@ -57,7 +57,7 @@ public sealed class VaultExportTests
 
         Assert.Equal(1, picker.ExportCalls);
         Assert.False(File.Exists(picker.ExportPath));
-        Assert.Equal("The vault locked before the copy was made. Nothing was written.", model.Message);
+        Assert.Equal("The vault locked before the copy was made. Nothing was written. Unlock it, then try again.", model.Message);
     }
 
     [Fact]

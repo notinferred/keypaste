@@ -50,7 +50,7 @@ public sealed class UnlockKeyfileTests : IDisposable
         Type(model, _master);
         await model.UnlockAsync();
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal("That password didn't open this vault.", model.Message);
+        Assert.Equal("That password didn't open this vault. It may also need a key file: add one below, or type the password again.", model.Message);
 
         _picker.KeyfilePath = _keyfile;
         await model.ChooseKeyfileAsync();
@@ -103,7 +103,7 @@ public sealed class UnlockKeyfileTests : IDisposable
         await model.UnlockAsync();
 
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal("That password and keyfile didn't open this vault.", model.Message);
+        Assert.Equal("That password and keyfile didn't open this vault. Check both, then try again.", model.Message);
     }
 
     [Fact]
@@ -118,12 +118,12 @@ public sealed class UnlockKeyfileTests : IDisposable
 
         _picker.KeyfilePath = Path.Combine(_home.Path, "absent.key");
         await model.ChooseKeyfileAsync();
-        Assert.Equal("That keyfile isn't there any more.", model.Message);
+        Assert.Equal("That keyfile isn't there any more. Choose it from where it is now.", model.Message);
         Assert.Null(model.KeyfilePath);
 
         _picker.KeyfilePath = empty;
         await model.ChooseKeyfileAsync();
-        Assert.Equal("That file is empty, so it can't be a keyfile.", model.Message);
+        Assert.Equal("That file is empty, so it can't be a keyfile. Choose another.", model.Message);
 
         _picker.KeyfilePath = path;
         await model.ChooseKeyfileAsync();
@@ -148,7 +148,7 @@ public sealed class UnlockKeyfileTests : IDisposable
 
         Assert.Equal(0, _unlockedCalls);
         Assert.False(_session.IsUnlocked);
-        Assert.Equal("That keyfile isn't there any more.", model.Message);
+        Assert.Equal("That keyfile isn't there any more. Choose it from where it is now.", model.Message);
     }
 
     [Fact]

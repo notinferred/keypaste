@@ -285,7 +285,7 @@ public sealed class VaultAccessTests : IDisposable
         Enter(settings.Access, "not-the-password", _later);
         await Confirm(settings.Access);
 
-        Assert.Equal("That isn't the vault's current password. Nothing was changed.", settings.Access.Message);
+        Assert.Equal("That isn't the vault's current password. Nothing was changed. Type it again.", settings.Access.Message);
         Assert.Equal(before, Snapshot());
         Assert.True(session.IsUnlocked);
         Assert.Equal(0, settings.Access.CurrentMaskedLength);
@@ -324,7 +324,7 @@ public sealed class VaultAccessTests : IDisposable
         Enter(settings.Access, _master, _later, "a-different-one");
         await Confirm(settings.Access);
 
-        Assert.Equal("Those two new passwords aren't the same. Nothing was changed.", settings.Access.Message);
+        Assert.Equal("Those two new passwords aren't the same. Nothing was changed. Type them again.", settings.Access.Message);
         Assert.Equal(before, Snapshot());
     }
 

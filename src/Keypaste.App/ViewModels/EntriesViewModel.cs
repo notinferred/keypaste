@@ -119,6 +119,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(CanRenameGroup));
                 OnPropertyChanged(nameof(ListTitle));
                 OnPropertyChanged(nameof(SearchScope));
+                OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
                 OnPropertyChanged(nameof(ListEmptyNote));
                 OnPropertyChanged(nameof(ListEmptyOffersImport));
                 OnPropertyChanged(nameof(CreateGroupPrompt));
@@ -169,6 +170,24 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 ? $"No items in {ListTitle}."
                 : "No items in this vault yet.";
 
+    /// <summary>Whether a search found nothing, so clearing it is the next step.</summary>
+    internal bool ListEmptyOffersClearSearch => Search.Trim().Length > 0;
+
+    /// <summary>Whether that search looked in one group, so looking everywhere is a next step too.</summary>
+    internal bool ListEmptyOffersSearchAll => ListEmptyOffersClearSearch && SearchScope is not null;
+
+    /// <summary>Clears the search box, which the shell owns.</summary>
+    internal Action? ClearSearchBox { get; set; }
+
+    /// <summary>Widens the search to every item through the shell, which keeps a draft from being lost.</summary>
+    internal Action? WidenSearch { get; set; }
+
+    [RelayCommand]
+    private void ClearSearch() => ClearSearchBox?.Invoke();
+
+    [RelayCommand]
+    private void SearchAllItems() => WidenSearch?.Invoke();
+
     /// <summary>Whether the empty list offers New, which it does when a filter is not the reason.</summary>
     internal bool ListEmptyOffersNew => Search.Trim().Length == 0;
 
@@ -200,6 +219,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             {
                 OnPropertyChanged(nameof(ListEmptyNote));
                 OnPropertyChanged(nameof(ListEmptyOffersNew));
+                OnPropertyChanged(nameof(ListEmptyOffersClearSearch));
+                OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
                 OnPropertyChanged(nameof(ListEmptyOffersImport));
                 // A new query is a new question, so an entry held in the list by the last one stops
                 // being held by this one.
@@ -771,6 +792,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         OnPropertyChanged(nameof(Search));
         OnPropertyChanged(nameof(ListEmptyNote));
         OnPropertyChanged(nameof(ListEmptyOffersNew));
+        OnPropertyChanged(nameof(ListEmptyOffersClearSearch));
+        OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
         OnPropertyChanged(nameof(ListEmptyOffersImport));
     }
 
@@ -811,7 +834,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         if (found is not { } entry)
         {
-            Error = "That item could not be read. The vault may have locked.";
+            Error = "That item could not be read. The vault may have locked: unlock it, then try again.";
             return null;
         }
 
@@ -948,7 +971,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         if (_session.Unlocked is not { } vault)
         {
-            Error = "The vault is locked.";
+            Error = "The vault is locked. Unlock it, then try again.";
             return;
         }
 
@@ -1061,7 +1084,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         if (write.Outcome != WriteOutcome.Saved)
         {
-            Error = "That could not be undone, because the vault has changed since. Nothing was changed.";
+            Error = "That could not be undone, because the vault has changed since. Nothing was changed. Make the change by hand.";
             return;
         }
 
@@ -1537,14 +1560,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 return "That group already has an item with this name.";
 
             case OrganizeOutcome.DestinationAmbiguous:
-                return "That would leave two items answering to one path, and keypaste could not tell them apart afterwards.";
+                return "That would leave two items answering to one path, and keypaste could not tell them apart afterwards. Choose another name.";
 
             case OrganizeOutcome.NameRefused:
                 VaultNameRules.IsValidTitle(target.Title, out var why);
                 return $"keypaste will not use that title: {why}.";
 
             default:
-                return "That change could not be made.";
+                return "That change could not be made. Check the name and the group, then try again.";
         }
     }
 
@@ -1561,10 +1584,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 return IsMovingGroup ? "The group is already there." : "That is already its name.";
 
             case GroupOutcome.DestinationOccupied:
-                return "Something in there already answers to that name. Nothing was changed.";
+                return "Something in there already answers to that name. Nothing was changed. Choose another name.";
 
             case GroupOutcome.DestinationAmbiguous:
-                return "That change would leave two items answering to one path, and keypaste could not tell them apart afterwards.";
+                return "That change would leave two items answering to one path, and keypaste could not tell them apart afterwards. Choose another name.";
 
             case GroupOutcome.DestinationInside:
                 return "A group cannot go inside itself or a group within it. Choose another group.";
@@ -1578,10 +1601,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
             case GroupOutcome.NameReserved:
                 return "env at the top level and the recycle bin are names keypaste assigns. A group cannot be created as one, renamed to one "
-                    + "or moved to the top level as env; env is not renamed, moved or deleted, and a group holding the recycle bin is not deleted.";
+                    + "or moved to the top level as env; env is not renamed, moved or deleted, and a group holding the recycle bin is not deleted. Choose another name or group.";
 
             default:
-                return "That change could not be made.";
+                return "That change could not be made. Check the name and the group, then try again.";
         }
     }
 

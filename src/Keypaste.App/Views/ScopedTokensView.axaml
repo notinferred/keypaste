@@ -125,7 +125,15 @@
               </Grid>
             </Border>
             <Border Classes="table-row" Padding="16,12" IsVisible="{Binding HasNoRows}">
-              <TextBlock Classes="caption" Text="No tokens yet." />
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Classes="caption" Text="No tokens yet." VerticalAlignment="Center" />
+                <Button Classes="sm"
+                        Name="NewTokenFromEmpty"
+                        Content="New token"
+                        IsVisible="{Binding CanOpenForm}"
+                        Command="{Binding OpenFormCommand}"
+                        AutomationProperties.Name="New token" />
+              </StackPanel>
             </Border>
             <ItemsControl ItemsSource="{Binding Rows}">
               <ItemsControl.ItemTemplate>

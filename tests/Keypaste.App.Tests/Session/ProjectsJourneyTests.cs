@@ -250,7 +250,7 @@ public sealed class ProjectsJourneyTests
         var project = screen.OpenProject!;
 
         // The clock here never ends the last run's toast, which would cover this confirmation's action.
-        shell.DismissToastCommand.Press();
+        shell.Toasts.Shown.ToList().ForEach(toast => toast.CloseCommand.Press());
 
         var run = ByName<Button>(main, "Run in a terminal");
         Press(main, run);

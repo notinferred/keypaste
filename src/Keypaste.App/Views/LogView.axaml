@@ -321,9 +321,18 @@
               </ItemsControl>
 
               <Border Classes="table-row" IsVisible="{Binding FilterEmpty}">
-                <TextBlock Text="Nothing in this log matches this filter."
-                           FontSize="12.5"
-                           Foreground="{DynamicResource KpTextMuted}" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <TextBlock Text="Nothing in this log matches this filter."
+                             FontSize="12.5"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource KpTextMuted}" />
+                  <Button Classes="sm"
+                          Name="ShowWholeLog"
+                          Content="Show all"
+                          IsVisible="{Binding OffersShowAll}"
+                          Command="{Binding ShowWholeLogCommand}"
+                          AutomationProperties.Name="Show all" />
+                </StackPanel>
               </Border>
 
             </StackPanel>

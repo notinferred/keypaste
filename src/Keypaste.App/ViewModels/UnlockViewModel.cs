@@ -441,7 +441,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             }
             else if (value is not null && !OfferForRestore(value.Path, "That file isn't there any more"))
             {
-                Fail("That file isn't there any more.");
+                Fail("That file isn't there any more. Choose it from where it is now.");
             }
         }
     }
@@ -630,7 +630,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         {
             if (!OfferForRestore(path, "That file isn't there any more"))
             {
-                Fail("That file isn't there any more.");
+                Fail("That file isn't there any more. Choose it from where it is now.");
             }
 
             return false;
@@ -640,7 +640,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         {
             if (!OfferForRestore(path, "That isn't a readable KeePass vault"))
             {
-                Fail("That isn't a KeePass vault.");
+                Fail("That isn't a KeePass vault. Choose a .kdbx file.");
             }
 
             return false;
@@ -952,9 +952,15 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            // A KDBX file does not record that it needs a second factor, so the password alone failing may mean that.
+            var maybeSecondFactor = outcome == UnlockOutcome.WrongPassword && keyfile is null && slot is null;
             var explained = outcome == UnlockOutcome.KeyfileUnusable && keyfile is not null
                 ? ExplainKeyfile(VaultKeyfile.Inspect(keyfile).Outcome)
-                : Explain(outcome, keyfile is not null, slot is not null);
+                : maybeSecondFactor
+                    ? ExplainPasswordAlone()
+                    : Explain(outcome, keyfile is not null, slot is not null);
+
+            MoreOptions |= maybeSecondFactor;
 
             Fail(HasBackups && outcome != UnlockOutcome.KeyfileUnusable
                 ? $"{explained} If the file is damaged, or its password or keyfile was changed and lost, restore a backup."
@@ -1181,7 +1187,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     internal static string ExplainKeyfileCreation(KeyfileCreationOutcome outcome) => outcome switch
     {
         KeyfileCreationOutcome.PathAlreadyExists => "There's already a file there, and keypaste won't replace it. Choose a name that isn't taken.",
-        KeyfileCreationOutcome.Unsupported => "This build of keypaste can't read a KeePass XML keyfile, so it won't make one.",
+        KeyfileCreationOutcome.Unsupported => "This build of keypaste can't read a KeePass XML keyfile, so it won't make one. Choose a keyfile you already have.",
         _ => "The keyfile couldn't be saved there. Choose another folder.",
     };
 
@@ -1195,13 +1201,13 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>Why a file cannot be used as a keyfile, in the register of <see cref="Explain"/>.</summary>
     internal static string ExplainKeyfile(KeyfileOutcome outcome) => outcome switch
     {
-        KeyfileOutcome.Missing => "That keyfile isn't there any more.",
-        KeyfileOutcome.Unreadable => "That keyfile couldn't be read.",
-        KeyfileOutcome.Empty => "That file is empty, so it can't be a keyfile.",
+        KeyfileOutcome.Missing => "That keyfile isn't there any more. Choose it from where it is now.",
+        KeyfileOutcome.Unreadable => "That keyfile couldn't be read. Check that you can open it, then choose it again.",
+        KeyfileOutcome.Empty => "That file is empty, so it can't be a keyfile. Choose another.",
         KeyfileOutcome.IsAVault => "That's a KeePass vault, not a keyfile.",
         KeyfileOutcome.XmlUnreadable =>
-            "That's a KeePass XML keyfile, and this build of keypaste can't read one: it would use the wrong key. Nothing was opened.",
-        _ => "That file can't be used as a keyfile.",
+            "That's a KeePass XML keyfile, and this build of keypaste can't read one: it would use the wrong key. Nothing was opened. Open this vault in KeePassXC instead.",
+        _ => "That file can't be used as a keyfile. Choose another.",
     };
 
     private string? RememberedKeyfile(string? vaultPath) => Remembered(vaultPath)?.KeyfilePath;
@@ -1220,7 +1226,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             $"That YubiKey's slot {slot} isn't set up for challenge-response. If the vault uses the other slot, switch to it.",
         HardwareKeyFailure.TimedOut => "The YubiKey wasn't touched in time. Unlock again and touch it when it flashes.",
         HardwareKeyFailure.Cancelled => "Stopped waiting for the YubiKey. Nothing was opened.",
-        _ => failure?.Message ?? "The YubiKey didn't answer.",
+        _ => failure?.Message ?? "The YubiKey didn't answer. Plug it in again, then try again.",
     };
 
     /// <summary>
@@ -1242,7 +1248,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         VaultCreationOutcome.KeyfileIsThisVault => "A vault can't be its own keyfile. Choose another file.",
         VaultCreationOutcome.HardwareKeyNotFound =>
             $"No YubiKey with slot {slot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager.",
-        _ => "That vault couldn't be created.",
+        _ => "That vault couldn't be created. Check that you can write to that folder, then try again.",
     };
 
     /// <summary>Why a YubiKey gave the new vault's first save no answer, so no vault was made.</summary>
@@ -1310,13 +1316,17 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             "That password, keyfile and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
         UnlockOutcome.WrongPassword when withHardwareKey =>
             "That password and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
-        UnlockOutcome.WrongPassword when withKeyfile => "That password and keyfile didn't open this vault.",
-        UnlockOutcome.WrongPassword => "That password didn't open this vault.",
-        UnlockOutcome.KeyfileUnusable => "That keyfile can't be used.",
-        UnlockOutcome.NotFound => "That file isn't there any more.",
-        UnlockOutcome.NotAKdbx => "That isn't a KeePass vault.",
-        _ => "That vault couldn't be opened.",
+        UnlockOutcome.WrongPassword when withKeyfile => "That password and keyfile didn't open this vault. Check both, then try again.",
+        UnlockOutcome.WrongPassword => "That password didn't open this vault. Type it again.",
+        UnlockOutcome.KeyfileUnusable => "That keyfile can't be used. Choose it again, or another.",
+        UnlockOutcome.NotFound => "That file isn't there any more. Choose it from where it is now.",
+        UnlockOutcome.NotAKdbx => "That isn't a KeePass vault. Choose a .kdbx file.",
+        _ => "That vault couldn't be opened. Check that you can read the file, then try again.",
     };
+
+    private string ExplainPasswordAlone() => OffersHardwareKey
+        ? "That password didn't open this vault. It may also need a key file or a YubiKey: add one below, or type the password again."
+        : "That password didn't open this vault. It may also need a key file: add one below, or type the password again.";
 
     private void Remember(string path, string? keyfile, int? hardwareKeySlot = null)
     {

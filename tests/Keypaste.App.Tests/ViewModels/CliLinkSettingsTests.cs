@@ -230,7 +230,7 @@ public sealed class CliLinkSettingsTests
     [InlineData(CliLinkOutcome.Cancelled, null, null, "Nothing was linked.")]
     [InlineData(CliLinkOutcome.Refused, CliLinkRefusal.NotKeypaste, null, FakeCliLink.Location + " changed before keypaste linked it, so it was left as it is.")]
     [InlineData(CliLinkOutcome.Refused, CliLinkRefusal.BackupExists, null, _backup + " already exists, so keypaste replaces nothing. Move or delete it to replace " + FakeCliLink.Location + ".")]
-    [InlineData(CliLinkOutcome.Failed, null, "No space left on device", "keypaste could not link " + FakeCliLink.Location + ": No space left on device")]
+    [InlineData(CliLinkOutcome.Failed, null, "No space left on device", "keypaste could not link " + FakeCliLink.Location + ": No space left on device. Correct that, then link again.")]
     public async Task A_link_that_did_not_happen_says_so_and_leaves_the_row(CliLinkOutcome outcome, CliLinkRefusal? refusal, string? reason, string message)
     {
         var link = FakeCliLink.At(CliLinkState.Absent, answer: new CliLinkResult(outcome, refusal, reason));

@@ -42,7 +42,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     private readonly IVaultFilePicker? _picker;
     private readonly ProjectLaunching _launching;
     private readonly Action<string?> _report;
-    private readonly Action<string?> _announce;
+    private readonly Action<string?, ToastTone> _announce;
     private readonly CancellationTokenSource _withdrawn = new();
 
     private TaskCompletionSource<bool>? _answer;
@@ -53,7 +53,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         IVaultFilePicker? picker,
         ProjectLaunching launching,
         Action<string?> report,
-        Action<string?> announce)
+        Action<string?, ToastTone> announce)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(project);
@@ -170,7 +170,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     {
         if (_session.VaultPath is not { } vault)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -185,7 +185,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (!System.IO.Directory.Exists(directory))
         {
-            _report($"There is no directory at {directory}.");
+            _report($"There is no directory at {directory}. Choose one that exists.");
             return;
         }
 
@@ -200,7 +200,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (!ProjectMappings.Save(MappingsPath, ProjectMappings.Put(mappings, mapping)))
         {
-            _report($"{MappingsPath} could not be written.");
+            _report($"{MappingsPath} could not be written. Check that you can write to it, then save again.");
             return;
         }
 
@@ -208,7 +208,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         Directory = directory;
         Command = command;
         _report(null);
-        _announce("Saved. Run starts the command in a terminal there, after you confirm it.");
+        _announce("Saved. Run starts the command in a terminal there, after you confirm it.", ToastTone.Success);
     }
 
     /// <summary>Asks, resolves and, only on a released set, starts the terminal.</summary>
@@ -231,20 +231,20 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (!_launching.Terminal.TryPlan(mapping.Directory, run ? mapping.Command : null, out var target, out var refusal))
         {
-            _report($"Nothing was started: {refusal}.");
+            _report($"Nothing was started: {refusal}. Correct that, then run it again.");
             return;
         }
 
         if (_launching.Authority is not { } authority)
         {
-            _report("Nothing was started: a Run from the app writes a History line, and nothing in this app records one now.");
+            _report("Nothing was started: a Run from the app writes a History line, and nothing in this app records one now. Lock and unlock the vault, then run it again.");
             return;
         }
 
         // A Run's line is written before it starts, so it is not confirmed while the log will not open (T-6).
         if (authority.AuditFailure is { } unopened)
         {
-            _report(Shown($"Nothing was started: a Run from the app writes a History line, and {unopened.TrimEnd('.')}."));
+            _report(Shown($"Nothing was started: a Run from the app writes a History line, and {unopened.TrimEnd('.')}. Check that the audit log can be written, then run it again."));
             return;
         }
 
@@ -276,7 +276,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (unrecordable is not null)
         {
-            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app writes one."));
+            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app writes one. Copy the run command instead."));
             return;
         }
 
@@ -297,13 +297,13 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (result.Outcome == ChildOutcome.Started)
         {
-            _announce(run
-                ? $"Started {mapping.Command} in a terminal in {mapping.Directory}."
-                : $"Opened a terminal in {mapping.Directory}.");
+            _announce(
+                run ? $"Started {mapping.Command} in a terminal in {mapping.Directory}." : $"Opened a terminal in {mapping.Directory}.",
+                ToastTone.Success);
         }
         else
         {
-            _report($"Nothing was started: {result.Error}.");
+            _report($"Nothing was started: {result.Error}. Correct that, then run it again.");
         }
     }
 
@@ -321,20 +321,20 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     {
         if (!_launching.Terminal.TryPlanThroughSession(mapping.Directory, run ? mapping.Command : null, _launching.Parent(), out var plan, out var refusal))
         {
-            _report(Shown($"Nothing was started: {refusal}."));
+            _report(Shown($"Nothing was started: {refusal}. Correct that, then run it again."));
             return;
         }
 
         if (_session.VaultPath is not { } vault || _session.Lifetime?.Id is not { } lifetime)
         {
-            _report("The vault was locked, so nothing was started.");
+            _report("The vault was locked, so nothing was started. Unlock it, then run it again.");
             return;
         }
 
         // The owner's rule reads the request and not the set, which the card has yet to show.
         if (TerminalLaunch.ClaimProblem(new LaunchClaim(_project, Profile, plan.Directory, plan.Arguments, new EnvPreview(_project, []))) is { } unhandable)
         {
-            _report(Shown($"Nothing was started: {unhandable}."));
+            _report(Shown($"Nothing was started: {unhandable}. Copy the run command instead."));
             return;
         }
 
@@ -353,7 +353,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         // The owner refuses a request it cannot record (T-6), so a Run is not confirmed while the log will not open.
         if (authority.AuditFailure is { } unopened)
         {
-            _report(Shown($"Nothing was started: a Run from the app writes a History line, and {unopened.TrimEnd('.')}."));
+            _report(Shown($"Nothing was started: a Run from the app writes a History line, and {unopened.TrimEnd('.')}. Check that the audit log can be written, then run it again."));
             return;
         }
 
@@ -383,7 +383,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (unrecordable is not null)
         {
-            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app writes one."));
+            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables come from more items than one History line can name, and a Run from the app writes one. Copy the run command instead."));
             return;
         }
 
@@ -395,7 +395,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (!SessionAuthority.Sendable(resolved))
         {
-            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables are too large for keypaste to hand to Terminal."));
+            _report(Shown($"Nothing was started: {Source(resolved.Profile)}'s variables are too large for keypaste to hand to Terminal. Copy the run command instead."));
             return;
         }
 
@@ -413,7 +413,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         if (!requests.TryWrite(request, out var path, out refusal))
         {
             authority.WithdrawLaunch(issued.Pass);
-            _report(Shown($"Nothing was started: {refusal}."));
+            _report(Shown($"Nothing was started: {refusal}. Correct that, then run it again."));
             return;
         }
 
@@ -423,13 +423,13 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         {
             requests.Withdraw(path);
             authority.WithdrawLaunch(issued.Pass);
-            _report(Shown($"Nothing was started: Terminal did not open: {OpenerFailure(plan.Opener, opened)}."));
+            _report(Shown($"Nothing was started: Terminal did not open: {OpenerFailure(plan.Opener, opened)}. Copy the run command instead."));
             return;
         }
 
-        _announce(run
-            ? $"Started {mapping.Command} in a terminal in {mapping.Directory}."
-            : $"Opened a terminal in {mapping.Directory}.");
+        _announce(
+            run ? $"Started {mapping.Command} in a terminal in {mapping.Directory}." : $"Opened a terminal in {mapping.Directory}.",
+            ToastTone.Success);
     }
 
     private async ValueTask<bool> AskAsync(EnvPreview preview, string starts, string directory, bool run, CancellationToken token)
@@ -475,12 +475,12 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     private static string Refused(EnvResolved resolved) => resolved.Outcome switch
     {
         EnvOutcome.Declined => "Nothing was started.",
-        EnvOutcome.Locked => "The vault was locked, so nothing was started.",
+        EnvOutcome.Locked => "The vault was locked, so nothing was started. Unlock it, then run it again.",
         EnvOutcome.Unusable => Shown(
             $"{resolved.Project}/{resolved.Profile} cannot be used, so nothing was started: " +
             string.Join("; ", resolved.Problems.Select(problem => $"{problem.Key} {problem.Reason}")) +
             ". Fix or remove them, then try again."),
-        _ => Shown($"Nothing was started: {resolved.Refusal}."),
+        _ => Shown($"Nothing was started: {resolved.Refusal}. Correct that, then run it again."),
     };
 
     /// <summary>Why the run Terminal would start could not ask this app for the set.</summary>
@@ -489,7 +489,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     {
         null => Unreachable("nothing in this app answers Terminal"),
         { LaunchFailure: { } failure } => Unreachable(failure),
-        _ => "The vault was locked, so nothing was started.",
+        _ => "The vault was locked, so nothing was started. Unlock it, then run it again.",
     };
 
     private static string Unreachable(string reason) =>

@@ -70,7 +70,7 @@ public sealed class RecommendationsTests : IDisposable
         var settings = Settings(shell);
         Assert.Equal("3", settings.Count);
         Assert.Null(shell.Notice);
-        Assert.Null(shell.Toast);
+        Assert.Empty(shell.Toasts.Shown);
     }
 
     [Fact]

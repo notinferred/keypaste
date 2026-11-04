@@ -220,10 +220,11 @@
                     IsDefault="True"
                     Command="{Binding UnlockCommand}"
                     AutomationProperties.Name="Unlock">
-              <Panel>
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
                 <TextBlock Text="Unlock" IsVisible="{Binding !Busy}" />
                 <TextBlock Text="Unlocking…" IsVisible="{Binding Busy}" />
-              </Panel>
+              </StackPanel>
             </Button>
 
             <TextBlock Classes="lock-note"
@@ -375,8 +376,14 @@
 
           <Button Classes="primary wide"
                   IsDefault="True"
-                  Content="Create vault"
-                  Command="{Binding CreateCommand}" />
+                  AutomationProperties.Name="Create vault"
+                  Command="{Binding CreateCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+              <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+              <TextBlock Text="Create vault" IsVisible="{Binding !Busy}" />
+              <TextBlock Text="Creating vault…" IsVisible="{Binding Busy}" />
+            </StackPanel>
+          </Button>
 
           <StackPanel Spacing="8">
             <Panel HorizontalAlignment="Center">

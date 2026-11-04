@@ -236,7 +236,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         AssertNothingStarted();
         Assert.False(launch.IsConfirming);
-        Assert.Equal("The vault was locked, so nothing was started.", screen.Error);
+        Assert.Equal("The vault was locked, so nothing was started. Unlock it, then run it again.", screen.Error);
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         AssertNothingStarted();
         Assert.Null(launch.LastStart);
-        Assert.Equal("The vault was locked, so nothing was started.", screen.Error);
+        Assert.Equal("The vault was locked, so nothing was started. Unlock it, then run it again.", screen.Error);
     }
 
     /// <summary>Once Start has released the set the launch is the person's: closing the project, which disposes its card, does not take it back.</summary>
@@ -342,7 +342,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
-        Assert.Equal("Nothing was started: Terminal did not open: LSOpenURLsWithRole() failed with error -10810.", screen.Error);
+        Assert.Equal("Nothing was started: Terminal did not open: LSOpenURLsWithRole() failed with error -10810. Copy the run command instead.", screen.Error);
         Assert.Empty(TerminalStandIn.Waiting());
 
         // The request as a Terminal opening late would have found it: its pass went with it.
@@ -659,7 +659,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         await running.WaitAsync(Cancel);
 
         Assert.Equal(
-            "Nothing was started: dev's variables come from more items than one History line can name, and a Run from the app writes one.",
+            "Nothing was started: dev's variables come from more items than one History line can name, and a Run from the app writes one. Copy the run command instead.",
             screen.Error);
         AssertNothingStarted();
         Assert.Equal(0, _asked.Count);
@@ -764,7 +764,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         launch.ConfirmLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
-        Assert.Equal("Nothing was started: dev's variables are too large for keypaste to hand to Terminal.", screen.Error);
+        Assert.Equal("Nothing was started: dev's variables are too large for keypaste to hand to Terminal. Copy the run command instead.", screen.Error);
         AssertNothingStarted();
         Assert.Equal(0, _asked.Count);
     }

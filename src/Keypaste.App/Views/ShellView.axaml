@@ -450,7 +450,7 @@
       </Border>
     </Border>
 
-    <!-- Toasts, bottom right. The clipboard countdown is one; ShowToast says anything else. -->
+    <!-- Toasts, bottom right. The clipboard countdown is one; Toasts says anything else. -->
     <StackPanel HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
                 Margin="20"
@@ -488,13 +488,35 @@
         </StackPanel>
       </Border>
 
-      <!-- Says something and takes no press, so a click on what it covers reaches that control. -->
-      <Border Name="Toast" Classes="toast" IsVisible="{Binding HasToast}" IsHitTestVisible="False">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" />
-          <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="360" />
-        </StackPanel>
-      </Border>
+      <ItemsControl ItemsSource="{Binding Toasts.Shown}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="8" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:Toast">
+            <Border Classes="toast" PointerEntered="OnToastPointerEntered" PointerExited="OnToastPointerExited">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <Panel VerticalAlignment="Top" Margin="0,2,0,0">
+                  <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" IsVisible="{Binding IsSuccess}" />
+                  <ctl:KpIcon Icon="info" Size="15" Foreground="{DynamicResource KpInfo}" IsVisible="{Binding IsInformation}" />
+                  <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpAccentText}" IsVisible="{Binding IsWarning}" />
+                </Panel>
+                <TextBlock Grid.Column="1" Text="{Binding Message}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
+                <Button Grid.Column="2"
+                        Classes="icon ghost sm"
+                        VerticalAlignment="Top"
+                        Command="{Binding CloseCommand}"
+                        ToolTip.Tip="Close"
+                        AutomationProperties.Name="Close this message">
+                  <ctl:KpIcon Icon="x" Size="12" />
+                </Button>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
 
     </StackPanel>
 

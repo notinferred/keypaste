@@ -58,7 +58,7 @@ public sealed class WriteThroughSessionTests
 
         Assert.Equal(WriteOutcome.Locked, write.Outcome);
         Assert.False(ran);
-        Assert.Equal("The vault is locked.", write.Problem("try again"));
+        Assert.Equal("The vault is locked. Unlock it, then try again.", write.Problem("try again"));
     }
 
     /// <summary>The case every screen caught for itself: the file keeps the other save, and the edit stays open and unwritten.</summary>
@@ -192,7 +192,7 @@ public sealed class WriteThroughSessionTests
             added => added);
 
         Assert.Equal(WriteOutcome.Locked, write.Outcome);
-        Assert.Equal("The vault is locked.", write.Problem("add this again"));
+        Assert.Equal("The vault is locked. Unlock it, then try again.", write.Problem("add this again"));
         Assert.DoesNotContain("MINE", TitlesOnDisk(fixture));
     }
 
