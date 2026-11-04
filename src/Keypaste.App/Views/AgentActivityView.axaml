@@ -165,7 +165,7 @@
                               AutomationProperties.Name="{Binding Title, StringFormat='Connect {0}'}" />
 
                       <!-- The plan core composed, run only on Run it (D-0333). -->
-                      <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Classes="card filled" IsVisible="{Binding HasConnection}">
+                      <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Classes="card filled" IsVisible="{Binding HasConnection}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Connection.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Connection.CancelCommand}">
                         <StackPanel Spacing="12" DataContext="{Binding Connection}" x:DataType="vm:ConnectClientViewModel">
                           <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Classes="dialog-title" Text="{Binding Title}" VerticalAlignment="Center" />

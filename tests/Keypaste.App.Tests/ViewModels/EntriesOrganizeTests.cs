@@ -388,7 +388,7 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.MoveTarget = Group(entries, group);
         entries.ConfirmOrganizeCommand.Press();
 
-        Assert.NotNull(entries.Error);
+        Assert.NotNull(entries.Error ?? entries.OrganizeTitleProblem);
         Assert.Equal(before, Digest(_vaultPath));
     }
 

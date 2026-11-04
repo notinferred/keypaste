@@ -159,6 +159,28 @@ public sealed class AgentSettingsViewModelTests
     }
 
     [Fact]
+    public async Task A_limit_not_yet_applied_is_a_draft_a_refresh_keeps_and_applying_ends()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Change = ApprovalAnswer.ApprovedOnce;
+        using var model = app.Settings();
+        model.NewRowScope = "billing:dev";
+        await model.AddRowAsync();
+        await model.ChooseAsync(Choice(Assert.Single(model.Rows).Modes, "Automatic"));
+        Assert.Null(model.UnsavedDraft);
+
+        model.PerHourText = "5";
+        Assert.NotNull(model.UnsavedDraft);
+
+        model.Read();
+        Assert.Equal("5", model.PerHourText);
+
+        await model.ApplyLimitAsync();
+        Assert.Null(model.UnsavedDraft);
+        Assert.Equal("5", model.PerHourText);
+    }
+
+    [Fact]
     public async Task A_row_starts_at_the_mode_it_has_and_its_mode_limit_and_removal_are_changes_of_their_own()
     {
         await using var app = await App.StartAsync();

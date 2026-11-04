@@ -8,11 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.4 — Keep unsaved work.** Needs: none.
-  - Changing place disposes the screen (`ShellViewModel.Show`), which drops the New item form, Edit fields' drafts and agent limits not yet applied, asking nothing. A screen holding a draft asks "Discard …?" with Cancel and Discard before the place changes, from the sidebar, a shortcut or a search typed elsewhere. A lock still discards drafts.
-  - In-pane forms answer Return with their confirm, never a danger one, and Escape with Cancel, as the import dialogs do (`ExportImportView.OnRootEscape`); the Share dialog gains Escape and a Cancel button. Escape in a masked field clears it and then reaches the form (`MaskedInput.OnKeyDown`).
-  - An error appears under the field it concerns as the field is typed, as the pairing prompt's name does: New item's title, key name and tags, Rename or move's name and Projects' key name. Create waits for a title.
-  - Accepted when tests show a draft kept after Cancel and gone after Discard, Return and Escape on each form, and each error under its field.
 - [ ] **Q.5 — Make destructive actions consistent and undoable.** Needs: Q.2.
   - A terminal's `keypaste rm` on a vault with no recycle bin is approved with the ordinary amber Allow (`Views/TerminalEditWindow.axaml`). The prompt carries `EditPreview.Recycles`, and when it is false the Allow is drawn as danger and reads "Delete for good", the layout, focus on Deny and arming unchanged.
   - Edit › Undo and ⌘Z reverse the last delete, rename or move, duplicate, and group create, rename, move or delete, each through the inverse write; the Restore link stays. Trash restores several selected rows at once.

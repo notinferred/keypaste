@@ -21,7 +21,7 @@ namespace Keypaste.App.ViewModels;
 /// showing eight projects has read one project's worth of anything.
 /// </para>
 /// </remarks>
-internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable
+internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
@@ -56,6 +56,11 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable
 
         Reload();
     }
+
+    /// <inheritdoc/>
+    public string? UnsavedDraft => NewProjectDraft() ?? OpenProject?.UnsavedDraft;
+
+    internal Func<string?> NewProjectDraft => () => IsAdding && NewProject.Trim().Length > 0 ? "this new project" : null;
 
     /// <summary>Every project in the vault, by name.</summary>
     [ObservableProperty]

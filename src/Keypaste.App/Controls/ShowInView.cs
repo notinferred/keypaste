@@ -30,20 +30,34 @@ internal sealed class ShowInView : AvaloniaObject
         if (change.NewValue is true)
         {
             control.PropertyChanged += OnPropertyChanged;
+            control.AttachedToVisualTree += OnAttached;
         }
         else
         {
             control.PropertyChanged -= OnPropertyChanged;
+            control.AttachedToVisualTree -= OnAttached;
         }
     }
 
     private static void OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs change)
     {
-        if (change.Property != Visual.IsVisibleProperty || change.NewValue is not true || sender is not Control control)
+        if (change.Property == Visual.IsVisibleProperty && change.NewValue is true && sender is Control control)
         {
-            return;
+            Reveal(control);
         }
+    }
 
+    // A form in a row that a list rebuilt is shown from the start, with no change of visibility to hear.
+    private static void OnAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is Control { IsVisible: true } control)
+        {
+            Reveal(control);
+        }
+    }
+
+    private static void Reveal(Control control)
+    {
         // After layout, so the form has a size to scroll to and its fields are effectively visible.
         Dispatcher.UIThread.Post(
             () =>
@@ -54,9 +68,20 @@ internal sealed class ShowInView : AvaloniaObject
                 }
 
                 control.BringIntoView();
-                control.GetVisualDescendants()
+                var shown = control.GetVisualDescendants()
                     .OfType<InputElement>()
-                    .FirstOrDefault(field => field is TextBox or MaskedInput && field.IsEffectivelyVisible && field.IsEffectivelyEnabled)
+                    .Where(element => element.IsEffectivelyVisible && element.IsEffectivelyEnabled)
+                    .ToList();
+
+                var buttons = shown.Where(element => element is Button).ToList();
+                var confirm = buttons.Any(button => button.Classes.Contains("danger"))
+                    ? null
+                    : buttons.FirstOrDefault(button => !button.Classes.Contains("ghost"));
+
+                // A form with no field takes the keyboard on its confirm, unless that is a danger one, when Return reaches only its quiet button.
+                (shown.FirstOrDefault(element => element is TextBox or MaskedInput)
+                    ?? confirm
+                    ?? buttons.FirstOrDefault(button => button.Classes.Contains("ghost")))
                     ?.Focus();
             },
             DispatcherPriority.Loaded);

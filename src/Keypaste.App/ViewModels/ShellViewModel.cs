@@ -82,6 +82,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private bool _noticeNamesAConflict;
     private int _ticks;
     private readonly Action<string, string?, int?>? _openInPlace;
+    private Action? _discard;
+    private Action? _keep;
     private bool _disposed;
 
     internal ShellViewModel(
@@ -124,7 +126,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         DismissToastCommand = new RelayCommand(() => Toast = null);
         BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
         ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && Share is null);
-        ClearScopeCommand = new RelayCommand(() => (Content as EntriesViewModel)?.ClearScopeCommand.Press());
+        ClearScopeCommand = new RelayCommand(() => Leave(() => (Content as EntriesViewModel)?.ClearScopeCommand.Press()));
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && !HasImport);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => IsWaitingForTouch);
 
@@ -283,7 +285,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         set
         {
             // Replacing the rows makes the list re-select, and write back, whichever row it had.
-            if (_rebuildingSidebar)
+            if (_rebuildingSidebar || Equals(value, SelectedSidebarRow))
             {
                 return;
             }
@@ -500,7 +502,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         ShowToast(message);
-        Show(_current);
+
+        if (Content is not IHoldsDraft { UnsavedDraft: not null })
+        {
+            Show(_current);
+        }
     }
 
     private async Task PickImportAsync()
@@ -588,6 +594,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         get => _search;
         set
         {
+            var before = _search;
+
             if (!SetProperty(ref _search, value ?? string.Empty))
             {
                 return;
@@ -595,13 +603,19 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
             if (_search.Length > 0 && _current.Kind != DestinationKind.Entries)
             {
-                Current = Destinations.Of(DestinationKind.Entries);
+                Leave(() => MoveTo(Destinations.Of(DestinationKind.Entries)), () => TakeBackSearch(before));
             }
-            else if (Content is EntriesViewModel entries)
+            else if (Content is EntriesViewModel)
             {
-                entries.Search = _search;
+                Leave(() => (Content as EntriesViewModel)!.Search = _search, () => TakeBackSearch(before));
             }
         }
+    }
+
+    private void TakeBackSearch(string before)
+    {
+        _search = before;
+        OnPropertyChanged(nameof(Search));
     }
 
     /// <summary>The group the search is limited to, or null when it searches every item.</summary>
@@ -657,25 +671,105 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         get => _current;
         set
         {
-            if (value is not null && SetProperty(ref _current, value))
+            if (value is not null && value != _current)
             {
-                OnPropertyChanged(nameof(CurrentTitle));
-                OnPropertyChanged(nameof(ShowsHeader));
-                OnPropertyChanged(nameof(HasBack));
-                OnPropertyChanged(nameof(BackTitle));
-                OnPropertyChanged(nameof(SelectedMain));
-                OnPropertyChanged(nameof(SelectedFooter));
-                BackCommand.NotifyCanExecuteChanged();
-
-                if (value.Kind != DestinationKind.EnvSets)
-                {
-                    _openProject = null;
-                }
-
-                Show(value);
-                OnPropertyChanged(nameof(SelectedSidebarRow));
+                Leave(() => MoveTo(value));
             }
         }
+    }
+
+    private void MoveTo(Destination destination)
+    {
+        if (SetProperty(ref _current, destination, nameof(Current)))
+        {
+            OnPropertyChanged(nameof(CurrentTitle));
+            OnPropertyChanged(nameof(ShowsHeader));
+            OnPropertyChanged(nameof(HasBack));
+            OnPropertyChanged(nameof(BackTitle));
+            OnPropertyChanged(nameof(SelectedMain));
+            OnPropertyChanged(nameof(SelectedFooter));
+            BackCommand.NotifyCanExecuteChanged();
+
+            if (destination.Kind != DestinationKind.EnvSets)
+            {
+                _openProject = null;
+            }
+
+            Show(destination);
+            OnPropertyChanged(nameof(SelectedSidebarRow));
+        }
+    }
+
+    /// <summary>What "Discard …?" names while it is asked over the window, or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDiscardPrompt))]
+    internal partial string? DiscardPrompt { get; private set; }
+
+    internal bool HasDiscardPrompt => DiscardPrompt is not null;
+
+    /// <summary>Asks before losing <paramref name="draft"/>, which only <paramref name="discard"/> then does; asks one thing at a time.</summary>
+    internal void AskDiscard(string draft, Action discard, Action? keep = null)
+    {
+        if (_disposed || HasDiscardPrompt)
+        {
+            keep?.Invoke();
+            return;
+        }
+
+        _discard = discard;
+        _keep = keep;
+        DiscardPrompt = $"Discard {draft}?";
+    }
+
+    [RelayCommand]
+    private void KeepDraft()
+    {
+        var keep = _keep;
+        CloseDiscardPrompt();
+        keep?.Invoke();
+    }
+
+    [RelayCommand]
+    private void ConfirmDiscard()
+    {
+        var discard = _discard;
+        CloseDiscardPrompt();
+        discard?.Invoke();
+    }
+
+    private void CloseDiscardPrompt()
+    {
+        _discard = null;
+        _keep = null;
+        DiscardPrompt = null;
+    }
+
+    /// <summary>
+    /// Does <paramref name="go"/>, which replaces or refilters the screen, once any draft on it is discarded.
+    /// A rebuilt screen holds none, including when <paramref name="go"/> stays on this one.
+    /// </summary>
+    private void Leave(Action go, Action? keep = null)
+    {
+        if (Content is IHoldsDraft { UnsavedDraft: { } draft })
+        {
+            AskDiscard(
+                draft,
+                () =>
+                {
+                    Show(_current);
+                    go();
+                },
+                keep);
+            return;
+        }
+
+        if (HasDiscardPrompt)
+        {
+            keep?.Invoke();
+            return;
+        }
+
+        go();
     }
 
     /// <summary>The current destination's title, for the content header.</summary>
@@ -777,7 +871,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker);
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker) { AskDiscard = AskDiscard };
 
         if (_search.Length > 0)
         {
@@ -789,11 +883,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Shows Agents with one agent's settings open on its row.</summary>
     /// <param name="agent">The agent's name.</param>
-    internal void OpenAgentSettings(string agent)
+    internal void OpenAgentSettings(string agent) => Leave(() =>
     {
-        Current = Destinations.Of(DestinationKind.AgentActivity);
+        MoveTo(Destinations.Of(DestinationKind.AgentActivity));
         (Content as AgentActivityViewModel)?.OpenSettings(agent);
-    }
+    });
 
     private AgentActivityViewModel Activity() =>
         new(Authority, Home, _clock, _post, Authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.AgentHistory), Clipboard, _web);
@@ -906,13 +1000,19 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     // New item with the generated value as its password, taken character by character into the form's own field.
     private void NewItemWith(SecretField value)
     {
-        Current = Destinations.Of(DestinationKind.Entries);
-
-        if (Content is EntriesViewModel items)
+        // The generator stays open behind "Discard …?", since closing it disposes the value.
+        Leave(() =>
         {
-            items.BeginAddCommand.Press();
-            items.NewItem?.Password.TakeFrom(value);
-        }
+            MoveTo(Destinations.Of(DestinationKind.Entries));
+
+            if (Content is EntriesViewModel items)
+            {
+                items.BeginAddCommand.Press();
+                items.NewItem?.Password.TakeFrom(value);
+            }
+
+            CloseGenerator();
+        });
     }
 
     [RelayCommand]
@@ -946,15 +1046,15 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>New project, from Items' "+" menu: Env profiles, with its create form open.</summary>
     [RelayCommand]
-    private void NewProject()
+    private void NewProject() => Leave(() =>
     {
-        Current = Destinations.Of(DestinationKind.EnvSets);
+        MoveTo(Destinations.Of(DestinationKind.EnvSets));
 
         if (Content is EnvSetsViewModel env)
         {
             env.BeginAddCommand.Press();
         }
-    }
+    });
 
     /// <summary>Import .env, from Items' "+" menu: into the first project; with none, create one first.</summary>
     [RelayCommand]
@@ -966,25 +1066,31 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        OpenProject(_projects[0].Name);
-
-        if ((Content as EnvSetsViewModel)?.OpenProject is { } open)
+        Leave(() =>
         {
-            open.Import.ChooseCommand.Press();
-        }
+            ShowProject(_projects[0].Name);
+
+            if ((Content as EnvSetsViewModel)?.OpenProject is { } open)
+            {
+                open.Import.ChooseCommand.Press();
+            }
+        });
     }
 
     /// <summary>Opens Env profiles on a project.</summary>
     [RelayCommand]
     private void OpenProject(string? project)
     {
-        if (project is null)
+        if (project is not null)
         {
-            return;
+            Leave(() => ShowProject(project));
         }
+    }
 
+    private void ShowProject(string project)
+    {
         _openProject = project;
-        Current = Destinations.Of(DestinationKind.EnvSets);
+        MoveTo(Destinations.Of(DestinationKind.EnvSets));
 
         if (Content is EnvSetsViewModel env)
         {
@@ -999,19 +1105,24 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     {
         ArgumentNullException.ThrowIfNull(name);
 
-        Search = string.Empty;
-        ShowGroup(name.GroupPath);
-
-        if (Content is EntriesViewModel entries)
+        Leave(() =>
         {
-            entries.Selected = entries.Rows.FirstOrDefault(row => row.Name == name);
-        }
+            Search = string.Empty;
+            ShowGroupNow(name.GroupPath);
+
+            if (Content is EntriesViewModel entries)
+            {
+                entries.Selected = entries.Rows.FirstOrDefault(row => row.Name == name);
+            }
+        });
     }
 
     /// <summary>Items showing <paramref name="path"/>, or every item when it is empty.</summary>
-    private void ShowGroup(string path)
+    private void ShowGroup(string path) => Leave(() => ShowGroupNow(path));
+
+    private void ShowGroupNow(string path)
     {
-        Current = Destinations.Of(DestinationKind.Entries);
+        MoveTo(Destinations.Of(DestinationKind.Entries));
 
         if (Content is EntriesViewModel entries && entries.Groups.FirstOrDefault(node => node.Path == path) is { } node)
         {
@@ -1400,6 +1511,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
             switch (Content)
             {
+                case IHoldsDraft { UnsavedDraft: not null }:
                 case EntriesViewModel { Detail.IsEditing: true }:
                     break;
 
@@ -1456,7 +1568,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Opens what the file holds now in place of the open copy (D-0412), offered once a merge was refused (D-0543).</summary>
     [RelayCommand]
-    private void Reload()
+    private void Reload() => Leave(ReloadNow);
+
+    private void ReloadNow()
     {
         var result = _session.Reload();
 
@@ -1503,6 +1617,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         switch (Content)
         {
+            case IHoldsDraft { UnsavedDraft: not null }:
+                break;
+
             case EntriesViewModel entries when entries.Detail is not { IsEditing: true }:
                 entries.Reload();
                 break;
@@ -1610,6 +1727,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         Recommendations.Dispose();
+        CloseDiscardPrompt();
         CloseShare();
         CloseGenerator();
 

@@ -273,7 +273,7 @@
         <TextBlock Text="{Binding Error}" TextWrapping="Wrap" FontSize="12" Classes="secondary" />
       </Border>
 
-      <Border Classes="form" IsVisible="{Binding IsCreatingGroup}">
+      <Border Classes="form" IsVisible="{Binding IsCreatingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmCreateGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding CreateGroupPrompt}" />
           <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" />
@@ -284,7 +284,7 @@
         </StackPanel>
       </Border>
 
-      <Border Classes="form" IsVisible="{Binding IsRenamingGroup}">
+      <Border Classes="form" IsVisible="{Binding IsRenamingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
           <TextBox x:Name="RenameGroupName" Text="{Binding DraftGroupName}" />
@@ -302,7 +302,7 @@
       </Border>
 
       <!-- A group moves with everything in it, to the places an item can move to (D-0483). -->
-      <Border Classes="form" IsVisible="{Binding IsMovingGroup}">
+      <Border Classes="form" IsVisible="{Binding IsMovingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
           <ComboBox x:Name="MoveGroupTarget"
@@ -326,7 +326,7 @@
       </Border>
 
       <!-- Deleting a group asks first and says how many items go with it. -->
-      <Border Classes="form danger" IsVisible="{Binding IsConfirmingGroupDelete}">
+      <Border Classes="form danger" IsVisible="{Binding IsConfirmingGroupDelete}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
           <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
           <StackPanel Orientation="Horizontal" Spacing="8">
@@ -462,7 +462,7 @@
 
       <!-- A new item is made from a template in the pane's place, where there is room for its generator (N.4). -->
       <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                    IsVisible="{Binding IsAdding}">
+                    IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding NewItemDraft}">
         <Grid Margin="32,28">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MaxWidth="756" />
@@ -500,6 +500,12 @@
                 <StackPanel Grid.Column="0" Spacing="8">
                   <TextBlock Classes="label" Text="Title" />
                   <TextBox x:Name="NewItemTitle" MinHeight="40" Text="{Binding Title}" PlaceholderText="github" />
+                  <TextBlock x:Name="NewItemTitleProblem"
+                             Classes="caption"
+                             Foreground="{DynamicResource KpDanger}"
+                             TextWrapping="Wrap"
+                             IsVisible="{Binding HasTitleProblem}"
+                             Text="{Binding TitleProblem}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="8">
                   <TextBlock Classes="label" Text="Folder" />
@@ -522,6 +528,12 @@
               <StackPanel Spacing="8" IsVisible="{Binding ShowsKey}">
                 <TextBlock Classes="label" Text="Key name" />
                 <TextBox x:Name="NewItemKeyName" Classes="mono" MinHeight="40" Text="{Binding KeyName}" PlaceholderText="OPENAI_API_KEY" />
+                <TextBlock x:Name="NewItemKeyNameProblem"
+                           Classes="caption"
+                           Foreground="{DynamicResource KpDanger}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding HasKeyNameProblem}"
+                           Text="{Binding KeyNameProblem}" />
                 <TextBlock Classes="caption" Text="The name a project reads it under. It is kept as a protected field, and a project tag puts it in that project's environment." />
               </StackPanel>
 
@@ -620,7 +632,7 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8" ctl:FormKeys.Confirm="{Binding AddTagCommand}">
                   <!-- Suggests the vault's project tags as one is typed; choosing one fills the box for Add tag. -->
                   <AutoCompleteBox x:Name="NewItemTag"
                                    Classes="mono"
@@ -631,6 +643,12 @@
                                    Width="220" />
                   <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
                 </StackPanel>
+                <TextBlock x:Name="NewItemTagProblem"
+                           Classes="caption"
+                           Foreground="{DynamicResource KpDanger}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding HasTagProblem}"
+                           Text="{Binding TagProblem}" />
               </StackPanel>
 
               <TextBlock x:Name="NewItemError"
@@ -801,7 +819,7 @@
                   </StackPanel>
 
                   <!-- Rotate asks first: the old value stays in history and the new one is never shown here. -->
-                  <Border Classes="note" IsVisible="{Binding IsConfirmingRotate}">
+                  <Border Classes="note" IsVisible="{Binding IsConfirmingRotate}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRotateCommand}" ctl:FormKeys.Cancel="{Binding CancelRotateCommand}">
                     <StackPanel Spacing="10">
                       <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
@@ -815,7 +833,7 @@
                   <StackPanel Spacing="12"
                               x:DataType="vm:EntriesViewModel"
                               DataContext="{Binding $parent[views:EntriesView].DataContext}"
-                              IsVisible="{Binding IsConfirmingDelete}">
+                              IsVisible="{Binding IsConfirmingDelete}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelDeleteCommand}">
                     <!-- What the deletion costs depends on the vault: DeletePrompt reads its recycle-bin
                          setting and says which case this is. -->
                     <Border Classes="form danger">
@@ -835,7 +853,7 @@
                   <Border Classes="form"
                           x:DataType="vm:EntriesViewModel"
                           DataContext="{Binding $parent[views:EntriesView].DataContext}"
-                          IsVisible="{Binding IsOrganizing}">
+                          IsVisible="{Binding IsOrganizing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmOrganizeCommand}" ctl:FormKeys.Cancel="{Binding CancelOrganizeCommand}" ctl:FormKeys.Draft="{Binding OrganizeDraft}">
                     <StackPanel Spacing="10">
                       <TextBlock Classes="section" Text="Rename or move" />
                       <TextBlock Text="{Binding OrganizePrompt}"
@@ -844,6 +862,12 @@
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Name" />
                         <TextBox x:Name="OrganizeTitle" Classes="mono" Text="{Binding DraftTitle}" />
+                        <TextBlock x:Name="OrganizeTitleProblem"
+                                   Classes="caption"
+                                   Foreground="{DynamicResource KpDanger}"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding HasOrganizeTitleProblem}"
+                                   Text="{Binding OrganizeTitleProblem}" />
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Group" />
@@ -1024,7 +1048,7 @@
 
                         <!-- A restore that puts back other project tags is written only after the person has seen what
                              it does to the item's projects, as every tag change is (D-0415). -->
-                        <Border Classes="form" IsVisible="{Binding History.IsConfirmingRestore}" ctl:ShowInView.OnShow="True">
+                        <Border Classes="form" IsVisible="{Binding History.IsConfirmingRestore}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding History.ConfirmRestoreCommand}" ctl:FormKeys.Cancel="{Binding History.CancelRestoreCommand}">
                           <StackPanel Spacing="10">
                             <ItemsControl ItemsSource="{Binding History.RestoreLines}">
                               <ItemsControl.ItemTemplate>
@@ -1320,7 +1344,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True">
+                    <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="Add a field" />
                         <TextBox x:Name="NewFieldName"
@@ -1362,7 +1386,7 @@
                       </StackPanel>
                     </Border>
 
-                    <Border Classes="form" IsVisible="{Binding IsReplacingField}" ctl:ShowInView.OnShow="True">
+                    <Border Classes="form" IsVisible="{Binding IsReplacingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmReplaceFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelReplaceFieldCommand}" ctl:FormKeys.Draft="{Binding ReplaceFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding ReplaceFieldPrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -1396,7 +1420,7 @@
 
                     <!-- A field named as a project variable, or one the item's own {S:…} names, is renamed only after
                          the person has seen what the rename breaks, as a project tag change is (D-0415). -->
-                    <Border Classes="form" IsVisible="{Binding IsRenamingField}" ctl:ShowInView.OnShow="True">
+                    <Border Classes="form" IsVisible="{Binding IsRenamingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelRenameFieldCommand}" ctl:FormKeys.Draft="{Binding RenameFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding RenameFieldPrompt}" TextWrapping="Wrap" />
                         <TextBox x:Name="RenamedFieldName"
@@ -1419,7 +1443,7 @@
                       </StackPanel>
                     </Border>
 
-                    <Border Classes="form danger" IsVisible="{Binding IsRemovingField}" ctl:ShowInView.OnShow="True">
+                    <Border Classes="form danger" IsVisible="{Binding IsRemovingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelRemoveFieldCommand}">
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding RemoveFieldPrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -1480,7 +1504,7 @@
                                IsVisible="{Binding Attachments.HasNote}"
                                Text="{Binding Attachments.Note}" />
 
-                    <Border Classes="form danger" IsVisible="{Binding Attachments.IsRemoving}" ctl:ShowInView.OnShow="True">
+                    <Border Classes="form danger" IsVisible="{Binding Attachments.IsRemoving}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding Attachments.CancelRemoveCommand}">
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding Attachments.RemovePrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -1534,7 +1558,7 @@
 
                     <!-- A project tag is written only after the person has seen the environment and the fields it
                          reaches (D-0415). -->
-                    <Border Classes="form" IsVisible="{Binding IsConfirmingTagChange}" ctl:ShowInView.OnShow="True">
+                    <Border Classes="form" IsVisible="{Binding IsConfirmingTagChange}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmTagChangeCommand}" ctl:FormKeys.Cancel="{Binding CancelTagChangeCommand}">
                       <StackPanel Spacing="10">
                         <ItemsControl ItemsSource="{Binding TagChangeLines}">
                           <ItemsControl.ItemTemplate>
@@ -1644,7 +1668,7 @@
                     </StackPanel>
                   </Border>
 
-                  <Border Classes="form" IsVisible="{Binding IsEditing}">
+                  <Border Classes="form" IsVisible="{Binding IsEditing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding SaveCommand}" ctl:FormKeys.Cancel="{Binding CancelCommand}" ctl:FormKeys.Draft="{Binding EditDraft}">
                     <StackPanel Spacing="10">
                       <TextBlock Classes="section" Text="Edit fields" />
                       <StackPanel Spacing="6">

@@ -40,6 +40,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>The custom field a database's or a server's host is kept in.</summary>
     internal const string HostField = "Host";
 
+    private const string _keyNameRule = "Name the key as a project reads it: capitals, digits and _, such as OPENAI_API_KEY.";
+
     private readonly AppVaultSession _session;
     private IReadOnlyList<string> _projectTags;
     private ItemTemplate _template = ItemTemplate.Login;
@@ -136,7 +138,28 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     internal bool ShowsKey => _template == ItemTemplate.ApiKey;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TitleProblem), nameof(HasTitleProblem))]
     internal partial string Title { get; set; } = string.Empty;
+
+    /// <summary>Why the title typed cannot be used, or null; none while it is empty, which Create waits on.</summary>
+    internal string? TitleProblem =>
+        HasTitle && EntryNameSanitizer.Sanitize(Title.Trim()) is { WasAltered: true } sanitized
+            ? $"That is not a name keypaste will create. Try '{sanitized.Text}'."
+            : null;
+
+    internal bool HasTitleProblem => TitleProblem is not null;
+
+    /// <summary>Whether Create can go on: it waits for a title.</summary>
+    internal bool HasTitle => Title.Trim().Length > 0;
+
+    /// <summary>What leaving would lose: anything typed, and never a password keypaste generated.</summary>
+    internal string? UnsavedDraft =>
+        new[] { Title, Username, Url, Host, KeyName, Notes, DraftTag }.Any(text => text.Trim().Length > 0)
+        || Tags.Count > 0
+        || KeyValue.HasValue
+        || (Password.HasValue && !Password.IsGenerated)
+            ? "this new item"
+            : null;
 
     /// <summary>The vault's groups a new item may go in, the top level first.</summary>
     internal IReadOnlyList<FolderChoice> Folders { get; }
@@ -164,7 +187,14 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     /// <summary>An API key's name, as the environment variable a project would read it under.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeyNameProblem), nameof(HasKeyNameProblem))]
     internal partial string KeyName { get; set; } = string.Empty;
+
+    /// <summary>Why the key name typed cannot be used, or null.</summary>
+    internal string? KeyNameProblem =>
+        KeyName.Trim() is { Length: > 0 } key && !EnvConvention.IsEnvNamedField(key) ? _keyNameRule : null;
+
+    internal bool HasKeyNameProblem => KeyNameProblem is not null;
 
     [ObservableProperty]
     internal partial string Notes { get; set; } = string.Empty;
@@ -203,12 +233,38 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     internal SecretField KeyValue { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TagSuggestions))]
+    [NotifyPropertyChangedFor(nameof(TagSuggestions), nameof(TagProblem), nameof(HasTagProblem))]
     internal partial IReadOnlyList<EntryTagChip> Tags { get; private set; } = [];
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTagCommand))]
+    [NotifyPropertyChangedFor(nameof(TagProblem), nameof(HasTagProblem))]
     internal partial string DraftTag { get; set; } = string.Empty;
+
+    /// <summary>Why the tag typed cannot be added, or null.</summary>
+    internal string? TagProblem
+    {
+        get
+        {
+            var tag = DraftTag.Trim();
+
+            if (tag.Length == 0)
+            {
+                return null;
+            }
+
+            if (!TagRules.IsValid(tag, out var error))
+            {
+                return string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), ".");
+            }
+
+            return Tags.Any(chip => string.Equals(chip.Tag, tag, StringComparison.Ordinal))
+                ? $"The item already has the tag {EntryNameSanitizer.Sanitize(tag).Text}."
+                : null;
+        }
+    }
+
+    internal bool HasTagProblem => TagProblem is not null;
 
     /// <summary>The vault's project tags not yet added, which the tag box offers as a tag is typed; choosing one only fills <see cref="DraftTag"/>.</summary>
     internal IReadOnlyList<string> TagSuggestions => [.. _projectTags.Except(Tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
@@ -234,11 +290,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             return null;
         }
 
-        var sanitized = EntryNameSanitizer.Sanitize(title);
-
-        if (sanitized.WasAltered)
+        if (HasTitleProblem)
         {
-            Error = $"That is not a name keypaste will create. Try '{sanitized.Text}'.";
             return null;
         }
 
@@ -250,7 +303,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
             if (!EnvConvention.IsEnvNamedField(key))
             {
-                Error = "Name the key as a project reads it: capitals, digits and _, such as OPENAI_API_KEY.";
+                Error = _keyNameRule;
                 return null;
             }
 
@@ -357,21 +410,12 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
 
     private void AddTag()
     {
-        var tag = DraftTag.Trim();
-
-        if (!TagRules.IsValid(tag, out var error))
+        if (HasTagProblem)
         {
-            Error = string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), ".");
             return;
         }
 
-        if (Tags.Any(chip => string.Equals(chip.Tag, tag, StringComparison.Ordinal)))
-        {
-            Error = $"The item already has the tag {EntryNameSanitizer.Sanitize(tag).Text}.";
-            return;
-        }
-
-        Tags = [.. Tags, new EntryTagChip(tag, RemoveTag)];
+        Tags = [.. Tags, new EntryTagChip(DraftTag.Trim(), RemoveTag)];
         DraftTag = string.Empty;
         Error = null;
     }

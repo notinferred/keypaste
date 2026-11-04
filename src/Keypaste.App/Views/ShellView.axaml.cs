@@ -25,6 +25,8 @@ internal sealed partial class ShellView : UserControl
 
     private ShellViewModel? _shell;
     private Control? _focusBeforeImport;
+    private Control? _focusBeforeDiscardPrompt;
+    private TopLevel? _root;
 
     public ShellView()
     {
@@ -38,6 +40,21 @@ internal sealed partial class ShellView : UserControl
         AddHandler(PointerReleasedEvent, OnControlClick, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, OnShiftF10, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnShiftF10, RoutingStrategies.Tunnel);
+    }
+
+    // On the window rather than here, ahead of the handlers the dialogs under the question put there, so Escape answers it first.
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _root = TopLevel.GetTopLevel(this);
+        _root?.AddHandler(KeyDownEvent, OnDiscardPromptEscape, RoutingStrategies.Tunnel);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        _root?.RemoveHandler(KeyDownEvent, OnDiscardPromptEscape);
+        _root = null;
+        base.OnDetachedFromVisualTree(e);
     }
 
     /// <summary>The commands a row's context menu offers; the running app's, or a test's.</summary>
@@ -200,8 +217,51 @@ internal sealed partial class ShellView : UserControl
     }
 
     /// <summary>The import dialog hands the keyboard back to what had it, or to Items' "+", when it closes.</summary>
+    private void OnDiscardPromptEscape(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && _shell is { HasDiscardPrompt: true } shell)
+        {
+            shell.KeepDraftCommand.Press();
+            e.Handled = true;
+        }
+    }
+
+    private void OnDiscardPromptChanged(bool asking)
+    {
+        if (asking)
+        {
+            _focusBeforeDiscardPrompt = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Control;
+        }
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (asking)
+                {
+                    this.FindControl<Button>("KeepDraft")?.Focus();
+                }
+                else
+                {
+                    // The lists keep the row they wrote, and a binding does not republish a value its source never took.
+                    this.FindControl<ListBox>("Nav")!.SelectedItem = _shell?.SelectedSidebarRow;
+                    this.FindControl<ListBox>("FooterNav")!.SelectedItem = _shell?.SelectedFooter;
+
+                    if (_focusBeforeDiscardPrompt is { IsEffectivelyVisible: true } before)
+                    {
+                        before.Focus();
+                    }
+                }
+            },
+            DispatcherPriority.Loaded);
+    }
+
     private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(ShellViewModel.HasDiscardPrompt) && _shell is not null)
+        {
+            OnDiscardPromptChanged(_shell.HasDiscardPrompt);
+        }
+
         if (e.PropertyName != nameof(ShellViewModel.HasImport) || _shell is null)
         {
             return;

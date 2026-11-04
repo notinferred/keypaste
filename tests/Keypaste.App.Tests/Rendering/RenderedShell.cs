@@ -243,7 +243,7 @@ internal sealed class RenderedShell : IDisposable
         return Named<RevealedValue>(cell);
     }
 
-    private EntryDetailViewModel OpenPane()
+    internal EntryDetailViewModel OpenPane()
     {
         OpenEntry("CurrentPassword");
         return Assert.IsType<EntriesViewModel>(Shell.Content).Detail!;
@@ -269,7 +269,7 @@ internal sealed class RenderedShell : IDisposable
         return Named<RevealedValue>("RevisionPassword");
     }
 
-    private EnvProjectViewModel OpenProject()
+    internal EnvProjectViewModel OpenProject()
     {
         var env = Show<EnvSetsViewModel>(DestinationKind.EnvSets);
         env.OpenCommand.Press("billing");

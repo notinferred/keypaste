@@ -23,7 +23,7 @@ internal sealed record IdleChoice(int Seconds, string Label);
 /// to leave the screen with a setting that looks changed but is not. Shortening the idle timeout
 /// re-arms the session on the spot rather than at the next lock.
 /// </remarks>
-internal sealed partial class SettingsViewModel : ObservableObject, IDisposable
+internal sealed partial class SettingsViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private const string _translocatedNote =
         "macOS is running this copy from a temporary location. Move keypaste to Applications and open it again to link it.";
@@ -98,6 +98,9 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable
 
     /// <summary>Changing the vault's master password and keyfile.</summary>
     internal VaultAccessViewModel Access { get; }
+
+    /// <inheritdoc/>
+    public string? UnsavedDraft => Access.UnsavedDraft;
 
     /// <summary>
     /// The timeouts every vault is offered. There is deliberately no "never".

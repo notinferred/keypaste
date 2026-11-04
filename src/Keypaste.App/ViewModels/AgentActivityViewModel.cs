@@ -40,7 +40,7 @@ namespace Keypaste.App.ViewModels;
 /// when its length or write time has moved.
 /// </para>
 /// </remarks>
-internal sealed partial class AgentActivityViewModel : ObservableObject, IDisposable
+internal sealed partial class AgentActivityViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -270,6 +270,9 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         AuthorityStatus.HeldBy held => held.Sentence,
         _ => "Agents cannot reach this vault right now.",
     };
+
+    /// <inheritdoc/>
+    public string? UnsavedDraft => _rows.Select(row => row.Settings?.UnsavedDraft).FirstOrDefault(draft => draft is not null);
 
     /// <summary>Opens the named agent's settings on its row, listing it first when no row shows it yet.</summary>
     /// <param name="agent">The agent's name, or <c>*</c>.</param>

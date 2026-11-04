@@ -171,6 +171,9 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     internal partial bool RequirePassphrase { get; set; }
 
+    /// <summary>What Escape would lose, for the dialog: a recipient or a passphrase typed, or null.</summary>
+    internal Func<string?> Draft => () => _recipient.Trim().Length > 0 || Passphrase.HasValue ? "this share link" : null;
+
     /// <summary>The passphrase, entered through the masked field.</summary>
     internal SecretField Passphrase { get; }
 
