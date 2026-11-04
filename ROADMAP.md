@@ -42,7 +42,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 
 | Outcome | Tasks |
 |---|---|
-| Worked first: the architecture rules hold in the compiler, test classes run on the founder's machine, CI caches restores and repeats no green branch run on `main`, and established libraries replace hand-written retries, CLI parsing, parser test suites and the app's bindings (D-0670, D-0672). | K.7, K.8, K.9, K.10, K.11, K.12, B.5, B.6 |
+| Worked first: the architecture rules hold in the compiler, test classes run on the founder's machine, CI caches restores and a branch runs only its fast tier, and established libraries replace hand-written retries, CLI parsing, parser test suites and the app's bindings (D-0670, D-0672). | K.7, K.8, K.9, K.10, K.11, K.12, B.5 |
 | Worked next, after K and B: when more than one item answers to an agent's request, such as two logins for one website, the app says the agent is requesting a credential and the person picks one, seeing each item and the field they pick (D-0684). | F.76 |
 | Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. The terminal finds items and shows their fields without printing a value unless asked. | V.7a, V.7b, C.2, N.13 |
 | A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project, and nothing else does: keypaste keeps no compatibility with its own releases before 0.5.0. An entry that loses its tag in another app is flagged, and a value's `{PASSWORD}`-style placeholders fill in from its own entry. | C.1a, C.1b, C.1c, C.6, C.4, V.11, P.3b1 |

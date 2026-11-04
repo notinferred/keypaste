@@ -1,8 +1,9 @@
 name: ci
 
 on:
+  # A branch push runs the fast tier, Linux only; main's push runs every job.
   push:
-    branches: [main]
+    branches: ['**']
     # Keep pages checked by verify-demo.sh out of this list; docs/** would also skip them.
     paths-ignore:
       - 'docs/PRODUCT.md'
@@ -148,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON((github.event_name == 'push' && github.ref != 'refs/heads/main') && '["ubuntu-24.04"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -181,7 +182,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON((github.event_name == 'push' && github.ref != 'refs/heads/main') && '["ubuntu-24.04"]' || '["ubuntu-24.04", "windows-2025", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -211,7 +212,7 @@ jobs:
 
   compat:
     name: compat (${{ matrix.os }})
-    if: ${{ !inputs.only_tools }}
+    if: ${{ !inputs.only_tools && !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}
     strategy:
       fail-fast: false
       matrix:
@@ -326,7 +327,7 @@ jobs:
 
   aot:
     name: aot publish (linux-x64)
-    if: ${{ !inputs.only_tools }}
+    if: ${{ !inputs.only_tools && !(github.event_name == 'push' && github.ref != 'refs/heads/main') }}
     # NativeAOT inherits the build machine's glibc floor, which must match release.yml.
     runs-on: ubuntu-22.04
     timeout-minutes: 10

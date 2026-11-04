@@ -5,7 +5,8 @@ Completed 2026-11-04 in `9ae7e2ce`, source only; runs ci 41895008202, app 418950
 ## Amendments
 
 - **SDK 10.0.302 → 10.0.403.** GHSA-p3jp-9v83-76w9 (CVE-2026-111497, an out-of-bounds write in the runtime's Brotli decoder, published 2026-11-03) covers the 10.0.10 runtime packages 10.0.302 brings, and NuGet audit as an error failed every restore, `main`'s included (ci 41891448938). The founder chose to fix it inside B.5: `global.json` and the demo capture's image move to 10.0.403, whose runtime is 10.0.14, and every lock file was regenerated with `--force-evaluate`.
-- **Merged before the macOS jobs finished**, by the founder's direction, which also replaces the branch-then-`main` double run with a fast branch tier and one full run on `main` in a later change.
+- **Merged before the macOS jobs finished**, by the founder's direction.
+- **A branch runs a fast tier, and `main` the full matrix once**, by the founder's direction after the runs above: a push to any branch but `main` runs ci's scripts, workflows, format, and backend tests and integration on Linux, and no app run; `dev.sh` follows that run, and `dev.sh --full` dispatches every job as before. A step integrates once its fast tier is green, and a failure in `main`'s full run is fixed as the next work. B.6, which would have kept `main` from repeating a green branch run, is retired, since no branch runs the full matrix unasked. The release gate is unchanged: a ci run counts only with its tools jobs green and no other job skipped, which a fast-tier run never is.
 
 ## Evidence
 

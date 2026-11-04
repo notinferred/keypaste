@@ -4,19 +4,21 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/dev.sh [--tools] [--wait]
+Usage: bash scripts/dev.sh [--full [--tools]] [--wait]
        bash scripts/dev.sh --profile P [--os O] [--wait]
        bash scripts/dev.sh --acts APP_RUN_ID [--os O] [--wait]
 
 Pushes the current branch and follows GitHub's verdict on it. Needs only git and gh; nothing builds
 on this machine.
 
-With no option it dispatches ci.yml and app.yml on the branch and follows their runs: every job on all
-three runners. No pull request is opened. Each job is printed as it finishes.
+With no option it follows the ci.yml run the push starts: the fast tier, on Linux. No pull request is
+opened. Each job is printed as it finishes.
 The first failure ends the wait with that job's log; the runs carry on until the next push cancels them.
 
---tools   also run ci.yml's tools jobs, which install the real AI tools on every runner and connect keypaste
-          to them
+--full    dispatch ci.yml and app.yml on the branch instead: every job on all three runners, for a change
+          that behaves differently on Windows or macOS
+--tools   with --full, also run ci.yml's tools jobs, which install the real AI tools on every runner and
+          connect keypaste to them
 --profile one verify.sh profile, backend, integration, desktop or desktop-gates, run through dev.yml, to retry a
           failure only one runner showed
 --acts    install a successful app.yml run's packages, built at any commit, through install-desktop.yml, and do
@@ -29,10 +31,11 @@ USAGE
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 die() { echo "dev: $1" >&2; exit 1; }
 
-profile='' os='' acts='' wait_all=false tools=false
+profile='' os='' acts='' wait_all=false tools=false full=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
+    --full) full=true ;;
     --tools) tools=true ;;
     --wait) wait_all=true ;;
     --profile|--os|--acts)
@@ -53,6 +56,8 @@ done
   || bad_usage '--acts is a run of its own; it cannot accompany --profile or --tools'
 case "$acts" in *[!0-9]*) bad_usage "--acts takes an app.yml run ID, not $acts" ;; esac
 [ -z "$profile" ] || [ "$tools" = false ] || bad_usage '--profile is a run of its own; it cannot accompany --tools'
+[ "$tools" = false ] || [ "$full" = true ] || bad_usage '--tools needs --full'
+[ "$full" = false ] || { [ -z "$profile" ] && [ -z "$acts" ]; } || bad_usage '--full is a run of its own; it cannot accompany --profile or --acts'
 case "$profile" in ''|backend|integration|desktop|desktop-gates) ;; *) bad_usage "unknown --profile $profile" ;; esac
 case "${os:-linux}" in
   linux) runner=ubuntu-24.04 ;;
@@ -93,6 +98,16 @@ if [ -n "$mode" ]; then
   read -r id head <<< "$found"
   [ "$head" = "$sha" ] || die "run $id tests $head, not HEAD $sha"
   runs=("$id")
+elif [ "$full" = false ]; then
+  found='' tries=0
+  while [ -z "$found" ] && [ "$tries" -lt 20 ]; do
+    sleep 3
+    tries=$((tries + 1))
+    found="$(gh run list --workflow ci.yml --branch "$branch" --commit "$sha" --event push --limit 1 \
+      --json databaseId --jq '.[].databaseId' || true)"
+  done
+  [ -n "$found" ] || die "no ci run started for $sha within 60s; a push changing only ignored documents starts none"
+  runs=("$found")
 else
   # By workflow file, since a run whose file does not parse is named after its path.
   for workflow in ci.yml app.yml; do
