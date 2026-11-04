@@ -41,7 +41,7 @@ public sealed class AppMenuTests : IDisposable
 
         var bar = AppMenu.Bar(commands);
         var menus = bar.Items.OfType<NativeMenuItem>().ToDictionary(item => item.Header!, item => item.Menu!, StringComparer.Ordinal);
-        Assert.Equal(["File", "Edit", "View", "Window", "Help"], menus.Keys);
+        Assert.Equal(["File", "Edit", "Item", "View", "Window", "Help"], menus.Keys);
 
         var newItem = Item(menus["File"], "New item");
         Assert.Equal(new KeyGesture(Key.N, KeyModifiers.Meta), newItem.Gesture);
@@ -74,7 +74,7 @@ public sealed class AppMenuTests : IDisposable
 
         var flyout = AppMenu.Flyout(commands);
         var groups = flyout.Items.OfType<MenuItem>().ToDictionary(item => (string)item.Header!, StringComparer.Ordinal);
-        Assert.Equal(["keypaste", "File", "Edit", "View", "Window", "Help"], groups.Keys);
+        Assert.Equal(["keypaste", "File", "Edit", "Item", "View", "Window", "Help"], groups.Keys);
 
         var settings = Child(groups["keypaste"], "Settings…");
         Assert.Equal(new KeyGesture(Key.OemComma, KeyModifiers.Control), settings.InputGesture);

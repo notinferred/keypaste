@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
@@ -12,16 +13,14 @@ namespace Keypaste.App.Views;
 
 internal sealed partial class ShellView : UserControl
 {
-    /// <summary>Room the group menu needs below where it opens, so one opened low in the sidebar stays in the window.</summary>
-    private const double _groupMenuHeight = 160d;
-
-    /// <summary>What takes the keyboard after each choice in the group menu: the form it opened.</summary>
-    private static readonly Dictionary<string, string> _groupMenuFocus = new(StringComparer.Ordinal)
+    /// <summary>What takes the keyboard after a context menu's choice that opens a form: the form's first field.</summary>
+    private static readonly Dictionary<string, string> _formFocus = new(StringComparer.Ordinal)
     {
-        ["GroupMenuNewGroup"] = "NewGroupName",
-        ["GroupMenuRename"] = "RenameGroupName",
-        ["GroupMenuMove"] = "MoveGroupTarget",
-        ["GroupMenuDelete"] = "KeepGroup",
+        ["New group"] = "NewGroupName",
+        ["Rename group…"] = "RenameGroupName",
+        ["Move group…"] = "MoveGroupTarget",
+        ["Delete group"] = "KeepGroup",
+        ["Rename or move…"] = "OrganizeTitle",
     };
 
     private ShellViewModel? _shell;
@@ -34,12 +33,15 @@ internal sealed partial class ShellView : UserControl
         var nav = this.FindControl<ListBox>("Nav")!;
         nav.ContainerPrepared += OnSidebarRowPrepared;
         nav.AddHandler(KeyDownEvent, OnSidebarKeyDown, RoutingStrategies.Tunnel);
-        nav.AddHandler(PointerReleasedEvent, OnSidebarPointerReleased, RoutingStrategies.Tunnel);
 
-        this.FindControl<Border>("GroupMenuPanel")!.AddHandler(Button.ClickEvent, OnGroupMenuClick, RoutingStrategies.Bubble);
-        AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
-        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+        AddHandler(ContextRequestedEvent, OnContextRequested, RoutingStrategies.Bubble);
+        AddHandler(PointerReleasedEvent, OnControlClick, RoutingStrategies.Tunnel);
+        AddHandler(KeyDownEvent, OnShiftF10, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnShiftF10, RoutingStrategies.Tunnel);
     }
+
+    /// <summary>The commands a row's context menu offers; the running app's, or a test's.</summary>
+    internal AppCommands? Commands { get; init; }
 
     /// <summary>A heading names the rows under it and cannot be chosen; a group's row is a denser tree row.</summary>
     private static void OnSidebarRowPrepared(object? sender, ContainerPreparedEventArgs e)
@@ -53,24 +55,12 @@ internal sealed partial class ShellView : UserControl
 
     /// <summary>
     /// Right unfolds the chosen row and Left folds it, as in KeePassXC's group tree. Folding replaces the
-    /// rows, so the keyboard is handed back to the chosen one, or the next key would go nowhere. The menu
-    /// key, or Shift+F10, opens the chosen group's menu.
+    /// rows, so the keyboard is handed back to the chosen one, or the next key would go nowhere.
     /// </summary>
     private void OnSidebarKeyDown(object? sender, KeyEventArgs e)
     {
         if (_shell is null || sender is not ListBox nav)
         {
-            return;
-        }
-
-        if ((e.Key == Key.Apps && e.KeyModifiers == KeyModifiers.None) || (e.Key == Key.F10 && e.KeyModifiers == KeyModifiers.Shift))
-        {
-            if (_shell.SelectedSidebarRow is GroupRow chosenGroup && nav.ContainerFromItem(chosenGroup) is Control row)
-            {
-                OpenGroupMenu(chosenGroup, row.TranslatePoint(new Point(24, row.Bounds.Height), this), NavigationMethod.Tab);
-                e.Handled = true;
-            }
-
             return;
         }
 
@@ -89,91 +79,97 @@ internal sealed partial class ShellView : UserControl
         }
     }
 
-    /// <summary>A right-click on a group's row opens its menu where the pointer is.</summary>
-    private void OnSidebarPointerReleased(object? sender, PointerReleasedEventArgs e)
+    /// <summary>
+    /// A row's context menu, from a right-click, the menu key or Shift+F10, which Avalonia raises as one request,
+    /// and from a Control-click on macOS: the row's commands from the menus, at the pointer or at the row.
+    /// </summary>
+    private void OnContextRequested(object? sender, ContextRequestedEventArgs e)
     {
-        if (_shell is null || e.InitialPressMouseButton != MouseButton.Right || e.Source is not Visual source
-            || source.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault() is not { DataContext: GroupRow row })
+        if (Commands is null || e.Source is not Visual source
+            || source.GetSelfAndVisualAncestors().OfType<Control>().FirstOrDefault(control => AppCommands.HasContextMenu(control.DataContext)) is not { } anchor)
         {
             return;
         }
 
-        OpenGroupMenu(row, e.GetPosition(this), NavigationMethod.Pointer);
+        var row = anchor.DataContext!;
+
+        if (Commands.ContextMenu(row) is not { } entries)
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        // Choosing a sidebar row can rebuild the sidebar, taking the row's container with it.
+        if (TopLevel.GetTopLevel(anchor) is null)
+        {
+            anchor = this.FindControl<ListBox>("Nav")!.ContainerFromItem(row) ?? (Control)this;
+        }
+
+        var menu = AppMenu.Context(entries);
+        string? chosenForm = null;
+
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            if (item.Header is string header && _formFocus.TryGetValue(header, out var form))
+            {
+                // The item marks its click handled once it has run the command.
+                item.AddHandler(MenuItem.ClickEvent, (_, _) => chosenForm = form, handledEventsToo: true);
+            }
+        }
+
+        // Closing hands the keyboard back to where it was, so the form takes it only once the menu has closed.
+        menu.Closed += (_, _) =>
+        {
+            if (chosenForm is { } form)
+            {
+                FocusForm(form);
+            }
+        };
+
+        // Attached, not set as the row's ContextFlyout, which would open itself at the next request.
+        FlyoutBase.SetAttachedFlyout(anchor, menu);
+        menu.ShowAt(anchor, showAtPointer: e.TryGetPosition(anchor, out _));
+    }
+
+    /// <summary>macOS opens a context menu on a Control-click as on a right-click.</summary>
+    private void OnControlClick(object? sender, PointerReleasedEventArgs e)
+    {
+        if (Commands is { Mac: true } && e.InitialPressMouseButton == MouseButton.Left && e.KeyModifiers == KeyModifiers.Control
+            && e.Source is Interactive source)
+        {
+            source.RaiseEvent(new ContextRequestedEventArgs(e));
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Shift+F10 asks for the focused row's context menu as the menu key does, which not every platform's Avalonia does.</summary>
+    private void OnShiftF10(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.F10 || e.KeyModifiers != KeyModifiers.Shift)
+        {
+            return;
+        }
+
+        // The key's release is taken too, so a platform that does raise the request raises it once.
+        if (e.RoutedEvent == KeyDownEvent && e.Source is Interactive source)
+        {
+            source.RaiseEvent(new ContextRequestedEventArgs());
+        }
+
         e.Handled = true;
     }
 
-    /// <summary>Opens the group menu at a point of this view, with the keyboard on its first item.</summary>
-    private void OpenGroupMenu(GroupRow row, Point? at, NavigationMethod method)
-    {
-        if (_shell is null)
-        {
-            return;
-        }
-
-        var panel = this.FindControl<Border>("GroupMenuPanel")!;
-        var point = at ?? default;
-        Canvas.SetLeft(panel, Math.Max(0, point.X));
-        Canvas.SetTop(panel, Math.Max(0, Math.Min(point.Y, Bounds.Height - _groupMenuHeight)));
-
-        _shell.OpenGroupMenu(row);
-
+    private void FocusForm(string name) =>
         Dispatcher.UIThread.Post(
             () =>
             {
-                if (_shell?.HasGroupMenu == true
-                    && panel.GetVisualDescendants().OfType<Button>().FirstOrDefault(button => button.IsEffectivelyEnabled) is { } first)
-                {
-                    first.Focus(method);
-                }
-            },
-            DispatcherPriority.Loaded);
-    }
-
-    /// <summary>A choice in the group menu hands the keyboard to the form it opened.</summary>
-    private void OnGroupMenuClick(object? sender, RoutedEventArgs e)
-    {
-        if (e.Source is not Button { Name: { } name } || !_groupMenuFocus.TryGetValue(name, out var target))
-        {
-            return;
-        }
-
-        Dispatcher.UIThread.Post(
-            () =>
-            {
-                if (this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name == target && control.IsEffectivelyVisible) is { } form)
+                if (this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name == name && control.IsEffectivelyVisible) is { } form)
                 {
                     form.Focus(NavigationMethod.Tab);
                 }
             },
             DispatcherPriority.Loaded);
-    }
-
-    /// <summary>A press anywhere but the open group menu closes it.</summary>
-    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (_shell?.HasGroupMenu != true || e.Source is not Visual source)
-        {
-            return;
-        }
-
-        if (!source.GetSelfAndVisualAncestors().Any(visual => visual is Control { Name: "GroupMenuPanel" }))
-        {
-            _shell.CloseGroupMenu();
-        }
-    }
-
-    /// <summary>Escape closes the open group menu and gives the keyboard back to the group's row.</summary>
-    private void OnKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Escape || _shell?.HasGroupMenu != true)
-        {
-            return;
-        }
-
-        _shell.CloseGroupMenu();
-        e.Handled = true;
-        FocusChosenRow(this.FindControl<ListBox>("Nav")!);
-    }
 
     /// <summary>Gives the keyboard to the sidebar's chosen row.</summary>
     private void FocusChosenRow(ListBox nav)
@@ -227,7 +223,7 @@ internal sealed partial class ShellView : UserControl
                 _focusBeforeImport = null;
                 back?.Focus();
             },
-            DispatcherPriority.Background);
+            DispatcherPriority.Loaded);
     }
 
     private void OnSearchFocusRequested(object? sender, EventArgs e)

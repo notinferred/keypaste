@@ -127,10 +127,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         ClearScopeCommand = new RelayCommand(() => (Content as EntriesViewModel)?.ClearScopeCommand.Press());
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && !HasImport);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => IsWaitingForTouch);
-        NewGroupInsideCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginCreateGroupCommand));
-        RenameGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginRenameGroupCommand));
-        MoveGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginMoveGroupCommand));
-        DeleteGroupCommand = new RelayCommand(() => FromGroupMenu(entries => entries.BeginDeleteGroupCommand));
 
         FoldCommand = new RelayCommand<object>(row => Fold(row, open: null));
         MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity, IsExpandable = d.Kind == DestinationKind.Entries })];
@@ -394,66 +390,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     }
 
     internal bool HasProjects => _projects.Count > 0;
-
-    /// <summary>The group whose menu is open in the sidebar, or null.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasGroupMenu))]
-    internal partial GroupRow? GroupMenu { get; private set; }
-
-    internal bool HasGroupMenu => GroupMenu is not null;
-
-    /// <summary>The group menu's New group: a group inside the one the menu is for.</summary>
-    internal RelayCommand NewGroupInsideCommand { get; }
-
-    /// <summary>The group menu's Rename.</summary>
-    internal RelayCommand RenameGroupCommand { get; }
-
-    /// <summary>The group menu's Move.</summary>
-    internal RelayCommand MoveGroupCommand { get; }
-
-    /// <summary>The group menu's Delete, which asks first.</summary>
-    internal RelayCommand DeleteGroupCommand { get; }
-
-    /// <summary>
-    /// Opens a sidebar group's menu, from a right-click or the keyboard's menu key, with Items showing
-    /// that group, so each choice acts on what the list shows.
-    /// </summary>
-    /// <param name="row">The group's row.</param>
-    internal void OpenGroupMenu(GroupRow row)
-    {
-        ArgumentNullException.ThrowIfNull(row);
-
-        if (_disposed)
-        {
-            return;
-        }
-
-        ShowGroup(row.Path);
-        GroupMenu = row;
-    }
-
-    /// <summary>Closes the group menu, choosing nothing.</summary>
-    internal void CloseGroupMenu() => GroupMenu = null;
-
-    /// <summary>
-    /// Closes the group menu and opens one of Items' group forms on its group. The forms and the writes
-    /// they make are Items' own, so a group is changed the same way from the menu and from the list header.
-    /// </summary>
-    private void FromGroupMenu(Func<EntriesViewModel, RelayCommand> form)
-    {
-        if (GroupMenu is not { } row)
-        {
-            return;
-        }
-
-        GroupMenu = null;
-        ShowGroup(row.Path);
-
-        if (Content is EntriesViewModel entries)
-        {
-            form(entries).Press();
-        }
-    }
 
     /// <summary>Goes up from a screen to the screen or place it sits under.</summary>
     internal RelayCommand BackCommand { get; }
@@ -801,7 +737,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Builds the current destination's content.</summary>
     private void Show(Destination destination)
     {
-        GroupMenu = null;
 
         if (Content is EntriesViewModel previous)
         {
@@ -1688,7 +1623,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Import = null;
         ExportImport?.Dispose();
         ExportImport = null;
-        GroupMenu = null;
         Notice = null;
         Toast = null;
         Projects = [];

@@ -8,10 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.3 — Add context menus.** Needs: Q.2.
-  - Only a sidebar group row opens a menu, on a right-button release (`Views/ShellView.axaml.cs`); item, Trash, project, agent and revision rows have none, and an item's actions sit only in its preview's ⋯ menu.
-  - Each row gets a context flyout of its existing commands: an item's Copy username, Copy password, Open URL, Edit fields, Rename or move, Duplicate, Share… and Delete; Trash's Restore and Delete for good; a project's Open; an agent's Settings and Disconnect. The group menu moves onto the context-request event, so right-click, Control-click, Shift+F10 and the menu key share one path, and every entry is also in the menu bar.
-  - Accepted when headless tests open each flyout from the pointer and the keyboard and run a command from it.
 - [ ] **Q.4 — Keep unsaved work.** Needs: none.
   - Changing place disposes the screen (`ShellViewModel.Show`), which drops the New item form, Edit fields' drafts and agent limits not yet applied, asking nothing. A screen holding a draft asks "Discard …?" with Cancel and Discard before the place changes, from the sidebar, a shortcut or a search typed elsewhere. A lock still discards drafts.
   - In-pane forms answer Return with their confirm, never a danger one, and Escape with Cancel, as the import dialogs do (`ExportImportView.OnRootEscape`); the Share dialog gains Escape and a Cancel button. Escape in a masked field clears it and then reaches the form (`MaskedInput.OnKeyDown`).

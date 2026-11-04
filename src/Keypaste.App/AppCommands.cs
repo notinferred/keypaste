@@ -1,5 +1,8 @@
+using System.Windows.Input;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
@@ -93,6 +96,17 @@ internal sealed class AppCommands
 
     private readonly AppCommandHost _host;
     private readonly AppCommand _openVault;
+    private readonly AppCommand _newGroup;
+    private readonly AppCommand _delete;
+    private readonly IReadOnlyList<AppMenuEntry> _itemMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _trashMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _revisionMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _groupMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _projectMenu;
+    private readonly IReadOnlyList<AppMenuEntry> _agentMenu;
+
+    // The row a context menu was opened on, for the rows that cannot be chosen without opening them.
+    private object? _context;
 
     internal AppCommands(AppCommandHost host, bool? mac = null)
     {
@@ -119,10 +133,11 @@ internal sealed class AppCommands
 
         _openVault = new AppCommand("Open vault…", Chord(Key.O), CanOpenVault, () => OpenVault(null));
         var lockNow = new AppCommand("Lock", Chord(Key.L), () => host.Session.IsUnlocked, () => _ = host.Session.LockAsync(VaultLockReason.Manual));
+        _newGroup = new AppCommand("New group", [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press()));
         var file = new AppMenuGroup("File",
         [
             new AppCommand("New item", Chord(Key.N), () => Unmodal() is not null, () => OnItems(items => items.BeginAddCommand.Press())),
-            new AppCommand("New group", [], () => Unmodal() is not null, () => OnItems(items => items.BeginCreateGroupCommand.Press())),
+            _newGroup,
             new AppCommand(GenerateHeader, [], () => Unmodal() is not null, () => Unmodal()?.OpenGeneratorCommand.Press()),
             _line,
             _openVault,
@@ -136,6 +151,7 @@ internal sealed class AppCommands
             new AppCommand("Export…", [], () => Unmodal() is not null, Export),
         ]);
 
+        _delete = new AppCommand("Delete", Mac ? [new(Key.Back, KeyModifiers.Meta)] : [new(Key.Delete)], CanDelete, Delete);
         var edit = new AppMenuGroup("Edit",
         [
             new AppCommand("Undo", Chord(Key.Z), () => CanUndo(text: true), Undo) { ChordCanRun = () => CanUndo(text: false) },
@@ -145,7 +161,7 @@ internal sealed class AppCommands
             new AppCommand("Copy", Chord(Key.C), () => CanCopy(text: true), Copy) { ChordCanRun = () => CanCopy(text: false) },
             new AppCommand("Paste", Chord(Key.V), CanPaste, Paste) { ChordCanRun = static () => false },
             new AppCommand("Select all", Chord(Key.A), () => Text() is { Text.Length: > 0 }, () => Text()?.SelectAll()) { ChordCanRun = static () => false },
-            new AppCommand("Delete", Mac ? [new(Key.Back, KeyModifiers.Meta)] : [new(Key.Delete)], CanDelete, Delete),
+            _delete,
             _line,
             new AppCommand(
                 "Find",
@@ -182,7 +198,52 @@ internal sealed class AppCommands
             new AppCommand("Report a problem", [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(ProblemAddress))),
         ]);
 
-        Menus = [file, edit, view, window, help];
+        var copyUsername = Routed("Copy username", () => Items()?.Detail, detail => detail.CopyUsernameCommand);
+        var copyPassword = Routed("Copy password", () => Items()?.Detail, detail => detail.CopyPasswordCommand);
+        var openUrl = Routed("Open URL", () => Items()?.Detail, detail => detail.OpenUrlCommand);
+        var editFields = Routed("Edit fields…", () => Items()?.Detail, detail => detail.EditCommand);
+        var organize = Routed("Rename or move…", Items, items => items.OrganizeCommand);
+        var duplicate = Routed("Duplicate", Items, items => items.DuplicateCommand);
+        var share = Routed("Share…", Unmodal, shell => shell.ShareCommand, shell => (shell.Content as EntriesViewModel)?.Detail?.Path);
+        var restore = Routed("Restore", Trash, trash => trash.RestoreCommand);
+        var purge = Routed("Delete for good", Trash, trash => trash.PurgeCommand);
+        var copyRevision = Routed("Copy this revision's password", () => Items()?.Detail?.History.Selected, revision => revision.CopyPasswordCommand);
+        var restoreRevision = Routed("Restore this revision", () => Items()?.Detail, detail => detail.History.RestoreCommand);
+        var renameGroup = Routed("Rename group…", Items, items => items.BeginRenameGroupCommand);
+        var moveGroup = Routed("Move group…", Items, items => items.BeginMoveGroupCommand);
+        var deleteGroup = Routed("Delete group", Items, items => items.BeginDeleteGroupCommand);
+        var openProject = new AppCommand(
+            "Open project",
+            [],
+            () => Unmodal() is { } shell && Target<ProjectRow>() is { } project && !Equals(shell.SelectedSidebarRow, project),
+            OpenProject);
+        var agentSettings = new AppCommand(
+            "Agent settings…",
+            [],
+            () => Agents() is not null && Target<AgentRow>() is { HasSettings: true, IsOpen: false },
+            OpenAgentSettings);
+        var disconnect = Routed("Disconnect agent", Agents, agents => agents.DisconnectCommand, _ => Target<AgentRow>());
+
+        _itemMenu = [copyUsername, copyPassword, openUrl, _line, editFields, organize, duplicate, share, _line, _delete];
+        _trashMenu = [restore, _line, purge];
+        _revisionMenu = [copyRevision, restoreRevision];
+        _groupMenu = [_newGroup, renameGroup, moveGroup, _line, deleteGroup];
+        _projectMenu = [openProject];
+        _agentMenu = [agentSettings, _line, disconnect];
+
+        // Edit has Delete, and File has New group, so the item menu leaves them out.
+        var item = new AppMenuGroup("Item",
+        [
+            copyUsername, copyPassword, openUrl, _line,
+            editFields, organize, duplicate, share, _line,
+            copyRevision, restoreRevision, _line,
+            restore, purge, _line,
+            renameGroup, moveGroup, deleteGroup, _line,
+            openProject, _line,
+            agentSettings, disconnect,
+        ]);
+
+        Menus = [file, edit, item, view, window, help];
         Dock = [lockNow, new AppCommand(_openVault.Header, [], CanOpenVault, OpenVaultFromDock)];
     }
 
@@ -192,7 +253,7 @@ internal sealed class AppCommands
     /// <summary>The app's own menu: keypaste's in the macOS menu bar, the first submenu of the menu button elsewhere.</summary>
     internal IReadOnlyList<AppMenuEntry> AppMenu { get; }
 
-    /// <summary>File, Edit, View, Window and Help.</summary>
+    /// <summary>File, Edit, Item, View, Window and Help.</summary>
     internal IReadOnlyList<AppMenuGroup> Menus { get; }
 
     /// <summary>The macOS Dock icon's menu.</summary>
@@ -354,6 +415,105 @@ internal sealed class AppCommands
                 break;
             default:
                 break;
+        }
+    }
+
+    /// <summary>Whether <paramref name="row"/> is a kind of row that has a context menu.</summary>
+    internal static bool HasContextMenu(object? row) => row is EntryRow or TrashRow or EntryRevisionRow or GroupRow or ProjectRow or AgentRow;
+
+    /// <summary>
+    /// The context menu of a row, made the menus' target first: an item, a Trash row, a revision and a sidebar group
+    /// are chosen, while a project and an agent, which choosing would open or cannot be chosen, are its commands' target
+    /// while they run. Null for a row with no menu.
+    /// </summary>
+    internal IReadOnlyList<AppMenuEntry>? ContextMenu(object row)
+    {
+        if (Unmodal() is not { } shell)
+        {
+            return null;
+        }
+
+        switch (row)
+        {
+            case EntryRow entry when Items() is { } items:
+                items.Selected = entry;
+                return _itemMenu;
+            case TrashRow deleted when Trash() is { } trash:
+                trash.Selected = deleted;
+                return _trashMenu;
+            case EntryRevisionRow revision when Items()?.Detail is { } detail:
+                detail.History.Selected = revision;
+                return _revisionMenu;
+            case GroupRow group:
+                shell.SelectedSidebarRow = group;
+                return _groupMenu;
+            case ProjectRow:
+                return Bound(_projectMenu, row);
+            case AgentRow when Agents() is not null:
+                return Bound(_agentMenu, row);
+            default:
+                return null;
+        }
+    }
+
+    private List<AppMenuEntry> Bound(IReadOnlyList<AppMenuEntry> entries, object row) =>
+    [
+        .. entries.Select(entry => entry is AppCommand command
+            ? command with { CanRun = () => On(row, command.CanRun), Run = () => On(row, () => { command.Run(); return true; }) }
+            : entry),
+    ];
+
+    private T On<T>(object row, Func<T> act)
+    {
+        var before = _context;
+        _context = row;
+
+        try
+        {
+            return act();
+        }
+        finally
+        {
+            _context = before;
+        }
+    }
+
+    // A context menu's row, else the row holding the keyboard, as macOS sends a menu's command to the focused view.
+    private T? Target<T>()
+        where T : class =>
+        _context as T ?? (Focus() as Visual)?.GetSelfAndVisualAncestors().OfType<StyledElement>().Select(element => element.DataContext).OfType<T>().FirstOrDefault();
+
+    private AgentActivityViewModel? Agents() => Unmodal()?.Content as AgentActivityViewModel;
+
+    private static AppCommand Routed<T>(string header, Func<T?> target, Func<T, ICommand> command, Func<T, object?>? parameter = null)
+        where T : class =>
+        new(
+            header,
+            [],
+            () => target() is { } on && command(on).CanExecute(parameter?.Invoke(on)),
+            () =>
+            {
+                if (target() is { } on)
+                {
+                    command(on).Press(parameter?.Invoke(on));
+                }
+            });
+
+    private TrashViewModel? Trash() => Unmodal()?.Content as TrashViewModel;
+
+    private void OpenProject()
+    {
+        if (Unmodal() is { } shell && Target<ProjectRow>() is { } project)
+        {
+            shell.SelectedSidebarRow = project;
+        }
+    }
+
+    private void OpenAgentSettings()
+    {
+        if (Agents() is not null && Target<AgentRow>() is { } agent)
+        {
+            agent.IsOpen = true;
         }
     }
 

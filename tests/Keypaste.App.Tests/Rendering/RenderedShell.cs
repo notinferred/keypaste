@@ -80,9 +80,9 @@ internal sealed class RenderedShell : IDisposable
         Window = new MainWindow { Height = 1000 };
         // Crash reports composed as launch composes them, so Settings shows their switch and Diagnostics their list.
         _crashes = new CrashReporting(_directory, new DesktopPreferences(_directory), endpoint: null);
-        _shell = new ShellViewModel(Session, _directory, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start)) { Crashes = _crashes };
-        Root.Content = new ShellView { DataContext = _shell };
+        _shell = new ShellViewModel(Session, _directory, null, clipboard: Clipboard, clock: new ManualClock(AppClock.Start)) { Crashes = _crashes };
         _shortcuts = App.Bind(Window, Session, () => _unlock, () => _shell);
+        Root.Content = new ShellView { DataContext = _shell, Commands = _shortcuts.Commands };
         Session.Locked += OnLocked;
 
         Window.Show();
@@ -93,6 +93,8 @@ internal sealed class RenderedShell : IDisposable
     internal static IReadOnlyList<string> Secrets { get; } = [Current, Superseded, EnvValue, FieldValue, PlainFieldValue];
 
     internal AppVaultSession Session { get; }
+
+    internal FakeClipboard Clipboard { get; } = new();
 
     internal MainWindow Window { get; }
 

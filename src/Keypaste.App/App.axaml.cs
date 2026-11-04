@@ -797,7 +797,7 @@ internal sealed partial class App : Application, IDisposable
         };
 
         _window.FindControl<ContentControl>("Root")!.Content =
-            new ShellView { DataContext = _shell };
+            new ShellView { DataContext = _shell, Commands = _commands };
     }
 
     /// <summary>

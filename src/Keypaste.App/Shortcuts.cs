@@ -47,6 +47,9 @@ internal sealed class Shortcuts : IDisposable
     {
     }
 
+    /// <summary>The commands whose chords these are.</summary>
+    internal AppCommands Commands => _commands;
+
     /// <summary>Unbinds. Doing it twice is not an error.</summary>
     public void Dispose()
     {

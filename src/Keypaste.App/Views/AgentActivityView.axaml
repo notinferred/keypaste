@@ -139,7 +139,8 @@
             <ItemsControl Name="AgentRows" ItemsSource="{Binding Rows}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AgentRow">
-                  <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                  <!-- Transparent, so a right-click anywhere on the row opens its menu. -->
+                  <Border Padding="16,14" Background="Transparent" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12">
                       <Border Classes="tile" VerticalAlignment="Top">
                         <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"

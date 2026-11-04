@@ -46,8 +46,8 @@ public sealed class AppCommandsTests : IDisposable
         var mac = Commands(shell: null, mac: true);
         var other = Commands(shell: null, mac: false);
 
-        Assert.Equal(["File", "Edit", "View", "Window", "Help"], mac.Menus.Select(menu => menu.Header));
-        Assert.Equal(["File", "Edit", "View", "Window", "Help"], other.Menus.Select(menu => menu.Header));
+        Assert.Equal(["File", "Edit", "Item", "View", "Window", "Help"], mac.Menus.Select(menu => menu.Header));
+        Assert.Equal(["File", "Edit", "Item", "View", "Window", "Help"], other.Menus.Select(menu => menu.Header));
         Assert.Equal(["About keypaste", "Settings…", "Hide keypaste", "Hide others", "Show all", "Quit keypaste"], Headers(mac.AppMenu));
         Assert.Equal(["About keypaste", "Settings…", "Quit keypaste"], Headers(other.AppMenu));
 

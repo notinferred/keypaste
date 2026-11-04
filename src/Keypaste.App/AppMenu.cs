@@ -34,7 +34,7 @@ internal static class AppMenu
         return menu;
     }
 
-    /// <summary>The main window's menus on macOS: File, Edit, View, Window and Help, after the app menu.</summary>
+    /// <summary>The main window's menus on macOS: File, Edit, Item, View, Window and Help, after the app menu.</summary>
     internal static NativeMenu Bar(AppCommands commands)
     {
         ArgumentNullException.ThrowIfNull(commands);
@@ -49,7 +49,7 @@ internal static class AppMenu
         return bar;
     }
 
-    /// <summary>The menu button's flyout on Windows and Linux: keypaste, then File, Edit, View, Window and Help.</summary>
+    /// <summary>The menu button's flyout on Windows and Linux: keypaste, then File, Edit, Item, View, Window and Help.</summary>
     /// <remarks>A chord is shown, never bound: the window's chords already run it.</remarks>
     internal static MenuFlyout Flyout(AppCommands commands)
     {
@@ -62,6 +62,23 @@ internal static class AppMenu
         foreach (var group in commands.Menus)
         {
             flyout.Items.Add(Group(group.Header, group.Entries, made));
+        }
+
+        flyout.Opening += (_, _) => made.ForEach(command => command.NotifyCanExecuteChanged());
+        return flyout;
+    }
+
+    /// <summary>A row's context menu: the same commands as the menus, on exactly while each can run.</summary>
+    internal static MenuFlyout Context(IReadOnlyList<AppMenuEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var made = new List<RelayCommand>();
+        var flyout = new MenuFlyout();
+
+        foreach (var entry in entries)
+        {
+            flyout.Items.Add(entry is AppCommand command ? Item(command, made) : new Separator());
         }
 
         flyout.Opening += (_, _) => made.ForEach(command => command.NotifyCanExecuteChanged());
