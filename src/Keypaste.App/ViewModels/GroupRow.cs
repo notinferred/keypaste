@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Keypaste.App.ViewModels;
 
 /// <summary>A group in the sidebar's tree under Items, as KeePassXC's group tree draws it.</summary>
@@ -10,6 +12,12 @@ internal sealed record GroupRow(string Path, string Title, int Depth, bool HasCh
 {
     /// <summary>The fold's chevron: down while open, right while closed.</summary>
     internal string Chevron => IsExpanded ? "chevron-down" : "chevron-right";
+
+    /// <summary>What the fold button will do.</summary>
+    internal string FoldLabel => $"{(IsExpanded ? "Hide" : "Show")} the groups in {Title}";
+
+    /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
+    public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"{Title}, level {Depth + 1}");
 }
 
 /// <summary>A label in the sidebar's list that names the rows under it and cannot be chosen.</summary>
@@ -18,4 +26,7 @@ internal sealed record SidebarHeading(string Title)
 {
     /// <summary>What the list draws: a table heading, in capitals.</summary>
     internal string Label => Title.ToUpperInvariant();
+
+    /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
+    public override string ToString() => Title;
 }

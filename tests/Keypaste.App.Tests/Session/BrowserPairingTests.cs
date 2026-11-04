@@ -191,7 +191,7 @@ public sealed partial class BrowserPairingTests
 
         var names = card.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible)
             .Select(button => ControlAutomationPeer.CreatePeerForElement(button).GetName()).ToList();
-        Assert.Equal(["Stop pairing", "Remove this pairing"], names);
+        Assert.Equal(["Stop pairing", "Remove the pairing work laptop"], names);
 
         window.Close();
     });

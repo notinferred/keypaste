@@ -66,7 +66,7 @@
             Padding="32,12">
       <StackPanel Orientation="Horizontal" Spacing="10">
         <ctl:KpIcon Icon="info" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="12.5" VerticalAlignment="Center"
+        <TextBlock ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" TextWrapping="Wrap" FontSize="12.5" VerticalAlignment="Center"
                    Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
     </Border>
@@ -134,9 +134,9 @@
                         <TextBlock Classes="caption" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <Button Classes="sm" Content="Move to a field" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
-                        <Button Classes="sm ghost" Content="Dismiss" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
-                        <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                        <Button Classes="sm" Content="Move to a field" AutomationProperties.Name="{Binding Key, StringFormat='Move {0} to a field'}" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
+                        <Button Classes="sm ghost" Content="Dismiss" AutomationProperties.Name="{Binding Key, StringFormat='Dismiss {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost" Content="Review again" AutomationProperties.Name="{Binding Key, StringFormat='Review {0} again'}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -178,9 +178,9 @@
                           <TextBlock Classes="caption" Text="{Binding Where}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                          <Button Classes="sm" Content="Restore tag" IsVisible="{Binding NeedsReview}" Command="{Binding RestoreCommand}" />
-                          <Button Classes="sm ghost" Content="Dismiss" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
-                          <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                          <Button Classes="sm" Content="Restore tag" AutomationProperties.Name="{Binding Tag, StringFormat='Restore {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding RestoreCommand}" />
+                          <Button Classes="sm ghost" Content="Dismiss" AutomationProperties.Name="{Binding Tag, StringFormat='Dismiss {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                          <Button Classes="sm ghost" Content="Review again" AutomationProperties.Name="{Binding Tag, StringFormat='Review {0} again'}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                         </StackPanel>
                       </Grid>
                       <Border Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRestoreCommand}" ctl:FormKeys.Cancel="{Binding CancelRestoreCommand}">
@@ -227,8 +227,8 @@
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <Button Classes="sm ghost" Content="Open item" Command="{Binding OpenCommand}"
                                 AutomationProperties.Name="{Binding OpenLabel}" />
-                        <Button Classes="sm ghost" Content="Dismiss" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
-                        <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                        <Button Classes="sm ghost" Content="Dismiss" AutomationProperties.Name="{Binding Entry, StringFormat='Dismiss {0}'}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost" Content="Review again" AutomationProperties.Name="{Binding Entry, StringFormat='Review {0} again'}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -244,7 +244,7 @@
               <TextBlock Name="RecommendationsMessage"
                          Classes="caption"
                          TextWrapping="Wrap"
-                         Text="{Binding Message}"
+                         ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                          Foreground="{DynamicResource KpTextSecondary}" />
             </Border>
           </StackPanel>
@@ -269,6 +269,7 @@
                 </StackPanel>
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding IdleChoices}"
+                          AutomationProperties.Name="Lock the vault after"
                           SelectedItem="{Binding Idle}"
                           MinWidth="160"
                           VerticalAlignment="Top">
@@ -343,7 +344,7 @@
                   <TextBlock Classes="caption" Text="System follows the operating system's light or dark setting." />
                 </StackPanel>
                 <ListBox Grid.Column="1"
-                         Name="ThemeChoice"
+                         Name="ThemeChoice" AutomationProperties.Name="Theme"
                          Classes="segmented"
                          VerticalAlignment="Center"
                          ItemsSource="{Binding Themes}"
@@ -371,26 +372,35 @@
                 </StackPanel>
 
                 <StackPanel Spacing="8" MaxWidth="420" HorizontalAlignment="Left" Width="420">
-                  <ctl:MaskedInput x:Name="CurrentPassword"
-                                   AllowsPaste="True"
-                                   MaskedLength="{Binding CurrentMaskedLength}"
-                                   Placeholder="Current master password"
-                                   IsEnabled="{Binding IsEditing}" />
+                  <StackPanel Spacing="6">
+                    <TextBlock Classes="label" Text="Current master password" />
+                    <ctl:MaskedInput x:Name="CurrentPassword"
+                                     AllowsPaste="True"
+                                     MaskedLength="{Binding CurrentMaskedLength}"
+                                     Placeholder="Current master password"
+                                     IsEnabled="{Binding IsEditing}" />
+                  </StackPanel>
 
                   <CheckBox Content="Set a new master password"
                             IsChecked="{Binding SetPassword}"
                             IsEnabled="{Binding IsEditing}" />
                   <StackPanel Spacing="8" IsVisible="{Binding SetPassword}">
-                    <ctl:MaskedInput x:Name="AccessNewPassword"
-                                     AllowsPaste="True"
-                                     MaskedLength="{Binding NewMaskedLength}"
-                                     Placeholder="New master password"
-                                     IsEnabled="{Binding IsEditing}" />
-                    <ctl:MaskedInput x:Name="AccessConfirmPassword"
-                                     AllowsPaste="True"
-                                     MaskedLength="{Binding ConfirmMaskedLength}"
-                                     Placeholder="Confirm new master password"
-                                     IsEnabled="{Binding IsEditing}" />
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="label" Text="New master password" />
+                      <ctl:MaskedInput x:Name="AccessNewPassword"
+                                       AllowsPaste="True"
+                                       MaskedLength="{Binding NewMaskedLength}"
+                                       Placeholder="New master password"
+                                       IsEnabled="{Binding IsEditing}" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="label" Text="Confirm new master password" />
+                      <ctl:MaskedInput x:Name="AccessConfirmPassword"
+                                       AllowsPaste="True"
+                                       MaskedLength="{Binding ConfirmMaskedLength}"
+                                       Placeholder="Confirm new master password"
+                                       IsEnabled="{Binding IsEditing}" />
+                    </StackPanel>
                   </StackPanel>
                 </StackPanel>
 
@@ -468,7 +478,7 @@
                 <TextBlock Classes="caption" Text="Changing…" IsVisible="{Binding Busy}" />
                 <TextBlock Name="AccessMessage"
                            Classes="caption"
-                           Text="{Binding Message}"
+                           ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                            IsVisible="{Binding HasMessage}"
                            Foreground="{DynamicResource KpTextSecondary}" />
               </StackPanel>
@@ -602,7 +612,7 @@
                 </Grid>
                 <TextBlock Name="PairingArmedLine" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
                            Text="{Binding ArmedText}" IsVisible="{Binding IsArmed}" />
-                <TextBlock Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+                <TextBlock Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
@@ -619,7 +629,7 @@
                           <TextBlock Classes="caption" Text="{Binding Used}" TextWrapping="Wrap" />
                         </StackPanel>
                         <Button Grid.Column="1" Classes="ghost sm" Content="Remove" VerticalAlignment="Top"
-                                AutomationProperties.Name="Remove this pairing"
+                                AutomationProperties.Name="{Binding Name, StringFormat='Remove the pairing {0}'}"
                                 IsVisible="{Binding !IsConfirmingRemove}"
                                 Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).AskRemoveCommand}"
                                 CommandParameter="{Binding}" />
@@ -628,7 +638,7 @@
                           <Button Classes="ghost sm" Content="Cancel"
                                   Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).CancelRemoveCommand}"
                                   CommandParameter="{Binding}" />
-                          <Button Classes="danger sm" Content="Remove" AutomationProperties.Name="Confirm removing this pairing"
+                          <Button Classes="danger sm" Content="Remove" AutomationProperties.Name="{Binding Name, StringFormat='Confirm removing the pairing {0}'}"
                                   Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).RemoveCommand}"
                                   CommandParameter="{Binding}" />
                         </StackPanel>

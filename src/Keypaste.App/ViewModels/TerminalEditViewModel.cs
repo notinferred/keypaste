@@ -27,6 +27,9 @@ internal sealed class TerminalEditViewModel : PromptViewModel
     /// <summary>The item, or the environment, sanitized.</summary>
     internal string Item { get; }
 
+    /// <inheritdoc/>
+    protected override string Asks => $"{Item}, {Command}";
+
     /// <summary>Where the request says it came from, said as a claim.</summary>
     internal string Origin { get; }
 

@@ -43,7 +43,7 @@
       <TextBlock Name="IdentityText" Classes="caption" Text="{Binding Identity}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
     </StackPanel>
 
-    <TextBlock Name="SettingsProblem" Classes="body danger" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
+    <TextBlock Name="SettingsProblem" Classes="body danger" ctl:Announcer.Says="{Binding Problem}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
 
     <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="16" RowSpacing="14">
 
@@ -147,15 +147,27 @@
       <StackPanel Grid.Row="5" Grid.Column="1" Spacing="6" IsVisible="{Binding OffersLimits}">
         <!-- Wraps, so the panel's narrowest column, inside a row of a table that clips, still shows Apply. -->
         <WrapPanel ItemSpacing="8" LineSpacing="8" ctl:FormKeys.Confirm="{Binding ApplyLimitCommand}">
-          <ComboBox ItemsSource="{Binding LimitTargets}" SelectedItem="{Binding LimitTarget}" MinWidth="160"
-                    AutomationProperties.Name="Where the limit applies" />
-          <TextBox Classes="mono" Width="90" Text="{Binding PerHourText}" PlaceholderText="per hour"
-                   AutomationProperties.Name="At most this many an hour" />
-          <CalendarDatePicker Width="140" SelectedDate="{Binding UntilDate, Mode=TwoWay}" SelectedDateFormat="Custom" CustomDateFormatString="yyyy-MM-dd"
-                              PlaceholderText="until" AutomationProperties.Name="Automatic until this day" />
-          <TextBox Classes="mono" Width="100" Text="{Binding UntilTimeText}" PlaceholderText="end of day"
-                   AutomationProperties.Name="Automatic until this time of day" />
-          <Button Content="Apply" Command="{Binding ApplyLimitCommand}" />
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="Applies to" />
+            <ComboBox ItemsSource="{Binding LimitTargets}" SelectedItem="{Binding LimitTarget}" MinWidth="160"
+                      AutomationProperties.Name="Where the limit applies" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="Per hour" />
+            <TextBox Classes="mono" Width="90" Text="{Binding PerHourText}" PlaceholderText="per hour"
+                     AutomationProperties.Name="At most this many an hour" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="Until" />
+            <CalendarDatePicker Width="140" SelectedDate="{Binding UntilDate, Mode=TwoWay}" SelectedDateFormat="Custom" CustomDateFormatString="yyyy-MM-dd"
+                                PlaceholderText="until" AutomationProperties.Name="Automatic until this day" />
+          </StackPanel>
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="Time" />
+            <TextBox Classes="mono" Width="100" Text="{Binding UntilTimeText}" PlaceholderText="end of day"
+                     AutomationProperties.Name="Automatic until this time of day" />
+          </StackPanel>
+          <Button Content="Apply" VerticalAlignment="Bottom" Command="{Binding ApplyLimitCommand}" />
         </WrapPanel>
         <TextBlock Classes="caption" Text="{Binding LimitNow}" TextWrapping="Wrap" />
         <TextBlock Classes="caption" TextWrapping="Wrap"
@@ -173,7 +185,7 @@
 
     <TextBlock Classes="caption" Text="{Binding Beneath}" IsVisible="{Binding IsBeneath}" TextWrapping="Wrap" />
 
-    <TextBlock Name="SettingsMessage" Classes="body" Text="{Binding Message}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" />
+    <TextBlock Name="SettingsMessage" Classes="body" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" />
 
   </StackPanel>
 

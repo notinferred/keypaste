@@ -46,6 +46,9 @@ internal sealed record LogRow
     /// <summary>The divider drawn above this row when it starts a day, or null; the screen sets it per filter.</summary>
     internal string? Day { get; init; }
 
+    /// <summary>What a screen reader says for the row: its columns, none of which holds a value.</summary>
+    internal string RowName => $"{When}, {Actor}, {Action}, {Secrets}, {Where}, {Result}{(Unverified ? $", {UnverifiedWords}" : string.Empty)}";
+
     internal bool StartsDay => Day is not null;
 
     /// <summary>The full local timestamp, for the tooltip.</summary>

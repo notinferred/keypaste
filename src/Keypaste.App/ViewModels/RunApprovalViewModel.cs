@@ -63,6 +63,9 @@ internal sealed class RunApprovalViewModel : PromptViewModel
     /// <summary>Who asks and how many secrets, as the design's heading says it.</summary>
     internal string Title { get; }
 
+    /// <inheritdoc/>
+    protected override string Asks => Title;
+
     internal string Subtitle { get; }
 
     /// <summary>The environment the set comes from, which the prompt draws whole on a row of its own.</summary>

@@ -82,6 +82,21 @@ internal abstract partial class PromptViewModel : ObservableObject
         }
     }
 
+    /// <summary>What the prompt asks, in the words of its heading, for a screen reader.</summary>
+    protected abstract string Asks { get; }
+
+    /// <summary>What a screen reader is told once as the prompt opens: what it asks and how long is left, which never ticks.</summary>
+    [ObservableProperty]
+    internal partial string Opening { get; private set; } = string.Empty;
+
+    private static string TimeLimit(int seconds) => seconds switch
+    {
+        >= 120 when seconds % 60 == 0 => string.Create(CultureInfo.InvariantCulture, $"{seconds / 60} minutes"),
+        60 => "1 minute",
+        1 => "1 second",
+        _ => string.Create(CultureInfo.InvariantCulture, $"{seconds} seconds"),
+    };
+
     /// <summary>Lets no allow be pressed until a wait begun now arms it. Called on the UI thread.</summary>
     internal void Disarm()
     {
@@ -93,6 +108,12 @@ internal abstract partial class PromptViewModel : ObservableObject
     internal void Tick(TimeSpan remaining)
     {
         var seconds = remaining <= TimeSpan.Zero ? 0 : (int)Math.Ceiling(remaining.TotalSeconds);
+
+        if (Opening.Length == 0)
+        {
+            Opening = $"{Asks}. {TimeLimit(seconds)} to answer.";
+        }
+
         Countdown = string.Create(CultureInfo.InvariantCulture, $"{seconds / 60}:{seconds % 60:00}");
     }
 

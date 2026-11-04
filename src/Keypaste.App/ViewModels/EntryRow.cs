@@ -120,8 +120,9 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     internal string DisplayTitle { get; } = EntryNameSanitizer.Sanitize(Title).Text;
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
-    /// <returns>The scrubbed title, as the row draws it.</returns>
-    public override string ToString() => DisplayTitle;
+    /// <returns>The row's columns, as it draws them, which hold no secret.</returns>
+    public override string ToString() =>
+        string.Join(", ", new[] { DisplayTitle, Why, DisplayUsername, DisplayUrl, KindLabel, Where, LastUsedText }.Where(column => !string.IsNullOrEmpty(column)));
 
     /// <summary>The group, for a list that is not grouped by one. Display only, so scrubbed.</summary>
     internal string Where { get; } =

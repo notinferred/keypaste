@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app now works better with screen readers: every field and list row has a name, headings carry their level, buttons in a repeated row name what they act on, and unlock and form errors, toasts, the banner saying another program saved the vault and a prompt's opening with its time limit are each announced once. Fields labelled only by a placeholder now have a visible label, and the Agents row says live or refusing beside its dot. ([Q.7](docs/steps/Q.7.md))
+
 The desktop app now says what is happening: a toast shows whether it reports a success, information or a warning, stays at least four seconds, waits while the pointer is on it and closes with ×, and later ones stack rather than replace it; a moving indicator and label sit beside each wait; errors end with what to do next; a password that alone does not open a vault says it may also need a key file or a YubiKey and opens More options; and empty lists offer Search all items, Clear search, Show all or New token. ([Q.6](docs/steps/Q.6.md))
 
 The desktop app's Edit › Undo, ⌘Z or Ctrl+Z, now reverses the last delete, rename or move, duplicate, and group create, rename, move or delete, until the next write to the vault, so a delete that goes to the recycle bin no longer asks first. Trash restores several selected rows at once. Every confirmation puts Cancel first and the action last, "Forget them all" and a browser pairing's Remove now confirm in place, and a terminal's `keypaste rm` on a vault with no recycle bin is approved with a danger button reading "Delete for good" ([Q.5](docs/steps/Q.5.md)).

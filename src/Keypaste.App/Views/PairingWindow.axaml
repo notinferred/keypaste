@@ -27,6 +27,7 @@
     <StackPanel Spacing="16">
 
       <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
         <Border Grid.Column="0" Classes="prompt-tile">
           <ctl:KpIcon Icon="globe" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         </Border>
@@ -49,7 +50,7 @@
         <TextBlock Classes="caption" Text="Name this pairing, as the browser will list it" />
         <TextBox Name="NameBox" Text="{Binding Name}" MaxLength="64" AutomationProperties.Name="Name of this pairing" />
         <TextBlock Name="NameProblemText" Height="18" FontSize="12" Foreground="{DynamicResource KpDanger}"
-                   Text="{Binding NameProblem}" TextTrimming="CharacterEllipsis" />
+                   ctl:Announcer.Says="{Binding NameProblem}" Text="{Binding NameProblem}" TextTrimming="CharacterEllipsis" />
       </StackPanel>
 
       <TextBlock Name="ExplainerText" Classes="prompt-note" Text="{Binding Explainer}" />

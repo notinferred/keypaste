@@ -12,6 +12,7 @@
 
   <UserControl.Styles>
     <Style Selector="TextBlock.first-title">
+      <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
       <Setter Property="FontSize" Value="22" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="LetterSpacing" Value="-0.66" />
@@ -26,6 +27,7 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
     <Style Selector="TextBlock.terms-heading">
+      <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Margin" Value="0,8,0,0" />

@@ -44,6 +44,9 @@ internal sealed class AccessChangeViewModel : PromptViewModel
     /// <summary>The agent the change is for, sanitized, or every agent for a reset.</summary>
     internal string Agent { get; }
 
+    /// <inheritdoc/>
+    protected override string Asks => $"{Agent} would get more";
+
     /// <summary>What is being changed: the agent's settings, or this computer's ceilings for a reset.</summary>
     internal string Subject { get; }
 

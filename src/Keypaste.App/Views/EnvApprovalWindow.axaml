@@ -33,6 +33,7 @@
 
       <StackPanel Spacing="10">
         <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+          <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
           <Border Grid.Column="0" Classes="prompt-tile">
             <ctl:KpIcon Icon="terminal" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
           </Border>

@@ -67,7 +67,7 @@
                        IsVisible="{Binding !IsUnreadable}" />
             <TextBlock FontSize="12"
                        Classes="danger"
-                       Text="{Binding Message}"
+                       ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                        TextWrapping="Wrap"
                        IsVisible="{Binding IsUnreadable}" />
           </StackPanel>
@@ -236,7 +236,7 @@
       <TextBlock Classes="danger"
                  FontSize="12.5"
                  TextWrapping="Wrap"
-                 Text="{Binding Message}"
+                 ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                  IsVisible="{Binding HasTrailingMessage}" />
 
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">

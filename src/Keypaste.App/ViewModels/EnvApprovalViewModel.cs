@@ -34,6 +34,9 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
     /// <summary>Who asks and how many secrets, as the design's heading says it.</summary>
     internal string Title { get; }
 
+    /// <inheritdoc/>
+    protected override string Asks => Title;
+
     internal string Project { get; }
 
     internal string Profile { get; }

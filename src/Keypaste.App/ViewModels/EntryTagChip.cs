@@ -48,5 +48,8 @@ internal sealed class EntryTagChip
     /// <summary>What the remove button is called. Names the tag.</summary>
     internal string RemoveLabel => $"Remove the tag {Display}";
 
+    /// <summary>What a screen reader says for the chip, the shield and the warning in words.</summary>
+    internal string Spoken => string.Join(", ", new[] { Display, IsProtected ? "protected" : string.Empty, IsMalformed ? "malformed" : string.Empty }.Where(part => part.Length > 0));
+
     internal RelayCommand RemoveCommand { get; }
 }

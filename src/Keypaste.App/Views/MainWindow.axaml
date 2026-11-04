@@ -20,6 +20,7 @@
        other content gets DragStrip, so the window can still be moved from its top edge. -->
 
   <Panel>
+    <TextBlock Classes="live" />
     <ContentControl Name="Root" />
     <Border Name="DragStrip"
             Height="{x:Static views:WindowChrome.TitleBarHeight}"

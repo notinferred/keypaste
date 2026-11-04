@@ -47,6 +47,9 @@ internal sealed class PairingViewModel : PromptViewModel
     }
 
     /// <summary>Why the name cannot be used, or null.</summary>
+    /// <inheritdoc/>
+    protected override string Asks => "A browser asks to pair";
+
     internal string? NameProblem => _prompt.NameProblem(_name);
 
     internal bool HasNameProblem => NameProblem is not null;

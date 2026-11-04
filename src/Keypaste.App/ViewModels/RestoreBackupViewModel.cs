@@ -15,6 +15,9 @@ internal sealed class BackupRow(VaultBackup backup, bool isDamaged)
 
     /// <summary>Whether the file has no KDBX header, which needs no password to find out.</summary>
     internal bool IsDamaged { get; } = isDamaged;
+
+    /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
+    public override string ToString() => IsDamaged ? $"{Taken}, damaged" : Taken;
 }
 
 /// <summary>

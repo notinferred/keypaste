@@ -57,6 +57,9 @@ internal sealed class ApprovalViewModel : PromptViewModel
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }
 
+    /// <inheritdoc/>
+    protected override string Asks => $"{Client} wants 1 secret, {Entry}";
+
     /// <summary>The label the client's configuration gave its bridge.</summary>
     internal string Label { get; }
 

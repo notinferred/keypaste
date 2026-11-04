@@ -254,7 +254,7 @@
       <Border Classes="note" IsVisible="{Binding HasNotice}">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Grid.Column="0"
-                     Text="{Binding Notice}"
+                     ctl:Announcer.Says="{Binding Notice}" Text="{Binding Notice}"
                      TextWrapping="Wrap"
                      VerticalAlignment="Center"
                      FontSize="12"
@@ -270,13 +270,16 @@
 
       <!-- Calm, not a dialog. KpDanger is reserved for the destructive confirmation. -->
       <Border Classes="note" IsVisible="{Binding HasError}">
-        <TextBlock Text="{Binding Error}" TextWrapping="Wrap" FontSize="12" Classes="secondary" />
+        <TextBlock ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12" Classes="secondary" />
       </Border>
 
       <Border Classes="form" IsVisible="{Binding IsCreatingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmCreateGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding CreateGroupPrompt}" />
-          <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" />
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="Group name" />
+            <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" AutomationProperties.Name="Group name" />
+          </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
             <Button x:Name="CreateGroup" Classes="primary sm" Content="Create" Command="{Binding ConfirmCreateGroupCommand}" />
@@ -287,7 +290,7 @@
       <Border Classes="form" IsVisible="{Binding IsRenamingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
-          <TextBox x:Name="RenameGroupName" Text="{Binding DraftGroupName}" />
+          <TextBox x:Name="RenameGroupName" AutomationProperties.Name="The group's new name" Text="{Binding DraftGroupName}" />
           <TextBlock Classes="caption" Text="{Binding AccessNote}" />
           <!-- A group under env is where keypaste puts a project's new keys. -->
           <TextBlock x:Name="ProjectRenameNote"
@@ -305,7 +308,7 @@
       <Border Classes="form" IsVisible="{Binding IsMovingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
-          <ComboBox x:Name="MoveGroupTarget"
+          <ComboBox x:Name="MoveGroupTarget" AutomationProperties.Name="Move to"
                     HorizontalAlignment="Stretch"
                     ItemsSource="{Binding MoveTargets}"
                     SelectedItem="{Binding GroupMoveTarget}">
@@ -404,6 +407,7 @@
           </StackPanel>
 
           <ListBox Name="Rows"
+                   AutomationProperties.Name="Items"
                    Classes="rows table"
                    Padding="6,4"
                    ItemsSource="{Binding Rows}"
@@ -490,6 +494,7 @@
             <StackPanel Spacing="24" DataContext="{Binding NewItem}" x:DataType="vm:NewItemViewModel">
 
               <ListBox x:Name="NewItemTemplate"
+                       AutomationProperties.Name="Kind of item"
                        Classes="templates"
                        ItemsSource="{Binding Templates}"
                        SelectedItem="{Binding SelectedTemplate}">
@@ -511,17 +516,17 @@
               <Grid ColumnDefinitions="*,16,*">
                 <StackPanel Grid.Column="0" Spacing="8">
                   <TextBlock Classes="label" Text="Title" />
-                  <TextBox x:Name="NewItemTitle" MinHeight="40" Text="{Binding Title}" PlaceholderText="github" />
+                  <TextBox x:Name="NewItemTitle" AutomationProperties.Name="Title" MinHeight="40" Text="{Binding Title}" PlaceholderText="github" />
                   <TextBlock x:Name="NewItemTitleProblem"
                              Classes="caption"
                              Foreground="{DynamicResource KpDanger}"
                              TextWrapping="Wrap"
                              IsVisible="{Binding HasTitleProblem}"
-                             Text="{Binding TitleProblem}" />
+                             ctl:Announcer.Says="{Binding TitleProblem}" Text="{Binding TitleProblem}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="8">
                   <TextBlock Classes="label" Text="Folder" />
-                  <ComboBox x:Name="NewItemFolder"
+                  <ComboBox x:Name="NewItemFolder" AutomationProperties.Name="Folder"
                             MinHeight="40"
                             HorizontalAlignment="Stretch"
                             ItemsSource="{Binding Folders}"
@@ -539,13 +544,13 @@
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsKey}">
                 <TextBlock Classes="label" Text="Key name" />
-                <TextBox x:Name="NewItemKeyName" Classes="mono" MinHeight="40" Text="{Binding KeyName}" PlaceholderText="OPENAI_API_KEY" />
+                <TextBox x:Name="NewItemKeyName" AutomationProperties.Name="Key name" Classes="mono" MinHeight="40" Text="{Binding KeyName}" PlaceholderText="OPENAI_API_KEY" />
                 <TextBlock x:Name="NewItemKeyNameProblem"
                            Classes="caption"
                            Foreground="{DynamicResource KpDanger}"
                            TextWrapping="Wrap"
                            IsVisible="{Binding HasKeyNameProblem}"
-                           Text="{Binding KeyNameProblem}" />
+                           ctl:Announcer.Says="{Binding KeyNameProblem}" Text="{Binding KeyNameProblem}" />
                 <TextBlock Classes="caption" Text="The name a project reads it under. It is kept as a protected field, and a project tag puts it in that project's environment." />
               </StackPanel>
 
@@ -563,12 +568,12 @@
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsHost}">
                 <TextBlock Classes="label" Text="Host" />
-                <TextBox x:Name="NewItemHost" Classes="mono" MinHeight="40" Text="{Binding Host}" PlaceholderText="db.example.com:5432" />
+                <TextBox x:Name="NewItemHost" AutomationProperties.Name="Host" Classes="mono" MinHeight="40" Text="{Binding Host}" PlaceholderText="db.example.com:5432" />
               </StackPanel>
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsUsername}">
                 <TextBlock Classes="label" Text="Username" />
-                <TextBox x:Name="NewEntryUsername" Classes="mono" MinHeight="40" Text="{Binding Username}" PlaceholderText="Optional" />
+                <TextBox x:Name="NewEntryUsername" AutomationProperties.Name="Username" Classes="mono" MinHeight="40" Text="{Binding Username}" PlaceholderText="Optional" />
               </StackPanel>
 
               <StackPanel Spacing="10" IsVisible="{Binding ShowsPassword}">
@@ -606,12 +611,12 @@
 
               <StackPanel Spacing="8" IsVisible="{Binding ShowsUrl}">
                 <TextBlock Classes="label" Text="Web address" />
-                <TextBox x:Name="NewEntryUrl" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="https://" />
+                <TextBox x:Name="NewEntryUrl" AutomationProperties.Name="Web address" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="https://" />
               </StackPanel>
 
               <StackPanel Spacing="8">
                 <TextBlock Classes="label" Text="Notes" />
-                <TextBox x:Name="NewItemNotes"
+                <TextBox x:Name="NewItemNotes" AutomationProperties.Name="Notes"
                          MinHeight="80"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
@@ -628,7 +633,7 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:EntryTagChip">
-                      <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}">
+                      <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Spoken}">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                           <ctl:KpIcon Icon="shield-check" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
                           <ctl:KpIcon Icon="alert-triangle" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
@@ -660,7 +665,7 @@
                            Foreground="{DynamicResource KpDanger}"
                            TextWrapping="Wrap"
                            IsVisible="{Binding HasTagProblem}"
-                           Text="{Binding TagProblem}" />
+                           ctl:Announcer.Says="{Binding TagProblem}" Text="{Binding TagProblem}" />
               </StackPanel>
 
               <TextBlock x:Name="NewItemError"
@@ -668,7 +673,7 @@
                          Foreground="{DynamicResource KpDanger}"
                          TextWrapping="Wrap"
                          IsVisible="{Binding HasError}"
-                         Text="{Binding Error}" />
+                         ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -873,17 +878,17 @@
                                  TextTrimming="CharacterEllipsis" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Name" />
-                        <TextBox x:Name="OrganizeTitle" Classes="mono" Text="{Binding DraftTitle}" />
+                        <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="Name" Classes="mono" Text="{Binding DraftTitle}" />
                         <TextBlock x:Name="OrganizeTitleProblem"
                                    Classes="caption"
                                    Foreground="{DynamicResource KpDanger}"
                                    TextWrapping="Wrap"
                                    IsVisible="{Binding HasOrganizeTitleProblem}"
-                                   Text="{Binding OrganizeTitleProblem}" />
+                                   ctl:Announcer.Says="{Binding OrganizeTitleProblem}" Text="{Binding OrganizeTitleProblem}" />
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Group" />
-                        <ComboBox x:Name="OrganizeGroup"
+                        <ComboBox x:Name="OrganizeGroup" AutomationProperties.Name="Group"
                                   HorizontalAlignment="Stretch"
                                   ItemsSource="{Binding MoveTargets}"
                                   SelectedItem="{Binding MoveTarget}">
@@ -926,6 +931,7 @@
                                  Text="{Binding History.EmptyNote}" />
 
                       <ListBox x:Name="Revisions"
+                               AutomationProperties.Name="Earlier versions"
                                MaxHeight="180"
                                ItemsSource="{Binding History.Rows}"
                                SelectedItem="{Binding History.Selected}">
@@ -1202,7 +1208,7 @@
                                  x:Name="TotpRefusal"
                                  Classes="caption"
                                  TextWrapping="Wrap"
-                                 Text="{Binding TotpProblem}" />
+                                 ctl:Announcer.Says="{Binding TotpProblem}" Text="{Binding TotpProblem}" />
                     </Grid>
 
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
@@ -1322,15 +1328,17 @@
                                   <ctl:KpIcon Icon="eye" Size="13" />
                                 </ctl:RevealButton>
                                 <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource FieldCopyGlyph}"
+                                    AutomationProperties.Name="{Binding DisplayName, StringFormat='Copy {0}'}"
                                         ToolTip.Tip="Copy the value; the clipboard clears itself"
                                         Command="{Binding CopyValueCommand}" />
                                 <Button Classes="ghost row-action" Content="Replace" ContentTemplate="{StaticResource FieldReplaceGlyph}"
+                                    AutomationProperties.Name="{Binding DisplayName, StringFormat='Replace {0}'}"
                                         ToolTip.Tip="Replace the value"
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding ReplaceCommand}" />
                                 <Button Classes="ghost row-action"
                                         ToolTip.Tip="Generate a new value"
-                                        AutomationProperties.Name="Generate a new value"
+                                        AutomationProperties.Name="{Binding DisplayName, StringFormat='Generate a new value for {0}'}"
                                         IsVisible="{Binding CanGenerate}"
                                         Command="{Binding GenerateCommand}">
                                   <ctl:KpIcon Icon="wand-2" Size="13" />
@@ -1346,6 +1354,7 @@
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding ToggleProtectionCommand}" />
                                 <Button Classes="ghost row-action" Content="Remove" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                        AutomationProperties.Name="{Binding DisplayName, StringFormat='Remove {0}'}"
                                         ToolTip.Tip="Remove this field"
                                         IsVisible="{Binding IsWritable}"
                                         Command="{Binding RemoveCommand}" />
@@ -1359,7 +1368,7 @@
                     <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelAddFieldCommand}" ctl:FormKeys.Draft="{Binding AddFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="Add a field" />
-                        <TextBox x:Name="NewFieldName"
+                        <TextBox x:Name="NewFieldName" AutomationProperties.Name="Field name"
                                  Classes="mono"
                                  Text="{Binding DraftFieldName}"
                                  PlaceholderText="STRIPE_SECRET_KEY"
@@ -1435,7 +1444,7 @@
                     <Border Classes="form" IsVisible="{Binding IsRenamingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelRenameFieldCommand}" ctl:FormKeys.Draft="{Binding RenameFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding RenameFieldPrompt}" TextWrapping="Wrap" />
-                        <TextBox x:Name="RenamedFieldName"
+                        <TextBox x:Name="RenamedFieldName" AutomationProperties.Name="New field name"
                                  Classes="mono"
                                  Text="{Binding DraftFieldRename}"
                                  Width="320"
@@ -1539,7 +1548,7 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:EntryTagChip">
-                          <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}">
+                          <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Spoken}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                               <ctl:KpIcon Icon="shield-check" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
                               <ctl:KpIcon Icon="alert-triangle" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
@@ -1685,15 +1694,15 @@
                       <TextBlock Classes="section" Text="Edit fields" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Username" />
-                        <TextBox Classes="mono" Text="{Binding DraftUsername}" />
+                        <TextBox Classes="mono" Text="{Binding DraftUsername}" AutomationProperties.Name="Username" />
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="URL" />
-                        <TextBox Classes="mono" Text="{Binding DraftUrl}" />
+                        <TextBox Classes="mono" Text="{Binding DraftUrl}" AutomationProperties.Name="URL" />
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Notes" />
-                        <TextBox Text="{Binding DraftNotes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
+                        <TextBox Text="{Binding DraftNotes}" AutomationProperties.Name="Notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="Password" />

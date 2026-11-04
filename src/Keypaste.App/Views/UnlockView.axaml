@@ -81,6 +81,7 @@
 
   <UserControl.Styles>
     <Style Selector="TextBlock.lock-title">
+      <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
       <Setter Property="FontSize" Value="22" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="LetterSpacing" Value="-0.66" />
@@ -211,7 +212,7 @@
                                MaskedLength="{Binding MaskedLength}"
                                Placeholder="Master password"
                                IsEnabled="{Binding CanTypePassword}" />
-              <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+              <TextBlock Classes="lock-error" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
             </StackPanel>
 
             <!-- While a YubiKey waits for a touch, its waiting dot is the screen's one amber element. -->
@@ -312,6 +313,7 @@
             <StackPanel Spacing="6" IsVisible="{Binding OffersKeePassXc}">
               <TextBlock Classes="th" Text="KEEPASSXC LAST OPENED" Margin="10,0" />
               <ListBox x:Name="KeePassXcList"
+                       AutomationProperties.Name="KeePassXC's databases"
                        Classes="recent"
                        ItemsSource="{Binding KeePassXc}"
                        SelectedItem="{Binding SelectedKeePassXc}"
@@ -371,7 +373,7 @@
                              AllowsPaste="True"
                              MaskedLength="{Binding ConfirmMaskedLength}"
                              Placeholder="Confirm master password" />
-            <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+            <TextBlock Classes="lock-error" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
           </StackPanel>
 
           <Button Classes="primary wide"
@@ -489,6 +491,7 @@
                     Background="{DynamicResource KpBgPanel}"
                     Padding="4">
               <ListBox x:Name="BackupList"
+                       AutomationProperties.Name="Backups"
                        Classes="recent"
                        ItemsSource="{Binding Rows}"
                        SelectedItem="{Binding Selected}"
@@ -515,7 +518,7 @@
                                MaskedLength="{Binding MaskedLength}"
                                Placeholder="That backup's master password"
                                IsEnabled="{Binding IsChoosing}" />
-              <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+              <TextBlock Classes="lock-error" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding IsError}" />
             </StackPanel>
 
             <Panel HorizontalAlignment="Center" IsEnabled="{Binding IsChoosing}">
@@ -577,7 +580,7 @@
             </Border>
 
             <TextBlock Classes="lock-note"
-                       Text="{Binding Message}"
+                       ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                        IsVisible="{Binding HasNote}" />
           </StackPanel>
         </StackPanel>
@@ -595,12 +598,12 @@
         </StackPanel>
 
         <TextBlock Classes="lock-note"
-                   Text="{Binding Message}"
+                   ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                    IsVisible="{Binding HasNote}" />
 
         <TextBlock Classes="lock-error"
                    TextAlignment="Center"
-                   Text="{Binding Message}"
+                   ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                    IsVisible="{Binding HasLooseError}" />
 
         <TextBlock x:Name="Owner"
@@ -663,6 +666,7 @@
           </StackPanel.IsVisible>
           <TextBlock Classes="th" Text="RECENT VAULTS" Margin="10,0" />
           <ListBox x:Name="RecentList"
+                   AutomationProperties.Name="Recent vaults"
                    Classes="recent"
                    ItemsSource="{Binding Recent}"
                    SelectedItem="{Binding SelectedRecent}"

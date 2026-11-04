@@ -55,7 +55,7 @@
             </Grid>
             <TextBlock Classes="caption"
                        Text="read:project/environment/KEY, or * for the whole set; separate several with commas." />
-            <TextBlock Classes="body danger" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
+            <TextBlock Classes="body danger" ctl:Announcer.Says="{Binding FormError}" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
               <Button Classes="ghost" Content="Cancel" Command="{Binding CancelFormCommand}" />
               <Button Name="CreateToken" Classes="primary" Content="Create token" Command="{Binding CreateCommand}" />
@@ -111,7 +111,7 @@
           </StackPanel>
         </Border>
 
-        <TextBlock Classes="body danger" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+        <TextBlock Classes="body danger" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
 
         <Border Classes="table">
           <StackPanel>
@@ -144,7 +144,7 @@
                         <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <Button Grid.Column="1" Classes="ghost sm" FontSize="12" Content="Cancel" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
-                        <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
+                        <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"
                                 CommandParameter="{Binding}" />
                       </Grid>
@@ -158,7 +158,7 @@
                         </Border>
                         <TextBlock Grid.Column="4" FontSize="12.5" Text="{Binding Expires}" VerticalAlignment="Center"
                                    Classes.muted="{Binding !IsExpired}" Classes.danger="{Binding IsExpired}" />
-                        <Button Grid.Column="5" Classes="danger sm" FontSize="12" Content="Revoke" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        <Button Grid.Column="5" Classes="danger sm" FontSize="12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" HorizontalAlignment="Right" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).AskRevokeCommand}"
                                 CommandParameter="{Binding}" />
                       </Grid>

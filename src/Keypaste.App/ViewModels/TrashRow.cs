@@ -45,6 +45,9 @@ internal sealed class TrashRow
     internal DateTime DeletedUtc { get; }
 
     /// <summary>The title as the list draws it, scrubbed of anything that misrepresents it.</summary>
+    /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
+    public override string ToString() => $"{DisplayTitle}, {Where}{(CameFromALiveGroup ? string.Empty : ", comes back at the root")}, {When}";
+
     internal string DisplayTitle => EntryNameSanitizer.Sanitize(Title).Text;
 
     /// <summary>Whether the group this came from is still in the vault.</summary>

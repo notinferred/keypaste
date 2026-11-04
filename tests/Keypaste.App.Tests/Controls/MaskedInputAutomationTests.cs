@@ -302,7 +302,7 @@ public sealed class MaskedInputAutomationTests
 
     private static readonly string[] _unlockScreenLabels =
     [
-        "Unlock", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
+        "Recent vaults", "KeePassXC's databases", "Backups", "Unlock", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
         "Unlock without a YubiKey", "Open a vault…", "Create a new vault…", "Add a key file", "Create a key file", "No key file",
         "Add a YubiKey", "No YubiKey", "That backup's key file", "Open another vault", "New vault", "Restore a backup", "More options",
         "Open another file…", "Unlock with Windows Hello", "Create vault",
@@ -368,7 +368,7 @@ public sealed class MaskedInputAutomationTests
 
     /// <summary>
     /// <c>AutomationProperties.Name="{Binding …}"</c> compiles, renders identically and publishes
-    /// whatever it is bound to. The only names on this screen are these button labels, each a literal
+    /// whatever it is bound to. The only names on this screen are these button and list labels, each a literal
     /// in the view, so a screen reader does not announce a button by its content's type (F.25); a name
     /// that is not one of them, or any other attached metadata, fails here.
     /// </summary>
@@ -383,7 +383,7 @@ public sealed class MaskedInputAutomationTests
         {
             if (AutomationProperties.GetName(element) is { } name)
             {
-                Assert.IsAssignableFrom<Button>(element);
+                Assert.True(element is Button or ListBox, $"{element.GetType().Name} is named {name}");
                 Assert.Contains(name, _unlockScreenLabels);
             }
 

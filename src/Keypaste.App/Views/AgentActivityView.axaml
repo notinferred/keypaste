@@ -72,7 +72,7 @@
                       <TextBlock Grid.Column="1" Classes="mono amber" FontSize="11" Text="{Binding LeftText}" VerticalAlignment="Center" />
                       <Button Grid.Column="2" Name="ShowPrompt" Classes="sm" Content="Show the prompt" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).ShowPromptCommand}"
-                              AutomationProperties.Name="Show the prompt" />
+                              AutomationProperties.Name="{Binding Client, StringFormat='Show the prompt from {0}'}" />
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -134,7 +134,7 @@
           <TextBlock Classes="caption" Text="{Binding NoTools}" IsVisible="{Binding HasNoTools}" TextWrapping="Wrap" />
           <Border Classes="card" IsVisible="{Binding HasClientsProblem}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-              <TextBlock Name="ClientsProblemText" Classes="body danger" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <TextBlock Name="ClientsProblemText" Classes="body danger" ctl:Announcer.Says="{Binding ClientsProblem}" Text="{Binding ClientsProblem}" VerticalAlignment="Center" TextWrapping="Wrap" />
               <Button Grid.Column="1" Name="ResetClients" Content="Reset" VerticalAlignment="Center" Command="{Binding ResetClientsCommand}" />
             </Grid>
           </Border>
@@ -204,7 +204,7 @@
                               </Button>
                             </StackPanel>
                           </StackPanel>
-                          <TextBlock Classes="body" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
+                          <TextBlock Classes="body" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
                           <!-- Cursor and VS Code add keypaste themselves from a link holding the same entry (G.6e). -->
                           <StackPanel Spacing="10" IsVisible="{Binding OffersInstallLink}">
                             <TextBlock Classes="caption" Text="{Binding InstallLinkNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
@@ -240,7 +240,7 @@
                               </ComboBox>
                               <Button Name="AskCheckItem" Content="Ask for it" Command="{Binding AskCommand}" IsVisible="{Binding IsPicking}" />
                             </StackPanel>
-                            <TextBlock Classes="body secondary" Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}"
+                            <TextBlock Classes="body secondary" ctl:Announcer.Says="{Binding CheckMessage}" Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}"
                                        MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
                           </StackPanel>
                         </StackPanel>

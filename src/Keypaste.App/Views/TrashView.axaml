@@ -106,7 +106,7 @@
             Margin="0,0,0,12">
       <StackPanel Orientation="Horizontal" Spacing="10">
         <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" />
-        <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12.5" VerticalAlignment="Center"
+        <TextBlock ctl:Announcer.Says="{Binding Notice}" Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12.5" VerticalAlignment="Center"
                    Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
     </Border>
@@ -120,7 +120,7 @@
             Margin="0,0,0,12">
       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
         <ctl:KpIcon Grid.Column="0" Icon="alert-triangle" Size="15" VerticalAlignment="Top" Foreground="{DynamicResource KpDanger}" />
-        <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12.5"
+        <TextBlock Grid.Column="1" ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12.5"
                    Foreground="{DynamicResource KpTextPrimary}" />
         <!-- When the name is taken, the way back under another one; nothing moves until it is pressed. -->
         <Button Grid.Column="2"
@@ -156,6 +156,7 @@
         </StackPanel>
 
         <ListBox Grid.Row="1"
+                 AutomationProperties.Name="Deleted items"
                  Classes="table-body"
                  IsVisible="{Binding !IsEmpty}"
                  ItemsSource="{Binding Rows}"

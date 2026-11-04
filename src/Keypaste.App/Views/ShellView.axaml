@@ -138,17 +138,8 @@
             </TextBox.InnerRightContent>
           </TextBox>
 
-          <!-- The idle warning's first line, which a screen reader says once as the warning comes. Avalonia names a
-               TextBlock by its text, so this one, which nobody sees, is live and the ticking one below is not. -->
-          <TextBlock Grid.Column="2"
-                     Text="{Binding CountdownAnnouncement}"
-                     AutomationProperties.LiveSetting="Polite"
-                     Width="1"
-                     Height="1"
-                     Opacity="0"
-                     IsHitTestVisible="False"
-                     HorizontalAlignment="Left"
-                     VerticalAlignment="Top" />
+          <!-- The idle warning's first line, said once as the warning comes, while the ticking text below stays quiet. -->
+          <Border Grid.Column="2" ctl:Announcer.Says="{Binding CountdownAnnouncement}" />
 
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
@@ -210,6 +201,7 @@
 
             <!-- Trash and Settings, quieter, at the bottom. -->
             <ListBox Name="FooterNav"
+                     AutomationProperties.Name="More places"
                      DockPanel.Dock="Bottom"
                      Classes="nav quiet"
                      Margin="0,12,0,0"
@@ -233,6 +225,7 @@
                  arrow keys walk the sidebar as it reads, and Left and Right fold a row as in KeePassXC's
                  tree (D-0376). -->
             <ListBox Name="Nav"
+                     AutomationProperties.Name="Places"
                      Classes="nav"
                      ItemsSource="{Binding SidebarRows}"
                      SelectedItem="{Binding SelectedSidebarRow}"
@@ -249,21 +242,27 @@
                                Classes="mono sm muted"
                                Text="{Binding Count}"
                                VerticalAlignment="Center" />
-                    <Border Grid.Column="3"
-                            Name="AgentsDot"
-                            Classes="dot"
-                            Classes.ok="{Binding DotLive}"
-                            Classes.danger="{Binding DotDanger}"
-                            Margin="8,0,0,0"
-                            IsVisible="{Binding HasDot}" />
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Name="AgentsDotWords"
+                                 Classes="mono sm muted"
+                                 Margin="0,0,6,0"
+                                 VerticalAlignment="Center"
+                                 Text="{Binding DotWords}"
+                                 IsVisible="{Binding DotWords, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <Border Name="AgentsDot"
+                              Classes="dot"
+                              Classes.ok="{Binding DotLive}"
+                              Classes.danger="{Binding DotDanger}"
+                              IsVisible="{Binding HasDot}" />
+                    </StackPanel>
                     <Button Grid.Column="4"
                             Classes="icon ghost fold"
                             Margin="4,0,-6,0"
                             IsVisible="{Binding IsExpandable}"
                             Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
                             CommandParameter="{Binding}"
-                            ToolTip.Tip="Show or hide the groups"
-                            AutomationProperties.Name="Show or hide the groups">
+                            ToolTip.Tip="{Binding FoldLabel}"
+                            AutomationProperties.Name="{Binding FoldLabel}">
                       <ctl:KpIcon Icon="{Binding Chevron}" Size="12" />
                     </Button>
                   </Grid>
@@ -277,7 +276,8 @@
                             IsVisible="{Binding HasChildren}"
                             Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
                             CommandParameter="{Binding}"
-                            AutomationProperties.Name="{Binding Title, StringFormat='Show or hide the groups in {0}'}">
+                            ToolTip.Tip="{Binding FoldLabel}"
+                            AutomationProperties.Name="{Binding FoldLabel}">
                       <ctl:KpIcon Icon="{Binding Chevron}" Size="12" />
                     </Button>
                     <ctl:KpIcon Grid.Column="1" Icon="folder" Size="14" Margin="4,0,8,0" />
@@ -376,6 +376,7 @@
                 <ctl:KpIcon Grid.Column="0" Icon="info" Size="14" Margin="0,0,10,0" Foreground="{DynamicResource KpTextSecondary}" />
                 <TextBlock Grid.Column="1"
                            Name="Notice"
+                           ctl:Announcer.Says="{Binding Notice}"
                            Text="{Binding Notice}"
                            TextWrapping="Wrap"
                            FontSize="12.5"
@@ -464,6 +465,7 @@
             <ctl:KpIcon Icon="clipboard-check" Size="15" Foreground="{DynamicResource KpOk}" />
             <TextBlock VerticalAlignment="Center"
                        IsVisible="{Binding Clipboard.IsCounting}"
+                       ctl:Announcer.Says="{Binding Clipboard.Label, StringFormat='{}{0} copied.'}"
                        Text="{Binding Clipboard.Label, StringFormat='{}{0} copied.'}" />
             <TextBlock VerticalAlignment="Center"
                        Classes="muted"
@@ -473,6 +475,7 @@
                        TextWrapping="Wrap"
                        MaxWidth="320"
                        Classes="secondary"
+                       ctl:Announcer.Says="{Binding Clipboard.Failure}"
                        Text="{Binding Clipboard.Failure}" />
             <Button Classes="link"
                     Content="Clear now"
@@ -503,7 +506,7 @@
                   <ctl:KpIcon Icon="info" Size="15" Foreground="{DynamicResource KpInfo}" IsVisible="{Binding IsInformation}" />
                   <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpAccentText}" IsVisible="{Binding IsWarning}" />
                 </Panel>
-                <TextBlock Grid.Column="1" Text="{Binding Message}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
+                <TextBlock Grid.Column="1" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
                 <Button Grid.Column="2"
                         Classes="icon ghost sm"
                         VerticalAlignment="Top"

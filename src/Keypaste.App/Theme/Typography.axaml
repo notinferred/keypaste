@@ -19,6 +19,7 @@
   </Style>
 
   <Style Selector=":is(TextBlock).h1">
+    <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
     <Setter Property="FontSize" Value="24" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="-0.72" />
@@ -26,6 +27,7 @@
   </Style>
 
   <Style Selector=":is(TextBlock).h2">
+    <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
     <Setter Property="FontSize" Value="20" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="-0.6" />
@@ -34,16 +36,29 @@
 
   <!-- A section heading inside a screen: "Allowances", "AI tools". -->
   <Style Selector=":is(TextBlock).section">
+    <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
   <Style Selector=":is(TextBlock).dialog-title">
+    <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
     <Setter Property="FontSize" Value="16" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="-0.16" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <!-- What the window says to a screen reader, drawn nowhere: Announcer changes it. -->
+  <Style Selector="TextBlock.live">
+    <Setter Property="AutomationProperties.LiveSetting" Value="Polite" />
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalAlignment" Value="Top" />
   </Style>
 
   <Style Selector=":is(TextBlock).body">
@@ -100,6 +115,7 @@
   <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size (DESIGN).
        A variable's key is machine text and stays mono.lg / mono.xl. -->
   <Style Selector=":is(TextBlock).title">
+    <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
     <Setter Property="FontSize" Value="22" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="LetterSpacing" Value="-0.66" />
