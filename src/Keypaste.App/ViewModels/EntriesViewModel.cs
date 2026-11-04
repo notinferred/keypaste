@@ -39,7 +39,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private string _search = string.Empty;
     private string? _matchedQuery;
     private Dictionary<EntryName, EntryMatch> _matches = [];
-    private RecycledEntryId? _undo;
+    private Undoable? _undo;
     private NewItemViewModel? _newItem;
 
     internal EntriesViewModel(
@@ -60,10 +60,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         _post = post;
         _picker = picker;
 
+        _session.Edited += OnVaultEdited;
+
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
         DeleteCommand = new RelayCommand(
-            () => IsConfirmingDelete = true,
+            DeleteOrAsk,
             () => Selected is not null && !IsConfirmingDelete);
         ConfirmDeleteCommand = new RelayCommand(Delete, () => IsConfirmingDelete);
         CancelDeleteCommand = new RelayCommand(
@@ -311,9 +313,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
             var name = EntryNameSanitizer.SanitizePath(row.Path).Text;
 
-            return _session.Unlocked?.RecyclesDeletedEntries == true
-                ? $"Delete {name}? It goes to the vault's recycle bin."
-                : $"Delete {name}? There is no undo.";
+            return $"Delete {name}? There is no undo.";
         }
     }
 
@@ -383,7 +383,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal bool HasNotice => Notice is not null;
 
     /// <summary>Whether the last deletion can still be taken back from here.</summary>
-    internal bool CanUndoDelete => _undo is not null;
+    internal bool CanUndo => _undo is not null;
+
+    /// <summary>Whether the last change was a delete, which the notice's Restore link puts back.</summary>
+    internal bool OffersRestore => _undo is { Restores: true };
 
     /// <summary>How many entries the vault holds, for the empty state.</summary>
     internal int TotalCount => _all.Count;
@@ -512,13 +515,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             var count = _all.Count(row => group.Contains(row.GroupPath));
             var items = count == 1 ? "1 item" : $"{count} items";
 
-            if (_session.Unlocked?.RecyclesDeletedEntries == true)
-            {
-                return count == 0
-                    ? $"Delete {name}? It goes to the vault's recycle bin."
-                    : $"Delete {name}? It and the {items} in it go to the vault's recycle bin, and Trash can put each item back.";
-            }
-
             return count == 0 && group.Children.Count == 0
                 ? $"Delete {name}? This vault has no recycle bin, so there is no undo."
                 : $"{name} holds {(count == 0 ? "groups" : items)}, and this vault has no recycle bin, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
@@ -531,7 +527,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Moves the selected group, with everything in it, in one write.</summary>
     internal RelayCommand ConfirmMoveGroupCommand { get; }
 
-    /// <summary>Asks before deleting the selected group. It deletes nothing.</summary>
+    /// <summary>Deletes the selected group into the recycle bin, or asks first where the vault has none.</summary>
     internal RelayCommand BeginDeleteGroupCommand { get; }
 
     /// <summary>Deletes the selected group with everything in it, having been confirmed.</summary>
@@ -781,6 +777,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Nothing derived from the vault outlives this.</summary>
     public void Dispose()
     {
+        _session.Edited -= OnVaultEdited;
+
         if (_activity is not null)
         {
             _activity.Changed -= OnActivity;
@@ -954,7 +952,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        Offer(null, null);
+        Notice = null;
         Error = null;
         NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
     }
@@ -982,6 +980,18 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Selected = Rows.FirstOrDefault(row => row.Name == name);
     }
 
+    private void DeleteOrAsk()
+    {
+        if (_session.Unlocked?.RecyclesDeletedEntries == true)
+        {
+            Delete();
+        }
+        else
+        {
+            IsConfirmingDelete = true;
+        }
+    }
+
     private void Delete()
     {
         Offer(null, null);
@@ -991,10 +1001,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        // Reversible where the vault has a recycle bin: the entry keeps its identity, fields
-        // and history, and Trash puts it back. The confirmation is the view's job, and it is
-        // the one place KpDanger appears. The row is addressed by its name rather than its
-        // path: two entries can share a path.
+        // The row is addressed by its name rather than its path: two entries can share a path.
         var write = _session.Write(
             vault => (Outcome: vault.RemoveEntry(row.Name, out var id), Recycled: id),
             removal => removal.Outcome != DeletionOutcome.NothingMatched);
@@ -1022,31 +1029,29 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         // Last, because Reload and the selection it clears both drop a pending offer.
         Offer(
-            outcome == DeletionOutcome.Recycled ? recycled : null,
+            outcome == DeletionOutcome.Recycled
+                ? new Undoable(
+                    vault => vault.RestoreRecycled(recycled) is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot,
+                    () => Reselect(row.Name),
+                    Restores: true)
+                : null,
             outcome == DeletionOutcome.Recycled
                 ? $"Moved {name} to the trash."
                 : $"Deleted {name}. This vault has no recycle bin, so nothing can put it back.");
     }
 
-    /// <summary>Restores the entry the last deletion recycled, by the identity core returned.</summary>
-    /// <remarks>
-    /// Recovery beside the action it reverses, for the one deletion a person is still looking at.
-    /// The Trash screen is where every other recovery happens, including this one after a
-    /// navigation or a lock.
-    /// </remarks>
-    [RelayCommand(CanExecute = nameof(CanUndoDelete))]
-    private void UndoDelete()
+    /// <summary>Reverses the last delete, rename, move, duplicate or group change through its inverse write.</summary>
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo()
     {
-        if (_undo is not { } id)
+        if (_undo is not { } last)
         {
             return;
         }
 
-        var write = _session.Write(
-            vault => vault.RestoreRecycled(id),
-            outcome => outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot);
+        var write = _session.Write(last.Reverse, reversed => reversed);
 
-        if (write.Problem("restore this from Trash") is { } problem)
+        if (write.Problem("undo this again") is { } problem)
         {
             Error = problem;
             return;
@@ -1054,16 +1059,15 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Offer(null, null);
 
-        if (write.Outcome == WriteOutcome.Saved)
+        if (write.Outcome != WriteOutcome.Saved)
         {
-            Reload();
-            Error = null;
+            Error = "That could not be undone, because the vault has changed since. Nothing was changed.";
             return;
         }
 
-        // Every refusal reads the same way from here: the entry is still in the bin, and Trash is
-        // the screen that says which refusal it was and what to do about it.
-        Error = "That item could not be put back. Open Trash to see why.";
+        Error = null;
+        Reload();
+        last.Show?.Invoke();
     }
 
     private void BeginOrganize()
@@ -1140,8 +1144,16 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         var moved = write.Value.Moved!;
 
         CloseOrganize();
-        Offer(null, Did(write.Value.Outcome, moved));
+        Offer(
+            new Undoable(
+                vault => vault.Relocate(moved, row.Name, out _) is OrganizeOutcome.Renamed or OrganizeOutcome.Moved or OrganizeOutcome.RenamedAndMoved,
+                () => FollowRelocated(row.Name)),
+            Did(write.Value.Outcome, moved));
+        FollowRelocated(moved);
+    }
 
+    private void FollowRelocated(EntryName moved)
+    {
         // Held in the result even when its new name no longer answers the query that found it, so
         // the entry does not vanish from under somebody at the moment they renamed it.
         _pinned = moved;
@@ -1205,8 +1217,16 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         CloseOtherForms();
         CloseGroupForms();
-        IsConfirmingGroupDelete = true;
         Error = null;
+
+        if (_session.Unlocked?.RecyclesDeletedEntries == true)
+        {
+            ConfirmDeleteGroup();
+        }
+        else
+        {
+            IsConfirmingGroupDelete = true;
+        }
     }
 
     private void CloseGroupForms()
@@ -1222,7 +1242,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Closes whatever else is open, so one form is on screen at a time.</summary>
     private void CloseOtherForms()
     {
-        Offer(null, null);
+        Notice = null;
         NewItem = null;
         IsConfirmingDelete = false;
         IsOrganizing = false;
@@ -1240,7 +1260,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             },
             GroupOutcome.Created,
             path => $"Created {EntryNameSanitizer.SanitizePath(path).Text}.",
-            follow: false);
+            follow: false,
+            path => new Undoable(vault => vault.DeleteGroup(path) is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently));
     }
 
     private void ConfirmRenameGroup()
@@ -1260,7 +1281,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             },
             GroupOutcome.Renamed,
             renamed => $"Renamed to {EntryNameSanitizer.SanitizePath(renamed).Text}.",
-            follow: true);
+            follow: true,
+            renamed => new Undoable(
+                vault => vault.RenameGroup(renamed, selected.Name, out _) == GroupOutcome.Renamed,
+                () => ShowGroup(path)));
     }
 
     /// <summary>Moves the selected group into the chosen one, in one core write, and follows it there.</summary>
@@ -1294,15 +1318,18 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var movedPath = write.Value.Path;
+        var from = ParentOf(path);
         var where = destination.Length == 0 ? "the top level" : EntryNameSanitizer.SanitizePath(destination).Text;
 
         CloseGroupForms();
         Reload();
 
         // The sidebar was pointing at a path that no longer exists, so it follows the group, as a rename does.
-        SelectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, movedPath, StringComparison.Ordinal)) ?? SelectedGroup;
+        ShowGroup(movedPath);
         Error = null;
-        Offer(null, $"Moved {EntryNameSanitizer.Sanitize(selected.Name).Text} to {where}.");
+        Offer(
+            new Undoable(vault => vault.MoveGroup(movedPath, from, out _) == GroupOutcome.Moved, () => ShowGroup(path)),
+            $"Moved {EntryNameSanitizer.Sanitize(selected.Name).Text} to {where}.");
     }
 
     /// <summary>Deletes the selected group with everything in it, in one core write, and shows the group it was in.</summary>
@@ -1336,8 +1363,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var name = EntryNameSanitizer.SanitizePath(path).Text;
-        var slash = path.LastIndexOf('/');
-        var parent = slash < 0 ? string.Empty : path[..slash];
+        var parent = ParentOf(path);
 
         CloseGroupForms();
         Reload();
@@ -1345,7 +1371,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             ?? Groups.FirstOrDefault(node => node.IsEverything);
         Error = null;
         Offer(
-            null,
+            write.Value == GroupOutcome.Recycled
+                ? new Undoable(vault => vault.RestoreRecycledGroup(path) == GroupOutcome.Restored, () => ShowGroup(path), Restores: true)
+                : null,
             write.Value == GroupOutcome.DeletedPermanently
                 ? $"Deleted {name}. This vault has no recycle bin, so nothing can put it back."
                 : count == 0
@@ -1392,7 +1420,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Error = null;
         _pinned = made;
         Reselect(made);
-        Offer(null, Duplicated(row.Title, made.Title, write.Value.Dropped));
+        Offer(
+            new Undoable(vault => vault.RemoveEntry(made, out _) != DeletionOutcome.NothingMatched, () => Reselect(row.Name)),
+            Duplicated(row.Title, made.Title, write.Value.Dropped));
     }
 
     /// <summary>What the app says a duplicate made, naming any project tag the copy left out and never a value.</summary>
@@ -1416,7 +1446,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         Func<Vault, string, (GroupOutcome Outcome, string Path)> operation,
         GroupOutcome success,
         Func<string, string> said,
-        bool follow)
+        bool follow,
+        Func<string, Undoable> undo)
     {
         var name = DraftGroupName.Trim();
 
@@ -1458,11 +1489,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         // left to select.
         if (follow)
         {
-            SelectedGroup = Groups.FirstOrDefault(
-                node => string.Equals(node.Path, path, StringComparison.Ordinal)) ?? SelectedGroup;
+            ShowGroup(path);
         }
 
-        Offer(null, said(path));
+        Offer(undo(path), said(path));
     }
 
     /// <summary>What the app says happened, for a write that went through.</summary>
@@ -1565,12 +1595,44 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             && !groupPath.AsSpan(slash + 1).Contains('/');
     }
 
-    /// <summary>Holds, or drops, the offer to undo the last deletion.</summary>
-    private void Offer(RecycledEntryId? undo, string? notice)
+    private void ShowGroup(string path) =>
+        SelectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, path, StringComparison.Ordinal)) ?? SelectedGroup;
+
+    private static string ParentOf(string groupPath)
+    {
+        var slash = groupPath.LastIndexOf('/');
+        return slash < 0 ? string.Empty : groupPath[..slash];
+    }
+
+    /// <summary>Holds the last change's undo, or drops it, with what the notice says.</summary>
+    private void Offer(Undoable? undo, string? notice)
     {
         _undo = undo;
         Notice = notice;
-        OnPropertyChanged(nameof(CanUndoDelete));
-        UndoDeleteCommand.NotifyCanExecuteChanged();
+        NotifyUndoChanged();
     }
+
+    // Any write, from anywhere, ends the undo, so a reverse never overwrites newer work; a write here offers its own once it returns.
+    private void OnVaultEdited(object? sender, VaultEdit edit)
+    {
+        _undo = null;
+
+        if (_post is { } post)
+        {
+            post(NotifyUndoChanged);
+        }
+        else
+        {
+            NotifyUndoChanged();
+        }
+    }
+
+    private void NotifyUndoChanged()
+    {
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(OffersRestore));
+        UndoCommand.NotifyCanExecuteChanged();
+    }
+
+    private sealed record Undoable(Func<Vault, bool> Reverse, Action? Show = null, bool Restores = false);
 }

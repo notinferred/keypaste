@@ -5,10 +5,20 @@ using Keypaste.Core.Ownership;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>A browser's pairing as Settings lists it.</summary>
-/// <param name="Name">The pairing's name, as the extension lists it.</param>
-/// <param name="Identity">The build that paired.</param>
-/// <param name="Used">When it was paired, and when it was last proven here.</param>
-internal sealed record PairingItem(string Name, string Identity, string Used);
+/// <param name="name">The pairing's name, as the extension lists it.</param>
+/// <param name="identity">The build that paired.</param>
+/// <param name="used">When it was paired, and when it was last proven here.</param>
+internal sealed partial class PairingItem(string name, string identity, string used) : ObservableObject
+{
+    internal string Name { get; } = name;
+
+    internal string Identity { get; } = identity;
+
+    internal string Used { get; } = used;
+
+    [ObservableProperty]
+    internal partial bool IsConfirmingRemove { get; set; }
+}
 
 /// <summary>
 /// Settings › Browser fill: Pair a browser, which arms pairing for two minutes and one pairing, and the pairings the vault
@@ -39,6 +49,8 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         _post = post ?? (run => run());
 
         PairCommand = new RelayCommand(Pair, () => !IsArmed);
+        AskRemoveCommand = new RelayCommand<PairingItem>(row => SetConfirming(row, true), row => row is not null);
+        CancelRemoveCommand = new RelayCommand<PairingItem>(row => SetConfirming(row, false), row => row is not null);
         RemoveCommand = new RelayCommand<PairingItem>(Remove, row => row is not null);
 
         ArmedUntil = _authority.PairingArmedUntil;
@@ -53,7 +65,12 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
     /// <summary>Arms pairing for two minutes and one pairing.</summary>
     internal RelayCommand PairCommand { get; }
 
-    /// <summary>Removes one pairing, so the browser holding it is refused from its next check.</summary>
+    /// <summary>Asks in the row before removing its pairing.</summary>
+    internal RelayCommand<PairingItem> AskRemoveCommand { get; }
+
+    internal RelayCommand<PairingItem> CancelRemoveCommand { get; }
+
+    /// <summary>Removes one pairing, having been confirmed, so the browser holding it is refused from its next check.</summary>
     internal RelayCommand<PairingItem> RemoveCommand { get; }
 
     /// <summary>The pairings the vault holds, by name.</summary>
@@ -119,6 +136,14 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
     {
         _authority.DisarmPairing();
         Tick();
+    }
+
+    private static void SetConfirming(PairingItem? row, bool confirming)
+    {
+        if (row is not null)
+        {
+            row.IsConfirmingRemove = confirming;
+        }
     }
 
     private void Remove(PairingItem? row)

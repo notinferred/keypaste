@@ -1003,6 +1003,38 @@ internal sealed class KeePassInterop : IDisposable
         return GroupOutcome.Recycled;
     }
 
+    /// <summary>Moves the group most recently deleted from this path out of the bin, as it went in.</summary>
+    internal GroupOutcome RestoreRecycledGroup(string groupPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Bin() is not { } bin)
+        {
+            return GroupOutcome.NothingMatched;
+        }
+
+        PwGroup? recycled = bin.Groups
+            .Where(group => LiveGroup(group.PreviousParentGroup) is { } from
+                && PathOf(from) is { } path
+                && string.Equals(ChildPath(path, group.Name), groupPath, StringComparison.Ordinal))
+            .MaxBy(group => group.LocationChanged);
+
+        if (recycled is null || LiveGroup(recycled.PreviousParentGroup) is not { } parent)
+        {
+            return GroupOutcome.NothingMatched;
+        }
+
+        if (HasChildNamed(parent, recycled.Name, except: null))
+        {
+            return GroupOutcome.DestinationOccupied;
+        }
+
+        parent.AddGroup(recycled, true, true);
+        bin.Groups.Remove(recycled);
+        recycled.PreviousParentGroup = PwUuid.Zero;
+        return GroupOutcome.Restored;
+    }
+
     /// <summary>Whether a group is one keypaste assigns meaning to: the env root, or one of its own (D-0273).</summary>
     private static bool IsKeypastesOwn(string groupPath) =>
         ReservedGroups.IsReserved(groupPath) || string.Equals(groupPath, EnvConvention.RootGroup, StringComparison.Ordinal);

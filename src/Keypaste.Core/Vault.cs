@@ -2305,6 +2305,19 @@ public sealed class Vault : IDisposable
             deleted => deleted is GroupOutcome.Recycled or GroupOutcome.DeletedPermanently ? VaultEdit.Of(beneath) : null);
     }
 
+    /// <summary>Puts the group most recently deleted from this path back, with everything under it. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="groupPath">The path the group had when it was deleted.</param>
+    /// <returns><see cref="GroupOutcome.Restored"/>, or why nothing changed.</returns>
+    public GroupOutcome RestoreRecycledGroup(string groupPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(groupPath);
+
+        return Change(
+            () => _interop.RestoreRecycledGroup(groupPath),
+            restored => restored == GroupOutcome.Restored ? VaultEdit.Of(Beneath(groupPath)) : null);
+    }
+
     /// <summary>Every live entry in the group at this path or under it, keypaste's own included.</summary>
     private List<EntryName> Beneath(string groupPath) =>
         [.. _interop.ReadEntries().Select(EntryName.Of).Where(entry => IsBeneath(entry.GroupPath, groupPath))];

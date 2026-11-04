@@ -53,7 +53,6 @@ public sealed class ContextMenuTests
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         entries.Selected = entries.Rows.Single(entry => entry.Title == "github");
         entries.DeleteCommand.Press();
-        entries.ConfirmDeleteCommand.Press();
         var trash = shell.Show<TrashViewModel>(DestinationKind.Trash);
         var row = Container(shell.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.ItemsSource == trash.Rows), trash.Rows.Single());
 

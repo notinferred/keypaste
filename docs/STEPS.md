@@ -8,12 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.5 — Make destructive actions consistent and undoable.** Needs: Q.2.
-  - A terminal's `keypaste rm` on a vault with no recycle bin is approved with the ordinary amber Allow (`Views/TerminalEditWindow.axaml`). The prompt carries `EditPreview.Recycles`, and when it is false the Allow is drawn as danger and reads "Delete for good", the layout, focus on Deny and arming unchanged.
-  - Edit › Undo and ⌘Z reverse the last delete, rename or move, duplicate, and group create, rename, move or delete, each through the inverse write; the Restore link stays. Trash restores several selected rows at once.
-  - Every confirmation puts Cancel first and the action last, and its cancel button reads Cancel: item and group delete, the in-pane forms, token revoke, Projects' Remove, Settings' access change and key file replace, Connect and Restore backup.
-  - Settings' "Forget them all" and a pairing's Remove confirm in place.
-  - Accepted when tests show the danger Allow for an edit that does not recycle, each undo returning the vault to its state before, and the button order of every confirmation.
 - [ ] **Q.6 — Say what is happening.** Needs: none.
   - The toast (`Views/ShellView.axaml`) shows a green check for every message, a cancellation or a failure included, lasts 2.8 seconds, cannot be pointed at and is replaced by the next. It carries its tone (success, information or warning), lasts at least four seconds and longer for longer text, waits while the pointer is on it and closes with ×.
   - A moving indicator sits beside each wait, with its own label: Unlocking…, Create vault while its key is derived, Looking for AI tools…, Run it, Create and copy link and Check status.

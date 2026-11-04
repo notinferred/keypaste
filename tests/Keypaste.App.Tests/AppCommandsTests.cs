@@ -137,11 +137,6 @@ public sealed class AppCommandsTests : IDisposable
         Assert.Equal(TempVault.ExamplePassword, _clipboard.Content);
 
         Find(commands, "Delete").Run();
-
-        Assert.True(items.IsConfirmingDelete);
-        Assert.Single(items.Rows);
-
-        items.ConfirmDeleteCommand.Press();
         Assert.Empty(items.Rows);
         Assert.True(Find(commands, "Undo").CanRun());
 

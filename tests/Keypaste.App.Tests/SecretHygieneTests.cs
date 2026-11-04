@@ -694,7 +694,6 @@ public sealed class SecretHygieneTests
         // Deleted through the screen, so the trash below holds a row somebody's action produced
         // rather than an empty list that would sweep clean whatever the screen did.
         entries.DeleteCommand.Press();
-        entries.ConfirmDeleteCommand.Press();
 
         shell.Current = Destinations.Of(DestinationKind.Trash);
         var trash = Assert.IsType<TrashViewModel>(shell.Content);

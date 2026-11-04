@@ -41,10 +41,50 @@ public sealed class KeepUnsavedWorkTests
         Assert.True(vault.RemoveTags(new EntryName(string.Empty, "github"), ["env:billing:old"]));
     }
 
+    private static Action<Vault> SeedFor(string name) => vault =>
+    {
+        Seed(vault);
+
+        if (name is "delete group" or "delete item")
+        {
+            vault.SetRecyclesDeletedEntries(false);
+        }
+    };
+
     private static Form Open(RenderedShell shell, string name)
     {
         switch (name)
         {
+            case "delete .env file":
+                var offering = shell.OpenProject();
+                var imported = Path.Combine(Path.GetDirectoryName(shell.Session.VaultPath)!, "import.env");
+                File.WriteAllText(imported, "IMPORTED_KEY=value\n");
+                offering.Import.Preview(imported);
+                offering.Import.ConfirmCommand.Press();
+                return new Form(() => offering.Import.IsOfferingDelete, () => { }, IsDanger: true);
+
+            case "delete for good":
+                var seeding = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+                seeding.Selected = seeding.Rows.Single(row => row.Title == "spare");
+                seeding.DeleteCommand.Press();
+                var purging = shell.Show<TrashViewModel>(DestinationKind.Trash);
+                purging.Selected = purging.Rows.Single();
+                purging.PurgeCommand.Press();
+                return new Form(() => purging.IsConfirmingPurge, () => { }, IsDanger: true);
+
+            case "empty trash":
+                var filling = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+                filling.Selected = filling.Rows.Single(row => row.Title == "spare");
+                filling.DeleteCommand.Press();
+                var emptying = shell.Show<TrashViewModel>(DestinationKind.Trash);
+                emptying.EmptyCommand.Press();
+                return new Form(() => emptying.IsConfirmingEmpty, () => { }, IsDanger: true);
+
+            case "forget recent":
+                var settings = shell.Show<SettingsViewModel>(DestinationKind.Settings);
+                settings.AskForgetAllCommand.Press();
+                return new Form(() => settings.IsConfirmingForgetAll, () => { }, IsDanger: true);
+
             case "new project":
                 var env = shell.Show<EnvSetsViewModel>(DestinationKind.EnvSets);
                 env.BeginAddCommand.Press();
@@ -231,10 +271,26 @@ public sealed class KeepUnsavedWorkTests
     });
 
     [Theory]
+    [MemberData(nameof(ConfirmingForms))]
+    [MemberData(nameof(DangerForms))]
+    [InlineData("delete .env file")]
+    [InlineData("delete for good")]
+    [InlineData("empty trash")]
+    [InlineData("forget recent")]
+    public Task Every_confirmation_puts_Cancel_first_and_the_action_last(string name) => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell(seed: SeedFor(name));
+        Assert.True(Open(shell, name).IsOpen());
+        RenderedShell.Drain();
+
+        ConfirmationButtons.AssertCancelComesFirst(shell.Window);
+    });
+
+    [Theory]
     [MemberData(nameof(DangerForms))]
     public Task Return_never_confirms_a_danger_form(string name) => HeadlessSession.On(() =>
     {
-        using var shell = new RenderedShell(seed: Seed);
+        using var shell = new RenderedShell(seed: SeedFor(name));
         var form = Open(shell, name);
         Assert.True(form.IsDanger);
         RenderedShell.Drain();
@@ -250,7 +306,7 @@ public sealed class KeepUnsavedWorkTests
     [MemberData(nameof(DangerForms))]
     public Task Escape_closes_an_untouched_form_without_asking(string name) => HeadlessSession.On(() =>
     {
-        using var shell = new RenderedShell(seed: Seed);
+        using var shell = new RenderedShell(seed: SeedFor(name));
         var form = Open(shell, name);
         RenderedShell.Drain();
         var before = VaultBytes(shell);

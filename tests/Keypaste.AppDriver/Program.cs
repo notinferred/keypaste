@@ -702,7 +702,7 @@ internal sealed class Driver(string home)
 
         if (decline)
         {
-            Press(open.CancelTagChangeCommand, open.TagChangeCancel);
+            Press(open.CancelTagChangeCommand, "Cancel");
             return Did("declined");
         }
 
@@ -803,7 +803,12 @@ internal sealed class Driver(string home)
         Select(entries, entry);
 
         Press(entries.DeleteCommand, "Delete");
-        Press(entries.ConfirmDeleteCommand, "Move to trash");
+
+        if (entries.IsConfirmingDelete)
+        {
+            Press(entries.ConfirmDeleteCommand, "Delete for good");
+        }
+
         return entries.Error is not null ? Refused(entries.Error) : Did(entries.Notice);
     }
 

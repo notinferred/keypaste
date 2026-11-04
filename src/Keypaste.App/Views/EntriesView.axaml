@@ -263,8 +263,8 @@
                   Classes="link"
                   Content="Restore"
                   Margin="10,0,0,0"
-                  IsVisible="{Binding CanUndoDelete}"
-                  Command="{Binding UndoDeleteCommand}" />
+                  IsVisible="{Binding OffersRestore}"
+                  Command="{Binding UndoCommand}" />
         </Grid>
       </Border>
 
@@ -278,8 +278,8 @@
           <TextBlock Classes="caption" Text="{Binding CreateGroupPrompt}" />
           <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="CreateGroup" Classes="primary sm" Content="Create" Command="{Binding ConfirmCreateGroupCommand}" />
             <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
+            <Button x:Name="CreateGroup" Classes="primary sm" Content="Create" Command="{Binding ConfirmCreateGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -295,8 +295,8 @@
                      IsVisible="{Binding ShowsProjectRenameNote}"
                      Text="{Binding ProjectRenameNote}" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="RenameGroupSave" Classes="primary sm" Content="Rename" Command="{Binding ConfirmRenameGroupCommand}" />
             <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
+            <Button x:Name="RenameGroupSave" Classes="primary sm" Content="Rename" Command="{Binding ConfirmRenameGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -319,19 +319,19 @@
           </ComboBox>
           <TextBlock Classes="caption" Text="{Binding AccessNote}" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="MoveGroupSave" Classes="primary sm" Content="Move" Command="{Binding ConfirmMoveGroupCommand}" />
             <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
+            <Button x:Name="MoveGroupSave" Classes="primary sm" Content="Move" Command="{Binding ConfirmMoveGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
 
-      <!-- Deleting a group asks first and says how many items go with it. -->
+      <!-- Only where the vault has no recycle bin: a recycled group goes at once, and Undo brings it back. -->
       <Border Classes="form danger" IsVisible="{Binding IsConfirmingGroupDelete}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
           <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
           <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="KeepGroup" Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
             <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="Delete" Command="{Binding ConfirmDeleteGroupCommand}" />
-            <Button x:Name="KeepGroup" Classes="ghost sm" Content="Keep it" Command="{Binding CancelGroupCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -660,8 +660,8 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button x:Name="CreateItem" Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
               <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
+              <Button x:Name="CreateItem" Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
             </StackPanel>
 
           </StackPanel>
@@ -823,8 +823,8 @@
                     <StackPanel Spacing="10">
                       <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="ConfirmRotate" Classes="primary sm" Content="Rotate" Command="{Binding ConfirmRotateCommand}" />
                         <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelRotateCommand}" />
+                        <Button x:Name="ConfirmRotate" Classes="primary sm" Content="Rotate" Command="{Binding ConfirmRotateCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -840,8 +840,8 @@
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelDeleteCommand}" />
                           <Button Classes="danger sm" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
-                          <Button Classes="ghost sm" Content="Keep it" Command="{Binding CancelDeleteCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -884,8 +884,8 @@
                       </StackPanel>
                       <TextBlock Classes="caption" Text="{Binding AccessNote}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="OrganizeSave" Classes="primary sm" Content="Save" Command="{Binding ConfirmOrganizeCommand}" />
                         <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelOrganizeCommand}" />
+                        <Button x:Name="OrganizeSave" Classes="primary sm" Content="Save" Command="{Binding ConfirmOrganizeCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -1058,8 +1058,8 @@
                               </ItemsControl.ItemTemplate>
                             </ItemsControl>
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                              <Button Classes="primary" Content="Restore" Command="{Binding History.ConfirmRestoreCommand}" />
                               <Button Classes="ghost" Content="Cancel" Command="{Binding History.CancelRestoreCommand}" />
+                              <Button Classes="primary" Content="Restore" Command="{Binding History.ConfirmRestoreCommand}" />
                             </StackPanel>
                           </StackPanel>
                         </Border>
@@ -1380,8 +1380,8 @@
                                       OffContent="Plain" />
                         <TextBlock Classes="caption" Text="{x:Static app:ShortcutText.PasteProtected}" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddFieldCommand}" />
                           <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddFieldCommand}" />
+                          <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1412,8 +1412,8 @@
                         <TextBlock Classes="caption" IsVisible="{Binding ReplacementFieldValue.Note.Length}" Text="{Binding ReplacementFieldValue.Note}" />
                         <TextBlock Classes="caption" Text="The old value stays in the item's history." />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceFieldCommand}" />
                           <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceFieldCommand}" />
+                          <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1437,8 +1437,8 @@
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button x:Name="RenameFieldSave" Classes="primary" Content="Rename" Command="{Binding ConfirmRenameFieldCommand}" />
                           <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRenameFieldCommand}" />
+                          <Button x:Name="RenameFieldSave" Classes="primary" Content="Rename" Command="{Binding ConfirmRenameFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1447,8 +1447,8 @@
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding RemoveFieldPrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveFieldCommand}" />
                           <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRemoveFieldCommand}" />
+                          <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1508,8 +1508,8 @@
                       <StackPanel Spacing="10">
                         <TextBlock Text="{Binding Attachments.RemovePrompt}" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button x:Name="RemoveAttachmentConfirm" Classes="danger" Content="Remove" Command="{Binding Attachments.ConfirmRemoveCommand}" />
                           <Button Classes="ghost" Content="Cancel" Command="{Binding Attachments.CancelRemoveCommand}" />
+                          <Button x:Name="RemoveAttachmentConfirm" Classes="danger" Content="Remove" Command="{Binding Attachments.ConfirmRemoveCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1568,8 +1568,8 @@
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Classes="primary" Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
                           <Button Classes="ghost" Content="Cancel" Command="{Binding CancelTagChangeCommand}" />
+                          <Button Classes="primary" Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1713,8 +1713,8 @@
                                    Text="{Binding NewPassword.Note}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="primary sm" Content="Save" Command="{Binding SaveCommand}" />
                         <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelCommand}" />
+                        <Button Classes="primary sm" Content="Save" Command="{Binding SaveCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>

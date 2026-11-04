@@ -97,7 +97,6 @@ public sealed class ShellViewModelTests : IDisposable
         shell.SelectedSidebarRow = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "Work");
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.BeginDeleteGroupCommand.Press();
-        entries.ConfirmDeleteGroupCommand.Press();
 
         Assert.Null(entries.Error);
         Assert.Equal(["Items", "env", "Projects", "billing", "Agents"], Titles(shell));

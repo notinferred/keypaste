@@ -221,7 +221,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     /// delete puts the group and its items in the recycle bin and shows the group it was in.
     /// </summary>
     [Fact]
-    public void Deleting_a_group_asks_first_naming_its_items_and_recycles_them()
+    public void Deleting_a_group_recycles_it_at_once_naming_its_items()
     {
         var before = Digest(_vaultPath);
 
@@ -229,22 +229,11 @@ public sealed class EntriesOrganizeTests : IDisposable
         {
             var entries = context.Entries;
 
-            entries.SelectedGroup = Group(entries, "env/billing");
-            entries.BeginDeleteGroupCommand.Press();
-
-            Assert.True(entries.IsConfirmingGroupDelete);
-            Assert.Equal(
-                "Delete env/billing? It and the 1 item in it go to the vault's recycle bin, and Trash can put each item back.",
-                entries.GroupDeletePrompt);
-            Assert.Equal(before, Digest(_vaultPath));
-
             entries.SelectedGroup = Group(entries, "servers");
-            Assert.False(entries.IsConfirmingGroupDelete);
-
             entries.BeginDeleteGroupCommand.Press();
-            Assert.Contains("the 2 items in it", entries.GroupDeletePrompt, StringComparison.Ordinal);
 
-            entries.ConfirmDeleteGroupCommand.Press();
+            Assert.False(entries.IsConfirmingGroupDelete);
+            Assert.NotEqual(before, Digest(_vaultPath));
 
             Assert.Null(entries.Error);
             Assert.True(entries.SelectedGroup?.IsEverything);

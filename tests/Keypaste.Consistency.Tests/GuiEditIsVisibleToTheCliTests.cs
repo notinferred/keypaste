@@ -135,7 +135,6 @@ public sealed class GuiEditIsVisibleToTheCliTests
 
         screen.Model.Selected = screen.Model.Rows.Single(row => row.Title == "github");
         screen.Model.DeleteCommand.Execute(null);
-        screen.Model.ConfirmDeleteCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
         Assert.Equal(CliApp.ExitNotFound, fixture.Run("get", "github", "--reveal"));

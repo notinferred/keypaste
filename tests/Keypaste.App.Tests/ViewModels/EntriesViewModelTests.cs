@@ -198,8 +198,9 @@ public sealed class EntriesViewModelTests : IDisposable
     /// Deleting takes two clicks, because there is nothing to undo.
     /// </summary>
     [Fact]
-    public void Deleting_needs_confirming_first()
+    public void Deleting_for_good_needs_confirming_first()
     {
+        WithoutRecycleBin();
         using var context = New();
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "staging");
@@ -235,7 +236,6 @@ public sealed class EntriesViewModelTests : IDisposable
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "nested/TOKEN");
         context.Entries.DeleteCommand.Press();
-        context.Entries.ConfirmDeleteCommand.Press();
 
         Assert.Null(context.Entries.Error);
 
@@ -268,7 +268,6 @@ public sealed class EntriesViewModelTests : IDisposable
         using var context = new Context(path);
         context.Entries.Selected = context.Entries.Rows[0];
         context.Entries.DeleteCommand.Press();
-        context.Entries.ConfirmDeleteCommand.Press();
 
         Assert.NotNull(context.Entries.Error);
         Assert.Equal(before, Digest(path), StringComparer.Ordinal);
@@ -280,6 +279,7 @@ public sealed class EntriesViewModelTests : IDisposable
     [Fact]
     public void Changing_the_mind_about_a_delete_keeps_the_entry()
     {
+        WithoutRecycleBin();
         using var context = New();
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "staging");
@@ -290,6 +290,13 @@ public sealed class EntriesViewModelTests : IDisposable
 
         using var reopened = Vault.Open(_vaultPath, Master);
         Assert.NotNull(reopened.Find("servers/staging"));
+    }
+
+    private void WithoutRecycleBin()
+    {
+        using var vault = Vault.Open(_vaultPath, Master);
+        vault.SetRecyclesDeletedEntries(false);
+        vault.Save();
     }
 
     [Fact]

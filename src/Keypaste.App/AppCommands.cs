@@ -365,7 +365,7 @@ internal sealed class AppCommands
     }
 
     private bool CanUndo(bool text) =>
-        Focus() is TextBox field ? text && field.CanUndo : !InField() && Items() is { CanUndoDelete: true };
+        Focus() is TextBox field ? text && field.CanUndo : !InField() && Items() is { CanUndo: true };
 
     private void Undo()
     {
@@ -375,7 +375,7 @@ internal sealed class AppCommands
         }
         else
         {
-            Items()?.UndoDeleteCommand.Press();
+            Items()?.UndoCommand.Press();
         }
     }
 
@@ -519,7 +519,7 @@ internal sealed class AppCommands
 
     private bool CanDelete() => !InField() && Items() is { } items && items.DeleteCommand.CanExecute(null);
 
-    // Delete asks first; the menu never reaches the confirming command.
+    // Asks first only where nothing could put the item back.
     private void Delete() => Items()?.DeleteCommand.Press();
 
     private void SetState(WindowState state)

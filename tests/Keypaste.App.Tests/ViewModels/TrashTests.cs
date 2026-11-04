@@ -150,7 +150,6 @@ public sealed class TrashTests : IDisposable
         {
             context.Entries.SelectedGroup = context.Entries.Groups.Single(node => node.Path == "servers");
             context.Entries.BeginDeleteGroupCommand.Press();
-            context.Entries.ConfirmDeleteGroupCommand.Press();
 
             Assert.Null(context.Entries.Error);
             Assert.DoesNotContain(context.Entries.Groups, node => node.Path == "servers");
@@ -455,7 +454,7 @@ public sealed class TrashTests : IDisposable
 
     /// <summary>
     /// Emptying the bin is the same second deliberate act as erasing one entry: asking names how many go and
-    /// writes nothing, Keep them writes nothing, and only the confirmation erases every entry and its history.
+    /// writes nothing, Cancel writes nothing, and only the confirmation erases every entry and its history.
     /// </summary>
     [Fact]
     public void Emptying_the_trash_needs_its_own_confirmation_naming_how_many_go()
@@ -630,12 +629,12 @@ public sealed class TrashTests : IDisposable
             Delete(context, "servers/production");
 
             Assert.Equal("Moved servers/production to the trash.", context.Entries.Notice, StringComparer.Ordinal);
-            Assert.True(context.Entries.CanUndoDelete);
+            Assert.True(context.Entries.CanUndo);
             Assert.DoesNotContain(context.Entries.Rows, row => row.Path == "servers/production");
 
-            context.Entries.UndoDeleteCommand.Press();
+            context.Entries.UndoCommand.Press();
 
-            Assert.False(context.Entries.CanUndoDelete);
+            Assert.False(context.Entries.CanUndo);
             Assert.Null(context.Entries.Notice);
             Assert.Null(context.Entries.Error);
             Assert.Contains(context.Entries.Rows, row => row.Path == "servers/production");
@@ -671,21 +670,61 @@ public sealed class TrashTests : IDisposable
             context.Entries.Notice,
             StringComparer.Ordinal);
 
-        Assert.False(context.Entries.CanUndoDelete);
+        Assert.False(context.Entries.CanUndo);
     }
 
     [Fact]
-    public void The_offer_to_undo_is_dropped_by_the_next_action()
+    public void Opening_a_form_keeps_the_undo_and_the_next_write_ends_it()
     {
         using var context = new Context(_vaultPath);
 
         Delete(context, "servers/production");
-        Assert.True(context.Entries.CanUndoDelete);
+        Assert.True(context.Entries.CanUndo);
 
-        var form = NewItemForm.Open(context.Entries);
+        NewItemForm.Open(context.Entries);
 
-        Assert.False(context.Entries.CanUndoDelete);
+        Assert.True(context.Entries.CanUndo);
         Assert.Null(context.Entries.Notice);
+
+        context.Entries.CancelAddCommand.Press();
+        context.Entries.Selected = context.Entries.Rows[0];
+        context.Entries.DuplicateCommand.Press();
+        var copy = context.Entries.Selected!.Name;
+
+        context.Entries.UndoCommand.Press();
+
+        Assert.DoesNotContain(context.Entries.Rows, row => row.Name == copy);
+        Assert.False(context.Entries.CanUndo);
+    }
+
+    [Fact]
+    public void Restore_puts_every_selected_row_back_in_one_save_and_names_the_ones_it_cannot()
+    {
+        using var context = new Context(_vaultPath);
+
+        Add(context, "servers/staging");
+        Delete(context, "servers/production");
+        Delete(context, "servers/staging");
+        Add(context, "servers/staging");
+
+        var trash = context.Trash;
+        trash.Load();
+        Assert.Equal(2, trash.Rows.Count);
+        trash.SelectedRows.AddRange(trash.Rows);
+
+        Assert.False(trash.PurgeCommand.CanExecute(null));
+
+        trash.Selected = trash.Rows[0];
+        trash.RestoreCommand.Press();
+
+        Assert.Equal("1 item is back.", trash.Notice);
+        Assert.Contains("staging", trash.Error, StringComparison.Ordinal);
+        Assert.Empty(trash.SelectedRows);
+        Assert.Contains(context.Entries.Rows.Select(row => row.Path), path => path == "servers/staging");
+        Assert.Single(trash.Rows);
+
+        using var reopened = Vault.Open(_vaultPath, _master);
+        Assert.NotNull(reopened.Find("servers/production"));
     }
 
     /// <summary>A key removed on the env card leaves its entry, whose history keeps it, and puts nothing in the bin.</summary>
@@ -703,7 +742,11 @@ public sealed class TrashTests : IDisposable
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Path == path);
         context.Entries.DeleteCommand.Press();
-        context.Entries.ConfirmDeleteCommand.Press();
+
+        if (context.Entries.IsConfirmingDelete)
+        {
+            context.Entries.ConfirmDeleteCommand.Press();
+        }
     }
 
     private static void Add(Context context, string path)

@@ -18,6 +18,7 @@ internal sealed class TerminalEditViewModel : PromptViewModel
         Item = prompt.Item;
         Origin = prompt.OriginText;
         Changes = prompt.Changes;
+        DeletesForGood = prompt.DeletesForGood;
     }
 
     /// <summary>The command that asked, as a person types it.</summary>
@@ -31,6 +32,11 @@ internal sealed class TerminalEditViewModel : PromptViewModel
 
     /// <summary>What changes, in keypaste's own words.</summary>
     internal IReadOnlyList<string> Changes { get; }
+
+    /// <summary>Whether allowing erases the item for good, which draws Allow as danger.</summary>
+    internal bool DeletesForGood { get; }
+
+    internal string AllowLabel => DeletesForGood ? "Delete for good" : "Allow";
 
     /// <summary>What allowing does.</summary>
     internal string Explainer { get; } = "Allowing saves this in the vault now. Allow only a change you made yourself.";

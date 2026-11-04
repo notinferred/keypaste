@@ -524,7 +524,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TagChangeReturnCommand))]
     [NotifyPropertyChangedFor(nameof(IsConfirmingTagChange), nameof(TagChangeLines), nameof(TagChangeAdds), nameof(TagChangeAction))]
-    [NotifyPropertyChangedFor(nameof(TagChangeCancel))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmTagChangeCommand), nameof(CancelTagChangeCommand))]
     internal partial ProjectTagChange? PendingTagChange { get; private set; }
 
@@ -540,8 +539,6 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             ? $"Add to {EntryNameSanitizer.Sanitize(environment).Text}"
             : $"Remove from {EntryNameSanitizer.Sanitize(environment).Text}"
         : string.Empty;
-
-    internal string TagChangeCancel => TagChangeAdds ? "Cancel" : "Keep it";
 
     /// <summary>Writes the pending tag change.</summary>
     internal RelayCommand ConfirmTagChangeCommand { get; }

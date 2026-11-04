@@ -249,6 +249,9 @@ public sealed class ProjectsJourneyTests
         var screen = Assert.IsType<EnvSetsViewModel>(shell.Content);
         var project = screen.OpenProject!;
 
+        // The clock here never ends the last run's toast, which would cover this confirmation's action.
+        shell.DismissToastCommand.Press();
+
         var run = ByName<Button>(main, "Run in a terminal");
         Press(main, run);
         await Until(() => project.Launch.IsConfirming, () => screen.Error ?? $"no confirmation and no error; the press reached {Hit(main, run)}");

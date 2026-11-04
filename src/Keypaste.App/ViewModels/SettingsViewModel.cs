@@ -577,10 +577,21 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         _ => $"keypaste could not link {link.LinkPath}: {result.Reason}",
     };
 
-    /// <summary>Empties the recent-vaults list.</summary>
+    /// <summary>Whether "Forget them all" is waiting on its confirmation.</summary>
+    [ObservableProperty]
+    internal partial bool IsConfirmingForgetAll { get; private set; }
+
+    [RelayCommand]
+    private void AskForgetAll() => IsConfirmingForgetAll = true;
+
+    [RelayCommand]
+    private void CancelForgetAll() => IsConfirmingForgetAll = false;
+
+    /// <summary>Empties the recent-vaults list, having been confirmed.</summary>
     [RelayCommand]
     private void ForgetAll()
     {
+        IsConfirmingForgetAll = false;
         RecentVaults.Save(KeypasteHome.RecentPath(_home), []);
         Message = "The recent vaults list is empty.";
     }

@@ -499,7 +499,7 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal(
             ["Removing env:acme-api, env:acme-api:dev takes services/Mail out of acme-api/dev.", "Leaving acme-api/dev: MAIL_KEY."],
             project.TagChangeLines);
-        Assert.Equal(("Remove from dev", "Keep it"), (project.TagChangeAction, project.TagChangeCancel));
+        Assert.Equal("Remove from dev", project.TagChangeAction);
 
         var before = File.ReadAllBytes(_fixture.Path_);
         project.CancelTagChangeCommand.Press();

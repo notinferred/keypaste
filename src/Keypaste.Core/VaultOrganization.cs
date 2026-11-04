@@ -104,4 +104,7 @@ public enum GroupOutcome
 
     /// <summary>The destination is the group itself or a group inside it.</summary>
     DestinationInside = 13,
+
+    /// <summary>The group is back where it was deleted from, with everything under it.</summary>
+    Restored = 14,
 }

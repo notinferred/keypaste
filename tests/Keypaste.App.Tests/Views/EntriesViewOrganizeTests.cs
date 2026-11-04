@@ -142,12 +142,13 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         Assert.Same(context.Entries.Groups.Single(node => node.IsEverything), target.SelectedItem);
         Assert.False(Named<TextBox>(window, "RenameGroupName")!.IsEffectivelyVisible);
 
+        context.Session.Unlocked!.SetRecyclesDeletedEntries(false);
         context.Entries.BeginDeleteGroupCommand.Press();
         window.UpdateLayout();
 
         var prompt = Named<TextBlock>(window, "GroupDeletePrompt")!;
         Assert.True(prompt.IsEffectivelyVisible);
-        Assert.Contains("the 1 item in it", prompt.Text, StringComparison.Ordinal);
+        Assert.Contains("1 item", prompt.Text, StringComparison.Ordinal);
         Assert.False(target.IsEffectivelyVisible);
     });
 

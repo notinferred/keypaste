@@ -264,8 +264,8 @@
                        Text="A project is the items in your vault tagged with its name, such as env:billing-api. It appears in the vault once you add its first item or key." />
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" />
-              <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
               <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
+              <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
             </StackPanel>
           </StackPanel>
         </Border>
@@ -298,8 +298,8 @@
                     </ItemsControl>
                     <TextBlock Classes="caption" Text="{Binding Import.Notes}" IsVisible="{Binding Import.HasNotes}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="primary" Content="Import" Command="{Binding Import.ConfirmCommand}" />
                       <Button Classes="ghost" Content="Cancel" Command="{Binding Import.CancelCommand}" />
+                      <Button Classes="primary" Content="Import" Command="{Binding Import.ConfirmCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -310,9 +310,9 @@
                     <TextBlock Classes="body primary" Text="{Binding Import.Leftover, StringFormat='Delete {0}?'}" TextWrapping="Wrap" />
                     <TextBlock Classes="caption" Text="{Binding Import.DeleteWarning}" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding Import.KeepSourceCommand}" />
                       <Button Classes="danger" Content="Delete" Command="{Binding Import.DeleteSourceCommand}"
                               AutomationProperties.Name="{Binding Import.Leftover, StringFormat='Delete {0}'}" />
-                      <Button Classes="ghost" Content="Keep it" Command="{Binding Import.KeepSourceCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -495,8 +495,8 @@
                                Text="Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key or item creates it, and prod and production environments always ask before release." />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" />
-                      <Button Classes="primary" Content="Add key" Command="{Binding ConfirmAddProfileCommand}" />
                       <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddProfileCommand}" />
+                      <Button Classes="primary" Content="Add key" Command="{Binding ConfirmAddProfileCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -553,8 +553,8 @@
                     <TextBlock Classes="caption" IsVisible="{Binding NewValue.Note.Length}"
                                Text="{Binding NewValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddCommand}" />
                       <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                      <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -585,8 +585,8 @@
                     <TextBlock Classes="caption" IsVisible="{Binding ReplacementValue.Note.Length}"
                                Text="{Binding ReplacementValue.Note}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
                       <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceCommand}" />
+                      <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -595,8 +595,8 @@
                   <StackPanel Spacing="10">
                     <TextBlock Classes="body primary" Text="{Binding RemovePrompt}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRemoveCommand}" />
                       <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveCommand}" />
-                      <Button Classes="ghost" Content="Keep it" Command="{Binding CancelRemoveCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -693,10 +693,10 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Name="CancelTagChange" Classes="ghost" Content="Cancel"
+                              Command="{Binding CancelTagChangeCommand}" />
                       <Button Name="ConfirmTagChange" Classes.primary="{Binding TagChangeAdds}" Classes.danger="{Binding !TagChangeAdds}"
                               Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
-                      <Button Name="CancelTagChange" Classes="ghost" Content="{Binding TagChangeCancel}"
-                              Command="{Binding CancelTagChangeCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -810,8 +810,8 @@
                           <TextBlock Classes="caption" Text="{Binding Launch.ConfirmSources}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="Everything run in that terminal can read these values." />
                           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                            <Button Classes="primary" Content="Start" Command="{Binding Launch.ConfirmLaunchCommand}" />
                             <Button Classes="ghost" Content="Cancel" Command="{Binding Launch.CancelLaunchCommand}" />
+                            <Button Classes="primary" Content="Start" Command="{Binding Launch.ConfirmLaunchCommand}" />
                           </StackPanel>
                         </StackPanel>
                       </Border>

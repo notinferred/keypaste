@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's Edit › Undo, ⌘Z or Ctrl+Z, now reverses the last delete, rename or move, duplicate, and group create, rename, move or delete, until the next write to the vault, so a delete that goes to the recycle bin no longer asks first. Trash restores several selected rows at once. Every confirmation puts Cancel first and the action last, "Forget them all" and a browser pairing's Remove now confirm in place, and a terminal's `keypaste rm` on a vault with no recycle bin is approved with a danger button reading "Delete for good" ([Q.5](docs/steps/Q.5.md)).
+
 The desktop app keeps what you type: leaving a screen, choosing another item or pressing Escape on a form holding unsaved text now asks "Discard …?" with Cancel and Discard first, and a merge of another program's save leaves the form as typed; a lock still discards it. Forms answer Return with their confirm, never a danger one, and Escape with Cancel, the Share dialog gains a Cancel button, an error appears under its field as you type, and Create waits for a title ([Q.4](docs/steps/Q.4.md)).
 
 The CLI and the desktop app are now built with .NET 10.0.14, which fixes an out-of-bounds write in the runtime's Brotli decoder (CVE-2026-111497); `v0.3.0` was built with an earlier, affected runtime ([B.5](docs/steps/B.5.md)).
@@ -109,7 +111,7 @@ Search now also finds an item by any part of one of its own tags, so `prod` find
 
 In the app, Rename on a custom field's row does the same. For a field a project reads as a variable, or one the item's own `{S:…}` names, it first lists the environments that stop giving the variable, the `kp://` references and the fields the rename leaves naming nothing, and renames only when you press Rename again.
 
-In the app, right-clicking a group in the sidebar, or pressing the menu key or Shift+F10 on it, opens a menu with New group, Rename, Move and Delete. Move takes the group and everything in it into another group. Delete asks first, saying how many items go with it, and puts the group in the vault's recycle bin, where Trash lists each of its items and puts each back at the path it had; in a vault whose recycle bin is switched off, only an empty group can be deleted, for good. The sidebar now lists groups in the order the vault holds them, as KeePassXC does.
+In the app, right-clicking a group in the sidebar, or pressing the menu key or Shift+F10 on it, opens a menu with New group, Rename, Move and Delete. Move takes the group and everything in it into another group. Delete puts the group in the vault's recycle bin, where Trash lists each of its items and puts each back at the path it had; in a vault whose recycle bin is switched off, only an empty group can be deleted, for good. The sidebar now lists groups in the order the vault holds them, as KeePassXC does.
 
 Duplicate in an item's ⋯ menu makes a copy beside it, titled `<title> (copy)`, with its fields and attachments but none of its history, and selects it. The copy leaves out the item's project tags, because a project takes one item for each variable, and the app says which tags it left out.
 

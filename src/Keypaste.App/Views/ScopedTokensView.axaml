@@ -134,11 +134,11 @@
                     <Panel>
                       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}">
                         <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
+                        <Button Grid.Column="1" Classes="ghost sm" FontSize="12" Content="Cancel" VerticalAlignment="Center"
+                                Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
+                        <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"
                                 CommandParameter="{Binding}" />
-                        <Button Grid.Column="2" Classes="ghost sm" FontSize="12" Content="Cancel" VerticalAlignment="Center"
-                                Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
                       </Grid>
                       <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,72" ColumnSpacing="12" IsVisible="{Binding !IsConfirming}">
                         <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />

@@ -7,6 +7,7 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Editing;
 using Keypaste.Core.Tests;
 using Xunit;
 using static Keypaste.App.Tests.Session.DesktopApprovalTests;
@@ -42,6 +43,39 @@ public sealed class TerminalEditWindowTests
 
             Click(window, "Deny");
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
+        });
+
+    [Fact]
+    public Task A_remove_that_does_not_recycle_is_allowed_by_a_danger_button_in_the_same_place() =>
+        HeadlessSession.On(() =>
+        {
+            var edit = new RemoveItem("work/github");
+            var forGood = TerminalEditPrompt.For(edit, new EditPreview(EditAction.Remove, "work/github", ["Removes work/github for good: this vault has no recycle bin."]));
+            var recycled = TerminalEditPrompt.For(edit, new EditPreview(EditAction.Remove, "work/github", ["Moves work/github to the recycle bin."]) { Recycles = true });
+            var otherEdit = TerminalEditPrompt.For(edit, new EditPreview(EditAction.Add, "work/github", ["Adds work/github."]));
+
+            var (window, _) = Layout(forGood);
+            var allow = window.FindControl<Button>("Allow")!;
+            var deny = window.FindControl<Button>("Deny")!;
+
+            Assert.Equal("Delete for good", allow.Content);
+            Assert.Contains("danger", allow.Classes);
+            Assert.DoesNotContain("primary", allow.Classes);
+            Assert.True(deny.IsFocused);
+            Assert.False(allow.IsEffectivelyEnabled);
+            Assert.True(deny.TranslatePoint(default, window)!.Value.X < allow.TranslatePoint(default, window)!.Value.X);
+            window.Close();
+
+            foreach (var ordinary in new[] { recycled, otherEdit })
+            {
+                var (shown, _) = Layout(ordinary);
+                var answer = shown.FindControl<Button>("Allow")!;
+
+                Assert.Equal("Allow", answer.Content);
+                Assert.Contains("primary", answer.Classes);
+                Assert.DoesNotContain("danger", answer.Classes);
+                shown.Close();
+            }
         });
 
     [Fact]

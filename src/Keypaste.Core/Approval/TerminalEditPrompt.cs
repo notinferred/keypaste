@@ -25,6 +25,9 @@ public sealed record TerminalEditPrompt
     /// <summary>Where the request came from, as the prompt says it: a terminal, which never proves the person asked.</summary>
     public string OriginText { get; init; } = AccessChangePrompt.FromTerminalText;
 
+    /// <summary>Whether allowing erases an item for good, because the vault has no recycle bin.</summary>
+    public bool DeletesForGood { get; init; }
+
     /// <summary>The prompt for one edit, from the preview the holder checked it into.</summary>
     /// <param name="edit">The edit.</param>
     /// <param name="preview">What it would do.</param>
@@ -39,6 +42,7 @@ public sealed record TerminalEditPrompt
             Command = $"keypaste {edit.Verb}",
             Item = preview.Item,
             Changes = preview.Changes,
+            DeletesForGood = preview.Action == EditAction.Remove && !preview.Recycles,
         };
     }
 }

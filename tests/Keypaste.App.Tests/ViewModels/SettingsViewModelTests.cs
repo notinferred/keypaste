@@ -156,8 +156,20 @@ public sealed class SettingsViewModelTests
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = Screen(session, fixture);
 
+        model.AskForgetAllCommand.Press();
+
+        Assert.True(model.IsConfirmingForgetAll);
+        Assert.NotEmpty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
+
+        model.CancelForgetAllCommand.Press();
+
+        Assert.False(model.IsConfirmingForgetAll);
+        Assert.NotEmpty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
+
+        model.AskForgetAllCommand.Press();
         model.ForgetAllCommand.Press();
 
+        Assert.False(model.IsConfirmingForgetAll);
         Assert.Empty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
         Assert.True(model.HasMessage);
     }

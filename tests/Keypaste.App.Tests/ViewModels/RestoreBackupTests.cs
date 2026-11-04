@@ -1,8 +1,12 @@
 using System.Security.Cryptography;
+using Avalonia.Controls;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.Rendering;
+using Keypaste.App.Tests.Views;
 using Keypaste.App.ViewModels;
+using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
@@ -532,6 +536,26 @@ public sealed class RestoreBackupTests : IDisposable
     // ------------------------------------------------------------------ fixtures
 
     /// <summary>Changes the password on the Entries screen and locks, which is a real save and so a real backup.</summary>
+    [Fact]
+    public Task Restoring_puts_Cancel_first() => HeadlessSession.On(async () =>
+    {
+        ChangeThroughTheApp("v1");
+
+        using var session = new AppVaultSession(_clock);
+        using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
+        var window = new Window { Content = new UnlockView { DataContext = unlock } };
+        window.Show();
+
+        unlock.StartRestoreCommand.Press();
+        Enter(unlock.Restore!, _master);
+        await unlock.Restore!.CheckAsync();
+        WindowInput.Drain();
+
+        Assert.True(unlock.Restore!.IsConfirming);
+        ConfirmationButtons.AssertCancelComesFirst(window);
+        window.Close();
+    });
+
     private void ChangeThroughTheApp(string password)
     {
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));

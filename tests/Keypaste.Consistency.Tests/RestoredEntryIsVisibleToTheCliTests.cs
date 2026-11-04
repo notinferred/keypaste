@@ -137,9 +137,9 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
         using var screen = Entries(fixture);
 
         Delete(screen, "github");
-        Assert.True(screen.Model.CanUndoDelete);
+        Assert.True(screen.Model.CanUndo);
 
-        screen.Model.UndoDeleteCommand.Execute(null);
+        screen.Model.UndoCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--reveal"));
@@ -150,7 +150,6 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
     {
         screen.Model.Selected = screen.Model.Rows.Single(row => row.Title == title);
         screen.Model.DeleteCommand.Execute(null);
-        screen.Model.ConfirmDeleteCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
     }

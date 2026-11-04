@@ -419,7 +419,7 @@ public sealed class ScreenRenderer
 
         entries.DeleteCommand.Press();
         Save(window, output, "18-secrets-delete");
-        entries.CancelDeleteCommand.Press();
+        entries.UndoCommand.Press();
 
         entries.OrganizeCommand.Press();
         Save(window, output, "19-secrets-organize");

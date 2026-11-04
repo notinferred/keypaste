@@ -66,7 +66,7 @@ public sealed partial class BrowserPairingTests
 
         using var listed = new BrowserFillViewModel(app.Authority, app.Clock);
         var row = Assert.Single(listed.Rows);
-        Assert.Equal(new PairingItem("work laptop", "KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)", row.Used), row);
+        Assert.Equal(("work laptop", "KeePassXC-Browser from the Chrome Web Store (oboonakemofpalcgghocfoadofidjkkk)"), (row.Name, row.Identity));
         Assert.Contains("last used", row.Used, StringComparison.Ordinal);
         Assert.False(listed.IsArmed);
     });
@@ -125,7 +125,14 @@ public sealed partial class BrowserPairingTests
         Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "work laptop"), Token))?.Outcome);
 
         using var browserFill = new BrowserFillViewModel(app.Authority, app.Clock);
-        browserFill.RemoveCommand.Press(Assert.Single(browserFill.Rows));
+        var pairing = Assert.Single(browserFill.Rows);
+        browserFill.AskRemoveCommand.Press(pairing);
+        Assert.True(pairing.IsConfirmingRemove);
+        Assert.Single(app.Authority.Pairings());
+        browserFill.CancelRemoveCommand.Press(pairing);
+        Assert.False(pairing.IsConfirmingRemove);
+        browserFill.AskRemoveCommand.Press(pairing);
+        browserFill.RemoveCommand.Press(pairing);
 
         Assert.Empty(browserFill.Rows);
         Assert.StartsWith("Removed the pairing work laptop.", browserFill.Message, StringComparison.Ordinal);

@@ -69,7 +69,8 @@
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
         <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
                 IsCancel="True" Command="{Binding DenyCommand}" />
-        <Button Grid.Column="1" Name="Allow" Classes="prompt primary" Content="Allow"
+        <Button Grid.Column="1" Name="Allow" Classes="prompt" Classes.primary="{Binding !DeletesForGood}"
+                Classes.danger="{Binding DeletesForGood}" Content="{Binding AllowLabel}"
                 HorizontalAlignment="Right" Command="{Binding AllowOnceCommand}" />
       </Grid>
 

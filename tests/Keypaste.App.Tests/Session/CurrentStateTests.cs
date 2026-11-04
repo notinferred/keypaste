@@ -104,7 +104,6 @@ public sealed class CurrentStateTests : IDisposable
                 case "delete":
                     Select(entries, _token);
                     entries.DeleteCommand.Press();
-                    entries.ConfirmDeleteCommand.Press();
                     break;
 
                 case "move":

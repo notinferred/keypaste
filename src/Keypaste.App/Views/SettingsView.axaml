@@ -193,8 +193,8 @@
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                           <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Classes="sm" Content="Add tag" Command="{Binding ConfirmRestoreCommand}" />
                             <Button Classes="sm ghost" Content="Cancel" Command="{Binding CancelRestoreCommand}" />
+                            <Button Classes="sm" Content="Add tag" Command="{Binding ConfirmRestoreCommand}" />
                           </StackPanel>
                         </StackPanel>
                       </Border>
@@ -459,8 +459,8 @@
                                IsVisible="{Binding HasHardwareKeyWarning}"
                                Foreground="{DynamicResource KpTextPrimary}" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
                       <Button Classes="danger" Content="Change access" Command="{Binding ConfirmCommand}" />
-                      <Button Classes="ghost" Content="Leave access as it is" Command="{Binding CancelCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -566,8 +566,8 @@
                   <StackPanel Spacing="10">
                     <TextBlock Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Name="KeepCli" Classes="ghost sm" Content="Cancel" Command="{Binding CancelReplaceCliCommand}" />
                       <Button Name="ConfirmReplaceCli" Classes="danger sm" Content="Replace" Command="{Binding ConfirmReplaceCliCommand}" />
-                      <Button Name="KeepCli" Classes="ghost sm" Content="Keep it" Command="{Binding CancelReplaceCliCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -620,8 +620,18 @@
                         </StackPanel>
                         <Button Grid.Column="1" Classes="ghost sm" Content="Remove" VerticalAlignment="Top"
                                 AutomationProperties.Name="Remove this pairing"
-                                Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).RemoveCommand}"
+                                IsVisible="{Binding !IsConfirmingRemove}"
+                                Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).AskRemoveCommand}"
                                 CommandParameter="{Binding}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top"
+                                    IsVisible="{Binding IsConfirmingRemove}" ctl:ShowInView.OnShow="True">
+                          <Button Classes="ghost sm" Content="Cancel"
+                                  Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).CancelRemoveCommand}"
+                                  CommandParameter="{Binding}" />
+                          <Button Classes="danger sm" Content="Remove" AutomationProperties.Name="Confirm removing this pairing"
+                                  Command="{Binding $parent[ItemsControl].((vm:BrowserFillViewModel)DataContext).RemoveCommand}"
+                                  CommandParameter="{Binding}" />
+                        </StackPanel>
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
@@ -641,12 +651,23 @@
               </StackPanel>
             </Border>
             <Border Classes="settings-row">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                <TextBlock Grid.Column="0" Classes="caption"
-                           Text="keypaste remembers the paths of vaults you have opened on this machine, where the keyfile each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material." />
-                <Button Grid.Column="1" Classes="ghost" Content="Forget them all" Command="{Binding ForgetAllCommand}"
-                        VerticalAlignment="Top" />
-              </Grid>
+              <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                  <TextBlock Grid.Column="0" Classes="caption"
+                             Text="keypaste remembers the paths of vaults you have opened on this machine, where the keyfile each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material." />
+                  <Button Grid.Column="1" Name="AskForgetAll" Classes="ghost" Content="Forget them all" Command="{Binding AskForgetAllCommand}"
+                          IsVisible="{Binding !IsConfirmingForgetAll}" VerticalAlignment="Top" />
+                </Grid>
+                <Border Name="ForgetAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingForgetAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelForgetAllCommand}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Text="Forget every recent vault? The vaults themselves are not touched." TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Name="CancelForgetAll" Classes="ghost sm" Content="Cancel" Command="{Binding CancelForgetAllCommand}" />
+                      <Button Name="ConfirmForgetAll" Classes="danger sm" Content="Forget them all" Command="{Binding ForgetAllCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
             </Border>
           </StackPanel>
         </Border>

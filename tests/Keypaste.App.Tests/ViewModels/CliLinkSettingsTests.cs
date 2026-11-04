@@ -1,5 +1,9 @@
+using Avalonia.Controls;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Rendering;
+using Keypaste.App.Tests.Views;
 using Keypaste.App.ViewModels;
+using Keypaste.App.Views;
 using Keypaste.Core.Linking;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -127,7 +131,23 @@ public sealed class CliLinkSettingsTests
     }
 
     [Fact]
-    public void Replace_only_asks_and_Keep_it_closes_the_question_changing_nothing()
+    public Task Replace_puts_Cancel_first() => HeadlessSession.On(() =>
+    {
+        using var home = new TempHome();
+        using var session = new AppVaultSession(new ManualClock());
+        using var screen = Screen(home, session, FakeCliLink.At(CliLinkState.Foreign));
+        var window = new Window { Content = new SettingsView { DataContext = screen } };
+        window.Show();
+
+        screen.BeginReplaceCliCommand.Press();
+        WindowInput.Drain();
+
+        ConfirmationButtons.AssertCancelComesFirst(window);
+        window.Close();
+    });
+
+    [Fact]
+    public void Replace_only_asks_and_Cancel_closes_the_question_changing_nothing()
     {
         var link = FakeCliLink.At(CliLinkState.Foreign);
         using var home = new TempHome();

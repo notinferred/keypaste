@@ -1,3 +1,4 @@
+using Avalonia.Collections;
 using Keypaste.App.Session;
 using Keypaste.Core;
 
@@ -42,6 +43,9 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     private TrashRow? _selected;
 
+    /// <summary>The rows selected in the list, which Restore takes together when there are several.</summary>
+    internal AvaloniaList<object> SelectedRows { get; } = [];
+
     internal TrashViewModel(AppVaultSession session)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -50,9 +54,10 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
         RestoreCommand = new RelayCommand(Restore, () => _selected is not null && !IsConfirming);
         RestoreAsCommand = new RelayCommand(RestoreAs, () => _selected is not null && RestoreAsTitle is not null && !IsConfirming);
+        SelectedRows.CollectionChanged += (_, _) => PurgeCommand?.NotifyCanExecuteChanged();
         PurgeCommand = new RelayCommand(
             () => IsConfirmingPurge = true,
-            () => _selected is not null && !IsConfirming);
+            () => SelectedRows.Count <= 1 && _selected is not null && !IsConfirming);
         ConfirmPurgeCommand = new RelayCommand(Purge, () => IsConfirmingPurge);
         CancelPurgeCommand = new RelayCommand(() => IsConfirmingPurge = false, () => IsConfirmingPurge);
         EmptyCommand = new RelayCommand(() => IsConfirmingEmpty = true, () => Rows.Count > 0 && !IsConfirming);
@@ -179,6 +184,29 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     /// <summary>Puts the selected entry back where it was deleted from.</summary>
     internal RelayCommand RestoreCommand { get; }
 
+    /// <summary>Puts every selected entry back in one save; one whose name is taken stays in the bin and is named.</summary>
+    private void RestoreSeveral(IReadOnlyList<TrashRow> rows)
+    {
+        var write = _session.Write(
+            vault => rows.Where(row => vault.RestoreRecycled(row.Id) is not (RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot)).ToList(),
+            left => left.Count < rows.Count);
+
+        if (write.Problem("restore these again") is { } problem)
+        {
+            Report(null, problem);
+            return;
+        }
+
+        var left = write.Value ?? [];
+        var back = rows.Count - left.Count;
+
+        Report(
+            back == 0 ? null : back == 1 ? "1 item is back." : $"{back} items are back.",
+            left.Count == 0 ? null : $"Not restored: {string.Join(", ", left.Select(row => row.DisplayTitle))}. Something else has the name, or it left the trash. Restore each one alone to see why.");
+        SelectedRows.Clear();
+        Load();
+    }
+
     /// <summary>Puts the selected entry back under the first free <c>(restored)</c> title, its own being taken.</summary>
     internal RelayCommand RestoreAsCommand { get; }
 
@@ -242,6 +270,12 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     private void Restore()
     {
+        if (SelectedRows.Count > 1)
+        {
+            RestoreSeveral([.. SelectedRows.OfType<TrashRow>()]);
+            return;
+        }
+
         if (_selected is not { } row)
         {
             return;
