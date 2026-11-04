@@ -9,7 +9,7 @@
 | Original work | The Bouncy Castle Cryptography Library for .NET, by The Legion of the Bouncy Castle Inc. |
 | Licence | MIT; `LICENSE` is upstream's `LICENSE.md` byte for byte |
 
-KeePass writes Twofish only through its TwofishCipher plugin and KeePassXC writes it natively, so KeePassLib carries no Twofish. These files give KeePassLib's `KEYPASTE_TWOFISH` engine ([UPSTREAM.md](../KeePassLib/UPSTREAM.md)) the Twofish block cipher, the CBC mode and the PKCS#7 padding a Twofish KDBX file is encrypted with, so keypaste writes none of that cryptography itself (docs/PRODUCT.md §3.6). [DECISIONS.md](../../DECISIONS.md) D-0292 records why and the §3.9 justification. They compile into `KeePassLib.dll` through `KeePassLib.csproj`, under the quarantine of [third_party/Directory.Build.props](../Directory.Build.props), and add no package.
+KeePass writes Twofish only through its TwofishCipher plugin and KeePassXC writes it natively, so KeePassLib carries no Twofish. These files give KeePassLib's `KEYPASTE_TWOFISH` engine ([UPSTREAM.md](../KeePassLib/UPSTREAM.md)) the Twofish block cipher, the CBC mode and the PKCS#7 padding a Twofish KDBX file is encrypted with, so keypaste writes none of that cryptography itself (docs/PRODUCT.md §3.6). They compile into `KeePassLib.dll` through `KeePassLib.csproj`, under the quarantine of [third_party/Directory.Build.props](../Directory.Build.props), and add no package.
 
 ## Files
 

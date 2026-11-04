@@ -1,8 +1,8 @@
 # Design principles
 
-Seven principles govern what keypaste builds and how it feels, for the desktop app, the CLI, the site and the brand. They come from the founder's *Principles of Design* (2026-11-03), drawn from Dieter Rams' ten principles, Apple's Human Interface Guidelines and the GOV.UK design principles, and each is stated here with keypaste's own test. The first six hold in priority order; the seventh is where keypaste makes its choices. The security laws of [PRODUCT §3](PRODUCT.md#3-security-laws) stand above all seven, and these are design principles, not a business case: a design can pass all seven and still not be worth building ([PRODUCT §6](PRODUCT.md#6-decision-tiebreakers)).
+Seven principles govern what keypaste builds and how it feels, for the desktop app, the CLI, the site and the brand. They come from the founder's *Principles of Design* (2026-11-03), drawn from Dieter Rams' ten principles, Apple's Human Interface Guidelines and the GOV.UK design principles, and each is stated here with keypaste's own test. The first six hold in priority order; the seventh is where keypaste makes its choices. The security laws of [PRODUCT §3](PRODUCT.md#3-security-laws) stand above all seven, and keypaste also has to work as a business: these principles do not judge that, and business does not override them.
 
-[DESIGN](DESIGN.md) is the system they are applied through, and [BRAND](BRAND.md) owns its visual values.
+[DESIGN](DESIGN.md) is the system they are applied through.
 
 ## 1. Truth
 
@@ -44,6 +44,7 @@ Test: someone who has never used KeePass can download keypaste, open or create a
 - Decide for the person. Defaults are opinionated and safe ([PRODUCT §5.8](PRODUCT.md#5-product-laws)), and a setting exists only when real people need both answers.
 - Safe without effort: the laws of §3 hold without the person having to understand them.
 - Controls look like what they do, every action gets feedback, and the words are the person's, not keypaste's internal ones.
+- Mistakes are easy to recover from: what can be undone does not ask first, and what cannot be undone, such as deleting past the Trash, says so before it happens ([DESIGN § Interaction](DESIGN.md#interaction)).
 - Each fact appears once in a view, where the person looks for it.
 
 ## 5. Care
@@ -53,7 +54,7 @@ Finish every detail.
 Test: every state is designed, including empty, error, loading, locked and first use.
 
 - Care goes where people look: what people touch gets the polish.
-- Design for every person: different abilities, languages, screens and text sizes ([BRAND § Interaction](BRAND.md#interaction)).
+- Design for every person: different abilities, languages, screens and text sizes ([DESIGN § Interaction](DESIGN.md#interaction)).
 - When the budget runs short, cut scope, never the finish.
 - Prioritise by how often people meet a state and how much harm a bad one does; a prompt that releases a value is met often and does the most harm.
 
@@ -61,10 +62,10 @@ Test: every state is designed, including empty, error, loading, locked and first
 
 Every choice is deliberate.
 
-Test: the system is written down in [DESIGN](DESIGN.md) and [BRAND](BRAND.md) before a screen is designed, not explained afterwards.
+Test: the system is written down in [DESIGN](DESIGN.md) before a screen is designed, not explained afterwards.
 
 - Work from the system: the layout, the 4px spacing, the palette, the type scale and the icons.
-- At home on every platform: the desktop follows Apple's Human Interface Guidelines on every platform, with Ctrl where macOS uses ⌘ and only where the platform has the concept; BRAND governs where the two differ, and PRODUCT §3 governs both (D-0682).
+- At home on every platform: the desktop follows Apple's Human Interface Guidelines on every platform, with Ctrl where macOS uses ⌘ and only where the platform has the concept; DESIGN governs where the two differ, and PRODUCT §3 governs both (D-0682).
 - Order is not minimalism. A view can be quiet or loud, but never random.
 
 ## 7. Character
@@ -75,6 +76,6 @@ Test: you can state each setting below, for each layer, and why.
 
 | Setting | keypaste | Why |
 |---|---|---|
-| Volume | Quiet: flat ink, one amber per view, a calm voice | A credential tool earns trust by not shouting; the one loud thing is what needs the person ([BRAND](BRAND.md)) |
+| Volume | Quiet: flat ink, one amber per view, a calm voice | A credential tool earns trust by not shouting; the one loud thing is what needs the person ([DESIGN](DESIGN.md)) |
 | Mystery | Little: everything a person needs is visible or one menu away | Mystery that fails Clarity is confusion, and an approval cannot be a discovery |
-| Tempo | Slow: the look changes only by founder direction recorded in BRAND | A faster tempo still has to pass Responsibility, and people learn where things are |
+| Tempo | Slow: the look changes only by founder direction recorded in DESIGN, and what people recognize keypaste by, the "k." icon, the wordmark, the amber and the four places' names, stays while what surrounds it changes | A faster tempo still has to pass Responsibility, and people learn where things are |

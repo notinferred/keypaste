@@ -10,7 +10,7 @@
 | Original work | Mozilla Foundation and the Public Suffix List's contributors |
 | Licence | MPL-2.0 for the list, `LICENSE` being upstream's text; `test_psl.txt` dedicated to the public domain under CC0 1.0, as its header says |
 
-The list names the suffixes under which anyone may register a name, `com` and `co.uk` in its ICANN section and hosting platforms such as `github.io` in its private section, so a host's registrable domain is its public suffix and one more label. keypaste's browser fill matches a page to an item within one registrable domain, and `Keypaste.Core.Browser.PublicSuffixList` takes it from this file, embedded in `Keypaste.Core`, both sections read, with no package and no network ([DECISIONS.md](../../DECISIONS.md) D-0615, which holds PRODUCT §3.9's justification).
+The list names the suffixes under which anyone may register a name, `com` and `co.uk` in its ICANN section and hosting platforms such as `github.io` in its private section, so a host's registrable domain is its public suffix and one more label. keypaste's browser fill matches a page to an item within one registrable domain, and `Keypaste.Core.Browser.PublicSuffixList` takes it from this file, embedded in `Keypaste.Core`, both sections read, with no package and no network.
 
 ## Files
 

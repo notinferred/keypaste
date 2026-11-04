@@ -58,7 +58,7 @@ These are retained feature ideas, not discarded features or promises for the fir
 
 ## Investigation candidates
 
-These observations were previously in DECISIONS. They are not completed fixes or established causes. Only the founder makes one a STEPS task; reproduce a defect before treating it as solved.
+These observations are not completed fixes or established causes. Only the founder makes one a STEPS task; reproduce a defect before treating it as solved.
 
 | Observation | What must be established |
 |---|---|

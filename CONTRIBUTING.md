@@ -12,7 +12,7 @@ Use KDBX4 through the vendored library. Do not implement cryptography. Only `src
 
 ## Verification and commits
 
-Implementation needs no local SDK: commit on a branch and run `bash scripts/dev.sh`, which pushes it, dispatches the `ci` and `app` workflows on it without opening a pull request and follows their runs. With the pinned SDK, `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash runs the backend, desktop, consistency, format, script and process checks together; `bash scripts/verify.sh --help` lists its profiles and prerequisites.
+Before each push, `bash scripts/verify.sh compile` builds both solutions with the pinned SDK and checks formatting; then commit on a branch and run `bash scripts/dev.sh`, which pushes it, dispatches the `ci` and `app` workflows on it without opening a pull request and follows their runs. With the pinned SDK, `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash runs the backend, desktop, consistency, format, script and process checks together; `bash scripts/verify.sh --help` lists its profiles and prerequisites.
 
 Sign off every commit, including maintainer and agent commits:
 

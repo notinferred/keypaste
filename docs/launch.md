@@ -4,9 +4,9 @@
 
 # Launch material
 
-This is reusable draft copy for the next CLI/MCP release, reviewed against the source on 2026-09-25; its transcript matches the current source, which `v0.3.0` predates (`v0.3.0` prompts `Approve? [y/N]` with a `for N seconds` line). An announcement of `v0.3.0` itself must use the `v0.3.0` [demo](docs/demo.md) recording instead, and when the version that ships this prompt is tagged, re-date this draft to it. It is not an instruction to publish or contact anyone. There is no mandatory campaign, posting schedule or announcement gate. The founder chooses whether and where to use it; any later use must describe the version actually available.
+This is reusable draft copy for the next CLI/MCP release, reviewed against the source on 2026-09-25; its transcript matches the current source, which `v0.3.0` predates (`v0.3.0` prompts `Approve? [y/N]` with a `for N seconds` line). An announcement of `v0.3.0` itself must use the `v0.3.0` [demo](demo.md) recording instead, and when the version that ships this prompt is tagged, re-date this draft to it. It is not an instruction to publish or contact anyone. There is no mandatory campaign, posting schedule or announcement gate. The founder chooses whether and where to use it; any later use must describe the version actually available.
 
-[PRODUCT](docs/PRODUCT.md) defines the focused local desktop product. [ROADMAP](ROADMAP.md) owns what comes next, and [RELEASE](docs/RELEASE.md) distinguishes source, packages and public downloads. A future desktop announcement must wait for that desktop release and its installation evidence.
+[PRODUCT](PRODUCT.md) defines the focused local desktop product. [ROADMAP](../ROADMAP.md) owns what comes next, and [RELEASE](RELEASE.md) distinguishes source, packages and public downloads. A future desktop announcement must wait for that desktop release and its installation evidence.
 
 ## Next release draft
 
@@ -54,14 +54,14 @@ keypaste: an agent is asking for a credential.
   2026-07-27 09:57:42  claude-code  env/demo/.env  granted   prompt
 ```
 
-`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. TTL controls approval reuse, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](SECURITY.md) and [THREATS](THREATS.md) own these limits.
+`request_credential` returns plaintext to the MCP client, which may retain it in context or session files. TTL controls approval reuse, not the downstream credential's validity. The log excludes the released field value, but agent-written names or reasons may contain sensitive text. A writer can recompute the log's hash chain. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) own these limits.
 
 ## Before using this material
 
-Confirm the download, version and supported workflows against [RELEASE](docs/RELEASE.md). Keep installation commands in README rather than copying commands that will become stale. Check the chosen venue's rules and answer feedback within the time actually available; no particular channel or response campaign is required.
+Confirm the download, version and supported workflows against [RELEASE](RELEASE.md). Keep installation commands in README rather than copying commands that will become stale. Check the chosen venue's rules and answer feedback within the time actually available; no particular channel or response campaign is required.
 
-Public bug reports and requests belong in the [issue tracker](https://github.com/notinferred/keypaste/issues). Vulnerabilities go to <security@keypaste.com>, under the response policy in [SECURITY](SECURITY.md).
+Public bug reports and requests belong in the [issue tracker](https://github.com/notinferred/keypaste/issues). Vulnerabilities go to <security@keypaste.com>, under the response policy in [SECURITY](../SECURITY.md).
 
-The signup endpoint stores unconfirmed addresses and sends no confirmation mail. Do not send to that list unless the promised consent flow exists and the recipients have confirmed. Future mail handling is optional work in [BACKLOG](docs/BACKLOG.md).
+The signup endpoint stores unconfirmed addresses and sends no confirmation mail. Do not send to that list unless the promised consent flow exists and the recipients have confirmed. Future mail handling is optional work in [BACKLOG](BACKLOG.md).
 
-New suggestions do not become product commitments automatically. Record them in [BACKLOG](docs/BACKLOG.md) for a separate scope decision.
+New suggestions do not become product commitments automatically. Record them in [BACKLOG](BACKLOG.md) for a separate scope decision.

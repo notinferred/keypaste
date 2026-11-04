@@ -359,7 +359,7 @@ Can it change my vault? The current MCP surface only lists names and requests va
 
 Will it see my desktop edits immediately? No. The current terminal approver holds its own snapshot. Stop and reopen it after changing the file to read the saved values. In source, the desktop serves its own saved edits at once and merges another program's save, refusing as `vault-changed` until the merged copy is saved, and an approver whose file another program changed refuses until it is reopened.
 
-The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [D-0023](decisions-archive.md) records this design.
+The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester.
 
 Do I have to approve every single call? No. In source, after Allow for 1 hour (`h` at the terminal), a repeat request for the same field of the same entry, from the same connection, is served without asking again until the hour is up; Allow once (`o`) keeps nothing. Shorten the hour with `--max-ttl` on the agent. `v0.3.0` asks `[y/N]` and keeps an approval for up to 300 seconds. In source, setting an agent to Automatic for a project, which waits for your confirmation, releases what it can see there without a prompt ([agent settings](policy.md)); in `v0.3.0` a policy rule can.
 

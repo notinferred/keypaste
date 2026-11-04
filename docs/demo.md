@@ -248,4 +248,4 @@ The tool returns the credential as both text and structured data. Claude can ret
 
 `scripts/verify-demo.sh` runs real CLI and MCP processes on Linux, macOS and Windows. It compares the approval dialog byte for byte, exercises both deploy paths, checks that refusal returns no credential, and checks that the credential stays out of deploy output and the audit log.
 
-The harness sends fixed MCP calls; it does not run Claude. Observing the model remains part of the manual demo. [D-0034](decisions-archive.md) explains the reproducibility requirement and the two prompt lines the harness cannot observe.
+The harness sends fixed MCP calls; it does not run Claude. Observing the model remains part of the manual demo.

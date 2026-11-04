@@ -2,7 +2,7 @@
 
 ## Start here
 
-For a task, read this file, the [code map](docs/ARCHITECTURE.md) and the STEPS row or document the task names. Open another document when the task touches what it owns in the table below; do not read every document to begin, because most of them describe surfaces the task does not touch. Code cites decisions as `D-<number>` and threats as `T-<number>`; `git grep D-0123 -- '*.md'` finds the one row that governs.
+For a task, read this file, the [code map](docs/ARCHITECTURE.md) and the STEPS row or document the task names. Open another document when the task touches what it owns in the table below; do not read every document to begin, because most of them describe surfaces the task does not touch. Code cites threats as `T-<number>`, which THREATS owns. A `D-<number>` label left in code or a document names a retired, agent-written decision whose ledger is gone; remove it from code you touch, and where a task depends on the reason behind one, ask the founder.
 
 ## Writing
 
@@ -18,34 +18,33 @@ Documents fall into four layers that change at different rates. A base document 
 
 | Layer | Document | Owns | Changes when |
 |---|---|---|---|
-| Base | [PRODUCT](docs/PRODUCT.md) | Ratified scope and laws; conflicting decisions do not override it | Dated re-ratification with a decision row and an updated plan |
+| Base | [PRODUCT](docs/PRODUCT.md) | Ratified scope and laws; conflicting decisions do not override it | Dated re-ratification and an updated plan |
 | Base | This file | Working rules and document ownership | Founder direction |
 | Base | [ARCHITECTURE](docs/ARCHITECTURE.md) | Code map: projects, entry points, processes and where each concern lives | A project, entry point or process boundary changes |
-| Base | [DECISIONS](DECISIONS.md) | Decisions that constrain later work, one line each. Superseded wording lives in [decisions-archive](docs/decisions-archive.md) as history, not requirements | A step makes a decision a later change could undo |
 | Base | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits | A guarantee, threat or limit changes |
 | Base | [DESIGN-PRINCIPLES](docs/DESIGN-PRINCIPLES.md) | The seven design principles, in priority order, and each one's test | Founder direction, with PRODUCT's re-ratification |
 | Base | [DESIGN](docs/DESIGN.md) | The design system: how a screen is put together, the marks, the three colours, the type, the shape, the voice, the interaction and usage rules; `docs/design/tokens` holds its CSS copy | Founder direction |
 | Plan | [ROADMAP](ROADMAP.md) | Track order and milestones: which tasks each release or later stage needs | A milestone, its tasks or the track order changes |
 | Plan | [STEPS](docs/STEPS.md) | Open tasks by product track: dependencies, detail and acceptance | A task is selected, finished or re-planned |
 | Plan | [BACKLOG](docs/BACKLOG.md) | Optional ideas, investigation candidates and conditions for reconsideration; no delivery commitments | An idea is added, selected or dropped |
-| Record | [steps](docs/steps/README.md) | One record per completed task, and the completed-steps evidence index | A task completes |
+| Record | [steps](docs/steps/README.md) | One record per completed task | A task completes |
 | Public | [README](README.md) | Introduction, published installation instructions and navigation | A release or published claim changes |
 | Public | [FEATURES](docs/FEATURES.md) | Dated capabilities by surface, implementation evidence and gaps; no parity promise | A capability or gap changes |
 | Public | [RELEASE](docs/RELEASE.md) | Distribution matrix, publication and installation verification | Release work |
 | Public | [CHANGELOG](CHANGELOG.md) | One short entry per user-visible change, separating Unreleased work from published versions | Each user-visible change |
-| Public | Guides: [desktop](docs/desktop.md), [mcp-setup](docs/mcp-setup.md), [policy](docs/policy.md), [approvals](docs/approvals.md), [safe-agents](docs/safe-agents.md), [replace-dotenv](docs/replace-dotenv.md), [demo](docs/demo.md), [keepass-and-agents](docs/keepass-and-agents.md), [launch](launch.md) | How to use or present one surface | The behavior they describe changes |
+| Public | Guides: [desktop](docs/desktop.md), [mcp-setup](docs/mcp-setup.md), [policy](docs/policy.md), [approvals](docs/approvals.md), [safe-agents](docs/safe-agents.md), [replace-dotenv](docs/replace-dotenv.md), [demo](docs/demo.md), [keepass-and-agents](docs/keepass-and-agents.md), [launch](docs/launch.md) | How to use or present one surface | The behavior they describe changes |
 | Public | [keypaste.com's pages](site/web/src/content/docs/) | How keypaste works, each product and its label, design-level comparisons, the vision and the docs hub; labels live in `site/web/src/data/products.json` | A release changes a label, or a page's design changes |
 | Public | [ACAF v1](site/web/src/content/docs/acaf/v1.mdx) | The Agent Credential Access Format: how a KDBX file keeps projects and each agent's access, what readers and writers must do, and keypaste's implementation status in RELEASE's terms | A release changes keypaste's status; a change to the format is a new version, v1.1 onward |
 
 ### What a step writes
 
-Finishing a task writes its record as `docs/steps/<ID>.md` from the template in [steps](docs/steps/README.md), removes its row from STEPS, and adds one CHANGELOG entry that links the record when users see a change. DECISIONS, SECURITY and THREATS change when the step makes a decision a later change could undo or changes a guarantee, threat or limit. FEATURES, the guides and README change only where the step made one of their statements false, and the claims `verify-demo.sh` checks stay true at every commit; new capabilities reach them through L.1, which rewrites them for 1.0.0 from CHANGELOG's Unreleased section.
+Finishing a task writes its record as `docs/steps/<ID>.md` from the template in [steps](docs/steps/README.md), removes its row from STEPS, and adds one CHANGELOG entry that links the record when users see a change. SECURITY and THREATS change when the step changes a guarantee, threat or limit. FEATURES, the guides and README change only to correct a statement the step made false, never to add one, and the claims `verify-demo.sh` checks stay true at every commit; new capabilities reach them through L.1, which rewrites them for 1.0.0 from CHANGELOG's Unreleased section.
 
 ### Records
 
-Each fact has one authoritative owner; other documents link to it rather than restating it. Explicit user direction authorizes amendments within its scope. Product scope changes require dated re-ratification, a decision record and an updated plan; preserve the security laws in PRODUCT §3. Editorial changes preserve requirements and evidence.
+Each fact has one authoritative owner; other documents link to it rather than restating it. Explicit user direction authorizes amendments within its scope. Product scope changes require dated re-ratification and an updated plan; preserve the security laws in PRODUCT §3. Editorial changes preserve requirements and evidence.
 
-Records are proportional to the risk they retire (PRODUCT §6.6). A choice with no future cost needs no row, a low-risk step's record is a few lines, and one batch record may carry every step's run IDs (D-0671). Never write a document whose subject is another document: delete it instead. Tests on the secret, injection, sync and bridge paths are outside this rule and stay mandatory (PRODUCT §4.5); what gets cut is ceremony, never coverage.
+Records are proportional to the risk they retire (PRODUCT §6.6). A record fills the template without restating the diff, a low-risk step's is a few lines, and one batch record may carry every step's run IDs (D-0671). Never write a document whose subject is another document: delete it instead. Tests on the secret, injection, sync and bridge paths are outside this rule and stay mandatory (PRODUCT §4.5); what gets cut is ceremony, never coverage.
 
 IDs are permanent: a retired decision, threat or task ID is never given to something new, and the 5.x and 7.x task IDs of the earlier sync, hosting and organization ideas stay retired. Rewrite outdated current text in the other documents instead of appending another account, and keep history in Git. Published claims require supporting evidence (D-0036).
 
@@ -55,7 +54,7 @@ Use RELEASE's four states: Implemented, Packaged, Published and Installation-ver
 
 ROADMAP orders the committed work into milestones and STEPS holds its tasks; BACKLOG is not an implementation queue. The founder selects implementation work, and a documentation-only instruction starts no task. Identify the producer, transport, consumer and user action; the existence of a reader, view, protocol, fixture or package does not prove that the producing operation or complete journey works. A session never adds a STEPS row: a finding, follow-up or check it cannot close goes to BACKLOG, and only the founder makes it a task (D-0673).
 
-When the user explicitly requests the next build task, pick the first unchecked ready code task of ROADMAP's current milestone, in its track order, skipping external inputs and blocked work; a specific user selection takes precedence. Build, verify and record only the authorized task, then stop unless the user requested continued implementation. A founder amendment to a selected task's scope is recorded in its step record with the decision that made it. Nothing publishes before its Ships after gates pass. Claude settles reversible, local choices that touch no law, scope, money, legal text or published claim, and lists them in the batch's summary; the founder decides the rest (D-0671).
+When the user explicitly requests the next build task, pick the first unchecked ready code task of ROADMAP's current milestone, in its track order, skipping external inputs and blocked work; a specific user selection takes precedence. Build, verify and record only the authorized task, then stop unless the user requested continued implementation. A founder amendment to a selected task's scope is recorded in its step record. Nothing publishes before its Ships after gates pass. Claude settles reversible, local choices that touch no law, scope, money, legal text or published claim, and lists them in the batch's summary; the founder decides the rest (D-0671).
 
 ## Local verification and delivery
 
@@ -75,7 +74,7 @@ Diagnose before repairing when the mechanism is unknown. Keep the regression in 
 
 CI spends nothing that cannot change a verdict (D-0468). A push carries only code that passed the compile check. No dispatch repeats what a run at the same commit already does: a step whose push ran ci and app gets its tools evidence from `-f only_tools=true`. A failure only one runner shows is retried on a branch with `dev.sh --profile` on that runner and integrated with one push. A suspected flake reruns only its failed jobs with `gh run rerun <id> --failed`, recorded as Local verification says. Each job's `timeout-minutes` is about twice its slowest green time. A paid Blacksmith runner carries a job only where measurement shows it shortens the run, at the smallest size within about 10% of the fastest, and jobs that sign, attest, package for release or read secrets stay on GitHub's runners. Workflows from a fork's pull request wait for approval. A run is followed with `gh run watch <id> --exit-status`, and no polling loop outlives its run.
 
-`README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` must trigger `ci.yml`: `scripts/verify-demo.sh` checks their transcripts against the built binaries. Never add `docs/**` to `paths-ignore`. New documentation paths trigger backend CI unless explicitly ignored.
+`README.md`, `docs/launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` must trigger `ci.yml`: `scripts/verify-demo.sh` checks their transcripts against the built binaries. Never add `docs/**` to `paths-ignore`. New documentation paths trigger backend CI unless explicitly ignored.
 
 keypaste.com deploys through Cloudflare's Git integration on pushes to `main`, watching `site/`, with root directory `site`, no build command in the dashboard and deploy command `npm run deploy`, whose wrangler build step builds the content pages in `site/web` (D-0127, D-0402). GitHub workflows do not query the live origin. Run [verify-site-disclosure.sh](scripts/verify-site-disclosure.sh) after a site deploy; [verify-site-endpoint.sh](scripts/verify-site-endpoint.sh) is also manual. Only the offline disclosure self-test runs in CI. `site/README.md` changes trigger a site deployment while skipping both GitHub workflows.
 

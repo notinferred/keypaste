@@ -26,7 +26,7 @@ The [upstream library](https://github.com/bcgit/bc-csharp) is BouncyCastle C#, t
 
 Copyright 2015 Daniel Dinu, Dmitry Khovratovich, Jean-Philippe Aumasson and Samuel Neves. Licensed under the Creative Commons CC0 1.0 Universal waiver or the Apache License, Version 2.0, at your option; both texts are in the release archive's `LICENSE`, and at <https://creativecommons.org/publicdomain/zero/1.0/> and <https://www.apache.org/licenses/LICENSE-2.0>.
 
-On Windows and macOS the app and the CLI carry `argon2.dll` or `libargon2.1.dylib` beside their binaries, which [build-argon2.sh](scripts/build-argon2.sh) compiles unmodified from release `20190702` of the Password Hashing Competition's [phc-winner-argon2](https://github.com/P-H-C/phc-winner-argon2), its archive pinned by SHA-256. KeePassLib derives vault keys with it (DECISIONS.md D-0522). Either licence permits combining it into this AGPL-3.0-only distribution, and the library remains available under both.
+On Windows and macOS the app and the CLI carry `argon2.dll` or `libargon2.1.dylib` beside their binaries, which [build-argon2.sh](scripts/build-argon2.sh) compiles unmodified from release `20190702` of the Password Hashing Competition's [phc-winner-argon2](https://github.com/P-H-C/phc-winner-argon2), its archive pinned by SHA-256. KeePassLib derives vault keys with it. Either licence permits combining it into this AGPL-3.0-only distribution, and the library remains available under both.
 
 ## libsodium
 
@@ -36,7 +36,7 @@ Copyright (c) 2013-2026 Frank Denis <j at pureftpd dot org>. Licensed under the 
 >
 > THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-The NativeAOT `keypaste`, in the CLI archives and beside the desktop app, links libsodium, which [build-libsodium.sh](scripts/build-libsodium.sh) compiles unmodified from [release `1.0.22`](https://github.com/jedisct1/libsodium/releases/tag/1.0.22-RELEASE), its archive pinned by SHA-256 and checked against upstream's Minisign signature. keypaste seals and opens NaCl boxes with it for browser fill (DECISIONS.md D-0611), and embeds NaCl's box test vectors from libsodium's `test/default` as the answers its box must give. The ISC licence permits combining it into this AGPL-3.0-only distribution, and the library remains available under it.
+The NativeAOT `keypaste`, in the CLI archives and beside the desktop app, links libsodium, which [build-libsodium.sh](scripts/build-libsodium.sh) compiles unmodified from [release `1.0.22`](https://github.com/jedisct1/libsodium/releases/tag/1.0.22-RELEASE), its archive pinned by SHA-256 and checked against upstream's Minisign signature. keypaste seals and opens NaCl boxes with it for browser fill, and embeds NaCl's box test vectors from libsodium's `test/default` as the answers its box must give. The ISC licence permits combining it into this AGPL-3.0-only distribution, and the library remains available under it.
 
 ## EFF Large Wordlist for Passphrases
 

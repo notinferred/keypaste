@@ -10,7 +10,7 @@
 | Port author | Timothy Byrd |
 | Licence | GPL-2.0-or-later; see `LICENSE` |
 
-`KeePassNetStandard` ports KeePassLib to .NET Standard. Only `KeePassLib/` is vendored. Keypaste supplies its own project file and excludes the upstream signing key. The selected tag did not publish a NuGet package; [DECISIONS.md](../../DECISIONS.md) D-0007 records the selection.
+`KeePassNetStandard` ports KeePassLib to .NET Standard. Only `KeePassLib/` is vendored. Keypaste supplies its own project file and excludes the upstream signing key. The selected tag did not publish a NuGet package.
 
 ## Licence
 

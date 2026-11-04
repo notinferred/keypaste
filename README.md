@@ -242,7 +242,7 @@ When stdin is not a terminal each prompt consumes one line in order. `init` take
 
 ## Environment variables
 
-In `v0.3.0` each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password; [D-0014](docs/decisions-archive.md) explains the convention. In 0.5.0, which is not yet published, a variable is a protected field of an entry tagged `env:<project>`, and `env set` and `env pull` put a new one on the project's entry `env/<project>/.env`, so the value below is read with `keypaste get env/billing/.env --field DATABASE_URL --reveal`; an entry of the earlier layout stays an ordinary entry and is no longer a variable. KeePassXC can edit both directly. CI checks interoperability on all three operating systems.
+In `v0.3.0` each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password. In 0.5.0, which is not yet published, a variable is a protected field of an entry tagged `env:<project>`, and `env set` and `env pull` put a new one on the project's entry `env/<project>/.env`, so the value below is read with `keypaste get env/billing/.env --field DATABASE_URL --reveal`; an entry of the earlier layout stays an ordinary entry and is no longer a variable. KeePassXC can edit both directly. CI checks interoperability on all three operating systems.
 
 ```sh
 keypaste env pull billing
@@ -351,7 +351,7 @@ Each audit record includes its predecessor's hash. `keypaste log verify` checks 
 
 KDBX4 with Argon2d key derivation (2 iterations, 64 MiB, parallelism 2) and AES-256. keypaste never invents a format and writes no cryptography of its own (docs/PRODUCT.md §2, §3.6): the format layer is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
 
-`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and on each pull request that changes the code that writes vaults or the gate's own scripts. This is a permanent gate under docs/PRODUCT.md §4.6 and [D-0008 and D-0014](docs/decisions-archive.md).
+`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and on each pull request that changes the code that writes vaults or the gate's own scripts. This is a permanent gate under docs/PRODUCT.md §4.6.
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the roadmap's and survive where they are user-visible, in the shipped binary names.
 
@@ -397,7 +397,7 @@ dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out > cl
 scripts/verify-aot-trim.sh cli.log
 ```
 
-Eleven vendored-code diagnostics are accepted in [D-0040](docs/decisions-archive.md). ILC analyzes only changed inputs; if a repeat publish emits none, the script reports that no new analysis occurred.
+Eleven vendored-code diagnostics are accepted; `scripts/aot-trim-baseline.txt` lists them. ILC analyzes only changed inputs; if a repeat publish emits none, the script reports that no new analysis occurred.
 
 `third_party/Directory.Build.props` isolates vendored source from project style checks, and `dotnet format` excludes `third_party/` to preserve upstream mergeability.
 

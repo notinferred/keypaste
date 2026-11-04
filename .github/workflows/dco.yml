@@ -2,7 +2,7 @@ name: dco
 
 # D-0055 ratified the Developer Certificate of Origin and CONTRIBUTING.md states it. Every other
 # rule in this repository names an enforcer; until this file existed that one named none, which
-# made it aspiration rather than a rule - the same shape launch.md already flags for branch
+# made it aspiration rather than a rule - the same shape docs/launch.md already flags for branch
 # protection, where "a red build blocks the merge" is a habit because nothing consults a check.
 #
 # WHAT IT COSTS ON EVERY PUSH: nothing. There is no `push` trigger. A pull request already pays
@@ -58,7 +58,7 @@ jobs:
           done < <(git rev-list "$BASE..$HEAD")
 
           if [ "$missing" -ne 0 ]; then
-            echo "::error::Sign off with 'git commit -s' (or 'git rebase --signoff $BASE' for a branch). CONTRIBUTING.md and DECISIONS.md D-0055 say why, and it is one line per commit."
+            echo "::error::Sign off with 'git commit -s' (or 'git rebase --signoff $BASE' for a branch). CONTRIBUTING.md says why, and it is one line per commit."
             exit 1
           fi
 
