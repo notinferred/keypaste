@@ -12,7 +12,7 @@ It needs a pty, so Linux or macOS. On Windows, build, capture in the SDK contain
 and render on the host:
 
   dotnet build keypaste.slnx -c Release
-  docker run --rm -v "${PWD}:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0.302 bash -c 'apt-get update -qq && apt-get install -y -qq python3 >/dev/null && python3 scripts/demo/capture-demo.py --home /home/you --keypaste "dotnet artifacts/bin/Keypaste.Cli/release/keypaste.dll" --out artifacts/demo/tape.json'
+  docker run --rm -v "${PWD}:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0.403 bash -c 'apt-get update -qq && apt-get install -y -qq python3 >/dev/null && python3 scripts/demo/capture-demo.py --home /home/you --keypaste "dotnet artifacts/bin/Keypaste.Cli/release/keypaste.dll" --out artifacts/demo/tape.json'
   python scripts/demo/render-gif.py artifacts/demo/tape.json docs/demo/keypaste-demo.gif
 """
 import argparse

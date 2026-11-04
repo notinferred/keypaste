@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The CLI and the desktop app are now built with .NET 10.0.14, which fixes an out-of-bounds write in the runtime's Brotli decoder (CVE-2026-111497); `v0.3.0` was built with an earlier, affected runtime ([B.5](docs/steps/B.5.md)).
+
 The desktop app generates a password where it goes: New item opens with one in its password field, ready to copy before you create the item, and Generate beside every password and protected field, in the forms and on an item, puts a new one there, with the old value kept in the item's history once you save. Generate password…, in File and Items' New menu, makes one on its own to copy, to start a new item with or to add to the chosen item as a field ([V.12](docs/steps/V.12.md)).
 
 The desktop app has menus: on macOS a full menu bar, keypaste, File, Edit, View, Window and Help, with About keypaste, Settings… on ⌘, and a Dock menu, and on Windows and Linux the same menus from a button at the window's top left. The standard shortcuts work, among them ⌘N or Ctrl+N for a new item, ⌘F or Ctrl+F to search, ⌘W or Ctrl+W to close the window and ⌘Q or Ctrl+Q to quit, and outside a text field ⌘C or Ctrl+C copies the chosen item's password ([Q.2](docs/steps/Q.2.md)).
