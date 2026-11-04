@@ -1,6 +1,6 @@
 # Q.6 — Say what is happening
 
-Completed 2026-11-04 on `q6-say-what-is-happening`; ci 41925391576 passed its fast tier and dev 41925389342 passed the `desktop` profile on Linux, both at the code integrated, which differs from them only in this record. `main`'s push runs every other job.
+Completed 2026-11-04 on `q6-say-what-is-happening`; ci 41925391576 passed its fast tier and dev 41925389342 passed the `desktop` profile on Linux, both at the code integrated, which differs from them only in this record. At `c35df221`, `main`'s ci 41926224439 passed every job and app 41926224435 every job but `keepassxc first run (macos-15)`, which failed as BACKLOG's F.74 does, KeePassXC segfaulting before it opened the vaults, and cancelled its Ubuntu twin.
 
 ## Amendments
 
@@ -8,7 +8,7 @@ The row named a toast's being replaced by the next as a defect without saying wh
 
 ## Evidence
 
-`SayWhatIsHappeningTests` shows each tone's icon, the duration and hold, the stack, each busy label with its moving icon, the More options error, the locked error and each empty list's next step. `ToastHitTests` replaces C.4's rule that a toast takes no press. `SharingViewModelTests`, `UnlockKeyfileTests` and the preference tests hold the other named errors' wording. The first desktop run, dev 41924258959, failed 15 tests pinned to the old wording and showed that a reason without a full stop ran into the next sentence, which the code now closes.
+`SayWhatIsHappeningTests` shows each tone's icon, the duration and hold, the stack, each busy label with its moving icon, the More options error, the locked error and each empty list's next step. `ToastHitTests` replaces C.4's rule that a toast takes no press. `SharingViewModelTests`, `UnlockKeyfileTests` and `SettingsViewModelTests` hold the other named errors' wording. The first desktop run, dev 41924258959, failed 15 tests pinned to the old wording and showed that a reason without a full stop ran into the next sentence, which the code now closes.
 
 ## Limits and follow-ups
 

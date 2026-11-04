@@ -63,6 +63,19 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public void A_preference_that_cannot_be_saved_says_what_to_do_next()
+    {
+        using var fixture = new TempVault();
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        using var model = Screen(session, fixture);
+        Directory.CreateDirectory(KeypasteHome.SettingsPath(fixture.Home));
+
+        model.Theme = AppTheme.Dark;
+
+        Assert.Equal("That preference could not be saved, so it will not survive a restart. Check that keypaste's folder can be written, then change it again.", model.Message);
+    }
+
+    [Fact]
     public void A_preference_saved_while_app_toml_cannot_be_read_keeps_the_chosen_vault()
     {
         using var fixture = new TempVault();
