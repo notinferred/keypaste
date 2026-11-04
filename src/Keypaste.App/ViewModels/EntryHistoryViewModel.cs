@@ -219,7 +219,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
 
         if (_session.Unlocked is not { } vault)
         {
-            _owner.Report("That password could not be read. The vault may have locked.");
+            _owner.Report("That password could not be read. The vault may have locked: unlock it, then try again.");
             return;
         }
 
@@ -404,7 +404,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
         && string.Equals(fresh[row.Index].Fields.Title, row.Title, StringComparison.Ordinal)
         && fresh[row.Index].Fields.Password.Length == row.MaskedLength;
 
-    private string Gone() => $"'{_owner.DisplayPath}' is no longer in this vault.";
+    private string Gone() => $"'{_owner.DisplayPath}' is no longer in this vault. Choose another item.";
 
     private void Forget()
     {

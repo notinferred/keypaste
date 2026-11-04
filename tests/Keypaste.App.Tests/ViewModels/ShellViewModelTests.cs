@@ -344,12 +344,12 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        shell.ShowToast("Copied the username.");
-        Assert.True(shell.HasToast);
+        shell.ShowToast("Copied the username.", ToastTone.Success);
+        Assert.NotEmpty(shell.Toasts.Shown);
 
-        _clock.Advance(ShellViewModel.ToastDuration);
+        _clock.Advance(ToastStack.DurationOf("Copied the username."));
 
-        Assert.False(shell.HasToast);
+        Assert.Empty(shell.Toasts.Shown);
     }
 
     [Fact]
@@ -382,7 +382,7 @@ public sealed class ShellViewModelTests : IDisposable
 
         await share.CreateCommand.PressAsync();
 
-        Assert.Equal("Link copied. Expires in 24h, 1 view.", shell.Toast);
+        Assert.Equal("Link copied. Expires in 24h, 1 view.", shell.Toasts.Shown.Last().Message);
         Assert.False(shell.HasShare);
 
         shell.Current = Destinations.Of(DestinationKind.Sharing);

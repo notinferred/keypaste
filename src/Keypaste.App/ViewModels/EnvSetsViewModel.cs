@@ -27,7 +27,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     private readonly ClipboardCountdown _clipboard;
     private readonly IVaultFilePicker? _picker;
     private readonly ProjectLaunching _launching;
-    private readonly Action<string>? _toast;
+    private readonly Action<string, ToastTone>? _toast;
 
     private EnvProjectViewModel? _open;
 
@@ -36,7 +36,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         ClipboardCountdown clipboard,
         IVaultFilePicker? picker = null,
         ProjectLaunching? launching = null,
-        Action<string>? toast = null)
+        Action<string, ToastTone>? toast = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -271,7 +271,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
                 RefreshProjects);
     }
 
-    private void Announce(string? outcome)
+    private void Announce(string? outcome, ToastTone tone)
     {
         if (_toast is null)
         {
@@ -279,7 +279,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         }
         else if (!string.IsNullOrWhiteSpace(outcome))
         {
-            _toast(outcome);
+            _toast(outcome, tone);
         }
     }
 
@@ -301,7 +301,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     {
         if (_session.Unlocked is not { } vault)
         {
-            Error = "The vault is locked.";
+            Error = "The vault is locked. Unlock it, then try again.";
             return;
         }
 

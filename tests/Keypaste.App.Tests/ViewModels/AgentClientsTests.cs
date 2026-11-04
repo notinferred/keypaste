@@ -168,7 +168,7 @@ public sealed class AgentClientsTests
         File.WriteAllText(app.ClientsPath, Malformed);
         List<string> toasts = [];
 
-        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: toasts.Add);
+        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: (message, _) => toasts.Add(message));
 
         Assert.True(model.HasClientsProblem);
         Assert.Contains("refused", model.ClientsProblem, StringComparison.Ordinal);

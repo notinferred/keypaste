@@ -186,8 +186,10 @@
                 Command="{Binding CreateCommand}"
                 AutomationProperties.Name="Create and copy link">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <ctl:KpIcon Icon="link" Size="14" />
-            <TextBlock Text="Create and copy link" />
+            <ctl:KpIcon Icon="link" Size="14" IsVisible="{Binding !CreateCommand.IsRunning}" />
+            <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding CreateCommand.IsRunning}" Classes.spinning="{Binding CreateCommand.IsRunning}" />
+            <TextBlock Text="Create and copy link" IsVisible="{Binding !CreateCommand.IsRunning}" />
+            <TextBlock Text="Creating link…" IsVisible="{Binding CreateCommand.IsRunning}" />
           </StackPanel>
         </Button>
       </Grid>

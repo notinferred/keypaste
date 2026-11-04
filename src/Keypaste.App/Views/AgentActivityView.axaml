@@ -127,7 +127,10 @@
           </StackPanel>
           <TextBlock Classes="caption" TextWrapping="Wrap"
                      Text="Found on this computer, and any agent that asked in the last 30 days. Settings follow each one's name." />
-          <TextBlock Classes="caption" Text="Looking for AI tools on this computer…" IsVisible="{Binding IsLooking}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}">
+            <ctl:KpIcon Icon="refresh-cw" Size="13" Foreground="{DynamicResource KpTextMuted}" Classes.spinning="{Binding IsLooking}" />
+            <TextBlock Classes="caption" Text="Looking for AI tools on this computer…" />
+          </StackPanel>
           <TextBlock Classes="caption" Text="{Binding NoTools}" IsVisible="{Binding HasNoTools}" TextWrapping="Wrap" />
           <Border Classes="card" IsVisible="{Binding HasClientsProblem}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -189,9 +192,16 @@
                             <TextBlock Classes="caption" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <Button Name="CancelConnection" Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
-                              <Button Name="RunConnection" Content="Run it"
+                              <Button Name="RunConnection"
                                       Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}"
-                                      Command="{Binding ConfirmCommand}" />
+                                      AutomationProperties.Name="Run it"
+                                      Command="{Binding ConfirmCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <ctl:KpIcon Icon="refresh-cw" Size="13" IsVisible="{Binding IsRunning}" Classes.spinning="{Binding IsRunning}" />
+                                  <TextBlock Text="Run it" IsVisible="{Binding !IsRunning}" />
+                                  <TextBlock Text="Running…" IsVisible="{Binding IsRunning}" />
+                                </StackPanel>
+                              </Button>
                             </StackPanel>
                           </StackPanel>
                           <TextBlock Classes="body" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap" />

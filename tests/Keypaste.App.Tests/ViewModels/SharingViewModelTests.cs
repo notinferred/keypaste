@@ -151,7 +151,7 @@ public sealed class SharingViewModelTests : IDisposable
 
         await screen.CreateCommand.PressAsync();
 
-        Assert.Equal("The link could not be copied, so it was withdrawn.", screen.Error);
+        Assert.Equal("The link could not be copied, so it was withdrawn. Create the link again.", screen.Error);
         Assert.Empty(_server.Shares);
         Assert.Empty(screen.Rows);
         Assert.Empty(_toasts);

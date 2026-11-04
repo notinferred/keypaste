@@ -891,7 +891,7 @@ public sealed class ScreenRenderer
         DrawActivityStates(shell, window, demo.Home, output);
 
         shell.Current = Destinations.Of(DestinationKind.Entries);
-        shell.ShowToast("Copied the username");
+        shell.ShowToast("Copied the username", ToastTone.Success);
         Save(window, output, "90-toast");
 
         window.Close();

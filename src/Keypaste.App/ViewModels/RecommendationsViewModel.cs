@@ -214,7 +214,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     {
         if (_session.Unlocked is not { } vault)
         {
-            Message = "The vault is locked.";
+            Message = "The vault is locked. Unlock it, then try again.";
             return;
         }
 
@@ -288,13 +288,13 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     {
         if (_session.Unlocked is not { } vault)
         {
-            Message = "The vault is locked.";
+            Message = "The vault is locked. Unlock it, then try again.";
             return;
         }
 
         if (vault.EntryNameOf(row.Finding.EntryUuid) is not { } name)
         {
-            Message = $"{row.Entry} is no longer in this vault.";
+            Message = $"{row.Entry} is no longer in this vault. Check the list, then try again.";
             return;
         }
 
@@ -369,12 +369,12 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     {
         if (!_dismissalsReadable)
         {
-            return "Your earlier dismissals could not be read, so this change lasts until you lock.";
+            return "Your earlier dismissals could not be read, so this change lasts until you lock. Check that keypaste's folder can be read.";
         }
 
         return RecommendationDismissals.Save(_dismissalsPath, _dismissals)
             ? string.Empty
-            : "This change could not be saved on this machine, so it lasts until you lock.";
+            : "This change could not be saved on this machine, so it lasts until you lock. Check that keypaste's folder can be written.";
     }
 
     private bool IsDismissed(string vaultKey, NoteKeyFinding finding) =>
@@ -408,7 +408,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             NoteKeyRefusalReason.NotesChanged => $"The notes of {entry} changed after they were checked, so nothing was moved. They have been checked again.",
             NoteKeyRefusalReason.FieldHoldsOtherValue => $"{entry} already has a {key} field with a different value, so nothing was moved. Remove or rename that field, or dismiss this key.",
             NoteKeyRefusalReason.KeyRepeated => $"The notes of {entry} set {key} on more than one line, so nothing was moved. Edit the notes to keep one.",
-            _ => $"{entry} is no longer in this vault under that name, so nothing was moved.",
+            _ => $"{entry} is no longer in this vault under that name, so nothing was moved. Check the list, then try again.",
         };
     }
 

@@ -65,8 +65,9 @@
                     Command="{Binding RefreshCommand}"
                     AutomationProperties.Name="Check status">
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <ctl:KpIcon Icon="refresh-cw" Size="13" />
-                <TextBlock Text="Check status" />
+                <ctl:KpIcon Icon="refresh-cw" Size="13" Classes.spinning="{Binding RefreshCommand.IsRunning}" />
+                <TextBlock Text="Check status" IsVisible="{Binding !RefreshCommand.IsRunning}" />
+                <TextBlock Text="Checking status…" IsVisible="{Binding RefreshCommand.IsRunning}" />
               </StackPanel>
             </Button>
           </Grid>

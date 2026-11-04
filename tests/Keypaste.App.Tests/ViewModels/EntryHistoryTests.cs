@@ -399,7 +399,7 @@ public sealed class EntryHistoryTests : IDisposable
         context.Session.Lock(VaultLockReason.Manual);
         history.RestoreCommand.Press();
 
-        Assert.Equal("The vault is locked.", context.Entries.Error);
+        Assert.Equal("The vault is locked. Unlock it, then try again.", context.Entries.Error);
     }
 
     [Fact]

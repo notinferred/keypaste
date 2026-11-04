@@ -413,7 +413,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         else
         {
             _state = null;
-            Problem = $"These settings can't be read: {problem}.";
+            Problem = $"These settings can't be read: {problem}. Correct that, then open them again.";
         }
 
         var vault = _state?.Vault ?? AgentAccess.Defaults;
@@ -573,7 +573,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     private static string Said(AccessChangeReply reply, string reason)
     {
         var said = reply.Decision == AuditDecision.Granted ? $"Changed: {reason}." : $"Not changed: {reason}.";
-        return reply.Recorded ? said : said + " The audit log could not record it.";
+        return reply.Recorded ? said : said + " The audit log could not record it. Check that it can be written.";
     }
 
     /// <summary>

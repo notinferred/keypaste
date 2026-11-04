@@ -246,7 +246,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             // The next preference this screen writes starts from the choice, not from what it read when it opened.
             _settings = _preferences.Current;
             OnPropertyChanged();
-            Message = saved ? string.Empty : "That preference could not be saved, so it will not survive a restart.";
+            Message = saved ? string.Empty : "That preference could not be saved, so it will not survive a restart. Check that keypaste's folder can be written, then change it again.";
         }
     }
 
@@ -273,8 +273,8 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             if (!done)
             {
                 Message = value
-                    ? "keypaste could not add itself to what opens at login."
-                    : "keypaste could not remove itself from what opens at login.";
+                    ? "keypaste could not add itself to what opens at login. Try again, or add it in your system's login items."
+                    : "keypaste could not remove itself from what opens at login. Try again, or remove it in your system's login items.";
             }
         }
     }
@@ -474,7 +474,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             Message = write.Outcome switch
             {
                 WriteOutcome.NothingToSave when write.Value => $"An encrypted copy is at {destination}. It opens with this vault's master password.",
-                WriteOutcome.NothingToSave or WriteOutcome.Locked => "The vault locked before the copy was made. Nothing was written.",
+                WriteOutcome.NothingToSave or WriteOutcome.Locked => "The vault locked before the copy was made. Nothing was written. Unlock it, then try again.",
                 WriteOutcome.ChangedOnDisk when write.Merged => write.Problem("export again")!,
                 WriteOutcome.ChangedOnDisk => "The vault file changed since it was unlocked. Reload to see it, then export.",
                 _ => write.Reason!,
@@ -507,9 +507,9 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         Message = ChosenVault.Choose(_home, path, onlyIfNone: false) switch
         {
             ChooseOutcome.Chosen => "Agents and the keypaste CLI now use this vault when no --vault is given.",
-            ChooseOutcome.Unreadable => $"{KeypasteHome.SettingsPath(_home)} could not be read, so it was left as it is.",
+            ChooseOutcome.Unreadable => $"{KeypasteHome.SettingsPath(_home)} could not be read, so it was left as it is. Fix or delete it, then choose again.",
             ChooseOutcome.Unrecordable => "This vault's path holds a quote, a control character or a backslash, which app.toml cannot record. Move or rename the vault.",
-            _ => $"{KeypasteHome.SettingsPath(_home)} could not be written, so nothing changed.",
+            _ => $"{KeypasteHome.SettingsPath(_home)} could not be written, so nothing changed. Check that you can write to it, then choose again.",
         };
 
         OnPropertyChanged(nameof(IsThisVaultChosen));
@@ -573,8 +573,8 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         { Refusal: CliLinkRefusal.BackupExists } => BackupTaken(link.LinkPath, link.BackupPath),
         { Refusal: CliLinkRefusal.NotKeypaste } => $"{link.LinkPath} changed before keypaste linked it, so it was left as it is.",
         { Refusal: CliLinkRefusal.Translocated } => _translocatedNote,
-        { Refusal: CliLinkRefusal.UnsafeProgram } => $"keypaste could not link {link.LinkPath}: this app's path holds a line break.",
-        _ => $"keypaste could not link {link.LinkPath}: {result.Reason}",
+        { Refusal: CliLinkRefusal.UnsafeProgram } => $"keypaste could not link {link.LinkPath}: this app's path holds a line break. Move the app to a path without one.",
+        _ => $"keypaste could not link {link.LinkPath}: {result.Reason} Correct that, then link again.",
     };
 
     /// <summary>Whether "Forget them all" is waiting on its confirmation.</summary>
@@ -610,7 +610,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
         Message = _preferences.Update(settings)
             ? string.Empty
-            : "That preference could not be saved, so it will not survive a restart.";
+            : "That preference could not be saved, so it will not survive a restart. Check that keypaste's folder can be written, then change it again.";
     }
 
     /// <summary>The offered timeouts, widened by the one in force if it is not among them.</summary>

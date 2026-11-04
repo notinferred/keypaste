@@ -369,6 +369,18 @@
                        Text="{Binding ListEmptyNote}" />
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
               <Button Classes="sm"
+                      Name="SearchAllItems"
+                      Content="Search all items"
+                      IsVisible="{Binding ListEmptyOffersSearchAll}"
+                      Command="{Binding SearchAllItemsCommand}"
+                      AutomationProperties.Name="Search all items" />
+              <Button Classes="sm"
+                      Name="ClearSearch"
+                      Content="Clear search"
+                      IsVisible="{Binding ListEmptyOffersClearSearch}"
+                      Command="{Binding ClearSearchCommand}"
+                      AutomationProperties.Name="Clear search" />
+              <Button Classes="sm"
                       IsVisible="{Binding ListEmptyOffersNew}"
                       Command="{Binding BeginAddCommand}"
                       AutomationProperties.Name="New item">

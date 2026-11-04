@@ -236,7 +236,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         AssertNothingStarted();
         Assert.False(launch.IsConfirming);
-        Assert.Equal("The vault was locked, so nothing was started.", screen.Error);
+        Assert.Equal("The vault was locked, so nothing was started. Unlock it, then run it again.", screen.Error);
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         AssertNothingStarted();
         Assert.Null(launch.LastStart);
-        Assert.Equal("The vault was locked, so nothing was started.", screen.Error);
+        Assert.Equal("The vault was locked, so nothing was started. Unlock it, then run it again.", screen.Error);
     }
 
     /// <summary>Once Start has released the set the launch is the person's: closing the project, which disposes its card, does not take it back.</summary>

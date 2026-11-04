@@ -121,7 +121,7 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
     {
         if (!_authority.ArmPairing())
         {
-            Message = "keypaste is not answering browsers for this vault now, so pairing could not be turned on.";
+            Message = "keypaste is not answering browsers for this vault now, so pairing could not be turned on. Lock and unlock the vault, then try again.";
             return;
         }
 
@@ -156,7 +156,7 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         var removed = _authority.RemovePairing(row.Name);
         Message = removed.Removed
             ? $"Removed the pairing {row.Name}. That browser has to pair again before it can ask for anything."
-            : $"The pairing {row.Name} was not removed: {removed.Reason}";
+            : $"The pairing {row.Name} was not removed: {removed.Reason} Try again.";
         Rows = Read();
     }
 

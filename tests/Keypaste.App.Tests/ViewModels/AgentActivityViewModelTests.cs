@@ -306,7 +306,7 @@ public sealed class AgentActivityViewModelTests
         await app.RequestAsync();
 
         List<string> said = [];
-        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: said.Add);
+        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: (message, _) => said.Add(message));
 
         var grant = Assert.Single(model.Grants);
         Assert.Equal(("claude-code", "example · password", "1h left", 1d), (grant.Client, grant.Detail, grant.LeftText, grant.Fraction));
@@ -335,7 +335,7 @@ public sealed class AgentActivityViewModelTests
         var pending = app.RequestAsync();
         await app.Person.Waiting.WaitAsync(_connect, Token);
         List<string> said = [];
-        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: said.Add);
+        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: (message, _) => said.Add(message));
 
         Assert.True(model.ShowPromptCommand.CanExecute(null));
         model.ShowPromptCommand.Press();

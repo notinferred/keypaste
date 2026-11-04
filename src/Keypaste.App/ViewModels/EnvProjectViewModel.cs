@@ -30,7 +30,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     private readonly AppVaultSession _session;
     private readonly Action<string?> _report;
-    private readonly Action<string?> _announce;
+    private readonly Action<string?, ToastTone> _announce;
     private readonly IVaultFilePicker? _picker;
     private readonly Action _projectsChanged;
 
@@ -45,7 +45,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         ClipboardCountdown clipboard,
         string name,
         Action<string?> report,
-        Action<string?>? announce = null,
+        Action<string?, ToastTone>? announce = null,
         IVaultFilePicker? picker = null,
         ProjectLaunching? launching = null,
         Action? imported = null,
@@ -57,7 +57,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         _session = session;
         _report = report;
-        _announce = announce ?? (_ => { });
+        _announce = announce ?? ((_, _) => { });
         _picker = picker;
         _projectsChanged = projectsChanged ?? (() => { });
         Clipboard = clipboard;
@@ -242,7 +242,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (_session.Unlocked is not { } vault)
         {
-            return "The vault is locked.";
+            return "The vault is locked. Unlock it, then try again.";
         }
 
         var target = Path.GetFullPath(path);
@@ -268,9 +268,9 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             EnvReferenceExportOutcome.NoProject or EnvReferenceExportOutcome.NoProfile =>
                 $"{DisplayName}/{SelectedProfile} has no variables yet, so nothing was written.",
             EnvReferenceExportOutcome.Refused =>
-                $"{EntryNameSanitizer.SanitizeProse(export.Problem, 1024).Text.TrimEnd('.')}. Nothing was written.",
+                $"{EntryNameSanitizer.SanitizeProse(export.Problem, 1024).Text.TrimEnd('.')}. Nothing was written. Correct that, then export again.",
             EnvReferenceExportOutcome.OverVault => overVault,
-            _ => $"{target} could not be written: {export.Problem}",
+            _ => $"{target} could not be written: {export.Problem} Choose another place.",
         };
     }
 
@@ -749,7 +749,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         if (written)
         {
             _report(null);
-            _announce(message);
+            _announce(message, ToastTone.Success);
         }
         else
         {
@@ -811,7 +811,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         if (Read(row) is not { } value)
         {
-            _report("That value could not be read. The vault may have locked.");
+            _report("That value could not be read. The vault may have locked: unlock it, then try again.");
             return null;
         }
 
@@ -833,7 +833,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         _report(fill?.Refusal is { } refusal
             ? DisplayTextSanitizer.Sanitize($"{row.DisplayKey} {refusal}, so it was not copied.").Text + " Edit the item so keypaste can fill it in."
-            : "That value could not be read. The vault may have locked.");
+            : "That value could not be read. The vault may have locked: unlock it, then try again.");
         return null;
     }
 
@@ -913,7 +913,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         if (!_session.IsUnlocked)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -970,7 +970,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (_session.Unlocked is not { } open)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -978,7 +978,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         // new key the person did not ask for.
         if (!EnvResolution.List(open, Name, SelectedProfile).Sources.Contains(row.Source))
         {
-            _report($"{row.DisplayKey} is no longer on {ApprovalPrompt.Shown(row.Source.Entry)}, so nothing was written.");
+            _report($"{row.DisplayKey} is no longer on {ApprovalPrompt.Shown(row.Source.Entry)}, so nothing was written. Check the list, then try again.");
             CancelReplaceQuietly();
             Reload();
             return;
@@ -1028,7 +1028,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (write.Value is { Outcome: EnvRemoveOutcome.NothingMatched })
         {
-            _report($"{row.DisplayKey} is not in {DisplayName} any more.");
+            _report($"{row.DisplayKey} is not in {DisplayName} any more. Check the list, then try again.");
             Removing = null;
             Reload();
             return;
@@ -1048,7 +1048,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         Removing = null;
         _report(null);
-        _announce($"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the item's history.");
+        _announce($"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the item's history.", ToastTone.Success);
 
         Reload();
     }
@@ -1058,7 +1058,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         if (_session.Unlocked is not { } vault)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -1139,7 +1139,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     {
         if (_session.Unlocked is not { } vault)
         {
-            _report("The vault is locked.");
+            _report("The vault is locked. Unlock it, then try again.");
             return;
         }
 
@@ -1168,7 +1168,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         if (tags.Count == 0)
         {
-            _report($"{ApprovalPrompt.Shown(entry)} is no longer in {DisplayName}/{EntryNameSanitizer.Sanitize(environment).Text}.");
+            _report($"{ApprovalPrompt.Shown(entry)} is no longer in {DisplayName}/{EntryNameSanitizer.Sanitize(environment).Text}. Check the list, then try again.");
             Reload();
             return;
         }
@@ -1213,8 +1213,8 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         if (write.Outcome == WriteOutcome.NothingToSave)
         {
             _report(change.Adding
-                ? $"{entry} is already in {environment} or no longer in this vault, so nothing was written."
-                : $"{entry} is no longer in {environment}, so nothing was written.");
+                ? $"{entry} is already in {environment} or no longer in this vault, so nothing was written. Check the list, then try again."
+                : $"{entry} is no longer in {environment}, so nothing was written. Check the list, then try again.");
             CloseEntryForms();
             Reload();
             return;
@@ -1230,7 +1230,8 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         _report(null);
         _announce(change.Adding
             ? $"Added {entry} to {environment}."
-            : $"Removed {entry} from {environment}. The item and its fields are kept.");
+            : $"Removed {entry} from {environment}. The item and its fields are kept.",
+            ToastTone.Success);
         Reload();
         _projectsChanged();
     }

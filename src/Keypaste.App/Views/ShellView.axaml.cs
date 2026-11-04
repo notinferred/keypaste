@@ -23,6 +23,10 @@ internal sealed partial class ShellView : UserControl
         ["Rename or move…"] = "OrganizeTitle",
     };
 
+    private static void OnToastPointerEntered(object? sender, PointerEventArgs e) => ((sender as Control)?.DataContext as Toast)?.Hold();
+
+    private static void OnToastPointerExited(object? sender, PointerEventArgs e) => ((sender as Control)?.DataContext as Toast)?.Release();
+
     private ShellViewModel? _shell;
     private Control? _focusBeforeImport;
     private Control? _focusBeforeDiscardPrompt;

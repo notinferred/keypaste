@@ -81,7 +81,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
 
         Assert.Equal("4", Settings(shell).Count);
         Assert.Null(shell.Notice);
-        Assert.Null(shell.Toast);
+        Assert.Empty(shell.Toasts.Shown);
     }
 
     [Fact]

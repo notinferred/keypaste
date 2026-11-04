@@ -37,7 +37,7 @@ internal sealed record WriteResult<T>(WriteOutcome Outcome, T? Value = default, 
     /// <param name="redo">What to do again once the vault is reloaded, as the screen words it, such as "delete this again".</param>
     internal string? Problem(string redo) => Outcome switch
     {
-        WriteOutcome.Locked => "The vault is locked.",
+        WriteOutcome.Locked => "The vault is locked. Unlock it, then try again.",
         WriteOutcome.ChangedOnDisk when Merged => $"Another program saved this vault meanwhile, and keypaste has merged its save. Now {redo}.",
         WriteOutcome.ChangedOnDisk => $"Something else changed this vault since you opened it. Reload to see it, then {redo}.",
         WriteOutcome.Failed => Reason,

@@ -559,7 +559,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
             default:
                 var reason = DisplayTextSanitizer.Sanitize(write.Reason!).Text;
                 Check();
-                Message = reason.StartsWith("Nothing was imported", StringComparison.Ordinal) ? reason : $"{reason} Nothing was imported.";
+                Message = reason.StartsWith("Nothing was imported", StringComparison.Ordinal) ? reason : $"{reason} Nothing was imported. Correct that, then choose the file again.";
                 return;
         }
     }

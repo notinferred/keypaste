@@ -303,9 +303,9 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
             McpSetupStatus.Done when removing => $"Removed. {name} can no longer start keypaste mcp for this vault." + Afterwards(client, result, removing),
             McpSetupStatus.Done => $"Connected. {name} starts keypaste mcp for this vault; Check asks through it once." + Afterwards(client, result, removing),
             McpSetupStatus.NotConnected => NotConnected(client),
-            McpSetupStatus.NotInstalled => $"{name} could not be started, so nothing was changed.",
+            McpSetupStatus.NotInstalled => $"{name} could not be started, so nothing was changed. Check that it is installed, then run this again.",
             McpSetupStatus.LinkFailed when plan.Steps.OfType<McpBridgeLink>().FirstOrDefault() is { } link =>
-                $"keypaste could not {link.Verb} {link.Link.LinkPath}: {result.Said}. Nothing else was changed.",
+                $"keypaste could not {link.Verb} {link.Link.LinkPath}: {result.Said}. Nothing else was changed. Correct that, then run this again.",
             McpSetupStatus.Refused when client.Wiring == McpWiring.ConfigFile && result.Said is { } reason => Sentence(reason),
             _ => $"{name} refused" + (result.Said is { } said ? $": {said}" : "."),
         };
@@ -365,7 +365,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         var check = await Task.Run(() => _connector.StartCheck(registration)).ConfigureAwait(true);
         if (check is null)
         {
-            CheckMessage = $"The check could not start {registration.Server.Path}.";
+            CheckMessage = $"The check could not start {registration.Server.Path}. Connect the tool again, then check.";
             return;
         }
 
@@ -389,7 +389,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
 
         if (listing.Problem is { } problem)
         {
-            await EndCheckAsync($"The bridge started but did not list: {problem}").ConfigureAwait(true);
+            await EndCheckAsync($"The bridge started but did not list: {problem} Connect the tool again, then check.").ConfigureAwait(true);
             return;
         }
 
@@ -444,7 +444,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
             McpCheckOutcome.Granted => $"Connected: you approved {entry.Name}, and {Shown(entry.Field)} was released to the check, which discarded it unread. "
                 + "Its record is under Since you unlocked, below.",
             McpCheckOutcome.Denied => $"Connected: the request for {entry.Name} reached you and was refused. {answer.Said}",
-            _ => $"The check failed: {answer.Said}",
+            _ => $"The check failed: {answer.Said} Connect the tool again, then check.",
         }).ConfigureAwait(true);
     }
 
@@ -474,7 +474,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
     }
 
     private static string NotInstalled(McpClient client) => client.Executable is { } command
-        ? $"{client.DisplayName} is not installed here: `{command}` could not be started."
+        ? $"{client.DisplayName} is not installed here: `{command}` could not be started. Install it, then connect it."
         : $"{client.DisplayName} is not installed here.";
 
     private static string NotConnected(McpClient client) => $"{client.DisplayName} is not connected; there is nothing to remove.";
