@@ -17,6 +17,6 @@ Completed 2026-11-04 in `9ae7e2ce`, source only; runs ci 41895008202, app 418950
 
 ## Limits and follow-ups
 
-- A cache saved on a branch is not readable from `main`; the restore from a hit, and its job times, come from `main`'s second full run.
+- A cache saved on a branch is not readable from `main`, so the restore from a hit and its job times come from `main`'s full run after `9b7de8f5`'s, which fills the cache; a fresh restore after a lock-file change follows from the key, which holds every lock file's hash, and was not run separately.
 - `verify.sh compile` skipped the advisory: its restore was a no-op ("All projects are up-to-date for restore"), and a no-op restore runs no audit; a fresh restore of `8381d498` fails at once.
 - `v0.3.0` was built with the affected runtime, and SECURITY lists 0.3.x as supported.

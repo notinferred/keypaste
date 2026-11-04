@@ -4,14 +4,6 @@ This plan owns the committed tasks, grouped by product track: each task's depend
 
 This file holds open work only. Needs are build dependencies; time and human acts are never Needs, and a Human row is its own track. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
-## K and B — Build infrastructure
-
-These rows serve every track, and ROADMAP has them worked first in 1.0.0 (D-0672): they move architecture rules into the compiler, tests onto the founder's machine and hand-written code onto established libraries in the order PRODUCT §4.9 sets (D-0670, D-0671).
-
-- [ ] **B.5 — Cache NuGet restores in CI.** Needs: none.
-  - Locked-mode restores are cached by their lock files' hash, an exception to D-0423's "nothing cached" for restores only (D-0671).
-  - Accepted when a second run restores from the cache, a changed lock file restores fresh, and both runs' job times are recorded.
-
 ## Q — At home on every platform
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
