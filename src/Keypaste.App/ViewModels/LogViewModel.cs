@@ -242,7 +242,7 @@ internal sealed partial class LogViewModel : ObservableObject
         _message = _history.Kind switch
         {
             AuditReadKind.Missing => NothingYet,
-            AuditReadKind.Unreadable => $"That log couldn't be read: {_history.Error} Check the file, then open this screen again.",
+            AuditReadKind.Unreadable => $"That log couldn't be read: {_history.Error.TrimEnd('.')}. Check the file, then open this screen again.",
             AuditReadKind.Unchecked => "That log couldn't be checked, so nothing from it is shown here. Check the file, then open this screen again.",
             AuditReadKind.Broken => $"This log has been edited since keypaste wrote it. {ChainSays("where")}",
             _ => string.Empty,

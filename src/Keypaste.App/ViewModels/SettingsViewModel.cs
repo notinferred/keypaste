@@ -574,7 +574,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         { Refusal: CliLinkRefusal.NotKeypaste } => $"{link.LinkPath} changed before keypaste linked it, so it was left as it is.",
         { Refusal: CliLinkRefusal.Translocated } => _translocatedNote,
         { Refusal: CliLinkRefusal.UnsafeProgram } => $"keypaste could not link {link.LinkPath}: this app's path holds a line break. Move the app to a path without one.",
-        _ => $"keypaste could not link {link.LinkPath}: {result.Reason} Correct that, then link again.",
+        _ => $"keypaste could not link {link.LinkPath}: {result.Reason?.TrimEnd('.')}. Correct that, then link again.",
     };
 
     /// <summary>Whether "Forget them all" is waiting on its confirmation.</summary>

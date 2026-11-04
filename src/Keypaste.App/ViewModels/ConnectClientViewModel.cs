@@ -389,7 +389,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
 
         if (listing.Problem is { } problem)
         {
-            await EndCheckAsync($"The bridge started but did not list: {problem} Connect the tool again, then check.").ConfigureAwait(true);
+            await EndCheckAsync($"The bridge started but did not list: {problem.TrimEnd('.')}. Connect the tool again, then check.").ConfigureAwait(true);
             return;
         }
 
@@ -444,7 +444,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
             McpCheckOutcome.Granted => $"Connected: you approved {entry.Name}, and {Shown(entry.Field)} was released to the check, which discarded it unread. "
                 + "Its record is under Since you unlocked, below.",
             McpCheckOutcome.Denied => $"Connected: the request for {entry.Name} reached you and was refused. {answer.Said}",
-            _ => $"The check failed: {answer.Said} Connect the tool again, then check.",
+            _ => $"The check failed: {answer.Said?.TrimEnd('.')}. Connect the tool again, then check.",
         }).ConfigureAwait(true);
     }
 

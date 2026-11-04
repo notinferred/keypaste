@@ -156,7 +156,7 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         var removed = _authority.RemovePairing(row.Name);
         Message = removed.Removed
             ? $"Removed the pairing {row.Name}. That browser has to pair again before it can ask for anything."
-            : $"The pairing {row.Name} was not removed: {removed.Reason} Try again.";
+            : $"The pairing {row.Name} was not removed: {removed.Reason?.TrimEnd('.')}. Try again.";
         Rows = Read();
     }
 

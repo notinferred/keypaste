@@ -254,7 +254,7 @@ public sealed class AgentActivityViewModelTests
         Assert.Empty(model.Waiting);
         Assert.True(model.IsUnavailable);
         Assert.False(model.NoGrants);
-        Assert.Equal("History can't be shown, because this app is not answering agents for this vault.", model.HistoryMessage);
+        Assert.Equal("History can't be shown, because this app is not answering agents for this vault. Lock and unlock the vault to try again.", model.HistoryMessage);
     }
 
     [Fact]

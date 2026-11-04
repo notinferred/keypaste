@@ -276,7 +276,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
 
         await model.PreviewAsync();
 
-        Assert.Equal("Codex is not installed here: `codex` could not be started.", model.Message);
+        Assert.Equal("Codex is not installed here: `codex` could not be started. Install it, then connect it.", model.Message);
         Assert.False(model.HasPreview);
         Assert.False(model.ConfirmCommand.CanExecute(null));
     }
@@ -592,7 +592,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         await model.PreviewAsync();
         await model.ConfirmCommand.PressAsync();
 
-        Assert.Equal($"keypaste could not create {link.LinkPath}: Permission denied. Nothing else was changed.", model.Message);
+        Assert.Equal($"keypaste could not create {link.LinkPath}: Permission denied. Nothing else was changed. Correct that, then run this again.", model.Message);
         Assert.Empty(_runner.Changes);
         Assert.Null(model.Registered);
         Assert.False(model.CheckCommand.CanExecute(null));

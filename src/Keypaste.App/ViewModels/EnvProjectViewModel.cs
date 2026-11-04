@@ -270,7 +270,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             EnvReferenceExportOutcome.Refused =>
                 $"{EntryNameSanitizer.SanitizeProse(export.Problem, 1024).Text.TrimEnd('.')}. Nothing was written. Correct that, then export again.",
             EnvReferenceExportOutcome.OverVault => overVault,
-            _ => $"{target} could not be written: {export.Problem} Choose another place.",
+            _ => $"{target} could not be written: {export.Problem?.TrimEnd('.')}. Choose another place.",
         };
     }
 

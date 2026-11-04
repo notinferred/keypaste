@@ -148,7 +148,7 @@ internal sealed partial class EnvImportViewModel : ObservableObject, IDisposable
             {
                 DotEnvFileFailure.Missing => $"There is no file at {path}, so nothing was imported. Choose another file.",
                 DotEnvFileFailure.TooLarge => $"{path} is larger than a .env file can be, so nothing was imported. Choose another file.",
-                _ => $"{path} could not be read: {readError} Check the file, then choose it again.",
+                _ => $"{path} could not be read: {readError?.TrimEnd('.')}. Check the file, then choose it again.",
             });
             return;
         }

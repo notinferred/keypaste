@@ -266,7 +266,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
             + (automatic.Count == 0
                 ? "or you set that agent to Automatic for it in its settings."
                 : $"except what these agents are Automatic for: {string.Join("; ", automatic)}."),
-        AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason} Lock and unlock the vault to try again.",
+        AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason.TrimEnd('.')}. Lock and unlock the vault to try again.",
         AuthorityStatus.HeldBy held => held.Sentence,
         _ => "Agents cannot reach this vault right now. Lock and unlock the vault to try again.",
     };
@@ -771,7 +771,7 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
 
         Show(history.Lines, history.Kind switch
         {
-            AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error} Check the file, then open this screen again.",
+            AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error.TrimEnd('.')}. Check the file, then open this screen again.",
             AuditReadKind.Unchecked => "History unavailable: the audit log couldn't be checked, so nothing from it is shown here. Check the file, then open this screen again.",
             AuditReadKind.Broken => "This log has been edited since keypaste wrote it. The activity log in Settings › Advanced says where.",
             _ => string.Empty,

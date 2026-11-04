@@ -118,12 +118,12 @@ public sealed class UnlockKeyfileTests : IDisposable
 
         _picker.KeyfilePath = Path.Combine(_home.Path, "absent.key");
         await model.ChooseKeyfileAsync();
-        Assert.Equal("That keyfile isn't there any more.", model.Message);
+        Assert.Equal("That keyfile isn't there any more. Choose it from where it is now.", model.Message);
         Assert.Null(model.KeyfilePath);
 
         _picker.KeyfilePath = empty;
         await model.ChooseKeyfileAsync();
-        Assert.Equal("That file is empty, so it can't be a keyfile.", model.Message);
+        Assert.Equal("That file is empty, so it can't be a keyfile. Choose another.", model.Message);
 
         _picker.KeyfilePath = path;
         await model.ChooseKeyfileAsync();
@@ -148,7 +148,7 @@ public sealed class UnlockKeyfileTests : IDisposable
 
         Assert.Equal(0, _unlockedCalls);
         Assert.False(_session.IsUnlocked);
-        Assert.Equal("That keyfile isn't there any more.", model.Message);
+        Assert.Equal("That keyfile isn't there any more. Choose it from where it is now.", model.Message);
     }
 
     [Fact]
