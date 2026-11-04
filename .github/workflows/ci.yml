@@ -76,6 +76,7 @@ env:
 jobs:
   # Every run runs every job but tools, which runs on the schedule and on a dispatch that asks for it; a dispatch, the
   # schedule or a tag's own run counts toward a release, ci's only with its tools jobs (D-0403, D-0423, D-0438).
+  # Only NuGet restores are cached, by every lock file's hash with no fallback key; release builds restore fresh (B.5).
   checks:
     name: scripts + workflows
     if: ${{ !inputs.only_tools }}
@@ -132,6 +133,11 @@ jobs:
         with:
           global-json-file: global.json
 
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
       - name: Check every project's format
         shell: bash
         run: bash scripts/verify.sh format
@@ -153,6 +159,11 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
       - name: Build and test the backend solution
         shell: bash
@@ -181,6 +192,11 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
       - name: Install GNU timeout (macOS)
         if: runner.os == 'macOS'
@@ -213,6 +229,11 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
       - name: Restore and build the backend solution
         shell: bash
@@ -320,6 +341,11 @@ jobs:
         with:
           global-json-file: global.json
 
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
       - name: Install the native toolchain
         run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
 
@@ -424,6 +450,11 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
       - name: Install GNU timeout (macOS)
         if: runner.os == 'macOS'

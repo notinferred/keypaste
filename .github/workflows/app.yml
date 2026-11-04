@@ -104,6 +104,7 @@ env:
 
 jobs:
   # Every run runs every job; a dispatch or a tag's own run counts toward a release (D-0403, D-0423).
+  # Only NuGet restores are cached, by every lock file's hash with no fallback key; package restores fresh (B.5).
   targets:
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -148,6 +149,11 @@ jobs:
         with:
           global-json-file: global.json
 
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
       - name: Restore, build and test desktop and consistency
         shell: bash
         run: bash scripts/verify.sh desktop
@@ -170,6 +176,11 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
       - name: Install GNU timeout (macOS)
         if: runner.os == 'macOS'
@@ -202,6 +213,11 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
@@ -258,6 +274,11 @@ jobs:
         with:
           global-json-file: global.json
 
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
+
       - name: Install KeePassXC (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -304,6 +325,11 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/packages.lock.json') }}
 
       - name: Restore (locked) and build the observer
         shell: bash
