@@ -160,8 +160,8 @@ Every command is in the menus: the menu bar on macOS, with keypaste, File, Edit,
 | `Cmd+H`, `Option+Cmd+H` | On macOS, hide keypaste or the other apps |
 | `Tab` / `Shift+Tab` | Move between controls |
 | `↑` `↓` | Move within the sidebar or the recent list |
-| `Enter` | Unlock |
-| `Escape` | Clear the secret field in focus |
+| `Enter` | Unlock, or confirm the form in focus unless its confirm is a danger one |
+| `Escape` | Clear the secret field in focus and cancel the form around it, asking first when the form still holds what you typed |
 | `Ctrl/Cmd+V` | Paste into a secret field, the master-password fields and an imported vault's password field included |
 
 On macOS the modifier is Cmd; everywhere else, Ctrl.

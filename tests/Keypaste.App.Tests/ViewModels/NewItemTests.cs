@@ -196,13 +196,12 @@ public sealed class NewItemTests : IDisposable
         form.AddTagCommand.Press();
 
         Assert.Equal(1, asked);
-        Assert.Contains(nameof(NewItemViewModel.HasError), raised);
-        Assert.True(form.HasError);
+        Assert.Contains(nameof(NewItemViewModel.HasTagProblem), raised);
+        Assert.True(form.HasTagProblem);
     }
 
     [Theory]
     [InlineData("github", "otp", "is already in that group")]
-    [InlineData("", "OPENAI_API_KEY", "An item needs a title.")]
     [InlineData("OpenAI", "otp", "Name the key as a project reads it")]
     [InlineData("OpenAI", "api key", "Name the key as a project reads it")]
     [InlineData("OpenAI", "KPXC_KEY", "Name the key as a project reads it")]

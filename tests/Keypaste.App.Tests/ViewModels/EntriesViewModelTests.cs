@@ -183,15 +183,15 @@ public sealed class EntriesViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Adding_nothing_says_so()
+    public void Create_waits_for_a_title()
     {
         using var context = New();
 
         var form = NewItemForm.Open(context.Entries, "   ");
-        context.Entries.ConfirmAddCommand.Press();
+        Assert.False(context.Entries.ConfirmAddCommand.CanExecute(null));
 
-        Assert.Equal("An item needs a title.", form.Error);
-        Assert.True(context.Entries.IsAdding);
+        form.Title = "github";
+        Assert.True(context.Entries.ConfirmAddCommand.CanExecute(null));
     }
 
     /// <summary>

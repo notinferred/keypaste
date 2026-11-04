@@ -98,6 +98,7 @@ public sealed class AgentsFirstLevelTests
 
         Assert.Null(cursor.Connection);
         Assert.NotNull(gemini.Connection);
+        focused.Focus();
         Assert.Single(agents.Window.GetVisualDescendants().OfType<Button>(), button => button is { Name: "CloseConnection", IsEffectivelyVisible: true });
 
         await using var another = await agents.AttachAsync(new AttachClient("zed", "1.0", "zed"));

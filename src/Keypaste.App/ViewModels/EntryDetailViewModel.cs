@@ -197,6 +197,27 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     [ObservableProperty]
     internal partial bool NewFieldProtected { get; set; } = true;
 
+    /// <summary>What leaving would lose: the first form here holding what was typed, or a tag being typed; null when none does.</summary>
+    internal string? UnsavedDraft =>
+        EditDraft() ?? AddFieldDraft() ?? ReplaceFieldDraft() ?? RenameFieldDraft()
+        ?? (DraftTag.Trim().Length > 0 ? "this tag" : null);
+
+    internal Func<string?> EditDraft => () =>
+        IsEditing && (DraftUsername != Username || DraftUrl != Url || DraftNotes != Notes || NewPassword.HasValue)
+            ? "your changes to this item"
+            : null;
+
+    internal Func<string?> AddFieldDraft => () =>
+        IsAddingField && (DraftFieldName.Trim().Length > 0 || (NewFieldValue.HasValue && !NewFieldValue.IsGenerated))
+            ? "this new field"
+            : null;
+
+    internal Func<string?> ReplaceFieldDraft => () =>
+        IsReplacingField && ReplacementFieldValue.HasValue && !ReplacementFieldValue.IsGenerated ? "this new value" : null;
+
+    internal Func<string?> RenameFieldDraft => () =>
+        IsRenamingField && DraftFieldRename.Trim() != _renamingField?.Name ? "this new name" : null;
+
     /// <summary>The field whose value the replace form is for, or null.</summary>
     internal EntryFieldRow? ReplacingField
     {

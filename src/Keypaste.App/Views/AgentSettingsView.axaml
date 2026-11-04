@@ -101,7 +101,7 @@
           <TextBlock Grid.Column="1" Name="PicksCaption" Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding PicksCaption}" />
         </Grid>
         <Button Classes="link" HorizontalAlignment="Left" Content="Advanced: patterns" Command="{Binding ToggleAdvancedCommand}" />
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding IsAdvancedOpen}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding IsAdvancedOpen}" ctl:FormKeys.Confirm="{Binding ApplySeeCommand}">
           <TextBox Classes="mono" Text="{Binding SeePattern}" AutomationProperties.Name="Patterns it can see" />
           <Button Grid.Column="1" Content="Apply" Command="{Binding ApplySeeCommand}" />
         </Grid>
@@ -146,7 +146,7 @@
       <TextBlock Grid.Row="5" Classes="label" Text="Limits" Margin="0,5,0,0" IsVisible="{Binding OffersLimits}" />
       <StackPanel Grid.Row="5" Grid.Column="1" Spacing="6" IsVisible="{Binding OffersLimits}">
         <!-- Wraps, so the panel's narrowest column, inside a row of a table that clips, still shows Apply. -->
-        <WrapPanel ItemSpacing="8" LineSpacing="8">
+        <WrapPanel ItemSpacing="8" LineSpacing="8" ctl:FormKeys.Confirm="{Binding ApplyLimitCommand}">
           <ComboBox ItemsSource="{Binding LimitTargets}" SelectedItem="{Binding LimitTarget}" MinWidth="160"
                     AutomationProperties.Name="Where the limit applies" />
           <TextBox Classes="mono" Width="90" Text="{Binding PerHourText}" PlaceholderText="per hour"

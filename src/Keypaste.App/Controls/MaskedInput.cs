@@ -189,14 +189,14 @@ internal sealed class MaskedInput : TemplatedControl
                 break;
 
             case Key.Escape:
+                // Left unhandled so that it reaches the form around the field, whose Cancel it also is.
                 ClearRequested?.Invoke(this, EventArgs.Empty);
                 Sink?.Clear();
-                e.Handled = true;
                 break;
 
             case Key.Enter:
                 Submitted?.Invoke(this, EventArgs.Empty);
-                e.Handled = true;
+                e.Handled = Submitted is not null;
                 break;
 
             default:

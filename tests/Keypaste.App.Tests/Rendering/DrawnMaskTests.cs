@@ -115,7 +115,7 @@ public sealed class DrawnMaskTests
 
         foreach (var length in new[] { 1, 5, 24, 64 })
         {
-            WindowInput.Escape(window);
+            Clear(window, field);
             Assert.Equal(0, field.MaskedLength);
 
             value = Secret(length);
@@ -159,7 +159,7 @@ public sealed class DrawnMaskTests
         WindowInput.Type(window, _alpha);
         var first = AutomationSurface.Of(window);
 
-        WindowInput.Escape(window);
+        Clear(window, field);
         WindowInput.Type(window, _beta);
         var second = AutomationSurface.Of(window);
 
@@ -182,6 +182,19 @@ public sealed class DrawnMaskTests
     }
 
     /// <summary>The template's text block that draws the mask.</summary>
+    // Through the sink where there is one: Escape would also cancel the form the field stands in.
+    private static void Clear(Window window, MaskedInput field)
+    {
+        if (field.Sink is { } sink)
+        {
+            sink.Clear();
+        }
+        else
+        {
+            WindowInput.Escape(window);
+        }
+    }
+
     private static TextBlock Display(MaskedInput field) => DrawnText.Showing(field, field.Display);
 
     private static string Secret(int length) =>

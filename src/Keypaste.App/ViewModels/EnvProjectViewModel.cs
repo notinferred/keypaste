@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -417,7 +418,32 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>The name of the variable being added.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewKeyProblem), nameof(HasNewKeyProblem))]
     internal partial string NewKey { get; set; } = string.Empty;
+
+    /// <summary>Why the name typed cannot be added, or null: core's rule for a new key, which an existing key of this environment already passed.</summary>
+    internal string? NewKeyProblem =>
+        NewKey.Trim() is { Length: > 0 } key
+        && !Variables.Any(variable => string.Equals(variable.Key, key, StringComparison.Ordinal))
+        && !EnvStore.IsNewFieldName(key, out var error)
+            ? EntryNameSanitizer.SanitizeProse(error, 1024).Text
+            : null;
+
+    internal bool HasNewKeyProblem => NewKeyProblem is not null;
+
+    /// <summary>What leaving would lose: the first form here holding what was typed, or null.</summary>
+    internal string? UnsavedDraft => ProfileDraft() ?? KeyDraft() ?? ReplaceDraft();
+
+    internal Func<string?> ProfileDraft => () => IsAddingProfile && NewProfile.Trim().Length > 0 ? "this new environment" : null;
+
+    internal Func<string?> KeyDraft => () =>
+        IsAdding && (NewKey.Trim().Length > 0 || (NewValue.HasValue && !NewValue.IsGenerated)) ? "this new key" : null;
+
+    internal Func<string?> ReplaceDraft => () =>
+        IsReplacing && ReplacementValue.HasValue && !ReplacementValue.IsGenerated ? "this new value" : null;
+
+    /// <summary>What Return does on the tag change's confirmation: nothing when the change takes keys away, which is its danger form.</summary>
+    internal ICommand? TagChangeReturnCommand => TagChangeAdds ? ConfirmTagChangeCommand : null;
 
     /// <summary>The entries a new key can go on: the selected profile's home entry first, then the entries tagged into it.</summary>
     [ObservableProperty]
@@ -496,6 +522,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>The tag change waiting for the person's answer, as the entry pane asks it (D-0415).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TagChangeReturnCommand))]
     [NotifyPropertyChangedFor(nameof(IsConfirmingTagChange), nameof(TagChangeLines), nameof(TagChangeAdds), nameof(TagChangeAction))]
     [NotifyPropertyChangedFor(nameof(TagChangeCancel))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmTagChangeCommand), nameof(CancelTagChangeCommand))]

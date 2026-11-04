@@ -644,6 +644,28 @@ public sealed class ShellStatusTests
     }
 
     /// <summary>Advances the clock a second at a time until the poll or the folder watch has started a merge, then waits for it.</summary>
+    [Fact]
+    public async Task AMerge_LeavesAScreenHoldingADraftAsTyped()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        Unlock(authority.Session, fixture);
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        shell.Current = Destinations.Of(DestinationKind.Tokens);
+        var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
+        tokens.OpenFormCommand.Press();
+        tokens.Name = "half-typed";
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+        await MergedByThePoll(shell, clock);
+
+        Assert.Same(tokens, shell.Content);
+        Assert.Equal("half-typed", tokens.Name);
+    }
+
     private static async Task MergedByThePoll(ShellViewModel shell, ManualClock clock)
     {
         for (var tick = 0; tick < 5 && shell.Merging.IsCompleted; tick++)

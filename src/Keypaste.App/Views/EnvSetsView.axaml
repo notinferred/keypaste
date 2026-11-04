@@ -257,7 +257,7 @@
           </Grid>
         </Border>
 
-        <Border Classes="card filled" IsVisible="{Binding IsAdding}">
+        <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding NewProjectDraft}">
           <StackPanel Spacing="10">
             <TextBlock Classes="section" Text="New project" />
             <TextBlock Classes="caption"
@@ -286,7 +286,7 @@
               <StackPanel Spacing="24">
 
                 <!-- The .env import: read and checked whole, previewed by name, written only on Import. -->
-                <Border Classes="card filled" IsVisible="{Binding Import.IsPreviewing}">
+                <Border Classes="card filled" IsVisible="{Binding Import.IsPreviewing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Import.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Import.CancelCommand}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding Import.Source, StringFormat='Import {0}?'}" TextWrapping="Wrap" />
                     <ItemsControl ItemsSource="{Binding Import.Rows}">
@@ -488,7 +488,7 @@
                 </StackPanel>
 
                 <!-- A form opens under the matrix, beside the footer and rows that open it. -->
-                <Border Classes="card filled" IsVisible="{Binding IsAddingProfile}" ctl:ShowInView.OnShow="True">
+                <Border Classes="card filled" IsVisible="{Binding IsAddingProfile}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddProfileCommand}" ctl:FormKeys.Cancel="{Binding CancelAddProfileCommand}" ctl:FormKeys.Draft="{Binding ProfileDraft}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="New environment" />
                     <TextBlock Classes="caption"
@@ -501,11 +501,17 @@
                   </StackPanel>
                 </Border>
 
-                <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True">
+                <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding KeyDraft}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
                     <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left"
                              AutomationProperties.Name="New key" />
+                    <TextBlock x:Name="NewKeyProblem"
+                               Classes="caption"
+                               Foreground="{DynamicResource KpDanger}"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding HasNewKeyProblem}"
+                               Text="{Binding NewKeyProblem}" />
                     <!-- A new key is a protected field of the entry chosen here: the environment's home entry, or
                          one of the entries tagged into it (D-0413). -->
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -553,7 +559,7 @@
                   </StackPanel>
                 </Border>
 
-                <Border Classes="card filled" IsVisible="{Binding IsReplacing}" ctl:ShowInView.OnShow="True">
+                <Border Classes="card filled" IsVisible="{Binding IsReplacing}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmReplaceCommand}" ctl:FormKeys.Cancel="{Binding CancelReplaceCommand}" ctl:FormKeys.Draft="{Binding ReplaceDraft}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding ReplacePrompt}" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -585,7 +591,7 @@
                   </StackPanel>
                 </Border>
 
-                <Border Classes="card" IsVisible="{Binding IsRemoving}" BorderBrush="{DynamicResource KpDanger}" ctl:ShowInView.OnShow="True">
+                <Border Classes="card" IsVisible="{Binding IsRemoving}" BorderBrush="{DynamicResource KpDanger}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelRemoveCommand}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="body primary" Text="{Binding RemovePrompt}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -657,7 +663,7 @@
                     </ItemsControl>
                   </Border>
                 </StackPanel>
-                <Border Classes="card filled" IsVisible="{Binding IsAddingEntry}" ctl:ShowInView.OnShow="True">
+                <Border Classes="card filled" IsVisible="{Binding IsAddingEntry}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelAddEntryCommand}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding AddEntryTitle}" />
                     <TextBox Text="{Binding EntryFilter}" PlaceholderText="Find an item by its path" Width="420"
@@ -677,7 +683,7 @@
                   </StackPanel>
                 </Border>
                 <!-- What a tag change reaches, asked before it is written, as the entry pane asks it. -->
-                <Border Classes="card" IsVisible="{Binding IsConfirmingTagChange}" ctl:ShowInView.OnShow="True">
+                <Border Classes="card" IsVisible="{Binding IsConfirmingTagChange}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding TagChangeReturnCommand}" ctl:FormKeys.Cancel="{Binding CancelTagChangeCommand}">
                   <StackPanel Spacing="8">
                     <ItemsControl ItemsSource="{Binding TagChangeLines}">
                       <ItemsControl.ItemTemplate>
@@ -794,7 +800,7 @@
                       <TextBlock Classes="caption" IsVisible="{Binding !Launch.IsSupported}" Text="{Binding Launch.UnsupportedReason}" />
 
                       <!-- The confirmation names the command, the directory and the variables' names, never a value. -->
-                      <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" BorderBrush="{DynamicResource KpBorderStrong}"
+                      <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Launch.ConfirmLaunchCommand}" ctl:FormKeys.Cancel="{Binding Launch.CancelLaunchCommand}" BorderBrush="{DynamicResource KpBorderStrong}"
                               Background="{DynamicResource KpBgCard}" Padding="14">
                         <StackPanel Spacing="6">
                           <TextBlock Classes="body primary" Text="{Binding Launch.ConfirmTitle}" />

@@ -22,7 +22,7 @@ namespace Keypaste.App.ViewModels;
 /// <see cref="EntryNameSanitizer"/> and the core's own addressing.
 /// </para>
 /// </remarks>
-internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
+internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
@@ -234,17 +234,52 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
             : null;
         set
         {
-            if (value is { } row)
+            if (value is not { } row)
             {
-                if (IsAdding)
-                {
-                    CancelAdd();
-                }
-
-                Select(row.Name);
+                return;
             }
+
+            if ((IsAdding || row.Name != _selection) && PaneDraft is { } draft && AskDiscard is { } ask)
+            {
+                ask(draft, () => MoveSelection(row.Name), () => OnPropertyChanged(nameof(Selected)));
+                return;
+            }
+
+            MoveSelection(row.Name);
         }
     }
+
+    private string? _renamedGroupName;
+
+    private void MoveSelection(EntryName name)
+    {
+        if (IsAdding)
+        {
+            CancelAdd();
+        }
+
+        Select(name);
+    }
+
+    /// <summary>How this screen asks "Discard …?" before choosing a row loses a draft; the shell's, or none to lose it unasked.</summary>
+    internal Action<string, Action, Action?>? AskDiscard { get; init; }
+
+    /// <inheritdoc/>
+    public string? UnsavedDraft => PaneDraft ?? GroupDraft();
+
+    // What choosing another row would lose; a group's form stays open across that.
+    private string? PaneDraft => _newItem?.UnsavedDraft ?? OrganizeDraft() ?? Detail?.UnsavedDraft;
+
+    internal Func<string?> NewItemDraft => () => _newItem?.UnsavedDraft;
+
+    internal Func<string?> OrganizeDraft => () =>
+        IsOrganizing && Selected is { } row && DraftTitle.Trim() != row.Title ? "this new name" : null;
+
+    internal Func<string?> GroupDraft => () =>
+        (IsCreatingGroup && DraftGroupName.Trim().Length > 0)
+        || (IsRenamingGroup && DraftGroupName.Trim() != _renamedGroupName)
+            ? "this group's name"
+            : null;
 
     /// <summary>
     /// Whether the delete confirmation is showing.
@@ -366,6 +401,16 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
 
             if (SetProperty(ref _newItem, value))
             {
+                if (old is not null)
+                {
+                    old.PropertyChanged -= OnNewItemChanged;
+                }
+
+                if (value is not null)
+                {
+                    value.PropertyChanged += OnNewItemChanged;
+                }
+
                 OnPropertyChanged(nameof(IsAdding));
                 OnPropertyChanged(nameof(Selected));
                 OnPropertyChanged(nameof(AddIsPrimary));
@@ -381,6 +426,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
                 DuplicateCommand.NotifyCanExecuteChanged();
                 old?.Dispose();
             }
+        }
+    }
+
+    private void OnNewItemChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(NewItemViewModel.Title))
+        {
+            ConfirmAddCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -400,6 +453,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>Whether the organize form is showing for the selected entry.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
+    [NotifyPropertyChangedFor(nameof(OrganizeTitleProblem), nameof(HasOrganizeTitleProblem))]
     [NotifyCanExecuteChangedFor(nameof(OrganizeCommand), nameof(ConfirmOrganizeCommand), nameof(CancelOrganizeCommand))]
     internal partial bool IsOrganizing { get; private set; }
 
@@ -488,7 +542,17 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
 
     /// <summary>The title being typed for the selected entry.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OrganizeTitleProblem), nameof(HasOrganizeTitleProblem))]
     internal partial string DraftTitle { get; set; } = string.Empty;
+
+    /// <summary>Why the name typed in Rename or move cannot be used, or null.</summary>
+    internal string? OrganizeTitleProblem =>
+        !IsOrganizing ? null
+        : DraftTitle.Trim().Length == 0 ? "An item needs a name."
+        : EntryNameSanitizer.Sanitize(DraftTitle.Trim()) is { WasAltered: true } sanitized ? $"That is not a name keypaste will create. Try '{sanitized.Text}'."
+        : null;
+
+    internal bool HasOrganizeTitleProblem => OrganizeTitleProblem is not null;
 
     /// <summary>The name being typed for a group.</summary>
     [ObservableProperty]
@@ -902,7 +966,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
         Error = null;
     }
 
-    [RelayCommand(CanExecute = nameof(IsAdding))]
+    private bool CanCreate => _newItem is { HasTitle: true };
+
+    [RelayCommand(CanExecute = nameof(CanCreate))]
     private void ConfirmAdd()
     {
         if (_newItem?.Create() is not { } name)
@@ -1048,22 +1114,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var title = DraftTitle.Trim();
-
-        if (title.Length == 0)
+        if (HasOrganizeTitleProblem)
         {
-            Error = "An item needs a name.";
             return;
         }
 
-        var sanitized = EntryNameSanitizer.Sanitize(title);
-        if (sanitized.WasAltered)
-        {
-            Error = $"That is not a name keypaste will create. Try '{sanitized.Text}'.";
-            return;
-        }
-
-        var target = new EntryName(MoveTarget?.Path ?? string.Empty, sanitized.Text);
+        var target = new EntryName(MoveTarget?.Path ?? string.Empty, DraftTitle.Trim());
 
         var write = _session.Write(
             vault => (Outcome: vault.Relocate(row.Name, target, out var relocated), Moved: relocated),
@@ -1119,6 +1175,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable
         CloseOtherForms();
         CloseGroupForms();
         DraftGroupName = group.Name;
+        _renamedGroupName = group.Name;
         IsRenamingGroup = true;
         Error = null;
     }

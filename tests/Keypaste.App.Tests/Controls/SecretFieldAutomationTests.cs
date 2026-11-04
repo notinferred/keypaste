@@ -273,8 +273,8 @@ public sealed class SecretFieldAutomationTests
         var first = AutomationSurface.Of(field);
         AutomationSurface.AssertNamedByPurpose(field);
 
-        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        // Through the sink: Escape would also cancel the form the field stands in.
+        field.Sink!.Clear();
         Assert.Equal(0, field.MaskedLength);
 
         window.KeyTextInput(_beta);

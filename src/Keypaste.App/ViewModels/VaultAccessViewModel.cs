@@ -78,6 +78,12 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
 
     internal string AttachLabel => HasKeyfile ? "Use a different keyfile" : "Add a keyfile";
 
+    /// <summary>What leaving would lose: a password typed or a keyfile chosen, or null.</summary>
+    internal string? UnsavedDraft =>
+        _current.Length > 0 || _new.Length > 0 || _confirm.Length > 0 || NewKeyfilePath is not null
+            ? "this change to the vault's access"
+            : null;
+
     internal int CurrentMaskedLength => _current.Length;
 
     internal int NewMaskedLength => _new.Length;

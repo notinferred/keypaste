@@ -183,7 +183,7 @@
                           <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                         </StackPanel>
                       </Grid>
-                      <Border Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True">
+                      <Border Classes="form" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRestoreCommand}" ctl:FormKeys.Cancel="{Binding CancelRestoreCommand}">
                         <StackPanel Spacing="10">
                           <ItemsControl ItemsSource="{Binding Confirmation}">
                             <ItemsControl.ItemTemplate>
@@ -440,7 +440,7 @@
                 <Button Content="Change…" Command="{Binding ReviewCommand}" HorizontalAlignment="Left"
                         IsVisible="{Binding IsEditing}" />
 
-                <Border IsVisible="{Binding IsConfirming}"
+                <Border IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelCommand}"
                         Classes="card"
                         Background="{DynamicResource KpDangerTint}"
                         BorderBrush="{DynamicResource KpDanger}">
@@ -562,7 +562,7 @@
                     </Button>
                   </Panel>
                 </Grid>
-                <Border Name="CliReplaceForm" Classes="form danger" IsVisible="{Binding IsConfirmingCliReplace}" ctl:ShowInView.OnShow="True">
+                <Border Name="CliReplaceForm" Classes="form danger" IsVisible="{Binding IsConfirmingCliReplace}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelReplaceCliCommand}">
                   <StackPanel Spacing="10">
                     <TextBlock Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
                     <StackPanel Orientation="Horizontal" Spacing="8">

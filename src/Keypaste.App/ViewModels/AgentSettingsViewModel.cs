@@ -100,6 +100,10 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     private DateTime? _untilDate;
     private string _untilTime = string.Empty;
     private string _seePattern = string.Empty;
+    private string _shownSeePattern = string.Empty;
+    private string _shownPerHour = string.Empty;
+    private DateTime? _shownUntilDate;
+    private string _shownUntilTime = string.Empty;
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, which reads and changes their settings.</param>
@@ -214,6 +218,13 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
             }
         }
     }
+
+    /// <summary>What leaving would lose: picks, patterns or a limit not yet applied, or null.</summary>
+    internal string? UnsavedDraft => PicksChanged || SeeTyped || LimitTyped ? $"your settings for {Shown} not yet applied" : null;
+
+    private bool SeeTyped => _seePattern != _shownSeePattern;
+
+    private bool LimitTyped => _perHour != _shownPerHour || _untilDate != _shownUntilDate || _untilTime != _shownUntilTime;
 
     /// <summary>At most this many releases an hour, or empty for no hourly limit.</summary>
     internal string PerHourText
@@ -340,8 +351,11 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     internal Task ApplyPicksAsync() => ApplyAsync(see: [.. _offered.Where(_picked.Contains), .. Patterns()]);
 
     /// <summary>Lets the agent see what <see cref="SeePattern"/> names.</summary>
-    internal Task ApplySeeAsync() =>
-        ApplyAsync(see: [.. _seePattern.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]);
+    internal Task ApplySeeAsync()
+    {
+        _shownSeePattern = _seePattern;
+        return ApplyAsync(see: [.. _seePattern.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]);
+    }
 
     /// <summary>Adds a row for <see cref="NewRowScope"/>.</summary>
     internal Task AddRowAsync() =>
@@ -363,6 +377,8 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     /// </summary>
     internal Task ApplyLimitAsync()
     {
+        TakeTypedLimitAsShown();
+
         if (_limitTarget is not { } target)
         {
             return Task.CompletedTask;
@@ -386,6 +402,9 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     /// <summary>Reads the agent's settings again from the vault and this computer's ceilings.</summary>
     internal void Read()
     {
+        var seeTyped = SeeTyped;
+        var limitTyped = LimitTyped;
+
         if (_authority.TrySettings(Agent, out var state, out var problem))
         {
             _state = state;
@@ -418,7 +437,13 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         _choosingOnly = false;
         _seeChoices = [.. scopes.Select(scope => new SettingChoice(_pick, Selector(scope), scope.Name, _picked.Contains(Selector(scope))))];
         ShowSeeScopes();
-        _seePattern = string.Join(", ", vault.See.Globs);
+        _shownSeePattern = string.Join(", ", vault.See.Globs);
+
+        // A refresh from an outside change leaves a pattern or limit being typed as it is.
+        if (!seeTyped)
+        {
+            _seePattern = _shownSeePattern;
+        }
         _rows =
         [
             .. vault.Projects.Select(row => new SettingRow(
@@ -438,7 +463,10 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         targets.AddRange(vault.Projects.Where(row => row.Mode == AgentMode.Automatic).Select(row => row.Scope.Name));
         _limitTargets = targets;
         _limitTarget = Kept(_limitTarget, _limitTargets);
-        ShowLimit();
+        if (!limitTyped)
+        {
+            ShowLimit();
+        }
 
         HeldBack = _state is { HeldBack.Count: > 0 } held
             ? $"This computer holds {Shown} back from what the vault gives it: {string.Join("; ", held.HeldBack.Select(gain => AccessChangePrompt.Words(gain, held.Vault, Zone)))}."
@@ -666,14 +694,27 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         {
             UntilDate = null;
             UntilTimeText = string.Empty;
-            return;
+        }
+        else
+        {
+            var here = TimeZoneInfo.ConvertTime(until, Zone);
+            UntilDate = here.Date;
+            UntilTimeText = UntilTime.IsCloseOfDay(until, Zone) ? string.Empty
+                : here.Second == 0 ? here.ToString("HH:mm", CultureInfo.InvariantCulture)
+                : here.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
         }
 
-        var here = TimeZoneInfo.ConvertTime(until, Zone);
-        UntilDate = here.Date;
-        UntilTimeText = UntilTime.IsCloseOfDay(until, Zone) ? string.Empty
-            : here.Second == 0 ? here.ToString("HH:mm", CultureInfo.InvariantCulture)
-            : here.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        _shownPerHour = _perHour;
+        _shownUntilDate = _untilDate;
+        _shownUntilTime = _untilTime;
+    }
+
+    // Applying asks for what was typed, so the read after it shows what the vault then holds.
+    private void TakeTypedLimitAsShown()
+    {
+        _shownPerHour = _perHour;
+        _shownUntilDate = _untilDate;
+        _shownUntilTime = _untilTime;
     }
 
     /// <summary>The choice still offered, else the first one.</summary>

@@ -31,7 +31,7 @@ internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, str
 /// token back once. The form keeps it in <see cref="Minted"/> only until it is dismissed or the
 /// screen closes, drawn while held and copied through the clipboard countdown, never in a property.
 /// </remarks>
-internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposable
+internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown? _clipboard;
@@ -82,6 +82,12 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
             }
         }
     }
+
+    /// <inheritdoc/>
+    public string? UnsavedDraft => FormDraft();
+
+    internal Func<string?> FormDraft => () =>
+        IsFormOpen && (_name.Trim().Length > 0 || _scope.Trim().Length > 0) ? "this new token" : null;
 
     /// <summary>What the new token is called: lowercase letters, digits and dashes.</summary>
     internal string Name

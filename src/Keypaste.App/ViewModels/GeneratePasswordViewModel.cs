@@ -103,7 +103,6 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
     private void NewItem()
     {
         _newItem(Value);
-        _close();
     }
 
     private bool CanAdd() => _addField is not null && FieldName.Trim().Length > 0;

@@ -29,7 +29,7 @@
           </Button>
         </Grid>
 
-        <Border Classes="card filled" IsVisible="{Binding IsFormOpen}">
+        <Border Classes="card filled" IsVisible="{Binding IsFormOpen}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding CreateCommand}" ctl:FormKeys.Cancel="{Binding CancelFormCommand}" ctl:FormKeys.Draft="{Binding FormDraft}">
           <StackPanel Spacing="14">
             <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
               <TextBlock Classes="label" Text="Name" />
@@ -132,7 +132,7 @@
                 <DataTemplate x:DataType="vm:ScopedTokenRow">
                   <Border Classes="table-row" Padding="16,12">
                     <Panel>
-                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}">
+                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}">
                         <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <Button Grid.Column="1" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"

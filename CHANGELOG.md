@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app keeps what you type: leaving a screen, choosing another item or pressing Escape on a form holding unsaved text now asks "Discard …?" with Cancel and Discard first, and a merge of another program's save leaves the form as typed; a lock still discards it. Forms answer Return with their confirm, never a danger one, and Escape with Cancel, the Share dialog gains a Cancel button, an error appears under its field as you type, and Create waits for a title ([Q.4](docs/steps/Q.4.md)).
+
 The CLI and the desktop app are now built with .NET 10.0.14, which fixes an out-of-bounds write in the runtime's Brotli decoder (CVE-2026-111497); `v0.3.0` was built with an earlier, affected runtime ([B.5](docs/steps/B.5.md)).
 
 Every row in the desktop app now has a context menu, opened by a right-click, a Control-click on macOS, the menu key or Shift+F10: an item's Copy username, Copy password, Open URL, Edit fields…, Rename or move…, Duplicate, Share… and Delete; a Trash row's Restore and Delete for good; a revision's Copy this revision's password and Restore this revision; a sidebar group's New group, Rename group…, Move group… and Delete group; a project's Open project; and an agent's Agent settings… and Disconnect agent. The same commands are in a new Item menu in the menu bar, and on Windows and Linux in the menu button, acting on the chosen row or, for an agent, the one the keyboard is in ([Q.3](docs/steps/Q.3.md)).
