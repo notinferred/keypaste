@@ -57,7 +57,7 @@
       </Style>
       <Style Selector="^:focus /template/ Border#Frame">
         <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
-        <Setter Property="BoxShadow" Value="{StaticResource KpFieldGlow}" />
+        <Setter Property="BoxShadow" Value="{DynamicResource KpFieldGlow}" />
       </Style>
       <Style Selector="^:focus /template/ Border#Caret">
         <Setter Property="IsVisible" Value="True" />

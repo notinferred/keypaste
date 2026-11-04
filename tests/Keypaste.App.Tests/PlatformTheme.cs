@@ -16,7 +16,7 @@ namespace Keypaste.App.Tests;
 /// </remarks>
 internal static class PlatformTheme
 {
-    internal static void Set(PlatformThemeVariant variant)
+    internal static void Set(PlatformThemeVariant variant, ColorContrastPreference contrast = ColorContrastPreference.NoPreference)
     {
         var settings = Application.Current?.PlatformSettings;
         Assert.True(settings is not null, "the application has no platform settings yet");
@@ -27,6 +27,6 @@ internal static class PlatformTheme
             [typeof(PlatformColorValues)]);
 
         Assert.True(raise is not null, "Avalonia's platform settings no longer raise OnColorValuesChanged; raise the change another way");
-        raise.Invoke(settings, [new PlatformColorValues { ThemeVariant = variant }]);
+        raise.Invoke(settings, [new PlatformColorValues { ThemeVariant = variant, ContrastPreference = contrast }]);
     }
 }

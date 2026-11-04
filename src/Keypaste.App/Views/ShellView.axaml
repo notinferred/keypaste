@@ -121,7 +121,7 @@
                     <TextBlock Text="{Binding SearchScope}" MaxWidth="140" TextTrimming="CharacterEllipsis" />
                     <Button Name="ClearSearchScope"
                             Classes="icon ghost sm"
-                            Width="16" Height="16" MinHeight="16" Padding="0"
+                            Width="20" Height="20" MinHeight="20" Padding="0" Margin="-2"
                             ToolTip.Tip="Search every item"
                             AutomationProperties.Name="Search every item"
                             Command="{Binding ClearScopeCommand}">
@@ -257,7 +257,7 @@
                     </StackPanel>
                     <Button Grid.Column="4"
                             Classes="icon ghost fold"
-                            Margin="4,0,-6,0"
+                            Margin="2,-2,-8,-2"
                             IsVisible="{Binding IsExpandable}"
                             Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
                             CommandParameter="{Binding}"
@@ -273,6 +273,7 @@
                         AutomationProperties.Name="{Binding Title}">
                     <Button Grid.Column="0"
                             Classes="icon ghost fold"
+                            Margin="-2"
                             IsVisible="{Binding HasChildren}"
                             Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
                             CommandParameter="{Binding}"

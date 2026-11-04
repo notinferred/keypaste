@@ -442,7 +442,7 @@
                                                 HorizontalAlignment="Right" VerticalAlignment="Center">
                                   <ContentControl.ContentTemplate>
                                     <DataTemplate x:DataType="vm:EnvVariableRow">
-                                      <StackPanel Classes="row-actions" Orientation="Horizontal" Spacing="2">
+                                      <StackPanel Classes="row-actions" Orientation="Horizontal" Spacing="8">
                                         <ctl:RevealButton Classes="ghost row-action"
                                                           TargetSource="{Binding}"
                                                           ToolTip.Tip="Hold to reveal"

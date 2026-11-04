@@ -850,8 +850,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// </remarks>
     private void Reselect(EntryName name)
     {
-        _selection = name;
         Reload();
+        Select(name);
     }
 
     /// <summary>Narrows the list to the selected group and the current query.</summary>

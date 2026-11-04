@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Platform;
+using Avalonia.Styling;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -60,6 +61,34 @@ public sealed class ThemeFollowsSystemTests
         finally
         {
             window.Close();
+            PlatformTheme.Set(PlatformThemeVariant.Dark);
+            app.ApplyTheme(AppTheme.System);
+        }
+    });
+
+    [Fact]
+    public Task The_system_contrast_preference_holds_under_every_choice_in_Settings() => HeadlessSession.On(() =>
+    {
+        var app = Assert.IsType<App>(Application.Current);
+
+        try
+        {
+            app.ApplyTheme(AppTheme.System);
+
+            PlatformTheme.Set(PlatformThemeVariant.Dark, ColorContrastPreference.High);
+            Assert.Equal(HighContrast.Dark, app.ActualThemeVariant);
+
+            PlatformTheme.Set(PlatformThemeVariant.Light, ColorContrastPreference.High);
+            Assert.Equal(HighContrast.Light, app.ActualThemeVariant);
+
+            app.ApplyTheme(AppTheme.Dark);
+            Assert.Equal(HighContrast.Dark, app.ActualThemeVariant);
+
+            PlatformTheme.Set(PlatformThemeVariant.Light);
+            Assert.Equal(ThemeVariant.Dark, app.ActualThemeVariant);
+        }
+        finally
+        {
             PlatformTheme.Set(PlatformThemeVariant.Dark);
             app.ApplyTheme(AppTheme.System);
         }

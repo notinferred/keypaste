@@ -8,11 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.8 — Make focus, edges and targets visible.** Needs: none.
-  - In the light palette the amber focus ring, focused field, selection bar and warn dot are 1.5 to 1.8:1 against their grounds: they take `#8A5A00`, DESIGN's amber on light, in the theme dictionaries, and dark keeps its values. Muted text on hover and selected rows takes the secondary colour where it falls under 4.5:1 (sidebar counts, the toast's countdown, the keycap), and unchecked checkbox and radio edges and field borders reach 3:1.
-  - A high-contrast dark and light variant follows macOS's Increase Contrast and Windows' contrast themes through the platform's contrast preference.
-  - Fold, chip-remove and clear-scope buttons, drawn 16×16, take at least 20×20 without moving the layout, and row action buttons sit 8 apart.
-  - Accepted when a test computes every text and edge pair of `Theme/Tokens.axaml` on its grounds in each variant, against 4.5:1 for text and 3:1 for edges, and the screen renderer draws every screen in each variant.
 - [ ] **Q.9 — Let people enlarge text.** Needs: Q.2.
   - Nothing enlarges text, font sizes are fixed on about 180 lines of the views, and the 960×520 minimum window does not fit a 1366×768 screen at 150% Windows scaling. View › Zoom in, Zoom out and Actual size (⌘+, ⌘− and ⌘0) scale the interface up to 200%, kept in `app.toml`; view-level sizes move onto the Typography classes; and the minimum window and the prompt windows scale with it.
   - Accepted when the screen renderer draws every screen at 100%, 150% and 200% with nothing cut off, masked text staying at 14px or larger.

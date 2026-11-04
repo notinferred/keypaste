@@ -1,13 +1,15 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    xmlns:app="using:Keypaste.App">
 
   <!--
     The design tokens from docs/design/tokens, in two first-class palettes: the app follows the
     system's light or dark setting unless Settings chooses one. The single accent is amber, used once per
     view for the primary action or a live signal, and text on amber is always ink. Status colours
     share one oklch lightness and chroma in each palette; they are converted to sRGB here because Avalonia has no
-    oklch. Depth is lightness, not shadow: shadows are for overlays only.
+    oklch. Depth is lightness, not shadow: shadows are for overlays only. On a light ground the accent as a line or
+    a dot is DESIGN's #8A5A00, because #F2B544 is under 2:1 there.
 
     Semantic brushes (KpBg*, KpBorder*, KpText*, KpAccent*, status) change with the theme and are
     what views use. The raw palette below them (KpInk*, KpLine*, KpAmber…) does not change and is
@@ -24,16 +26,22 @@
       <SolidColorBrush x:Key="KpBgActive" Color="#2A2C30" />
       <SolidColorBrush x:Key="KpBgActiveHover" Color="#33363B" />
 
-      <SolidColorBrush x:Key="KpBorderSubtle" Color="#26282C" />
-      <SolidColorBrush x:Key="KpBorderDefault" Color="#2C2E33" />
-      <SolidColorBrush x:Key="KpBorderStrong" Color="#3A3D43" />
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#6E7076" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#74767C" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#7C7E84" />
 
       <SolidColorBrush x:Key="KpTextPrimary" Color="#F2F2F0" />
       <SolidColorBrush x:Key="KpTextSecondary" Color="#C9CACD" />
       <SolidColorBrush x:Key="KpTextMuted" Color="#8E9096" />
-      <SolidColorBrush x:Key="KpTextDisabled" Color="#55575C" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#84868C" />
 
       <SolidColorBrush x:Key="KpAccentText" Color="#F2B544" />
+      <SolidColorBrush x:Key="KpFocusRing" Color="#F2B544" />
+      <SolidColorBrush x:Key="KpWarn" Color="#F2B544" />
+      <SolidColorBrush x:Key="KpIdle" Color="#7C7E84" />
+      <BoxShadows x:Key="KpFieldGlow">0 0 0 3 #26F2B544</BoxShadows>
+      <BoxShadows x:Key="KpWaitingHalo">0 0 0 3 #33F2B544</BoxShadows>
+      <BoxShadows x:Key="KpSelectedBar">inset 2 0 0 0 #F2B544</BoxShadows>
       <SolidColorBrush x:Key="KpFocusGap" Color="#111214" />
       <SolidColorBrush x:Key="KpMarkInk" Color="#F2F2F0" />
       <SolidColorBrush x:Key="KpOk" Color="#72D699" />
@@ -55,16 +63,22 @@
       <SolidColorBrush x:Key="KpBgActive" Color="#E6E6E2" />
       <SolidColorBrush x:Key="KpBgActiveHover" Color="#DDDDD8" />
 
-      <SolidColorBrush x:Key="KpBorderSubtle" Color="#E8E8E4" />
-      <SolidColorBrush x:Key="KpBorderDefault" Color="#DCDCD7" />
-      <SolidColorBrush x:Key="KpBorderStrong" Color="#C4C4BE" />
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#8A8A86" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#84847F" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#7A7A75" />
 
       <SolidColorBrush x:Key="KpTextPrimary" Color="#111214" />
       <SolidColorBrush x:Key="KpTextSecondary" Color="#3A3C40" />
       <SolidColorBrush x:Key="KpTextMuted" Color="#6B6D72" />
-      <SolidColorBrush x:Key="KpTextDisabled" Color="#A3A5A9" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#6F7175" />
 
       <SolidColorBrush x:Key="KpAccentText" Color="#8A5A00" />
+      <SolidColorBrush x:Key="KpFocusRing" Color="#8A5A00" />
+      <SolidColorBrush x:Key="KpWarn" Color="#8A5A00" />
+      <SolidColorBrush x:Key="KpIdle" Color="#55575C" />
+      <BoxShadows x:Key="KpFieldGlow">0 0 0 3 #268A5A00</BoxShadows>
+      <BoxShadows x:Key="KpWaitingHalo">0 0 0 3 #338A5A00</BoxShadows>
+      <BoxShadows x:Key="KpSelectedBar">inset 2 0 0 0 #8A5A00</BoxShadows>
       <SolidColorBrush x:Key="KpFocusGap" Color="#FFFFFF" />
       <SolidColorBrush x:Key="KpMarkInk" Color="#111214" />
       <!-- DESIGN's status hues at oklch lightness 0.50, so a status read as text keeps 4.5:1 on every light surface. -->
@@ -78,6 +92,35 @@
       <SolidColorBrush x:Key="KpSurface3" Color="#EFEFEC" />
     </ResourceDictionary>
 
+    <!-- Each holds only what differs from the palette it inherits; the grounds stay. -->
+    <ResourceDictionary x:Key="{x:Static app:HighContrast.Dark}">
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#A9ABB0" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#B4B6BB" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#C9CACD" />
+      <SolidColorBrush x:Key="KpTextPrimary" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="KpTextSecondary" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="KpTextMuted" Color="#D9DADD" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#A9ABB0" />
+      <SolidColorBrush x:Key="KpIdle" Color="#A9ABB0" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="{x:Static app:HighContrast.Light}">
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#55575C" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#4A4C50" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#3A3C40" />
+      <SolidColorBrush x:Key="KpTextPrimary" Color="#000000" />
+      <SolidColorBrush x:Key="KpTextSecondary" Color="#1D1E22" />
+      <SolidColorBrush x:Key="KpTextMuted" Color="#3A3C40" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#55575C" />
+      <SolidColorBrush x:Key="KpAccentText" Color="#6B4500" />
+      <SolidColorBrush x:Key="KpFocusRing" Color="#6B4500" />
+      <SolidColorBrush x:Key="KpWarn" Color="#6B4500" />
+      <SolidColorBrush x:Key="KpIdle" Color="#3A3C40" />
+      <BoxShadows x:Key="KpFieldGlow">0 0 0 3 #266B4500</BoxShadows>
+      <BoxShadows x:Key="KpWaitingHalo">0 0 0 3 #336B4500</BoxShadows>
+      <BoxShadows x:Key="KpSelectedBar">inset 2 0 0 0 #6B4500</BoxShadows>
+    </ResourceDictionary>
+
   </ResourceDictionary.ThemeDictionaries>
 
   <!-- The same in both themes. -->
@@ -88,16 +131,13 @@
   <SolidColorBrush x:Key="KpAccentTintStrong" Color="#1FF2B544" />
   <SolidColorBrush x:Key="KpAccentHalo" Color="#33F2B544" />
   <SolidColorBrush x:Key="KpOnAccent" Color="#111214" />
-  <SolidColorBrush x:Key="KpFocusRing" Color="#F2B544" />
   <SolidColorBrush x:Key="KpMarkDot" Color="#F2B544" />
 
   <SolidColorBrush x:Key="KpDangerTint" Color="#1FF0786E" />
   <SolidColorBrush x:Key="KpDangerTintHover" Color="#33F0786E" />
-  <SolidColorBrush x:Key="KpWarn" Color="#F2B544" />
-  <SolidColorBrush x:Key="KpIdle" Color="#55575C" />
 
   <SolidColorBrush x:Key="KpTerminal" Color="#0C0D0E" />
-  <SolidColorBrush x:Key="KpTerminalDivider" Color="#1D1E22" />
+  <SolidColorBrush x:Key="KpTerminalDivider" Color="#6E7076" />
   <SolidColorBrush x:Key="KpBackdrop" Color="#9908090A" />
 
   <!-- The first palette's accent pair, mapped onto amber. -->
@@ -111,10 +151,10 @@
   <SolidColorBrush x:Key="KpInk3" Color="#24262A" />
   <SolidColorBrush x:Key="KpInk4" Color="#2A2C30" />
   <SolidColorBrush x:Key="KpInk5" Color="#33363B" />
-  <SolidColorBrush x:Key="KpLine1" Color="#26282C" />
-  <SolidColorBrush x:Key="KpLine2" Color="#2C2E33" />
-  <SolidColorBrush x:Key="KpLine3" Color="#3A3D43" />
-  <SolidColorBrush x:Key="KpGrey7" Color="#55575C" />
+  <SolidColorBrush x:Key="KpLine1" Color="#6E7076" />
+  <SolidColorBrush x:Key="KpLine2" Color="#74767C" />
+  <SolidColorBrush x:Key="KpLine3" Color="#7C7E84" />
+  <SolidColorBrush x:Key="KpGrey7" Color="#84868C" />
   <SolidColorBrush x:Key="KpGrey5" Color="#8E9096" />
   <SolidColorBrush x:Key="KpGrey3" Color="#C9CACD" />
   <SolidColorBrush x:Key="KpPaper" Color="#F2F2F0" />
@@ -164,9 +204,6 @@
 
   <BoxShadows x:Key="KpShadowDialog">0 24 64 0 #8C000000</BoxShadows>
   <BoxShadows x:Key="KpShadowPopover">0 8 24 0 #59000000</BoxShadows>
-  <BoxShadows x:Key="KpFieldGlow">0 0 0 3 #26F2B544</BoxShadows>
-  <BoxShadows x:Key="KpWaitingHalo">0 0 0 3 #33F2B544</BoxShadows>
-  <BoxShadows x:Key="KpSelectedBar">inset 2 0 0 0 #F2B544</BoxShadows>
 
   <!-- Motion: 120ms and 200ms on one curve, no bounce, for overlays appearing (dialog, toast).
        Hover, press and selection change instantly: a fade leaves a control's drawn state depending

@@ -123,10 +123,10 @@
     <Setter Property="Height" Value="28" />
   </Style>
 
-  <!-- A tree row's fold: a 16px chevron that takes no room from the row's text. -->
+  <!-- A tree row's fold: a 20px target that keeps the 16px column it sits in, so it takes no room from the row's text. -->
   <Style Selector="Button.fold">
-    <Setter Property="Width" Value="16" />
-    <Setter Property="Height" Value="16" />
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="CornerRadius" Value="4" />

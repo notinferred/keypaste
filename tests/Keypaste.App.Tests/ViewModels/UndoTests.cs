@@ -74,6 +74,18 @@ public sealed class UndoTests : IDisposable
         Assert.Equal(before, VaultState());
     }
 
+    [Fact]
+    public void Undoing_a_delete_shows_the_item_again_in_the_pane()
+    {
+        Make("delete item");
+        Assert.Null(_entries.Detail);
+
+        _entries.UndoCommand.Press();
+
+        Assert.NotNull(_entries.Selected);
+        Assert.NotNull(_entries.Detail);
+    }
+
     [Theory]
     [InlineData("delete item", true)]
     [InlineData("delete group", true)]

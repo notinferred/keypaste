@@ -60,6 +60,7 @@ internal sealed partial class App : Application, IDisposable
     private bool _crashed;
     private Core.Settings.AppTheme _theme = Core.Settings.AppTheme.System;
     private PlatformThemeVariant _platformTheme = PlatformThemeVariant.Dark;
+    private ColorContrastPreference _platformContrast = ColorContrastPreference.NoPreference;
 
     public override void Initialize()
     {
@@ -812,15 +813,25 @@ internal sealed partial class App : Application, IDisposable
     internal void ApplyTheme(Core.Settings.AppTheme theme)
     {
         _theme = theme;
-        RequestedThemeVariant = theme switch
-        {
-            Core.Settings.AppTheme.Light => ThemeVariant.Light,
-            Core.Settings.AppTheme.Dark => ThemeVariant.Dark,
-            _ => VariantOf(_platformTheme),
-        };
+        RequestedThemeVariant = ChosenVariant();
     }
 
-    /// <summary>Tracks the operating system's light or dark setting, and follows it while System is chosen.</summary>
+    /// <summary>Settings or the system says light or dark; only the system says high contrast, so a person who needs it keeps it under either choice.</summary>
+    private ThemeVariant ChosenVariant()
+    {
+        var dark = _theme switch
+        {
+            Core.Settings.AppTheme.Light => false,
+            Core.Settings.AppTheme.Dark => true,
+            _ => _platformTheme == PlatformThemeVariant.Dark,
+        };
+
+        return _platformContrast == ColorContrastPreference.High
+            ? (dark ? HighContrast.Dark : HighContrast.Light)
+            : (dark ? ThemeVariant.Dark : ThemeVariant.Light);
+    }
+
+    /// <summary>Tracks the operating system's light or dark setting, followed while System is chosen, and its contrast preference, always followed.</summary>
     private void FollowPlatformTheme()
     {
         if (PlatformSettings is not { } settings)
@@ -832,19 +843,19 @@ internal sealed partial class App : Application, IDisposable
         _platformTheme = ActualThemeVariant == ThemeVariant.Dark ? PlatformThemeVariant.Dark
             : ActualThemeVariant == ThemeVariant.Light ? PlatformThemeVariant.Light
             : settings.GetColorValues().ThemeVariant;
+        _platformContrast = settings.GetColorValues().ContrastPreference;
         settings.ColorValuesChanged += (_, values) =>
         {
             _platformTheme = values.ThemeVariant;
-
-            if (_theme == Core.Settings.AppTheme.System)
-            {
-                RequestedThemeVariant = VariantOf(values.ThemeVariant);
-            }
+            _platformContrast = values.ContrastPreference;
+            RequestedThemeVariant = ChosenVariant();
         };
-    }
 
-    private static ThemeVariant VariantOf(PlatformThemeVariant platform) =>
-        platform == PlatformThemeVariant.Dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        if (_platformContrast == ColorContrastPreference.High)
+        {
+            RequestedThemeVariant = ChosenVariant();
+        }
+    }
 
     /// <summary>Drops the vault and the unlock screen's password buffer.</summary>
     /// <remarks>

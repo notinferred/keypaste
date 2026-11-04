@@ -38,10 +38,16 @@
                    ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpAccentTint}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    <Setter Property="BoxShadow" Value="{StaticResource KpSelectedBar}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource KpSelectedBar}" />
   </Style>
   <Style Selector="ListBoxItem:selected ctl|KpIcon">
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <!-- Muted text falls under 4.5:1 on a hovered or selected row, so it takes the secondary colour there. -->
+  <Style Selector="ListBoxItem:pointerover :is(TextBlock).muted, ListBoxItem:pointerover :is(TextBlock).caption,
+                   ListBoxItem:selected :is(TextBlock).muted, ListBoxItem:selected :is(TextBlock).caption">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
   <Style Selector="ListBox.rows > ListBoxItem">

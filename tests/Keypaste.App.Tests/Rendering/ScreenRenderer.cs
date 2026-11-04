@@ -32,8 +32,8 @@ namespace Keypaste.App.Tests.Rendering;
 /// KEYPASTE_SCREENS_OUT=/tmp/screens bash scripts/verify.sh test Keypaste.App.Tests.Rendering.ScreenRenderer
 /// </code>
 /// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
-/// twice, into <c>dark</c> and <c>light</c> folders, with the system set to each and no theme chosen,
-/// as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Add a
+/// four times, into <c>dark</c>, <c>light</c>, <c>high-contrast-dark</c> and <c>high-contrast-light</c>
+/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Add a
 /// screen by adding a <see cref="Save"/> call.
 /// </summary>
 public sealed class ScreenRenderer
@@ -46,16 +46,27 @@ public sealed class ScreenRenderer
     private static readonly EntryName _apiHome = new("env/acme-api", ".env");
     private static readonly EntryName _openAi = new("Services", "OpenAI");
 
-    [Theory]
-    [InlineData("dark")]
-    [InlineData("light")]
-    public Task Every_screen_is_drawn_to_a_file(string palette) => HeadlessSession.On(() =>
+    /// <summary>Makes the palette's folder and sets the system to it; skips the test unless a folder is named.</summary>
+    private static string Prepare(string palette)
     {
         var root = Environment.GetEnvironmentVariable(_variable);
         Assert.SkipWhen(string.IsNullOrEmpty(root), $"{_variable} is not set");
         var output = Path.Combine(root!, palette);
         Directory.CreateDirectory(output);
-        PlatformTheme.Set(palette == "light" ? Avalonia.Platform.PlatformThemeVariant.Light : Avalonia.Platform.PlatformThemeVariant.Dark);
+        PlatformTheme.Set(
+            palette.EndsWith("light", StringComparison.Ordinal) ? Avalonia.Platform.PlatformThemeVariant.Light : Avalonia.Platform.PlatformThemeVariant.Dark,
+            palette.StartsWith("high-contrast", StringComparison.Ordinal) ? Avalonia.Platform.ColorContrastPreference.High : Avalonia.Platform.ColorContrastPreference.NoPreference);
+        return output;
+    }
+
+    [Theory]
+    [InlineData("dark")]
+    [InlineData("light")]
+    [InlineData("high-contrast-dark")]
+    [InlineData("high-contrast-light")]
+    public Task Every_screen_is_drawn_to_a_file(string palette) => HeadlessSession.On(() =>
+    {
+        var output = Prepare(palette);
 
         using var demo = new DemoVault();
         DrawUnlock(demo, output);
@@ -178,12 +189,14 @@ public sealed class ScreenRenderer
     /// Settings open, a tool's Connect pane while a request waits and while none does, the token form, a minted
     /// token and a token revoke being confirmed.
     /// </summary>
-    [Fact]
-    public Task The_agents_screen_is_drawn_with_grants_clients_and_tokens() => HeadlessSession.On(async () =>
+    [Theory]
+    [InlineData("dark")]
+    [InlineData("light")]
+    [InlineData("high-contrast-dark")]
+    [InlineData("high-contrast-light")]
+    public Task The_agents_screen_is_drawn_with_grants_clients_and_tokens(string palette) => HeadlessSession.On(async () =>
     {
-        var output = Environment.GetEnvironmentVariable(_variable);
-        Assert.SkipWhen(string.IsNullOrEmpty(output), $"{_variable} is not set");
-        Directory.CreateDirectory(output);
+        var output = Prepare(palette);
 
         using var demo = new DemoVault();
         var clock = new ManualClock(AppClock.Start);
@@ -228,38 +241,38 @@ public sealed class ScreenRenderer
         var agents = Assert.IsType<AgentActivityViewModel>(shell.Content);
         await agents.Looking;
         WindowInput.Drain();
-        Save(window, output!, "20-agents");
+        Save(window, output, "20-agents");
 
         window.Height = 1500;
-        Save(window, output!, "21-agents-full");
+        Save(window, output, "21-agents-full");
 
         window.Width = 1920;
         window.Height = 1100;
-        Save(window, output!, "25-agents-wide");
+        Save(window, output, "25-agents-wide");
         window.Width = 960;
-        Save(window, output!, "29-agents-narrow");
+        Save(window, output, "29-agents-narrow");
         window.Width = _width;
         window.Height = 1500;
 
         agents.EndCommand.Press(agents.Grants[0]);
         var claudeRow = agents.Rows.Single(row => row.Key == "claude-code");
         claudeRow.IsOpen = true;
-        Save(window, output!, "27-agents-settings-open");
+        Save(window, output, "27-agents-settings-open");
         window.Width = 960;
-        Save(window, output!, "27-agents-settings-narrow");
+        Save(window, output, "27-agents-settings-narrow");
         window.Width = _width;
 
         claudeRow.IsOpen = false;
         agents.ConnectCommand.Press(agents.Rows.Single(row => row.Key == "cursor"));
         await agents.Opening;
-        Save(window, output!, "24-agents-connect");
+        Save(window, output, "24-agents-connect");
 
         // With nothing waiting, the open pane's Run it is the frame's one amber.
         await zed.DisposeAsync();
         await Assert.ThrowsAnyAsync<Exception>(() => waiting);
         await WaitUntilAsync(() => authority.Activity.Waiting.Count == 0);
         agents.Refresh();
-        Save(window, output!, "28-agents-quiet");
+        Save(window, output, "28-agents-quiet");
 
         // Scoped tokens, under Settings › Advanced.
         window.Height = _height;
@@ -267,20 +280,20 @@ public sealed class ScreenRenderer
         var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
         Assert.True(tokens.Create("ci-github-actions", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
         Assert.True(tokens.Create("local-evals", "read:acme-api/dev/OPENAI_API_KEY", TimeSpan.FromDays(7), false).Ok);
-        Save(window, output!, "22-settings-tokens");
+        Save(window, output, "22-settings-tokens");
 
         tokens.OpenFormCommand.Press();
         tokens.Name = "deploy-preview";
         tokens.Scope = "read:acme-web/preview/*";
         tokens.Expiry = "7d";
-        Save(window, output!, "22b-settings-tokens-new");
+        Save(window, output, "22b-settings-tokens-new");
 
         tokens.CreateCommand.Press();
-        Save(window, output!, "23-settings-tokens-minted");
+        Save(window, output, "23-settings-tokens-minted");
 
         tokens.DoneMintedCommand.Press();
         tokens.AskRevokeCommand.Press(tokens.Rows[0]);
-        Save(window, output!, "26-settings-tokens-revoke");
+        Save(window, output, "26-settings-tokens-revoke");
 
         window.Close();
     });

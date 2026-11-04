@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app is easier to see: on the light palette focus, selection and warnings are drawn in a darker amber, every line and disabled label keeps WCAG's contrast on its ground, high-contrast light and dark palettes follow macOS's Increase Contrast and Windows' contrast themes, small buttons take a 20 by 20 target, and undoing a delete shows the item again in the pane ([Q.8](docs/steps/Q.8.md)).
+
 The desktop app now works better with screen readers: every field and list row has a name, headings carry their level, buttons in a repeated row name what they act on, and unlock and form errors, toasts, the banner saying another program saved the vault and a prompt's opening with its time limit are each announced once. Fields labelled only by a placeholder now have a visible label, and the Agents row says live or refusing beside its dot. ([Q.7](docs/steps/Q.7.md))
 
 The desktop app now says what is happening: a toast shows whether it reports a success, information or a warning, stays at least four seconds, waits while the pointer is on it and closes with ×, and later ones stack rather than replace it; a moving indicator and label sit beside each wait; errors end with what to do next; a password that alone does not open a vault says it may also need a key file or a YubiKey and opens More options; and empty lists offer Search all items, Clear search, Show all or New token. ([Q.6](docs/steps/Q.6.md))

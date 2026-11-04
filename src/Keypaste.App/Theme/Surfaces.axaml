@@ -120,17 +120,22 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <!-- A 20px target; the margins keep the 16px it used to take in the chip's row. -->
   <Style Selector="Button.chip-remove">
-    <Setter Property="Width" Value="16" />
-    <Setter Property="Height" Value="16" />
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="Margin" Value="2,0,-4,0" />
+    <Setter Property="Margin" Value="0,-2,-6,-2" />
     <Setter Property="CornerRadius" Value="3" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+
+  <Style Selector="Border.toast :is(TextBlock).muted">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
   <Style Selector="Border.chip > TextBlock">
@@ -155,7 +160,7 @@
   <Style Selector="Border.keycap > TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="FontSize" Value="10.5" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
   <Style Selector="Border.dot">
@@ -182,7 +187,7 @@
   </Style>
   <Style Selector="Border.dot.waiting">
     <Setter Property="Background" Value="{DynamicResource KpWarn}" />
-    <Setter Property="BoxShadow" Value="{StaticResource KpWaitingHalo}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource KpWaitingHalo}" />
   </Style>
 
   <Style Selector="Border.tile">
