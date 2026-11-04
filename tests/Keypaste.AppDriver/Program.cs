@@ -489,7 +489,12 @@ internal sealed class Driver(string home)
                 Type(form.Password);
             }
 
-            Press(entries.ConfirmAddCommand, "Create");
+            if (!entries.ConfirmAddCommand.CanExecute(null))
+            {
+                return Refused("the Create button is disabled");
+            }
+
+            entries.ConfirmAddCommand.Execute(null);
             return entries.IsAdding ? Refused(form.Error) : Did($"created {folder}/{title}");
         });
 
