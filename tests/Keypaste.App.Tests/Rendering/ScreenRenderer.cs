@@ -776,6 +776,11 @@ public sealed class ScreenRenderer
         Save(notice, output, "91g-always-for-notice");
         notice.Close();
 
+        var arming = new ApprovalWindow(new ApprovalViewModel(asked));
+        arming.Show();
+        Save(arming, output, "91j-approval-arming");
+        arming.Close();
+
         var locked = new LockedNoticeWindow("acme.kdbx", () => { }, new ManualClock(AppClock.Start));
         locked.Arm();
         locked.Show();

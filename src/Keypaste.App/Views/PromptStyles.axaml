@@ -147,10 +147,10 @@
   <Style Selector="Button.prompt.primary, Button.prompt.danger">
     <Setter Property="Padding" Value="14,0" />
   </Style>
-  <!-- While arming, Allow once keeps its fill and shape; only its label fades. -->
+  <!-- While arming, Allow once keeps its fill and shape; only its label fades, and stays readable because a person is reading the prompt by then. -->
   <Style Selector="Button.prompt:not(.primary):not(.danger):not(.ghost):disabled /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
 </Styles>

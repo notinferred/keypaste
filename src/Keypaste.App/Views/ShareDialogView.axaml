@@ -40,7 +40,7 @@
                     Width="16" Height="16"
                     CornerRadius="4"
                     BorderThickness="1"
-                    BorderBrush="{DynamicResource KpBorderStrong}"
+                    BorderBrush="{DynamicResource KpBorderControl}"
                     Background="{DynamicResource KpBgApp}"
                     VerticalAlignment="Center">
               <ctl:KpIcon Name="Tick" Icon="check" Size="12" IsVisible="False"

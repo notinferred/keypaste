@@ -12,7 +12,7 @@
       <ControlTemplate>
         <Border Name="Frame"
                 Background="{DynamicResource TextControlBackground}"
-                BorderBrush="{DynamicResource KpBorderDefault}"
+                BorderBrush="{DynamicResource KpBorderControl}"
                 BorderThickness="1"
                 CornerRadius="{DynamicResource KpRadiusField}"
                 Padding="{DynamicResource KpFieldPadding}">
@@ -30,7 +30,7 @@
     </Setter>
 
     <Style Selector="^:pointerover /template/ Border#Frame">
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushPointerOver}" />
     </Style>
 
     <!-- A keyboard-first app whose focus is invisible is not keyboard-first. This is never

@@ -12,7 +12,7 @@
     a dot is DESIGN's #8A5A00, because #F2B544 is under 2:1 there.
 
     Semantic brushes (KpBg*, KpBorder*, KpText*, KpAccent*, status) change with the theme and are
-    what views use. The raw palette below them (KpInk*, KpLine*, KpAmber…) does not change and is
+    what views use. The raw palette below them (KpInk*, KpAmber…) does not change and is
     for the rare surface that stays dark in both themes, such as a terminal preview.
   -->
 
@@ -26,14 +26,16 @@
       <SolidColorBrush x:Key="KpBgActive" Color="#2A2C30" />
       <SolidColorBrush x:Key="KpBgActiveHover" Color="#33363B" />
 
-      <SolidColorBrush x:Key="KpBorderSubtle" Color="#6E7076" />
-      <SolidColorBrush x:Key="KpBorderDefault" Color="#74767C" />
-      <SolidColorBrush x:Key="KpBorderStrong" Color="#7C7E84" />
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#26282C" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#2C2E33" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#3A3D43" />
+      <!-- The edge of what a person operates, at 3:1; the lines above are decorative. -->
+      <SolidColorBrush x:Key="KpBorderControl" Color="#74767C" />
 
       <SolidColorBrush x:Key="KpTextPrimary" Color="#F2F2F0" />
       <SolidColorBrush x:Key="KpTextSecondary" Color="#C9CACD" />
       <SolidColorBrush x:Key="KpTextMuted" Color="#8E9096" />
-      <SolidColorBrush x:Key="KpTextDisabled" Color="#84868C" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#55575C" />
 
       <SolidColorBrush x:Key="KpAccentText" Color="#F2B544" />
       <SolidColorBrush x:Key="KpFocusRing" Color="#F2B544" />
@@ -53,6 +55,12 @@
       <SolidColorBrush x:Key="KpSurface1" Color="#18191C" />
       <SolidColorBrush x:Key="KpSurface2" Color="#1D1E22" />
       <SolidColorBrush x:Key="KpSurface3" Color="#24262A" />
+
+      <!-- The terminal stays dark in every palette; these are here, not with the raw palette, because a key outside a palette would win over high contrast's. -->
+      <SolidColorBrush x:Key="KpLine1" Color="#26282C" />
+      <SolidColorBrush x:Key="KpLine2" Color="#2C2E33" />
+      <SolidColorBrush x:Key="KpLine3" Color="#3A3D43" />
+      <SolidColorBrush x:Key="KpTerminalDivider" Color="#1D1E22" />
     </ResourceDictionary>
 
     <ResourceDictionary x:Key="Light">
@@ -63,14 +71,15 @@
       <SolidColorBrush x:Key="KpBgActive" Color="#E6E6E2" />
       <SolidColorBrush x:Key="KpBgActiveHover" Color="#DDDDD8" />
 
-      <SolidColorBrush x:Key="KpBorderSubtle" Color="#8A8A86" />
-      <SolidColorBrush x:Key="KpBorderDefault" Color="#84847F" />
-      <SolidColorBrush x:Key="KpBorderStrong" Color="#7A7A75" />
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#E8E8E4" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#DCDCD7" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#C4C4BE" />
+      <SolidColorBrush x:Key="KpBorderControl" Color="#84847F" />
 
       <SolidColorBrush x:Key="KpTextPrimary" Color="#111214" />
       <SolidColorBrush x:Key="KpTextSecondary" Color="#3A3C40" />
       <SolidColorBrush x:Key="KpTextMuted" Color="#6B6D72" />
-      <SolidColorBrush x:Key="KpTextDisabled" Color="#6F7175" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#A3A5A9" />
 
       <SolidColorBrush x:Key="KpAccentText" Color="#8A5A00" />
       <SolidColorBrush x:Key="KpFocusRing" Color="#8A5A00" />
@@ -90,6 +99,11 @@
       <SolidColorBrush x:Key="KpSurface1" Color="#FFFFFF" />
       <SolidColorBrush x:Key="KpSurface2" Color="#FFFFFF" />
       <SolidColorBrush x:Key="KpSurface3" Color="#EFEFEC" />
+
+      <SolidColorBrush x:Key="KpLine1" Color="#26282C" />
+      <SolidColorBrush x:Key="KpLine2" Color="#2C2E33" />
+      <SolidColorBrush x:Key="KpLine3" Color="#3A3D43" />
+      <SolidColorBrush x:Key="KpTerminalDivider" Color="#1D1E22" />
     </ResourceDictionary>
 
     <!-- Each holds only what differs from the palette it inherits; the grounds stay. -->
@@ -97,17 +111,23 @@
       <SolidColorBrush x:Key="KpBorderSubtle" Color="#A9ABB0" />
       <SolidColorBrush x:Key="KpBorderDefault" Color="#B4B6BB" />
       <SolidColorBrush x:Key="KpBorderStrong" Color="#C9CACD" />
+      <SolidColorBrush x:Key="KpBorderControl" Color="#C9CACD" />
       <SolidColorBrush x:Key="KpTextPrimary" Color="#FFFFFF" />
       <SolidColorBrush x:Key="KpTextSecondary" Color="#F2F2F0" />
       <SolidColorBrush x:Key="KpTextMuted" Color="#D9DADD" />
       <SolidColorBrush x:Key="KpTextDisabled" Color="#A9ABB0" />
       <SolidColorBrush x:Key="KpIdle" Color="#A9ABB0" />
+      <SolidColorBrush x:Key="KpLine1" Color="#6E7076" />
+      <SolidColorBrush x:Key="KpLine2" Color="#74767C" />
+      <SolidColorBrush x:Key="KpLine3" Color="#7C7E84" />
+      <SolidColorBrush x:Key="KpTerminalDivider" Color="#6E7076" />
     </ResourceDictionary>
 
     <ResourceDictionary x:Key="{x:Static app:HighContrast.Light}">
       <SolidColorBrush x:Key="KpBorderSubtle" Color="#55575C" />
       <SolidColorBrush x:Key="KpBorderDefault" Color="#4A4C50" />
       <SolidColorBrush x:Key="KpBorderStrong" Color="#3A3C40" />
+      <SolidColorBrush x:Key="KpBorderControl" Color="#3A3C40" />
       <SolidColorBrush x:Key="KpTextPrimary" Color="#000000" />
       <SolidColorBrush x:Key="KpTextSecondary" Color="#1D1E22" />
       <SolidColorBrush x:Key="KpTextMuted" Color="#3A3C40" />
@@ -116,6 +136,10 @@
       <SolidColorBrush x:Key="KpFocusRing" Color="#6B4500" />
       <SolidColorBrush x:Key="KpWarn" Color="#6B4500" />
       <SolidColorBrush x:Key="KpIdle" Color="#3A3C40" />
+      <SolidColorBrush x:Key="KpLine1" Color="#6E7076" />
+      <SolidColorBrush x:Key="KpLine2" Color="#74767C" />
+      <SolidColorBrush x:Key="KpLine3" Color="#7C7E84" />
+      <SolidColorBrush x:Key="KpTerminalDivider" Color="#6E7076" />
       <BoxShadows x:Key="KpFieldGlow">0 0 0 3 #266B4500</BoxShadows>
       <BoxShadows x:Key="KpWaitingHalo">0 0 0 3 #336B4500</BoxShadows>
       <BoxShadows x:Key="KpSelectedBar">inset 2 0 0 0 #6B4500</BoxShadows>
@@ -137,7 +161,6 @@
   <SolidColorBrush x:Key="KpDangerTintHover" Color="#33F0786E" />
 
   <SolidColorBrush x:Key="KpTerminal" Color="#0C0D0E" />
-  <SolidColorBrush x:Key="KpTerminalDivider" Color="#6E7076" />
   <SolidColorBrush x:Key="KpBackdrop" Color="#9908090A" />
 
   <!-- The first palette's accent pair, mapped onto amber. -->
@@ -151,10 +174,7 @@
   <SolidColorBrush x:Key="KpInk3" Color="#24262A" />
   <SolidColorBrush x:Key="KpInk4" Color="#2A2C30" />
   <SolidColorBrush x:Key="KpInk5" Color="#33363B" />
-  <SolidColorBrush x:Key="KpLine1" Color="#6E7076" />
-  <SolidColorBrush x:Key="KpLine2" Color="#74767C" />
-  <SolidColorBrush x:Key="KpLine3" Color="#7C7E84" />
-  <SolidColorBrush x:Key="KpGrey7" Color="#84868C" />
+  <SolidColorBrush x:Key="KpGrey7" Color="#55575C" />
   <SolidColorBrush x:Key="KpGrey5" Color="#8E9096" />
   <SolidColorBrush x:Key="KpGrey3" Color="#C9CACD" />
   <SolidColorBrush x:Key="KpPaper" Color="#F2F2F0" />

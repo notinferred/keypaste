@@ -39,15 +39,6 @@
     <Setter Property="Padding" Value="8,0" />
     <Setter Property="FontSize" Value="12.5" />
   </Style>
-  <Style Selector="TextBox.search /template/ Border#PART_BorderElement">
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-  </Style>
-  <Style Selector="TextBox.search:pointerover /template/ Border#PART_BorderElement">
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
-  </Style>
-  <Style Selector="TextBox.search:focus /template/ Border#PART_BorderElement">
-    <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
-  </Style>
 
   <Style Selector="ComboBox">
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
@@ -101,7 +92,7 @@
   </Style>
   <Style Selector="ToggleSwitch /template/ Border#Track">
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderControl}" />
   </Style>
   <Style Selector="ToggleSwitch /template/ Ellipse#Knob">
     <Setter Property="Fill" Value="{DynamicResource KpTextMuted}" />
@@ -148,14 +139,14 @@
     </Setter>
   </Style>
   <Style Selector="RadioButton:not(.segment) /template/ Ellipse#Ring">
-    <Setter Property="Stroke" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="Stroke" Value="{DynamicResource KpBorderControl}" />
     <Setter Property="Fill" Value="{DynamicResource KpBgApp}" />
   </Style>
   <Style Selector="RadioButton:not(.segment) /template/ Ellipse#Dot">
     <Setter Property="Fill" Value="Transparent" />
   </Style>
   <Style Selector="RadioButton:not(.segment):pointerover /template/ Ellipse#Ring">
-    <Setter Property="Stroke" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Stroke" Value="{DynamicResource RadioButtonOuterEllipseStrokePointerOver}" />
   </Style>
   <Style Selector="RadioButton:not(.segment):checked /template/ Ellipse#Ring">
     <Setter Property="Stroke" Value="{DynamicResource KpTextPrimary}" />

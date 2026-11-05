@@ -26,7 +26,7 @@ Every screen designs each state it can reach: first use, empty, loading, filled,
 
 ## Colour
 
-The app follows the system's light or dark setting, and both palettes are first-class. Depth is lightness, not shadow.
+The app follows the system's light or dark setting, and both palettes are first-class. Depth is lightness, not shadow. Lines are quiet: cards, tables, dividers, chips and read-only values take them. The control edge outlines text fields, combo boxes, date pickers, unchecked checkboxes, radio rings and a `ToggleSwitch`'s off track; [Q.8](steps/Q.8.md) names the controls drawn without it.
 
 | Role | Dark | Light |
 |---|---|---|
@@ -35,14 +35,15 @@ The app follows the system's light or dark setting, and both palettes are first-
 | Card, dialog | `#1D1E22` | `#FFFFFF` |
 | Hover | `#24262A` | `#EFEFEC` |
 | Active, secondary button | `#2A2C30` (hover `#33363B`) | `#E6E6E2` (hover `#DDDDD8`) |
-| Lines: subtle, field, strong | `#6E7076`, `#74767C`, `#7C7E84` | `#8A8A86`, `#84847F`, `#7A7A75` |
+| Lines: subtle, default, strong | `#26282C`, `#2C2E33`, `#3A3D43` | `#E8E8E4`, `#DCDCD7`, `#C4C4BE` |
+| Control edge | `#74767C` (hover `#8E9096`) | `#84847F` (hover `#6B6D72`) |
 | Text: primary, secondary, muted | `#F2F2F0`, `#C9CACD`, `#8E9096` | `#111214`, `#3A3C40`, `#6B6D72` |
-| Text: disabled | `#84868C` | `#6F7175` |
-| Terminal | `#0C0D0E`, header divider `#6E7076` | unchanged |
+| Text: disabled | `#55575C` | `#A3A5A9` |
+| Terminal | `#0C0D0E`, header divider `#1D1E22` | unchanged |
 
 The single accent is amber `#F2B544` (hover `#F7C566`, press `#D99D2E`, tint 10–12%). It appears once per view, for the primary action or a live signal, and text on amber is always ink `#111214`. On a light ground amber as text, a focus ring, a focused field, a selection bar or a warn dot is `#8A5A00`; a filled primary button stays `#F2B544`.
 
-High-contrast dark and light variants follow macOS's Increase Contrast and Windows' contrast themes, whichever of light or dark Settings chooses. They keep the grounds and raise text and lines: on dark, text `#FFFFFF`, `#F2F2F0`, `#D9DADD`, disabled and subtle line `#A9ABB0`, lines `#B4B6BB`, `#C9CACD`; on light, text `#000000`, `#1D1E22`, `#3A3C40`, disabled and subtle line `#55575C`, lines `#4A4C50`, `#3A3C40`, amber `#6B4500`.
+High-contrast dark and light variants follow macOS's Increase Contrast and Windows' contrast themes, whichever of light or dark Settings chooses. They keep the grounds and raise text and lines: on dark, text `#FFFFFF`, `#F2F2F0`, `#D9DADD`, disabled and subtle line `#A9ABB0`, lines `#B4B6BB`, `#C9CACD`, control edge `#C9CACD` (hover `#F2F2F0`); on light, text `#000000`, `#1D1E22`, `#3A3C40`, disabled and subtle line `#55575C`, lines `#4A4C50`, `#3A3C40`, control edge `#3A3C40` (hover `#1D1E22`), amber `#6B4500`. The terminal stays dark in both, with lines `#6E7076`, `#74767C`, `#7C7E84` and header divider `#6E7076`.
 
 Status colours: ok `oklch(0.80 0.13 155)`, danger `oklch(0.74 0.14 25)` with a 12% tint behind danger buttons, info `oklch(0.78 0.10 245)`. On the light palette the same hues sit at lightness 0.50, `oklch(0.50 0.13 155)`, `oklch(0.50 0.17 25)` and `oklch(0.50 0.10 245)`, so a status read as text keeps 4.5:1 on every light surface. Warn is amber, and an idle dot is `#7C7E84` on dark and `#55575C` on light. The app draws them as `#72D699`, `#F7857D` and `#7FBEF3`, and on light as `#007840`, `#B02A2D` and `#296898`, because Avalonia has no oklch.
 
@@ -96,8 +97,8 @@ The desktop follows Apple's Human Interface Guidelines on every platform, with C
 4. **Work survives**: a draft is kept when the person changes place, or the app asks before discarding it. A lock still discards it.
 5. **Every field has a visible label** above it, and a placeholder is only an example. An error appears under the field it concerns, as the field is typed.
 6. **Feedback is honest**: anything that takes more than a moment shows a moving indicator and says what it is doing, a toast's icon says whether it reports a success, a warning or information, and every error says what to do next.
-7. **Accessible to everyone**: every control has an accessible name, never a secret. Text keeps 4.5:1 against its ground, and focus rings, control edges and status marks 3:1, in both palettes. A control's target is at least 20 by 20, a row's action buttons sit 8 apart, status is never shown by colour alone, what a screen announces goes through one live line, and text enlarges to 200%.
-8. **Prompts keep their own rules** (D-0326, D-0456, D-0634): no default button, focus on Deny, the allows disarmed for a second, and a fixed layout.
+7. **Accessible to everyone**: every control has an accessible name, never a secret. Enabled text keeps 4.5:1 against its ground, and focus rings, the control edge and status marks 3:1, in both palettes; disabled text and decorative lines are exempt, as in WCAG, and stay quiet. A control's target is at least 20 by 20, a row's action buttons sit 8 apart, status is never shown by colour alone, what a screen announces goes through one live line, and text enlarges to 200%.
+8. **Prompts keep their own rules** (D-0326, D-0456, D-0634): no default button, focus on Deny, the allows disarmed for a second with their labels still readable, and a fixed layout.
 
 ## The marks
 

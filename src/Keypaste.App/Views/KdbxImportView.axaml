@@ -24,12 +24,14 @@
                     CornerRadius="9"
                     VerticalAlignment="Top"
                     Margin="0,1,10,0"
-                    Background="{DynamicResource KpBgActive}">
+                    Background="{DynamicResource KpBgActive}"
+                    BorderBrush="{DynamicResource KpBorderControl}"
+                    BorderThickness="1">
               <Border Name="Knob"
                       Width="14" Height="14"
                       CornerRadius="7"
                       HorizontalAlignment="Left"
-                      Margin="2,0,0,0"
+                      Margin="1,0,0,0"
                       Background="{DynamicResource KpTextMuted}" />
             </Border>
             <ContentPresenter Grid.Column="1"
@@ -41,9 +43,10 @@
       </Setter>
       <Style Selector="^:checked /template/ Border#Track">
         <Setter Property="Background" Value="{DynamicResource KpTextPrimary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource KpTextPrimary}" />
       </Style>
       <Style Selector="^:checked /template/ Border#Knob">
-        <Setter Property="Margin" Value="16,0,0,0" />
+        <Setter Property="Margin" Value="15,0,0,0" />
         <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
       </Style>
       <Style Selector="^:focus-visible /template/ Border#Track">
@@ -65,7 +68,7 @@
                   Width="16" Height="16"
                   CornerRadius="{DynamicResource KpRadiusChip}"
                   BorderThickness="1"
-                  BorderBrush="{DynamicResource KpBorderStrong}"
+                  BorderBrush="{DynamicResource KpBorderControl}"
                   Background="Transparent">
             <ctl:KpIcon Name="Check" Icon="check" Size="12" IsVisible="False"
                         HorizontalAlignment="Center"
@@ -80,7 +83,7 @@
         <Setter Property="IsVisible" Value="True" />
       </Style>
       <Style Selector="^:pointerover /template/ Border#Box">
-        <Setter Property="BorderBrush" Value="{DynamicResource KpTextMuted}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CheckBoxCheckBackgroundStrokeUncheckedPointerOver}" />
       </Style>
       <Style Selector="^:focus-visible /template/ Border#Box">
         <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
@@ -101,7 +104,7 @@
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Style Selector="^:pointerover /template/ Border#PART_BorderElement">
         <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource KpBorderControl}" />
       </Style>
       <Style Selector="^.blocked /template/ Border#PART_BorderElement">
         <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
