@@ -526,9 +526,13 @@ public sealed class ScreenRenderer
         window.Width = 720;
         Save(window, output, "16b-secrets-720");
 
-        shell.ToggleSidebar();
+        shell.OpenSidebarOverlay();
         Save(window, output, "16c-secrets-720-sidebar-open");
         shell.CloseSidebarOverlay();
+
+        shell.ToggleSidebar();
+        Save(window, output, "16e-secrets-720-sidebar-hidden");
+        shell.ToggleSidebar();
 
         window.Width = _width;
         window.Height = _height;
@@ -1123,6 +1127,27 @@ public sealed class ScreenRenderer
 
             Save(window, output, ScreenName(destination));
         }
+
+        window.Width = 720;
+        window.Height = 520;
+
+        foreach (var destination in Destinations.All)
+        {
+            shell.Current = destination;
+
+            if (shell.Content is EnvSetsViewModel env)
+            {
+                env.OpenCommand.Press("acme-api");
+            }
+
+            if (shell.Content is not SharingViewModel)
+            {
+                Save(window, output, $"{ScreenName(destination)}-rail");
+            }
+        }
+
+        window.Width = _width;
+        window.Height = _height;
 
         DrawActivityStates(shell, window, demo.Home, output);
 

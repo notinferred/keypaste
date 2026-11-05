@@ -28,6 +28,10 @@ public sealed class TargetSizeTests
 
         shell.Window.Width = 720;
         RenderedShell.Drain();
+        AssertLargeEnough(shell.Named<Button>("RailGroups"));
+
+        shell.Shell.ToggleSidebar();
+        RenderedShell.Drain();
         AssertLargeEnough(shell.Named<Button>("ShowSidebar"));
     });
 

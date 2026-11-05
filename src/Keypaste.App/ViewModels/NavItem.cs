@@ -26,12 +26,12 @@ internal sealed partial class NavItem : ObservableObject
 
     /// <summary>Whether the dot is green: this app is answering agents for the vault.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DotWords))]
+    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName))]
     internal partial bool DotLive { get; set; }
 
     /// <summary>Whether the dot is red: this app holds the vault and refuses every agent request (D-0494).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DotWords))]
+    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName))]
     internal partial bool DotDanger { get; set; }
 
     /// <summary>Whether the row folds the rows under it: Items does, over the group tree.</summary>
@@ -53,7 +53,19 @@ internal sealed partial class NavItem : ObservableObject
 
     /// <summary>The row's tooltip and automation help text, or null.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RailTip))]
     internal partial string? Detail { get; set; }
+
+    /// <summary>How many requests are waiting for an answer; the rail's accessible name says it, since the rail has no count.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RailName))]
+    internal partial int Waiting { get; set; }
+
+    /// <summary>The rail's row for a screen reader: the rail draws no word, so its name says what the dot's colour and the row's count do.</summary>
+    internal string RailName => string.Join(", ", new[] { Title, DotWords, Waiting > 0 ? string.Create(CultureInfo.InvariantCulture, $"{Waiting} waiting") : string.Empty }.Where(part => part.Length > 0));
+
+    /// <summary>The rail's tooltip: the place, and what the row would say beside it if there were room.</summary>
+    internal string RailTip => string.IsNullOrEmpty(Detail) ? Title : $"{Title} · {Detail}";
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
     public override string ToString() => string.Join(", ", new[] { Title, IsExpandable ? "level 1" : string.Empty, Count, DotWords }.Where(part => part.Length > 0));

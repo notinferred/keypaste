@@ -67,6 +67,18 @@
       <Setter Property="AutomationProperties.Name" Value="{ReflectionBinding Title}" />
     </Style>
 
+    <!-- The rail draws no words, so a row is announced with its status and says the rest as a tooltip. -->
+    <Style Selector="ListBox.rail > ListBoxItem">
+      <Setter Property="AutomationProperties.Name" Value="{ReflectionBinding RailName}" />
+      <Setter Property="AutomationProperties.HelpText" Value="{ReflectionBinding Detail}" />
+      <Setter Property="ToolTip.Tip" Value="{ReflectionBinding RailTip}" />
+      <Setter Property="ToolTip.Placement" Value="Right" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+
     <Style Selector="Button.titlebar-lock">
       <Setter Property="Height" Value="26" />
       <Setter Property="MinHeight" Value="0" />
@@ -99,17 +111,22 @@
               WindowDecorationProperties.ElementRole="TitleBar">
         <Grid Name="TitleColumns" ColumnDefinitions="232,Auto,*">
 
-          <!-- Only while the sidebar is away: Agents, Settings and the groups would otherwise have nothing on screen pointing to them. -->
+          <!-- Only while the person has hidden the sidebar: Agents, Settings and the groups would otherwise have nothing on screen pointing to them. In a narrow window, where the rail is what a person expects to see, it says so in words. -->
           <Button Grid.Column="1"
                   Name="ShowSidebar"
-                  Classes="icon ghost sm"
+                  Classes="ghost sm"
+                  Classes.icon="{Binding !IsNarrow}"
                   VerticalAlignment="Center"
-                  IsVisible="{Binding !ShowsSidebar}"
+                  IsVisible="{Binding SidebarHidden}"
                   Command="{Binding ToggleSidebarCommand}"
-                  ToolTip.Tip="Show sidebar"
+                  ToolTip.Tip="{Binding SidebarWayBack, TargetNullValue='Show sidebar'}"
                   AutomationProperties.Name="Show sidebar"
+                  AutomationProperties.HelpText="{Binding SidebarWayBack}"
                   WindowDecorationProperties.ElementRole="User">
-            <ctl:KpIcon Icon="panel-left" Size="16" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="panel-left" Size="16" />
+              <TextBlock Text="Show sidebar" VerticalAlignment="Center" IsVisible="{Binding IsNarrow}" />
+            </StackPanel>
           </Button>
 
           <!-- The idle warning's first line, said once as the warning comes, while the ticking text below stays quiet. -->
@@ -163,7 +180,58 @@
         </Grid>
       </Border>
 
-      <Grid Name="BodyColumns" Grid.Row="1" ColumnDefinitions="232,*">
+      <!-- The screens' own styles read narrow-window for what gives way under the rail. -->
+      <Grid Name="BodyColumns" Grid.Row="1" ColumnDefinitions="232,*" Classes.narrow-window="{Binding IsNarrow}">
+
+        <!-- The rail, under the titlebar and so clear of the traffic lights and the menu button. The places are one list, so the arrow keys walk them; what does not fit in icons opens from its button. -->
+        <Border Name="Rail"
+                Grid.Column="0"
+                IsVisible="{Binding ShowsRail}"
+                Background="{DynamicResource KpBgPanel}"
+                BorderBrush="{DynamicResource KpBorderSubtle}"
+                BorderThickness="0,0,1,0">
+          <DockPanel Margin="8">
+            <Button Name="RailGroups"
+                    DockPanel.Dock="Top"
+                    Classes="icon ghost"
+                    Width="40"
+                    Height="40"
+                    Margin="0,0,0,8"
+                    Command="{Binding OpenSidebarOverlayCommand}"
+                    ToolTip.Tip="Show groups and projects"
+                    ToolTip.Placement="Right"
+                    AutomationProperties.Name="Show groups and projects">
+              <ctl:KpIcon Icon="panel-left" Size="20" />
+            </Button>
+
+            <ListBox Name="RailNav"
+                     AutomationProperties.Name="Places"
+                     Classes="nav rail"
+                     ItemsSource="{Binding RailPlaces}"
+                     SelectedItem="{Binding SelectedRailPlace}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <ctl:RailPanel />
+                </ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:NavItem">
+                  <Panel Width="28" Height="28">
+                    <ctl:KpIcon Icon="{Binding Icon}" Size="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Name="RailAgentsDot"
+                            Classes="dot"
+                            Classes.ok="{Binding DotLive}"
+                            Classes.danger="{Binding DotDanger}"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            IsVisible="{Binding HasDot}" />
+                  </Panel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </Border>
 
         <!-- The sidebar. Nav is a ListBox on purpose: arrow keys, Home/End and type-ahead all work
              for free, the accessibility roles are right, and there is no custom key handling to get

@@ -22,11 +22,14 @@ internal static class WindowChrome
     /// <inheritdoc cref="MinimumWidth"/>
     public const double MinimumHeight = 520;
 
-    /// <summary>Under this width the sidebar collapses and Items drops its Username and URL columns; from here up, beside the sidebar, those columns keep room for a few characters.</summary>
+    /// <summary>Under this width the sidebar collapses to the rail and Items drops its Username and URL columns; from here up, beside the sidebar, those columns keep room for a few characters.</summary>
     public const double NarrowBelow = 840;
 
     /// <summary>The sidebar's width, and the titlebar's first column while the sidebar shows.</summary>
     public const double SidebarWidth = 232;
+
+    /// <summary>The width of the rail of icons the sidebar collapses to.</summary>
+    public const double RailWidth = 56;
 
     /// <summary>Room the titlebar's content leaves for the caption buttons, which the platform draws and no zoom scales.</summary>
     /// <remarks>

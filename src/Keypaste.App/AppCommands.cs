@@ -194,8 +194,10 @@ internal sealed class AppCommands
         // ⌃⌘S is macOS's own chord for this; Windows and Linux have none, and no chord there can hold Alt.
         _sidebar = new AppCommand("Hide sidebar", Mac ? [new(Key.S, KeyModifiers.Meta | KeyModifiers.Control)] : Chord(Key.B), () => Unmodal() is not null, () => Unmodal()?.ToggleSidebar())
         {
-            Says = () => host.Shell() is { ShowsSidebar: false } ? "Show sidebar" : "Hide sidebar",
+            Says = () => host.Shell() is { SidebarHidden: true } ? "Show sidebar" : "Hide sidebar",
         };
+
+        var groupsAndProjects = new AppCommand("Show groups and projects", [], () => Unmodal() is { ShowsRail: true }, () => Unmodal()?.OpenSidebarOverlay());
 
         // The keyboard's plus is shifted on some layouts, and a chord matches exactly its modifiers.
         AppMenuEntry[] zoom =
@@ -207,8 +209,8 @@ internal sealed class AppCommands
 
         // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
         var view = new AppMenuGroup("View", Mac
-            ? [.. places, _line, _sidebar, _line, .. zoom]
-            : [.. places, _line, _sidebar, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), _line, .. zoom]);
+            ? [.. places, _line, _sidebar, groupsAndProjects, _line, .. zoom]
+            : [.. places, _line, _sidebar, groupsAndProjects, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), _line, .. zoom]);
 
         var window = new AppMenuGroup("Window",
         [

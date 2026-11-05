@@ -279,6 +279,7 @@ public sealed class ShellStatusTests
         clock.Advance(TimeSpan.FromSeconds(1));
 
         Assert.Equal("Answering agents · 1 waiting · 2 connected", shell.AgentsDetail);
+        Assert.Equal("Agents, live, 1 waiting", shell.RailPlaces.Single(place => place.Destination.Kind == Navigation.DestinationKind.AgentActivity).RailName);
 
         await stop.CancelAsync();
         await waiting;

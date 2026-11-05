@@ -10,11 +10,11 @@ The app has four places, Items, Agents, Trash and Settings, on Ctrl/⌘+1–4, a
 
 | Region | Holds |
 |---|---|
-| Title bar | While the sidebar is away the button that shows it; the idle-lock countdown, the vault's file name with its save state, its path the tooltip, and Lock |
-| Sidebar | The wordmark; Items with the vault's group tree, the projects and Agents; Trash and Settings at the bottom |
+| Title bar | While the person has hidden the sidebar the button that shows it; the idle-lock countdown, the vault's file name with its save state, its path the tooltip, and Lock |
+| Sidebar | The wordmark; Items with the vault's group tree, the projects and Agents; Trash and Settings at the bottom. Under 840 wide, a rail of the four places' icons |
 | Content | The place in view: on Items, the list under a header of what it shows, the search and New, and the selected item's pane |
 
-The window goes down to 720 wide, so two sit side by side on a laptop. Under 840 wide the sidebar collapses and Items drops its Username and URL columns; the title bar's button or Show sidebar then opens it over the content, which keeps its width, until Escape or a press outside. View › Hide sidebar hides it at any width. `WindowChrome.cs` holds the sizes.
+The window goes down to 720 wide, so two sit side by side on a laptop. Under 840 wide the sidebar collapses to a rail 56 wide, Items drops its Username and URL columns, the log drops its Where column to the Secrets cell's tooltip, and an environment's note wraps under its mask. The rail keeps the four places, one list the arrow keys walk, each with its name as tooltip and accessible name and the selected one drawn as in the sidebar. Counts drop, and Agents' dot stays, its word in the tooltip and the accessible name. The group tree and the projects open from the rail's first button, or View › Show groups and projects, as the whole sidebar over the content, which keeps its width, until Escape or a press outside. View › Hide sidebar hides the sidebar, or the rail, at any width; the title bar's button then brings it back, and in a narrow window says Show sidebar in words and names the other ways back in its tooltip. `WindowChrome.cs` holds the sizes.
 
 View › Zoom in, Zoom out and Actual size (⌘+, ⌘− and ⌘0) scale every window's interface from 100% to 200% in steps of 25, by drawing it through a layout transform, so the sizes on this page and the breakpoint above read the design's pixels, and at 200% a window 1500 wide lays out as one 750 wide. The minimum window scales with the zoom but never passes the screen's working area; where the screen cannot hold it, the interface keeps its minimum and scrolls inside the window. A prompt takes the zoom as it opens, scaled as a whole so its layout stays fixed, or at the largest scale that shows all of it on its screen, and keeps that scale while it is open.
 

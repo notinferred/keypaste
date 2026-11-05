@@ -31,6 +31,9 @@ internal sealed partial class ShellView : UserControl
     private ShellViewModel? _shell;
     private Control? _focusBeforeImport;
     private Control? _focusBeforeDiscardPrompt;
+
+    // Kept past the moment a control leaves the screen and takes the focus with it.
+    private Visual? _lastFocused;
     private TopLevel? _root;
 
     public ShellView()
@@ -40,7 +43,9 @@ internal sealed partial class ShellView : UserControl
         var nav = this.FindControl<ListBox>("Nav")!;
         nav.ContainerPrepared += OnSidebarRowPrepared;
         nav.AddHandler(KeyDownEvent, OnSidebarKeyDown, RoutingStrategies.Tunnel);
+        this.FindControl<ListBox>("RailNav")!.AddHandler(TappedEvent, OnRailPlaceTapped);
 
+        AddHandler(GotFocusEvent, (_, e) => _lastFocused = e.Source as Visual);
         AddHandler(ContextRequestedEvent, OnContextRequested, RoutingStrategies.Bubble);
         AddHandler(PointerReleasedEvent, OnControlClick, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, OnShiftF10, RoutingStrategies.Tunnel);
@@ -69,37 +74,76 @@ internal sealed partial class ShellView : UserControl
         }
     }
 
-    /// <summary>The titlebar's first column follows the sidebar under it; a sidebar over the content spans it and leaves the columns as a collapsed one does.</summary>
+    /// <summary>The titlebar's first column follows the sidebar under it; a sidebar over the content spans it and leaves the columns as the rail does.</summary>
     private void PlaceSidebar()
     {
         var beside = _shell is { ShowsSidebar: true, SidebarOverlays: false };
         var title = this.FindControl<Grid>("TitleColumns")!;
         title.Margin = WindowChrome.CaptionInset(InterfaceZoom.Factor);
         title.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : WindowChrome.LeadingInset(InterfaceZoom.Factor));
-        this.FindControl<Grid>("BodyColumns")!.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : 0);
+        var collapsed = _shell is { ShowsRail: true } or { SidebarOverlays: true } ? WindowChrome.RailWidth : 0;
+        this.FindControl<Grid>("BodyColumns")!.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : collapsed);
         Grid.SetColumnSpan(this.FindControl<Border>("Sidebar")!, _shell is { SidebarOverlays: true } ? 2 : 1);
     }
 
-    /// <summary>A sidebar opened over the content takes the keyboard, and one that closes with the keyboard inside hands it to the button that opens it again rather than to nothing.</summary>
-    private void OnSidebarShownChanged()
-    {
-        var sidebar = this.FindControl<Border>("Sidebar")!;
-        var held = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is Visual focused
-            && focused.GetSelfAndVisualAncestors().Contains(sidebar);
-
+    /// <summary>A sidebar opened over the content takes the keyboard. What goes with the keyboard on it hands it on rather than to nothing, unless a press has already moved it.</summary>
+    private void OnSidebarShownChanged() =>
         Dispatcher.UIThread.Post(
             () =>
             {
                 if (_shell is { SidebarOverlays: true })
                 {
-                    FocusChosenRow(this.FindControl<ListBox>("Nav")!);
+                    FocusChosenRow();
                 }
-                else if (held && _shell is { ShowsSidebar: false })
+                else if (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is not Control { IsEffectivelyVisible: true })
                 {
-                    this.FindControl<Button>("ShowSidebar")!.Focus(NavigationMethod.Tab);
+                    HandOnTheKeyboard();
                 }
             },
             DispatcherPriority.Loaded);
+
+    private void HandOnTheKeyboard()
+    {
+        var showSidebar = this.FindControl<Button>("ShowSidebar")!;
+
+        // At 840 and wider the button's hand-off stays as Q.18 left it.
+        var fromButton = _lastFocused == showSidebar && _shell is { IsNarrow: true };
+
+        if (!fromButton && _lastFocused?.GetSelfAndVisualAncestors().Any(visual => visual == this.FindControl<Border>("Sidebar") || visual == this.FindControl<Border>("Rail")) != true)
+        {
+            return;
+        }
+
+        if (_shell is { ShowsRail: true } shell)
+        {
+            if (fromButton && shell.SelectedRailPlace is { } place)
+            {
+                this.FindControl<ListBox>("RailNav")!.ContainerFromItem(place)?.Focus(NavigationMethod.Directional);
+            }
+            else
+            {
+                this.FindControl<Button>("RailGroups")!.Focus(NavigationMethod.Tab);
+            }
+        }
+        else if (_shell is { ShowsSidebar: true })
+        {
+            FocusChosenRow();
+        }
+        else
+        {
+            showSidebar.Focus(NavigationMethod.Tab);
+        }
+    }
+
+    /// <summary>The list does not hear a press on its selected row, but the rail's Items still shows every item from a group or a project, as the sidebar's row does.</summary>
+    private void OnRailPlaceTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Visual source && _shell is { } shell
+            && source.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext is NavItem { IsExpandable: true } items
+            && Equals(items, shell.SelectedRailPlace))
+        {
+            shell.SelectedSidebarRow = items;
+        }
     }
 
     /// <summary>A press outside a sidebar lying over the content closes it, and still does what it presses.</summary>
@@ -155,7 +199,7 @@ internal sealed partial class ShellView : UserControl
         {
             _shell.Fold(selected, open: e.Key == Key.Right);
             e.Handled = true;
-            Dispatcher.UIThread.Post(() => FocusChosenRow(nav), DispatcherPriority.Loaded);
+            Dispatcher.UIThread.Post(FocusChosenRow, DispatcherPriority.Loaded);
         }
     }
 
@@ -251,13 +295,13 @@ internal sealed partial class ShellView : UserControl
             },
             DispatcherPriority.Loaded);
 
-    /// <summary>Gives the keyboard to the sidebar's chosen row.</summary>
-    private void FocusChosenRow(ListBox nav)
+    /// <summary>Gives the keyboard to the sidebar's chosen row, which is in the footer's list on Trash and Settings.</summary>
+    private void FocusChosenRow()
     {
-        if (_shell?.SelectedSidebarRow is { } chosen && nav.ContainerFromItem(chosen) is Control container)
-        {
-            container.Focus(NavigationMethod.Directional);
-        }
+        var chosen = _shell?.SelectedFooter is { } footer
+            ? this.FindControl<ListBox>("FooterNav")!.ContainerFromItem(footer)
+            : _shell?.SelectedSidebarRow is { } row ? this.FindControl<ListBox>("Nav")!.ContainerFromItem(row) : null;
+        chosen?.Focus(NavigationMethod.Directional);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -318,6 +362,7 @@ internal sealed partial class ShellView : UserControl
                     // The lists keep the row they wrote, and a binding does not republish a value its source never took.
                     this.FindControl<ListBox>("Nav")!.SelectedItem = _shell?.SelectedSidebarRow;
                     this.FindControl<ListBox>("FooterNav")!.SelectedItem = _shell?.SelectedFooter;
+                    this.FindControl<ListBox>("RailNav")!.SelectedItem = _shell?.SelectedRailPlace;
 
                     if (_focusBeforeDiscardPrompt is { IsEffectivelyVisible: true } before)
                     {
@@ -330,7 +375,7 @@ internal sealed partial class ShellView : UserControl
 
     private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(ShellViewModel.ShowsSidebar) or nameof(ShellViewModel.SidebarOverlays))
+        if (e.PropertyName is nameof(ShellViewModel.ShowsSidebar) or nameof(ShellViewModel.SidebarOverlays) or nameof(ShellViewModel.ShowsRail))
         {
             PlaceSidebar();
             Commands?.SidebarChanged();
@@ -359,7 +404,7 @@ internal sealed partial class ShellView : UserControl
             {
                 var back = _focusBeforeImport is { IsEffectivelyVisible: true } before && TopLevel.GetTopLevel(before) is not null
                     ? before
-                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name is "AddEntry" or "Nav" or "ShowSidebar" && control.IsEffectivelyVisible);
+                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name is "AddEntry" or "Nav" or "RailGroups" or "ShowSidebar" && control.IsEffectivelyVisible);
                 _focusBeforeImport = null;
                 back?.Focus();
             },

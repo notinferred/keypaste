@@ -131,6 +131,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         FoldCommand = new RelayCommand<object>(row => Fold(row, open: null));
         MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity, IsExpandable = d.Kind == DestinationKind.Entries })];
         FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
+        RailPlaces = [.. MainNav, .. FooterNav];
         SidebarRows = SidebarOf();
 
         _current = Destinations.Places[0];
@@ -189,22 +190,34 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Whether the person hid the sidebar with View › Hide sidebar; it stays hidden at every width and across locks.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
+    [NotifyPropertyChangedFor(nameof(ShowsRail))]
     internal partial bool SidebarHidden { get; private set; }
 
-    /// <summary>Whether the window is under <see cref="Views.WindowChrome.NarrowBelow"/>, where the sidebar collapses and Items drops two columns.</summary>
+    /// <summary>Whether the window is under <see cref="Views.WindowChrome.NarrowBelow"/>, where the sidebar collapses to the rail and Items drops two columns.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
     [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
+    [NotifyPropertyChangedFor(nameof(ShowsRail))]
+    [NotifyPropertyChangedFor(nameof(SidebarWayBack))]
     internal partial bool IsNarrow { get; set; }
 
-    /// <summary>Whether a collapsed sidebar was opened over the content, which keeps its width, so a group can still be chosen.</summary>
+    /// <summary>Whether the rail opened the whole sidebar over the content, which keeps its width, so a group or a project can still be chosen.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
     [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
+    [NotifyPropertyChangedFor(nameof(ShowsRail))]
     private partial bool SidebarOpenedOver { get; set; }
 
-    /// <summary>Whether the sidebar is on the screen.</summary>
+    /// <summary>Whether the whole sidebar is on the screen.</summary>
     internal bool ShowsSidebar => IsNarrow ? SidebarOpenedOver : !SidebarHidden;
+
+    /// <summary>Whether the rail of icons stands in for the sidebar: a narrow window, unless the person hid it or it is open over the content.</summary>
+    internal bool ShowsRail => IsNarrow && !SidebarHidden && !SidebarOpenedOver;
+
+    /// <summary>What a narrow window's titlebar button adds to its name: every way back, the button being all that is left of the places there.</summary>
+    internal string? SidebarWayBack => IsNarrow
+        ? $"The sidebar is hidden. Show it here, from the View menu or with {(OperatingSystem.IsMacOS() ? "⌃⌘S" : "Ctrl+B")}."
+        : null;
 
     /// <summary>Whether the sidebar lies over the content rather than beside it.</summary>
     internal bool SidebarOverlays => IsNarrow && SidebarOpenedOver;
@@ -212,24 +225,20 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The list's thousandths of the height it shares with the preview, or null until the divider moves.</summary>
     internal int? ListShare { get; set; }
 
-    /// <summary>View › Hide sidebar and Show sidebar, and the titlebar's button: at a narrow width it opens or closes the sidebar over the content, and otherwise it is the person's kept choice.</summary>
+    /// <summary>View › Hide sidebar and Show sidebar, and the titlebar's button: the person's kept choice at every width, which hides the rail too.</summary>
     [RelayCommand]
-    internal void ToggleSidebar()
-    {
-        if (IsNarrow)
-        {
-            SidebarOpenedOver = !SidebarOpenedOver;
-        }
-        else
-        {
-            SidebarHidden = !SidebarHidden;
-        }
-    }
+    internal void ToggleSidebar() => SidebarHidden = !SidebarHidden;
+
+    /// <summary>The rail's button and View › Show groups and projects: the whole sidebar over the content, for what does not fit in icons.</summary>
+    [RelayCommand]
+    internal void OpenSidebarOverlay() => SidebarOpenedOver = ShowsRail;
 
     /// <summary>Closes a sidebar lying over the content: a press outside it, or Escape.</summary>
     internal void CloseSidebarOverlay() => SidebarOpenedOver = false;
 
     partial void OnIsNarrowChanged(bool value) => SidebarOpenedOver = false;
+
+    partial void OnSidebarHiddenChanged(bool value) => SidebarOpenedOver = false;
 
     /// <summary>What the notice says while the file holds another program's save that keypaste did not merge, or null.</summary>
     [ObservableProperty]
@@ -294,6 +303,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The sidebar's quieter rows at the bottom: Settings and Trash.</summary>
     internal IReadOnlyList<NavItem> FooterNav { get; }
+
+    /// <summary>The four places, in the order the rail draws them.</summary>
+    internal IReadOnlyList<NavItem> RailPlaces { get; }
 
     /// <summary>
     /// The sidebar's main list, in reading order: Items with the vault's group tree folded under it,
@@ -376,6 +388,19 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             if (value is not null)
             {
                 Current = value.Destination;
+            }
+        }
+    }
+
+    /// <summary>The rail's row for the place <see cref="Current"/> is, or is under; a group or a project in view counts as Items.</summary>
+    internal NavItem? SelectedRailPlace
+    {
+        get => RailPlaces.FirstOrDefault(item => item.Destination == Destinations.PlaceOf(_current));
+        set
+        {
+            if (value is not null && !Equals(value, SelectedRailPlace))
+            {
+                SelectedSidebarRow = value;
             }
         }
     }
@@ -719,6 +744,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(BackTitle));
             OnPropertyChanged(nameof(SelectedMain));
             OnPropertyChanged(nameof(SelectedFooter));
+            OnPropertyChanged(nameof(SelectedRailPlace));
             BackCommand.NotifyCanExecuteChanged();
 
             if (destination.Kind != DestinationKind.EnvSets)
@@ -1306,6 +1332,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                     ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
                     : "Answering agents · " + ClientCount(clients);
             SetCount(DestinationKind.AgentActivity, grants + waiting);
+            AgentsRow.Waiting = AgentsRefusing ? 0 : waiting;
             return;
         }
 
@@ -1318,13 +1345,15 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _ => "not serving agents",
         };
         SetCount(DestinationKind.AgentActivity, 0);
+        AgentsRow.Waiting = 0;
     }
+
+    private NavItem AgentsRow => MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
 
     private void ShowAgentsDot()
     {
-        var agents = MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
-        agents.DotLive = _agentsServing && !_agentsRefusing;
-        agents.DotDanger = _agentsServing && _agentsRefusing;
+        AgentsRow.DotLive = _agentsServing && !_agentsRefusing;
+        AgentsRow.DotDanger = _agentsServing && _agentsRefusing;
     }
 
     private static string ClientCount(int count) => count switch

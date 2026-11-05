@@ -105,7 +105,7 @@ public sealed class SearchByTheListTests
         using var shell = new RenderedShell("keypaste-search-overlay-", Seed);
         shell.Window.Width = 720;
         RenderedShell.Drain();
-        shell.Shell.ToggleSidebar();
+        shell.Shell.OpenSidebarOverlay();
         RenderedShell.Drain();
         Assert.True(shell.Shell.SidebarOverlays);
 
@@ -377,6 +377,7 @@ public sealed class SearchByTheListTests
         using var shell = new RenderedShell("keypaste-search-long-file-", Seed, new string('n', 150) + ".kdbx");
         shell.Window.Width = 720;
         RenderedShell.Drain();
+        shell.Shell.ToggleSidebar();
         shell.Frame();
 
         var line = shell.Named<TextBlock>("VaultStatusLine");
@@ -416,12 +417,12 @@ public sealed class SearchByTheListTests
 
         shell.Window.Width = 720;
         shell.Frame();
-        Assert.True(button.IsEffectivelyVisible);
+        Assert.False(button.IsEffectivelyVisible, "the rail takes over the button's job");
         Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
-        Assert.True(Bounds(shell, button).X >= WindowChrome.LeadingInset(InterfaceZoom.Factor));
 
-        shell.Press(button);
-        shell.Release(button);
+        var railButton = shell.Named<Button>("RailGroups");
+        shell.Press(railButton);
+        shell.Release(railButton);
         RenderedShell.Drain();
         Assert.True(shell.Shell.SidebarOverlays);
         Assert.False(button.IsEffectivelyVisible);
@@ -431,7 +432,7 @@ public sealed class SearchByTheListTests
         shell.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
         RenderedShell.Drain();
         Assert.False(shell.Shell.SidebarOverlays);
-        Assert.True(button.IsFocused);
+        Assert.True(railButton.IsFocused);
     });
 
     [Fact]

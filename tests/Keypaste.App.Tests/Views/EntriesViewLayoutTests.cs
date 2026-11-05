@@ -124,7 +124,7 @@ public sealed class EntriesViewLayoutTests
             AssertApart(panes, at);
         });
 
-    /// <summary>At the minimum width the sidebar collapses and Username and URL go; what is left of the table, the toolbar and the preview stays whole (Q.10).</summary>
+    /// <summary>At the minimum width the sidebar collapses to the rail and Username and URL go; what is left of the table, the toolbar and the preview stays whole (Q.10).</summary>
     [Theory]
     [InlineData(720, 520)]
     [InlineData(720, 680)]
@@ -162,7 +162,7 @@ public sealed class EntriesViewLayoutTests
 
             Assert.True(search.Width >= _searchMinimum, $"the search box is {search.Width:0} px wide at {at}");
             Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
-            Assert.Equal(width, list.Width, 0.5);
+            Assert.Equal(width - WindowChrome.RailWidth, list.Width, 0.5);
             Assert.True(list.Bottom <= pane.Top, $"the list {list} is not above the entry's preview {pane} at {at}");
             Assert.True(content.Contains(pane), $"the entry's pane {pane} leaves the window's content {content} at {at}");
 

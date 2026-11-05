@@ -156,6 +156,22 @@
       <Setter Property="Foreground" Value="{DynamicResource KpPaper}" />
     </Style>
 
+    <!-- Each line of a cell is as tall as the mask, which sits on the first. Under the rail a note wraps at its words, so "same as" keeps the name it points to. -->
+    <Style Selector="WrapPanel.cell-lines">
+      <Setter Property="ItemHeight" Value="17" />
+    </Style>
+    <Style Selector="Grid.narrow-window WrapPanel.cell-lines">
+      <Setter Property="ItemHeight" Value="NaN" />
+    </Style>
+    <Style Selector="Grid.narrow-window TextBlock.cell-mask">
+      <Setter Property="Height" Value="17" />
+    </Style>
+    <Style Selector="Grid.narrow-window TextBlock.cell-note">
+      <Setter Property="Margin" Value="0,1,0,0" />
+      <Setter Property="LineHeight" Value="17" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="MaxLines" Value="2" />
+    </Style>
     <Style Selector="Border.banner">
       <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
       <Setter Property="Padding" Value="12,9" />
@@ -399,14 +415,14 @@
                                         <Button Classes="flat cell" Command="{Binding Act}"
                                                 IsHitTestVisible="{Binding ShowsLabel}" Focusable="{Binding ShowsLabel}"
                                                 AutomationProperties.Name="{Binding Label}">
-                                          <!-- A narrow cell drops the note below the mask rather than cutting it to a stub, so every line is as tall as the mask, which sits on the first. -->
-                                          <WrapPanel Orientation="Horizontal" ItemHeight="17">
-                                            <TextBlock Classes="mono" Margin="0,0,8,0" VerticalAlignment="Center"
+                                          <!-- A narrow cell drops the note below the mask rather than cutting it to a stub. -->
+                                          <WrapPanel Classes="cell-lines" Orientation="Horizontal">
+                                            <TextBlock Classes="mono cell-mask" Margin="0,0,8,0" VerticalAlignment="Center"
                                                        Classes.secondary="{Binding IsSet}"
                                                        Classes.danger="{Binding IsMissing}"
                                                        Classes.under="{Binding HasVariable}"
                                                        Text="{Binding Label}" />
-                                            <TextBlock Classes="mono secondary" VerticalAlignment="Center"
+                                            <TextBlock Classes="mono secondary cell-note" VerticalAlignment="Center"
                                                        Text="{Binding Note}" IsVisible="{Binding HasNote}"
                                                        MaxWidth="{Binding $parent[Button].Bounds.Width}"
                                                        TextTrimming="CharacterEllipsis" />
