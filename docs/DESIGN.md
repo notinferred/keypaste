@@ -10,11 +10,11 @@ The app has four places, Items, Agents, Trash and Settings, on Ctrl/⌘+1–4, a
 
 | Region | Holds |
 |---|---|
-| Title bar | The search, the idle-lock countdown, the vault's save state and Lock |
+| Title bar | While the sidebar is away the button that shows it; the idle-lock countdown, the vault's file name with its save state, its path the tooltip, and Lock |
 | Sidebar | The wordmark; Items with the vault's group tree, the projects and Agents; Trash and Settings at the bottom |
-| Content | The place in view: on Items, the list and the selected item's pane |
+| Content | The place in view: on Items, the list under a header of what it shows, the search and New, and the selected item's pane |
 
-The window goes down to 720 wide, so two sit side by side on a laptop. Under 840 wide the sidebar collapses and Items drops its Username and URL columns; Show sidebar then opens it over the content, which keeps its width, until Escape or a press outside. View › Hide sidebar hides it at any width. `WindowChrome.cs` holds the sizes.
+The window goes down to 720 wide, so two sit side by side on a laptop. Under 840 wide the sidebar collapses and Items drops its Username and URL columns; the title bar's button or Show sidebar then opens it over the content, which keeps its width, until Escape or a press outside. View › Hide sidebar hides it at any width. `WindowChrome.cs` holds the sizes.
 
 View › Zoom in, Zoom out and Actual size (⌘+, ⌘− and ⌘0) scale every window's interface from 100% to 200% in steps of 25, by drawing it through a layout transform, so the sizes on this page and the breakpoint above read the design's pixels, and at 200% a window 1500 wide lays out as one 750 wide. The minimum window scales with the zoom but never passes the screen's working area; where the screen cannot hold it, the interface keeps its minimum and scrolls inside the window. A prompt takes the zoom as it opens, scaled as a whole so its layout stays fixed, or at the largest scale that shows all of it on its screen, and keeps that scale while it is open.
 
@@ -22,7 +22,7 @@ View › Zoom in, Zoom out and Actual size (⌘+, ⌘− and ⌘0) scale every w
 
 1. **Each fact once in a view.** A name, a state or a location appears in one place in a view, the place the person looks for it; another place links to it or leaves it out. The vault's file name, the group in view and the save state are each such a fact.
 2. **The main job gets the room.** On Items that is finding an item and using it: the list and the pane take the space, and what serves the whole window stays in the title bar and the sidebar.
-3. **A control sits by what it acts on.** A command that acts on a row is in that row's menu and the menu bar ([§ Interaction](#interaction)), and a field that filters a list is read as part of that list.
+3. **A control sits by what it acts on.** A command that acts on a row is in that row's menu and the menu bar ([§ Interaction](#interaction)), and a field that filters a list is read as part of that list. The pane shows only what the list does, so a search or a group that hides the selected item closes it; the pane says an item's group only where neither the list nor its header does.
 
 ## States
 

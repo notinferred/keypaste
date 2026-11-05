@@ -309,34 +309,30 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void The_titlebar_search_moves_to_items_and_filters_them()
+    public void The_search_filters_items_and_is_kept_across_a_trip_to_another_place()
     {
         using var shell = Shell();
-        shell.GoTo(2);
-
         shell.Search = "github";
+        Assert.Equal("github", Assert.IsType<EntriesViewModel>(shell.Content).Search);
 
-        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-        Assert.Equal("github", entries.Search);
+        shell.GoTo(2);
+        shell.GoTo(1);
+
+        Assert.Equal("github", shell.Search);
+        Assert.Equal("github", Assert.IsType<EntriesViewModel>(shell.Content).Search);
     }
 
     [Fact]
-    public void The_titlebar_search_says_its_scope_and_can_widen_it()
+    public void Find_goes_to_items_from_another_place()
     {
         using var shell = Shell();
-        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-        Assert.Null(shell.SearchScope);
-        Assert.Equal("Search all items", shell.SearchPlaceholder);
+        shell.GoTo(2);
+        var searched = 0;
+        shell.SearchFocusRequested += (_, _) => searched += shell.Content is EntriesViewModel ? 1 : 0;
 
-        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "Work");
+        shell.FocusSearch();
 
-        Assert.Equal("Work", shell.SearchScope);
-        Assert.Equal("Search in this group", shell.SearchPlaceholder);
-
-        shell.ClearScopeCommand.Press();
-
-        Assert.Null(shell.SearchScope);
-        Assert.True(entries.SelectedGroup?.IsEverything);
+        Assert.Equal(1, searched);
     }
 
     [Fact]

@@ -544,7 +544,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     // ---------------------------------------------------------------- what the selection survives
 
     [Fact]
-    public void The_selection_survives_a_search_that_hides_its_row()
+    public void A_search_that_hides_the_selected_row_closes_its_pane()
     {
         using var context = New();
         var entries = context.Entries;
@@ -555,12 +555,11 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.Search = "STRIPE";
 
         Assert.DoesNotContain(entries.Rows, row => row.Title == "production");
-        Assert.NotNull(entries.Detail);
-        Assert.Equal("production", entries.Detail!.Title);
+        Assert.Null(entries.Detail);
     }
 
     [Fact]
-    public void The_selection_survives_a_group_change()
+    public void A_group_that_hides_the_selected_row_closes_its_pane()
     {
         using var context = New();
         var entries = context.Entries;
@@ -569,8 +568,7 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.SelectedGroup = Group(entries, "env/billing");
 
         Assert.DoesNotContain(entries.Rows, row => row.Title == "production");
-        Assert.NotNull(entries.Detail);
-        Assert.Equal("production", entries.Detail!.Title);
+        Assert.Null(entries.Detail);
     }
 
     /// <summary>

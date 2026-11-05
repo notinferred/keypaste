@@ -532,6 +532,37 @@ public sealed class ScreenRenderer
         Save(window, output, "16d-secrets-sidebar-hidden");
         shell.ToggleSidebar();
 
+        entries.SelectedGroup = entries.Groups.First(group => group.Path == "Work");
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+        Save(window, output, "17-items-group");
+
+        shell.Search = "git";
+        Save(window, output, "17b-items-group-filter");
+
+        shell.Search = "aws";
+        Save(window, output, "17c-items-filter-hides-the-selected");
+
+        shell.Search = "no-such-item";
+        Save(window, output, "17d-items-group-no-match");
+        shell.Search = string.Empty;
+
+        entries.ShowEveryItem();
+        shell.FocusSearch();
+        WindowInput.Drain();
+        DrawnFrame.Capture(window);
+        AmberElements.AssertOne(window, null, "a focused search beside New");
+        Save(window, output, "17e-items-search-focused");
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+        window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Rows").ContainerFromIndex(0)!.Focus();
+        WindowInput.Drain();
+
+        entries.SelectedGroup = entries.Groups.First(group => group.Path == "Work");
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+        entries.Detail!.EditCommand.Press();
+        entries.ShowEveryItem();
+        Save(window, output, "17f-items-edit-names-its-group");
+        entries.Detail.CancelCommand.Press();
+
         window.Width = _width;
         window.Height = _height;
         entries.Detail!.RotateCommand.Press();
@@ -562,9 +593,9 @@ public sealed class ScreenRenderer
         shell.CloseGeneratorCommand.Press();
 
         // A filter that matches nothing.
-        entries.Search = "no-such-secret";
+        shell.Search = "no-such-secret";
         Save(window, output, "23-secrets-no-match");
-        entries.Search = string.Empty;
+        shell.Search = string.Empty;
 
         window.Close();
     }

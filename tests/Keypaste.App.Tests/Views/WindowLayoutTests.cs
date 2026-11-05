@@ -252,16 +252,16 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task Focus_inside_a_sidebar_that_hides_moves_to_the_search_and_focus_elsewhere_stays() => HeadlessSession.On(() =>
+    public Task Focus_inside_a_sidebar_that_hides_moves_to_its_button_and_focus_elsewhere_stays() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-window-focus-");
         shell.Frame();
-        var search = shell.Named<TextBox>("ShellSearch");
+        var button = shell.Named<Button>("ShowSidebar");
 
         shell.Window.Width = 720;
         shell.Frame();
         WindowInput.Drain();
-        Assert.False(search.IsFocused, "narrowing the window moved the keyboard to the search");
+        Assert.False(button.IsFocused, "narrowing the window moved the keyboard to the sidebar's button");
 
         shell.Window.Width = 1000;
         shell.Frame();
@@ -272,7 +272,7 @@ public sealed class WindowLayoutTests
         shell.Frame();
         WindowInput.Drain();
 
-        Assert.True(search.IsFocused);
+        Assert.True(button.IsFocused);
     });
 
     [Fact]

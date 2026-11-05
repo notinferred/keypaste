@@ -138,7 +138,7 @@
 
   </UserControl.Styles>
 
-  <!-- KeePassXC's layout (D-0376): the vault's group tree is the sidebar's, so Items is its list header,
+  <!-- KeePassXC's layout: the vault's group tree is the sidebar's, so Items is its list header,
        the list, and the chosen item's preview below it. A new item, an edit and a comparison of two
        revisions take the whole view, as KeePassXC's editor does. -->
   <DockPanel>
@@ -150,10 +150,20 @@
             BorderBrush="{DynamicResource KpBorderSubtle}"
             BorderThickness="0,0,0,1">
       <StackPanel>
-        <Grid ColumnDefinitions="Auto,*,Auto">
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <TextBlock Classes="mono lg"
+        <!-- The search takes all the room there is up to its most, and stays beside New past that. -->
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="100*" MaxWidth="440" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <TextBlock x:Name="ListTitle"
+                       Classes="dialog-title"
+                       MaxWidth="200"
                        Text="{Binding ListTitle}"
+                       ToolTip.Tip="{Binding ListTitle}"
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
             <!-- A group is renamed where its name is; the tree it is chosen from is the sidebar's. -->
@@ -166,10 +176,29 @@
               <ctl:KpIcon Icon="folder-pen" Size="14" />
             </Button>
           </StackPanel>
-          <ToggleButton Grid.Column="2"
+          <!-- The app's only search. It searches what the header names. -->
+          <TextBox Grid.Column="2"
+                   x:Name="ShellSearch"
+                   Classes="search"
+                   Margin="16,0,12,0"
+                   VerticalAlignment="Center"
+                   Text="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).Search, FallbackValue={x:Null}}"
+                   PlaceholderText="Search"
+                   AutomationProperties.Name="Search">
+            <TextBox.InnerLeftContent>
+              <ctl:KpIcon Icon="search" Size="13" Margin="2,0,6,0" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
+            </TextBox.InnerLeftContent>
+            <TextBox.InnerRightContent>
+              <Border Classes="keycap" Margin="0,0,5,0">
+                <TextBlock Text="{x:Static vm:ShellViewModel.SearchShortcut}" />
+              </Border>
+            </TextBox.InnerRightContent>
+          </TextBox>
+          <ToggleButton Grid.Column="3"
                         x:Name="AddEntry"
                         Classes="sm"
                         Classes.primary="{Binding AddIsPrimary}"
+                        Width="68"
                         Height="28"
                         Padding="10,0"
                         ToolTip.Tip="New item, project or import"
@@ -181,7 +210,7 @@
           </ToggleButton>
         </Grid>
 
-        <!-- The "+" menu: everything that adds to the vault, in one place (D-0374). -->
+        <!-- The "+" menu: everything that adds to the vault, in one place. -->
         <Canvas Height="0">
           <Border x:Name="AddMenuPanel"
                   Classes="menu"
@@ -303,7 +332,7 @@
         </StackPanel>
       </Border>
 
-      <!-- A group moves with everything in it, to the places an item can move to (D-0483). -->
+      <!-- A group moves with everything in it, to the places an item can move to. -->
       <Border Classes="form" IsVisible="{Binding IsMovingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
           <TextBlock Classes="caption" Text="{Binding MoveGroupPrompt}" TextWrapping="Wrap" />
@@ -349,7 +378,7 @@
 
       <DockPanel Grid.Row="0" x:Name="ListArea" IsVisible="{Binding ShowsList}">
         <!-- The columns, as KeePassXC's entry table draws them: what an item is, its username and web
-             address, and where it lives, never a password or a custom field's value (EntryRow, D-0488). -->
+             address, and where it lives, never a password or a custom field's value (EntryRow). -->
         <views:EntryColumns DockPanel.Dock="Top" Classes="table-head" Margin="16,8,16,0">
           <TextBlock Grid.Column="1" Classes="th" Text="TITLE" />
           <TextBlock Grid.Column="2" x:Name="UsernameHead" Classes="th" Text="USERNAME" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
@@ -486,10 +515,7 @@
           </Grid.ColumnDefinitions>
           <StackPanel Spacing="24">
 
-            <StackPanel Spacing="6">
-              <TextBlock Classes="h1" Text="New item" />
-              <TextBlock Classes="subtitle" Text="{Binding VaultName, StringFormat='Saved into {0}.'}" />
-            </StackPanel>
+            <TextBlock Classes="h1" Text="New item" />
 
             <StackPanel Spacing="24" DataContext="{Binding NewItem}" x:DataType="vm:NewItemViewModel">
 
@@ -686,7 +712,7 @@
       </ScrollViewer>
 
       <!-- The entry's pane. Username, URL and notes for the one entry somebody chose; the password is
-           dots until it is held, and no binding here carries it (D-0300). -->
+           dots until it is held, and no binding here carries it. -->
       <ContentControl x:Name="EntryPane"
                       IsVisible="{Binding !IsAdding}"
                       Content="{Binding Detail}">
@@ -708,9 +734,11 @@
                                    Classes="title"
                                    Text="{Binding DisplayTitle}"
                                    TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding Location}"
+                        <TextBlock x:Name="PaneLocation"
+                                   Text="{Binding Location}"
                                    Classes="muted size-13"
-                                   TextWrapping="Wrap" />
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).PaneNamesGroup, FallbackValue={x:False}}" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
                         <Button x:Name="CopyPassword" Classes="action" Command="{Binding CopyPasswordCommand}" AutomationProperties.Name="Copy password">
@@ -1023,7 +1051,7 @@
                           <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
-                        <!-- Custom fields by name and protection, and the tags: never a field's value (D-0487). -->
+                        <!-- Custom fields by name and protection, and the tags: never a field's value. -->
                         <TextBlock Grid.Row="13" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Custom fields" Margin="0,12,0,6" />
                         <TextBlock Grid.Row="14" Grid.Column="0" Classes="caption" Text="Then" />
                         <Panel Grid.Row="14" Grid.Column="2">
@@ -1060,7 +1088,7 @@
                                    Text="Restoring makes these the item's values and drops any attachments, custom fields and custom data added since. The ones it replaces are kept here." />
 
                         <!-- A restore that puts back other project tags is written only after the person has seen what
-                             it does to the item's projects, as every tag change is (D-0415). -->
+                             it does to the item's projects, as every tag change is. -->
                         <Border Classes="form" IsVisible="{Binding History.IsConfirmingRestore}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding History.ConfirmRestoreCommand}" ctl:FormKeys.Cancel="{Binding History.CancelRestoreCommand}">
                           <StackPanel Spacing="10">
                             <ItemsControl ItemsSource="{Binding History.RestoreLines}">
@@ -1148,7 +1176,7 @@
                     </Grid>
 
                     <!-- The TOTP code is masked and computed at the hold or the copy, as the password is read;
-                         only the seconds until the next code are bound (D-0481). -->
+                         only the seconds until the next code are bound. -->
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding ShowsTotp}">
                       <TextBlock Grid.Column="0" Classes="label" Text="TOTP" VerticalAlignment="Center" />
                       <Border Grid.Column="1" Classes="value">
@@ -1206,7 +1234,7 @@
 
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding !IsEditing}">
                       <TextBlock Grid.Column="0" Classes="label" Text="URL" VerticalAlignment="Top" Margin="0,11,0,0" />
-                      <!-- A web address opens in the browser; anything else is text and says why (N.5, D-0378). -->
+                      <!-- A web address opens in the browser; anything else is text and says why (N.5). -->
                       <StackPanel Grid.Column="1" Spacing="6">
                         <Border Classes="value">
                           <Grid ColumnDefinitions="*,Auto">
@@ -1297,7 +1325,7 @@
                                 <TextBlock Classes="caption" Text="{Binding Kind}" VerticalAlignment="Center" />
                               </StackPanel>
                               <!-- Not a TextBlock, for the reason CurrentPassword is not one. It takes the row's width, so an
-                                   API key has room and a hold changes no size the automation surface reports (D-0232). -->
+                                   API key has room and a hold changes no size the automation surface reports. -->
                               <ctl:RevealedValue Grid.Row="1"
                                                  Grid.ColumnSpan="2"
                                                  Margin="0,4,0,0"
@@ -1431,7 +1459,7 @@
                     </Border>
 
                     <!-- A field named as a project variable, or one the item's own {S:…} names, is renamed only after
-                         the person has seen what the rename breaks, as a project tag change is (D-0415). -->
+                         the person has seen what the rename breaks, as a project tag change is. -->
                     <Border Classes="form" IsVisible="{Binding IsRenamingField}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRenameFieldCommand}" ctl:FormKeys.Cancel="{Binding CancelRenameFieldCommand}" ctl:FormKeys.Draft="{Binding RenameFieldDraft}">
                       <StackPanel Spacing="10">
                         <TextBlock Classes="section" Text="{Binding RenameFieldPrompt}" TextWrapping="Wrap" />
@@ -1467,7 +1495,7 @@
                   </StackPanel>
 
                   <!-- Attachments by name and size, never their content. Save writes a copy only where nothing is, and nothing
-                       here opens or runs an attachment (D-0534). -->
+                       here opens or runs an attachment. -->
                   <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
                     <Grid ColumnDefinitions="*,Auto">
                       <TextBlock Grid.Column="0" Classes="label" Text="Attachments" VerticalAlignment="Center" />
@@ -1527,7 +1555,7 @@
                   </StackPanel>
 
                   <!-- The entry's own tags. A project tag reads as its project and environment, with a shield
-                       when every agent request for the entry is asked about (D-0370, D-0371). -->
+                       when every agent request for the entry is asked about. -->
                   <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
                     <TextBlock Classes="label" Text="Tags" />
                     <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
@@ -1556,7 +1584,7 @@
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <!-- Suggests the vault's project tags the item lacks as one is typed; choosing one fills the box,
-                           and Add tag still asks first for a project tag (D-0415). -->
+                           and Add tag still asks first for a project tag. -->
                       <AutoCompleteBox x:Name="NewTag"
                                        Classes="mono"
                                        Text="{Binding DraftTag, Mode=TwoWay}"
@@ -1568,7 +1596,7 @@
                     </StackPanel>
 
                     <!-- A project tag is written only after the person has seen the environment and the fields it
-                         reaches (D-0415). -->
+                         reaches. -->
                     <Border Classes="form" IsVisible="{Binding IsConfirmingTagChange}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmTagChangeCommand}" ctl:FormKeys.Cancel="{Binding CancelTagChangeCommand}">
                       <StackPanel Spacing="10">
                         <ItemsControl ItemsSource="{Binding TagChangeLines}">
@@ -1656,7 +1684,7 @@
                           <TextBlock Grid.Column="1" x:Name="CreatedText" Classes="primary size-12-5" Text="{Binding Created}" />
                         </Grid>
                       </Border>
-                      <!-- An expiry KeePassXC set, shown as Expired in danger text once the session's clock passes it (D-0337). -->
+                      <!-- An expiry KeePassXC set, shown as Expired in danger text once the session's clock passes it. -->
                       <Border Classes="meta" IsVisible="{Binding HasExpiry}">
                         <Grid ColumnDefinitions="140,*">
                           <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="{Binding ExpiryLabel}" />

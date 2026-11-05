@@ -33,6 +33,8 @@ internal sealed partial class EntriesView : UserControl
 
     private readonly RowDefinition _listRow;
     private readonly RowDefinition _previewRow;
+    private readonly TextBox _search;
+    private readonly ListBox _rows;
     private GridLength _listHeight;
     private EntriesViewModel? _entries;
     private ShellViewModel? _shell;
@@ -52,6 +54,19 @@ internal sealed partial class EntriesView : UserControl
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
+
+        _rows = this.FindControl<ListBox>("Rows")!;
+        _search = this.FindControl<TextBox>("ShellSearch")!;
+        _search.GotFocus += (_, _) => TellEntriesAboutSearchFocus();
+        _search.LostFocus += (_, _) => TellEntriesAboutSearchFocus();
+    }
+
+    private void TellEntriesAboutSearchFocus()
+    {
+        if (_entries is not null)
+        {
+            _entries.SearchHasFocus = _search.IsFocused;
+        }
     }
 
     // The shell holds the split and the width, because this view is built again at every return to Items.
@@ -123,6 +138,7 @@ internal sealed partial class EntriesView : UserControl
             _entries.PropertyChanged += OnEntriesChanged;
         }
 
+        TellEntriesAboutSearchFocus();
         PlaceList();
     }
 
@@ -131,6 +147,12 @@ internal sealed partial class EntriesView : UserControl
         if (e.PropertyName == nameof(EntriesViewModel.ShowsList))
         {
             PlaceList();
+        }
+
+        // A new list of rows clears the ListBox's selection, and its binding re-reads Selected inside that change, where the value is lost and then counts as already published.
+        if (e.PropertyName == nameof(EntriesViewModel.Selected) && !ReferenceEquals(_rows.SelectedItem, _entries?.Selected))
+        {
+            _rows.SelectedItem = _entries?.Selected;
         }
     }
 

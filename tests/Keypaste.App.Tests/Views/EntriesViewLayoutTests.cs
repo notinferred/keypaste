@@ -65,7 +65,7 @@ public sealed class EntriesViewLayoutTests
             shell.Frame();
             var at = $"{width}×{height}{(comparing ? ", comparing" : string.Empty)}";
 
-            // The titlebar's is the only search (D-0374); the list has no filter box of its own.
+            // The search in the list header is the only one, under the name it has always had.
             Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<TextBox>(), box => box.Name == "Search");
             var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
             var controls = new Dictionary<string, Rect>

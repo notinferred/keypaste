@@ -14,7 +14,7 @@ namespace Keypaste.App.ViewModels;
 /// <b>The password is not a property of this object, in any state.</b> Title, group, username, URL
 /// and notes are read once on selection and held, which is a deliberate widening bounded to one
 /// entry a person chose — <c>keypaste get</c>'s scope minus the password. The password is read out
-/// of the open vault at the moment Copy is pressed or its cell is held (D-0300), and handed straight
+/// of the open vault at the moment Copy is pressed or its cell is held, and handed straight
 /// to the clipboard or to the <see cref="Controls.RevealedValue"/> that draws it, so it is never in a
 /// view model and never in a binding.
 /// </para>
@@ -25,12 +25,12 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// A copy or an open hands on a value as it leaves keypaste, its KeePass placeholders filled in from
-/// the item's own fields, and refuses one it cannot fill (D-0465); a hold, a mask and the edit form
+/// the item's own fields, and refuses one it cannot fill; a hold, a mask and the edit form
 /// keep the stored text.
 /// </para>
 /// <para>
 /// An item with a TOTP gets <see cref="Totp"/>, whose code is computed the same way, at the press
-/// (D-0481); one keypaste cannot compute says why in <see cref="TotpProblem"/> instead.
+///; one keypaste cannot compute says why in <see cref="TotpProblem"/> instead.
 /// </para>
 /// </remarks>
 internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
@@ -113,7 +113,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
         Kind = EntryKinds.Of(entry);
-        VaultName = session.VaultPath is { } vaultPath ? System.IO.Path.GetFileName(vaultPath) : string.Empty;
 
         Reference = KpReferences.ForEntry(Name);
 
@@ -294,7 +293,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     }
 
     /// <summary>
-    /// What renaming the field breaks, shown before it is written as a project tag change is (D-0415): the
+    /// What renaming the field breaks, shown before it is written as a project tag change is: the
     /// project variable it is, the <c>kp://</c> references that name it and the item's fields whose
     /// <c>{S:…}</c> names it. Names only, never a value; empty until the rename needs asking about.
     /// </summary>
@@ -348,7 +347,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     internal RelayCommand AddTagCommand { get; }
 
-    /// <summary>A project tag being added or removed, held until the person confirms what it reaches (D-0415); null otherwise.</summary>
+    /// <summary>A project tag being added or removed, held until the person confirms what it reaches; null otherwise.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsConfirmingTagChange), nameof(TagChangeLines), nameof(TagChangeAction))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmTagChangeCommand), nameof(CancelTagChangeCommand))]
@@ -423,7 +422,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         return Filled(vault => vault.FillPlaceholders(Name, value), row.DisplayName, "copied");
     }
 
-    /// <summary>A value of this item as it leaves keypaste, its placeholders filled in from the item's own fields (D-0465).</summary>
+    /// <summary>A value of this item as it leaves keypaste, its placeholders filled in from the item's own fields.</summary>
     /// <param name="fill">Fills the value in from the open vault.</param>
     /// <param name="what">What the value is, as a sentence about it starts, such as <c>The password</c>.</param>
     /// <param name="refused">What does not happen to it when it cannot leave, such as <c>copied</c>.</param>
@@ -602,7 +601,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Whether the item has an expiry, so its metadata row shows.</summary>
     internal bool HasExpiry => Expiry.Length > 0;
 
-    /// <summary>Whether its expiry has passed by the session's clock, as a run judges it (D-0337).</summary>
+    /// <summary>Whether its expiry has passed by the session's clock, as a run judges it.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ExpiryLabel))]
     internal partial bool IsExpired { get; private set; }
@@ -664,34 +663,35 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>What sort of entry this is.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(KindLabel), nameof(Location))]
+    [NotifyPropertyChangedFor(nameof(KindLabel))]
     internal partial EntryKind Kind { get; private set; }
 
     internal string KindLabel => EntryKinds.Label(Kind);
 
-    /// <summary>The vault's file name.</summary>
-    internal string VaultName { get; }
+    /// <summary>Each group down to this entry.</summary>
+    internal string Location => string.Join(" › ", _groupPath.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(group => EntryNameSanitizer.Sanitize(group).Text));
 
-    /// <summary>The header's second line: the kind, then the vault file and each group down to this entry.</summary>
-    internal string Location
+    /// <summary>Back to the preview from an edit or a comparison.</summary>
+    internal void LeaveWholeView()
     {
-        get
+        if (IsEditing)
         {
-            var trail = _groupPath.Length == 0
-                ? VaultName
-                : string.Join(" › ", _groupPath.Split('/').Select(group => EntryNameSanitizer.Sanitize(group).Text).Prepend(VaultName));
+            CancelEdit();
+        }
 
-            return trail.Length == 0 ? KindLabel : $"{KindLabel} · {trail}";
+        if (History.IsOpen)
+        {
+            History.ToggleCommand.Press();
         }
     }
 
     /// <summary>Where the value lives in the KDBX file: the entry's UUID, abbreviated, and its field.</summary>
-    /// <remarks>The path is on the location line already; the UUID is what KeePassXC shows nowhere else.</remarks>
+    /// <remarks>The list's row says where it is; the UUID is what KeePassXC shows nowhere else.</remarks>
     internal string KdbxEntry => _uuid is { Length: > 8 } uuid
         ? $"uuid {uuid[..4].ToLowerInvariant()}…{uuid[^4..].ToLowerInvariant()} · field Password"
         : $"{DisplayPath} · field Password";
 
-    /// <summary>Whether the URL is a link that opens in the browser: http or https, or a bare address as https (D-0378).</summary>
+    /// <summary>Whether the URL is a link that opens in the browser: http or https, or a bare address as https.</summary>
     internal bool OpensUrl => WebAddress.TryOpenable(Url, out _);
 
     /// <summary>Whether the URL is shown as text, with a line saying why it opens nothing.</summary>
@@ -1147,7 +1147,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
         ReadFieldsAndTags();
 
-        // The change is a revision now, and a list read before it would name the wrong one at every index (D-0229).
+        // The change is a revision now, and a list read before it would name the wrong one at every index.
         History.Refresh();
         Report(null);
         return true;
@@ -1388,7 +1388,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
                 // An untouched password is carried across rather than read and written back, which
                 // would put it in a local for no reason. A replacement is applied in the same
                 // UpdateEntry as the field edits, so the whole change costs one history item rather
-                // than two (D-0014).
+                // than two.
                 // Title and GroupPath come across too, so the read has to be the identity one — `UpdateEntry`
                 // locates by them, and an `existing` from the wrong entry writes the draft into that entry.
                 var updated = existing with
@@ -1422,11 +1422,11 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         Reload();
 
         // The edit it just made is a revision now, and a list read before it would name the wrong
-        // one at every index (D-0229).
+        // one at every index.
         History.Refresh();
         Report(null);
 
-        // The list shows the username and the URL too (D-0488), so it reads them again.
+        // The list shows the username and the URL too, so it reads them again.
         _restored(Name);
     }
 }

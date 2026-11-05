@@ -99,17 +99,16 @@ public sealed class FourPlacesJourneyTests
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<Control>(), control => control.Name is "Search" or "McpCard");
             Assert.Equal(["ShellSearch"], main.GetVisualDescendants().OfType<TextBox>().Where(box => box.Classes.Contains("search")).Select(box => box.Name));
 
-            // An item found by the one search, then the scope it searches.
+            // An item found by the one search, then the group it then searches, which the list header names.
             Chord(main, PhysicalKey.Digit1);
-            Chord(main, PhysicalKey.K);
+            Chord(main, PhysicalKey.F);
             WindowInput.Type(main, "git");
             var items = Assert.IsType<EntriesViewModel>(shell.Content);
             Press(main, Row(main, "Rows", row => row is EntryRow { Title: "github" }));
             Assert.Equal("github", items.Selected?.Title);
             Press(main, Row(main, "Nav", row => row is GroupRow { Path: "Work" }));
-            Assert.Equal("Work", Named<Border>(main, "SearchScope").GetVisualDescendants().OfType<TextBlock>().First().Text);
-            Assert.True(Named<Border>(main, "SearchScope").IsEffectivelyVisible);
-            AmberElements.AssertOne(main, Named<ToggleButton>(main, "AddEntry"), "Items, an item open and the search scoped");
+            Assert.Equal("Work", Named<TextBlock>(main, "ListTitle").Text);
+            AmberElements.AssertOne(main, Named<ToggleButton>(main, "AddEntry"), "Items, an item open in a group");
 
             // A project's variables, from its row beneath Items; Back returns to Items.
             Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "billing" }));

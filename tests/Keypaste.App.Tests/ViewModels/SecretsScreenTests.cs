@@ -68,13 +68,11 @@ public sealed class SecretsScreenTests : IDisposable
     {
         using var context = new Context(_vaultPath);
 
-        Assert.Equal("acme.kdbx", context.Entries.ListTitle);
-        Assert.Null(context.Entries.SearchScope);
+        Assert.Equal("All items", context.Entries.ListTitle);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env/acme-api/prod");
 
         Assert.Equal("env/acme-api/prod", context.Entries.ListTitle);
-        Assert.Equal("env/acme-api/prod", context.Entries.SearchScope);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "Work");
 
@@ -90,7 +88,7 @@ public sealed class SecretsScreenTests : IDisposable
         var detail = context.Entries.Detail!;
 
         Assert.Equal(EntryKind.Password, detail.Kind);
-        Assert.Equal("Password · acme.kdbx › env › acme-api", detail.Location);
+        Assert.Equal("env › acme-api", detail.Location);
         Assert.Equal("kp:///env/acme-api/DATABASE_URL", detail.Reference);
     }
 
@@ -103,7 +101,7 @@ public sealed class SecretsScreenTests : IDisposable
         var detail = context.Entries.Detail!;
 
         Assert.Equal(EntryKind.Login, detail.Kind);
-        Assert.Equal("Login · acme.kdbx › Work", detail.Location);
+        Assert.Equal("Work", detail.Location);
         Assert.Matches("^uuid [0-9a-f]{4}…[0-9a-f]{4} · field Password$", detail.KdbxEntry);
         Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
     }

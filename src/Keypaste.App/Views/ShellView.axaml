@@ -97,78 +97,58 @@
               BorderBrush="{DynamicResource KpBorderSubtle}"
               BorderThickness="0,0,0,1"
               WindowDecorationProperties.ElementRole="TitleBar">
-        <Grid Name="TitleColumns" ColumnDefinitions="232,*,Auto">
+        <Grid Name="TitleColumns" ColumnDefinitions="232,Auto,*">
 
-          <!-- The app's only search. It searches Items, and says where: every item, or the group in view. -->
-          <TextBox Grid.Column="1"
-                   Name="ShellSearch"
-                   Classes="search"
-                   MaxWidth="440"
-                   Margin="16,0"
-                   VerticalAlignment="Center"
-                   Text="{Binding Search}"
-                   PlaceholderText="{Binding SearchPlaceholder}"
-                   AutomationProperties.Name="Search"
-                   WindowDecorationProperties.ElementRole="User">
-            <TextBox.InnerLeftContent>
-              <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,0,0,0">
-                <ctl:KpIcon Icon="search" Size="13" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
-                <Border Name="SearchScope"
-                        Classes="chip"
-                        IsVisible="{Binding HasSearchScope}"
-                        VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal" Spacing="4">
-                    <TextBlock Text="{Binding SearchScope}" MaxWidth="140" TextTrimming="CharacterEllipsis" />
-                    <Button Name="ClearSearchScope"
-                            Classes="icon ghost sm"
-                            Width="20" Height="20" MinHeight="20" Padding="0" Margin="-2"
-                            ToolTip.Tip="Search every item"
-                            AutomationProperties.Name="Search every item"
-                            Command="{Binding ClearScopeCommand}">
-                      <ctl:KpIcon Icon="x" Size="10" />
-                    </Button>
-                  </StackPanel>
-                </Border>
-              </StackPanel>
-            </TextBox.InnerLeftContent>
-            <TextBox.InnerRightContent>
-              <Border Classes="keycap" Margin="0,0,5,0">
-                <TextBlock Text="{x:Static vm:ShellViewModel.SearchShortcut}" />
-              </Border>
-            </TextBox.InnerRightContent>
-          </TextBox>
+          <!-- Only while the sidebar is away: Agents, Settings and the groups would otherwise have nothing on screen pointing to them. -->
+          <Button Grid.Column="1"
+                  Name="ShowSidebar"
+                  Classes="icon ghost sm"
+                  VerticalAlignment="Center"
+                  IsVisible="{Binding !ShowsSidebar}"
+                  Command="{Binding ToggleSidebarCommand}"
+                  ToolTip.Tip="Show sidebar"
+                  AutomationProperties.Name="Show sidebar"
+                  WindowDecorationProperties.ElementRole="User">
+            <ctl:KpIcon Icon="panel-left" Size="16" />
+          </Button>
 
           <!-- The idle warning's first line, said once as the warning comes, while the ticking text below stays quiet. -->
           <Border Grid.Column="2" ctl:Announcer.Says="{Binding CountdownAnnouncement}" />
 
-          <StackPanel Grid.Column="2"
-                      Orientation="Horizontal"
-                      Spacing="6"
-                      Margin="0,0,12,0"
-                      VerticalAlignment="Center">
+          <Grid Grid.Column="2"
+                ColumnDefinitions="Auto,*,Auto"
+                HorizontalAlignment="Right"
+                Margin="8,0,12,0"
+                VerticalAlignment="Center">
 
             <!-- Muted, never red. An auto-lock is the most normal thing this app does. -->
             <TextBlock Classes="mono sm muted"
                        Text="{Binding Countdown}"
                        IsVisible="{Binding HasCountdown}"
                        VerticalAlignment="Center"
-                       Margin="0,0,6,0" />
+                       Margin="0,0,12,0" />
 
-            <StackPanel Orientation="Horizontal"
-                        Spacing="6"
-                        Margin="8,0"
-                        ToolTip.Tip="{Binding VaultStatusDetail}"
-                        WindowDecorationProperties.ElementRole="User">
+            <Grid Grid.Column="1"
+                  ColumnDefinitions="Auto,*"
+                  Margin="8,0,14,0"
+                  ToolTip.Tip="{Binding VaultStatusDetail}"
+                  WindowDecorationProperties.ElementRole="User">
               <Border Classes="dot"
+                      Margin="0,0,6,0"
                       Classes.ok="{Binding VaultStatusOk}"
                       Classes.warn="{Binding VaultStatusAccent}"
                       Classes.danger="{Binding VaultStatusDanger}" />
-              <TextBlock Classes="mono sm muted"
+              <!-- A long file name gives way in its middle, so the save state at the end always shows. -->
+              <TextBlock Grid.Column="1"
+                         Name="VaultStatusLine"
+                         Classes="mono sm muted"
                          Text="{Binding VaultStatus}"
+                         TextTrimming="PrefixCharacterEllipsis"
                          VerticalAlignment="Center" />
-            </StackPanel>
+            </Grid>
 
-            <Button Classes="titlebar-lock"
+            <Button Grid.Column="2"
+                    Classes="titlebar-lock"
                     Command="{Binding LockCommand}"
                     ToolTip.Tip="Lock now"
                     AutomationProperties.Name="Lock now"
@@ -178,7 +158,7 @@
                 <TextBlock Text="lock" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-          </StackPanel>
+          </Grid>
 
         </Grid>
       </Border>
@@ -230,7 +210,7 @@
 
             <!-- Items with the vault's group tree under it, the projects, then Agents: one list, so the
                  arrow keys walk the sidebar as it reads, and Left and Right fold a row as in KeePassXC's
-                 tree (D-0376). -->
+                 tree. -->
             <ListBox Name="Nav"
                      AutomationProperties.Name="Places"
                      Classes="nav"
@@ -325,7 +305,7 @@
 
         <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*">
 
-          <!-- A screen under a place, such as History under Agents, goes back up to it (D-0374). -->
+          <!-- A screen under a place, such as History under Agents, goes back up to it. -->
           <!-- A row of its own, so nothing a page scrolls can sit under the link or be hidden by it; the screens under a place keep 16 less at their top for this. -->
           <Border Grid.Row="0"
                   Name="BackStrip"
@@ -351,7 +331,7 @@
                      Margin="18,14,18,0" />
 
           <StackPanel Grid.Row="2">
-            <!-- Another program's save keypaste did not merge: agents are refused until a reload (D-0412, D-0543). -->
+            <!-- Another program's save keypaste did not merge: agents are refused until a reload. -->
             <Border IsVisible="{Binding HasVaultChanged}"
                     CornerRadius="{DynamicResource KpRadiusCard}"
                     Background="{DynamicResource KpDangerTint}"
@@ -375,7 +355,7 @@
               </Grid>
             </Border>
 
-            <!-- What a restore did, a fragile keyfile, that this vault was just chosen, or what a merge saved and named (D-0542). Quiet. -->
+            <!-- What a restore did, a fragile keyfile, that this vault was just chosen, or what a merge saved and named. Quiet. -->
             <Border IsVisible="{Binding HasNotice}"
                     Classes="card"
                     BorderBrush="{DynamicResource KpBorderSubtle}"

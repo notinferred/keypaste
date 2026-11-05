@@ -145,7 +145,7 @@ public sealed class ContextMenuTests
 
         var disconnect = agents.Commands.Menus.Single(group => group.Header == "Item").Entries.OfType<AppCommand>().Single(command => command.Header == "Disconnect agent");
         Assert.True(disconnect.CanRun());
-        agents.Window.GetVisualDescendants().OfType<TextBox>().Single(box => box.Name == "ShellSearch").Focus();
+        agents.Window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Nav").ContainerFromIndex(0)!.Focus();
         Assert.False(disconnect.CanRun());
     });
 

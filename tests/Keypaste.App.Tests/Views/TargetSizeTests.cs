@@ -13,7 +13,7 @@ public sealed class TargetSizeTests
     private const double _minimum = 20;
 
     [Fact]
-    public Task The_sidebars_folds_and_the_clear_scope_button_are_large_enough() => HeadlessSession.On(() =>
+    public Task The_sidebars_folds_and_the_button_that_shows_it_are_large_enough() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-targets-");
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -25,7 +25,10 @@ public sealed class TargetSizeTests
 
         Assert.NotEmpty(folds);
         Assert.All(folds, AssertLargeEnough);
-        AssertLargeEnough(buttons.Single(button => button.Name == "ClearSearchScope"));
+
+        shell.Window.Width = 720;
+        RenderedShell.Drain();
+        AssertLargeEnough(shell.Named<Button>("ShowSidebar"));
     });
 
     [Fact]

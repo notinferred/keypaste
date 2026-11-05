@@ -79,7 +79,7 @@ internal sealed partial class ShellView : UserControl
         Grid.SetColumnSpan(this.FindControl<Border>("Sidebar")!, _shell is { SidebarOverlays: true } ? 2 : 1);
     }
 
-    /// <summary>A sidebar opened over the content takes the keyboard, and one that closes with the keyboard inside hands it to the search rather than to nothing.</summary>
+    /// <summary>A sidebar opened over the content takes the keyboard, and one that closes with the keyboard inside hands it to the button that opens it again rather than to nothing.</summary>
     private void OnSidebarShownChanged()
     {
         var sidebar = this.FindControl<Border>("Sidebar")!;
@@ -95,7 +95,7 @@ internal sealed partial class ShellView : UserControl
                 }
                 else if (held && _shell is { ShowsSidebar: false })
                 {
-                    this.FindControl<TextBox>("ShellSearch")!.Focus();
+                    this.FindControl<Button>("ShowSidebar")!.Focus(NavigationMethod.Tab);
                 }
             },
             DispatcherPriority.Loaded);
@@ -356,17 +356,23 @@ internal sealed partial class ShellView : UserControl
             {
                 var back = _focusBeforeImport is { IsEffectivelyVisible: true } before && TopLevel.GetTopLevel(before) is not null
                     ? before
-                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name == "AddEntry") ?? this.FindControl<Control>("ShellSearch");
+                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name is "AddEntry" or "Nav" or "ShowSidebar" && control.IsEffectivelyVisible);
                 _focusBeforeImport = null;
                 back?.Focus();
             },
             DispatcherPriority.Loaded);
     }
 
-    private void OnSearchFocusRequested(object? sender, EventArgs e)
-    {
-        var search = this.FindControl<TextBox>("ShellSearch")!;
-        search.Focus();
-        search.SelectAll();
-    }
+    /// <summary>Find from another place has only just asked for Items, so the field is there once it has been drawn.</summary>
+    private void OnSearchFocusRequested(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(box => box.Name == "ShellSearch") is { } search)
+                {
+                    search.Focus();
+                    search.SelectAll();
+                }
+            },
+            DispatcherPriority.Loaded);
 }

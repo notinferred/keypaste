@@ -474,24 +474,24 @@ public sealed class KeepUnsavedWorkTests
     });
 
     [Fact]
-    public Task A_search_typed_elsewhere_asks_and_Cancel_takes_it_back() => HeadlessSession.On(() =>
+    public Task Find_elsewhere_asks_and_Cancel_stays_where_the_draft_is() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell();
         var tokens = shell.Show<ScopedTokensViewModel>(DestinationKind.Tokens);
         tokens.OpenFormCommand.Press();
         tokens.Name = "half-typed";
 
-        shell.Shell.Search = "g";
+        shell.Shell.FocusSearch();
         Assert.Equal("Discard this new token?", shell.Shell.DiscardPrompt);
         shell.Shell.KeepDraftCommand.Press();
-        Assert.Equal(string.Empty, shell.Shell.Search);
         Assert.Same(tokens, shell.Shell.Content);
         Assert.Equal("half-typed", tokens.Name);
 
-        shell.Shell.Search = "g";
+        shell.Shell.FocusSearch();
         shell.Shell.ConfirmDiscardCommand.Press();
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
-        Assert.Equal("g", Assert.IsType<EntriesViewModel>(shell.Shell.Content).Search);
+        RenderedShell.Drain();
+        Assert.True(shell.Named<TextBox>("ShellSearch").IsFocused);
     });
 
     [Fact]

@@ -63,7 +63,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         _session.Edited += OnVaultEdited;
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
-        ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
         DeleteCommand = new RelayCommand(
             DeleteOrAsk,
             () => Selected is not null && !IsConfirmingDelete);
@@ -118,7 +117,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             {
                 OnPropertyChanged(nameof(CanRenameGroup));
                 OnPropertyChanged(nameof(ListTitle));
-                OnPropertyChanged(nameof(SearchScope));
+                OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ListEmptyOffersSearchAll));
                 OnPropertyChanged(nameof(ListEmptyNote));
                 OnPropertyChanged(nameof(ListEmptyOffersImport));
@@ -131,7 +130,14 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 BeginRenameGroupCommand.NotifyCanExecuteChanged();
                 BeginMoveGroupCommand.NotifyCanExecuteChanged();
                 BeginDeleteGroupCommand.NotifyCanExecuteChanged();
+
+                if (_pinned is { } pin && !Shows(value, pin.GroupPath))
+                {
+                    _pinned = null;
+                }
+
                 Filter();
+                ClosePaneTheListHid();
                 CloseGroupForms();
             }
         }
@@ -140,18 +146,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Whether a group is showing, which Rename beside its name then renames.</summary>
     internal bool CanRenameGroup => SelectedGroup is { IsEverything: false };
 
-    /// <summary>The vault's file name, which the pane's location line starts from.</summary>
-    internal string VaultName => _session.VaultPath is { } path ? System.IO.Path.GetFileName(path) : string.Empty;
-
-    /// <summary>What the list header names: the group showing, or the vault when it is all of it.</summary>
+    /// <summary>What the list header names, which is what the search covers: every item, or the group showing.</summary>
     internal string ListTitle =>
-        SelectedGroup is { IsEverything: false } group ? EntryNameSanitizer.SanitizePath(group.Path).Text : VaultName;
+        SelectedGroup is { IsEverything: false } group ? EntryNameSanitizer.SanitizePath(group.Path).Text : "All items";
 
-    /// <summary>The group the titlebar search is limited to, as the list header names it, or null for every item.</summary>
-    internal string? SearchScope => SelectedGroup is { IsEverything: false } ? ListTitle : null;
-
-    /// <summary>Shows every item again, which widens the titlebar search to all of them.</summary>
-    internal RelayCommand ClearScopeCommand { get; }
+    /// <summary>Shows every item again, which widens the search to all of them.</summary>
+    internal void ShowEveryItem() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything);
 
     /// <summary>What matches the search and the selected group.</summary>
     [ObservableProperty]
@@ -174,7 +174,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal bool ListEmptyOffersClearSearch => Search.Trim().Length > 0;
 
     /// <summary>Whether that search looked in one group, so looking everywhere is a next step too.</summary>
-    internal bool ListEmptyOffersSearchAll => ListEmptyOffersClearSearch && SearchScope is not null;
+    internal bool ListEmptyOffersSearchAll => ListEmptyOffersClearSearch && CanRenameGroup;
 
     /// <summary>Clears the search box, which the shell owns.</summary>
     internal Action? ClearSearchBox { get; set; }
@@ -225,21 +225,40 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 // A new query is a new question, so an entry held in the list by the last one stops
                 // being held by this one.
                 _pinned = null;
+                ReturnToList();
                 Filter();
+                ClosePaneTheListHid();
             }
+        }
+    }
+
+    /// <summary>A search asks for the list, so a form or a comparison holding nothing to lose gives way to it; the shell has already asked about one that does.</summary>
+    private void ReturnToList()
+    {
+        if (!ShowsList && PaneDraft is null)
+        {
+            NewItem = null;
+            Detail?.LeaveWholeView();
+        }
+    }
+
+    /// <summary>The pane shows only what the list does, so the group or query just chosen closes an item it hid.</summary>
+    private void ClosePaneTheListHid()
+    {
+        if (_selection is { } name && !Rows.Any(row => row.Name == name))
+        {
+            Select(null);
         }
     }
 
     /// <summary>The selected row, or null.</summary>
     /// <remarks>
     /// <para>
-    /// <b>Held as the entry's name rather than as the row object, and that is what makes the
-    /// selection survive a search.</b> The list writes null back into this property whenever the row
-    /// it had selected leaves <see cref="Rows"/> — which is every keystroke that narrows a result —
-    /// so a selection stored as a row was cleared by filtering, taking the detail pane with it. A
-    /// null from the list is therefore ignored; <see cref="Select"/> is how the selection is
-    /// deliberately dropped, and <see cref="Dispose"/>, the locked branch of <see cref="Reload"/>
-    /// and a completed delete are the three callers that do it.
+    /// <b>Held as the entry's name rather than as the row object, so what the list does to its rows
+    /// does not decide the selection.</b> The list writes null back into this property whenever the
+    /// row it had selected leaves <see cref="Rows"/>. A null from the list is therefore ignored;
+    /// <see cref="Select"/> is how the selection is deliberately dropped: by a query or group that
+    /// hides it, <see cref="Dispose"/>, the locked branch of <see cref="Reload"/> and a completed delete.
     /// </para>
     /// <para>
     /// The getter looks the row up in the current list, so an equal row selected again is the same
@@ -257,12 +276,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             : null;
         set
         {
-            if (value is not { } row)
+            // The list writes the row it was just told to show, which is no choice to act on.
+            if (value is not { } row || (!IsAdding && row.Name == _selection))
             {
                 return;
             }
 
-            if ((IsAdding || row.Name != _selection) && PaneDraft is { } draft && AskDiscard is { } ask)
+            if (PaneDraft is { } draft && AskDiscard is { } ask)
             {
                 ask(draft, () => MoveSelection(row.Name), () => OnPropertyChanged(nameof(Selected)));
                 return;
@@ -339,15 +359,23 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     }
 
     /// <summary>
-    /// Whether "+ New" is the screen's primary action: not while a form here shows a primary of its own,
-    /// since a view has one amber element (D-0375).
+    /// Whether "+ New" is the screen's primary action: not while a form here shows a primary of its own
+    /// or the search beside it shows its focus, since a view has one amber element.
     /// </summary>
     internal bool AddIsPrimary =>
-        !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && !IsMovingGroup && _detail is not { HasOwnPrimary: true };
+        !SearchHasFocus && !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && !IsMovingGroup && _detail is not { HasOwnPrimary: true };
+
+    /// <summary>Whether the pane says the item's group: only while the list and its Group column are away, and the header does not already name it.</summary>
+    internal bool PaneNamesGroup => !ShowsList && _detail is { GroupPath.Length: > 0 } detail && detail.GroupPath != SelectedGroup?.Path;
+
+    /// <summary>Whether the search in the list header holds the keyboard.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AddIsPrimary))]
+    internal partial bool SearchHasFocus { get; set; }
 
     /// <summary>
     /// Whether the list shows above the item's preview. A new item, an edit and a comparison of two
-    /// revisions take the whole view instead, as KeePassXC's editor does (D-0376).
+    /// revisions take the whole view instead, as KeePassXC's editor does.
     /// </summary>
     internal bool ShowsList => !IsAdding && _detail is not { TakesWholeView: true };
 
@@ -373,6 +401,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             {
                 OnPropertyChanged(nameof(AddIsPrimary));
                 OnPropertyChanged(nameof(ShowsList));
+                OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
                 // a notes field read from an open vault, and the lock has to mean something.
@@ -439,6 +468,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(Selected));
                 OnPropertyChanged(nameof(AddIsPrimary));
                 OnPropertyChanged(nameof(ShowsList));
+                OnPropertyChanged(nameof(PaneNamesGroup));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 OnPropertyChanged(nameof(DeletePrompt));
                 OnPropertyChanged(nameof(OrganizePrompt));
@@ -471,6 +501,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         if (e.PropertyName == nameof(EntryDetailViewModel.TakesWholeView))
         {
             OnPropertyChanged(nameof(ShowsList));
+            OnPropertyChanged(nameof(PaneNamesGroup));
         }
     }
 
@@ -614,8 +645,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// matched against an entry's group path and its title (<see cref="EntryExposure"/>), so it follows
     /// neither the group nor the entry: renaming away from a path an agent sees takes the entry out of
     /// its view, and renaming onto one brings it in. THREATS.md T-13 records that keypaste does not
-    /// prevent this, and D-0275 records why there is no check in the write path. Neither is a reason to
-    /// let somebody do it without being told, so this is a line on the form and never a refusal (D-0276).
+    /// prevent this. That is no reason to
+    /// let somebody do it without being told, so this is a line on the form and never a refusal.
     /// </remarks>
     /// <remarks>
     /// An instance property over a static one, because a binding needs one — the same trade
@@ -722,7 +753,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         OnPropertyChanged(nameof(SelectedGroup));
         OnPropertyChanged(nameof(CanRenameGroup));
         OnPropertyChanged(nameof(ListTitle));
-        OnPropertyChanged(nameof(SearchScope));
         OnPropertyChanged(nameof(ListEmptyNote));
         OnPropertyChanged(nameof(ListEmptyOffersImport));
         OnPropertyChanged(nameof(CreateGroupPrompt));
@@ -854,8 +884,17 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         SelectIfListed(name);
     }
 
-    private void SelectIfListed(EntryName? name) =>
+    /// <summary>Selects what the vault still holds, and holds it in the list until the next query or group, because an edit or another program's save is not the person hiding it.</summary>
+    private void SelectIfListed(EntryName? name)
+    {
         Select(name is not null && _all.Any(row => row.Name == name) ? name : null);
+
+        if (_selection is { } selected && !Rows.Any(row => row.Name == selected))
+        {
+            _pinned = selected;
+            Filter();
+        }
+    }
 
     /// <summary>Narrows the list to the selected group and the current query.</summary>
     /// <remarks>
@@ -1361,7 +1400,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Deletes the selected group with everything in it, in one core write, and shows the group it was in.</summary>
     /// <remarks>
     /// Where the vault has a recycle bin the whole group goes there and Trash lists each of its items, which
-    /// is where they come back from; without one only an empty group goes, for good (D-0483).
+    /// is where they come back from; without one only an empty group goes, for good.
     /// </remarks>
     private void ConfirmDeleteGroup()
     {
@@ -1413,8 +1452,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// </summary>
     /// <remarks>
     /// The copy is held in the result and followed as an organized item is, so it does not vanish under a
-    /// query its new title no longer answers. A project takes one item for each variable (D-0337), so the
-    /// copy is in no project until somebody tags it, and the note says so (D-0484).
+    /// query its new title no longer answers. A project takes one item for each variable, so the
+    /// copy is in no project until somebody tags it, and the note says so.
     /// </remarks>
     private void Duplicate()
     {

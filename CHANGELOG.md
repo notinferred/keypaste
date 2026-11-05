@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's search now sits above the list it filters, reads "Search" and shows Find's own chord, and Find reaches it from any place. The list's header says "All items" or the group's name, the file name stays in the title bar's status, a search or a group that hides the selected item closes its pane, and a button at the start of the title bar shows a collapsed or hidden sidebar ([Q.18](docs/steps/Q.18.md)).
+
 The desktop app's interface now enlarges: View › Zoom in, Zoom out and Actual size (Cmd or Ctrl with +, − and 0) scale every window up to 200%, kept in `app.toml`, with the minimum window growing to match as far as the screen holds it and the interface scrolling inside where it does not; prompts show whole on any screen, and text in the access-change and terminal-edit prompts is no longer cut at the right edge ([Q.9](docs/steps/Q.9.md)).
 
 The desktop app now reopens where you left it: its place and size, maximized or full screen, the line between the list and the preview, and the sidebar, kept in `app.toml` and brought back onto a screen if the one it was on has gone. The window goes down to 720 wide, where the sidebar collapses and Items drops its Username and URL columns, and View › Hide sidebar hides the sidebar at any width ([Q.10](docs/steps/Q.10.md)).

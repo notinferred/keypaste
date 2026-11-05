@@ -124,7 +124,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Toasts = new ToastStack(_clock, Post);
         BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
         ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && Share is null);
-        ClearScopeCommand = new RelayCommand(() => Leave(() => (Content as EntriesViewModel)?.ClearScopeCommand.Press()));
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && !HasImport);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => IsWaitingForTouch);
 
@@ -174,7 +173,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// What the restore that opened this vault did, or what a merge of another program's save carried and named, until it is
-    /// dismissed or the vault locks; a later merge's notice follows one naming a conflict rather than replacing it (D-0542).
+    /// dismissed or the vault locks; a later merge's notice follows one naming a conflict rather than replacing it.
     /// </summary>
     /// <remarks>
     /// Said after the fact as well as before it, because only afterwards is it known whether the
@@ -212,7 +211,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The list's thousandths of the height it shares with the preview, or null until the divider moves.</summary>
     internal int? ListShare { get; set; }
 
-    /// <summary>View › Hide sidebar and Show sidebar: at a narrow width it opens or closes the sidebar over the content, and otherwise it is the person's kept choice.</summary>
+    /// <summary>View › Hide sidebar and Show sidebar, and the titlebar's button: at a narrow width it opens or closes the sidebar over the content, and otherwise it is the person's kept choice.</summary>
+    [RelayCommand]
     internal void ToggleSidebar()
     {
         if (IsNarrow)
@@ -293,7 +293,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// The sidebar's main list, in reading order: Items with the vault's group tree folded under it,
-    /// the projects under their heading, then Agents (D-0376).
+    /// the projects under their heading, then Agents.
     /// </summary>
     /// <remarks>
     /// One list rather than several, so the arrow keys walk the sidebar as a person reads it; Left and
@@ -480,7 +480,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Shows the import dialog for <paramref name="path"/>, replacing one already open: the KeePass database dialog for a file
     /// whose KeePass header reads, the export dialog for one an export reader recognizes, and otherwise the KeePass database
-    /// dialog's refusal, naming the exports it is not either (D-0590).
+    /// dialog's refusal, naming the exports it is not either.
     /// </summary>
     internal void OpenImport(string path)
     {
@@ -603,7 +603,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Whether this app answers agents for the vault but refuses every request, because its audit log
-    /// will not open; the Agents row's dot then shows danger in place of ok (D-0494).
+    /// will not open; the Agents row's dot then shows danger in place of ok.
     /// </summary>
     internal bool AgentsRefusing
     {
@@ -630,7 +630,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The titlebar search, the app's only one. It filters Items, and moves there to do it.</summary>
+    /// <summary>The search in Items' list header, the app's only one, kept here across a trip to another place and rebuilds of the screen.</summary>
     internal string Search
     {
         get => _search;
@@ -638,16 +638,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             var before = _search;
 
-            if (!SetProperty(ref _search, value ?? string.Empty))
-            {
-                return;
-            }
-
-            if (_search.Length > 0 && _current.Kind != DestinationKind.Entries)
-            {
-                Leave(() => MoveTo(Destinations.Of(DestinationKind.Entries)), () => TakeBackSearch(before));
-            }
-            else if (Content is EntriesViewModel)
+            if (SetProperty(ref _search, value ?? string.Empty) && Content is EntriesViewModel)
             {
                 Leave(() => (Content as EntriesViewModel)!.Search = _search, () => TakeBackSearch(before));
             }
@@ -660,24 +651,29 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(Search));
     }
 
-    /// <summary>The group the search is limited to, or null when it searches every item.</summary>
-    internal string? SearchScope => Content is EntriesViewModel entries ? entries.SearchScope : null;
-
-    internal bool HasSearchScope => SearchScope is not null;
-
-    /// <summary>What the search box says while empty: where it searches.</summary>
-    internal string SearchPlaceholder => SearchScope is null ? "Search all items" : "Search in this group";
-
-    /// <summary>Widens the search to every item.</summary>
-    internal RelayCommand ClearScopeCommand { get; }
-
-    /// <summary>Raised when <c>Ctrl/Cmd+K</c> asks for the titlebar search.</summary>
+    /// <summary>Raised when Find asks for the search, once Items is in view.</summary>
     internal event EventHandler? SearchFocusRequested;
 
-    internal void FocusSearch() => SearchFocusRequested?.Invoke(this, EventArgs.Empty);
+    /// <summary>Find: the search is on Items, so it goes there from any other place, asking first about a draft it would leave.</summary>
+    internal void FocusSearch()
+    {
+        CloseSidebarOverlay();
 
-    /// <summary>The shortcut hint on the search field, in the platform's own spelling.</summary>
-    public static string SearchShortcut => OperatingSystem.IsMacOS() ? "⌘K" : "Ctrl K";
+        if (_current.Kind == DestinationKind.Entries)
+        {
+            SearchFocusRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        Leave(() =>
+        {
+            MoveTo(Destinations.Of(DestinationKind.Entries));
+            SearchFocusRequested?.Invoke(this, EventArgs.Empty);
+        });
+    }
+
+    /// <summary>Find's first chord on the search field, in the platform's own spelling.</summary>
+    public static string SearchShortcut => OperatingSystem.IsMacOS() ? "⌘F" : "Ctrl F";
 
     /// <summary>What the bottom-right corner is saying.</summary>
     internal ToastStack Toasts { get; }
@@ -811,7 +807,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Whatever the current destination shows.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SearchScope), nameof(HasSearchScope), nameof(SearchPlaceholder))]
     internal partial object? Content { get; private set; }
 
     /// <summary>
@@ -905,7 +900,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web, _post, _picker) { AskDiscard = AskDiscard };
 
         entries.ClearSearchBox = () => Search = string.Empty;
-        entries.WidenSearch = () => ClearScopeCommand.Press();
+        entries.WidenSearch = () => Leave(() => (Content as EntriesViewModel)?.ShowEveryItem());
 
         if (_search.Length > 0)
         {
@@ -928,13 +923,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(EntriesViewModel.SearchScope))
-        {
-            OnPropertyChanged(nameof(SearchScope));
-            OnPropertyChanged(nameof(HasSearchScope));
-            OnPropertyChanged(nameof(SearchPlaceholder));
-        }
-
         // A group made, renamed, moved or deleted on Items is in the tree at once, even one holding no item,
         // whose change names no entry for Count to hear of.
         if (e.PropertyName == nameof(EntriesViewModel.Groups) && sender is EntriesViewModel { Groups.Count: > 0 } entries)
@@ -1465,7 +1453,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        // The poll and the folder watch merge another program's save; Reload is offered for one keypaste did not merge (D-0542, D-0543).
+        // The poll and the folder watch merge another program's save; Reload is offered for one keypaste did not merge.
         if (_session.MergeRefusal() is { } refused)
         {
             VaultChanged = string.Concat(
@@ -1487,7 +1475,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _reloadFailure is { } failure ? $" Reloading failed: {failure}" : string.Empty);
     }
 
-    /// <summary>Merges another program's save on a thread of its own, the title bar saying so meanwhile (D-0542).</summary>
+    /// <summary>Merges another program's save on a thread of its own, the title bar saying so meanwhile.</summary>
     private void StartMerge()
     {
         if (_isMerging)
@@ -1520,7 +1508,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Says what a merge did and shows the merged copy on the screen open now, leaving an item being edited as typed, so
-    /// its next save writes by name to the merged copy (D-0639); a refusal is said by the banner the status reads.
+    /// its next save writes by name to the merged copy; a refusal is said by the banner the status reads.
     /// </summary>
     private void ShowMerged(MergeResult merged)
     {
@@ -1575,7 +1563,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         _noticeNamesAConflict = false;
     }
 
-    /// <summary>What reloading would discard, naming the items changed here since the last save and never a value (D-0412).</summary>
+    /// <summary>What reloading would discard, naming the items changed here since the last save and never a value.</summary>
     private string Discarded()
     {
         var unsaved = _session.Unsaved;
@@ -1600,7 +1588,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         };
     }
 
-    /// <summary>Opens what the file holds now in place of the open copy (D-0412), offered once a merge was refused (D-0543).</summary>
+    /// <summary>Opens what the file holds now in place of the open copy, offered once a merge was refused.</summary>
     [RelayCommand]
     private void Reload() => Leave(ReloadNow);
 
