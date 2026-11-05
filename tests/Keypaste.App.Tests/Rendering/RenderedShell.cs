@@ -98,6 +98,8 @@ internal sealed class RenderedShell : IDisposable
 
     internal MainWindow Window { get; }
 
+    internal AppCommands Commands => _shortcuts.Commands;
+
     internal ShellViewModel Shell => _shell ?? throw new InvalidOperationException("the shell has locked");
 
     internal ContentControl Root => Window.FindControl<ContentControl>("Root")!;

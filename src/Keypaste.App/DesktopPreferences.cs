@@ -80,9 +80,33 @@ internal sealed class DesktopPreferences
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        Current = settings with { Vault = AppSettings.TryLoad(_path, out var onDisk) ? onDisk.Vault : Current.Vault };
+        Current = settings with { Vault = AppSettings.TryLoad(_path, out var onDisk) ? onDisk.Vault : Current.Vault, Window = Current.Window };
         var saved = AppSettings.Save(_path, Current);
         Changed?.Invoke(this, EventArgs.Empty);
         return saved;
+    }
+
+    /// <summary>Keeps how the window was left, writing only when it changed.</summary>
+    /// <param name="window">The window's layout.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="window"/> is null.</exception>
+    /// <remarks>
+    /// Nobody asked for this write, so it takes only the window section from this copy: every other key stays as the file
+    /// has it, hand edits made while the app runs included, and a file that does not read whole is left alone (D-0028).
+    /// </remarks>
+    internal void KeepWindow(WindowLayout window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        if (window == Current.Window)
+        {
+            return;
+        }
+
+        Current = Current with { Window = window };
+
+        if (AppSettings.TryLoad(_path, out var onDisk))
+        {
+            _ = AppSettings.Save(_path, onDisk with { Window = window });
+        }
     }
 }

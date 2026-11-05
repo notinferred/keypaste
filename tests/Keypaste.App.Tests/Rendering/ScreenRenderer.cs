@@ -251,6 +251,10 @@ public sealed class ScreenRenderer
         Save(window, output, "25-agents-wide");
         window.Width = 960;
         Save(window, output, "29-agents-narrow");
+        window.Width = 720;
+        window.Height = 520;
+        Save(window, output, "29b-agents-720");
+        window.Height = 1100;
         window.Width = _width;
         window.Height = 1500;
 
@@ -423,6 +427,20 @@ public sealed class ScreenRenderer
         window.Height = 520;
         entries.Selected = entries.Rows.First(row => row.Title == "github");
         Save(window, output, "16-secrets-960");
+
+        window.Width = 720;
+        Save(window, output, "16b-secrets-720");
+
+        shell.ToggleSidebar();
+        Save(window, output, "16c-secrets-720-sidebar-open");
+        shell.CloseSidebarOverlay();
+
+        window.Width = _width;
+        window.Height = _height;
+        DrawnFrame.Capture(window);
+        shell.ToggleSidebar();
+        Save(window, output, "16d-secrets-sidebar-hidden");
+        shell.ToggleSidebar();
 
         window.Width = _width;
         window.Height = _height;
@@ -828,6 +846,10 @@ public sealed class ScreenRenderer
         window.Height = 1700;
         shell.Current = Destinations.Of(DestinationKind.Settings);
         Save(window, output, "95-settings-whole");
+        var settingsWidth = window.Width;
+        window.Width = 720;
+        Save(window, output, "95a-settings-720");
+        window.Width = settingsWidth;
         window.Height = _height;
 
         shell.Current = Destinations.Of(DestinationKind.Diagnostics);

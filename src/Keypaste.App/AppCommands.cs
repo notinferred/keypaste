@@ -36,6 +36,16 @@ internal sealed record AppCommand(string Header, IReadOnlyList<KeyGesture> Keys,
 
     /// <summary>The chord its menu item shows, if any.</summary>
     internal KeyGesture? Shown => Keys.Count > 0 ? Keys[0] : null;
+
+    /// <summary>What its menu item says now, where that follows a state; <see cref="Header"/> otherwise.</summary>
+    internal Func<string>? Says { get; init; }
+
+    internal string HeaderNow => Says?.Invoke() ?? Header;
+
+    /// <summary>Raised when <see cref="Says"/> would answer differently, for the menu item drawn from it.</summary>
+    internal event Action? Reworded;
+
+    internal void Reword() => Reworded?.Invoke();
 }
 
 /// <summary>What the commands act on: the running app's objects, or a test's.</summary>
@@ -98,6 +108,7 @@ internal sealed class AppCommands
     private readonly AppCommand _openVault;
     private readonly AppCommand _newGroup;
     private readonly AppCommand _delete;
+    private readonly AppCommand _sidebar;
     private readonly IReadOnlyList<AppMenuEntry> _itemMenu;
     private readonly IReadOnlyList<AppMenuEntry> _trashMenu;
     private readonly IReadOnlyList<AppMenuEntry> _revisionMenu;
@@ -179,10 +190,16 @@ internal sealed class AppCommands
                 () => Unmodal()?.GoTo(place.Shortcut))),
         ];
 
+        // ⌃⌘S is macOS's own chord for this; Windows and Linux have none, and no chord there can hold Alt.
+        _sidebar = new AppCommand("Hide sidebar", Mac ? [new(Key.S, KeyModifiers.Meta | KeyModifiers.Control)] : Chord(Key.B), () => Unmodal() is not null, () => Unmodal()?.ToggleSidebar())
+        {
+            Says = () => host.Shell() is { ShowsSidebar: false } ? "Show sidebar" : "Hide sidebar",
+        };
+
         // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
         var view = new AppMenuGroup("View", Mac
-            ? places
-            : [.. places, _line, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen)]);
+            ? [.. places, _line, _sidebar]
+            : [.. places, _line, _sidebar, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen)]);
 
         var window = new AppMenuGroup("Window",
         [
@@ -246,6 +263,9 @@ internal sealed class AppCommands
         Menus = [file, edit, item, view, window, help];
         Dock = [lockNow, new AppCommand(_openVault.Header, [], CanOpenVault, OpenVaultFromDock)];
     }
+
+    /// <summary>Has the sidebar's menu item say what it would do now.</summary>
+    internal void SidebarChanged() => _sidebar.Reword();
 
     /// <summary>Whether these are macOS's commands and chords, with ⌘, or every other platform's, with Ctrl.</summary>
     internal bool Mac { get; }

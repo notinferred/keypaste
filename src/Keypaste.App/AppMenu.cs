@@ -88,14 +88,21 @@ internal static class AppMenu
     private static IEnumerable<NativeMenuItemBase> NativeItems(IReadOnlyList<AppMenuEntry> entries) =>
         entries.Select(entry => entry switch
         {
-            AppCommand command => new NativeMenuItem(command.Header)
-            {
-                Command = new RelayCommand(command.Run, command.CanRun),
-                Gesture = command.Shown,
-            },
+            AppCommand command => NativeItem(command),
             AppSubmenu submenu => NativeSubmenu(submenu),
             _ => (NativeMenuItemBase)new NativeMenuItemSeparator(),
         });
+
+    private static NativeMenuItem NativeItem(AppCommand command)
+    {
+        var item = new NativeMenuItem(command.HeaderNow)
+        {
+            Command = new RelayCommand(command.Run, command.CanRun),
+            Gesture = command.Shown,
+        };
+        command.Reworded += () => item.Header = command.HeaderNow;
+        return item;
+    }
 
     // Its entries are read again as it is about to show, so Open recent lists what recent.toml holds now.
     private static NativeMenuItem NativeSubmenu(AppSubmenu submenu)
@@ -160,7 +167,9 @@ internal static class AppMenu
     {
         var relay = new RelayCommand(command.Run, command.CanRun);
         made.Add(relay);
-        return new MenuItem { Header = command.Header, Command = relay, InputGesture = command.Shown };
+        var item = new MenuItem { Header = command.HeaderNow, Command = relay, InputGesture = command.Shown };
+        command.Reworded += () => item.Header = command.HeaderNow;
+        return item;
     }
 
     private static MenuItem Submenu(AppSubmenu submenu, List<RelayCommand> made)

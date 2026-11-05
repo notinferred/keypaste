@@ -14,6 +14,8 @@ The app has four places, Items, Agents, Trash and Settings, on Ctrl/⌘+1–4, a
 | Sidebar | The wordmark; Items with the vault's group tree, the projects and Agents; Trash and Settings at the bottom |
 | Content | The place in view: on Items, the list and the selected item's pane |
 
+The window goes down to 720 wide, so two sit side by side on a laptop. Under 840 wide the sidebar collapses and Items drops its Username and URL columns; Show sidebar then opens it over the content, which keeps its width, until Escape or a press outside. View › Hide sidebar hides it at any width. `WindowChrome.cs` holds the sizes.
+
 ## Information
 
 1. **Each fact once in a view.** A name, a state or a location appears in one place in a view, the place the person looks for it; another place links to it or leaves it out. The vault's file name, the group in view and the save state are each such a fact.

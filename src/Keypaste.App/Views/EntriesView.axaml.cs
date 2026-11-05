@@ -23,27 +23,88 @@ namespace Keypaste.App.Views;
 /// </remarks>
 internal sealed partial class EntriesView : UserControl
 {
-    /// <summary>The list's least height beside the preview (D-0344).</summary>
+    /// <summary>The list's least height beside the preview.</summary>
     internal const double ListMinHeight = 100d;
+
+    private const int _shareOfWhole = 1000;
 
     /// <summary>Each menu's toggle, by name, and the panel it opens.</summary>
     private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel")];
 
     private readonly RowDefinition _listRow;
+    private readonly RowDefinition _previewRow;
     private GridLength _listHeight;
     private EntriesViewModel? _entries;
+    private ShellViewModel? _shell;
 
     public EntriesView()
     {
         AvaloniaXamlLoader.Load(this);
 
-        _listRow = this.FindControl<Grid>("Split")!.RowDefinitions[0];
+        var split = this.FindControl<Grid>("Split")!;
+        _listRow = split.RowDefinitions[0];
+        _previewRow = split.RowDefinitions[2];
         _listHeight = _listRow.Height;
+        _listRow.PropertyChanged += OnRowChanged;
+        _previewRow.PropertyChanged += OnRowChanged;
 
         AddHandler(Button.ClickEvent, OnClick, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
+    }
+
+    // The shell holds the split and the width, because this view is built again at every return to Items.
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        if (this.FindAncestorOfType<ShellView>()?.DataContext is not ShellViewModel shell)
+        {
+            return;
+        }
+
+        EntryColumns.SetShowsContact(this, !shell.IsNarrow);
+
+        // Before the rows are watched, so setting them one at a time cannot read as a move of the divider.
+        if (shell.ListShare is { } share)
+        {
+            _listHeight = new GridLength(share, GridUnitType.Star);
+            _previewRow.Height = new GridLength(_shareOfWhole - share, GridUnitType.Star);
+            PlaceList();
+        }
+
+        _shell = shell;
+        _shell.PropertyChanged += OnShellChanged;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_shell is not null)
+        {
+            _shell.PropertyChanged -= OnShellChanged;
+            _shell = null;
+        }
+
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnShellChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ShellViewModel.IsNarrow) && _shell is not null)
+        {
+            EntryColumns.SetShowsContact(this, !_shell.IsNarrow);
+        }
+    }
+
+    /// <summary>The divider, dragged or moved from the keyboard, gives each row a star length; the shell keeps their proportion.</summary>
+    private void OnRowChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == RowDefinition.HeightProperty && _shell is not null && _listRow.Height.IsStar && _previewRow.Height.IsStar)
+        {
+            var whole = _listRow.Height.Value + _previewRow.Height.Value;
+            _shell.ListShare = Math.Clamp((int)Math.Round(_shareOfWhole * _listRow.Height.Value / whole), 1, _shareOfWhole - 1);
+        }
     }
 
     protected override void OnDataContextChanged(EventArgs e)

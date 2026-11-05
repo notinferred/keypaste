@@ -44,6 +44,7 @@ internal sealed partial class ShellView : UserControl
         AddHandler(PointerReleasedEvent, OnControlClick, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, OnShiftF10, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnShiftF10, RoutingStrategies.Tunnel);
+        AddHandler(PointerPressedEvent, OnPressOutsideSidebar, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     // On the window rather than here, ahead of the handlers the dialogs under the question put there, so Escape answers it first.
@@ -52,6 +53,58 @@ internal sealed partial class ShellView : UserControl
         base.OnAttachedToVisualTree(e);
         _root = TopLevel.GetTopLevel(this);
         _root?.AddHandler(KeyDownEvent, OnDiscardPromptEscape, RoutingStrategies.Tunnel);
+        Commands?.SidebarChanged();
+    }
+
+    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    {
+        base.OnSizeChanged(e);
+
+        if (_shell is not null)
+        {
+            _shell.IsNarrow = e.NewSize.Width < WindowChrome.NarrowBelow;
+        }
+    }
+
+    /// <summary>The titlebar's first column follows the sidebar under it; a sidebar over the content spans it and leaves the columns as a collapsed one does.</summary>
+    private void PlaceSidebar()
+    {
+        var beside = _shell is { ShowsSidebar: true, SidebarOverlays: false };
+        this.FindControl<Grid>("TitleColumns")!.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : WindowChrome.LeadingInset);
+        this.FindControl<Grid>("BodyColumns")!.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : 0);
+        Grid.SetColumnSpan(this.FindControl<Border>("Sidebar")!, _shell is { SidebarOverlays: true } ? 2 : 1);
+    }
+
+    /// <summary>A sidebar opened over the content takes the keyboard, and one that closes with the keyboard inside hands it to the search rather than to nothing.</summary>
+    private void OnSidebarShownChanged()
+    {
+        var sidebar = this.FindControl<Border>("Sidebar")!;
+        var held = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is Visual focused
+            && focused.GetSelfAndVisualAncestors().Contains(sidebar);
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (_shell is { SidebarOverlays: true })
+                {
+                    FocusChosenRow(this.FindControl<ListBox>("Nav")!);
+                }
+                else if (held && _shell is { ShowsSidebar: false })
+                {
+                    this.FindControl<TextBox>("ShellSearch")!.Focus();
+                }
+            },
+            DispatcherPriority.Loaded);
+    }
+
+    /// <summary>A press outside a sidebar lying over the content closes it, and still does what it presses.</summary>
+    private void OnPressOutsideSidebar(object? sender, PointerPressedEventArgs e)
+    {
+        if (_shell is { SidebarOverlays: true } shell && e.Source is Visual source
+            && !source.GetSelfAndVisualAncestors().Contains(this.FindControl<Border>("Sidebar")))
+        {
+            shell.CloseSidebarOverlay();
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -217,7 +270,10 @@ internal sealed partial class ShellView : UserControl
         {
             _shell.SearchFocusRequested += OnSearchFocusRequested;
             _shell.PropertyChanged += OnShellChanged;
+            _shell.IsNarrow = Bounds.Width > 0 && Bounds.Width < WindowChrome.NarrowBelow;
         }
+
+        PlaceSidebar();
     }
 
     /// <summary>The import dialog hands the keyboard back to what had it, or to Items' "+", when it closes.</summary>
@@ -226,6 +282,11 @@ internal sealed partial class ShellView : UserControl
         if (e.Key == Key.Escape && _shell is { HasDiscardPrompt: true } shell)
         {
             shell.KeepDraftCommand.Press();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && _shell is { SidebarOverlays: true } overlaid)
+        {
+            overlaid.CloseSidebarOverlay();
             e.Handled = true;
         }
     }
@@ -261,6 +322,13 @@ internal sealed partial class ShellView : UserControl
 
     private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(ShellViewModel.ShowsSidebar) or nameof(ShellViewModel.SidebarOverlays))
+        {
+            PlaceSidebar();
+            Commands?.SidebarChanged();
+            OnSidebarShownChanged();
+        }
+
         if (e.PropertyName == nameof(ShellViewModel.HasDiscardPrompt) && _shell is not null)
         {
             OnDiscardPromptChanged(_shell.HasDiscardPrompt);

@@ -107,6 +107,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         Authority = authority;
         ApplyTheme = applyTheme ?? (_ => { });
         Preferences = preferences ?? new DesktopPreferences(home);
+        SidebarHidden = Preferences.Current.Window?.SidebarHidden ?? false;
+        ListShare = Preferences.Current.Window?.ListShare;
         _clock = clock ?? TimeProvider.System;
         _post = post;
 
@@ -183,6 +185,50 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     internal partial string? Notice { get; private set; }
 
     internal bool HasNotice => Notice is not null;
+
+    /// <summary>Whether the person hid the sidebar with View › Hide sidebar; it stays hidden at every width and across locks.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
+    internal partial bool SidebarHidden { get; private set; }
+
+    /// <summary>Whether the window is under <see cref="Views.WindowChrome.NarrowBelow"/>, where the sidebar collapses and Items drops two columns.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
+    [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
+    internal partial bool IsNarrow { get; set; }
+
+    /// <summary>Whether a collapsed sidebar was opened over the content, which keeps its width, so a group can still be chosen.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsSidebar))]
+    [NotifyPropertyChangedFor(nameof(SidebarOverlays))]
+    private partial bool SidebarOpenedOver { get; set; }
+
+    /// <summary>Whether the sidebar is on the screen.</summary>
+    internal bool ShowsSidebar => IsNarrow ? SidebarOpenedOver : !SidebarHidden;
+
+    /// <summary>Whether the sidebar lies over the content rather than beside it.</summary>
+    internal bool SidebarOverlays => IsNarrow && SidebarOpenedOver;
+
+    /// <summary>The list's thousandths of the height it shares with the preview, or null until the divider moves.</summary>
+    internal int? ListShare { get; set; }
+
+    /// <summary>View › Hide sidebar and Show sidebar: at a narrow width it opens or closes the sidebar over the content, and otherwise it is the person's kept choice.</summary>
+    internal void ToggleSidebar()
+    {
+        if (IsNarrow)
+        {
+            SidebarOpenedOver = !SidebarOpenedOver;
+        }
+        else
+        {
+            SidebarHidden = !SidebarHidden;
+        }
+    }
+
+    /// <summary>Closes a sidebar lying over the content: a press outside it, or Escape.</summary>
+    internal void CloseSidebarOverlay() => SidebarOpenedOver = false;
+
+    partial void OnIsNarrowChanged(bool value) => SidebarOpenedOver = false;
 
     /// <summary>What the notice says while the file holds another program's save that keypaste did not merge, or null.</summary>
     [ObservableProperty]

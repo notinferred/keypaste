@@ -64,6 +64,9 @@ public sealed record AppSettings
     /// <summary>The section header the preferences are written under.</summary>
     public const string SectionName = "settings";
 
+    /// <summary>The section the window's layout is written under, apart from the preferences: every reader of the file holds a section to eight keys, and the preferences already take seven.</summary>
+    public const string WindowSectionName = "window";
+
     /// <summary>
     /// The three keys the section carries.
     /// </summary>
@@ -85,10 +88,15 @@ public sealed record AppSettings
     internal const string VaultKey = "vault";
     internal const string CrashReportsKey = "crash_reports";
     internal const string TermsKey = "terms";
+    internal const string WindowBoundsKey = "bounds";
+    internal const string WindowStateKey = "state";
+    internal const string WindowListShareKey = "list_share";
+    internal const string WindowSidebarHiddenKey = "sidebar_hidden";
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
+    private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey];
 
     private static readonly string[] _header =
     [
@@ -145,6 +153,9 @@ public sealed record AppSettings
 
     /// <summary>The version of the terms of use the person was shown when they chose, or null.</summary>
     public string? TermsShown { get; init; }
+
+    /// <summary>How the person left the desktop app's window, or null until it has been kept or when the file's bounds make no window.</summary>
+    public WindowLayout? Window { get; init; }
 
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
@@ -214,6 +225,11 @@ public sealed record AppSettings
             }
         }
 
+        if (document.Tables.FirstOrDefault(IsWindowSection) is { } window)
+        {
+            settings = settings with { Window = ReadWindow(window) };
+        }
+
         return true;
     }
 
@@ -275,7 +291,7 @@ public sealed record AppSettings
             writer.Text(TermsKey, terms, "the terms of use shown when that was chosen");
         }
 
-        if (!TryKeep(writer, Existing(path)))
+        if (!TryKeep(writer, Existing(path), settings.Window))
         {
             return false;
         }
@@ -321,9 +337,12 @@ public sealed record AppSettings
 
     /// <summary>Writes back what <paramref name="existing"/> holds beyond the preferences: the other keys of its first <c>[[settings]]</c>, then every other section.</summary>
     /// <returns><see langword="false"/> when something kept cannot be written so that it reads back as itself.</returns>
-    private static bool TryKeep(TomlWriter writer, TomlDocument existing)
+    private static bool TryKeep(TomlWriter writer, TomlDocument existing, WindowLayout? layout)
     {
         var section = existing.Tables.FirstOrDefault(table => string.Equals(table.Name, SectionName, StringComparison.Ordinal));
+
+        // With no layout to write, a [[window]] whose bounds did not read stays as a hand edit left it, among the other sections.
+        var window = layout is null ? null : existing.Tables.FirstOrDefault(IsWindowSection);
 
         try
         {
@@ -332,7 +351,17 @@ public sealed record AppSettings
                 return false;
             }
 
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section)))
+            if (layout is not null)
+            {
+                Write(writer, layout);
+
+                if (window is not null && !TryWrite(writer, window.Pairs.Where(pair => !_knownWindowKeys.Contains(pair.Key, StringComparer.Ordinal))))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -348,6 +377,22 @@ public sealed record AppSettings
         }
 
         return true;
+    }
+
+    private static void Write(TomlWriter writer, WindowLayout layout)
+    {
+        writer
+            .BlankLine()
+            .Table(WindowSectionName)
+            .Text(WindowBoundsKey, layout.BoundsText, "left, top, width, height, at the window's own size")
+            .Text(WindowStateKey, layout.ModeText);
+
+        if (layout.ListShare is { } share)
+        {
+            writer.Number(WindowListShareKey, share, "the list's thousandths of the height it shares with the preview");
+        }
+
+        writer.Number(WindowSidebarHiddenKey, layout.SidebarHidden ? 1 : 0);
     }
 
     private static bool TryWrite(TomlWriter writer, IEnumerable<TomlPair> pairs)
@@ -377,6 +422,17 @@ public sealed record AppSettings
     /// <remarks>A path holding a quote, a control character or, on Unix, a backslash cannot; nor can one longer than the file's strings.</remarks>
     internal static bool CanRecord(string vaultPath) =>
         new TomlWriter(TomlLimits.Paths).CanWrite(VaultKey, RecentVaults.Portable(vaultPath), _vaultComment);
+
+    private static bool IsWindowSection(TomlTable table) => string.Equals(table.Name, WindowSectionName, StringComparison.Ordinal);
+
+    private static WindowLayout? ReadWindow(TomlTable table) =>
+        table.TryGet(WindowBoundsKey, out var bounds) && bounds.Value.Kind == TomlValueKind.Text
+            ? WindowLayout.Read(
+                bounds.Value.Text,
+                table.TryGet(WindowStateKey, out var state) && state.Value.Kind == TomlValueKind.Text ? state.Value.Text : null,
+                table.TryGet(WindowListShareKey, out var share) && share.Value.Kind == TomlValueKind.Number ? share.Value.Number : null,
+                table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0)
+            : null;
 
     private static AppSettings Read(TomlTable table) => new()
     {

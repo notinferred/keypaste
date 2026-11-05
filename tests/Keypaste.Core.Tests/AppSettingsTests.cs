@@ -234,6 +234,91 @@ public sealed class AppSettingsTests : IDisposable
 
     /// <summary>What a newer version wrote and this one does not read survives this one's Settings and its <c>keypaste use</c> (D-0520).</summary>
     [Fact]
+    public void The_window_round_trips_beside_every_preference_at_a_position_left_of_the_main_screen()
+    {
+        var window = new WindowLayout(-1500, 40, 800, 600, WindowMode.FullScreen, 425, true);
+        var settings = AppSettings.Default with
+        {
+            Theme = AppTheme.Dark,
+            StayInTray = true,
+            Vault = Path.Combine(_directory, "chosen.kdbx"),
+            SendCrashReports = false,
+            TermsShown = "2026-01-01",
+            Window = window,
+        };
+
+        Assert.True(AppSettings.Save(SettingsFile, settings));
+
+        Assert.True(AppSettings.TryLoad(SettingsFile, out var read, out var problem), problem);
+        Assert.Equal(settings, read);
+    }
+
+    /// <summary>
+    /// A reader built before the window was kept reads no section it does not know, and writes it back as it was (D-0520); it
+    /// refuses a whole file over a negative number or a ninth key in a section, so what is written holds to neither.
+    /// </summary>
+    [Fact]
+    public void The_file_stays_inside_what_an_older_reader_takes_and_a_choice_of_vault_keeps_the_window()
+    {
+        var window = new WindowLayout(-1500, -40, 800, 600, WindowMode.Maximized, 425, true);
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = window, StayInTray = true, SendCrashReports = true, TermsShown = "2026-01-01" }));
+        Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(_directory, Path.Combine(_directory, "chosen.kdbx"), onlyIfNone: false));
+
+        Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var error), error);
+        var section = Assert.Single(document.Tables, table => string.Equals(table.Name, AppSettings.WindowSectionName, StringComparison.Ordinal));
+        Assert.True(section.Pairs.Count <= Toml.MaximumPairs);
+        Assert.True(section.TryGet("bounds", out var bounds));
+        Assert.Equal(TomlValueKind.Text, bounds.Value.Kind);
+        Assert.Equal(window, AppSettings.Load(SettingsFile).Window);
+    }
+
+    [Theory]
+    [InlineData("nonsense")]
+    [InlineData("1,2,3")]
+    [InlineData("1,2,0,600")]
+    [InlineData("1,2,-800,600")]
+    [InlineData("1,2,800,999999999")]
+    public void Bounds_that_make_no_window_read_as_none_and_a_save_leaves_them_as_they_were(string bounds)
+    {
+        File.WriteAllText(SettingsFile, $"[[settings]]\ntheme = \"dark\"\n\n[[window]]\nbounds = \"{bounds}\"\nlater = 1\n");
+
+        Assert.True(AppSettings.TryLoad(SettingsFile, out var read));
+        Assert.Equal(AppTheme.Dark, read.Theme);
+        Assert.Null(read.Window);
+
+        Assert.True(AppSettings.Save(SettingsFile, read));
+        Assert.Contains($"bounds = \"{bounds}\"", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("list_share = 0", null)]
+    [InlineData("list_share = 1000", null)]
+    [InlineData("list_share = 400", 400)]
+    public void A_share_of_nothing_or_of_everything_reads_as_none(string line, int? share)
+    {
+        File.WriteAllText(SettingsFile, $"[[window]]\nbounds = \"1,2,800,600\"\n{line}\n");
+
+        Assert.Equal(share, AppSettings.Load(SettingsFile).Window!.ListShare);
+    }
+
+    [Fact]
+    public void A_window_section_alone_leaves_every_preference_at_its_default_and_a_later_key_in_it_survives()
+    {
+        File.WriteAllText(SettingsFile, "[[window]]\nbounds = \"1,2,800,600\"\nstate = \"odd\"\nlater = 3\n");
+
+        var read = AppSettings.Load(SettingsFile);
+        Assert.Equal(AppSettings.Default.IdleTimeoutSeconds, read.IdleTimeoutSeconds);
+        Assert.Equal(new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false), read.Window);
+
+        Assert.True(AppSettings.Save(SettingsFile, read with { Window = read.Window! with { X = 9 } }));
+        Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var error), error);
+        var section = Assert.Single(document.Tables, table => string.Equals(table.Name, AppSettings.WindowSectionName, StringComparison.Ordinal));
+        Assert.True(section.TryGet("later", out var later));
+        Assert.Equal(3, later.Value.Number);
+        Assert.Equal(9, AppSettings.Load(SettingsFile).Window!.X);
+    }
+
+    [Fact]
     public void A_key_and_a_section_this_version_does_not_read_survive_a_save_and_a_choice_of_vault()
     {
         File.WriteAllText(SettingsFile, "[[settings]]\ntheme = \"dark\"\nlater_choice = \"kept\"\nlater_count = 3\n\n[[later]]\nnames = [\"a\", \"b\"]\n");

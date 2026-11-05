@@ -203,6 +203,10 @@
   </Style>
 
   <!-- A menu a ⋯ or + toggle opens, laid over what is below it. -->
+  <Style Selector="Border.sidebar.overlay">
+    <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
+  </Style>
+
   <Style Selector="Border.menu">
     <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
     <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />

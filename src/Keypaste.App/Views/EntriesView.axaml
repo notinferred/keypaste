@@ -351,14 +351,14 @@
       <DockPanel Grid.Row="0" x:Name="ListArea" IsVisible="{Binding ShowsList}">
         <!-- The columns, as KeePassXC's entry table draws them: what an item is, its username and web
              address, and where it lives, never a password or a custom field's value (EntryRow, D-0488). -->
-        <Grid DockPanel.Dock="Top" Classes="table-head" ColumnDefinitions="28,1.4*,*,*,88,*,104" Margin="16,8,16,0">
+        <views:EntryColumns DockPanel.Dock="Top" Classes="table-head" Margin="16,8,16,0">
           <TextBlock Grid.Column="1" Classes="th" Text="TITLE" />
-          <TextBlock Grid.Column="2" x:Name="UsernameHead" Classes="th" Text="USERNAME" />
-          <TextBlock Grid.Column="3" x:Name="UrlHead" Classes="th" Text="URL" />
+          <TextBlock Grid.Column="2" x:Name="UsernameHead" Classes="th" Text="USERNAME" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
+          <TextBlock Grid.Column="3" x:Name="UrlHead" Classes="th" Text="URL" IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}" />
           <TextBlock Grid.Column="4" Classes="th" Text="KIND" />
           <TextBlock Grid.Column="5" Classes="th" Text="GROUP" />
           <TextBlock Grid.Column="6" Classes="th" Text="LAST USED" HorizontalAlignment="Right" Margin="0,0,14,0" />
-        </Grid>
+        </views:EntryColumns>
         <Panel>
           <!-- An empty list says why, so a filter with no match does not read as a failed load. -->
           <StackPanel Spacing="12"
@@ -414,7 +414,7 @@
                    SelectedItem="{Binding Selected}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:EntryRow">
-                <Grid ColumnDefinitions="28,1.4*,*,*,88,*,104">
+                <views:EntryColumns>
                   <ctl:KpIcon Grid.Column="0" Classes="kind" Icon="{Binding Icon}" Size="15" />
                   <DockPanel Grid.Column="1" Margin="0,0,8,0">
                     <!-- Why it is in a result: a field name from a fixed vocabulary, or the tag it was in,
@@ -434,8 +434,10 @@
                                VerticalAlignment="Center" />
                   </DockPanel>
                   <TextBlock Grid.Column="2" Classes="mono muted" FontSize="12" Text="{Binding DisplayUsername}"
+                             IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="3" Classes="mono muted" FontSize="12" Text="{Binding DisplayUrl}"
+                             IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="4" Classes="muted" FontSize="12.5" Text="{Binding KindLabel}" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="5" Classes="mono muted" FontSize="12" Text="{Binding Where}"
@@ -450,7 +452,7 @@
                     <TextBlock Classes="mono sm muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
                     <Border Classes="dot" Classes.info="{Binding IsInUse}" Classes.ok="{Binding IsRecent}" Classes.idle="{Binding IsIdle}" />
                   </StackPanel>
-                </Grid>
+                </views:EntryColumns>
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>

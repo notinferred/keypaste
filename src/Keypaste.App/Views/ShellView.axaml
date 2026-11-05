@@ -97,7 +97,7 @@
               BorderBrush="{DynamicResource KpBorderSubtle}"
               BorderThickness="0,0,0,1"
               WindowDecorationProperties.ElementRole="TitleBar">
-        <Grid ColumnDefinitions="232,*,Auto" Margin="{x:Static views:WindowChrome.CaptionInset}">
+        <Grid Name="TitleColumns" ColumnDefinitions="232,*,Auto" Margin="{x:Static views:WindowChrome.CaptionInset}">
 
           <!-- The app's only search. It searches Items, and says where: every item, or the group in view. -->
           <TextBox Grid.Column="1"
@@ -183,12 +183,19 @@
         </Grid>
       </Border>
 
-      <Grid Grid.Row="1" ColumnDefinitions="232,*">
+      <Grid Name="BodyColumns" Grid.Row="1" ColumnDefinitions="232,*">
 
         <!-- The sidebar. Nav is a ListBox on purpose: arrow keys, Home/End and type-ahead all work
              for free, the accessibility roles are right, and there is no custom key handling to get
              wrong. SelectedMain drives navigation. -->
-        <Border Grid.Column="0"
+        <Border Name="Sidebar"
+                Grid.Column="0"
+                ZIndex="2"
+                Width="{x:Static views:WindowChrome.SidebarWidth}"
+                HorizontalAlignment="Left"
+                IsVisible="{Binding ShowsSidebar}"
+                Classes="sidebar"
+                Classes.overlay="{Binding SidebarOverlays}"
                 Background="{DynamicResource KpBgPanel}"
                 BorderBrush="{DynamicResource KpBorderSubtle}"
                 BorderThickness="0,0,1,0">

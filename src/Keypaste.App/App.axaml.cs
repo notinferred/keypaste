@@ -58,6 +58,7 @@ internal sealed partial class App : Application, IDisposable
     private bool _shuttingDown;
     private bool _quitting;
     private bool _crashed;
+    private Core.Settings.WindowLayout? _untouchedLayout;
     private Core.Settings.AppTheme _theme = Core.Settings.AppTheme.System;
     private PlatformThemeVariant _platformTheme = PlatformThemeVariant.Dark;
     private ColorContrastPreference _platformContrast = ColorContrastPreference.NoPreference;
@@ -119,6 +120,16 @@ internal sealed partial class App : Application, IDisposable
             Unexpected);
 
         _window = new MainWindow();
+
+        if (_preferences.Current.Window is { } left)
+        {
+            _window.Restore(left);
+        }
+        else
+        {
+            _window.Opened += NoteUntouchedLayout;
+        }
+
         _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
         _commands = Commands(_window, _session, home);
         _shortcuts = new Shortcuts(_window, _commands);
@@ -307,8 +318,33 @@ internal sealed partial class App : Application, IDisposable
         }
     }
 
+    private void NoteUntouchedLayout(object? sender, EventArgs e)
+    {
+        _window!.Opened -= NoteUntouchedLayout;
+        _untouchedLayout = _window.Layout(null, false);
+    }
+
+    /// <summary>Keeps how the window stands in <c>app.toml</c>, on close, lock and quit; with no shell, what the last one left. A window nobody has touched since its first opening has nothing to keep, so the file stays as it was.</summary>
+    private void KeepWindowLayout()
+    {
+        if (_crashed || _window is null || _preferences is null)
+        {
+            return;
+        }
+
+        var left = _preferences.Current.Window;
+
+        if (_window.Layout(_shell is { } shell ? shell.ListShare : left?.ListShare, _shell?.SidebarHidden ?? left?.SidebarHidden ?? false) is { } layout
+            && (left is not null || layout != _untouchedLayout))
+        {
+            _preferences.KeepWindow(layout);
+        }
+    }
+
     private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
     {
+        KeepWindowLayout();
+
         if (_quitting || _preferences?.StaysInTray != true || e.CloseReason != WindowCloseReason.WindowClosing)
         {
             return;
@@ -544,6 +580,7 @@ internal sealed partial class App : Application, IDisposable
         ArgumentNullException.ThrowIfNull(e);
 
         StopAnswering();
+        KeepWindowLayout();
 
         if (_shuttingDown || _shell is null)
         {
@@ -600,6 +637,7 @@ internal sealed partial class App : Application, IDisposable
                 return;
             }
 
+            KeepWindowLayout();
             ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable), LockMessage(reason), reason);
             _tray?.Refresh();
         });

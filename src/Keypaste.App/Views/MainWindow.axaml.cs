@@ -3,7 +3,9 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.App.Views;
 
@@ -27,6 +29,81 @@ internal sealed partial class MainWindow : Window
         };
 
         AddHandler(GotFocusEvent, OnGotFocus, RoutingStrategies.Bubble, handledEventsToo: true);
+
+        Opened += (_, _) => NoteBounds();
+
+        // Posted, because a platform can report the new size of a maximize before its new state.
+        PositionChanged += (_, _) => Dispatcher.UIThread.Post(NoteBounds, DispatcherPriority.Background);
+        Resized += (_, _) => Dispatcher.UIThread.Post(NoteBounds, DispatcherPriority.Background);
+    }
+
+    /// <summary>Opens the window as it was left, on the screen it was on or brought back onto one, before it shows.</summary>
+    /// <param name="saved">The layout <c>app.toml</c> keeps.</param>
+    internal void Restore(WindowLayout saved)
+    {
+        ArgumentNullException.ThrowIfNull(saved);
+
+        if (Screens is not { ScreenCount: > 0 } screens)
+        {
+            return;
+        }
+
+        // The main screen first, where a window on no screen comes back to. macOS measures positions and screens in points, as window sizes are.
+        var areas = screens.All
+            .OrderByDescending(screen => screen.IsPrimary)
+            .Select(screen => new ScreenArea(screen.WorkingArea, OperatingSystem.IsMacOS() ? 1 : screen.Scaling))
+            .ToList();
+        var placed = WindowPlacement.Fit(saved, new Size(MinWidth, MinHeight), areas);
+
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Position = placed.Position;
+        Width = placed.Size.Width;
+        Height = placed.Size.Height;
+        _normal = (placed.Position, placed.Size);
+        WindowState = saved.Mode switch
+        {
+            WindowMode.Maximized => WindowState.Maximized,
+            WindowMode.FullScreen => WindowState.FullScreen,
+            _ => WindowState.Normal,
+        };
+    }
+
+    /// <summary>How the window stands, at its own bounds under any maximize, or null before it has ever had bounds.</summary>
+    /// <param name="listShare">The list's share of the height, which the shell holds.</param>
+    /// <param name="sidebarHidden">Whether the sidebar is hidden, which the shell holds.</param>
+    internal WindowLayout? Layout(int? listShare, bool sidebarHidden)
+    {
+        NoteBounds();
+
+        return _normal is not var (position, size)
+            ? null
+            : new WindowLayout(position.X, position.Y, (int)Math.Round(size.Width), (int)Math.Round(size.Height), _mode, listShare, sidebarHidden);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        // A minimized window is still one that fills its screen, or not, when it comes back.
+        if (change.Property == WindowStateProperty)
+        {
+            _mode = WindowState switch
+            {
+                WindowState.Maximized => WindowMode.Maximized,
+                WindowState.FullScreen => WindowMode.FullScreen,
+                WindowState.Normal => WindowMode.Normal,
+                _ => _mode,
+            };
+        }
+    }
+
+    // Only a shown window at its own size has bounds worth keeping: Windows moves a minimized one to -32000.
+    private void NoteBounds()
+    {
+        if (IsVisible && WindowState == WindowState.Normal)
+        {
+            _normal = (Position, ClientSize);
+        }
     }
 
     /// <summary>
@@ -46,6 +123,8 @@ internal sealed partial class MainWindow : Window
     }
 
     private IInputElement? _beforeMenu;
+    private (PixelPoint Position, Size Size)? _normal;
+    private WindowMode _mode;
 
     private void OnGotFocus(object? sender, FocusChangedEventArgs e)
     {

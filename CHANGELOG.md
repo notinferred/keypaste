@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app now reopens where you left it: its place and size, maximized or full screen, the line between the list and the preview, and the sidebar, kept in `app.toml` and brought back onto a screen if the one it was on has gone. The window goes down to 720 wide, where the sidebar collapses and Items drops its Username and URL columns, and View › Hide sidebar hides the sidebar at any width ([Q.10](docs/steps/Q.10.md)).
+
 The desktop app is easier to see: on the light palette focus, selection and warnings are drawn in a darker amber, most fields, checkboxes, radio buttons and switches keep WCAG's 3:1 edge on their ground, high-contrast light and dark palettes follow macOS's Increase Contrast and Windows' contrast themes, small buttons take a 20 by 20 target, and undoing a delete shows the item again in the pane ([Q.8](docs/steps/Q.8.md)).
 
 The desktop app now works better with screen readers: every field and list row has a name, headings carry their level, buttons in a repeated row name what they act on, and unlock and form errors, toasts, the banner saying another program saved the vault and a prompt's opening with its time limit are each announced once. Fields labelled only by a placeholder now have a visible label, and the Agents row says live or refusing beside its dot. ([Q.7](docs/steps/Q.7.md))
