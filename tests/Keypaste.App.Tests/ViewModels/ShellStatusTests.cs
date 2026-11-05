@@ -1,5 +1,7 @@
+using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
@@ -502,6 +504,50 @@ public sealed class ShellStatusTests
         using var file = Vault.Open(fixture.Path_, TempVault.Password);
         Assert.NotNull(file.Find("env/app/ELSEWHERE"));
         Assert.Equal("secret-mine", file.Find("env/app/MINE")!.Password);
+    }
+
+    /// <summary>
+    /// The item open in the pane is purged by another program while it is edited: the merge keeps the change in Trash, so
+    /// the save succeeded and the pane closes with no claim that the item could not be read.
+    /// </summary>
+    [Fact]
+    public async Task AnEditOfAnItemAnotherProgramPurged_IsSavedInTrash_AndThePaneClosesWithoutAnError()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        var session = authority.Session;
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
+        using var countdown = new ClipboardCountdown(new FakeClipboard(), clock);
+        using var entries = new EntriesViewModel(session, countdown);
+
+        entries.Selected = entries.Rows.Single(row => row.Title == "example");
+        var detail = entries.Detail!;
+        detail.EditCommand.Press();
+        detail.DraftNotes = "mine";
+
+        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            Assert.Equal(DeletionOutcome.Recycled, other.RemoveEntry(new EntryName(string.Empty, "example"), out var recycled));
+            Assert.True(other.PurgeRecycled(recycled));
+            other.Save();
+        }
+
+        detail.SaveCommand.Press();
+        await shell.Merging.WaitAsync(_connect, Token);
+
+        Assert.Null(entries.Error);
+        Assert.False(detail.IsEditing);
+        Assert.Null(entries.Selected);
+        Assert.Null(entries.Detail);
+        Assert.Contains("It is in Trash with your change.", shell.Notice, StringComparison.Ordinal);
+
+        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        Assert.Null(file.Find("example"));
+        Assert.Contains(file.ReadRecycled(), item => item.Title == "example");
     }
 
     /// <summary>

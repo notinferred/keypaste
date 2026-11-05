@@ -740,7 +740,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Filter();
 
-        Select(wanted is not null && _all.Any(row => row.Name == wanted) ? wanted : null);
+        SelectIfListed(wanted);
         ApplyActivity();
     }
 
@@ -842,7 +842,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web, _post, _picker);
     }
 
-    /// <summary>Reads the list again and lands on the entry a restore left behind.</summary>
+    /// <summary>Reads the list again and lands on the entry a restore left behind, unless a merge took it to Trash.</summary>
     /// <remarks>
     /// <see cref="Reload"/> alone is not enough: it keeps the selection by path, and a restored
     /// revision from before a rename gives the entry a different one. It is also not too much: an
@@ -851,8 +851,11 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private void Reselect(EntryName name)
     {
         Reload();
-        Select(name);
+        SelectIfListed(name);
     }
+
+    private void SelectIfListed(EntryName? name) =>
+        Select(name is not null && _all.Any(row => row.Name == name) ? name : null);
 
     /// <summary>Narrows the list to the selected group and the current query.</summary>
     /// <remarks>
