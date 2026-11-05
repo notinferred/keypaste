@@ -7,6 +7,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using Keypaste.App.Navigation;
+using Keypaste.App.Notifications;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
 using Keypaste.App.Tests.Rendering;
@@ -409,6 +410,10 @@ public sealed partial class PlainWordsTests
         })));
         yield return ("the not-paired notice", new PairingNoticeWindow(new PairingNotice(Core.Browser.BrowserIdentity.FirefoxAddOns), () => { }));
     }
+
+    [Fact]
+    public void TheSystemNotifications_HoldNoneOfTheRetiredWords() =>
+        Assert.Empty(Offending(SystemNotice.All.SelectMany(notice => new[] { (notice.Kind, notice.Title), (notice.Kind, notice.Body), (notice.Kind, notice.Action) })));
 
     /// <summary>What the shell says of a merge of another program's save, saved with each kind of item named or refused for each reason, holds none of the words.</summary>
     [Fact]

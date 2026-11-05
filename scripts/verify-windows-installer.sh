@@ -8,6 +8,7 @@
 #   - a per-machine package, or a signature on a package the definition declares unsigned;
 #   - any Environment row but one appending the install folder to the per-user PATH, removed on
 #     uninstall, from the UserPath component rather than the payload's (G.5);
+#   - a Start menu shortcut without the AppUserModelID the app posts its notifications under (Q.14);
 #   - a package whose Registry table lacks .kdbx's ProgId and OpenWithProgids rows, or that sets the
 #     default of .kdbx itself, which would take it from whoever holds it (Q.13);
 #   - an administrative extraction whose files differ from the staged payload, whose binary reports
@@ -85,6 +86,7 @@ readings="$(powershell -NoProfile -NonInteractive -Command "
   'EnvironmentRows=' + \$environment.Count
   \$environment | ForEach-Object { 'Environment=' + \$_ }
   Rows 'SELECT \`Root\`, \`Key\`, \`Name\`, \`Value\` FROM \`Registry\`' 4 | ForEach-Object { 'Registry=' + \$_ }
+  Rows 'SELECT Shortcut_, PropertyKey, PropVariantValue FROM MsiShortcutProperty' 3 | ForEach-Object { 'ShortcutProperty=' + \$_ }
 " | tr -d "$CR")"
 
 reading() {
@@ -109,6 +111,7 @@ if [ "$signed" = "false" ]; then
 fi
 expect "Environment rows" "$(reading EnvironmentRows)" "1"
 expect "Environment (name, value, component)" "$(reading Environment)" "=-PATH [~];[INSTALLFOLDER] UserPath"
+expect "shortcut property" "$(reading ShortcutProperty)" "KeypasteShortcut System.AppUserModel.ID com.keypaste.app"
 
 # Root 1 is HKCU; a key's default value has no Name, and OpenWithProgids holds a named empty value.
 registry_row() { grep -qxF -- "Registry=1 $1" <<< "$readings" || die "$(basename "$msi") has no Registry row: $1"; }

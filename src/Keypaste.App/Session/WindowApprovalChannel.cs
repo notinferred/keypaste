@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Keypaste.App.Notifications;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Approval;
@@ -31,12 +32,14 @@ namespace Keypaste.App.Session;
 /// <param name="openSettings">What the Always for notice's Open settings does with the agent's name, or null to offer Close alone.</param>
 /// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null.</param>
 /// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
+/// <param name="notices">What may also post a notification as a prompt appears, or null to post none.</param>
 internal sealed class WindowApprovalChannel(
     TimeProvider clock,
     TimeSpan answerWindow,
     Action<string>? openSettings = null,
     Action<Exception, string>? unexpected = null,
-    Action? openBrowserFill = null) : IApprovalChannel
+    Action? openBrowserFill = null,
+    RequestNotices? notices = null) : IApprovalChannel
 {
     private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
 
@@ -131,15 +134,15 @@ internal sealed class WindowApprovalChannel(
         });
     }
 
-    /// <summary>
-    /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
-    /// <see cref="PromptViewModel.ArmingDelay"/> later. Called on the UI thread, for the person's
-    /// press of Show the prompt on Agents and nothing else.
-    /// </summary>
-    /// <returns>False when no prompt is on screen or it is already answered.</returns>
     /// <summary>Whether a prompt waits for the person's answer on screen, which no file dropped on the main window goes ahead of.</summary>
     internal bool IsAsking => _showing is { Request.IsAnswered: false };
 
+    /// <summary>
+    /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
+    /// <see cref="PromptViewModel.ArmingDelay"/> later. Called on the UI thread, for the person's
+    /// press of Show the prompt on Agents or in the notification, and nothing else.
+    /// </summary>
+    /// <returns>False when no prompt is on screen or it is already answered.</returns>
     internal bool BringForward()
     {
         Dispatcher.UIThread.VerifyAccess();
@@ -181,6 +184,7 @@ internal sealed class WindowApprovalChannel(
         CancellationToken cancellationToken)
     {
         PromptWindow? window = null;
+        RaisedNotice? raised = null;
         var started = _clock.GetTimestamp();
         var withdrawals = Withdrawals.Current;
 
@@ -188,6 +192,9 @@ internal sealed class WindowApprovalChannel(
 
         void TakeDown()
         {
+            raised?.Remove();
+            raised = null;
+
             var shown = window;
             window = null;
 
@@ -220,10 +227,18 @@ internal sealed class WindowApprovalChannel(
             {
                 request.Tick(Remaining());
                 window = create();
+
+                // Before the prompt shows, because showing it can give keypaste the focus that decides whether this is in the background.
+                var earned = notices?.Earned() == true;
                 window.Show();
                 _showing = new Showing(request, window, cancellationToken);
                 Shown?.Invoke(this, window);
                 _ = ArmAsync(request, cancellationToken);
+
+                if (earned)
+                {
+                    raised = notices!.Raise(() => _ = BringForward());
+                }
             }
             catch (Exception ex)
             {

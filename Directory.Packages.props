@@ -59,6 +59,9 @@
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!-- org.freedesktop.Notifications on the session bus (Q.14): the D-Bus client Avalonia.FreeDesktop already brings at this version,
+         named so the app's own use of it is pinned. It speaks only to the local bus and carries only fixed words. -->
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.1" />
   </ItemGroup>
 
   <!-- Hardware-key unlocking in the desktop app (P.1), justified in DECISIONS.md D-0366 as

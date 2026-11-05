@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Keypaste.App;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Notifications;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -76,6 +77,7 @@ internal static class AppLaunch
             Claim = claim,
             Preferences = preferences,
             Crashes = crashes,
+            Notifications = new NoSystemNotifications(),
             Clipboards = window => new WatchedClipboard(new AvaloniaClipboard(window)),
         })
             .UseSkia()

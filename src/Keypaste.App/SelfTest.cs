@@ -1,3 +1,4 @@
+using Keypaste.App.Notifications;
 using Keypaste.Core;
 
 namespace Keypaste.App;
@@ -19,6 +20,8 @@ namespace Keypaste.App;
 /// </remarks>
 internal static class SelfTest
 {
+    private static readonly TimeSpan _notificationAnswer = TimeSpan.FromSeconds(10);
+
     private const string _masterPassword = "keypaste-selftest";
     private const string _sentinel = "selftest-value-that-must-round-trip";
     private const string _groupPath = "selftest";
@@ -76,6 +79,20 @@ internal static class SelfTest
             stdout.WriteLine(CoreInfo.NativeArgon2 is { } library
                 ? $"keypaste-app: Argon2 derived natively by {library}"
                 : "keypaste-app: Argon2 derived by managed code, as no native libargon2 loaded");
+
+            // The macOS packaging job holds the bundle to reaching the notification center, where a mistake ends the process.
+            if (OperatingSystem.IsMacOS() && MacNotifications.InBundle())
+            {
+                var permission = MacNotifications.ReadPermissionAsync().WaitAsync(_notificationAnswer).GetAwaiter().GetResult();
+                stdout.WriteLine($"keypaste-app: notifications {permission}");
+
+                if (permission != "allowed")
+                {
+                    var accepted = MacNotifications.AddWithoutPermissionAsync().WaitAsync(_notificationAnswer).GetAwaiter().GetResult();
+                    stdout.WriteLine($"keypaste-app: notification add {(accepted ? "accepted" : "refused")}");
+                }
+            }
+
             return 0;
         }
         catch (Exception ex)

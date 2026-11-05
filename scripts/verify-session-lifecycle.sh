@@ -19,7 +19,8 @@
 # While that app is locked, its unlock screen on the vault it opened there and keypaste use having chosen
 # another, an agent asking for either is refused and recorded as before and told the app is open and
 # locked on it; one asking for a third vault is told nothing holds it, as before (G.4b). The first such
-# request shows one notice naming the vault asked about and no window, and later ones show none. Only
+# request shows one notice naming the vault asked about and no window, and later ones show none. The
+# driver gives the app no system notifications, so this is the window a system that takes none falls back to. Only
 # the notice's Open keypaste shows the window, with that vault on the unlock screen, after which the app
 # listens for that vault alone; a quit app listens for none.
 #

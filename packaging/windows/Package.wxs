@@ -36,7 +36,9 @@
     </Component>
 
     <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
-      <Shortcut Id="KeypasteShortcut" Name="keypaste" Target="[INSTALLFOLDER]keypaste-app.exe" WorkingDirectory="INSTALLFOLDER" Icon="keypaste.ico" />
+      <Shortcut Id="KeypasteShortcut" Name="keypaste" Target="[INSTALLFOLDER]keypaste-app.exe" WorkingDirectory="INSTALLFOLDER" Icon="keypaste.ico">
+        <ShortcutProperty Key="System.AppUserModel.ID" Value="com.keypaste.app" />
+      </Shortcut>
       <RegistryValue Root="HKCU" Key="Software\keypaste\Installer" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 

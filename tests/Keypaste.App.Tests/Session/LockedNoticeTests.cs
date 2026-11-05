@@ -1,6 +1,7 @@
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Keypaste.App.Notifications;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
@@ -16,7 +17,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// With the app running locked in the menu bar or tray and holding its home, a bridge that finds it locked has it show
 /// one notice and no window; only the notice's Open keypaste shows the unlock screen, and the next notice waits for an
-/// unlock and a lock (D-0466).
+/// unlock and a lock.
 /// </summary>
 /// <remarks>
 /// The app is composed by <see cref="App.Launch"/> at login into Avalonia's own lifetime, holding the claim
@@ -43,7 +44,7 @@ public sealed class LockedNoticeTests
             using var claim = Claim(home);
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Preferences = Tray(home), Claim = claim };
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var notices = Notices(app);
@@ -74,7 +75,7 @@ public sealed class LockedNoticeTests
             using var claim = Claim(home);
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Preferences = Tray(home), Claim = claim };
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var notices = Notices(app);
@@ -108,7 +109,7 @@ public sealed class LockedNoticeTests
             using var claim = Claim(home);
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Preferences = Tray(home), Claim = claim };
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var notices = Notices(app);
@@ -152,7 +153,7 @@ public sealed class LockedNoticeTests
             using var claim = Claim(home);
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Preferences = Tray(home), Claim = claim };
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var notices = Notices(app);
@@ -191,7 +192,7 @@ public sealed class LockedNoticeTests
             using var claim = Claim(home);
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Preferences = Tray(home), Claim = claim };
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var notices = Notices(app);
@@ -218,7 +219,7 @@ public sealed class LockedNoticeTests
             using var claim = Claim(home);
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Preferences = Tray(home), Claim = claim };
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var notices = Notices(app);
@@ -245,7 +246,7 @@ public sealed class LockedNoticeTests
             using var claim = Claim(home);
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
-            using var app = new App { Preferences = Tray(home), Claim = claim };
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var notices = Notices(app);
@@ -259,6 +260,122 @@ public sealed class LockedNoticeTests
             await Until(() => !notice.IsVisible);
             Assert.Null(app.LockedNotice);
             Assert.False(await TellAsync(vault.Path_), "a quitting app still heard the bridge");
+        });
+
+    [Fact]
+    public Task A_bridge_finding_the_app_locked_posts_one_ordinary_notification_naming_no_vault_and_shows_nothing() =>
+        WithNotifications(SystemAnswer.Accepts, async (app, lifetime, system, vault, notices) =>
+        {
+            Assert.True(await TellAsync(vault));
+            await Until(() => system.Posts.Count == 1);
+
+            var post = system.Posts[0];
+            Assert.Same(SystemNotice.VaultLocked, post.Notice);
+            Assert.False(post.Notice.TimeSensitive);
+            Assert.Equal("An agent asked for a locked vault", post.Notice.Title);
+            Assert.Equal("It was refused. Unlock the vault in keypaste, then ask the agent to try again.", post.Notice.Body);
+            Assert.Equal("Open keypaste", post.Notice.Action);
+            Assert.DoesNotContain("test", post.Notice.Title + post.Notice.Body + post.Notice.Kind, StringComparison.OrdinalIgnoreCase);
+
+            await SettleAsync();
+            Assert.Empty(notices);
+            Assert.Null(app.LockedNotice!.Showing);
+            Assert.False(app.Main!.IsVisible, "a bridge showed the main window");
+            Assert.Null(lifetime.MainWindow);
+
+            Assert.True(await TellAsync(vault), "the app stopped hearing once it had told the person");
+            await SettleAsync();
+            Assert.Single(system.Posts);
+        });
+
+    [Fact]
+    public Task Open_keypaste_in_the_notification_shows_the_unlock_screen_on_the_vault_asked_about() =>
+        WithNotifications(SystemAnswer.Accepts, async (app, lifetime, system, vault, _) =>
+        {
+            Assert.True(await TellAsync(vault));
+            await Until(() => system.Posts.Count == 1);
+            Assert.False(app.Main!.IsVisible);
+
+            system.Posts[0].Pressed();
+            await Until(() => app.Main.IsVisible);
+
+            Assert.Same(app.Main, lifetime.MainWindow);
+            Assert.Equal(vault, Screen(app).SelectedPath);
+            Assert.True(system.Posts[0].Removed);
+            app.Main.Close();
+        });
+
+    [Fact]
+    public Task Unlocking_removes_the_notification_and_its_late_press_after_another_lock_opens_nothing() =>
+        WithNotifications(SystemAnswer.Accepts, async (app, _, system, vault, _) =>
+        {
+            Assert.True(await TellAsync(vault));
+            await Until(() => system.Posts.Count == 1);
+
+            Unlock(app, vault);
+            await Until(() => system.Posts[0].Removed);
+
+            var unlocked = Screen(app);
+            app.Authority!.Session.Lock(VaultLockReason.Manual);
+            await Until(() => !ReferenceEquals(Screen(app), unlocked));
+
+            system.Posts[0].Pressed();
+            await SettleAsync();
+            Assert.False(app.Main!.IsVisible, "a press left over from before the unlock showed the window");
+
+            Assert.True(Screen(app).Offer(vault));
+            Assert.True(await TellAsync(vault));
+            await Until(() => system.Posts.Count == 2);
+            Assert.False(system.Posts[1].Removed);
+        });
+
+    [Theory]
+    [InlineData(SystemAnswer.Refuses)]
+    [InlineData(SystemAnswer.RefusesAfterAMoment)]
+    [InlineData(SystemAnswer.Throws)]
+    [InlineData(SystemAnswer.NeverAnswers)]
+    [InlineData(SystemAnswer.Stalls)]
+    public Task A_system_that_cannot_post_gets_the_window_which_names_the_vault(SystemAnswer mode) =>
+        WithNotifications(mode, async (app, _, system, vault, notices) =>
+        {
+            Assert.True(await TellAsync(vault));
+            var notice = await NoticeAsync(notices);
+
+            Assert.Single(system.Posts);
+            Assert.Equal("An agent asked for test.kdbx", Text(notice, "HeadText"));
+            Assert.False(app.Main!.IsVisible);
+            notice.Close();
+        });
+
+    [Fact]
+    public Task Quitting_removes_the_notification() =>
+        WithNotifications(SystemAnswer.Accepts, async (app, _, system, vault, _) =>
+        {
+            Assert.True(await TellAsync(vault));
+            await Until(() => system.Posts.Count == 1);
+
+            app.Tray!.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == AppTray.QuitHeader).Command!.Press();
+
+            await Until(() => system.Posts[0].Removed);
+            Assert.Null(app.LockedNotice);
+        });
+
+    private static Task WithNotifications(SystemAnswer answer, Func<App, ClassicDesktopStyleApplicationLifetime, FakeNotifications, string, List<Window>, Task> test) =>
+        HeadlessSession.On(async () =>
+        {
+            using var system = new FakeNotifications { Answers = answer };
+            using var home = new TempHome();
+            using var vault = new TempVault();
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = system };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            var notices = Notices(app);
+            Assert.True(Screen(app).Offer(vault.Path_));
+
+            await test(app, lifetime, system, vault.Path_, notices);
         });
 
     private static Task<bool> TellAsync(string vault) =>

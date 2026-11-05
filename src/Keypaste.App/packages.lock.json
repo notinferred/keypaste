@@ -63,6 +63,12 @@
         "resolved": "10.0.14",
         "contentHash": "YlTamXppEQls6DYWt7RdUuwWDb0lyw/vXCaGeQpLCpsLmfwGuCkOz/vIGgMTV7ECsJcavkCOkxZXv9s8rdAHkQ=="
       },
+      "Tmds.DBus.Protocol": {
+        "type": "Direct",
+        "requested": "[0.94.1, )",
+        "resolved": "0.94.1",
+        "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
+      },
       "Yubico.YubiKey": {
         "type": "Direct",
         "requested": "[1.18.0, )",
@@ -400,11 +406,6 @@
         "resolved": "10.0.12",
         "contentHash": "CGIkyGIf3UWBFmYJrFJ7FIxQ++3h5yDcDXwyQ0sOH4+5EJK04XMVU+hyy1Q8mTUsWLXz6/ydq1ln9SPutxFVoQ=="
       },
-      "Tmds.DBus.Protocol": {
-        "type": "Transitive",
-        "resolved": "0.94.1",
-        "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
-      },
       "Yubico.Core": {
         "type": "Transitive",
         "resolved": "1.18.0",
@@ -716,6 +717,12 @@
         "requested": "[10.0.14, )",
         "resolved": "10.0.14",
         "contentHash": "YlTamXppEQls6DYWt7RdUuwWDb0lyw/vXCaGeQpLCpsLmfwGuCkOz/vIGgMTV7ECsJcavkCOkxZXv9s8rdAHkQ=="
+      },
+      "Tmds.DBus.Protocol": {
+        "type": "Direct",
+        "requested": "[0.94.1, )",
+        "resolved": "0.94.1",
+        "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
       },
       "Yubico.YubiKey": {
         "type": "Direct",
@@ -1041,11 +1048,6 @@
         "type": "Transitive",
         "resolved": "10.0.12",
         "contentHash": "CGIkyGIf3UWBFmYJrFJ7FIxQ++3h5yDcDXwyQ0sOH4+5EJK04XMVU+hyy1Q8mTUsWLXz6/ydq1ln9SPutxFVoQ=="
-      },
-      "Tmds.DBus.Protocol": {
-        "type": "Transitive",
-        "resolved": "0.94.1",
-        "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
       },
       "Yubico.Core": {
         "type": "Transitive",

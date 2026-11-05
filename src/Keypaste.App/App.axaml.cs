@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using Keypaste.App.Clipboard;
 using Keypaste.App.HardwareKeys;
 using Keypaste.App.Navigation;
+using Keypaste.App.Notifications;
 using Keypaste.App.Session;
 using Keypaste.App.Terms;
 using Keypaste.App.ViewModels;
@@ -53,6 +54,7 @@ internal sealed partial class App : Application, IDisposable
     private IActivatableLifetime? _activatable;
     private IDisposable? _reopen;
     private LockedNotice? _lockedNotice;
+    private ISystemNotifications? _notifications;
     private bool _crashChoicePassed;
     private (string Path, string? Keyfile, int? HardwareKeySlot)? _openNext;
     private int _unlockScreens;
@@ -113,10 +115,12 @@ internal sealed partial class App : Application, IDisposable
         _session = Compose(_preferences, TimeProvider.System);
         _session.Locked += OnLocked;
         _session.Opened += (_, _) => Dispatcher.UIThread.Post(() => _tray?.Refresh());
+        _notifications = Notifications ?? SystemNotifications.ForThisProcess();
+        var requestNotices = new RequestNotices(_notifications, TimeProvider.System, () => desktop.Windows.Any(window => window.IsActive));
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings, Unexpected, OpenBrowserFill),
+            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window, OpenAgentSettings, Unexpected, OpenBrowserFill, requestNotices),
             AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)),
             Unexpected);
 
@@ -160,7 +164,8 @@ internal sealed partial class App : Application, IDisposable
             OpenWindow,
             TimeProvider.System,
             reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"),
-            Unexpected);
+            Unexpected,
+            _notifications);
 
         ShowUnlock(home);
 
@@ -230,6 +235,9 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>What tells the person an agent found the app locked; none unless <see cref="Claim"/> is held, or after quitting.</summary>
     internal LockedNotice? LockedNotice => _lockedNotice;
+
+    /// <summary>The system's notifications; this platform's unless a test gives others.</summary>
+    internal ISystemNotifications? Notifications { get; init; }
 
     /// <summary>The main window <see cref="Launch"/> composed, shown or not.</summary>
     internal MainWindow? Main => _window;
@@ -990,6 +998,8 @@ internal sealed partial class App : Application, IDisposable
 
         _authority?.Dispose();
         _authority = null;
+        _notifications?.Dispose();
+        _notifications = null;
         _session = null;
     }
 }

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Keypaste.App.Notifications;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Audit;
@@ -11,26 +12,32 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// While the app is locked, hears a bridge about to refuse its agent for want of an owner, and tells the person
-/// once that an agent asked (D-0466).
+/// once that an agent asked.
 /// </summary>
 /// <remarks>
 /// It listens for the vault the unlock screen shows and for the chosen vault, follows the unlock screen as its
 /// vault changes and the chosen vault as <c>app.toml</c> changes, and stops when a vault opens. One notice is
-/// shown each time the app is locked, whichever vault was asked for; it names that vault, and only its Open
-/// keypaste shows the unlock screen, with that vault on it.
+/// shown each time the app is locked, whichever vault was asked for, and only its Open keypaste shows the unlock
+/// screen, with that vault on it. It is a system notification, which names no vault since the lock screen and other
+/// apps can read it; where the system takes none, as Windows takes none of these, keypaste shows its own window, which names the vault.
 /// </remarks>
 internal sealed class LockedNotice : IDisposable
 {
+    // Long enough for a system that answers at once; a permission dialog the person has not reached yet gets the window.
+    private static readonly TimeSpan _systemAnswers = TimeSpan.FromSeconds(5);
+
     private readonly AppVaultSession _session;
     private readonly Action _open;
     private readonly TimeProvider _clock;
     private readonly Action<string> _unreachable;
     private readonly Action<Exception, string>? _unexpected;
+    private readonly ISystemNotifications _notifications;
 
     // Read and written on the UI thread only.
     private readonly Dictionary<string, LockedAppEndpoint> _listening = new(StringComparer.Ordinal);
     private FileSystemWatcher? _choiceWatcher;
     private UnlockViewModel? _screen;
+    private RaisedNotice? _raised;
     private bool _told;
     private bool _disposed;
 
@@ -39,8 +46,9 @@ internal sealed class LockedNotice : IDisposable
     /// <param name="open">Shows the main window.</param>
     /// <param name="clock">The clock a notice's arming delay runs on.</param>
     /// <param name="unreachable">Told why, when a vault's endpoint cannot be bound and no bridge can reach this app for it.</param>
-    /// <param name="unexpected">Keeps a report of a notice that could not be shown, at the site it names, or null (D-0596).</param>
-    internal LockedNotice(AppVaultSession session, Action open, TimeProvider clock, Action<string> unreachable, Action<Exception, string>? unexpected = null)
+    /// <param name="unexpected">Keeps a report of a notice that could not be shown, at the site it names, or null.</param>
+    /// <param name="notifications">The system's notifications, or null to use the window alone.</param>
+    internal LockedNotice(AppVaultSession session, Action open, TimeProvider clock, Action<string> unreachable, Action<Exception, string>? unexpected = null, ISystemNotifications? notifications = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(open);
@@ -52,13 +60,14 @@ internal sealed class LockedNotice : IDisposable
         _clock = clock;
         _unreachable = unreachable;
         _unexpected = unexpected;
+        _notifications = notifications ?? new NoSystemNotifications();
         _session.Opened += OnOpened;
     }
 
-    /// <summary>Raised on the UI thread once a notice is on screen.</summary>
+    /// <summary>Raised on the UI thread once the notice's window is on screen.</summary>
     internal event EventHandler<Window>? Shown;
 
-    /// <summary>The notice on screen, or null.</summary>
+    /// <summary>The notice's window on screen, or null.</summary>
     internal LockedNoticeWindow? Showing { get; private set; }
 
     /// <summary>Listens for the vault <paramref name="screen"/> shows and the chosen vault, and follows the screen as its vault changes.</summary>
@@ -194,6 +203,27 @@ internal sealed class LockedNotice : IDisposable
 
         _told = true;
 
+        var raised = RaisedNotice.Raise(_notifications, SystemNotice.VaultLocked, () => Open(name, vault));
+        _raised = raised;
+        _ = FallBackAsync(raised, name, vault);
+    }
+
+    private async Task FallBackAsync(RaisedNotice raised, string name, string vault)
+    {
+        if (!await raised.AcceptedWithinAsync(_systemAnswers, _clock).ConfigureAwait(false))
+        {
+            raised.Remove();
+            Dispatcher.UIThread.Post(() => ShowWindow(raised, name, vault));
+        }
+    }
+
+    private void ShowWindow(RaisedNotice raised, string name, string vault)
+    {
+        if (!ReferenceEquals(_raised, raised) || _disposed || _session.IsUnlocked)
+        {
+            return;
+        }
+
         try
         {
             var notice = new LockedNoticeWindow(Path.GetFileName(vault), () => Open(name, vault), _clock);
@@ -217,6 +247,8 @@ internal sealed class LockedNotice : IDisposable
 
     private void Open(string name, string vault)
     {
+        _raised?.Remove();
+
         if (!_session.IsUnlocked && _screen is { } screen && (screen.SelectedPath is not { } selected || EndpointFor(selected) != name))
         {
             screen.Offer(vault);
@@ -227,6 +259,9 @@ internal sealed class LockedNotice : IDisposable
 
     private void Stop()
     {
+        _raised?.Remove();
+        _raised = null;
+
         _choiceWatcher?.Dispose();
         _choiceWatcher = null;
 

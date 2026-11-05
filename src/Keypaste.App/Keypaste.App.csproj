@@ -71,6 +71,7 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="Tmds.DBus.Protocol" />
     <!-- YubiKey challenge-response; Directory.Packages.props says why and what it is trusted with. -->
     <PackageReference Include="Yubico.YubiKey" />
   </ItemGroup>

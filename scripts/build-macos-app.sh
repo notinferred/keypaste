@@ -84,6 +84,11 @@ grep -q '^keypaste-app: selftest ok ' "$work/launched" \
   || die "the bundle started through LaunchServices did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
 grep -q '^keypaste-app: Argon2 derived natively by .*/keypaste\.app/Contents/MacOS/libargon2\.1\.dylib$' "$work/launched" \
   || die "the bundle did not derive with the libargon2.1.dylib in its Contents/MacOS: $(cat "$work/launched")"
+grep -Eq '^keypaste-app: notifications (not asked|denied|allowed)$' "$work/launched" \
+  || die "the bundle did not reach the notification center: $(cat "$work/launched")"
+grep -q '^keypaste-app: notifications allowed$' "$work/launched" \
+  || grep -Eq '^keypaste-app: notification add (accepted|refused)$' "$work/launched" \
+  || die "the bundle's add to the notification center was never answered: $(cat "$work/launched")"
 cat "$work/launched" >&2
 
 echo "$out/$NAME"

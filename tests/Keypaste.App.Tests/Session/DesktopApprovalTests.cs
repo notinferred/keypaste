@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
+using Keypaste.App.Notifications;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Controls;
 using Keypaste.App.Tests.Rendering;
@@ -978,8 +979,10 @@ public sealed class DesktopApprovalTests
         private readonly TempVault _fixture;
         private ApproverClient? _client;
 
-        private PromptedApp(TempVault fixture, string vault, Func<IApprovalChannel, IApprovalChannel>? around)
+        private PromptedApp(TempVault fixture, string vault, Func<IApprovalChannel, IApprovalChannel>? around, FakeNotifications? notifications, Func<bool>? inFront)
         {
+            var notices = notifications is null ? null : new RequestNotices(notifications, Clock, inFront ?? (() => false));
+
             _fixture = fixture;
             Vault = vault;
 
@@ -987,7 +990,7 @@ public sealed class DesktopApprovalTests
 #pragma warning disable CA2000
             Authority = new AppAuthority(new AppVaultSession(Clock, home: fixture.Home), null, () =>
             {
-                var channel = new WindowApprovalChannel(Clock, ApprovalLimits.Default.Window);
+                var channel = new WindowApprovalChannel(Clock, ApprovalLimits.Default.Window, notices: notices);
                 channel.Shown += (_, window) => Windows.Add(window);
                 return around is null ? channel : around(channel);
             });
@@ -1008,7 +1011,9 @@ public sealed class DesktopApprovalTests
         internal List<Window> Windows { get; } = [];
 
         /// <param name="around">What the gate asks instead of the app's prompt, given that prompt.</param>
-        internal static async Task<PromptedApp> StartAsync(Func<IApprovalChannel, IApprovalChannel>? around = null)
+        /// <param name="notifications">The system the app's notifications go to, or null to post none.</param>
+        /// <param name="inFront">Whether keypaste is in front when a prompt appears; it is not, unless this says so.</param>
+        internal static async Task<PromptedApp> StartAsync(Func<IApprovalChannel, IApprovalChannel>? around = null, FakeNotifications? notifications = null, Func<bool>? inFront = null)
         {
             var fixture = new TempVault();
             var vault = Path.Combine(fixture.Home, "agents.kdbx");
@@ -1027,7 +1032,7 @@ public sealed class DesktopApprovalTests
                 created.Save();
             }
 
-            var app = new PromptedApp(fixture, vault, around);
+            var app = new PromptedApp(fixture, vault, around, notifications, inFront);
 
             using (var master = TempVault.Secret(TempVault.Password))
             {
@@ -1037,6 +1042,19 @@ public sealed class DesktopApprovalTests
             app._client = await app.ConnectAsync();
             app.SessionId = app.Authority.Session.SessionId!;
             return app;
+        }
+
+        /// <summary>Unlocks the vault once more, into a new session, and attaches this app's bridge to it.</summary>
+        internal async Task UnlockAgainAsync()
+        {
+            using (var master = TempVault.Secret(TempVault.Password))
+            {
+                Assert.Equal(UnlockOutcome.Opened, Authority.Session.TryUnlock(Vault, master.Value));
+            }
+
+            await _client!.DisposeAsync();
+            _client = await ConnectAsync();
+            SessionId = Authority.Session.SessionId!;
         }
 
         /// <summary>Another bridge, attached to the session.</summary>

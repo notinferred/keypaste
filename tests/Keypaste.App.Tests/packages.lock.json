@@ -386,11 +386,6 @@
         "resolved": "10.0.12",
         "contentHash": "CGIkyGIf3UWBFmYJrFJ7FIxQ++3h5yDcDXwyQ0sOH4+5EJK04XMVU+hyy1Q8mTUsWLXz6/ydq1ln9SPutxFVoQ=="
       },
-      "Tmds.DBus.Protocol": {
-        "type": "Transitive",
-        "resolved": "0.94.1",
-        "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
-      },
       "xunit.analyzers": {
         "type": "Transitive",
         "resolved": "1.27.0",
@@ -490,6 +485,7 @@
           "Avalonia.Themes.Fluent": "[12.1.0, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
           "Keypaste.Core": "[0.5.0, )",
+          "Tmds.DBus.Protocol": "[0.94.1, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
       },
@@ -567,6 +563,12 @@
         "requested": "[2.0.14, )",
         "resolved": "2.0.14",
         "contentHash": "15fyVO4aG6poR6IKmhM74zf7PUzaU6FZAGm2d3SQSO9yIyGAeo44e6t9qeKjjaqyMEqYdqcb2G1B0gpLoDU2cA=="
+      },
+      "Tmds.DBus.Protocol": {
+        "type": "CentralTransitive",
+        "requested": "[0.94.1, )",
+        "resolved": "0.94.1",
+        "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
       },
       "Yubico.YubiKey": {
         "type": "CentralTransitive",
