@@ -363,6 +363,52 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
+    public Task The_zoom_is_written_as_it_changes_and_comes_back_clamped_at_the_next_launch() => HeadlessSession.On(() =>
+    {
+        var home = Directory.CreateTempSubdirectory("keypaste-zoom-launch-").FullName;
+        var settingsPath = KeypasteHome.SettingsPath(home);
+
+        try
+        {
+            using (var lifetime = new ClassicDesktopStyleApplicationLifetime())
+            {
+                Attach(lifetime);
+                using var app = new App { Preferences = new DesktopPreferences(home) };
+                app.Launch(lifetime);
+                lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+                var main = lifetime.MainWindow!;
+                main.Show();
+                WindowInput.Drain();
+                Assert.False(File.Exists(settingsPath), "a window nobody touched wrote app.toml");
+
+                app.Menus!.All.Single(command => command.Header == "Zoom in").Run();
+                WindowInput.Drain();
+                Assert.Equal(125, AppSettings.Load(settingsPath).Window!.ZoomPercent);
+                main.Close();
+            }
+
+            File.WriteAllText(settingsPath, File.ReadAllText(settingsPath).Replace("125%", "9000%", StringComparison.Ordinal));
+
+            using (var lifetime = new ClassicDesktopStyleApplicationLifetime())
+            {
+                Attach(lifetime);
+                using var app = new App { Preferences = new DesktopPreferences(home) };
+                app.Launch(lifetime);
+                lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+                var main = lifetime.MainWindow!;
+
+                Assert.Equal(200, InterfaceZoom.Percent);
+                Assert.Equal(1440, main.MinWidth);
+                main.Close();
+            }
+        }
+        finally
+        {
+            Directory.Delete(home, recursive: true);
+        }
+    });
+
+    [Fact]
     public Task A_window_nobody_touched_writes_nothing_on_closing() => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();

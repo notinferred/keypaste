@@ -7,6 +7,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.App.Views;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
 
@@ -196,10 +197,18 @@ internal sealed class AppCommands
             Says = () => host.Shell() is { ShowsSidebar: false } ? "Show sidebar" : "Hide sidebar",
         };
 
+        // The keyboard's plus is shifted on some layouts, and a chord matches exactly its modifiers.
+        AppMenuEntry[] zoom =
+        [
+            new AppCommand("Zoom in", [new(Key.OemPlus, command), new(Key.OemPlus, command | KeyModifiers.Shift), new(Key.Add, command)], () => WindowShows() && InterfaceZoom.CanEnlarge, InterfaceZoom.Enlarge),
+            new AppCommand("Zoom out", [new(Key.OemMinus, command), new(Key.Subtract, command)], () => WindowShows() && InterfaceZoom.CanReduce, InterfaceZoom.Reduce),
+            new AppCommand("Actual size", [new(Key.D0, command), new(Key.NumPad0, command)], () => WindowShows() && InterfaceZoom.CanReduce, InterfaceZoom.ActualSize),
+        ];
+
         // macOS adds its own Enter Full Screen, with ⌃⌘F, to a menu called View, so only the other platforms get one.
         var view = new AppMenuGroup("View", Mac
-            ? [.. places, _line, _sidebar]
-            : [.. places, _line, _sidebar, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen)]);
+            ? [.. places, _line, _sidebar, _line, .. zoom]
+            : [.. places, _line, _sidebar, new AppCommand("Enter full screen", [new(Key.F11)], () => host.Window() is { IsVisible: true }, ToggleFullScreen), _line, .. zoom]);
 
         var window = new AppMenuGroup("Window",
         [
@@ -290,6 +299,8 @@ internal sealed class AppCommands
 
     private IInputElement? Focus() =>
         _host.Focused is { } focused ? focused() : _host.Window()?.FocusManager?.GetFocusedElement();
+
+    private bool WindowShows() => _host.Window() is { IsVisible: true };
 
     private TextBox? Text() => Focus() as TextBox;
 

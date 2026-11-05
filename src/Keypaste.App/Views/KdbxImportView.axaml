@@ -170,13 +170,13 @@
           <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="22" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
             <TextBlock Classes="mono lg" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
-            <TextBlock FontSize="12"
-                       Classes="muted"
+            <TextBlock
+                       Classes="muted size-12"
                        Text="{Binding CardDetail}"
                        TextTrimming="CharacterEllipsis"
                        IsVisible="{Binding IsReadable}" />
-            <TextBlock FontSize="12"
-                       Classes="danger"
+            <TextBlock
+                       Classes="danger size-12"
                        ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                        TextWrapping="Wrap"
                        IsVisible="{Binding IsUnreadable}" />
@@ -188,7 +188,7 @@
                       VerticalAlignment="Center"
                       IsVisible="{Binding IsDecrypted}">
             <ctl:KpIcon Icon="lock-open" Size="13" Foreground="{DynamicResource KpOk}" />
-            <TextBlock FontSize="12" Classes="ok" Text="Decrypted" VerticalAlignment="Center" />
+            <TextBlock Classes="ok size-12" Text="Decrypted" VerticalAlignment="Center" />
           </StackPanel>
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
@@ -197,7 +197,7 @@
                       VerticalAlignment="Center"
                       IsVisible="{Binding IsLocked}">
             <ctl:KpIcon Icon="lock" Size="13" Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock FontSize="12" Classes="muted" Text="Locked" VerticalAlignment="Center" />
+            <TextBlock Classes="muted size-12" Text="Locked" VerticalAlignment="Center" />
           </StackPanel>
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
@@ -206,7 +206,7 @@
                       VerticalAlignment="Center"
                       IsVisible="{Binding IsUnreadable}">
             <ctl:KpIcon Icon="alert-triangle" Size="13" Foreground="{DynamicResource KpDanger}" />
-            <TextBlock FontSize="12" Classes="danger" Text="Can't read" VerticalAlignment="Center" />
+            <TextBlock Classes="danger size-12" Text="Can't read" VerticalAlignment="Center" />
           </StackPanel>
         </Grid>
       </Panel>
@@ -219,10 +219,10 @@
                          AllowsPaste="True"
                          MaskedLength="{Binding PasswordLength}"
                          FontFamily="{DynamicResource KpMono}"
-                         FontSize="14"
+                         Classes="size-14"
                          Placeholder="Its master password" />
-        <TextBlock FontSize="12.5"
-                   Classes="danger"
+        <TextBlock
+                   Classes="danger size-12-5"
                    TextWrapping="Wrap"
                    ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                    IsVisible="{Binding HasMessage}" />
@@ -230,16 +230,14 @@
           <ctl:KpIcon Grid.Column="0" Icon="file-key" Size="14" Margin="0,0,8,0"
                       Foreground="{DynamicResource KpTextMuted}" />
           <TextBlock Grid.Column="1"
-                     Classes="mono secondary"
-                     FontSize="12"
+                     Classes="mono secondary size-12"
                      Text="{Binding KeyfileName}"
                      ToolTip.Tip="{Binding KeyfilePath}"
                      IsVisible="{Binding HasKeyfile}"
                      TextTrimming="CharacterEllipsis"
                      VerticalAlignment="Center" />
           <TextBlock Grid.Column="1"
-                     Classes="muted"
-                     FontSize="12"
+                     Classes="muted size-12"
                      Text="No key file"
                      IsVisible="{Binding !HasKeyfile}"
                      VerticalAlignment="Center" />
@@ -253,14 +251,12 @@
           <ctl:KpIcon Grid.Column="0" Icon="usb" Size="14" Margin="0,0,8,0"
                       Foreground="{DynamicResource KpTextMuted}" />
           <TextBlock Grid.Column="1"
-                     Classes="mono secondary"
-                     FontSize="12"
+                     Classes="mono secondary size-12"
                      Text="{Binding HardwareKeyLabel}"
                      IsVisible="{Binding UsesHardwareKey}"
                      VerticalAlignment="Center" />
           <TextBlock Grid.Column="1"
-                     Classes="muted"
-                     FontSize="12"
+                     Classes="muted size-12"
                      Text="No YubiKey"
                      IsVisible="{Binding !UsesHardwareKey}"
                      VerticalAlignment="Center" />
@@ -274,7 +270,7 @@
         <!-- Waiting is an amber dot with its halo, the dialog's one amber element while it shows (DESIGN). -->
         <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsWaitingForTouch}">
           <Border Classes="dot waiting" VerticalAlignment="Center" />
-          <TextBlock Text="Touch your YubiKey" FontSize="13" VerticalAlignment="Center"
+          <TextBlock Text="Touch your YubiKey" Classes="size-13" VerticalAlignment="Center"
                      Foreground="{DynamicResource KpTextPrimary}" />
           <Button Classes="link" Content="Cancel" Command="{Binding CancelTouchCommand}"
                   AutomationProperties.Name="Stop waiting for the YubiKey" />
@@ -299,12 +295,10 @@
                                 IsChecked="{Binding Include}"
                                 ToolTip.Tip="Copy this group" />
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Classes="mono secondary"
-                                   FontSize="12"
+                        <TextBlock Classes="mono secondary size-12"
                                    Text="{Binding SourceGroup}"
                                    TextTrimming="CharacterEllipsis" />
-                        <TextBlock Classes="mono muted"
-                                   FontSize="11"
+                        <TextBlock Classes="mono muted size-11"
                                    Text="{Binding CountText}"
                                    VerticalAlignment="Center" />
                       </StackPanel>
@@ -317,7 +311,7 @@
                       <TextBox Grid.Column="3"
                                Theme="{StaticResource DestinationField}"
                                Classes.blocked="{Binding Blocks}"
-                               FontSize="12"
+                               Classes="size-12"
                                FontWeight="Normal"
                                Text="{Binding Destination}"
                                AutomationProperties.Name="{Binding SourceGroup, StringFormat='Where {0} goes'}"
@@ -326,9 +320,8 @@
                                  Grid.Column="1"
                                  Grid.ColumnSpan="3"
                                  Margin="0,4,0,0"
-                                 FontSize="11.5"
                                  TextWrapping="Wrap"
-                                 Classes="muted"
+                                 Classes="muted size-12"
                                  Classes.danger="{Binding Blocks}"
                                  Text="{Binding Problem}"
                                  IsVisible="{Binding HasProblem}" />
@@ -344,7 +337,7 @@
 
       <StackPanel Spacing="6" IsVisible="{Binding IsReadable}">
         <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}" AutomationProperties.Name="Keep editing this file in place, so KeePassXC and other KeePass apps stay in sync">
-          <TextBlock FontSize="13"
+          <TextBlock Classes="size-13"
                      FontWeight="Normal"
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource KpTextPrimary}"
@@ -356,8 +349,7 @@
                    IsVisible="{Binding KeepEditingInPlace}" />
       </StackPanel>
 
-      <TextBlock Classes="danger"
-                 FontSize="12.5"
+      <TextBlock Classes="danger size-12-5"
                  TextWrapping="Wrap"
                  ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                  IsVisible="{Binding HasTrailingMessage}" />

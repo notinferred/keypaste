@@ -48,19 +48,19 @@
       </Grid>
 
       <Border Classes="prompt-call" Height="40" Padding="12,0">
-        <TextBlock Name="OriginText" Classes="value" Text="{Binding Origin}" TextWrapping="Wrap" MaxLines="2"
+        <TextBlock Name="OriginText" Classes="value size-12-5" Text="{Binding Origin}" TextWrapping="Wrap" MaxLines="2"
                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                   FontFamily="{DynamicResource KpSans}" FontSize="12.5" />
+                   FontFamily="{DynamicResource KpSans}" />
       </Border>
 
       <StackPanel Spacing="6">
         <TextBlock Name="GainsCaptionText" Classes="caption" Text="{Binding GainsCaption}" />
         <Border Classes="prompt-reason" Height="96">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
-            <ItemsControl Name="GainsList" ItemsSource="{Binding Gains}">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl Margin="12,9" Name="GainsList" ItemsSource="{Binding Gains}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
-                  <TextBlock Classes="gain" Text="{Binding}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+                  <TextBlock Classes="gain size-13" Text="{Binding}" TextWrapping="Wrap" LineHeight="19.5"
                              Margin="0,0,0,4" Foreground="{DynamicResource KpTextPrimary}" />
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -73,13 +73,13 @@
       <StackPanel Spacing="6">
         <TextBlock Name="ReasonCaptionText" Classes="caption" Text="{Binding ReasonCaption}" Height="18" />
         <Border Classes="prompt-reason" Height="77">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
-            <StackPanel Spacing="6">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,9" Spacing="6">
               <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
                          IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               <TextBlock Classes="prompt-scrubbed" Text="{Binding Truncation}"
                          IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
                          Foreground="{DynamicResource KpTextSecondary}" />
             </StackPanel>
           </ScrollViewer>

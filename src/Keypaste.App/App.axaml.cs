@@ -119,7 +119,10 @@ internal sealed partial class App : Application, IDisposable
             AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)),
             Unexpected);
 
+        InterfaceZoom.Set(_preferences.Current.Window?.ZoomPercent ?? Core.Settings.WindowLayout.ActualSizePercent);
+        InterfaceZoom.Changed += KeepWindowLayout;
         _window = new MainWindow();
+        _window.Closed += (_, _) => InterfaceZoom.Changed -= KeepWindowLayout;
 
         if (_preferences.Current.Window is { } left)
         {

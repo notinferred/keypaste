@@ -8,7 +8,7 @@
 
   <!-- The design's page: padding 28/32, content at most 1080 wide and left-aligned. -->
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <Grid Margin="32,28">
+    <Grid Margin="32,12,32,28">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1080" />
       </Grid.ColumnDefinitions>
@@ -71,7 +71,7 @@
                        Name="Message"
                        Text="{Binding Message}"
                        TextWrapping="Wrap"
-                       FontSize="13"
+                       Classes="size-13"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextSecondary}" />
           </Grid>
@@ -91,7 +91,7 @@
                       Margin="0,0,10,0" />
               <TextBlock Grid.Column="1"
                          Text="{Binding Verdict.Headline}"
-                         FontSize="14"
+                         Classes="size-14"
                          FontWeight="SemiBold"
                          TextTrimming="CharacterEllipsis"
                          VerticalAlignment="Center"
@@ -114,7 +114,7 @@
                                  IsVisible="{Binding Verdict.HasHash}"
                                  Margin="16,-6,0,0"
                                  FontFamily="{DynamicResource KpMono}"
-                                 FontSize="12"
+                                 Classes="size-12"
                                  TextTrimming="CharacterEllipsis"
                                  Foreground="{DynamicResource KpTextMuted}" />
 
@@ -128,7 +128,7 @@
                 <DataTemplate x:DataType="x:String">
                   <TextBlock Text="{Binding}"
                              TextWrapping="Wrap"
-                             FontSize="13"
+                             Classes="size-13"
                              FontWeight="Medium"
                              Foreground="{DynamicResource KpTextPrimary}" />
                 </DataTemplate>
@@ -145,7 +145,7 @@
                 <DataTemplate x:DataType="x:String">
                   <TextBlock Text="{Binding}"
                              TextWrapping="Wrap"
-                             FontSize="13"
+                             Classes="size-13"
                              LineHeight="19"
                              MaxWidth="760"
                              HorizontalAlignment="Left"
@@ -163,7 +163,7 @@
               <TextBlock Grid.Column="1"
                          Text="{Binding ShortPath}"
                          FontFamily="{DynamicResource KpMono}"
-                         FontSize="11.5"
+                         Classes="size-12"
                          TextTrimming="PathSegmentEllipsis"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextMuted}" />
@@ -182,7 +182,7 @@
           </Border>
           <TextBlock Text="No activity yet"
                      Margin="0,4,0,0"
-                     FontSize="15"
+                     Classes="size-15"
                      FontWeight="SemiBold"
                      HorizontalAlignment="Center"
                      Foreground="{DynamicResource KpTextPrimary}" />
@@ -190,7 +190,7 @@
                      MaxWidth="380"
                      TextWrapping="Wrap"
                      TextAlignment="Center"
-                     FontSize="13"
+                     Classes="size-13"
                      Foreground="{DynamicResource KpTextSecondary}" />
         </StackPanel>
 
@@ -227,7 +227,7 @@
                               BorderBrush="{DynamicResource KpBorderSubtle}"
                               Background="{DynamicResource KpBgPanel}">
                         <TextBlock Text="{Binding Day}"
-                                   FontSize="11.5"
+                                   Classes="size-12"
                                    FontWeight="Medium"
                                    Foreground="{DynamicResource KpTextMuted}" />
                       </Border>
@@ -240,13 +240,13 @@
                                        Text="{Binding Time}"
                                        ToolTip.Tip="{Binding When}"
                                        FontFamily="{DynamicResource KpMono}"
-                                       FontSize="11.5"
+                                       Classes="size-12"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextMuted}" />
 
                             <TextBlock Grid.Column="1"
                                        Text="{Binding Actor}"
-                                       FontSize="12.5"
+                                       Classes="size-12-5"
                                        FontWeight="Medium"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center"
@@ -254,7 +254,7 @@
 
                             <TextBlock Grid.Column="2"
                                        Text="{Binding Action}"
-                                       FontSize="12.5"
+                                       Classes="size-12-5"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextSecondary}" />
@@ -262,7 +262,7 @@
                             <TextBlock Grid.Column="3"
                                        Text="{Binding Secrets}"
                                        FontFamily="{DynamicResource KpMono}"
-                                       FontSize="12"
+                                       Classes="size-12"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextPrimary}" />
@@ -270,7 +270,7 @@
                             <TextBlock Grid.Column="4"
                                        Text="{Binding Where}"
                                        FontFamily="{DynamicResource KpMono}"
-                                       FontSize="12"
+                                       Classes="size-12"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextMuted}" />
@@ -286,7 +286,7 @@
                               <TextBlock Grid.Column="1"
                                          Text="{Binding Result}"
                                          Margin="0,0,-12,0"
-                                         FontSize="12.5"
+                                         Classes="size-12-5"
                                          FontWeight="Medium"
                                          TextTrimming="CharacterEllipsis"
                                          VerticalAlignment="Center"
@@ -323,7 +323,7 @@
               <Border Classes="table-row" IsVisible="{Binding FilterEmpty}">
                 <StackPanel Orientation="Horizontal" Spacing="12">
                   <TextBlock Text="Nothing in this log matches this filter."
-                             FontSize="12.5"
+                             Classes="size-12-5"
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource KpTextMuted}" />
                   <Button Classes="sm"
@@ -344,21 +344,21 @@
           <StackPanel Name="Notes" Spacing="4" IsVisible="{Binding HasNotes}">
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnverifiedNote}">
               <Border Width="2" Height="12" Margin="5,0" VerticalAlignment="Center" Background="{DynamicResource KpDanger}" />
-              <TextBlock FontSize="12"
+              <TextBlock Classes="size-12"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"
                          Text="{Binding UnverifiedLegend}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadNote}">
               <ctl:KpIcon Icon="alert-triangle" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
-              <TextBlock FontSize="12"
+              <TextBlock Classes="size-12"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"
                          Text="Served from an earlier approval, under a reason that person never saw." />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadableNote}">
               <ctl:KpIcon Icon="info" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
-              <TextBlock FontSize="12"
+              <TextBlock Classes="size-12"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"
                          Text="{Binding UnreadableNote}" />
@@ -369,20 +369,20 @@
             <TextBlock Grid.Column="0"
                        Name="Summary"
                        Text="{Binding Summary}"
-                       FontSize="12"
+                       Classes="size-12"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="1"
                        Text="·"
                        Margin="8,0"
-                       FontSize="12"
+                       Classes="size-12"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="2"
                        Text="{Binding ShortPath}"
                        ToolTip.Tip="{Binding LogPath}"
                        FontFamily="{DynamicResource KpMono}"
-                       FontSize="11"
+                       Classes="size-11"
                        TextTrimming="PathSegmentEllipsis"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextMuted}" />

@@ -5,7 +5,11 @@ namespace Keypaste.App.Views;
 
 internal sealed partial class AccessChangeWindow : PromptWindow
 {
-    public AccessChangeWindow() => AvaloniaXamlLoader.Load(this);
+    public AccessChangeWindow()
+    {
+        AvaloniaXamlLoader.Load(this);
+        FrameCard();
+    }
 
     internal AccessChangeWindow(AccessChangeViewModel request)
         : this() => DataContext = request;

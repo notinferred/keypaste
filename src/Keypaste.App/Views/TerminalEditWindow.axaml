@@ -44,19 +44,19 @@
       </Grid>
 
       <Border Classes="prompt-call" Height="40" Padding="12,0">
-        <TextBlock Name="OriginText" Classes="value" Text="{Binding Origin}" TextWrapping="Wrap" MaxLines="2"
+        <TextBlock Name="OriginText" Classes="value size-12-5" Text="{Binding Origin}" TextWrapping="Wrap" MaxLines="2"
                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                   FontFamily="{DynamicResource KpSans}" FontSize="12.5" />
+                   FontFamily="{DynamicResource KpSans}" />
       </Border>
 
       <StackPanel Spacing="6">
         <TextBlock Classes="caption" Text="It would change" />
         <Border Classes="prompt-reason" Height="96">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
-            <ItemsControl Name="ChangesList" ItemsSource="{Binding Changes}">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl Margin="12,9" Name="ChangesList" ItemsSource="{Binding Changes}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
-                  <TextBlock Classes="change" Text="{Binding}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+                  <TextBlock Classes="change size-13" Text="{Binding}" TextWrapping="Wrap" LineHeight="19.5"
                              Margin="0,0,0,4" Foreground="{DynamicResource KpTextPrimary}" />
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

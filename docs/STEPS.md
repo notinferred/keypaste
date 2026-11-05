@@ -8,9 +8,6 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.9 — Let people enlarge text.** Needs: Q.2.
-  - Nothing enlarges text, font sizes are fixed on about 180 lines of the views, and the 720×520 minimum window does not fit a 1366×768 screen at 150% Windows scaling. View › Zoom in, Zoom out and Actual size (⌘+, ⌘− and ⌘0) scale the interface up to 200%, kept in `app.toml`; view-level sizes move onto the Typography classes; and the minimum window and the prompt windows scale with it.
-  - Accepted when the screen renderer draws every screen at 100%, 150% and 200% with nothing cut off, masked text staying at 14px or larger.
 - [ ] **Q.11 — Open on a first run anyone understands.** Needs: none. Input: H-0027 for where the terms appear.
   - With no vault and no KeePassXC database found, the welcome's first action is Create a vault, with one plain sentence on what a vault and its master password are; someone with KeePassXC databases still sees them first (D-0681).
   - The terms of use leave the first launch (D-0594), whose own copy says running keypaste needs no agreement, and appear where their two services start: the Share… dialog, and the crash-report choice, asked once on the unlock screen with Send crash reports and Don't send as two equal buttons and no default.

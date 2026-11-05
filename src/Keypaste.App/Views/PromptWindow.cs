@@ -16,6 +16,8 @@ internal abstract class PromptWindow : Window
 
     protected PromptWindow()
     {
+        OpensOn = ScreenItOpensOn;
+
         Opened += (_, _) =>
         {
             // A platform that cannot draw transparency would paint the shadow band black, so the
@@ -23,13 +25,33 @@ internal abstract class PromptWindow : Window
             if (ActualTransparencyLevel == WindowTransparencyLevel.None)
             {
                 Classes.Add("opaque");
-                Width -= 2 * _shadowMargin;
             }
+
+            (Content as PromptFrame)?.Hold();
 
             // Focus starts on Deny, so a keystroke meant for another window can only refuse.
             FocusDeny();
         };
     }
+
+    /// <summary>The working area the prompt must fit: the screen it opens on, as the platform centers it.</summary>
+    internal Func<ScreenArea?> OpensOn { get; set; }
+
+    /// <summary>Called once its XAML has loaded. The window's width there is the design's, shadow band included; from here the card holds it and the window follows the card's scale.</summary>
+    protected void FrameCard()
+    {
+        if (Content is Control card)
+        {
+            card.Width = Width - (2 * _shadowMargin);
+            Width = double.NaN;
+            SizeToContent = SizeToContent.WidthAndHeight;
+            Content = null;
+            Content = new PromptFrame(card, () => OpensOn());
+        }
+    }
+
+    private ScreenArea? ScreenItOpensOn() =>
+        Screens is { ScreenCount: > 0 } screens && (screens.ScreenFromPoint(Position) ?? screens.Primary) is { } screen ? ScreenArea.Of(screen) : null;
 
     /// <summary>Raises the window over the others with focus on Deny, as it opened.</summary>
     internal void BringForward()

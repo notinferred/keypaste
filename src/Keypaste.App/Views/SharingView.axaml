@@ -40,7 +40,7 @@
 
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <!-- The design's max-width 1080, left-aligned: the star column fills up to it. -->
-    <Grid Margin="32,28">
+    <Grid Margin="32,12,32,28">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1080" />
         <ColumnDefinition Width="Auto" />
@@ -102,7 +102,7 @@
                                    Text="{Binding Status}" />
                       </StackPanel>
                       <TextBlock Grid.Row="1" Grid.Column="0"
-                                 FontSize="12"
+                                 Classes="size-12"
                                  Foreground="{DynamicResource KpTextMuted}"
                                  Text="{Binding Detail}"
                                  TextTrimming="CharacterEllipsis" />

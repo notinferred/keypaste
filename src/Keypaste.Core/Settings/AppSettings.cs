@@ -1,3 +1,4 @@
+using System.Globalization;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
 using Keypaste.Infrastructure;
@@ -92,11 +93,12 @@ public sealed record AppSettings
     internal const string WindowStateKey = "state";
     internal const string WindowListShareKey = "list_share";
     internal const string WindowSidebarHiddenKey = "sidebar_hidden";
+    internal const string WindowZoomKey = "zoom";
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
-    private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey];
+    private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey];
 
     private static readonly string[] _header =
     [
@@ -393,6 +395,11 @@ public sealed record AppSettings
         }
 
         writer.Number(WindowSidebarHiddenKey, layout.SidebarHidden ? 1 : 0);
+
+        if (layout.ZoomPercent != WindowLayout.ActualSizePercent)
+        {
+            writer.Text(WindowZoomKey, layout.ZoomText, "how large the interface is drawn, from 100% to 200%");
+        }
     }
 
     private static bool TryWrite(TomlWriter writer, IEnumerable<TomlPair> pairs)
@@ -431,8 +438,25 @@ public sealed record AppSettings
                 bounds.Value.Text,
                 table.TryGet(WindowStateKey, out var state) && state.Value.Kind == TomlValueKind.Text ? state.Value.Text : null,
                 table.TryGet(WindowListShareKey, out var share) && share.Value.Kind == TomlValueKind.Number ? share.Value.Number : null,
-                table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0)
+                table.TryGet(WindowSidebarHiddenKey, out var hidden) && hidden.Value.Kind == TomlValueKind.Number && hidden.Value.Number != 0,
+                ZoomText(table))
             : null;
+
+    // Written as a string, as the bounds are, so a hand edit such as "-50" stays this key's own problem: the file's reader refuses a bare negative number, and with it the whole file.
+    private static string? ZoomText(TomlTable table)
+    {
+        if (!table.TryGet(WindowZoomKey, out var zoom))
+        {
+            return null;
+        }
+
+        return zoom.Value.Kind switch
+        {
+            TomlValueKind.Text => zoom.Value.Text,
+            TomlValueKind.Number => zoom.Value.Number.ToString(CultureInfo.InvariantCulture),
+            _ => null,
+        };
+    }
 
     private static AppSettings Read(TomlTable table) => new()
     {

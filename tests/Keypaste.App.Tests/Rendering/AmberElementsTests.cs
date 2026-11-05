@@ -33,6 +33,16 @@ public sealed class AmberElementsTests
     });
 
     [Fact]
+    public Task A_line_of_amber_text_stays_one_element_when_it_is_drawn_at_200_percent() => HeadlessSession.On(() =>
+    {
+        Keypaste.App.Views.InterfaceZoom.Set(200);
+        var text = new TextBlock { Text = "waiting for you", FontSize = 11 };
+        text.Classes.Add("amber");
+
+        Assert.Single(Count(new Keypaste.App.Views.ZoomFrame(Row(text))));
+    });
+
+    [Fact]
     public Task A_tint_a_selected_row_and_a_focused_field_are_none() => HeadlessSession.On(() =>
     {
         var tint = new Border { Width = 120, Height = 40 };

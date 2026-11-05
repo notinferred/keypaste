@@ -49,7 +49,7 @@
       <StackPanel Spacing="6">
         <TextBlock Classes="caption" Text="Name this pairing, as the browser will list it" />
         <TextBox Name="NameBox" Text="{Binding Name}" MaxLength="64" AutomationProperties.Name="Name of this pairing" />
-        <TextBlock Name="NameProblemText" Height="18" FontSize="12" Foreground="{DynamicResource KpDanger}"
+        <TextBlock Name="NameProblemText" Height="18" Classes="size-12" Foreground="{DynamicResource KpDanger}"
                    ctl:Announcer.Says="{Binding NameProblem}" Text="{Binding NameProblem}" TextTrimming="CharacterEllipsis" />
       </StackPanel>
 

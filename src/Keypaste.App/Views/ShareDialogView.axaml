@@ -49,7 +49,7 @@
             </Border>
             <ContentPresenter Content="{TemplateBinding Content}"
                               VerticalAlignment="Center"
-                              FontSize="13"
+                              Classes="size-13"
                               Foreground="{DynamicResource KpTextPrimary}" />
           </StackPanel>
         </ControlTemplate>
@@ -113,8 +113,7 @@
                 BorderBrush="{DynamicResource KpBorderDefault}"
                 BorderThickness="1">
           <TextBlock Name="ShareWhat"
-                     Classes="mono"
-                     FontSize="12.5"
+                     Classes="mono size-12-5"
                      VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis"
                      Text="{Binding SelectedWhat}"
@@ -164,11 +163,11 @@
         <ctl:MaskedInput x:Name="SharePassphrase"
                          MinHeight="34"
                          Height="34"
-                         FontSize="14"
+                         Classes="size-14"
                          AllowsPaste="True"
                          Sink="{Binding Passphrase}"
                          MaskedLength="{Binding Passphrase.MaskedLength}"
-                         Placeholder="Passphrase, at least 20 characters, such as six generated words" />
+                         Placeholder="At least 20 characters, such as six generated words" />
         <TextBlock Classes="caption"
                    Text="Not stored. Send it another way than the link." />
       </StackPanel>

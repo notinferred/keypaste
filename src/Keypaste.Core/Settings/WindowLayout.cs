@@ -23,8 +23,15 @@ public enum WindowMode
 /// <param name="Mode">Whether it fills the screen, over those bounds.</param>
 /// <param name="ListShare">The list's share of the height it divides with the preview, in thousandths, or null until the divider is moved.</param>
 /// <param name="SidebarHidden">Whether View › Hide sidebar is in force.</param>
-public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMode Mode, int? ListShare, bool SidebarHidden)
+/// <param name="ZoomPercent">How large the interface is drawn, from <see cref="ActualSizePercent"/> to <see cref="LargestZoomPercent"/>.</param>
+public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMode Mode, int? ListShare, bool SidebarHidden, int ZoomPercent = WindowLayout.ActualSizePercent)
 {
+    /// <summary>The interface as it was designed, and the smallest it goes: a masked field stays at 14px or larger.</summary>
+    public const int ActualSizePercent = 100;
+
+    /// <summary>The largest the interface goes.</summary>
+    public const int LargestZoomPercent = 200;
+
     private const int _largestSide = 100_000;
 
     /// <summary>The bounds as one string, because the file's numbers cannot be negative and a screen left of the main one has negative positions.</summary>
@@ -38,8 +45,10 @@ public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMod
         _ => "normal",
     };
 
+    internal string ZoomText => string.Create(CultureInfo.InvariantCulture, $"{ZoomPercent}%");
+
     /// <summary>Reads what the file holds; bounds that make no window read as none, and the app opens where it would with no file.</summary>
-    internal static WindowLayout? Read(string bounds, string? mode, int? listShare, bool sidebarHidden)
+    internal static WindowLayout? Read(string bounds, string? mode, int? listShare, bool sidebarHidden, string? zoom)
     {
         var parts = bounds.Split(',');
 
@@ -52,8 +61,14 @@ public sealed record WindowLayout(int X, int Y, int Width, int Height, WindowMod
             return null;
         }
 
-        return new WindowLayout(x, y, width, height, ModeOf(mode), listShare is > 0 and < 1000 ? listShare : null, sidebarHidden);
+        return new WindowLayout(x, y, width, height, ModeOf(mode), listShare is > 0 and < 1000 ? listShare : null, sidebarHidden, ZoomOf(zoom));
     }
+
+    /// <summary>A percentage out of range comes in at the nearer end, and anything else is actual size.</summary>
+    private static int ZoomOf(string? text) =>
+        int.TryParse(text?.TrimEnd('%'), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var percent)
+            ? Math.Clamp(percent, ActualSizePercent, LargestZoomPercent)
+            : ActualSizePercent;
 
     private static WindowMode ModeOf(string? text) => text switch
     {

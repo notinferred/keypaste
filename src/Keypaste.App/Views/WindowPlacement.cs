@@ -1,14 +1,31 @@
 using Avalonia;
+using Avalonia.Platform;
 using Keypaste.Core.Settings;
 
 namespace Keypaste.App.Views;
 
 /// <summary>A screen's working area, and how many of its units make one device-independent pixel.</summary>
-internal readonly record struct ScreenArea(PixelRect WorkingArea, double Scaling);
+internal readonly record struct ScreenArea(PixelRect WorkingArea, double Scaling)
+{
+    // macOS measures positions and screens in points, as window sizes are.
+    internal static ScreenArea Of(Screen screen) => new(screen.WorkingArea, OperatingSystem.IsMacOS() ? 1 : screen.Scaling);
+
+    /// <summary>The working area in device-independent pixels.</summary>
+    internal Size Size => new(WorkingArea.Width / Scaling, WorkingArea.Height / Scaling);
+}
 
 /// <summary>Where a kept window goes on the screens there are now.</summary>
 internal static class WindowPlacement
 {
+    /// <summary>The smallest the window goes at <paramref name="zoom"/>: the design's minimum scaled, but never more than its screen holds, so every zoom stays open to a small screen and the body scrolls inside.</summary>
+    internal static Size Minimum(double zoom, ScreenArea? screen)
+    {
+        var width = WindowChrome.MinimumWidth * zoom;
+        var height = WindowChrome.MinimumHeight * zoom;
+
+        return screen is { Size: var room } ? new Size(Math.Min(width, room.Width), Math.Min(height, room.Height)) : new Size(width, height);
+    }
+
     /// <summary>Puts the window wholly inside the working area it most overlaps, or the first one when it overlaps none.</summary>
     /// <param name="saved">The window as it was left.</param>
     /// <param name="minimum">The window's minimum size, in device-independent pixels.</param>

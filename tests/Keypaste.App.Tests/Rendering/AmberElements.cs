@@ -64,6 +64,7 @@ internal static class AmberElements
 
         var (pixels, width, height) = Read(bitmap);
         var scaling = window.RenderScaling;
+        var zoom = Keypaste.App.Views.InterfaceZoom.Factor;
         var mask = new bool[width * height];
         var surface = Surface(window, scaling, width, height);
 
@@ -81,7 +82,7 @@ internal static class AmberElements
             Clear(mask, width, height, excluded);
         }
 
-        return Components(mask, width, height);
+        return Components(mask, width, height, zoom);
     }
 
     /// <summary>
@@ -153,7 +154,7 @@ internal static class AmberElements
 
                 case ListBoxItem { IsSelected: true } row when row.Bounds.Height > 0:
                     var edge = Bounds(row, window, scaling, inflate: 0);
-                    yield return new PixelRect(edge.X, edge.Y, (int)Math.Ceiling(3 * scaling), edge.Height);
+                    yield return new PixelRect(edge.X, edge.Y, (int)Math.Ceiling(3 * scaling * Keypaste.App.Views.InterfaceZoom.Factor), edge.Height);
                     break;
             }
         }
@@ -180,9 +181,9 @@ internal static class AmberElements
 
     private static PixelRect Bounds(Visual control, TopLevel window, double scaling, int inflate)
     {
-        var origin = control.TranslatePoint(default, window) ?? default;
-        var pixels = PixelRect.FromRect(new Rect(origin, control.Bounds.Size), scaling);
-        var grow = (int)Math.Ceiling(inflate * scaling);
+        var transform = control.TransformToVisual(window) ?? Matrix.Identity;
+        var pixels = PixelRect.FromRect(new Rect(control.Bounds.Size).TransformToAABB(transform), scaling);
+        var grow = (int)Math.Ceiling(inflate * scaling * transform.M11);
         return new PixelRect(pixels.X - grow, pixels.Y - grow, pixels.Width + (2 * grow), pixels.Height + (2 * grow));
     }
 
@@ -196,9 +197,12 @@ internal static class AmberElements
         }
     }
 
-    /// <summary>Each connected region, joined across a word's space, of at least <see cref="_minimumPixels"/> pixels.</summary>
-    private static List<PixelRect> Components(bool[] mask, int width, int height)
+    /// <summary>Each connected region, joined across a word's space, of at least <see cref="_minimumPixels"/> pixels; all three measures grow with the zoom, so an element is the same element at any size.</summary>
+    private static List<PixelRect> Components(bool[] mask, int width, int height, double zoom)
     {
+        var joinAcross = (int)Math.Ceiling(_joinAcross * zoom);
+        var joinDown = (int)Math.Ceiling(_joinDown * zoom);
+        var minimumPixels = (int)Math.Ceiling(_minimumPixels * zoom * zoom);
         var seen = new bool[mask.Length];
         var found = new List<PixelRect>();
         var queue = new Queue<int>();
@@ -223,9 +227,9 @@ internal static class AmberElements
                 right = Math.Max(right, x);
                 bottom = Math.Max(bottom, y);
 
-                for (var dy = -_joinDown; dy <= _joinDown; dy++)
+                for (var dy = -joinDown; dy <= joinDown; dy++)
                 {
-                    for (var dx = -_joinAcross; dx <= _joinAcross; dx++)
+                    for (var dx = -joinAcross; dx <= joinAcross; dx++)
                     {
                         int nx = x + dx, ny = y + dy;
 
@@ -245,7 +249,7 @@ internal static class AmberElements
                 }
             }
 
-            if (count >= _minimumPixels)
+            if (count >= minimumPixels)
             {
                 found.Add(new PixelRect(left, top, right - left + 1, bottom - top + 1));
             }

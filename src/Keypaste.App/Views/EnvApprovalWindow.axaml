@@ -61,8 +61,8 @@
                  IsVisible="{Binding Requester, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
       <Border Classes="prompt-call" Height="58">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,10">
-          <StackPanel Spacing="2">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="12,10" Spacing="2">
             <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
                        IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <Grid ColumnDefinitions="36,*" RowDefinitions="Auto,Auto">
@@ -87,7 +87,7 @@
                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
                       <TextBlock Classes="key" Text="{Binding Key}" TextWrapping="Wrap" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="1" Classes="tag" Text="inject only" VerticalAlignment="Center" />
-                      <TextBlock Grid.Row="1" Classes="entry" Text="{Binding Entry}" TextWrapping="Wrap" FontSize="11.5"
+                      <TextBlock Grid.Row="1" Classes="entry size-12" Text="{Binding Entry}" TextWrapping="Wrap"
                                  IsVisible="{Binding Entry, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </Grid>
                   </Border>
@@ -95,7 +95,7 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <TextBlock Name="NoKeysText" Text="(none)" Margin="12,8" IsVisible="{Binding HasNoKeys}" />
-            <TextBlock Name="FileLinesText" Classes="tag" Text="{Binding FileLines}" TextWrapping="Wrap" FontSize="11.5"
+            <TextBlock Name="FileLinesText" Classes="tag size-12" Text="{Binding FileLines}" TextWrapping="Wrap"
                        Margin="12,8"
                        IsVisible="{Binding FileLines, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>

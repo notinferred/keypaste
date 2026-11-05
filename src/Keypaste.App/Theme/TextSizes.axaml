@@ -1,0 +1,29 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- A size for text whose other properties stay its own: the sizes of Typography's classes, without their weights and
+       colours. Included after the control styles so that a size named on an element holds over a control's own. -->
+
+  <Style Selector=":is(Control).size-11">
+    <Setter Property="TextElement.FontSize" Value="11" />
+  </Style>
+  <Style Selector=":is(Control).size-12">
+    <Setter Property="TextElement.FontSize" Value="12" />
+  </Style>
+  <Style Selector=":is(Control).size-12-5">
+    <Setter Property="TextElement.FontSize" Value="12.5" />
+  </Style>
+  <Style Selector=":is(Control).size-13">
+    <Setter Property="TextElement.FontSize" Value="13" />
+  </Style>
+  <Style Selector=":is(Control).size-13-5">
+    <Setter Property="TextElement.FontSize" Value="13.5" />
+  </Style>
+  <Style Selector=":is(Control).size-14">
+    <Setter Property="TextElement.FontSize" Value="14" />
+  </Style>
+  <Style Selector=":is(Control).size-15">
+    <Setter Property="TextElement.FontSize" Value="15" />
+  </Style>
+
+</Styles>

@@ -50,6 +50,7 @@ internal static class HeadlessSession
             () =>
             {
                 PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark);
+                Keypaste.App.Views.InterfaceZoom.Set(Core.Settings.WindowLayout.ActualSizePercent);
                 body();
             },
             CancellationToken.None);
@@ -75,6 +76,7 @@ internal static class HeadlessSession
             {
                 ArgumentNullException.ThrowIfNull(body);
                 PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark);
+                Keypaste.App.Views.InterfaceZoom.Set(Core.Settings.WindowLayout.ActualSizePercent);
                 await body().ConfigureAwait(true);
                 return true;
             },

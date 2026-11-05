@@ -74,13 +74,13 @@
       <StackPanel Spacing="6">
         <TextBlock Classes="caption" Text="The agent says it needs this because" />
         <Border Classes="prompt-reason" Height="77">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
-            <StackPanel Spacing="6">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,9" Spacing="6">
               <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
                          IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               <TextBlock Classes="prompt-scrubbed" Text="{Binding Truncation}"
                          IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
                          Foreground="{DynamicResource KpTextSecondary}" />
             </StackPanel>
           </ScrollViewer>

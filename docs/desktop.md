@@ -145,6 +145,7 @@ Every command is in the menus: the menu bar on macOS, with keypaste, File, Edit,
 | | |
 |---|---|
 | `Ctrl/Cmd+1` … `4` | Items, Agents, Trash, Settings |
+| `Ctrl/Cmd++`, `Ctrl/Cmd+-`, `Ctrl/Cmd+0` | View › Zoom in, Zoom out and Actual size: every window's interface from 100% to 200%, kept in `app.toml` |
 | `Ctrl/Cmd+,` | Settings |
 | `Ctrl+B`, `Ctrl+Cmd+S` on macOS | Hide or show the sidebar |
 | `Ctrl/Cmd+N` | New item |

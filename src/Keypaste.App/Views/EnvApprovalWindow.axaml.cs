@@ -5,7 +5,11 @@ namespace Keypaste.App.Views;
 
 internal sealed partial class EnvApprovalWindow : PromptWindow
 {
-    public EnvApprovalWindow() => AvaloniaXamlLoader.Load(this);
+    public EnvApprovalWindow()
+    {
+        AvaloniaXamlLoader.Load(this);
+        FrameCard();
+    }
 
     internal EnvApprovalWindow(EnvApprovalViewModel request)
         : this() => DataContext = request;

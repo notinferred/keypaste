@@ -257,8 +257,7 @@
                      ctl:Announcer.Says="{Binding Notice}" Text="{Binding Notice}"
                      TextWrapping="Wrap"
                      VerticalAlignment="Center"
-                     FontSize="12"
-                     Classes="secondary" />
+                     Classes="secondary size-12" />
           <Button Grid.Column="1"
                   Classes="link"
                   Content="Restore"
@@ -270,7 +269,7 @@
 
       <!-- Calm, not a dialog. KpDanger is reserved for the destructive confirmation. -->
       <Border Classes="note" IsVisible="{Binding HasError}">
-        <TextBlock ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12" Classes="secondary" />
+        <TextBlock ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" TextWrapping="Wrap" Classes="secondary size-12" />
       </Border>
 
       <Border Classes="form" IsVisible="{Binding IsCreatingGroup}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmCreateGroupCommand}" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}" ctl:FormKeys.Draft="{Binding GroupDraft}">
@@ -331,7 +330,7 @@
       <!-- Only where the vault has no recycle bin: a recycled group goes at once, and Undo brings it back. -->
       <Border Classes="form danger" IsVisible="{Binding IsConfirmingGroupDelete}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelGroupCommand}">
         <StackPanel Spacing="10">
-          <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+          <TextBlock x:Name="GroupDeletePrompt" Text="{Binding GroupDeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button x:Name="KeepGroup" Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
             <Button x:Name="DeleteGroupConfirm" Classes="danger sm" Content="Delete" Command="{Binding ConfirmDeleteGroupCommand}" />
@@ -421,8 +420,7 @@
                          never the value that matched. -->
                     <TextBlock DockPanel.Dock="Right"
                                Text="{Binding Why}"
-                               FontSize="11.5"
-                               Classes="secondary"
+                               Classes="secondary size-12"
                                Margin="8,0,0,0"
                                MaxWidth="180"
                                TextTrimming="CharacterEllipsis"
@@ -433,14 +431,14 @@
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center" />
                   </DockPanel>
-                  <TextBlock Grid.Column="2" Classes="mono muted" FontSize="12" Text="{Binding DisplayUsername}"
+                  <TextBlock Grid.Column="2" Classes="mono muted size-12" Text="{Binding DisplayUsername}"
                              IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="3" Classes="mono muted" FontSize="12" Text="{Binding DisplayUrl}"
+                  <TextBlock Grid.Column="3" Classes="mono muted size-12" Text="{Binding DisplayUrl}"
                              IsVisible="{Binding $self.(views:EntryColumns.ShowsContact)}"
                              Margin="0,0,8,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="4" Classes="muted" FontSize="12.5" Text="{Binding KindLabel}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="5" Classes="mono muted" FontSize="12" Text="{Binding Where}"
+                  <TextBlock Grid.Column="4" Classes="muted size-12-5" Text="{Binding KindLabel}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="5" Classes="mono muted size-12" Text="{Binding Where}"
                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <!-- When an agent last received it: blue in use, green recent, grey idle. A time, never a value. Not amber:
                        several rows can be in use at once, and a view has one amber element. -->
@@ -711,8 +709,7 @@
                                    Text="{Binding DisplayTitle}"
                                    TextWrapping="Wrap" />
                         <TextBlock Text="{Binding Location}"
-                                   FontSize="13"
-                                   Classes="muted"
+                                   Classes="muted size-13"
                                    TextWrapping="Wrap" />
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
@@ -794,8 +791,7 @@
                           <StackPanel x:Name="EntryIdentity" Margin="10,4" Spacing="3">
                             <TextBlock Classes="caption" Text="Reference" IsVisible="{Binding HasReference}" />
                             <TextBlock x:Name="ReferenceText"
-                                       Classes="mono secondary"
-                                       FontSize="12"
+                                       Classes="mono secondary size-12"
                                        MaxWidth="300"
                                        HorizontalAlignment="Left"
                                        IsVisible="{Binding HasReference}"
@@ -804,8 +800,7 @@
                                        ToolTip.Tip="Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when the bridge allows it. keypaste puts the value into the command&apos;s environment, not into the file." />
                             <TextBlock Classes="caption" Text="KeePass item ID" Margin="0,4,0,0" />
                             <TextBlock x:Name="KdbxEntryText"
-                                       Classes="mono secondary"
-                                       FontSize="12"
+                                       Classes="mono secondary size-12"
                                        MaxWidth="300"
                                        HorizontalAlignment="Left"
                                        Text="{Binding KdbxEntry}"
@@ -840,7 +835,7 @@
                   <!-- Rotate asks first: the old value stays in history and the new one is never shown here. -->
                   <Border Classes="note" IsVisible="{Binding IsConfirmingRotate}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmRotateCommand}" ctl:FormKeys.Cancel="{Binding CancelRotateCommand}">
                     <StackPanel Spacing="10">
-                      <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+                      <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelRotateCommand}" />
                         <Button x:Name="ConfirmRotate" Classes="primary sm" Content="Rotate" Command="{Binding ConfirmRotateCommand}" />
@@ -857,7 +852,7 @@
                          setting and says which case this is. -->
                     <Border Classes="form danger">
                       <StackPanel Spacing="10">
-                        <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+                        <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelDeleteCommand}" />
                           <Button Classes="danger sm" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
@@ -940,12 +935,11 @@
                         <ListBox.ItemTemplate>
                           <DataTemplate x:DataType="vm:EntryRevisionRow">
                             <Grid ColumnDefinitions="Auto,*">
-                              <TextBlock Grid.Column="0" Classes="mono" FontSize="12" Text="{Binding When}" />
+                              <TextBlock Grid.Column="0" Classes="mono size-12" Text="{Binding When}" />
                               <TextBlock Grid.Column="1"
                                          Text="{Binding DisplayTitle}"
-                                         FontSize="12"
                                          Margin="12,0,0,0"
-                                         Classes="muted"
+                                         Classes="muted size-12"
                                          TextTrimming="CharacterEllipsis" />
                             </Grid>
                           </DataTemplate>
@@ -972,7 +966,6 @@
                                              MaskedLength="{Binding History.Selected.MaskedLength}"
                                              AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
                                              FontFamily="{DynamicResource KpMono}"
-                                             FontSize="12"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
                                              Foreground="{DynamicResource KpTextSecondary}" />
@@ -1021,12 +1014,12 @@
                         <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Notes" Margin="0,12,0,6" />
                         <TextBlock Grid.Row="11" Grid.Column="0" Classes="caption" Text="Then" />
                         <Panel Grid.Row="11" Grid.Column="2">
-                          <TextBlock FontSize="13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
+                          <TextBlock Classes="size-13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
                         <TextBlock Grid.Row="12" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
                         <Panel Grid.Row="12" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock FontSize="13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" />
+                          <TextBlock Classes="size-13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
@@ -1034,24 +1027,24 @@
                         <TextBlock Grid.Row="13" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Custom fields" Margin="0,12,0,6" />
                         <TextBlock Grid.Row="14" Grid.Column="0" Classes="caption" Text="Then" />
                         <Panel Grid.Row="14" Grid.Column="2">
-                          <TextBlock x:Name="RevisionFields" Classes="mono" FontSize="12" Text="{Binding History.Selected.FieldsSummary}" TextWrapping="Wrap" />
+                          <TextBlock x:Name="RevisionFields" Classes="mono size-12" Text="{Binding History.Selected.FieldsSummary}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding History.Selected.FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
                         <TextBlock Grid.Row="15" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
                         <Panel Grid.Row="15" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock Classes="mono" FontSize="12" Text="{Binding FieldsSummary}" TextWrapping="Wrap" />
+                          <TextBlock Classes="mono size-12" Text="{Binding FieldsSummary}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding FieldsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
 
                         <TextBlock Grid.Row="16" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Tags" Margin="0,12,0,6" />
                         <TextBlock Grid.Row="17" Grid.Column="0" Classes="caption" Text="Then" />
                         <Panel Grid.Row="17" Grid.Column="2">
-                          <TextBlock x:Name="RevisionTags" Classes="mono" FontSize="12" Text="{Binding History.Selected.TagsSummary}" TextWrapping="Wrap" />
+                          <TextBlock x:Name="RevisionTags" Classes="mono size-12" Text="{Binding History.Selected.TagsSummary}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding History.Selected.TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
                         <TextBlock Grid.Row="18" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
                         <Panel Grid.Row="18" Grid.Column="2" Margin="0,4,0,0">
-                          <TextBlock Classes="mono" FontSize="12" Text="{Binding TagsSummary}" TextWrapping="Wrap" />
+                          <TextBlock Classes="mono size-12" Text="{Binding TagsSummary}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="(none)" IsVisible="{Binding TagsSummary, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
                         </Panel>
                       </Grid>
@@ -1124,7 +1117,6 @@
                                              MaskedLength="{Binding MaskedLength}"
                                              AutomationProperties.Name="Hold to reveal the password"
                                              FontFamily="{DynamicResource KpMono}"
-                                             FontSize="13"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
                                              ClipToBounds="True"
@@ -1167,7 +1159,6 @@
                                              MaskedLength="{Binding Totp.MaskedLength}"
                                              AutomationProperties.Name="Hold to reveal the TOTP code"
                                              FontFamily="{DynamicResource KpMono}"
-                                             FontSize="14"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
                                              ClipToBounds="True"
@@ -1273,9 +1264,8 @@
                       <Border Grid.Column="1" Classes="value" Padding="12,10">
                         <TextBlock Text="{Binding DisplayNotes}"
                                    TextWrapping="Wrap"
-                                   FontSize="13"
                                    LineHeight="19.5"
-                                   Classes="secondary" />
+                                   Classes="secondary size-13" />
                       </Border>
                     </Grid>
                   </StackPanel>
@@ -1317,7 +1307,6 @@
                                                  MaskedLength="{Binding MaskedLength}"
                                                  AutomationProperties.Name="{Binding RevealLabel}"
                                                  FontFamily="{DynamicResource KpMono}"
-                                                 FontSize="14"
                                                  HorizontalAlignment="Left"
                                                  VerticalAlignment="Center"
                                                  ClipToBounds="True"
@@ -1521,8 +1510,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <TextBlock x:Name="AttachmentNote"
-                               Classes="secondary"
-                               FontSize="12.5"
+                               Classes="secondary size-12-5"
                                TextWrapping="Wrap"
                                IsVisible="{Binding Attachments.HasNote}"
                                Text="{Binding Attachments.Note}" />
@@ -1608,8 +1596,7 @@
                           <TextBlock Classes="label" Text="Agent access" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock x:Name="AgentAccessSummary"
-                                   Classes="mono"
-                                   FontSize="12.5"
+                                   Classes="mono size-12-5"
                                    IsVisible="{Binding ShowsAgentAccessSummary}"
                                    Text="{Binding AgentAccessSummary}"
                                    TextWrapping="Wrap" />
@@ -1617,7 +1604,7 @@
                                       IsVisible="{Binding AgentLines.Count}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="x:String">
-                              <TextBlock Classes="mono" FontSize="12.5" Text="{Binding}" TextTrimming="CharacterEllipsis" Margin="0,2" />
+                              <TextBlock Classes="mono size-12-5" Text="{Binding}" TextTrimming="CharacterEllipsis" Margin="0,2" />
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -1640,13 +1627,12 @@
                             <DataTemplate x:DataType="vm:EnvironmentRow">
                               <Grid ColumnDefinitions="*,Auto" Margin="0,2">
                                 <TextBlock Grid.Column="0"
-                                           Classes="mono"
-                                           FontSize="12.5"
+                                           Classes="mono size-12-5"
                                            Text="{Binding Label}"
                                            TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="1"
-                                           FontSize="12.5"
+                                           Classes="size-12-5"
                                            Margin="12,0,0,0"
                                            Classes.muted="{Binding !RequiresApproval}"
                                            Classes.secondary="{Binding RequiresApproval}"
@@ -1666,17 +1652,17 @@
                     <StackPanel>
                       <Border Classes="meta">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="Created" />
-                          <TextBlock Grid.Column="1" x:Name="CreatedText" FontSize="12.5" Classes="primary" Text="{Binding Created}" />
+                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="Created" />
+                          <TextBlock Grid.Column="1" x:Name="CreatedText" Classes="primary size-12-5" Text="{Binding Created}" />
                         </Grid>
                       </Border>
                       <!-- An expiry KeePassXC set, shown as Expired in danger text once the session's clock passes it (D-0337). -->
                       <Border Classes="meta" IsVisible="{Binding HasExpiry}">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="{Binding ExpiryLabel}" />
+                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="{Binding ExpiryLabel}" />
                           <TextBlock Grid.Column="1"
                                      x:Name="ExpiryText"
-                                     FontSize="12.5"
+                                     Classes="size-12-5"
                                      Classes.primary="{Binding !IsExpired}"
                                      Classes.danger="{Binding IsExpired}"
                                      Text="{Binding Expiry}" />
@@ -1684,8 +1670,8 @@
                       </Border>
                       <Border Classes="meta">
                         <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="Rotated" />
-                          <TextBlock Grid.Column="1" x:Name="RotatedText" FontSize="12.5" Classes="primary" Text="{Binding Rotated}" />
+                          <TextBlock Grid.Column="0" Classes="muted size-12-5" Text="Rotated" />
+                          <TextBlock Grid.Column="1" x:Name="RotatedText" Classes="primary size-12-5" Text="{Binding Rotated}" />
                         </Grid>
                       </Border>
                     </StackPanel>

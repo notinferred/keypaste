@@ -14,4 +14,9 @@
     <Setter Property="IsVisible" Value="False" />
   </Style>
 
+  <!-- A popup is its own window, so it takes the scale of what opened it; see ZoomFrame and PromptFrame. -->
+  <Style Selector="Popup">
+    <Setter Property="InheritsTransform" Value="True" />
+  </Style>
+
 </Styles>

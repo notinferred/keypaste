@@ -10,6 +10,7 @@ internal sealed partial class PairingNoticeWindow : PromptWindow
     public PairingNoticeWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        FrameCard();
         this.FindControl<Button>("Dismiss")!.Click += (_, _) => Close();
         Opened += (_, _) => this.FindControl<Button>("Dismiss")!.Focus();
     }

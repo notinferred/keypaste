@@ -11,6 +11,7 @@ internal sealed partial class NoticeWindow : PromptWindow
     public NoticeWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        FrameCard();
         this.FindControl<Button>("Dismiss")!.Click += (_, _) => Close();
         Opened += (_, _) => this.FindControl<Button>("Dismiss")!.Focus();
     }

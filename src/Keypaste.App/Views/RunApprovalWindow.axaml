@@ -39,7 +39,7 @@
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
             <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
             <TextBlock Name="SubtitleText" Classes="prompt-sub" Text="{Binding Subtitle}" />
-            <TextBlock Name="ClientText" Classes="prompt-sub" Text="{Binding Client}" FontSize="12" />
+            <TextBlock Name="ClientText" Classes="prompt-sub size-12" Text="{Binding Client}" />
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <Border Classes="dot waiting" />
@@ -54,8 +54,8 @@
       </StackPanel>
 
       <Border Classes="prompt-call" Height="94">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,10">
-          <StackPanel>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="12,10">
             <TextBlock Name="ToolText" Text="{Binding Tool}" />
             <TextBlock Name="CommandText" Classes="value" Text="{Binding Command}" TextWrapping="Wrap" />
             <TextBlock Name="ProgramText" Text="{Binding Program}" TextWrapping="Wrap" />
@@ -76,7 +76,7 @@
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <StackPanel Grid.Column="0" Spacing="1">
                       <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
-                      <TextBlock Classes="tag" Text="{Binding Source}" TextWrapping="Wrap" FontSize="11" />
+                      <TextBlock Classes="tag size-11" Text="{Binding Source}" TextWrapping="Wrap" />
                     </StackPanel>
                     <TextBlock Grid.Column="1" Classes="tag" Text="{Binding Tag}" TextWrapping="Wrap" MaxWidth="170"
                                TextAlignment="Right" VerticalAlignment="Center" />
@@ -91,13 +91,13 @@
       <StackPanel Spacing="6">
         <TextBlock Classes="caption" Text="The agent says it needs this because" />
         <Border Classes="prompt-reason" Height="77">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
-            <StackPanel Spacing="6">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,9" Spacing="6">
               <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
                          IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               <TextBlock Classes="prompt-scrubbed" Text="{Binding Truncation}"
                          IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Classes="size-13" LineHeight="19.5"
                          Foreground="{DynamicResource KpTextSecondary}" />
             </StackPanel>
           </ScrollViewer>

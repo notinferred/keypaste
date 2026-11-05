@@ -11,6 +11,7 @@ internal sealed partial class AboutWindow : PromptWindow
     public AboutWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        FrameCard();
         this.FindControl<TextBlock>("VersionText")!.Text = Version;
         this.FindControl<TextBlock>("CopyrightText")!.Text = Copyright;
 

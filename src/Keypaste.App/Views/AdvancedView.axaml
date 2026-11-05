@@ -28,7 +28,7 @@
   </UserControl.Styles>
 
   <ScrollViewer>
-    <StackPanel Margin="{DynamicResource KpScreenPadding}" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+    <StackPanel Margin="32,12,32,28" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
       <StackPanel Spacing="6">
         <TextBlock Classes="h1" Text="Advanced" />
         <TextBlock Classes="subtitle" Text="What the everyday screens leave out, each on a screen of its own." />

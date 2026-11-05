@@ -33,8 +33,9 @@ namespace Keypaste.App.Tests.Rendering;
 /// </code>
 /// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
 /// four times, into <c>dark</c>, <c>light</c>, <c>high-contrast-dark</c> and <c>high-contrast-light</c>
-/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Add a
-/// screen by adding a <see cref="Save"/> call.
+/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Dark and light
+/// are also drawn at 150% and 200%, into <c>zoom-150</c> and <c>zoom-200</c>, where the 200% folders add <c>s-</c> frames on small screens. Add a
+/// screen by adding a <see cref="Save"/> call: <see cref="Every_screen_keeps_every_control_within_reach"/>, which needs no folder, walks each frame at each zoom.
 /// </summary>
 public sealed class ScreenRenderer
 {
@@ -46,12 +47,16 @@ public sealed class ScreenRenderer
     private static readonly EntryName _apiHome = new("env/acme-api", ".env");
     private static readonly EntryName _openAi = new("Services", "OpenAI");
 
+    // Set while a test walks every frame, for Save to add what each cuts off.
+    private static List<string>? _cutOff;
+
     /// <summary>Makes the palette's folder and sets the system to it; skips the test unless a folder is named.</summary>
-    private static string Prepare(string palette)
+    private static string Prepare(string palette, int percent = 100)
     {
         var root = Environment.GetEnvironmentVariable(_variable);
         Assert.SkipWhen(string.IsNullOrEmpty(root), $"{_variable} is not set");
-        var output = Path.Combine(root!, palette);
+        InterfaceZoom.Set(percent);
+        var output = percent == 100 ? Path.Combine(root!, palette) : Path.Combine(root!, $"zoom-{percent}", palette);
         Directory.CreateDirectory(output);
         PlatformTheme.Set(
             palette.EndsWith("light", StringComparison.Ordinal) ? Avalonia.Platform.PlatformThemeVariant.Light : Avalonia.Platform.PlatformThemeVariant.Dark,
@@ -64,10 +69,45 @@ public sealed class ScreenRenderer
     [InlineData("light")]
     [InlineData("high-contrast-dark")]
     [InlineData("high-contrast-light")]
-    public Task Every_screen_is_drawn_to_a_file(string palette) => HeadlessSession.On(() =>
-    {
-        var output = Prepare(palette);
+    public Task Every_screen_is_drawn_to_a_file(string palette) => HeadlessSession.On(() => DrawEveryScreen(Prepare(palette)));
 
+    [Theory]
+    [InlineData(150, "dark")]
+    [InlineData(150, "light")]
+    [InlineData(200, "dark")]
+    [InlineData(200, "light")]
+    public Task Every_screen_is_drawn_to_a_file_at_each_zoom(int percent, string palette) => HeadlessSession.On(async () =>
+    {
+        var output = Prepare(palette, percent);
+        DrawEveryScreen(output);
+        await DrawAgents(output);
+    });
+
+    [Theory]
+    [InlineData(100)]
+    [InlineData(150)]
+    [InlineData(200)]
+    public Task Every_screen_keeps_every_control_within_reach(int percent) => HeadlessSession.On(async () =>
+    {
+        var output = Directory.CreateTempSubdirectory("keypaste-reach-").FullName;
+        _cutOff = [];
+
+        try
+        {
+            InterfaceZoom.Set(percent);
+            DrawEveryScreen(output);
+            await DrawAgents(output);
+            Assert.True(_cutOff.Count == 0, string.Join('\n', _cutOff.Distinct()));
+        }
+        finally
+        {
+            _cutOff = null;
+            Directory.Delete(output, recursive: true);
+        }
+    });
+
+    private static void DrawEveryScreen(string output)
+    {
         using var demo = new DemoVault();
         DrawUnlock(demo, output);
         DrawShell(demo, output);
@@ -79,7 +119,55 @@ public sealed class ScreenRenderer
         DrawPrompts(output);
         DrawTrashWithRows(demo, output);
         DrawHardwareKey(output);
-    });
+        DrawSmallScreens(demo, output);
+    }
+
+    /// <summary>Items and the tallest prompt at the largest zoom on a 1366×768 screen, at 100% and at Windows' 150%, whose working areas hold less than the zoomed minimum window.</summary>
+    private static void DrawSmallScreens(DemoVault demo, string output)
+    {
+        if (InterfaceZoom.Percent < 200)
+        {
+            return;
+        }
+
+        foreach (var (name, area) in new[] { ("1366x768", new ScreenArea(new PixelRect(0, 0, 1366, 728), 1)), ("1366x768-at-150", new ScreenArea(new PixelRect(0, 0, 1366, 720), 1.5)) })
+        {
+            using var session = new AppVaultSession(new ManualClock(AppClock.Start), TimeSpan.FromHours(8), demo.Home);
+
+            using (var master = TempVault.Secret(_master))
+            {
+                Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
+            }
+
+            using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start));
+            var window = Show(new ShellView { DataContext = shell });
+            window.MinWidth = 0;
+            window.MinHeight = 0;
+            window.Width = area.Size.Width;
+            window.Height = area.Size.Height;
+            Save(window, output, $"s-items-on-{name}");
+            window.Close();
+
+            var run = new RunApprovalWindow(new RunApprovalViewModel(LongRun())) { OpensOn = () => area };
+            DrawWindow(run, output, $"s-run-approval-on-{name}");
+        }
+    }
+
+    private static RunPrompt LongRun() => new()
+    {
+        Client = "claude-code",
+        Label = "work laptop",
+        Reason = string.Concat(Enumerable.Repeat("Run the pending database migration for the api service before the deploy. ", 20)),
+        ReasonWasTruncated = false,
+        ReasonWasAltered = false,
+        Program = "/usr/local/bin/npm",
+        Command = "npm run migrate",
+        Directory = "/home/maya/acme/api",
+        Project = "acme-api",
+        Profile = "dev",
+        Variables = [new("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
+        GrantSeconds = 900,
+    };
 
     /// <summary>A vault that also needs a YubiKey: the unlock screen offering it, waiting for a touch, a save waiting for one, and adding one in Settings.</summary>
     private static void DrawHardwareKey(string output)
@@ -194,13 +282,14 @@ public sealed class ScreenRenderer
     [InlineData("light")]
     [InlineData("high-contrast-dark")]
     [InlineData("high-contrast-light")]
-    public Task The_agents_screen_is_drawn_with_grants_clients_and_tokens(string palette) => HeadlessSession.On(async () =>
-    {
-        var output = Prepare(palette);
+    public Task The_agents_screen_is_drawn_with_grants_clients_and_tokens(string palette) => HeadlessSession.On(() => DrawAgents(Prepare(palette)));
 
+    private static async Task DrawAgents(string output)
+    {
         using var demo = new DemoVault();
         var clock = new ManualClock(AppClock.Start);
-        using var authority = new AppAuthority(new AppVaultSession(clock, TimeSpan.FromHours(8), demo.Home), null, () => new Allowing());
+        using var session = new AppVaultSession(clock, TimeSpan.FromHours(8), demo.Home);
+        using var authority = new AppAuthority(session, null, () => new Allowing());
 
         using (var master = TempVault.Secret(_master))
         {
@@ -274,7 +363,8 @@ public sealed class ScreenRenderer
         // With nothing waiting, the open pane's Run it is the frame's one amber.
         await zed.DisposeAsync();
         await Assert.ThrowsAnyAsync<Exception>(() => waiting);
-        await WaitUntilAsync(() => authority.Activity.Waiting.Count == 0);
+        // Its grants go with its connection, a moment apart from its waiting request.
+        await WaitUntilAsync(() => authority.Activity.Waiting.Count == 0 && authority.Grants().All(grant => grant.Client != "zed"));
         agents.Refresh();
         Save(window, output, "28-agents-quiet");
 
@@ -300,7 +390,7 @@ public sealed class ScreenRenderer
         Save(window, output, "26-settings-tokens-revoke");
 
         window.Close();
-    });
+    }
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
@@ -1007,7 +1097,7 @@ public sealed class ScreenRenderer
     /// <summary>The Activity view on its own, the width of the shell's content area, for a state the demo home cannot reach.</summary>
     private static void DrawLogAlone(LogViewModel model, string output, string name)
     {
-        var window = new Window { Width = _width - 232, Height = 520, Content = new LogView { DataContext = model } };
+        var window = new Window { Width = (_width - 232) * InterfaceZoom.Factor, Height = 520 * InterfaceZoom.Factor, Content = new ZoomFrame(new LogView { DataContext = model }) };
         window.Show();
         Save(window, output, name);
         window.Close();
@@ -1270,7 +1360,7 @@ public sealed class ScreenRenderer
             icons,
         ]);
 
-        var window = new Window { Width = _width, Height = 900, Content = new ScrollViewer { Content = page } };
+        var window = new Window { Width = _width * InterfaceZoom.Factor, Height = 900 * InterfaceZoom.Factor, Content = new ZoomFrame(new ScrollViewer { Content = page }) };
         window.Show();
         focused.Focus();
         Save(window, output, "92-components", sheet: true);
@@ -1297,6 +1387,7 @@ public sealed class ScreenRenderer
         if (!sheet)
         {
             AmberElements.AssertAtMostOne(window, $"{Path.GetFileName(output)}/{name}");
+            _cutOff?.AddRange(ReachableControls.Problems(window).Select(problem => $"{name}: {problem}"));
         }
     }
 

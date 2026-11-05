@@ -15,6 +15,7 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
     public LockedNoticeWindow()
     {
         AvaloniaXamlLoader.Load(this);
+        FrameCard();
         var dismiss = this.FindControl<Button>("Dismiss")!;
         dismiss.Click += (_, _) => Close();
 
@@ -55,7 +56,7 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
         }
 
         var area = screen.WorkingArea;
-        var width = (int)Math.Ceiling(Width * DesktopScaling);
+        var width = (int)Math.Ceiling(ClientSize.Width * DesktopScaling);
         var edge = (int)Math.Round(_edge * DesktopScaling);
         Position = new PixelPoint(area.Right - width - edge, area.Y + edge);
     }

@@ -66,6 +66,67 @@ public sealed class AppCommandsTests : IDisposable
         Assert.Equal(["Lock", "Open vault…"], Headers(mac.Dock));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void The_zoom_chords_take_the_keyboards_plus_shifted_or_not_and_the_keypad_and_clash_with_nothing(bool isMac)
+    {
+        var commands = Commands(shell: null, mac: isMac);
+        var command = isMac ? KeyModifiers.Meta : KeyModifiers.Control;
+
+        Assert.Equal(new KeyGesture(Key.OemPlus, command), Find(commands, "Zoom in").Shown);
+        Assert.Contains(new KeyGesture(Key.OemPlus, command | KeyModifiers.Shift), Find(commands, "Zoom in").Keys);
+        Assert.Contains(new KeyGesture(Key.Add, command), Find(commands, "Zoom in").Keys);
+        Assert.Equal(new KeyGesture(Key.OemMinus, command), Find(commands, "Zoom out").Shown);
+        Assert.Contains(new KeyGesture(Key.Subtract, command), Find(commands, "Zoom out").Keys);
+        Assert.Equal(new KeyGesture(Key.D0, command), Find(commands, "Actual size").Shown);
+        Assert.Contains(new KeyGesture(Key.NumPad0, command), Find(commands, "Actual size").Keys);
+
+        var chords = commands.All.SelectMany(entry => entry.Keys).ToList();
+        Assert.Equal(chords.Count, chords.Distinct().Count());
+    }
+
+    [Fact]
+    public Task The_zoom_items_are_off_at_their_limits_and_without_a_window() => HeadlessSession.On(() =>
+    {
+        Assert.False(Find(Commands(shell: null, mac: true), "Zoom in").CanRun());
+
+        var window = new Window();
+        window.Show();
+        var commands = new AppCommands(new AppCommandHost { Session = _session, Shell = static () => null, Unlock = static () => null, Window = () => window }, mac: false);
+        var zoomIn = Find(commands, "Zoom in");
+        var zoomOut = Find(commands, "Zoom out");
+        var actual = Find(commands, "Actual size");
+
+        Assert.True(zoomIn.CanRun());
+        Assert.False(zoomOut.CanRun());
+        Assert.False(actual.CanRun());
+        Assert.Null(commands.ForChord(Key.OemMinus, KeyModifiers.Control));
+
+        commands.ForChord(Key.OemPlus, KeyModifiers.Control)!.Run();
+        Assert.Equal(125, InterfaceZoom.Percent);
+        commands.ForChord(Key.OemPlus, KeyModifiers.Control | KeyModifiers.Shift)!.Run();
+        Assert.Equal(150, InterfaceZoom.Percent);
+        Assert.True(zoomOut.CanRun());
+        Assert.True(actual.CanRun());
+
+        InterfaceZoom.Set(200);
+        Assert.False(zoomIn.CanRun());
+        Assert.True(commands.ForChord(Key.OemPlus, KeyModifiers.Control) is null);
+        commands.ForChord(Key.D0, KeyModifiers.Control)!.Run();
+        Assert.Equal(100, InterfaceZoom.Percent);
+        window.Close();
+    });
+
+    [Fact]
+    public void Windows_Zoom_and_Views_zoom_commands_keep_their_own_words()
+    {
+        var commands = Commands(shell: null, mac: true);
+
+        Assert.Equal("Zoom", Headers(commands.Menus.Single(menu => menu.Header == "Window").Entries).Single(header => header.StartsWith("Zoom", StringComparison.Ordinal)));
+        Assert.Equal(["Zoom in", "Zoom out", "Actual size"], Headers(commands.Menus.Single(menu => menu.Header == "View").Entries).TakeLast(3));
+    }
+
     [Fact]
     public Task Each_command_does_what_its_item_says() => HeadlessSession.On(() =>
     {

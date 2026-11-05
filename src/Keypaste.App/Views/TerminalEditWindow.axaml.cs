@@ -5,7 +5,11 @@ namespace Keypaste.App.Views;
 
 internal sealed partial class TerminalEditWindow : PromptWindow
 {
-    public TerminalEditWindow() => AvaloniaXamlLoader.Load(this);
+    public TerminalEditWindow()
+    {
+        AvaloniaXamlLoader.Load(this);
+        FrameCard();
+    }
 
     internal TerminalEditWindow(TerminalEditViewModel request)
         : this() => DataContext = request;

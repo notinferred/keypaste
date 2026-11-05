@@ -8,7 +8,7 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <!-- A capped star column keeps the page at the left gutter; a MaxWidth on a stretched panel centres it. -->
-    <Grid Margin="32,28">
+    <Grid Margin="32,12,32,28">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1016" />
       </Grid.ColumnDefinitions>
@@ -81,7 +81,6 @@
                                      Source="{Binding Minted}"
                                      MaskedLength="24"
                                      FontFamily="{DynamicResource KpMono}"
-                                     FontSize="14"
                                      VerticalAlignment="Center"
                                      ClipToBounds="True"
                                      Cursor="Hand"
@@ -116,7 +115,15 @@
         <Border Classes="table">
           <StackPanel>
             <Border Classes="table-head">
-              <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,72" ColumnSpacing="12">
+              <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="1.1*" />
+                  <ColumnDefinition Width="1*" />
+                  <ColumnDefinition Width="1.5*" />
+                  <ColumnDefinition Width="0.8*" MinWidth="104" />
+                  <ColumnDefinition Width="0.6*" MinWidth="64" />
+                  <ColumnDefinition Width="72" />
+                </Grid.ColumnDefinitions>
                 <TextBlock Classes="th" Text="NAME" />
                 <TextBlock Grid.Column="1" Classes="th" Text="TOKEN" />
                 <TextBlock Grid.Column="2" Classes="th" Text="SCOPE" />
@@ -141,24 +148,32 @@
                   <Border Classes="table-row" Padding="16,12">
                     <Panel>
                       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}">
-                        <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Classes="ghost sm" FontSize="12" Content="Cancel" VerticalAlignment="Center"
+                        <TextBlock Text="{Binding ConfirmText}" Classes="size-12-5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="ghost sm size-12" Content="Cancel" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
-                        <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" VerticalAlignment="Center"
+                        <Button Grid.Column="2" Classes="danger sm size-12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"
                                 CommandParameter="{Binding}" />
                       </Grid>
-                      <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,72" ColumnSpacing="12" IsVisible="{Binding !IsConfirming}">
-                        <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Classes="mono secondary" FontSize="12" Text="{Binding Prefix}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="2" Classes="mono secondary" FontSize="12" Text="{Binding Scope}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                      <Grid ColumnSpacing="12" IsVisible="{Binding !IsConfirming}">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="1.1*" />
+                          <ColumnDefinition Width="1*" />
+                          <ColumnDefinition Width="1.5*" />
+                          <ColumnDefinition Width="0.8*" MinWidth="104" />
+                          <ColumnDefinition Width="0.6*" MinWidth="64" />
+                          <ColumnDefinition Width="72" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Name}" Classes="size-12-5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Classes="mono secondary size-12" Text="{Binding Prefix}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Classes="mono secondary size-12" Text="{Binding Scope}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                    ToolTip.Tip="{Binding Scope}" />
                         <Border Grid.Column="3" Classes="chip outline">
                           <TextBlock Text="{Binding Mode}" />
                         </Border>
-                        <TextBlock Grid.Column="4" FontSize="12.5" Text="{Binding Expires}" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="4" Classes="size-12-5" Text="{Binding Expires}" VerticalAlignment="Center"
                                    Classes.muted="{Binding !IsExpired}" Classes.danger="{Binding IsExpired}" />
-                        <Button Grid.Column="5" Classes="danger sm" FontSize="12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        <Button Grid.Column="5" Classes="danger sm size-12" Content="Revoke" AutomationProperties.Name="{Binding Name, StringFormat='Revoke {0}'}" HorizontalAlignment="Right" VerticalAlignment="Center"
                                 Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).AskRevokeCommand}"
                                 CommandParameter="{Binding}" />
                       </Grid>

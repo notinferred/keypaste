@@ -15,6 +15,10 @@ internal sealed partial class MainWindow : Window
     {
         AvaloniaXamlLoader.Load(this);
 
+        var body = (Control)Content!;
+        Content = null;
+        Content = new ZoomFrame(body);
+
         var strip = this.FindControl<Border>("DragStrip")!;
         var root = this.FindControl<ContentControl>("Root")!;
 
@@ -30,10 +34,24 @@ internal sealed partial class MainWindow : Window
 
         AddHandler(GotFocusEvent, OnGotFocus, RoutingStrategies.Bubble, handledEventsToo: true);
 
-        Opened += (_, _) => NoteBounds();
+        ApplyZoom();
+        InterfaceZoom.Changed += ApplyZoom;
+        Closed += (_, _) => InterfaceZoom.Changed -= ApplyZoom;
+
+        Opened += (_, _) =>
+        {
+            ApplyZoom();
+            NoteBounds();
+        };
 
         // Posted, because a platform can report the new size of a maximize before its new state.
-        PositionChanged += (_, _) => Dispatcher.UIThread.Post(NoteBounds, DispatcherPriority.Background);
+        PositionChanged += (_, _) => Dispatcher.UIThread.Post(
+            () =>
+            {
+                HoldMinimum();
+                NoteBounds();
+            },
+            DispatcherPriority.Background);
         Resized += (_, _) => Dispatcher.UIThread.Post(NoteBounds, DispatcherPriority.Background);
     }
 
@@ -48,10 +66,10 @@ internal sealed partial class MainWindow : Window
             return;
         }
 
-        // The main screen first, where a window on no screen comes back to. macOS measures positions and screens in points, as window sizes are.
+        // The main screen first, where a window on no screen comes back to.
         var areas = screens.All
             .OrderByDescending(screen => screen.IsPrimary)
-            .Select(screen => new ScreenArea(screen.WorkingArea, OperatingSystem.IsMacOS() ? 1 : screen.Scaling))
+            .Select(ScreenArea.Of)
             .ToList();
         var placed = WindowPlacement.Fit(saved, new Size(MinWidth, MinHeight), areas);
 
@@ -77,7 +95,39 @@ internal sealed partial class MainWindow : Window
 
         return _normal is not var (position, size)
             ? null
-            : new WindowLayout(position.X, position.Y, (int)Math.Round(size.Width), (int)Math.Round(size.Height), _mode, listShare, sidebarHidden);
+            : new WindowLayout(position.X, position.Y, (int)Math.Round(size.Width), (int)Math.Round(size.Height), _mode, listShare, sidebarHidden, InterfaceZoom.Percent);
+    }
+
+    private ScreenArea? ScreenInUse() =>
+        Screens is { ScreenCount: > 0 } screens && (screens.ScreenFromWindow(this) ?? screens.Primary) is { } screen ? ScreenArea.Of(screen) : null;
+
+    private Size HoldMinimum()
+    {
+        var minimum = WindowPlacement.Minimum(InterfaceZoom.Factor, ScreenInUse());
+        MinWidth = minimum.Width;
+        MinHeight = minimum.Height;
+        return minimum;
+    }
+
+    /// <summary>Takes the zoom: the titlebar and the minimum scale with it, and a window it left too small grows, staying on its screen.</summary>
+    private void ApplyZoom()
+    {
+        ExtendClientAreaTitleBarHeightHint = WindowChrome.TitleBarHeight * InterfaceZoom.Factor;
+        var minimum = HoldMinimum();
+
+        if (WindowState != WindowState.Normal || (Width >= minimum.Width && Height >= minimum.Height))
+        {
+            return;
+        }
+
+        if (IsVisible && ScreenInUse() is { } screen)
+        {
+            var now = new WindowLayout(Position.X, Position.Y, (int)Math.Ceiling(Width), (int)Math.Ceiling(Height), WindowMode.Normal, null, false);
+            Position = WindowPlacement.Fit(now, minimum, [screen]).Position;
+        }
+
+        Width = Math.Max(Width, minimum.Width);
+        Height = Math.Max(Height, minimum.Height);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

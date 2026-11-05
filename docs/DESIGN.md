@@ -16,6 +16,8 @@ The app has four places, Items, Agents, Trash and Settings, on Ctrl/⌘+1–4, a
 
 The window goes down to 720 wide, so two sit side by side on a laptop. Under 840 wide the sidebar collapses and Items drops its Username and URL columns; Show sidebar then opens it over the content, which keeps its width, until Escape or a press outside. View › Hide sidebar hides it at any width. `WindowChrome.cs` holds the sizes.
 
+View › Zoom in, Zoom out and Actual size (⌘+, ⌘− and ⌘0) scale every window's interface from 100% to 200% in steps of 25, by drawing it through a layout transform, so the sizes on this page and the breakpoint above read the design's pixels, and at 200% a window 1500 wide lays out as one 750 wide. The minimum window scales with the zoom but never passes the screen's working area; where the screen cannot hold it, the interface keeps its minimum and scrolls inside the window. A prompt takes the zoom as it opens, scaled as a whole so its layout stays fixed, or at the largest scale that shows all of it on its screen, and keeps that scale while it is open.
+
 ## Information
 
 1. **Each fact once in a view.** A name, a state or a location appears in one place in a view, the place the person looks for it; another place links to it or leaves it out. The vault's file name, the group in view and the save state are each such a fact.
@@ -65,7 +67,7 @@ Instrument Sans 400/500/600 for the interface and Fragment Mono 400 for anything
 | Table header | 11/500, +0.04em, muted, written in capitals |
 | Mono | 12–13. An item's title is sans at heading size in its detail pane; a variable's key stays mono |
 
-[Typography.axaml](../src/Keypaste.App/Theme/Typography.axaml) holds these as text classes.
+[Typography.axaml](../src/Keypaste.App/Theme/Typography.axaml) holds these as text classes, and [TextSizes.axaml](../src/Keypaste.App/Theme/TextSizes.axaml) the sizes alone, for text that keeps its own weight and colour. A view sets a size through one of them. A masked value draws at 14 or larger.
 
 The marks are set in Hepta Slab, and only as outlines: no surface loads the face, and the interface never uses it. The wordmark is weight 500 tracked −1.5%, so it sits beside Instrument Sans without outweighing it; the icon is 580 tracked −1%, so it holds its weight on a tile and at 16px.
 
@@ -99,8 +101,8 @@ The desktop follows Apple's Human Interface Guidelines on every platform, with C
 4. **Work survives**: a draft is kept when the person changes place, or the app asks before discarding it. A lock still discards it.
 5. **Every field has a visible label** above it, and a placeholder is only an example. An error appears under the field it concerns, as the field is typed.
 6. **Feedback is honest**: anything that takes more than a moment shows a moving indicator and says what it is doing, a toast's icon says whether it reports a success, a warning or information, and every error says what to do next.
-7. **Accessible to everyone**: every control has an accessible name, never a secret. Enabled text keeps 4.5:1 against its ground, and focus rings, the control edge and status marks 3:1, in both palettes; disabled text and decorative lines are exempt, as in WCAG, and stay quiet. A control's target is at least 20 by 20, a row's action buttons sit 8 apart, status is never shown by colour alone, what a screen announces goes through one live line, and text enlarges to 200%.
-8. **Prompts keep their own rules** (D-0326, D-0456, D-0634): no default button, focus on Deny, the allows disarmed for a second with their labels still readable, and a fixed layout.
+7. **Accessible to everyone**: every control has an accessible name, never a secret. Enabled text keeps 4.5:1 against its ground, and focus rings, the control edge and status marks 3:1, in both palettes; disabled text and decorative lines are exempt, as in WCAG, and stay quiet. A control's target is at least 20 by 20, a row's action buttons sit 8 apart, status is never shown by colour alone, what a screen announces goes through one live line, and text enlarges to 200%, as far as a prompt's screen holds it whole (rule 8).
+8. **Prompts keep their own rules** (D-0326, D-0456, D-0634): no default button, focus on Deny, the allows disarmed for a second with their labels still readable, and a fixed layout whose every part, Deny and the reason included, shows on its screen at any zoom.
 
 ## The marks
 
@@ -128,4 +130,4 @@ The icon is "k." and the wordmark "keypaste.": the letters in ink, `#F2F2F0` on 
 
 ## Checking a screen
 
-`KEYPASTE_SCREENS_OUT=<dir> bash scripts/verify.sh test Keypaste.App.Tests.Rendering.ScreenRenderer` draws every screen with a demo vault; a screen is checked against this page and the principles' tests.
+`KEYPASTE_SCREENS_OUT=<dir> bash scripts/verify.sh test Keypaste.App.Tests.Rendering.ScreenRenderer` draws every screen with a demo vault in each palette, and in dark and light at 150% and 200%; a screen is checked against this page and the principles' tests. Without a folder, the same class still walks every frame at each zoom and fails a control or a line of text cut off with no scrolling that reaches it.

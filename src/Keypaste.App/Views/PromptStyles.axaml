@@ -153,4 +153,7 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
+  <!-- After this sheet's own rules, so a size named on an element holds over them here as it does elsewhere. -->
+  <StyleInclude Source="avares://keypaste-app/Theme/TextSizes.axaml" />
+
 </Styles>

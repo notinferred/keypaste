@@ -66,7 +66,7 @@
             Padding="32,12">
       <StackPanel Orientation="Horizontal" Spacing="10">
         <ctl:KpIcon Icon="info" Size="14" Foreground="{DynamicResource KpTextMuted}" />
-        <TextBlock ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" TextWrapping="Wrap" FontSize="12.5" VerticalAlignment="Center"
+        <TextBlock ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" TextWrapping="Wrap" Classes="size-12-5" VerticalAlignment="Center"
                    Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
     </Border>
@@ -117,13 +117,12 @@
                           <TextBlock Name="RecommendationTokenKind"
                                      Text="{Binding TokenKind}"
                                      IsVisible="{Binding IsToken}"
-                                     FontSize="13.5"
+                                     Classes="size-13-5"
                                      FontWeight="Medium"
                                      Foreground="{DynamicResource KpTextPrimary}"
                                      VerticalAlignment="Center" />
                           <TextBlock Name="RecommendationKey"
-                                     Classes="mono"
-                                     FontSize="13"
+                                     Classes="mono size-13"
                                      Text="{Binding Key}"
                                      Foreground="{DynamicResource KpTextPrimary}"
                                      VerticalAlignment="Center" />
@@ -166,8 +165,7 @@
                         <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Name="LostTag"
-                                       Classes="mono"
-                                       FontSize="13"
+                                       Classes="mono size-13"
                                        Text="{Binding Tag}"
                                        Foreground="{DynamicResource KpTextPrimary}"
                                        VerticalAlignment="Center" />
@@ -214,7 +212,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <TextBlock Name="PasswordProblem"
                                      Text="{Binding Problem}"
-                                     FontSize="13.5"
+                                     Classes="size-13-5"
                                      FontWeight="Medium"
                                      Foreground="{DynamicResource KpTextPrimary}"
                                      VerticalAlignment="Center" />
@@ -285,7 +283,7 @@
               <StackPanel Spacing="4">
                 <ToggleSwitch Content="Lock when the window is minimized"
                               FontWeight="Medium"
-                              FontSize="13.5"
+                              Classes="size-13-5"
                               IsChecked="{Binding LockWhenMinimized}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0"
                            Text="Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock; on macOS, hiding the app with Cmd+H is not minimizing either." />
@@ -308,7 +306,7 @@
                 <ToggleSwitch Name="StayInTray"
                               Content="{Binding StayInTrayLabel}"
                               FontWeight="Medium"
-                              FontSize="13.5"
+                              Classes="size-13-5"
                               IsChecked="{Binding StayInTray}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0"
                            Text="Closing the window still locks the vault. Open, Lock and Quit are on the icon's menu. Some Linux desktops show no tray icon." />
@@ -319,7 +317,7 @@
                 <ToggleSwitch Name="OpenAtLogin"
                               Content="Open keypaste at login"
                               FontWeight="Medium"
-                              FontSize="13.5"
+                              Classes="size-13-5"
                               IsChecked="{Binding OpenAtLogin}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0"
                            Text="It starts locked, and with no window when it stays in the tray. Only your own login is changed." />
@@ -457,7 +455,7 @@
                   <StackPanel Spacing="8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <ctl:KpIcon Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpDanger}" />
-                      <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="13" FontWeight="Medium"
+                      <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Classes="size-13" FontWeight="Medium"
                                  Foreground="{DynamicResource KpTextPrimary}" />
                     </StackPanel>
                     <TextBlock Classes="caption" Text="{Binding BackupCost}" Foreground="{DynamicResource KpTextSecondary}" />
@@ -502,7 +500,7 @@
                   <SelectableTextBlock Classes="fact-value" Text="{Binding BackupsPath}" VerticalAlignment="Center" />
                 </Border>
                 <TextBlock Name="BackupsSummary"
-                           FontSize="13"
+                           Classes="size-13"
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource KpTextPrimary}"
                            Text="{Binding BackupsSummary}" />
@@ -547,7 +545,7 @@
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <StackPanel Grid.Column="0" Spacing="6">
-                  <TextBlock Name="ChosenVaultLine" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
+                  <TextBlock Name="ChosenVaultLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding ChosenVaultText}" />
                   <TextBlock Classes="caption" Text="{Binding ChosenVaultRule}" />
                 </StackPanel>
                 <Button Grid.Column="1" Command="{Binding UseThisVaultCommand}" IsVisible="{Binding !IsThisVaultChosen}" VerticalAlignment="Top" AutomationProperties.Name="Use this vault for agents and the CLI">
@@ -560,7 +558,7 @@
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <StackPanel Grid.Column="0" Spacing="4">
                     <TextBlock Classes="row-label" Text="keypaste in a terminal" />
-                    <TextBlock Name="CliLinkLine" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
+                    <TextBlock Name="CliLinkLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding CliLinkText}" />
                     <TextBlock Name="CliLinkNote" Classes="caption" TextWrapping="Wrap" Text="{Binding CliLinkNote}" IsVisible="{Binding HasCliLinkNote}" />
                   </StackPanel>
                   <Panel Grid.Column="1" VerticalAlignment="Top">
@@ -574,7 +572,7 @@
                 </Grid>
                 <Border Name="CliReplaceForm" Classes="form danger" IsVisible="{Binding IsConfirmingCliReplace}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelReplaceCliCommand}">
                   <StackPanel Spacing="10">
-                    <TextBlock Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+                    <TextBlock Text="{Binding CliReplacePrompt}" TextWrapping="Wrap" Classes="primary size-12-5" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Name="KeepCli" Classes="ghost sm" Content="Cancel" Command="{Binding CancelReplaceCliCommand}" />
                       <Button Name="ConfirmReplaceCli" Classes="danger sm" Content="Replace" Command="{Binding ConfirmReplaceCliCommand}" />
@@ -610,7 +608,7 @@
                             AutomationProperties.Name="Stop pairing" />
                   </Panel>
                 </Grid>
-                <TextBlock Name="PairingArmedLine" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
+                <TextBlock Name="PairingArmedLine" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}"
                            Text="{Binding ArmedText}" IsVisible="{Binding IsArmed}" />
                 <TextBlock Name="BrowserFillMessage" Classes="caption" TextWrapping="Wrap" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
               </StackPanel>
@@ -624,8 +622,8 @@
                     <DataTemplate x:DataType="vm:PairingItem">
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,10">
                         <StackPanel Grid.Column="0" Spacing="2">
-                          <TextBlock FontSize="13.5" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Name}" TextWrapping="Wrap" />
-                          <TextBlock FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
+                          <TextBlock Classes="size-13-5" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding Name}" TextWrapping="Wrap" />
+                          <TextBlock FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding Identity}" TextWrapping="Wrap" />
                           <TextBlock Classes="caption" Text="{Binding Used}" TextWrapping="Wrap" />
                         </StackPanel>
                         <Button Grid.Column="1" Classes="ghost sm" Content="Remove" VerticalAlignment="Top"
@@ -670,7 +668,7 @@
                 </Grid>
                 <Border Name="ForgetAllForm" Classes="form danger" IsVisible="{Binding IsConfirmingForgetAll}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelForgetAllCommand}">
                   <StackPanel Spacing="10">
-                    <TextBlock Text="Forget every recent vault? The vaults themselves are not touched." TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+                    <TextBlock Text="Forget every recent vault? The vaults themselves are not touched." TextWrapping="Wrap" Classes="primary size-12-5" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Name="CancelForgetAll" Classes="ghost sm" Content="Cancel" Command="{Binding CancelForgetAllCommand}" />
                       <Button Name="ConfirmForgetAll" Classes="danger sm" Content="Forget them all" Command="{Binding ForgetAllCommand}" />
@@ -696,7 +694,7 @@
                 <ToggleSwitch Name="SendCrashReports"
                               Content="Send crash reports"
                               FontWeight="Medium"
-                              FontSize="13.5"
+                              Classes="size-13-5"
                               IsChecked="{Binding SendCrashReports}" />
                 <TextBlock Classes="caption" Margin="42,0,0,0" TextWrapping="Wrap"
                            Text="What failed and where in keypaste's code. Never anything from your vault, a path or who you are. Turning it off deletes the reports waiting to be sent, which Diagnostics lists." />

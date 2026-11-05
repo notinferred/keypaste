@@ -28,14 +28,14 @@ internal static class WindowChrome
     /// <summary>The sidebar's width, and the titlebar's first column while the sidebar shows.</summary>
     public const double SidebarWidth = 232;
 
-    /// <summary>Room the titlebar's content leaves for the caption buttons.</summary>
+    /// <summary>Room the titlebar's content leaves for the caption buttons, which the platform draws and no zoom scales.</summary>
     /// <remarks>
     /// macOS needs none here: its traffic lights sit over the empty column above the sidebar.
     /// Windows' three caption buttons are 46px each.
     /// </remarks>
-    public static Thickness CaptionInset { get; } =
-        OperatingSystem.IsMacOS() ? default : new Thickness(0, 0, 140, 0);
+    public static Thickness CaptionInset(double zoom) =>
+        OperatingSystem.IsMacOS() ? default : new Thickness(0, 0, 140 / zoom, 0);
 
-    /// <summary>The titlebar's first column with no sidebar under it: room for the traffic lights on macOS and the menu button elsewhere.</summary>
-    public static double LeadingInset { get; } = OperatingSystem.IsMacOS() ? 80 : 48;
+    /// <summary>The titlebar's first column with no sidebar under it: room for the traffic lights on macOS, which no zoom scales, and the menu button elsewhere, which zooms with it.</summary>
+    public static double LeadingInset(double zoom) => OperatingSystem.IsMacOS() ? 80 / zoom : 48;
 }

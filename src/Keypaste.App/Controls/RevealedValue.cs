@@ -61,9 +61,9 @@ internal sealed class RevealedValue : Control
     internal static readonly StyledProperty<FontFamily> FontFamilyProperty =
         AvaloniaProperty.Register<RevealedValue, FontFamily>(nameof(FontFamily), FontFamily.Default);
 
-    /// <summary>The size to draw at.</summary>
+    /// <summary>The size to draw at: a masked value stays at 14px or larger.</summary>
     internal static readonly StyledProperty<double> FontSizeProperty =
-        AvaloniaProperty.Register<RevealedValue, double>(nameof(FontSize), 13d);
+        AvaloniaProperty.Register<RevealedValue, double>(nameof(FontSize), 14d);
 
     /// <summary>The brush to draw with.</summary>
     internal static readonly StyledProperty<IBrush?> ForegroundProperty =

@@ -301,6 +301,51 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Equal(share, AppSettings.Load(SettingsFile).Window!.ListShare);
     }
 
+    [Theory]
+    [InlineData("zoom = \"150%\"", 150)]
+    [InlineData("zoom = \"150\"", 150)]
+    [InlineData("zoom = 175", 175)]
+    [InlineData("zoom = \"137%\"", 137)]
+    [InlineData("zoom = \"9000%\"", 200)]
+    [InlineData("zoom = 9000", 200)]
+    [InlineData("zoom = \"50%\"", 100)]
+    [InlineData("zoom = \"-50\"", 100)]
+    [InlineData("zoom = \"large\"", 100)]
+    [InlineData("zoom = \"\"", 100)]
+    [InlineData("zoom = 0", 100)]
+    [InlineData("later = 1", 100)]
+    public void A_hand_edited_zoom_is_clamped_and_anything_else_is_actual_size(string line, int percent)
+    {
+        File.WriteAllText(SettingsFile, $"[[window]]\nbounds = \"1,2,800,600\"\n{line}\n");
+
+        Assert.Equal(percent, AppSettings.Load(SettingsFile).Window!.ZoomPercent);
+    }
+
+    [Fact]
+    public void A_zoom_round_trips_and_actual_size_writes_no_key()
+    {
+        var zoomed = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false, 150);
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = zoomed }));
+        Assert.Contains("zoom = \"150%\"", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+        Assert.Equal(zoomed, AppSettings.Load(SettingsFile).Window);
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = zoomed with { ZoomPercent = 100 } }));
+        Assert.DoesNotContain("zoom", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_zoom_written_here_reads_as_a_later_key_to_a_reader_that_does_not_know_it()
+    {
+        var zoomed = new WindowLayout(1, 2, 800, 600, WindowMode.Normal, null, false, 200);
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = zoomed }));
+
+        Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var problem), problem);
+        var window = Assert.Single(document.Tables, table => table.Name == AppSettings.WindowSectionName);
+        Assert.True(window.Pairs.Count <= 8);
+        Assert.Contains(window.Pairs, pair => pair.Key == "zoom" && pair.Value.Kind == TomlValueKind.Text);
+    }
+
     [Fact]
     public void A_window_section_alone_leaves_every_preference_at_its_default_and_a_later_key_in_it_survives()
     {

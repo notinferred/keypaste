@@ -97,7 +97,7 @@
               BorderBrush="{DynamicResource KpBorderSubtle}"
               BorderThickness="0,0,0,1"
               WindowDecorationProperties.ElementRole="TitleBar">
-        <Grid Name="TitleColumns" ColumnDefinitions="232,*,Auto" Margin="{x:Static views:WindowChrome.CaptionInset}">
+        <Grid Name="TitleColumns" ColumnDefinitions="232,*,Auto">
 
           <!-- The app's only search. It searches Items, and says where: every item, or the group in view. -->
           <TextBox Grid.Column="1"
@@ -305,8 +305,7 @@
                         ToolTip.Tip="{Binding Name}">
                     <ctl:KpIcon Grid.Column="0" Icon="folder-git-2" Size="14" Margin="0,0,10,0" />
                     <TextBlock Grid.Column="1"
-                               Classes="mono"
-                               FontSize="12"
+                               Classes="mono size-12"
                                FontWeight="Normal"
                                Text="{Binding Name}"
                                TextTrimming="CharacterEllipsis"
@@ -327,20 +326,22 @@
         <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*">
 
           <!-- A screen under a place, such as History under Agents, goes back up to it (D-0374). -->
-          <Button Grid.Row="0"
-                  Name="Back"
-                  ZIndex="1"
-                  Classes="ghost sm"
-                  IsVisible="{Binding HasBack}"
-                  HorizontalAlignment="Left"
-                  Margin="24,12,0,-16"
-                  AutomationProperties.Name="{Binding BackTitle, StringFormat='Back to {0}'}"
-                  Command="{Binding BackCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <ctl:KpIcon Icon="chevron-right" Size="13" RenderTransform="rotate(180deg)" />
-              <TextBlock Text="{Binding BackTitle}" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
+          <!-- A row of its own, so nothing a page scrolls can sit under the link or be hidden by it; the screens under a place keep 16 less at their top for this. -->
+          <Border Grid.Row="0"
+                  Name="BackStrip"
+                  IsVisible="{Binding HasBack}">
+            <Button Name="Back"
+                    Classes="ghost sm"
+                    HorizontalAlignment="Left"
+                    Margin="24,12,0,0"
+                    AutomationProperties.Name="{Binding BackTitle, StringFormat='Back to {0}'}"
+                    Command="{Binding BackCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <ctl:KpIcon Icon="chevron-right" Size="13" RenderTransform="rotate(180deg)" />
+                <TextBlock Text="{Binding BackTitle}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </Border>
 
           <!-- Until a screen draws its own title (Destination.OwnsHeader), the shell draws it. -->
           <TextBlock Grid.Row="1"
@@ -362,7 +363,7 @@
                            Name="VaultChanged"
                            Text="{Binding VaultChanged}"
                            TextWrapping="Wrap"
-                           FontSize="12.5"
+                           Classes="size-12-5"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource KpTextSecondary}" />
                 <Button Grid.Column="2"
@@ -387,7 +388,7 @@
                            ctl:Announcer.Says="{Binding Notice}"
                            Text="{Binding Notice}"
                            TextWrapping="Wrap"
-                           FontSize="12.5"
+                           Classes="size-12-5"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource KpTextSecondary}" />
                 <Button Grid.Column="2"
@@ -430,7 +431,7 @@
         <StackPanel Spacing="12">
           <StackPanel Orientation="Horizontal" Spacing="10">
             <Border Classes="dot waiting" />
-            <TextBlock Text="Touch your YubiKey" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+            <TextBlock Text="Touch your YubiKey" Classes="size-14" FontWeight="SemiBold" VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextPrimary}" />
           </StackPanel>
           <TextBlock Classes="caption" TextWrapping="Wrap"

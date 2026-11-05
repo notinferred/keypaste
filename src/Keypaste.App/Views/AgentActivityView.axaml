@@ -66,10 +66,10 @@
                   <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16">
                       <StackPanel Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Client}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding Asked}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Client}" Classes="size-13-5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="mono secondary size-12" Text="{Binding Asked}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Classes="mono amber" FontSize="11" Text="{Binding LeftText}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="mono amber size-11" Text="{Binding LeftText}" VerticalAlignment="Center" />
                       <Button Grid.Column="2" Name="ShowPrompt" Classes="sm" Content="Show the prompt" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).ShowPromptCommand}"
                               AutomationProperties.Name="{Binding Client, StringFormat='Show the prompt from {0}'}" />
@@ -85,7 +85,7 @@
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
             <ctl:KpIcon Icon="hourglass" Size="15" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="1" Classes="section" Text="Allowances" VerticalAlignment="Center" />
-            <Button Grid.Column="2" Name="EndAllAllowances" Classes="danger sm" FontSize="12" Content="End all" HorizontalAlignment="Right" VerticalAlignment="Center"
+            <Button Grid.Column="2" Name="EndAllAllowances" Classes="danger sm size-12" Content="End all" HorizontalAlignment="Right" VerticalAlignment="Center"
                     IsVisible="{Binding HasGrants}" Command="{Binding EndAllCommand}"
                     AutomationProperties.Name="End all allowances" />
           </Grid>
@@ -98,14 +98,14 @@
                   <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,150,Auto" ColumnSpacing="16">
                       <StackPanel Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Client}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Client}" Classes="size-13-5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="mono secondary size-12" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
                         <TextBlock Classes="mono sm secondary" Text="{Binding LeftText}" />
                         <ProgressBar Classes="thin" MinWidth="0" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
                       </StackPanel>
-                      <Button Grid.Column="2" Name="EndAllowance" Classes="danger sm" FontSize="12" Content="End" VerticalAlignment="Center"
+                      <Button Grid.Column="2" Name="EndAllowance" Classes="danger sm size-12" Content="End" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).EndCommand}"
                               CommandParameter="{Binding}"
                               AutomationProperties.Name="{Binding EndName}" />
@@ -147,14 +147,14 @@
                     <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12">
                       <Border Classes="tile" VerticalAlignment="Top">
                         <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextPrimary}" />
+                                   FontFamily="{DynamicResource KpMono}" Classes="size-12" Foreground="{DynamicResource KpTextPrimary}" />
                       </Border>
                       <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Classes="size-14" FontWeight="SemiBold" />
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                           <!-- Top, so a status that wraps keeps its dot on the first line. -->
                           <Border Classes="dot" Classes.ok="{Binding IsLive}" VerticalAlignment="Top" Margin="0,5,0,0" />
-                          <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="12" TextWrapping="Wrap"
+                          <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="size-12" TextWrapping="Wrap"
                                      Classes.ok="{Binding IsLive}" Classes.muted="{Binding !IsLive}" />
                         </Grid>
                         <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" TextWrapping="Wrap" />
@@ -185,7 +185,7 @@
                                                      Text="{Binding Preview}"
                                                      Margin="14,12"
                                                      FontFamily="{DynamicResource KpMono}"
-                                                     FontSize="12"
+                                                     Classes="size-12"
                                                      Foreground="{DynamicResource KpGrey3}" />
                               </ScrollViewer>
                             </Border>
@@ -214,7 +214,7 @@
                                                      Text="{Binding InstallLink}"
                                                      Margin="14,12"
                                                      FontFamily="{DynamicResource KpMono}"
-                                                     FontSize="12"
+                                                     Classes="size-12"
                                                      Foreground="{DynamicResource KpGrey3}" />
                               </ScrollViewer>
                             </Border>
@@ -294,7 +294,7 @@
                                    Text="{Binding History}"
                                    Margin="14,12"
                                    FontFamily="{DynamicResource KpMono}"
-                                   FontSize="12"
+                                   Classes="size-12"
                                    Foreground="{DynamicResource KpGrey3}" />
             </ScrollViewer>
           </Border>

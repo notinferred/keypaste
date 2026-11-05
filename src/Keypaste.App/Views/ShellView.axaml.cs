@@ -53,6 +53,8 @@ internal sealed partial class ShellView : UserControl
         base.OnAttachedToVisualTree(e);
         _root = TopLevel.GetTopLevel(this);
         _root?.AddHandler(KeyDownEvent, OnDiscardPromptEscape, RoutingStrategies.Tunnel);
+        InterfaceZoom.Changed += PlaceSidebar;
+        PlaceSidebar();
         Commands?.SidebarChanged();
     }
 
@@ -70,7 +72,9 @@ internal sealed partial class ShellView : UserControl
     private void PlaceSidebar()
     {
         var beside = _shell is { ShowsSidebar: true, SidebarOverlays: false };
-        this.FindControl<Grid>("TitleColumns")!.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : WindowChrome.LeadingInset);
+        var title = this.FindControl<Grid>("TitleColumns")!;
+        title.Margin = WindowChrome.CaptionInset(InterfaceZoom.Factor);
+        title.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : WindowChrome.LeadingInset(InterfaceZoom.Factor));
         this.FindControl<Grid>("BodyColumns")!.ColumnDefinitions[0].Width = new GridLength(beside ? WindowChrome.SidebarWidth : 0);
         Grid.SetColumnSpan(this.FindControl<Border>("Sidebar")!, _shell is { SidebarOverlays: true } ? 2 : 1);
     }
@@ -109,6 +113,7 @@ internal sealed partial class ShellView : UserControl
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        InterfaceZoom.Changed -= PlaceSidebar;
         _root?.RemoveHandler(KeyDownEvent, OnDiscardPromptEscape);
         _root = null;
         base.OnDetachedFromVisualTree(e);

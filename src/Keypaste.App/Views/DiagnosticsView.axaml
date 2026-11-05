@@ -19,7 +19,7 @@
   </UserControl.Styles>
 
   <ScrollViewer>
-    <StackPanel Margin="{DynamicResource KpScreenPadding}" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+    <StackPanel Margin="32,12,32,28" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
       <StackPanel Spacing="6">
         <TextBlock Classes="h1" Text="Diagnostics" />
         <TextBlock Classes="subtitle" Text="The vault, the folder and the version this app is using, for when something is not where you expected." />
