@@ -122,7 +122,6 @@ internal sealed partial class App : Application, IDisposable
         InterfaceZoom.Set(_preferences.Current.Window?.ZoomPercent ?? Core.Settings.WindowLayout.ActualSizePercent);
         InterfaceZoom.Changed += KeepWindowLayout;
         _window = new MainWindow();
-        _window.Closed += (_, _) => InterfaceZoom.Changed -= KeepWindowLayout;
 
         if (_preferences.Current.Window is { } left)
         {
@@ -906,6 +905,7 @@ internal sealed partial class App : Application, IDisposable
     /// </remarks>
     public void Dispose()
     {
+        InterfaceZoom.Changed -= KeepWindowLayout;
         _minimize?.Dispose();
         _minimize = null;
         _activity?.Dispose();

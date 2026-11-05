@@ -368,6 +368,10 @@ public sealed class WindowLayoutTests
         var home = Directory.CreateTempSubdirectory("keypaste-zoom-launch-").FullName;
         var settingsPath = KeypasteHome.SettingsPath(home);
 
+        // Closing into the tray, as Moving_the_window_is_kept_on_closing_it does: a real close ends the shared headless session where the tray is off, Linux's default, and every later test then waits on it forever.
+        File.WriteAllText(settingsPath, "[[settings]]\nstay_in_tray = 1\n");
+        var untouched = File.ReadAllBytes(settingsPath);
+
         try
         {
             using (var lifetime = new ClassicDesktopStyleApplicationLifetime())
@@ -379,7 +383,7 @@ public sealed class WindowLayoutTests
                 var main = lifetime.MainWindow!;
                 main.Show();
                 WindowInput.Drain();
-                Assert.False(File.Exists(settingsPath), "a window nobody touched wrote app.toml");
+                Assert.Equal(untouched, File.ReadAllBytes(settingsPath));
 
                 app.Menus!.All.Single(command => command.Header == "Zoom in").Run();
                 WindowInput.Drain();
