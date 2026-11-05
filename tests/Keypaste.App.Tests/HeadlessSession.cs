@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Headless;
+using Keypaste.App.Controls;
+using Xunit;
 
 namespace Keypaste.App.Tests;
 
@@ -51,7 +53,16 @@ internal static class HeadlessSession
             {
                 PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark);
                 Keypaste.App.Views.InterfaceZoom.Set(Core.Settings.WindowLayout.ActualSizePercent);
-                body();
+
+                try
+                {
+                    body();
+                    AssertNothingLeftShown();
+                }
+                finally
+                {
+                    RevealedValue.HideShown();
+                }
             },
             CancellationToken.None);
 
@@ -77,8 +88,22 @@ internal static class HeadlessSession
                 ArgumentNullException.ThrowIfNull(body);
                 PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark);
                 Keypaste.App.Views.InterfaceZoom.Set(Core.Settings.WindowLayout.ActualSizePercent);
-                await body().ConfigureAwait(true);
+
+                try
+                {
+                    await body().ConfigureAwait(true);
+                    AssertNothingLeftShown();
+                }
+                finally
+                {
+                    RevealedValue.HideShown();
+                }
+
                 return true;
             },
             CancellationToken.None);
+
+    // RevealedValue.Shown is static and the session one, so what a test leaves there the next test finds.
+    private static void AssertNothingLeftShown() =>
+        Assert.True(RevealedValue.Shown is null, "the test ended with a value still shown");
 }

@@ -48,6 +48,7 @@ public sealed class RevealedValueTests
 
         Assert.True(cell.IsRevealed);
         Assert.Equal(Value, cell.Rendered);
+        cell.EndReveal();
     });
 
     [Fact]
@@ -156,6 +157,7 @@ public sealed class RevealedValueTests
         cell.BeginReveal();
 
         Assert.Equal(1, source.RevealCount);
+        cell.EndReveal();
     });
 
     /// <summary>
@@ -195,6 +197,8 @@ public sealed class RevealedValueTests
         {
             Assert.DoesNotContain(Value, text ?? string.Empty, StringComparison.Ordinal);
         }
+
+        cell.EndReveal();
     });
 
     /// <summary>
@@ -213,6 +217,7 @@ public sealed class RevealedValueTests
 
         Assert.Null(AutomationProperties.GetName(cell));
         Assert.Null(AutomationProperties.GetHelpText(cell));
+        cell.EndReveal();
     });
 
     /// <summary>
@@ -231,6 +236,8 @@ public sealed class RevealedValueTests
                 cell.GetValue(property)?.ToString() ?? string.Empty,
                 StringComparison.Ordinal);
         }
+
+        cell.EndReveal();
     });
 
     [Fact]

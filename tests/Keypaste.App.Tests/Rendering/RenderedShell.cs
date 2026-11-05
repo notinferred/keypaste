@@ -86,6 +86,17 @@ internal sealed class RenderedShell : IDisposable
         Session.Locked += OnLocked;
 
         Window.Show();
+
+        // The unlock's check lands on the UI thread whenever its scan ends, and changes Settings when it does: a test starts once it has.
+        Assert.True(
+            SpinWait.SpinUntil(
+                () =>
+                {
+                    Drain();
+                    return _shell.Recommendations.Checking.IsCompleted;
+                },
+                TimeSpan.FromSeconds(10)),
+            "the unlock's recommendations check did not finish");
         Drain();
     }
 
