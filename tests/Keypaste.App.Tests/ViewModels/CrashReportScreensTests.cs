@@ -60,7 +60,7 @@ public sealed class CrashReportScreensTests : IDisposable
         settings.SendCrashReports = true;
 
         Assert.True(_crashes.IsOn);
-        Assert.Equal((true, TermsOfUse.Carried.Version), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsShown));
+        Assert.Equal((true, TermsOfUse.Carried.Version), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).CrashChoiceTerms));
     }
 
     [Fact]

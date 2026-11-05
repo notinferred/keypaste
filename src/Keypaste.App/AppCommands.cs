@@ -56,7 +56,7 @@ internal sealed class AppCommandHost
 
     internal required Func<ShellViewModel?> Shell { get; init; }
 
-    /// <summary>The unlock screen while it is the one showing; null behind the first run's terms.</summary>
+    /// <summary>The unlock screen while it is the one showing.</summary>
     internal required Func<UnlockViewModel?> Unlock { get; init; }
 
     internal Func<Window?> Window { get; init; } = static () => null;
@@ -75,7 +75,7 @@ internal sealed class AppCommandHost
 
     internal Action? OpenWindow { get; init; }
 
-    /// <summary>Brings a waiting prompt forward through its own disarming path (D-0456); false when none waits.</summary>
+    /// <summary>Brings a waiting prompt forward through its own disarming path; false when none waits.</summary>
     internal Func<bool>? ShowPrompt { get; init; }
 
     internal Action<Uri>? OpenWeb { get; init; }

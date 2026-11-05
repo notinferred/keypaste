@@ -20,7 +20,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         new("KeePass database or export") { Patterns = ["*.kdbx", "*.json", "*.1pux", "*.csv"] };
 
     private static readonly FilePickerFileType _keyfile =
-        new("KeePass keyfile") { Patterns = ["*.keyx"] };
+        new("KeePass key file") { Patterns = ["*.keyx"] };
 
     public async Task<string?> PickExistingAsync()
     {
@@ -83,7 +83,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // No type filter: KeePassXC's keyfiles are .keyx or .key, and older ones are any file at all.
         var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Choose a keyfile",
+            Title = "Choose a key file",
             AllowMultiple = false,
         }).ConfigureAwait(true);
 
@@ -95,7 +95,7 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         // No overwrite prompt, for PickNewAsync's reason: a new keyfile never replaces a file.
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save a new keyfile",
+            Title = "Save a new key file",
             SuggestedFileName = suggestedName,
             DefaultExtension = "keyx",
             ShowOverwritePrompt = false,

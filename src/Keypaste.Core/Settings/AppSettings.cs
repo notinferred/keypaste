@@ -50,7 +50,7 @@ public enum AppTheme
 /// </para>
 /// <para>
 /// <b>Fail closed, and do not clobber.</b> A file that will not parse is left exactly as it is
-/// (D-0028). Rewriting it with the defaults would destroy a hand edit at the moment its author was
+///. Rewriting it with the defaults would destroy a hand edit at the moment its author was
 /// most likely to be part-way through making it.
 /// </para>
 /// </remarks>
@@ -67,6 +67,9 @@ public sealed record AppSettings
 
     /// <summary>The section the window's layout is written under, apart from the preferences: every reader of the file holds a section to eight keys, and the preferences already take seven.</summary>
     public const string WindowSectionName = "window";
+
+    /// <summary>The section recording which terms of use the app has linked for the person, which says nothing of whether they opened them; a choice stays in the preferences, whose readers and files already hold it.</summary>
+    public const string TermsLinkedSectionName = "terms_linked";
 
     /// <summary>
     /// The three keys the section carries.
@@ -89,6 +92,8 @@ public sealed record AppSettings
     internal const string VaultKey = "vault";
     internal const string CrashReportsKey = "crash_reports";
     internal const string TermsKey = "terms";
+    internal const string CrashChoiceAskedKey = "crash_choice";
+    internal const string ShareTermsKey = "share";
     internal const string WindowBoundsKey = "bounds";
     internal const string WindowStateKey = "state";
     internal const string WindowListShareKey = "list_share";
@@ -99,6 +104,8 @@ public sealed record AppSettings
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, TermsKey];
     private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey];
+
+    private static readonly string[] _knownTermsLinkedKeys = [CrashChoiceAskedKey, ShareTermsKey];
 
     private static readonly string[] _header =
     [
@@ -146,15 +153,21 @@ public sealed record AppSettings
     /// <summary>Whether closing the window leaves the app locked in the menu bar or tray; null until chosen, when the platform decides.</summary>
     public bool? StayInTray { get; init; }
     /// <summary>The vault agents and the CLI use when no <c>--vault</c> or <c>KEYPASTE_VAULT</c> names one, or null.</summary>
-    /// <remarks>A full path and never anything read from the vault (D-0389).</remarks>
+    /// <remarks>A full path and never anything read from the vault.</remarks>
     public string? Vault { get; init; }
 
     /// <summary>Whether the person chose to send the desktop app's crash reports; null until they answer.</summary>
-    /// <remarks>Only <c>1</c> in a file that reads whole turns them on, since every failure to read gives <see cref="Default"/> (D-0594).</remarks>
+    /// <remarks>Only <c>1</c> in a file that reads whole turns them on, since every failure to read gives <see cref="Default"/>.</remarks>
     public bool? SendCrashReports { get; init; }
 
-    /// <summary>The version of the terms of use the person was shown when they chose, or null.</summary>
-    public string? TermsShown { get; init; }
+    /// <summary>The version of the terms of use in force when the person last made the crash-report choice, or null.</summary>
+    public string? CrashChoiceTerms { get; init; }
+
+    /// <summary>The version of the terms of use in force when the unlock screen asked the crash-report choice, or null until it has; it says nothing of any answer.</summary>
+    public string? CrashChoiceAsked { get; init; }
+
+    /// <summary>The version of the terms of use Share… last linked for the person, or null; it says nothing about crash reports.</summary>
+    public string? ShareTermsLinked { get; init; }
 
     /// <summary>How the person left the desktop app's window, or null until it has been kept or when the file's bounds make no window.</summary>
     public WindowLayout? Window { get; init; }
@@ -232,6 +245,11 @@ public sealed record AppSettings
             settings = settings with { Window = ReadWindow(window) };
         }
 
+        if (document.Tables.FirstOrDefault(IsTermsLinkedSection) is { } linked)
+        {
+            settings = settings with { CrashChoiceAsked = TextOf(linked, CrashChoiceAskedKey), ShareTermsLinked = TextOf(linked, ShareTermsKey) };
+        }
+
         return true;
     }
 
@@ -243,7 +261,7 @@ public sealed record AppSettings
     /// <remarks>
     /// <para>
     /// A key of <c>[[settings]]</c> or a section this version does not read is written back as it was read,
-    /// after the preferences, so a version older than the one that wrote it does not drop it (D-0520). A
+    /// after the preferences, so a version older than the one that wrote it does not drop it. A
     /// file that does not parse is replaced, as before. When what is kept cannot be written back as itself, or
     /// the file would no longer read whole, nothing is written and this returns <see langword="false"/>.
     /// </para>
@@ -288,12 +306,12 @@ public sealed record AppSettings
             writer.Number(CrashReportsKey, crashReports ? 1 : 0, "1 sends the app's crash reports to keypaste.com");
         }
 
-        if (settings.TermsShown is { } terms && writer.CanWrite(TermsKey, terms))
+        if (settings.CrashChoiceTerms is { } terms && writer.CanWrite(TermsKey, terms))
         {
-            writer.Text(TermsKey, terms, "the terms of use shown when that was chosen");
+            writer.Text(TermsKey, terms, "the terms of use in force when that was chosen");
         }
 
-        if (!TryKeep(writer, Existing(path), settings.Window))
+        if (!TryKeep(writer, Existing(path), settings))
         {
             return false;
         }
@@ -339,12 +357,15 @@ public sealed record AppSettings
 
     /// <summary>Writes back what <paramref name="existing"/> holds beyond the preferences: the other keys of its first <c>[[settings]]</c>, then every other section.</summary>
     /// <returns><see langword="false"/> when something kept cannot be written so that it reads back as itself.</returns>
-    private static bool TryKeep(TomlWriter writer, TomlDocument existing, WindowLayout? layout)
+    private static bool TryKeep(TomlWriter writer, TomlDocument existing, AppSettings settings)
     {
+        var layout = settings.Window;
         var section = existing.Tables.FirstOrDefault(table => string.Equals(table.Name, SectionName, StringComparison.Ordinal));
 
         // With no layout to write, a [[window]] whose bounds did not read stays as a hand edit left it, among the other sections.
         var window = layout is null ? null : existing.Tables.FirstOrDefault(IsWindowSection);
+        var hasTermsLinked = settings.CrashChoiceAsked is not null || settings.ShareTermsLinked is not null;
+        var termsLinked = hasTermsLinked ? existing.Tables.FirstOrDefault(IsTermsLinkedSection) : null;
 
         try
         {
@@ -363,7 +384,17 @@ public sealed record AppSettings
                 }
             }
 
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window)))
+            if (hasTermsLinked)
+            {
+                WriteTermsLinked(writer, settings);
+
+                if (termsLinked is not null && !TryWrite(writer, termsLinked.Pairs.Where(pair => !_knownTermsLinkedKeys.Contains(pair.Key, StringComparer.Ordinal))))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, termsLinked)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -402,6 +433,21 @@ public sealed record AppSettings
         }
     }
 
+    private static void WriteTermsLinked(TomlWriter writer, AppSettings settings)
+    {
+        writer.BlankLine().Table(TermsLinkedSectionName);
+
+        if (settings.CrashChoiceAsked is { } asked && writer.CanWrite(CrashChoiceAskedKey, asked))
+        {
+            writer.Text(CrashChoiceAskedKey, asked, "the terms of use in force when the unlock screen asked about crash reports");
+        }
+
+        if (settings.ShareTermsLinked is { } share && writer.CanWrite(ShareTermsKey, share))
+        {
+            writer.Text(ShareTermsKey, share, "the terms of use Share… last linked");
+        }
+    }
+
     private static bool TryWrite(TomlWriter writer, IEnumerable<TomlPair> pairs)
     {
         foreach (var pair in pairs)
@@ -431,6 +477,11 @@ public sealed record AppSettings
         new TomlWriter(TomlLimits.Paths).CanWrite(VaultKey, RecentVaults.Portable(vaultPath), _vaultComment);
 
     private static bool IsWindowSection(TomlTable table) => string.Equals(table.Name, WindowSectionName, StringComparison.Ordinal);
+
+    private static bool IsTermsLinkedSection(TomlTable table) => string.Equals(table.Name, TermsLinkedSectionName, StringComparison.Ordinal);
+
+    private static string? TextOf(TomlTable table, string key) =>
+        table.TryGet(key, out var pair) && pair.Value.Kind == TomlValueKind.Text ? pair.Value.Text : null;
 
     private static WindowLayout? ReadWindow(TomlTable table) =>
         table.TryGet(WindowBoundsKey, out var bounds) && bounds.Value.Kind == TomlValueKind.Text
@@ -482,7 +533,7 @@ public sealed record AppSettings
         SendCrashReports = table.TryGet(CrashReportsKey, out var crashReports) && crashReports.Value.Kind == TomlValueKind.Number
             ? crashReports.Value.Number == 1
             : null,
-        TermsShown = table.TryGet(TermsKey, out var terms) && terms.Value.Kind == TomlValueKind.Text ? terms.Value.Text : null,
+        CrashChoiceTerms = table.TryGet(TermsKey, out var terms) && terms.Value.Kind == TomlValueKind.Text ? terms.Value.Text : null,
     };
 
     /// <summary>

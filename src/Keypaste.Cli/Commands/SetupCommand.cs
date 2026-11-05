@@ -19,9 +19,9 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// <b>Where a client ships its own command, keypaste calls it; otherwise it changes only its own entry in the
-/// client's file</b>, keeping the first original beside it (<see cref="McpWiring"/>, D-0435). Every step is printed
+/// client's file</b>, keeping the first original beside it (<see cref="McpWiring"/>). Every step is printed
 /// before anything runs, and one answer or <c>--yes</c> covers the whole run; without a terminal and without
-/// <c>--yes</c>, nothing changes (D-0437). A removal first reads each client's own configuration, and a client holding
+/// <c>--yes</c>, nothing changes. A removal first reads each client's own configuration, and a client holding
 /// no keypaste entry is not connected and is left alone.
 /// </para>
 /// <para>
@@ -180,7 +180,7 @@ internal static class SetupCommand
             ? resolved
             : null;
 
-        // A client may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both (D-0389).
+        // A client may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both.
         if (!McpServerLocator.TryPin(machine, home, context.Environment.Get(ApproverEndpoint.EnvironmentVariable), named, ChosenVault.Read(home), out var pins))
         {
             context.Stderr.WriteLine(
@@ -464,7 +464,7 @@ internal static class SetupCommand
 
         if (registration.ClientsPath is { } ceilings)
         {
-            context.Stdout.WriteLine($"ceilings       {ceilings}");
+            context.Stdout.WriteLine($"limits         {ceilings}");
         }
 
         if (registration.ApproverName is { } approver)

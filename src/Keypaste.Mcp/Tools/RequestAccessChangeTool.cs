@@ -227,7 +227,7 @@ internal sealed class RequestAccessChangeTool(
             return new Verdict(
                 AuditDecision.Denied,
                 AuditMethod.NoApprover,
-                $"{nobody}, and this bridge's --audit-log is not its home's and it was given no --clients, so it cannot tell which ceilings the owner reads" + named,
+                $"{nobody}, and this bridge's --audit-log is not its home's and it was given no --clients, so it cannot tell which limits the owner reads" + named,
                 ToolText.AccessCeilingsUnknown);
         }
 
@@ -240,13 +240,13 @@ internal sealed class RequestAccessChangeTool(
         }
         catch (ArgumentException tooMany)
         {
-            return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's ceilings could not hold it: {tooMany.Message}" + named, ToolText.AccessFailed);
+            return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's limits could not hold it: {tooMany.Message}" + named, ToolText.AccessFailed);
         }
 
         switch (changed)
         {
             case CapsChange.Unreadable:
-                return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's ceilings are not usable: {problem}" + named, ToolText.AccessFailed);
+                return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's limits are not usable: {problem}" + named, ToolText.AccessFailed);
             case CapsChange.Declined:
                 return new Verdict(
                     AuditDecision.Denied,
@@ -254,7 +254,7 @@ internal sealed class RequestAccessChangeTool(
                     nobody + named,
                     await LockedApp.TellAsync(options, cancellationToken).ConfigureAwait(false) ? ToolText.AccessAppLocked : ToolText.AccessNoOwner);
             case CapsChange.Unwritten:
-                return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's ceilings could not be written: {problem}" + named, ToolText.AccessFailed);
+                return new Verdict(AuditDecision.Denied, AuditMethod.Failed, $"{nobody}, and this computer's limits could not be written: {problem}" + named, ToolText.AccessFailed);
         }
 
         return new Verdict(

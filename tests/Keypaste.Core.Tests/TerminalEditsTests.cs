@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The edits the CLI's saving verbs make and a vault's holder makes for them (D-0464): each is checked
+/// The edits the CLI's saving verbs make and a vault's holder makes for them: each is checked
 /// and applied by the same code, refused in the CLI's words, previewed by name only, and never saved here.
 /// </summary>
 public sealed class TerminalEditsTests : IDisposable
@@ -138,7 +138,7 @@ public sealed class TerminalEditsTests : IDisposable
         _vault.AddEntry(new VaultEntry { Title = "gone", Password = "pw" });
         _vault.SetRecyclesDeletedEntries(false);
 
-        Assert.Equal(["Removes gone for good: this vault has no recycle bin."], Check(new RemoveItem("gone")).Preview!.Changes);
+        Assert.Equal(["Removes gone for good: this vault has no Trash."], Check(new RemoveItem("gone")).Preview!.Changes);
         Assert.Equal(EditOutcome.Deleted, Apply(new RemoveItem("gone")).Done!.Outcome);
     }
 
@@ -342,7 +342,7 @@ public sealed class TerminalEditsTests : IDisposable
 
     /// <summary>
     /// A tag edit's preview, which the holder's terminal and window show, names each variable joining whose value holds a
-    /// KeePass placeholder by keyword (D-0465), and never the value or what fills in.
+    /// KeePass placeholder by keyword, and never the value or what fills in.
     /// </summary>
     [Fact]
     public void Env_tag_names_each_joining_variable_that_holds_a_placeholder()

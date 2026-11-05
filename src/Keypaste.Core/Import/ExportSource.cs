@@ -118,8 +118,8 @@ public sealed class ExportSource : IDisposable
     /// <returns>What was copied.</returns>
     /// <remarks>
     /// Every landing item is added whole, with its fields, tags, attachments, earlier versions and times, in one change and
-    /// with no history item of its own, under a later second than every version it carries (D-0387). The edit names each
-    /// new item (D-0318), and a taken-back one names everything.
+    /// with no history item of its own, under a later second than every version it carries. The edit names each
+    /// new item, and a taken-back one names everything.
     /// </remarks>
     /// <exception cref="VaultException">The plan is refused or no longer matches the vault, or adding failed. Nothing was imported.</exception>
     /// <exception cref="Exception">Whatever <paramref name="save"/> threw, once everything was taken back.</exception>
@@ -295,7 +295,7 @@ public sealed class ExportSource : IDisposable
         {
             var passkey = item.Passkeys[0];
 
-            // KeePassXC's own names, read by its browser integration and its passkey export, all protected (D-0369).
+            // KeePassXC's own names, read by its browser integration and its passkey export, all protected.
             fields.Add(new FieldWrite("KPEX_PASSKEY_CREDENTIAL_ID", passkey.CredentialId, Protect: true));
             fields.Add(new FieldWrite("KPEX_PASSKEY_PRIVATE_KEY_PEM", passkey.PrivateKeyPem, Protect: true));
             fields.Add(new FieldWrite("KPEX_PASSKEY_RELYING_PARTY", passkey.RelyingParty, Protect: true));
@@ -331,7 +331,7 @@ public sealed class ExportSource : IDisposable
             if (string.Equals(name, KeePassInterop.RecycleBinName, StringComparison.Ordinal))
             {
                 name = $"{KeePassInterop.RecycleBinName} (imported)";
-                notes.Add($"{KeePassInterop.RecycleBinName} is the recycle bin's name");
+                notes.Add($"{KeePassInterop.RecycleBinName} is the Trash's name in a KeePass file");
             }
 
             path = Joined(path, name);

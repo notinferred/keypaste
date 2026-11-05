@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.UnlockView"
              x:DataType="vm:UnlockViewModel"
              Background="{DynamicResource KpBgApp}">
@@ -147,6 +148,13 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
 
+    <Style Selector="ListBox.recent">
+      <Setter Property="MaxHeight" Value="180" />
+    </Style>
+    <!-- Three rows, so that a long list leaves the crash-report answers below it in view at the default window. -->
+    <Style Selector="ListBox.recent.beside-question">
+      <Setter Property="MaxHeight" Value="102" />
+    </Style>
     <Style Selector="ListBox.recent > ListBoxItem">
       <Setter Property="MinHeight" Value="34" />
       <Setter Property="Padding" Value="10,0" />
@@ -192,7 +200,7 @@
           </StackPanel>
 
           <StackPanel Spacing="18" IsVisible="{Binding HasSelection}">
-            <!-- A vault Windows Hello can open again makes it the screen's one amber action; the password stays below it (D-0550). -->
+            <!-- A vault Windows Hello can open again makes it the screen's one amber action; the password stays below it. -->
             <Button x:Name="QuickUnlock"
                     Classes="wide"
                     Classes.primary="{Binding QuickUnlockIsPrimary}"
@@ -315,7 +323,7 @@
                        Classes="recent"
                        ItemsSource="{Binding KeePassXc}"
                        SelectedItem="{Binding SelectedKeePassXc}"
-                       MaxHeight="180">
+                       Classes.beside-question="{Binding HasCrashChoice}">
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:KeePassXcDatabaseItem">
                     <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Path}">
@@ -336,16 +344,16 @@
                 <TextBlock Text="Open another file…" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Classes="primary wide" IsVisible="{Binding OffersOpenFirst}" Command="{Binding BrowseCommand}" AutomationProperties.Name="Open a vault…">
+            <Button Classes="wide" Classes.primary="{Binding OffersCreateFirst}" Command="{Binding StartCreateCommand}" AutomationProperties.Name="Create a vault…">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="plus" Size="15" />
+                <TextBlock Text="Create a vault…" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button Classes="wide" IsVisible="{Binding OffersCreateFirst}" Command="{Binding BrowseCommand}" AutomationProperties.Name="Open a vault…">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="folder-open" Size="15" />
                 <TextBlock Text="Open a vault…" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Classes="wide" Command="{Binding StartCreateCommand}" AutomationProperties.Name="Create a new vault…">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <ctl:KpIcon Icon="plus" Size="15" />
-                <TextBlock Text="Create a new vault…" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
           </StackPanel>
@@ -652,6 +660,23 @@
                 Content="Back"
                 Command="{Binding CloseRestoreCommand}" />
 
+        <!-- Below the password and the buttons, so it never stands over them or takes the keyboard, and above the recent vaults, so however many there are its answers stay in view. -->
+        <Border Name="CrashChoiceCard" Classes="card filled" Padding="16" Margin="0,6,0,0">
+          <Border.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="IsOpening" />
+              <Binding Path="HasCrashChoice" />
+            </MultiBinding>
+          </Border.IsVisible>
+          <StackPanel Spacing="6">
+            <TextBlock Classes="section"
+                       AutomationProperties.HeadingLevel="2"
+                       Text="Crash reports"
+                       IsVisible="{Binding CrashChoice.IsAsking, FallbackValue=False}" />
+            <views:CrashChoiceView DataContext="{Binding CrashChoice}" />
+          </StackPanel>
+        </Border>
+
         <StackPanel Spacing="6" Margin="0,6,0,0">
           <StackPanel.IsVisible>
             <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -664,8 +689,7 @@
                    AutomationProperties.Name="Recent vaults"
                    Classes="recent"
                    ItemsSource="{Binding Recent}"
-                   SelectedItem="{Binding SelectedRecent}"
-                   MaxHeight="180">
+                   SelectedItem="{Binding SelectedRecent}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:RecentVaultItem">
                 <Grid ColumnDefinitions="Auto,*,Auto" ToolTip.Tip="{Binding Path}">

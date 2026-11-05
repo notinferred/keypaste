@@ -58,7 +58,7 @@ $ keypaste clients
                  billing:dev  automatic, at most 20 an hour
   *   (default)               allow-for-a-while              yes     off  tag:env:*
 
-  this computer's ceilings, in clients.toml: nothing above gives more than these
+  this computer's limits, in clients.toml: nothing above gives more than these
   AGENT  PROJECT  MODE  VALUES  RUN  SEES
   codex           ask   no
 ```

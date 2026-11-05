@@ -17,7 +17,7 @@ namespace Keypaste.Cli;
 /// </remarks>
 internal static class VaultSession
 {
-    /// <summary>What a refused open adds when the missing factor may be a hardware key, which only the app asks (D-0366).</summary>
+    /// <summary>What a refused open adds when the missing factor may be a hardware key, which only the app asks.</summary>
     internal const string HardwareKeyRefusal =
         "keypaste: a vault that also needs a YubiKey opens only in the desktop app; the CLI cannot ask a hardware key. "
         + "While the app holds the vault, `keypaste run --session` and edits such as `keypaste set` reach it there.";
@@ -69,7 +69,7 @@ internal static class VaultSession
         {
             context.Stderr.WriteLine(keyfile is null
                 ? "keypaste: wrong master password"
-                : "keypaste: wrong master password or keyfile");
+                : "keypaste: wrong master password or key file");
             if (namesHardwareKeys || LastOpenedWithHardwareKey(path, context))
             {
                 context.Stderr.WriteLine(HardwareKeyRefusal);
@@ -104,9 +104,9 @@ internal static class VaultSession
     /// </summary>
     /// <remarks>
     /// The claim is taken before the password is read, as <c>keypaste approve</c> takes it, so a
-    /// command never saves under a running owner and leaves that owner's copy changed on disk (D-0317).
+    /// command never saves under a running owner and leaves that owner's copy changed on disk.
     /// Every verb that saves opens the vault here; <see cref="Open"/> is for verbs that never save
-    /// (D-0382), which <c>SavingVerbSourceRulesTests</c> holds.
+    ///, which <c>SavingVerbSourceRulesTests</c> holds.
     /// </remarks>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
     /// <param name="line">The parsed command line, for <c>--keyfile</c>.</param>
@@ -119,7 +119,7 @@ internal static class VaultSession
 
     /// <summary>
     /// Takes the vault's claim, then opens the vault and runs <paramref name="body"/>, for a verb that edits
-    /// items; while the app or <c>keypaste approve</c> holds the vault, sends the edit to it instead (D-0464).
+    /// items; while the app or <c>keypaste approve</c> holds the vault, sends the edit to it instead.
     /// </summary>
     /// <remarks>
     /// The holder asks the person and saves the edit under its own claim, so no master password is read
@@ -155,7 +155,7 @@ internal static class VaultSession
     /// <paramref name="body"/> with both, for <c>keypaste approve</c>, which serves the vault and saves
     /// the agent settings a person confirms in it.
     /// </summary>
-    /// <remarks>A vault something holds is refused with the claim's own sentence, before the password is read (D-0309).</remarks>
+    /// <remarks>A vault something holds is refused with the claim's own sentence, before the password is read.</remarks>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
     /// <param name="line">The parsed command line, for <c>--keyfile</c>.</param>
     /// <param name="context">Where prompts and errors go.</param>
@@ -254,7 +254,7 @@ internal static class VaultSession
         if (inspection.IsFragile)
         {
             context.Stderr.WriteLine(
-                $"keypaste: '{keyfile}' is not a keyfile keypaste or KeePassXC made, so the vault is "
+                $"keypaste: '{keyfile}' is not a key file keypaste or KeePassXC made, so the vault is "
                 + "keyed to its exact contents. Changing or replacing that file locks the vault for good.");
         }
 
@@ -263,12 +263,12 @@ internal static class VaultSession
 
     internal static string Refusal(KeyfileOutcome outcome, string path) => outcome switch
     {
-        KeyfileOutcome.Missing => $"no keyfile at '{path}'",
-        KeyfileOutcome.Unreadable => $"the keyfile '{path}' could not be read",
-        KeyfileOutcome.Empty => $"the keyfile '{path}' is empty",
-        KeyfileOutcome.IsAVault => $"'{path}' is a KeePass vault, not a keyfile",
+        KeyfileOutcome.Missing => $"no key file at '{path}'",
+        KeyfileOutcome.Unreadable => $"the key file '{path}' could not be read",
+        KeyfileOutcome.Empty => $"the key file '{path}' is empty",
+        KeyfileOutcome.IsAVault => $"'{path}' is a KeePass vault, not a key file",
         KeyfileOutcome.XmlUnreadable => UnreadableKeyfile.Explain(path),
-        _ => $"the keyfile '{path}' cannot be used",
+        _ => $"the key file '{path}' cannot be used",
     };
 
     /// <summary>Whether <c>recent.toml</c> remembers the app last opening the vault at <paramref name="path"/> with a hardware key.</summary>

@@ -45,7 +45,7 @@ public sealed class FirstRunTests : IDisposable
 
         Assert.False(model.HasSelection);
         Assert.True(model.OffersKeePassXc);
-        Assert.False(model.OffersOpenFirst);
+        Assert.False(model.OffersCreateFirst);
         Assert.Equal([home, work], model.KeePassXc.Select(item => item.Path));
         Assert.Equal(["home.kdbx", "work.kdbx"], model.KeePassXc.Select(item => item.ToString()));
 
@@ -62,13 +62,15 @@ public sealed class FirstRunTests : IDisposable
     }
 
     [Fact]
-    public void Without_KeePassXCs_settings_the_welcome_opens_a_file_or_creates_a_vault()
+    public void Without_KeePassXCs_settings_the_welcome_starts_with_creating_a_vault_and_says_what_one_is()
     {
         using var model = NewModel(Ini);
 
         Assert.False(model.OffersKeePassXc);
-        Assert.True(model.OffersOpenFirst);
+        Assert.True(model.OffersCreateFirst);
         Assert.Empty(model.KeePassXc);
+        Assert.Equal("Start with a vault", model.Heading);
+        Assert.Contains("master password", model.WelcomeSubtitle, StringComparison.Ordinal);
     }
 
     [Fact]

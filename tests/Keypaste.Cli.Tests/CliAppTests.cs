@@ -89,7 +89,7 @@ public sealed class CliAppTests
 
     /// <summary>
     /// A removed spelling is refused on one line naming the one that replaced it, and runs nothing, its help
-    /// included: no password is asked for, nothing is printed, copied, started or written (D-0470).
+    /// included: no password is asked for, nothing is printed, copied, started or written.
     /// </summary>
     [Theory]
     [InlineData("keypaste: keypaste agent is now keypaste approve", "agent")]
@@ -121,7 +121,7 @@ public sealed class CliAppTests
     }
 
     /// <summary>
-    /// What the parser would otherwise accept is a usage error that runs nothing (D-0678): an undeclared option an operand
+    /// What the parser would otherwise accept is a usage error that runs nothing: an undeclared option an operand
     /// could take, a flag given a value or twice, and a first argument in brackets, which it reads as a directive.
     /// </summary>
     [Theory]
@@ -145,7 +145,7 @@ public sealed class CliAppTests
 
     /// <summary>
     /// An argument starting with <c>@</c> names no response file and one like <c>-pdev</c> is no bundle, so neither adds
-    /// an option the person did not type, such as a <c>--reveal</c> (D-0678).
+    /// an option the person did not type, such as a <c>--reveal</c>.
     /// </summary>
     [Fact]
     public void AnAtSignOrABundle_IsAnArgumentAsWritten()
@@ -226,11 +226,11 @@ public sealed class CliAppTests
             "  search      find items by title, group, username or URL",
             "  rm          remove an item",
             "  generate    print a passphrase (--words N); it is not stored",
-            "  access      change the master password or keyfile",
+            "  access      change the master password or key file",
             "",
             "FLAGS",
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",
-            $"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
+            $"  --keyfile <path>  the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
             "  --json            machine-readable output from ls, search, show, field ls,",
             "                    attachment ls, env ls, log, grants, doctor, token ls,",
             "                    share ls, clients",

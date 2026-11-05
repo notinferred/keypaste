@@ -42,7 +42,7 @@ namespace Keypaste.Core.Approval;
 /// <para>
 /// A TOTP code is offered no timed grant either: a grant holds the value it released, and a code is
 /// stale once its period ends. It is released once or under an Automatic mode, and the lifetime the
-/// reply carries is the code's time left in its period (D-0480).
+/// reply carries is the code's time left in its period.
 /// </para>
 /// </remarks>
 public sealed class ApproverHandler
@@ -114,13 +114,13 @@ public sealed class ApproverHandler
     /// <summary>Whether a release of this entry is asked about live every time, by the rule this handler applies.</summary>
     /// <param name="name">The entry.</param>
     /// <returns><see langword="true"/> when no grant, mode or token may release it unprompted.</returns>
-    /// <remarks>For the release paths beside this one, so a run naming the entry is held to the same rule (D-0371).</remarks>
+    /// <remarks>For the release paths beside this one, so a run naming the entry is held to the same rule.</remarks>
     public bool RequiresLiveApproval(EntryName name) => _requiresLiveApproval(name);
 
     /// <summary>An entry's own tags, as the exposure and the agent's settings read them.</summary>
     /// <param name="name">The entry.</param>
     /// <returns>Its tags, or none when they cannot be read.</returns>
-    /// <remarks>For the release paths beside this one, so a run is held to the agent's reach as a credential request is (D-0422).</remarks>
+    /// <remarks>For the release paths beside this one, so a run is held to the agent's reach as a credential request is.</remarks>
     public IReadOnlyList<string> Tags(EntryName name) => _source.Tags(name);
 
     /// <summary>What applies to an agent's requests now: its settings in the vault beneath this computer's ceilings.</summary>
@@ -709,9 +709,9 @@ public sealed class ApproverHandler
         var unapplied = (written.Understood, lifted) switch
         {
             (true, null) => null,
-            (true, _) => $"the vault holds it, but this computer's ceilings could not be lifted to match: {lifted}",
+            (true, _) => $"the vault holds it, but this computer's limits could not be lifted to match: {lifted}",
             (false, null) => $"the vault holds it, but {AccessChangePrompt.BeneathDefaultsText}",
-            (false, _) => $"the vault holds it, but {AccessChangePrompt.BeneathDefaultsText}, and this computer's ceilings could not be lifted to match: {lifted}",
+            (false, _) => $"the vault holds it, but {AccessChangePrompt.BeneathDefaultsText}, and this computer's limits could not be lifted to match: {lifted}",
         };
 
         var confirmed = edit.UsesVault
@@ -763,12 +763,12 @@ public sealed class ApproverHandler
         switch (_settings.ProbeCaps(out var problem))
         {
             case CapsFile.Usable:
-                return Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, "this computer's ceilings can be read, so there was nothing to reset");
+                return Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, "this computer's limits can be read, so there was nothing to reset");
             case CapsFile.Unreadable:
                 return Changed(
                     AuditDecision.Denied,
                     AuditMethod.Failed,
-                    $"keypaste could not read this computer's ceilings, so it left the file as it is: {problem}; fix what keeps it from being read, or move it away yourself");
+                    $"keypaste could not read this computer's limits, so it left the file as it is: {problem}; fix what keeps it from being read, or move it away yourself");
         }
 
         var prompt = AccessChangePrompt.ForReset(_settings.List(), _clock.LocalTimeZone);
@@ -789,12 +789,12 @@ public sealed class ApproverHandler
             CapsChange.Written => Changed(
                 AuditDecision.Granted,
                 AuditMethod.Prompt,
-                $"a person confirmed it: every ceiling this computer kept on agents was cleared, and the file keypaste could not read was kept beside it as {Path.GetFileName(kept)}; {string.Join("; ", prompt.Gains)}") with
+                $"a person confirmed it: every limit this computer kept on agents was cleared, and the file keypaste could not read was kept beside it as {Path.GetFileName(kept)}; {string.Join("; ", prompt.Gains)}") with
             {
                 Kept = kept,
             },
-            CapsChange.Unchanged => Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, "this computer's ceilings could be read again, so nothing was reset"),
-            _ => Changed(AuditDecision.Denied, AuditMethod.Failed, $"a person confirmed it, and this computer's ceilings were not reset: {problem}"),
+            CapsChange.Unchanged => Changed(AuditDecision.Denied, AuditMethod.InvalidRequest, "this computer's limits could be read again, so nothing was reset"),
+            _ => Changed(AuditDecision.Denied, AuditMethod.Failed, $"a person confirmed it, and this computer's limits were not reset: {problem}"),
         };
     }
 
@@ -874,11 +874,11 @@ public sealed class ApproverHandler
                 },
                 out var error)
                 ? null
-                : $"this computer's ceilings could not be written: {error}";
+                : $"this computer's limits could not be written: {error}";
         }
         catch (ArgumentException tooMany)
         {
-            return $"this computer's ceilings could not hold it: {tooMany.Message}";
+            return $"this computer's limits could not hold it: {tooMany.Message}";
         }
     }
 
@@ -938,7 +938,7 @@ public sealed class ApproverHandler
     /// <remarks>No cooldown starts: a revoked grant is a decision withdrawn, not a request refused.</remarks>
     public void Revoke(GrantKey key) => _grants.Revoke(key);
 
-    /// <summary>Ends every grant given to one agent, and keeps none a person is being asked about now (D-0516).</summary>
+    /// <summary>Ends every grant given to one agent, and keeps none a person is being asked about now.</summary>
     /// <param name="agent">Whether a grant, as <see cref="Activity"/> lists it, was given to the agent.</param>
     /// <returns>How many grants ended.</returns>
     public int RevokeAgent(Func<GrantInForce, bool> agent) => _grants.RevokeAgent(agent);
@@ -1027,7 +1027,7 @@ public sealed class ApproverHandler
     /// <remarks>
     /// A file somebody else wrote zeroes every grant: each holds a value from the copy that is now
     /// stale, which is not served again; the owner serves its merge with that file once saved, or what
-    /// a person reloads (D-0542, D-0640).
+    /// a person reloads.
     /// </remarks>
     private string Stale(CredentialFailure failure, string what)
     {
@@ -1045,7 +1045,7 @@ public sealed class ApproverHandler
 
     /// <summary>Refuses, before anything is read, a request withdrawn while it was being decided.</summary>
     /// <remarks>
-    /// A lock withdraws requests through this token (D-0313), so after one nothing more is decrypted
+    /// A lock withdraws requests through this token, so after one nothing more is decrypted
     /// for them. The owner's commit check, not this one, is what guarantees nothing is released.
     /// </remarks>
     private static CredentialReply? Withdrawn(string display, CancellationToken cancellationToken) =>

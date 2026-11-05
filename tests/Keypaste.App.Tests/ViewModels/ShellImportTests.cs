@@ -164,7 +164,7 @@ public sealed class ShellImportTests : IDisposable
         await import.ChooseKeyfileCommand.PressAsync();
         Assert.Equal(1, _picker.KeyfileCalls);
         Assert.False(import.HasKeyfile);
-        Assert.Equal("That's a KeePass vault, not a keyfile.", import.Message);
+        Assert.Equal("That's a KeePass vault, not a key file.", import.Message);
 
         _picker.KeyfilePath = _keyfile;
         await import.ChooseKeyfileCommand.PressAsync();
@@ -173,7 +173,7 @@ public sealed class ShellImportTests : IDisposable
         Assert.False(import.HasMessage);
     }
 
-    /// <summary>The dialog the shell opens pastes through the shell's clipboard, the source Settings' master-password fields read (D-0495).</summary>
+    /// <summary>The dialog the shell opens pastes through the shell's clipboard, the source Settings' master-password fields read.</summary>
     [Fact]
     public async Task The_password_arrives_through_the_field_sink_and_pastes_from_the_shells_clipboard()
     {
@@ -195,7 +195,7 @@ public sealed class ShellImportTests : IDisposable
         Assert.Equal(0, shell.Import.PasswordLength);
     }
 
-    /// <summary>One entry point takes either kind of file: an export opens the export dialog, and a file that is neither names what the import reads (D-0590).</summary>
+    /// <summary>One entry point takes either kind of file: an export opens the export dialog, and a file that is neither names what the import reads.</summary>
     [Fact]
     public async Task An_export_opens_the_export_dialog_and_a_file_that_is_neither_names_what_the_import_reads()
     {

@@ -143,7 +143,7 @@
       <Grid RowDefinitions="Auto,*">
         <Border Grid.Row="0" Classes="table-head">
           <Grid ColumnDefinitions="1.3*,1.3*,160" ColumnSpacing="16">
-            <TextBlock Grid.Column="0" Classes="th" Text="NAME" />
+            <TextBlock Grid.Column="0" Classes="th" Text="TITLE" />
             <TextBlock Grid.Column="1" Classes="th" Text="DELETED FROM" />
             <TextBlock Grid.Column="2" Classes="th" Text="DELETED" />
           </Grid>
@@ -175,7 +175,7 @@
                   </StackPanel>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                     <TextBlock Classes="mono muted size-12" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="secondary size-12" Text="comes back at the root"
+                    <TextBlock Classes="secondary size-12" Text="comes back at the top level"
                                IsVisible="{Binding !CameFromALiveGroup}" />
                   </StackPanel>
                   <TextBlock Grid.Column="2" Classes="mono muted size-12" Text="{Binding When}" VerticalAlignment="Center" />

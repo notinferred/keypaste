@@ -28,7 +28,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// There is no automation test beside this one, the way <c>HistoryRevealAutomationTests</c> sits
 /// beside the history pane. Nothing on this screen draws a secret: a
 /// <see cref="Keypaste.Core.RecycledEntry"/> carries no field value, so there is no masked control
-/// to hold, no reveal to end and no drawn value to prove (D-0099, D-0232).
+/// to hold, no reveal to end and no drawn value to prove.
 /// </para>
 /// </remarks>
 public sealed class TrashTests : IDisposable
@@ -141,7 +141,7 @@ public sealed class TrashTests : IDisposable
 
     /// <summary>
     /// A group deleted from Items lists each of its items here with the path it had, and restoring one
-    /// puts it back there with its history, making the group again (D-0483).
+    /// puts it back there with its history, making the group again.
     /// </summary>
     [Fact]
     public void A_deleted_groups_items_are_listed_and_one_restores_to_its_path()
@@ -175,7 +175,7 @@ public sealed class TrashTests : IDisposable
 
     /// <summary>
     /// Two home entries of one title from two projects land in one bin. The row a person selected is
-    /// the row that comes back, because the address is an identity and not a title (D-0250).
+    /// the row that comes back, because the address is an identity and not a title.
     /// </summary>
     [Fact]
     public void Duplicate_names_restore_the_selected_identity()
@@ -335,7 +335,7 @@ public sealed class TrashTests : IDisposable
 
     /// <summary>
     /// The refusal D-0249 requires, writing nothing, and the offer of the first free
-    /// <c>(restored)</c> title in its place (D-0512), which also writes nothing until it is taken.
+    /// <c>(restored)</c> title in its place, which also writes nothing until it is taken.
     /// </summary>
     [Fact]
     public void A_restore_is_refused_when_the_name_has_been_taken_again_and_offers_another_title()
@@ -666,7 +666,7 @@ public sealed class TrashTests : IDisposable
         Delete(context, "github");
 
         Assert.Equal(
-            "Deleted github. This vault has no recycle bin, so nothing can put it back.",
+            "Deleted github. This vault has no Trash, so nothing can put it back.",
             context.Entries.Notice,
             StringComparer.Ordinal);
 

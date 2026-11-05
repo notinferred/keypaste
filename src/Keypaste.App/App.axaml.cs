@@ -52,7 +52,7 @@ internal sealed partial class App : Application, IDisposable
     private IActivatableLifetime? _activatable;
     private IDisposable? _reopen;
     private LockedNotice? _lockedNotice;
-    private FirstRunViewModel? _firstRun;
+    private bool _crashChoicePassed;
     private (string Path, string? Keyfile, int? HardwareKeySlot)? _openNext;
     private int _unlockScreens;
     private bool _shuttingDown;
@@ -80,7 +80,7 @@ internal sealed partial class App : Application, IDisposable
         FollowPlatformTheme();
 
         // Only the app's start composes crash reports, and before anything can throw on the UI thread its exception is
-        // made to lock, clear and quit (D-0595); a test that launches the app in the shared test process sets no hook.
+        // made to lock, clear and quit; a test that launches the app in the shared test process sets no hook.
         if (Crashes is not null)
         {
             Dispatcher.UIThread.UnhandledException += OnUnhandledException;
@@ -153,7 +153,7 @@ internal sealed partial class App : Application, IDisposable
             _window.UseMenuButton(AppMenu.Flyout(_commands));
         }
 
-        // While locked, the app that holds its home tells the person once that an agent asked for a vault it would open (D-0466).
+        // While locked, the app that holds its home tells the person once that an agent asked for a vault it would open.
         _lockedNotice = Claim is null ? null : new LockedNotice(
             _session,
             OpenWindow,
@@ -162,6 +162,15 @@ internal sealed partial class App : Application, IDisposable
             Unexpected);
 
         ShowUnlock(home);
+
+        // Asked once, from when a window first shows the question: a start at login that opens none has not asked it.
+        _window.Opened += (_, _) =>
+        {
+            if (_unlock?.HasCrashChoice == true)
+            {
+                Crashes?.RememberAsked();
+            }
+        };
 
         _tray = new AppTray(OpenWindow, () => _ = _session?.LockAsync(VaultLockReason.Manual), () => _session?.IsUnlocked == true, Quit);
         _tray.Show(_preferences.StaysInTray);
@@ -178,7 +187,7 @@ internal sealed partial class App : Application, IDisposable
             _activatable.Activated += OnActivated;
         }
 
-        // A second start of this user's app in this home asks it to show the window instead (D-0397).
+        // A second start of this user's app in this home asks it to show the window instead.
         _reopen = Claim?.Listen(
             () => Dispatcher.UIThread.InvokeAsync(OpenWindow).GetTask(),
             reason => Console.Error.WriteLine($"keypaste: another start of keypaste cannot reach this one: {reason}"));
@@ -230,7 +239,7 @@ internal sealed partial class App : Application, IDisposable
     internal Action<bool>? DockIcon { get; init; }
 
     /// <summary>
-    /// The crash reports of the process the app's start runs, which also shows the first run's terms and choice; none for an
+    /// The crash reports of the process the app's start runs, whose choice the unlock screen also asks; none for an
     /// app a test or the previewer composes, which then shows neither and leaves an exception on the UI thread to the runtime.
     /// </summary>
     internal CrashReporting? Crashes { get; init; }
@@ -289,7 +298,7 @@ internal sealed partial class App : Application, IDisposable
         }
     }
 
-    /// <summary>Closes the window into the menu bar or tray; closing still ends the session, so the process stays locked and holds no secret (D-0385).</summary>
+    /// <summary>Closes the window into the menu bar or tray; closing still ends the session, so the process stays locked and holds no secret.</summary>
     internal void CloseToTray()
     {
         if (_session is null || _window is null)
@@ -364,7 +373,7 @@ internal sealed partial class App : Application, IDisposable
         {
             Session = session,
             Shell = () => _shell,
-            Unlock = () => _firstRun is null ? _unlock : null,
+            Unlock = () => _unlock,
             Window = () => _window,
             Focused = mac ? null : () => window.EditTarget,
             Home = home,
@@ -505,7 +514,7 @@ internal sealed partial class App : Application, IDisposable
     /// <c>internal</c> for the same reason <see cref="Compose"/> is: the defect F.2b repairs was
     /// that composition never introduced the saved setting to any behaviour at all, so a test has
     /// to run this method rather than a hand-built equivalent, which would have passed against the
-    /// broken app throughout (D-0095). The setting is passed as a function rather than a value, so
+    /// broken app throughout. The setting is passed as a function rather than a value, so
     /// a change in Settings is in force at the next minimize rather than at the next launch.
     /// </remarks>
     internal static MinimizeLock Watch(
@@ -588,7 +597,7 @@ internal sealed partial class App : Application, IDisposable
         {
             Dispose();
 
-            // A second request while the quit below is stopping the endpoint ends the process only once it has stopped (D-0392).
+            // A second request while the quit below is stopping the endpoint ends the process only once it has stopped.
             _ending?.Wait();
             return;
         }
@@ -608,7 +617,7 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>
     /// Hides the window, so nothing reaches the screens it disposes, drops what <see cref="Dispose"/> drops, then waits
-    /// for the authority to end on a thread of its own, so the app keeps responding while the endpoint stops (D-0392).
+    /// for the authority to end on a thread of its own, so the app keeps responding while the endpoint stops.
     /// </summary>
     private async Task QuitAsync()
     {
@@ -652,7 +661,7 @@ internal sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
-    /// What an exception nothing on the UI thread caught does (D-0595): its report is kept while reports are on, then the
+    /// What an exception nothing on the UI thread caught does: its report is kept while reports are on, then the
     /// vault locks, the clipboard is given back and the app quits with <see cref="CrashExitCode"/>, so neither a copied
     /// secret nor the exception's message, which the runtime would print, outlives it.
     /// </summary>
@@ -721,11 +730,11 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>What the unlock screen says when an access change could not carry on with the vault open.</summary>
     internal const string AccessChangedMessage =
-        "The vault's password or keyfile was changed, and it locked rather than open again. Unlock it with the new ones.";
+        "The vault's password or key file was changed, and it locked rather than open again. Unlock it with the new ones.";
 
     /// <summary>What the unlock screen says when a reload found that another program changed what unlocks the vault.</summary>
     internal const string ReloadRefusedMessage =
-        "Another program changed this vault's password or keyfile, so it locked instead of reloading. Unlock it with the new ones.";
+        "Another program changed this vault's password or key file, so it locked instead of reloading. Unlock it with the new ones.";
 
     private void ShowUnlock(string? home, string? message = null, VaultLockReason? reason = null)
     {
@@ -751,7 +760,10 @@ internal sealed partial class App : Application, IDisposable
             message,
             next is null ? reason : null,
             KeePassXcConfigs,
-            Clipboards(_window).TryPasteIntoAsync);
+            Clipboards(_window).TryPasteIntoAsync)
+        {
+            CrashChoice = AskCrashReports(),
+        };
 
         if (next is { } file)
         {
@@ -760,28 +772,22 @@ internal sealed partial class App : Application, IDisposable
 
         _lockedNotice?.Watch(_unlock);
 
-        // The first run's terms and choice come before the welcome, with the unlock screen built behind them (D-0594).
-        if (_firstRun is null && Crashes is { AwaitsAnswer: true } crashes)
+        ShowUnlockScreen();
+
+        var then = _afterLock;
+        _afterLock = null;
+
+        if (then is not null && _unlock is { } unlock)
         {
-            _firstRun = new FirstRunViewModel(TermsOfUse.Carried, crashes.Choose, ShowUnlockScreen);
-            crashes.Screen = "first-run";
-            _window.FindControl<ContentControl>("Root")!.Content = new FirstRunView { DataContext = _firstRun };
-            return;
-        }
-
-        if (_firstRun is null)
-        {
-            ShowUnlockScreen();
-
-            var then = _afterLock;
-            _afterLock = null;
-
-            if (then is not null && _unlock is { } unlock)
-            {
-                then(unlock);
-            }
+            then(unlock);
         }
     }
+
+    // An answer never stands between someone and their vault, and having unlocked past it once, the next lock this run does not ask again.
+    private CrashChoiceViewModel? AskCrashReports() =>
+        Crashes is { AsksThisRun: true } crashes && !_crashChoicePassed
+            ? new CrashChoiceViewModel(TermsOfUse.Carried, crashes.Choose)
+            : null;
 
     private void ShowUnlockScreen()
     {
@@ -789,8 +795,6 @@ internal sealed partial class App : Application, IDisposable
         {
             return;
         }
-
-        _firstRun = null;
 
         if (Crashes is { } crashes)
         {
@@ -813,6 +817,8 @@ internal sealed partial class App : Application, IDisposable
             _session.Lock(VaultLockReason.Closed);
             return;
         }
+
+        _crashChoicePassed = true;
 
         _shell?.Dispose();
         _shell = new ShellViewModel(

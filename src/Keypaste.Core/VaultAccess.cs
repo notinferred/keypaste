@@ -109,7 +109,7 @@ public static class UnreadableKeyfile
 {
     /// <summary>Why <paramref name="keyfilePath"/> was refused.</summary>
     public static string Explain(string keyfilePath) =>
-        $"'{keyfilePath}' is a KeePass XML keyfile, and this build of keypaste cannot read one: it " +
+        $"'{keyfilePath}' is a KeePass XML key file, and this build of keypaste cannot read one: it " +
         "would use the wrong key. Nothing was opened or written. The password is not the problem.";
 }
 

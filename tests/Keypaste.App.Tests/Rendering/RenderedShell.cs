@@ -92,6 +92,8 @@ internal sealed class RenderedShell : IDisposable
     /// <summary>Every secret in the vault, for a frame that should hold none of them.</summary>
     internal static IReadOnlyList<string> Secrets { get; } = [Current, Superseded, EnvValue, FieldValue, PlainFieldValue];
 
+    internal string Home => _directory;
+
     internal AppVaultSession Session { get; }
 
     internal FakeClipboard Clipboard { get; } = new();
@@ -168,6 +170,7 @@ internal sealed class RenderedShell : IDisposable
 
             case "SharePassphrase":
                 Shell.ShareCommand.Press("github");
+                Shell.Share!.ContinueCommand.Press();
                 Drain();
                 Shell.Share!.RequirePassphrase = true;
                 break;

@@ -41,13 +41,13 @@ internal static class ImportCommand
     internal static Option<bool> InPlace { get; } = Syntax.Flag("--in-place", "keep editing the KeePass file where it is instead of copying it");
 
     internal static Option<string> SourceKeyfile { get; } = Syntax.Value(
-        "--source-keyfile", "path|none", "the KeePass file's keyfile; a <name>.keyx or <name>.key beside it is used unless this says none");
+        "--source-keyfile", "path|none", "the KeePass file's key file; a <name>.keyx or <name>.key beside it is used unless this says none");
 
     internal static CliVerb Command { get; } = new(
         "import",
         "copy in an export or a KeePass database, or edit it in place\n\n"
             + "copies every item of another KeePass file into your vault, with its fields, attachments and history, under "
-            + "a group named after the file; the file itself is never changed and its recycle bin is left behind. with no "
+            + "a group named after the file; the file itself is never changed and its Trash is left behind. with no "
             + "vault configured, or --in-place, the file is kept where it is and remembered as a vault to open.\n\n"
             + "another password manager's export is copied the same way, all of it or nothing, and every part of it that "
             + $"cannot be copied is named with why. exports it reads: {string.Join(", ", ExportImport.Readers.Select(reader => reader.Format))}.",
@@ -309,7 +309,7 @@ internal static class ImportCommand
 
         if (keyfile is not null && !File.Exists(keyfile))
         {
-            context.Stderr.WriteLine($"keypaste import: no keyfile at '{keyfile}'");
+            context.Stderr.WriteLine($"keypaste import: no key file at '{keyfile}'");
             return false;
         }
 

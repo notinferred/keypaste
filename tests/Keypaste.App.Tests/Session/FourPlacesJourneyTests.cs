@@ -22,7 +22,7 @@ using static Keypaste.App.Tests.Session.JourneyDriver;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// V-N.1a: from the four places, through the app as launch composes it (D-0342), every act the old
+/// V-N.1a: from the four places, through the app as launch composes it, every act the old
 /// sidebar reached is still reached, and the sidebar lists the four places and the projects only.
 /// </summary>
 /// <remarks>
@@ -93,7 +93,7 @@ public sealed class FourPlacesJourneyTests
             DrawnFrame.Capture(main);
 
             // The sidebar lists the four places, the vault's group tree under Items and the project
-            // under its heading (D-0376), and there is one search.
+            // under its heading, and there is one search.
             Assert.Equal(["Items", "Work", "env", "Projects", "billing", "Agents"], Names(Named<ListBox>(main, "Nav")));
             Assert.Equal(["Trash", "Settings"], Names(Named<ListBox>(main, "FooterNav")));
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<Control>(), control => control.Name is "Search" or "McpCard");
@@ -140,6 +140,8 @@ public sealed class FourPlacesJourneyTests
             Press(main, Named<ToggleButton>(main, "EntryMenu"));
             Press(main, Named<Button>(main, "ShareEntry"));
             Assert.True(shell.HasShare);
+            AmberElements.AssertOne(main, Named<Button>(main, "ContinueToShare"), "the share dialog's terms");
+            Press(main, Named<Button>(main, "ContinueToShare"));
             AmberElements.AssertOne(main, Named<Button>(main, "CreateLink"), "the share dialog");
             Press(main, Named<Button>(main, "CreateLink"));
             await Until(() => !shell.HasShare);

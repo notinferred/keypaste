@@ -10,7 +10,7 @@ namespace Keypaste.Core.Import;
 /// </para>
 /// <para>
 /// Every top-level group is a row, <c>env</c> included: an entry's projects travel in its own tags
-/// (D-0416). The recycle bin, wherever it is, and <see cref="ReservedGroups.Root"/> are never rows:
+///. The recycle bin, wherever it is, and <see cref="ReservedGroups.Root"/> are never rows:
 /// tokens and share records belong to the vault that made them.
 /// </para>
 /// </remarks>
@@ -115,7 +115,7 @@ public sealed class ImportSource : IDisposable
                     name = $"{renamed} ({suffix})";
                 }
 
-                reason ??= $"{KeePassInterop.RecycleBinName} is the recycle bin's name";
+                reason ??= $"{KeePassInterop.RecycleBinName} is the Trash's name in a KeePass file";
             }
 
             path = path + "/" + name;
@@ -238,7 +238,7 @@ public sealed class ImportSource : IDisposable
                 .Select(row => new ImportPiece(_units[row.Index].Id, _units[row.Index].Scope, row.Destination))]);
     }
 
-    /// <summary>Copies every included row into <paramref name="target"/> and saves it, all of it or none, as an export's import commits (D-0567).</summary>
+    /// <summary>Copies every included row into <paramref name="target"/> and saves it, all of it or none, as an export's import commits.</summary>
     /// <param name="target">The vault imported into.</param>
     /// <param name="plan">The plan, as the person confirmed it.</param>
     /// <param name="save">Writes the vault, as the caller saves; when it throws, everything this copied is taken back out of the open vault.</param>
@@ -400,7 +400,7 @@ public sealed class ImportSource : IDisposable
 
             if (string.Equals(segment, KeePassInterop.RecycleBinName, StringComparison.Ordinal))
             {
-                return $"{KeePassInterop.RecycleBinName} is the recycle bin's name";
+                return $"{KeePassInterop.RecycleBinName} is the Trash's name in a KeePass file";
             }
 
             prefix = prefix.Length == 0 ? segment : prefix + "/" + segment;

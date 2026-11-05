@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Keypaste.App.Views.TermsLink">
+
+  <Button Name="OpenTerms"
+          Classes="link"
+          MinHeight="20"
+          VerticalContentAlignment="Center"
+          AutomationProperties.Name="Terms of use">
+    <TextBlock Text="Terms of use" TextDecorations="Underline" />
+  </Button>
+
+</UserControl>

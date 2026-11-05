@@ -165,9 +165,27 @@ public sealed class DrawnMaskTests
 
         Assert.Equal(_beta.Length, field.MaskedLength);
         Assert.NotEmpty(second);
-        Assert.Equal(first, second);
+
+        // A difference must not hide what the sweeps find, and a whole-surface comparison's message truncates which tuple it was.
+        var difference = FirstDifference(first, second);
         AutomationSurface.AssertNothingExposes(window, _alpha);
         AutomationSurface.AssertNothingExposes(window, _beta);
+        Assert.True(difference is null, difference);
+    }
+
+    private static string? FirstDifference(List<(string Source, string Text)> first, List<(string Source, string Text)> second)
+    {
+        for (var index = 0; index < Math.Min(first.Count, second.Count); index++)
+        {
+            if (first[index] != second[index])
+            {
+                return $"the surface differs at position {index}: {first[index]} and then {second[index]}";
+            }
+        }
+
+        return first.Count == second.Count
+            ? null
+            : $"the surface has {first.Count} tuples and then {second.Count}, and the first one past the end is {(first.Count > second.Count ? first[second.Count] : second[first.Count])}";
     }
 
     /// <summary>A sweep that finds the one-character value before it is typed would read the window's own text as an exposure.</summary>

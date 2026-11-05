@@ -2,10 +2,10 @@
 # 4.7b: installs an attested desktop candidate on a fresh runner and exercises the installed app from outside
 # its process, then classifies each check from what the app, the vault and the CLI/MCP recorded.
 #
-# The app carries no automation hook (D-0199). It is driven through the platform accessibility tree and real
+# The app carries no automation hook. It is driven through the platform accessibility tree and real
 # keystrokes: UI Automation on Windows (drive-desktop-windows.ps1), AT-SPI and xdotool on Linux
 # (drive-desktop-linux.py), the accessibility API and System Events on macOS (drive-desktop-macos.js). The vault
-# is made by the CLI (D-0146). The approval is a person's answer at the terminal agent, which holds the vault, so
+# is made by the CLI. The approval is a person's answer at the terminal agent, which holds the vault, so
 # the app's unlock is refused and its unlock screen names that agent. A new terminal must then run the keypaste
 # the install carries (G.5): on Windows the MSI puts its folder on the user PATH, and on Linux and macOS the person
 # links it from Settings, which the first session does.
@@ -20,7 +20,7 @@
 # earlier check failed, and is a contradiction when the action completed and the evidence disagrees. Anything but
 # pass fails, except a gatekeeper check on a runner whose assessments stay disabled, which records unassessed.
 #
-# A rehearsal installs a branch build instead (D-0433): app.yml names its packages <version>-dryrun and attests
+# A rehearsal installs a branch build instead: app.yml names its packages <version>-dryrun and attests
 # none, so the candidate is checked only against the .sha256 beside it and its check is rehearsal, never pass.
 # That check alone may then be rehearsal; the run is never release evidence.
 #
@@ -262,7 +262,7 @@ native() { if [ "$(platform)" = windows ]; then cygpath -m "$1"; else printf '%s
 sha256_of() { if command -v sha256sum >/dev/null; then sha256sum < "$1"; else shasum -a 256 < "$1"; fi | awk '{print $1}'; }
 
 # A rehearsal's candidate: app.yml's package for this RID under the branch build's -dryrun version, intact
-# against the .sha256 that job wrote beside it. Nothing attests a branch build (D-0433).
+# against the .sha256 that job wrote beside it. Nothing attests a branch build.
 verify_branch_build() {
   local extension name recorded
   case "$(platform)" in windows) extension=msi ;; linux) extension=AppImage ;; macos) extension=dmg ;; esac
@@ -416,8 +416,7 @@ first_session() {
   launch first > /dev/null
   act window drive window 120 || return 0
   act screenshot drive screenshot "$(native "$OUT/first-window.png")" || return 0
-  # A fresh home shows the terms, then the crash-report choice, before the unlock screen (4.11c).
-  act terms drive invoke Continue || return 0
+  # A fresh home's unlock screen asks the crash-report choice.
   act crash-choice drive invoke "Don't send" || return 0
   act password-focus drive focus id:Password || return 0
   unlock unlocked || return 0
@@ -457,7 +456,7 @@ first_session() {
 env_run() {
   local child="${BASH:-/bin/bash}"
   fact env_list "$(cli env ls "$PROJECT" 2>&1 || true)"
-  # The app adds a new key as a field of the project's home entry (D-0413).
+  # The app adds a new key as a field of the project's home entry.
   fact get_output "$(cli get "env/$PROJECT/.env" --field "$VARIABLE" --reveal 2>/dev/null || true)"
   fact run_output "$(printf '%s\n' "$MASTER" | "$KP" run "$PROJECT" --vault "$VAULT_NATIVE" -- "$child" -c "printf %s \"\$$VARIABLE\"" 2>/dev/null | tr -d '\r' || true)"
 }

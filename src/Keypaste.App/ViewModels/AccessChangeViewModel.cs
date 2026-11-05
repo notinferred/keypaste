@@ -17,7 +17,7 @@ internal sealed class AccessChangeViewModel : PromptViewModel
         ArgumentNullException.ThrowIfNull(prompt);
 
         Agent = prompt.Agent;
-        Subject = prompt.ResetsCeilings ? "this computer's ceilings, which keypaste cannot read" : "a change to its settings in this vault";
+        Subject = prompt.ResetsCeilings ? "this computer's limits, which keypaste cannot read" : "a change to its settings in this vault";
         Origin = prompt.OriginText;
         GainsCaption = prompt.ResetsCeilings ? "Beyond the defaults, each would get" : "It would gain";
         Gains = prompt.Gains;

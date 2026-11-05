@@ -152,7 +152,7 @@ internal sealed partial class ActivityRow : ObservableObject
         var prompt = waiting.Prompt;
         var what = prompt switch
         {
-            { ResetsCeilings: true } => "Your reset of this computer's ceilings",
+            { ResetsCeilings: true } => "Your reset of this computer's limits",
             { Origin: AccessOrigin.Terminal } => $"A change to {prompt.Agent}'s settings, asked from a terminal",
             { Origin: AccessOrigin.Agent } => $"A change to {prompt.Agent}'s settings, asked by {prompt.Agent} through its keypaste tool",
             _ => $"Your change to {prompt.Agent}'s settings",

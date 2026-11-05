@@ -98,7 +98,7 @@ public sealed class ExportImportTests : IDisposable
         Assert.Equal("export", plan.Into);
         var row = Assert.Single(plan.Rows);
         Assert.Equal(new EntryName("export/Recycle Bin (imported)", "Old"), row.Lands);
-        Assert.Equal("Recycle Bin is the recycle bin's name", row.Note);
+        Assert.Equal("Recycle Bin is the Trash's name in a KeePass file", row.Note);
     }
 
     // ---------------------------------------------------------------- collision decisions
@@ -268,7 +268,7 @@ public sealed class ExportImportTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Recycle Bin", "Recycle Bin is the recycle bin's name")]
+    [InlineData("Recycle Bin", "Recycle Bin is the Trash's name in a KeePass file")]
     [InlineData(".keypaste/tokens", ".keypaste is keypaste's own group; nothing is imported into it")]
     [InlineData("", "name a group to import into")]
     public void A_refused_group_stops_the_commit(string into, string refusal)

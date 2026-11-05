@@ -568,8 +568,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             var items = count == 1 ? "1 item" : $"{count} items";
 
             return count == 0 && group.Children.Count == 0
-                ? $"Delete {name}? This vault has no recycle bin, so there is no undo."
-                : $"{name} holds {(count == 0 ? "groups" : items)}, and this vault has no recycle bin, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
+                ? $"Delete {name}? This vault has no Trash, so there is no undo."
+                : $"{name} holds {(count == 0 ? "groups" : items)}, and this vault has no Trash, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
         }
     }
 
@@ -1102,7 +1102,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 : null,
             outcome == DeletionOutcome.Recycled
                 ? $"Moved {name} to the trash."
-                : $"Deleted {name}. This vault has no recycle bin, so nothing can put it back.");
+                : $"Deleted {name}. This vault has no Trash, so nothing can put it back.");
     }
 
     /// <summary>Reverses the last delete, rename, move, duplicate or group change through its inverse write.</summary>
@@ -1440,7 +1440,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 ? new Undoable(vault => vault.RestoreRecycledGroup(path) == GroupOutcome.Restored, () => ShowGroup(path), Restores: true)
                 : null,
             write.Value == GroupOutcome.DeletedPermanently
-                ? $"Deleted {name}. This vault has no recycle bin, so nothing can put it back."
+                ? $"Deleted {name}. This vault has no Trash, so nothing can put it back."
                 : count == 0
                     ? $"Moved {name} to the trash."
                     : $"Moved {name} and the {(count == 1 ? "1 item" : $"{count} items")} in it to the trash. Trash puts each one back.");
@@ -1635,15 +1635,15 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 return "A group cannot go inside itself or a group within it. Choose another group.";
 
             case GroupOutcome.NotEmpty:
-                return "This vault has no recycle bin, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
+                return "This vault has no Trash, so keypaste deletes a group only once it is empty. Move or delete what is in it first.";
 
             case GroupOutcome.NameRefused:
                 VaultNameRules.IsValidGroupName(DraftGroupName.Trim(), out var why);
                 return $"keypaste will not use that group name: {why}.";
 
             case GroupOutcome.NameReserved:
-                return "env at the top level and the recycle bin are names keypaste assigns. A group cannot be created as one, renamed to one "
-                    + "or moved to the top level as env; env is not renamed, moved or deleted, and a group holding the recycle bin is not deleted. Choose another name or group.";
+                return "env at the top level and the Trash are names keypaste assigns. A group cannot be created as one, renamed to one "
+                    + "or moved to the top level as env; env is not renamed, moved or deleted, and a group holding the Trash is not deleted. Choose another name or group.";
 
             default:
                 return "That change could not be made. Check the name and the group, then try again.";

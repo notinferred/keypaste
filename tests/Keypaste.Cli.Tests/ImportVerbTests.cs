@@ -113,7 +113,7 @@ public sealed class ImportVerbTests : IDisposable
         var exit = _cli.Run("import", source, "--into", "Recycle Bin", "--vault", _cli.VaultPath);
 
         _cli.AssertExit(CliApp.ExitUsageError, exit);
-        Assert.Contains("Recycle Bin is the recycle bin's name", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("Recycle Bin is the Trash's name in a KeePass file", _cli.Err, StringComparison.Ordinal);
         Assert.Contains("nothing was written", _cli.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("✓", _cli.Err, StringComparison.Ordinal);
         Assert.Equal(before, File.ReadAllBytes(_cli.VaultPath));

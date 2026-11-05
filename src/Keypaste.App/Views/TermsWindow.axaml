@@ -1,0 +1,75 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:terms="using:Keypaste.App.Terms"
+                    x:Class="Keypaste.App.Views.TermsWindow"
+                    x:DataType="terms:TermsOfUse"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="Terms of use"
+                    Width="568"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    WindowStartupLocation="CenterOwner">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+    <Style Selector="TextBlock.terms-heading">
+      <Setter Property="AutomationProperties.HeadingLevel" Value="2" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,8,0,0" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <!-- Selectable text takes a tab stop of its own by default, which would put every paragraph between the keyboard and Close. -->
+    <Style Selector="SelectableTextBlock.terms-text">
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="LineHeight" Value="18.75" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+  </Window.Styles>
+
+  <Border Classes="prompt">
+    <StackPanel Spacing="12">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="prompt-title" Text="{Binding Title}" />
+        <TextBlock Classes="prompt-sub" Text="{Binding Status}" />
+      </StackPanel>
+
+      <!-- The keyboard reaches the whole text here: Tab stops once, and Page Up and Page Down scroll it. -->
+      <Border Height="360"
+              CornerRadius="{DynamicResource KpRadiusField}"
+              Background="{DynamicResource KpBgApp}"
+              BorderBrush="{DynamicResource KpBorderDefault}"
+              BorderThickness="1">
+        <ScrollViewer Name="TermsText"
+                      Focusable="True"
+                      AutomationProperties.Name="Terms of use"
+                      HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl Margin="14,6,14,8" ItemsSource="{Binding Sections}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="terms:TermsSection">
+                <StackPanel Spacing="6" Margin="0,0,0,4">
+                  <TextBlock Classes="terms-heading size-13" Text="{Binding Heading}" />
+                  <ItemsControl ItemsSource="{Binding Paragraphs}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <SelectableTextBlock Classes="terms-text size-12-5" Text="{Binding}" Margin="0,0,0,6" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Border>
+
+      <Button Name="Dismiss" Classes="prompt ghost" Content="Close" HorizontalAlignment="Center" IsCancel="True" />
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

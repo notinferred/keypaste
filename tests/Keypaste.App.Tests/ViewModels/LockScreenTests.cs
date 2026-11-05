@@ -55,7 +55,7 @@ public sealed class LockScreenTests : IDisposable
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
-        Assert.Equal("Open a vault", model.Heading);
+        Assert.Equal("Start with a vault", model.Heading);
         Assert.True(model.Offer(_vault.Path_));
         Assert.Equal($"{Path.GetFileName(_vault.Path_)} is locked", model.Heading);
     }
@@ -148,7 +148,7 @@ public sealed class LockScreenTests : IDisposable
         string[] chosen =
         [
             nameof(UnlockViewModel.SelectedName), nameof(UnlockViewModel.HasSelection), nameof(UnlockViewModel.Heading),
-            nameof(UnlockViewModel.Subtitle), nameof(UnlockViewModel.CanTypePassword), nameof(UnlockViewModel.OffersOpenFirst),
+            nameof(UnlockViewModel.Subtitle), nameof(UnlockViewModel.CanTypePassword), nameof(UnlockViewModel.OffersCreateFirst),
             nameof(UnlockViewModel.WelcomeSubtitle), nameof(UnlockViewModel.HasLooseError),
         ];
         Assert.Empty(chosen.Except(raised));

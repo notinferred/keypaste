@@ -12,8 +12,8 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// <b>Simpler than the history pane, because an identity does not go stale.</b>
 /// <see cref="EntryHistoryViewModel"/> re-reads and checks a revision still sits at the index its
-/// row was built from (DECISIONS.md D-0229); a <see cref="RecycledEntryId"/> names one entry for as
-/// long as that entry is in the bin (D-0250), so a row whose entry has gone is answered by
+/// row was built from; a <see cref="RecycledEntryId"/> names one entry for as
+/// long as that entry is in the bin, so a row whose entry has gone is answered by
 /// <see cref="RestoreOutcome.NothingMatched"/> rather than by acting on the wrong one.
 /// </para>
 /// <para>
@@ -27,16 +27,16 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 {
     internal const string RecycledNote =
-        "Deleting an item in keypaste moves it here, to the vault's own recycle bin. KeePassXC "
-        + "opens the same file and shows the same bin.";
+        "Deleting an item in keypaste moves it here, to the vault's own Trash. KeePassXC "
+        + "opens the same file and shows it as its Recycle Bin.";
 
     internal const string NoBinNote =
-        "This vault's recycle bin is switched off in KeePassXC, so deleting removes an item and "
+        "This vault's Trash is switched off in KeePassXC, so deleting removes an item and "
         + "its history for good. Nothing can arrive here until that setting is turned back on.";
 
-    /// <summary>What recycling anything costs the file's other readers (DECISIONS.md D-0247).</summary>
+    /// <summary>What recycling anything costs the file's other readers.</summary>
     internal const string ReaderFloorNote =
-        "A vault that has recycled anything is saved in the KeePass database format 4.1, which KeePassXC 2.7 and "
+        "A vault that has put anything in the Trash is saved in the KeePass database format 4.1, which KeePassXC 2.7 and "
         + "KeePass 2.48 and later read. Older readers do not.";
 
     private readonly AppVaultSession _session;
@@ -300,12 +300,12 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             case RestoreOutcome.RestoredToRoot:
-                Report($"{row.DisplayTitle} is back at the root, because the group it came from is gone.", null);
+                Report($"{row.DisplayTitle} is back at the top level, because the group it came from is gone.", null);
                 break;
 
             case RestoreOutcome.DestinationOccupied:
-                // Core refused the restore whole (D-0249); another title is offered when the entry can
-                // take one, and taken only on a second press (D-0512).
+                // Core refused the restore whole; another title is offered when the entry can
+                // take one, and taken only on a second press.
                 offer = _session.Unlocked?.RenamedRestoreName(row.Id) is { } free
                     ? EntryNameSanitizer.Sanitize(free.Title).Text
                     : null;
@@ -357,7 +357,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
                 break;
 
             case RestoreOutcome.RestoredToRoot:
-                Report($"{row.DisplayTitle} is back at the root as {title}, because the group it came from is gone.", null);
+                Report($"{row.DisplayTitle} is back at the top level as {title}, because the group it came from is gone.", null);
                 break;
 
             case RestoreOutcome.DestinationOccupied:

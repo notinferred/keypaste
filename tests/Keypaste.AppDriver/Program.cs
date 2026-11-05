@@ -134,7 +134,7 @@ internal static class Program
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
         "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed;\n" +
-        "             first-run send | dont-send; unlock <vault>; copy <title>; lock; crash <text>)\n" +
+        "             crash-choice send | dont-send; unlock <vault>; copy <title>; lock; crash <text>)\n" +
         "       crash-endpoint <folder> [--silent]\n" +
         "            (answers crash reports on loopback 204 and keeps each in <folder>, or never answers, until standard input closes)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
@@ -874,7 +874,7 @@ internal sealed class Driver(string home)
             return trash.Error is not null ? Refused(trash.Error) : Did(trash.Notice);
         });
 
-    /// <summary>Presses Restore and, once it is refused for a taken name, the Restore as it offers (D-0512).</summary>
+    /// <summary>Presses Restore and, once it is refused for a taken name, the Restore as it offers.</summary>
     internal Task<int> RestoreRecycledAsAsync(string vault, string title) =>
         WithTrashAsync(vault, title, trash =>
         {
@@ -1432,7 +1432,7 @@ internal sealed class Driver(string home)
         return 0;
     }
 
-    /// <summary>Presses Settings › Browser fill's Pair a browser, as a person does, and says whether pairing is now on (D-0634).</summary>
+    /// <summary>Presses Settings › Browser fill's Pair a browser, as a person does, and says whether pairing is now on.</summary>
     private static void Pair(AppAuthority authority)
     {
         using var browserFill = new BrowserFillViewModel(authority);

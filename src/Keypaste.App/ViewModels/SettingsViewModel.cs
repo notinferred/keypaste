@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
+using Keypaste.App.Terms;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Linking;
@@ -128,7 +129,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// A hand-edited <c>idle_timeout_seconds</c> is honoured and named rather than snapped to the
     /// nearest offering. Snapping the label would put a number on the screen that the vault is not
     /// using, which is the defect this task exists to close; snapping the session would discard a
-    /// legitimate edit; rewriting the file to match the list would clobber it (D-0095). Whatever
+    /// legitimate edit; rewriting the file to match the list would clobber it. Whatever
     /// the file asked for, <see cref="AppSettings.IdleTimeoutSeconds"/> has already clamped it into
     /// a range that locks.
     /// </remarks>
@@ -230,22 +231,42 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     internal bool HasCrashReports => Crashes is not null;
 
-    /// <summary>Whether crash reports are sent, as chosen at first run; turning it off deletes the reports waiting (D-0594).</summary>
+    /// <summary>Whether the switch shows: the person has answered under these terms, here or on the unlock screen.</summary>
+    internal bool ShowsCrashSwitch => Crashes is { HasAnswered: true };
+
+    /// <summary>The choice with its terms for someone who has not answered under them, since a switch alone would send under terms it does not point to.</summary>
+    internal CrashChoiceViewModel? CrashChoice =>
+        _crashChoice ??= Crashes is { HasAnswered: false }
+            ? new CrashChoiceViewModel(TermsOfUse.Carried, AnswerCrashReports)
+            : null;
+
+    internal bool HasCrashChoice => CrashChoice is not null;
+
+    private CrashChoiceViewModel? _crashChoice;
+
+    private bool AnswerCrashReports(bool send)
+    {
+        var saved = Crashes!.Choose(send);
+
+        // The next preference this screen writes starts from the choice, not from what it read when it opened.
+        _settings = _preferences.Current;
+        OnPropertyChanged(nameof(SendCrashReports));
+        OnPropertyChanged(nameof(ShowsCrashSwitch));
+        return saved;
+    }
+
+    /// <summary>Whether crash reports are sent; turning it off deletes the reports waiting.</summary>
     internal bool SendCrashReports
     {
         get => Crashes?.IsOn == true;
         set
         {
-            if (Crashes is not { } crashes || value == crashes.IsOn)
+            if (Crashes is not { HasAnswered: true } crashes || value == crashes.IsOn)
             {
                 return;
             }
 
-            var saved = crashes.Choose(value);
-
-            // The next preference this screen writes starts from the choice, not from what it read when it opened.
-            _settings = _preferences.Current;
-            OnPropertyChanged();
+            var saved = AnswerCrashReports(value);
             Message = saved ? string.Empty : "That preference could not be saved, so it will not survive a restart. Check that keypaste's folder can be written, then change it again.";
         }
     }
@@ -279,7 +300,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         }
     }
 
-    /// <summary>Makes the unlocked vault the one agents and the CLI use without <c>--vault</c> (D-0389).</summary>
+    /// <summary>Makes the unlocked vault the one agents and the CLI use without <c>--vault</c>.</summary>
     internal RelayCommand UseThisVaultCommand { get; }
 
     /// <summary>The vault agents and the CLI use without <c>--vault</c>, read each time.</summary>
@@ -395,7 +416,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     /// <summary>Where a save keeps the file it replaces.</summary>
     /// <remarks>
-    /// The desktop's counterpart to the line the CLI prints when it creates the directory (D-0260): a
+    /// The desktop's counterpart to the line the CLI prints when it creates the directory: a
     /// folder of encrypted vaults appearing beside somebody's file should not be a discovery.
     /// </remarks>
     internal string BackupsPath =>

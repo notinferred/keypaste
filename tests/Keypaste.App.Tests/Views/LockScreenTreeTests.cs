@@ -43,7 +43,7 @@ public sealed class LockScreenTreeTests
         var names = Names(window);
         Assert.Contains("work.kdbx", names);
         Assert.Contains("Open another file…", names);
-        Assert.Contains("Create a new vault…", names);
+        Assert.Contains("Create a vault…", names);
         Assert.DoesNotContain("Open a vault…", names);
         Assert.DoesNotContain(names, name => name.Contains("agent", StringComparison.OrdinalIgnoreCase));
     });
@@ -90,7 +90,7 @@ public sealed class LockScreenTreeTests
         Assert.DoesNotContain("More options", names);
     });
 
-    /// <summary>A vault Windows Hello can open again names it on the screen, beside the password, as its one amber action (D-0553).</summary>
+    /// <summary>A vault Windows Hello can open again names it on the screen, beside the password, as its one amber action.</summary>
     [Fact]
     public Task A_vault_Windows_Hello_can_resume_offers_it_as_the_one_amber_action_beside_the_password() => HeadlessSession.On(() =>
     {

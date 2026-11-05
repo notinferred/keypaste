@@ -53,7 +53,7 @@
             <StackPanel Grid.Column="0" Spacing="6">
               <TextBlock Classes="h1" Text="Share links" />
               <TextBlock Classes="subtitle"
-                         Text="Links you made from an item's ⋯ menu, end-to-end encrypted. The key lives in the link itself, so our relay never sees it." />
+                         Text="Links you made from an item's ⋯ menu, end-to-end encrypted. The key lives in the link itself, so keypaste.com never sees it." />
             </StackPanel>
             <Button Grid.Column="1"
                     x:Name="CheckStatus"

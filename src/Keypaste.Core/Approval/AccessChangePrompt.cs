@@ -46,7 +46,7 @@ public sealed record AccessChangePrompt
 
     /// <summary>What a reset does, said after "Allowing".</summary>
     public const string ResetText =
-        "clears every ceiling this computer kept on agents, and keeps the file keypaste cannot read beside it as clients.toml"
+        "clears every limit this computer kept on agents, and keeps the file keypaste cannot read beside it as clients.toml"
         + AccessCaps.KeptSuffix + ", or the next free name, so no copy kept before is replaced";
 
     /// <summary>The agent's name, sanitized.</summary>

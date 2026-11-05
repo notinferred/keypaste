@@ -2,6 +2,7 @@ using System.Globalization;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
+using Keypaste.App.Terms;
 using Keypaste.Core;
 using Keypaste.Core.Editing;
 using Keypaste.Core.Linking;
@@ -995,7 +996,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             ShowDone,
             resolved ? null : $"Sharing is off: {ShareEndpoint.EnvironmentVariable} may only name a local development server. Unset it, then restart keypaste.",
             what,
-            cancel);
+            cancel,
+            what is null || Preferences.Current.ShareTermsLinked == TermsOfUse.Carried.Version ? null : TermsOfUse.Carried,
+            () => Preferences.Record(settings => settings with { ShareTermsLinked = TermsOfUse.Carried.Version }));
     }
 
     /// <summary>Generate password…, as a dialog over whatever screen is showing (V.12).</summary>

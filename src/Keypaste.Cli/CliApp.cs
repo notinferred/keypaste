@@ -92,7 +92,7 @@ internal static class CliApp
                 WriteHelp(context.Stdout, Parse([group]), context.ConsoleStyle);
                 return ExitSuccess;
 
-            // The removed spellings are refused before anything parses, their help included (D-0470).
+            // The removed spellings are refused before anything parses, their help included.
             case ["agent", ..]:
                 return Renamed(context, "keypaste agent", "keypaste approve");
 
@@ -145,7 +145,7 @@ internal static class CliApp
     /// <summary>Parses a whole command line, its verb first, without running anything.</summary>
     internal static ParseResult Parse(string[] args) => _root.Parse(args, Syntax.Parsing);
 
-    /// <summary>Refuses a removed spelling, naming the one that replaced it, and runs nothing (D-0470).</summary>
+    /// <summary>Refuses a removed spelling, naming the one that replaced it, and runs nothing.</summary>
     internal static int Renamed(CliContext context, string removed, string replacement)
     {
         context.Stderr.WriteLine($"keypaste: {removed} is now {replacement}");
@@ -230,7 +230,7 @@ internal static class CliApp
         writer.WriteLine();
         writer.WriteLine(Muted("FLAGS"));
         writer.WriteLine($"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}");
-        writer.WriteLine($"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
+        writer.WriteLine($"  --keyfile <path>  the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine("  --json            machine-readable output from ls, search, show, field ls,");
         writer.WriteLine("                    attachment ls, env ls, log, grants, doctor, token ls,");
         writer.WriteLine("                    share ls, clients");

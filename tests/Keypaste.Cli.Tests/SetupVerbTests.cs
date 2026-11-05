@@ -385,7 +385,7 @@ public sealed class SetupVerbTests
         Assert.DoesNotContain("audit log", harness.Out, StringComparison.Ordinal);
     }
 
-    /// <summary>A client may start the bridge without KEYPASTE_HOME, and Gemini CLI always does, so another home is written into it (D-0389).</summary>
+    /// <summary>A client may start the bridge without KEYPASTE_HOME, and Gemini CLI always does, so another home is written into it.</summary>
     [Fact]
     public void Another_home_pins_its_chosen_vault_its_log_its_ceilings_and_its_owner()
     {
@@ -404,7 +404,7 @@ public sealed class SetupVerbTests
             Assert.Single(Ran(harness), Adds),
             StringComparison.Ordinal);
         Assert.Contains($"audit log      {audit}", harness.Out, StringComparison.Ordinal);
-        Assert.Contains($"ceilings       {ceilings}", harness.Out, StringComparison.Ordinal);
+        Assert.Contains($"limits         {ceilings}", harness.Out, StringComparison.Ordinal);
         Assert.Contains($"approver       {owner}", harness.Out, StringComparison.Ordinal);
     }
 

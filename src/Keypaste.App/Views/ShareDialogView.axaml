@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="using:Keypaste.App.Controls"
              xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.ShareDialogView"
              x:DataType="vm:SharingViewModel">
 
@@ -73,9 +74,52 @@
     </Style>
   </UserControl.Styles>
 
-  <!-- Share…, from an item's ⋯ menu. The link it makes goes to the clipboard and nowhere else on screen. -->
+  <!-- Share…, from an item's ⋯ menu. The first time, the terms of use show here before the form, and until then no link can be made. -->
+  <Panel>
+  <Border Name="ShareTerms"
+          Classes="dialog"
+          IsVisible="{Binding IsReadingTerms}"
+          ctl:FormKeys.Confirm="{Binding ContinueCommand}"
+          ctl:FormKeys.Cancel="{Binding CancelCommand}"
+          KeyboardNavigation.TabNavigation="Cycle"
+          Width="440"
+          MaxWidth="440"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Center">
+    <StackPanel Spacing="14">
+      <Grid ColumnDefinitions="Auto,*">
+        <ctl:KpIcon Grid.Column="0" Icon="link" Size="16" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
+        <TextBlock Grid.Column="1" Classes="dialog-title" Text="Share a link" VerticalAlignment="Center" />
+      </Grid>
+
+      <StackPanel Spacing="8">
+        <TextBlock Name="TermsNotice"
+                   Classes="caption"
+                   TextWrapping="Wrap"
+                   Text="keypaste keeps your vault on this computer and never sends it anywhere. keypaste.com runs two services, share links and crash reports, which these terms cover. Running keypaste needs no agreement: its licence already lets you." />
+        <views:TermsLink DataContext="{Binding Terms}" HorizontalAlignment="Left" />
+      </StackPanel>
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Button x:Name="CancelTerms"
+                Classes="ghost lg"
+                Content="Cancel"
+                Command="{Binding CancelCommand}" />
+        <Button x:Name="ContinueToShare"
+                Grid.Column="1"
+                Classes="primary lg"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
+                Content="Continue"
+                Command="{Binding ContinueCommand}" />
+      </Grid>
+    </StackPanel>
+  </Border>
+
+  <!-- The link it makes goes to the clipboard and nowhere else on screen. -->
   <Border Name="ShareDialog"
           Classes="dialog"
+          IsVisible="{Binding !IsReadingTerms}"
           ctl:FormKeys.Confirm="{Binding CreateCommand}"
           ctl:FormKeys.Cancel="{Binding CancelCommand}"
           ctl:FormKeys.Draft="{Binding Draft}"
@@ -101,7 +145,7 @@
 
       <TextBlock Classes="caption"
                  TextWrapping="Wrap"
-                 Text="End-to-end encrypted. The key lives in the link itself, so the relay never sees it." />
+                 Text="End-to-end encrypted. The key lives in the link itself, so keypaste.com never sees it." />
 
       <Grid ColumnDefinitions="*,10,112" RowDefinitions="Auto,6,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="What" />
@@ -222,4 +266,5 @@
                  ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" />
     </StackPanel>
   </Border>
+  </Panel>
 </UserControl>

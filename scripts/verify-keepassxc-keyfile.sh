@@ -16,7 +16,7 @@
 # with the new factors and refuses the old ones. Last, the one keyfile keypaste makes: the desktop's
 # create form makes a vault with a keyfile it writes, and its Settings replaces that keyfile with
 # another it writes, each through tests/Keypaste.AppDriver, and KeePassXC opens the vault with the
-# keyfile keypaste made and refuses the one replaced (D-0506).
+# keyfile keypaste made and refuses the one replaced.
 #
 # WHO MAKES WHAT, which is the whole honesty of this gate:
 #
@@ -30,7 +30,7 @@
 #     hex file, and any file at all. KeePassXC is handed them and leaves them untouched, which is
 #     asserted below, because a tool that rewrote the file it was given would invalidate the case.
 #
-#   * EVERY read and write on the keypaste side is the SHIPPED BINARY (D-0012), through the real
+#   * EVERY read and write on the keypaste side is the SHIPPED BINARY, through the real
 #     command line with --keyfile. A core test that called Vault.Open would prove the library and
 #     not the product; V-V.1a1 says so in as many words. The keyfiles keypaste makes are the
 #     exception, because only the desktop makes one: the app driver presses the screens' own
@@ -248,11 +248,11 @@ fi
 
 step "a refusal says which factor was offered, and which refusal it was"
 said=$(printf '%s\n' "$pw" | "$kp" ls --vault "$vault" --keyfile "$raw_kf" 2>&1 >/dev/null || true)
-grep -qF 'keyfile' <<<"$said" \
+grep -qF 'key file' <<<"$said" \
   || die "a wrong keyfile was reported as a wrong password alone. It said: ${said}"
 
 said=$(printf '%s\n' "$pw" | "$kp" ls --vault "$vault" --keyfile "$vault" 2>&1 >/dev/null || true)
-grep -qF 'not a keyfile' <<<"$said" \
+grep -qF 'not a key file' <<<"$said" \
   || die "the vault offered as its own keyfile was not named as such. It said: ${said}"
 
 # ---------------------------------------------------------------------------------------
@@ -375,7 +375,7 @@ kpxc_only db-info --no-password --key-file "$(native "$only_kf")" "$(native "$on
   && die "KeePassXC still opens the keyfile-only vault with the keyfile it replaced"
 
 # ---------------------------------------------------------------------------------------
-# The keyfile the desktop makes (D-0506), through the app driver.
+# The keyfile the desktop makes, through the app driver.
 # ---------------------------------------------------------------------------------------
 if [ "$cli_only" = false ]; then
   drv=$(app_driver)

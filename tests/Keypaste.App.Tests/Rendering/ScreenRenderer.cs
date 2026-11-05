@@ -11,6 +11,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.Session;
 using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -21,6 +22,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Tests;
+using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -33,7 +35,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// </code>
 /// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
 /// four times, into <c>dark</c>, <c>light</c>, <c>high-contrast-dark</c> and <c>high-contrast-light</c>
-/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Dark and light
+/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one amber element. Dark and light
 /// are also drawn at 150% and 200%, into <c>zoom-150</c> and <c>zoom-200</c>, where the 200% folders add <c>s-</c> frames on small screens. Add a
 /// screen by adding a <see cref="Save"/> call: <see cref="Every_screen_keeps_every_control_within_reach"/>, which needs no folder, walks each frame at each zoom.
 /// </summary>
@@ -1004,13 +1006,83 @@ public sealed class ScreenRenderer
         window.Show();
         Save(window, output, "00-unlock");
 
-        // The first run, before the welcome: the terms, then the crash-report choice (4.11c).
-        var firstRun = new FirstRunViewModel(Terms.TermsOfUse.Carried, _ => true, () => { });
-        window.FindControl<ContentControl>("Root")!.Content = new FirstRunView { DataContext = firstRun };
-        Save(window, output, "00a-first-run-terms");
-        firstRun.ContinueCommand.Press();
-        Save(window, output, "00b-first-run-choice");
         window.Close();
+        DrawFirstRun(session, demo, output);
+    }
+
+    /// <summary>The first run: the welcome with nothing found and with KeePassXC's databases, and a locked vault alone, with recent vaults and with Windows Hello, each asking the crash-report choice at the default window, then the terms window its link opens.</summary>
+    private static void DrawFirstRun(AppVaultSession session, DemoVault demo, string output)
+    {
+        CrashChoiceViewModel Asking() => new(Terms.TermsOfUse.Carried, _ => true);
+
+        using var empty = new TempHome();
+        var database = Path.Combine(empty.Path, "personal.kdbx");
+        using (var kept = Vault.Create(database, "first-run-demo"))
+        {
+            kept.Save();
+        }
+
+        var ini = Path.Combine(empty.Path, "keepassxc.ini");
+        File.WriteAllText(ini, $"[General]\nLastActiveDatabase={database.Replace('\\', '/')}\n");
+
+        using var nothing = new UnlockViewModel(session, empty.Path, new FakeVaultFilePicker(), () => { }) { CrashChoice = Asking() };
+        using var fromKeePassXc = new UnlockViewModel(session, empty.Path, new FakeVaultFilePicker(), () => { }, keePassXcConfigs: () => [ini]) { CrashChoice = Asking() };
+        using var locked = new UnlockViewModel(session, demo.Home, new FakeVaultFilePicker(), () => { }) { CrashChoice = Asking() };
+
+        using var withRecents = new TempVault();
+        var others = Enumerable.Range(1, 5).Select(number => Path.Combine(withRecents.Home, $"vault-{number}.kdbx")).ToList();
+        others.ForEach(other => File.Copy(withRecents.Path_, other));
+        Core.Recent.RecentVaults.Save(
+            Core.Audit.KeypasteHome.RecentPath(withRecents.Home),
+            [new Core.Recent.RecentVault(withRecents.Path_, DateTimeOffset.UtcNow), .. others.Select(other => new Core.Recent.RecentVault(other, DateTimeOffset.UtcNow.AddDays(-1)))]);
+        using var recents = new UnlockViewModel(session, withRecents.Home, new FakeVaultFilePicker(), () => { }) { CrashChoice = Asking() };
+
+        using var helloSession = new AppVaultSession(new ManualClock(AppClock.Start), home: withRecents.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]), quickUnlock: new FakeQuickUnlockSigner());
+
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, helloSession.TryUnlock(withRecents.Path_, master.Value));
+        }
+
+        Assert.Equal(QuickUnlockOutcome.Done, helloSession.KeepForQuickUnlock());
+        helloSession.Lock(VaultLockReason.Manual);
+        using var hello = new UnlockViewModel(helloSession, withRecents.Home, new FakeVaultFilePicker(), () => { }, lockedBy: VaultLockReason.Manual) { CrashChoice = Asking() };
+
+        foreach (var (name, model) in new[]
+        {
+            ("00a-first-run-welcome", nothing),
+            ("00b-first-run-keepassxc", fromKeePassXc),
+            ("00c-first-run-locked", locked),
+            ("00f-first-run-recents", recents),
+            ("00g-first-run-windows-hello", hello),
+        })
+        {
+            var window = new MainWindow { Width = WindowChrome.DefaultWidth, Height = WindowChrome.DefaultHeight };
+            window.FindControl<ContentControl>("Root")!.Content = new UnlockView { DataContext = model };
+            window.Show();
+            Save(window, output, name);
+
+            // Tall enough for the whole of it, however far the zoom scrolls it.
+            window.Width = 720;
+            window.Height = 2600;
+            Save(window, output, name + "-720-whole");
+            window.Close();
+        }
+
+        var terms = new TermsWindow { DataContext = Terms.TermsOfUse.Carried };
+        terms.Show();
+        Save(terms, output, "00e-terms-window");
+        terms.Close();
+
+        // Settings until the person has answered: the choice in place of its switch.
+        var preferences = new DesktopPreferences(empty.Path);
+        using var crashes = new CrashReporting(empty.Path, preferences, endpoint: null);
+        using var settings = new SettingsViewModel(session, empty.Path, preferences, _ => { }) { Crashes = crashes };
+        var settingsWindow = new MainWindow { Width = _width, Height = 2600 };
+        settingsWindow.FindControl<ContentControl>("Root")!.Content = new SettingsView { DataContext = settings };
+        settingsWindow.Show();
+        Save(settingsWindow, output, "00d-settings-crash-choice-whole");
+        settingsWindow.Close();
     }
 
     private static void DrawShell(DemoVault demo, string output)
@@ -1285,6 +1357,12 @@ public sealed class ScreenRenderer
         shell.Current = Destinations.Of(DestinationKind.Entries);
         shell.ShareCommand.Press("Work/aws-console");
         var dialog = shell.Share!;
+        Save(window, output, "12-items-share-terms");
+        var wide = window.Width;
+        window.Width = 720;
+        Save(window, output, "12-items-share-terms-720");
+        window.Width = wide;
+        dialog.ContinueCommand.Press();
         dialog.Recipient = "sam@acme.dev";
         dialog.RequirePassphrase = true;
         Save(window, output, "12-items-share");

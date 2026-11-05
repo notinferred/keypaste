@@ -3,17 +3,17 @@
 # on a disposable vault KeePassXC made, with a real AI tool's registration, a real MCP client and a real child
 # process, and classifies each act from what the app, the vault, the child, the client and the audit log recorded.
 #
-# The app carries no automation hook (D-0199). It is driven from outside through scripts/lib/desktop-drive.sh's
+# The app carries no automation hook. It is driven from outside through scripts/lib/desktop-drive.sh's
 # verbs, which each platform's driver implements, and a secret-bearing control, which has no automation name, is
 # only typed into. A value is read only from an act's own evidence: the child's report, the client's reply, the
 # audit log or the vault through the CLI, and only its SHA-256 is recorded.
 #
 # The acts run in the default home, ~/.keypaste, as a person's first run does: the first unlock chooses the vault,
-# so Agents' Connect registers the bridge without a vault path (D-0389). KeePassXC makes the vault and opens it
+# so Agents' Connect registers the bridge without a vault path. KeePassXC makes the vault and opens it
 # once, as verify-keepassxc-first-run.sh has it do, so the first run offers it from KeePassXC's recent databases.
 #
 # The acts, in order, and the acts each needs:
-#   first-run      the terms and Don't send, then KeePassXC's database offered on the first run, chosen and
+#   first-run      Don't send on the crash-report choice, then KeePassXC's database offered on the first run, chosen and
 #                  unlocked, and Diagnostics saying no crash report is kept
 #   field          a key kept as a custom field from the item's pane                                  first-run
 #   notes-flag     a KEY=value line in notes flagged in Settings' Recommendations and moved to a field first-run
@@ -23,7 +23,7 @@
 #   approve-deny   its request allowed once in the app's prompt, and a second one denied              connect, field
 #   restore        a revision, an item from Trash and a backup restored                               field
 #   change-access  the master password changed in Settings: the old one refused, the new one unlocks  first-run
-#   lock-refused   Lock, and a request after it refused as the locked app's no-approver (D-0466)      connect
+#   lock-refused   Lock, and a request after it refused as the locked app's no-approver      connect
 #   timing         first-run's unlock and field's save, timed                                         first-run
 # An act passes only on its evidence. It is unreached when one of its steps could not be done, a verb this
 # platform's driver does not implement among them, or an act it needs did not pass; a contradiction when its steps
@@ -134,7 +134,7 @@ evidence_first_run() {
   elif [ "$(path_key "$chosen" "$platform")" != "$(path_key "$vault" "$platform")" ]; then
     contradict "the app chose $chosen, not KeePassXC's $vault"
   elif [ "$crash" != 0 ]; then contradict "after Don't send, app.toml says crash_reports = ${crash:-nothing}"
-  else pass "the first run showed the terms and the crash-report choice, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Don't send wrote crash_reports = 0"
+  else pass "the unlock screen asked the crash-report choice, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Don't send wrote crash_reports = 0"
   fi
 }
 
@@ -245,8 +245,8 @@ evidence_change_access() {
   fi
 }
 
-# D-0466: a request after Lock reaches the locked app's pipe, is recorded denied/no-approver, and tells the agent
-# that the app is open with this vault locked in it; vault-locked is for a request waiting when the lock came (D-0313).
+# A request after Lock reaches the locked app's pipe, is recorded denied/no-approver, and tells the agent
+# that the app is open with this vault locked in it; vault-locked is for a request waiting when the lock came.
 evidence_lock_refused() {
   local answer refusal
   answer="$(fact_of "$1" lock-refused audit_answer)"
@@ -641,7 +641,7 @@ keepassxc_vault() {
 
 # Windows: KeePassXC's own Create Database window makes the vault, as a person makes one, so it derives its key with
 # the Argon2d that window chooses, which keepassxc-cli db-create never does, and the timing act reaches the libargon2
-# the package carries (D-0522). This KeePassXC keeps its settings in files of its own, so the first run offers only
+# the package carries. This KeePassXC keeps its settings in files of its own, so the first run offers only
 # what keepassxc_recent leaves in KeePassXC's recent databases.
 keepassxc_create() {
   local gui pid maker="$OUT/keepassxc-maker" wizard='Create a new KeePassXC database…'
@@ -1048,8 +1048,7 @@ act_first_run() {
   if [ "$PLATFORM" = linux ]; then attempt accessibility enable_accessibility || return 1; fi
   attempt launch app_launch || return 1
   attempt window drive window 120 || return 1
-  # The terms come first, as a notice, then the crash-report choice, both before the welcome (4.11c).
-  attempt terms drive invoke Continue || return 1
+  # The welcome opens at once, with the crash-report choice.
   attempt dont-send drive invoke "Don't send" || return 1
   attempt keepassxc-list drive find 'KEEPASSXC LAST OPENED' || return 1
   attempt choose drive select "$VAULT_NAME" || return 1
@@ -1168,7 +1167,7 @@ act_restore() {
   attempt actions drive toggle 'More actions' || return 1
   attempt history drive invoke id:HistoryToggle || return 1
   attempt revision drive select-nth id:Revisions 1 || return 1
-  # That revision holds the item's project tags as they are, so Restore this writes it without asking first (D-0415).
+  # That revision holds the item's project tags as they are, so Restore this writes it without asking first.
   saved revision_ms restore-revision drive invoke id:RestoreRevision || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
   # An open history takes the whole view, so it is closed for the list to show again.
@@ -1239,7 +1238,7 @@ act_timing() {
   case "$PLATFORM" in
     windows) fact argon2 "the package carries: $(find "$(dirname "$APP")" -maxdepth 1 -iname '*argon2*' -exec basename {} \; | tr '\n' ' ')" ;;
     macos) fact argon2 "the package carries: $(find "$APP/Contents" -iname '*argon2*' -exec basename {} \; | tr '\n' ' ')" ;;
-    linux) fact argon2 "the package carries none; KeePassLib finds the system's by its sonames (D-0522): $(ldconfig -p | grep -o 'libargon2\.so[^ ]*' | sort -u | tr '\n' ' ')" ;;
+    linux) fact argon2 "the package carries none; KeePassLib finds the system's by its sonames: $(ldconfig -p | grep -o 'libargon2\.so[^ ]*' | sort -u | tr '\n' ' ')" ;;
   esac
   fact database "$(fact_of "$OUT" first-run database)"
 }

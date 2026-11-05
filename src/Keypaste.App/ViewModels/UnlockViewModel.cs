@@ -124,9 +124,9 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     internal bool HasLockNote => LockNote.Length > 0;
 
-    /// <summary>The screen's heading: which vault is locked, or an invitation to open one.</summary>
+    /// <summary>The screen's heading: which vault is locked, or an invitation to create or open one.</summary>
     internal string Heading => _selectedPath is null
-        ? "Open a vault"
+        ? OffersCreateFirst ? "Start with a vault" : "Open a vault"
         : IsRestoreOnly ? $"{SelectedName} can't be opened"
         : IsHandOff ? $"Open {SelectedName}"
         : $"{SelectedName} is locked";
@@ -175,16 +175,21 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The line under the heading with no vault selected.</summary>
     internal string WelcomeSubtitle => OffersKeePassXc
         ? "Open a vault KeePassXC opened, another file, or a new vault."
-        : "Choose a KeePass database, drag one here, or create a new vault.";
+        : "A vault is an encrypted file on this computer that keeps your passwords and keys, and its master password is the one password that opens it.";
 
-    /// <summary>The databases KeePassXC last opened, offered while no vault is selected (D-0377).</summary>
+    /// <summary>The crash-report choice this screen asks, below every way in, while nobody has answered it; null otherwise.</summary>
+    internal CrashChoiceViewModel? CrashChoice { get; init; }
+
+    internal bool HasCrashChoice => CrashChoice is not null;
+
+    /// <summary>The databases KeePassXC last opened, offered while no vault is selected.</summary>
     internal IReadOnlyList<KeePassXcDatabaseItem> KeePassXc { get; private set; } = [];
 
     /// <summary>Whether the welcome lists KeePassXC's databases.</summary>
     internal bool OffersKeePassXc => _selectedPath is null && KeePassXc.Count > 0;
 
-    /// <summary>Whether "Open a vault…" is the welcome's primary action, which it is while KeePassXC offers nothing.</summary>
-    internal bool OffersOpenFirst => _selectedPath is null && KeePassXc.Count == 0;
+    /// <summary>Whether "Create a vault…" is the welcome's first action, which it is while KeePassXC offers nothing, with "Open a vault…" after it.</summary>
+    internal bool OffersCreateFirst => _selectedPath is null && KeePassXc.Count == 0;
 
     /// <summary>Choosing a database KeePassXC opened goes to the ordinary unlock with its path.</summary>
     internal KeePassXcDatabaseItem? SelectedKeePassXc
@@ -271,7 +276,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         private set => _notice = value;
     }
 
-    /// <summary>What the shell says when the first create or unlock chose this vault for agents and the CLI (D-0389).</summary>
+    /// <summary>What the shell says when the first create or unlock chose this vault for agents and the CLI.</summary>
     internal const string ChosenNotice =
         "Agents and the keypaste CLI now use this vault when no --vault is given. Settings changes it.";
 
@@ -399,7 +404,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(IsHandOff));
                 OnPropertyChanged(nameof(OffersQuickUnlock));
                 OnPropertyChanged(nameof(OffersKeePassXc));
-                OnPropertyChanged(nameof(OffersOpenFirst));
+                OnPropertyChanged(nameof(OffersCreateFirst));
                 OnPropertyChanged(nameof(ShowsRecent));
                 OnPropertyChanged(nameof(CanTypePassword));
                 OnPropertyChanged(nameof(SelectedName));
@@ -494,7 +499,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
     private partial string? NewVaultPath { get; set; }
 
-    // A keyfile or a hardware key alone is a whole answer: KeePassXC makes vaults with no password (D-0282).
+    // A keyfile or a hardware key alone is a whole answer: KeePassXC makes vaults with no password.
     private bool CanUnlock =>
         !Busy && CanTypePassword && (_master.Length > 0 || KeyfilePath is not null || HardwareKeySlot is not null);
 
@@ -750,7 +755,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
         if (outcome != UnlockOutcome.Opened)
         {
-            Message = "The backup was restored. Unlock it with the password, keyfile and YubiKey that backup was made under.";
+            Message = "The backup was restored. Unlock it with the password, key file and YubiKey that backup was made under.";
             return;
         }
 
@@ -761,7 +766,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// After a password unlock, has Windows Hello asked whether to keep this unlock for a quick one, as KeePassXC asks
-    /// after each (D-0552), then hands the shell the vault, which is open whatever the answer.
+    /// after each, then hands the shell the vault, which is open whatever the answer.
     /// </summary>
     /// <remarks>
     /// A screen replaced meanwhile still hands it over while the unlock is the session's own, so the app locks a vault
@@ -842,7 +847,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         UnlockOutcome.HeldElsewhere => HeldElsewhere(),
         UnlockOutcome.HardwareKeyFailed => ExplainHardwareKey(_session.LastHardwareKeyFailure, HardwareKeySlot),
         UnlockOutcome.KeyChanged =>
-            $"This vault's password or keyfile was changed after it locked, so {QuickUnlockName} can't unlock it. Unlock it with the new ones.",
+            $"This vault's password or key file was changed after it locked, so {QuickUnlockName} can't unlock it. Unlock it with the new ones.",
         UnlockOutcome.QuickUnlockRefused => _session.LastQuickUnlock switch
         {
             QuickUnlockOutcome.Cancelled => null,
@@ -963,7 +968,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             MoreOptions |= maybeSecondFactor;
 
             Fail(HasBackups && outcome != UnlockOutcome.KeyfileUnusable
-                ? $"{explained} If the file is damaged, or its password or keyfile was changed and lost, restore a backup."
+                ? $"{explained} If the file is damaged, or its password or key file was changed and lost, restore a backup."
                 : explained);
             ResetPassword();
         }
@@ -1104,7 +1109,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Asks for a keyfile and takes it only if it is one, saying why not at once rather than after a
-    /// password has been typed (D-0284).
+    /// password has been typed.
     /// </summary>
     internal async Task ChooseKeyfileAsync()
     {
@@ -1127,7 +1132,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
         if (inspection.IsFragile && IsCreating)
         {
-            Fail("keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile.");
+            Fail("keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass key file.");
         }
         else
         {
@@ -1179,7 +1184,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         var note = $"keypaste saved {name}. Keep a copy somewhere other than this computer: without it the vault can't be opened, and nothing recovers it.";
 
         return string.Equals(System.IO.Path.GetDirectoryName(keyfile), System.IO.Path.GetDirectoryName(vault), PathIdentity.Comparison)
-            ? $"{note} It's in the vault's folder, so whoever copies that folder gets the vault and its keyfile together."
+            ? $"{note} It's in the vault's folder, so whoever copies that folder gets the vault and its key file together."
             : note;
     }
 
@@ -1187,27 +1192,27 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     internal static string ExplainKeyfileCreation(KeyfileCreationOutcome outcome) => outcome switch
     {
         KeyfileCreationOutcome.PathAlreadyExists => "There's already a file there, and keypaste won't replace it. Choose a name that isn't taken.",
-        KeyfileCreationOutcome.Unsupported => "This build of keypaste can't read a KeePass XML keyfile, so it won't make one. Choose a keyfile you already have.",
-        _ => "The keyfile couldn't be saved there. Choose another folder.",
+        KeyfileCreationOutcome.Unsupported => "This build of keypaste can't read a KeePass XML key file, so it won't make one. Choose a key file you already have.",
+        _ => "The key file couldn't be saved there. Choose another folder.",
     };
 
     /// <summary>The T-28 warning for a keyfile keyed by its hash, or null for any other.</summary>
     private static string? FragileNotice(string? keyfile) =>
         keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile
-            ? $"This vault's keyfile, {System.IO.Path.GetFileName(keyfile)}, is an ordinary file keyed by its exact bytes. " +
-              "Editing it, re-saving it or letting something sync over it loses the vault for good. Change to a KeePass keyfile in Settings."
+            ? $"This vault's key file, {System.IO.Path.GetFileName(keyfile)}, is an ordinary file keyed by its exact bytes. " +
+              "Editing it, re-saving it or letting something sync over it loses the vault for good. Change to a KeePass key file in Settings."
             : null;
 
     /// <summary>Why a file cannot be used as a keyfile, in the register of <see cref="Explain"/>.</summary>
     internal static string ExplainKeyfile(KeyfileOutcome outcome) => outcome switch
     {
-        KeyfileOutcome.Missing => "That keyfile isn't there any more. Choose it from where it is now.",
-        KeyfileOutcome.Unreadable => "That keyfile couldn't be read. Check that you can open it, then choose it again.",
-        KeyfileOutcome.Empty => "That file is empty, so it can't be a keyfile. Choose another.",
-        KeyfileOutcome.IsAVault => "That's a KeePass vault, not a keyfile.",
+        KeyfileOutcome.Missing => "That key file isn't there any more. Choose it from where it is now.",
+        KeyfileOutcome.Unreadable => "That key file couldn't be read. Check that you can open it, then choose it again.",
+        KeyfileOutcome.Empty => "That file is empty, so it can't be a key file. Choose another.",
+        KeyfileOutcome.IsAVault => "That's a KeePass vault, not a key file.",
         KeyfileOutcome.XmlUnreadable =>
-            "That's a KeePass XML keyfile, and this build of keypaste can't read one: it would use the wrong key. Nothing was opened. Open this vault in KeePassXC instead.",
-        _ => "That file can't be used as a keyfile. Choose another.",
+            "That's a KeePass XML key file, and this build of keypaste can't read one: it would use the wrong key. Nothing was opened. Open this vault in KeePassXC instead.",
+        _ => "That file can't be used as a key file. Choose another.",
     };
 
     private string? RememberedKeyfile(string? vaultPath) => Remembered(vaultPath)?.KeyfilePath;
@@ -1242,10 +1247,10 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         VaultCreationOutcome.PathAlreadyExists => "There's already a file there. Choose a name that isn't taken.",
         VaultCreationOutcome.EmptyPassword => "A vault needs a master password.",
         VaultCreationOutcome.PasswordsDoNotMatch => "Those two passwords aren't the same.",
-        VaultCreationOutcome.KeyfileUnusable => "That keyfile can't be used. Choose it again, or another.",
+        VaultCreationOutcome.KeyfileUnusable => "That key file can't be used. Choose it again, or another.",
         VaultCreationOutcome.KeyfileIsFragile =>
-            "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile.",
-        VaultCreationOutcome.KeyfileIsThisVault => "A vault can't be its own keyfile. Choose another file.",
+            "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass key file.",
+        VaultCreationOutcome.KeyfileIsThisVault => "A vault can't be its own key file. Choose another file.",
         VaultCreationOutcome.HardwareKeyNotFound =>
             $"No YubiKey with slot {slot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager.",
         _ => "That vault couldn't be created. Check that you can write to that folder, then try again.",
@@ -1310,15 +1315,15 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     private static string Explain(UnlockOutcome outcome, bool withKeyfile = false, bool withHardwareKey = false) => outcome switch
     {
         // Naming both factors when both were given, or a good password and the wrong file sends the
-        // person to retype the half that was right (D-0284). A wrong key or slot is refused the same
+        // person to retype the half that was right. A wrong key or slot is refused the same
         // way, because it answers, only differently.
         UnlockOutcome.WrongPassword when withKeyfile && withHardwareKey =>
-            "That password, keyfile and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
+            "That password, key file and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
         UnlockOutcome.WrongPassword when withHardwareKey =>
             "That password and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
-        UnlockOutcome.WrongPassword when withKeyfile => "That password and keyfile didn't open this vault. Check both, then try again.",
+        UnlockOutcome.WrongPassword when withKeyfile => "That password and key file didn't open this vault. Check both, then try again.",
         UnlockOutcome.WrongPassword => "That password didn't open this vault. Type it again.",
-        UnlockOutcome.KeyfileUnusable => "That keyfile can't be used. Choose it again, or another.",
+        UnlockOutcome.KeyfileUnusable => "That key file can't be used. Choose it again, or another.",
         UnlockOutcome.NotFound => "That file isn't there any more. Choose it from where it is now.",
         UnlockOutcome.NotAKdbx => "That isn't a KeePass vault. Choose a .kdbx file.",
         _ => "That vault couldn't be opened. Check that you can read the file, then try again.",
@@ -1376,7 +1381,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 : [.. KeePassXcDatabases.ReadAll(_keePassXcConfigs()).Select(path => new KeePassXcDatabaseItem(path))];
             OnPropertyChanged(nameof(KeePassXc));
             OnPropertyChanged(nameof(OffersKeePassXc));
-            OnPropertyChanged(nameof(OffersOpenFirst));
+            OnPropertyChanged(nameof(OffersCreateFirst));
             OnPropertyChanged(nameof(WelcomeSubtitle));
         }
     }

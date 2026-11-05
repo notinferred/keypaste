@@ -3,7 +3,7 @@
 # start, crash reports composed as that start composes them, on a headless display, and stands in on loopback for
 # keypaste.com's /api/crash, where KEYPASTE_CRASH_URL points the app.
 #
-# A fresh home shows the first run's terms and then its choice before the unlock screen, and Send crash reports writes
+# A fresh home goes straight to the unlock screen, which asks the crash-report choice with a link to its terms, and Send crash reports writes
 # crash_reports = 1 to app.toml. With an item's password copied, an exception thrown on the UI thread clears the
 # clipboard, locks and quits with exit code 70, prints nothing of its message and leaves one crash report and no run
 # marker: the report names the exception's types, Items and an uptime under a minute, and holds none of the vault's
@@ -49,7 +49,7 @@ VAULT="$(native "$WORK/$VAULT_NAME.kdbx")"
 export KEYPASTE_DRIVER_PASSWORD="$MASTER"
 APP_PIDS=''
 
-# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 4 is the endpoint's input, 5 the silent endpoint's, 6 to 8 the apps'.
+# Fixed descriptors, as macOS's bash 3.2 needs: 4 is the endpoint's input, 5 the silent endpoint's, 6 to 8 the apps'.
 for fd in 4 5 6 7 8; do eval "exec $fd>/dev/null"; done
 cleanup() {
   local pid
@@ -120,14 +120,13 @@ holds_nothing() {
   return 0
 }
 
-# A first start in home $1 on descriptor 6, answering the first run with $2 and crashing with an item's password copied.
+# A first start in home $1 on descriptor 6, answering the crash-report choice with $2 and crashing with an item's password copied.
 crash_with_copy() {
   local home="$1" answer="$2" url="${3:-}"
   start_app 6 "$home" "$home.out" "$url"
-  wait_for '^screen first-run' "$APP_OUT"
-  grep -q '^screen unlock' "$APP_OUT" && die "a fresh home showed the unlock screen before the first run's terms"
-  say 6 "first-run $answer"
-  wait_for '^screen unlock' "$APP_OUT"
+  wait_for '^crash choice asked' "$APP_OUT"
+  say 6 "crash-choice $answer"
+  wait_for '^crash choice answered' "$APP_OUT"
   say 6 "unlock $VAULT"
   wait_for '^screen shell' "$APP_OUT"
   say 6 "copy $ENTRY"
@@ -190,9 +189,9 @@ chose "$OFF" 0
 step 'Sending, then a crash an endpoint that never answers will hold'
 HELD="$WORK/held-home"
 start_app 6 "$HELD" "$HELD.out" "$SILENT"
-wait_for '^screen first-run' "$APP_OUT"
-say 6 'first-run send'
-wait_for '^screen unlock' "$APP_OUT"
+wait_for '^crash choice asked' "$APP_OUT"
+say 6 'crash-choice send'
+wait_for '^crash choice answered' "$APP_OUT"
 say 6 "unlock $VAULT"
 wait_for '^screen shell' "$APP_OUT"
 say 6 "crash $MESSAGE"
@@ -206,7 +205,7 @@ cp "$WORK/sent.json" "$OFF/crash-reports/$(basename "$REPORT")"
 start_app 7 "$OFF" "$OFF-2.out" "$ENDPOINT"
 OFF_OUT="$APP_OUT"
 wait_for '^screen unlock' "$OFF_OUT"
-grep -q '^screen first-run' "$OFF_OUT" && die "the first run showed again once Don't send was chosen"
+grep -q '^crash choice asked' "$OFF_OUT" && die "the crash-report choice was asked again once Don't send was chosen"
 for _ in $(seq 1 50); do [ -e "$OFF/crash-reports" ] || break; sleep 0.2; done
 [ -e "$OFF/crash-reports" ] && die "switched off, the next start kept the outbox: $(ls "$OFF/crash-reports")"
 
@@ -214,7 +213,7 @@ step 'The next start sends the report'
 start_app 6 "$ON" "$ON-2.out" "$ENDPOINT"
 ON_OUT="$APP_OUT"
 wait_for '^screen unlock' "$ON_OUT"
-grep -q '^screen first-run' "$ON_OUT" && die "the first run showed again once Send crash reports was chosen"
+grep -q '^crash choice asked' "$ON_OUT" && die "the crash-report choice was asked again once Send crash reports was chosen"
 
 step 'The next start where the endpoint holds the request'
 start_app 8 "$HELD" "$HELD-2.out" "$SILENT"
@@ -252,13 +251,28 @@ quit_app 7 0 "$OFF_OUT"
 [ -e "$WORK/received/2.json" ] && die "the endpoint received a second report, which only the switched-off home held"
 [ -e "$OFF/crash-reports" ] && die "switched off, the app wrote an outbox while it ran"
 
+# ------------------------------------------------------------- asked once, answered or not
+step 'Left unanswered, the choice is not asked at the next start and nothing is kept'
+PASSED="$WORK/passed"
+start_app 6 "$PASSED" "$PASSED.out" "$ENDPOINT"
+wait_for '^crash choice asked' "$APP_OUT"
+for _ in $(seq 1 50); do grep -q '^crash_choice = ' "$PASSED/app.toml" 2>/dev/null && break; sleep 0.2; done
+grep -Eq '^crash_choice = "[0-9]{4}-[0-9]{2}-[0-9]{2}"' "$PASSED/app.toml" || die "the first start did not record having asked: $(cat "$PASSED/app.toml" 2>/dev/null)"
+grep -q '^crash_reports' "$PASSED/app.toml" && die "asking recorded an answer nobody gave: $(cat "$PASSED/app.toml")"
+quit_app 6 0 "$APP_OUT"
+start_app 6 "$PASSED" "$PASSED-2.out" "$ENDPOINT"
+wait_for '^screen unlock' "$APP_OUT"
+grep -q '^crash choice asked' "$APP_OUT" && die "the crash-report choice was asked again though it was asked once"
+[ -e "$PASSED/crash-reports" ] && die "unanswered, the app wrote an outbox: $(ls "$PASSED/crash-reports")"
+quit_app 6 0 "$APP_OUT"
+
 # ------------------------------------------------------------- a run that ended with nothing able to report it
 step 'A killed run, reported at the next start'
 KILLED="$WORK/killed"
 start_app 6 "$KILLED" "$KILLED.out"
-wait_for '^screen first-run' "$APP_OUT"
-say 6 'first-run send'
-wait_for '^screen unlock' "$APP_OUT"
+wait_for '^crash choice asked' "$APP_OUT"
+say 6 'crash-choice send'
+wait_for '^crash choice answered' "$APP_OUT"
 [ -e "$KILLED/crash-reports/running" ] || die "a run sending reports set no run marker"
 kill_process "$APP_PID"
 exec 6>&-

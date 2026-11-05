@@ -1,6 +1,6 @@
-// The terms of use the app shows at first run, the one copy of them (D-0597). A line starting // is not shown, a line
+// The terms of use the app links at Share… and the crash-report choice, the one copy of them. A line starting // is not shown, a line
 // starting ## is a heading, and every other line is a paragraph. The version is the date on the second shown line, and a
-// new date shows the terms again before anything is sent under them.
+// new date stops crash reports until someone chooses Send under it, and shows Share…'s step again.
 // DRAFT pending H-0027: not legal advice and not reviewed. The founder or a lawyer approves it before 1.0.0, filling in
 // each bracketed item: the legal entity, the limitation of liability and the governing law.
 keypaste terms of use

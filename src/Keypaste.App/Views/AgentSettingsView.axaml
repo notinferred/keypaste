@@ -128,7 +128,7 @@
               <Button Grid.Column="1" Content="Apply" Command="{Binding ApplySeeCommand}" />
             </Grid>
             <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="Selectors as --expose takes them, separated by commas: tag:env:billing is every environment of billing; a place pattern such as api/** reaches whole items." />
+                       Text="What it can see, separated by commas: tag:env:billing is every environment of billing; a place pattern such as api/** reaches whole items." />
           </StackPanel>
         </Expander>
 

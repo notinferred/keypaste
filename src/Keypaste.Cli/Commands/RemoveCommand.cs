@@ -51,8 +51,8 @@ internal static class RemoveCommand
                 // keypaste would prefer to be true: one vault has a recycle bin and another does
                 // not, and only one of those deletes can be undone.
                 var answer = context.Prompt.ReadLine(check.Preview!.Recycles
-                    ? $"Move '{entryPath}' to the recycle bin? [y/N] "
-                    : $"Remove '{entryPath}'? This vault has no recycle bin. [y/N] ");
+                    ? $"Move '{entryPath}' to the Trash? [y/N] "
+                    : $"Remove '{entryPath}'? This vault has no Trash. [y/N] ");
                 if (!EditLines.Confirmed(answer))
                 {
                     context.Stderr.WriteLine("Cancelled.");
@@ -75,7 +75,7 @@ internal static class RemoveCommand
     internal static int Done(EditDone done, CliContext context)
     {
         context.Stderr.WriteLine(done.Outcome == EditOutcome.Recycled
-            ? $"Moved {done.Item} to the recycle bin"
+            ? $"Moved {done.Item} to the Trash"
             : $"Removed {done.Item}");
         return CliApp.ExitSuccess;
     }

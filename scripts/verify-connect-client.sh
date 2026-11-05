@@ -323,7 +323,7 @@ last_audit --arg s "$FIRST" --arg l "$CLAUDE" '.decision == "denied" and .method
 say '^preview end' connect-remove "$CLAUDE"
 [ "$(last_preview)" = 'claude mcp remove --scope user keypaste' ] || die "the Disconnect plan is not the tool's own removal"
 say '^message ' confirm
-case "$(last_message)" in Removed.*) ;; *) die "Disconnect did not remove: $(last_message)" ;; esac
+case "$(last_message)" in Disconnected.*) ;; *) die "Disconnect did not remove: $(last_message)" ;; esac
 LISTED="$(PATH="$CLIENT_PATH" "$FAKE" mcp list)"
 case "$LISTED" in *keypaste*) die "the tool still lists keypaste after Disconnect: $LISTED" ;; esac
 clean_config "$CONFIG"
@@ -399,7 +399,7 @@ case "$(last_preview)" in
   *) die "the Cursor Disconnect plan is not the edit that removes keypaste's entry: [$(last_preview)]" ;;
 esac
 say '^message ' confirm
-case "$(last_message)" in Removed.*) ;; *) die "Disconnect did not remove keypaste from Cursor: $(last_message)" ;; esac
+case "$(last_message)" in Disconnected.*) ;; *) die "Disconnect did not remove keypaste from Cursor: $(last_message)" ;; esac
 [ "$(bytes "$CURSOR")" = "$(bytes "$SEED")" ] || die "Disconnect did not give back Cursor's file as it was"
 [ "$(bytes "$CURSOR.keypaste-backup")" = "$(bytes "$SEED")" ] || die "Disconnect changed the backup"
 expect_state "$CURSOR_ID" connect "after Disconnect"

@@ -428,11 +428,11 @@ public sealed class SessionAuthorityAccessTests : IDisposable
 
         Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing), (full!.Decision, full.Method));
         Assert.Contains(
-            $"applied at once in the vault, since it gives the agent nothing more, but this computer's ceilings could not hold it: clients.toml holds at most {AccessCaps.MaximumRows} rows",
+            $"applied at once in the vault, since it gives the agent nothing more, but this computer's limits could not hold it: clients.toml holds at most {AccessCaps.MaximumRows} rows",
             full.Reason,
             StringComparison.Ordinal);
         Assert.Equal((AuditDecision.Granted, AuditMethod.Narrowing), (unwritable!.Decision, unwritable.Method));
-        Assert.Contains("but this computer's ceilings could not be written: the disk is full", unwritable.Reason, StringComparison.Ordinal);
+        Assert.Contains("but this computer's limits could not be written: the disk is full", unwritable.Reason, StringComparison.Ordinal);
         Assert.Equal((AgentMode.Ask, false), (_fixture.Settings.Records[_agent].Mode, _fixture.Settings.Records[_agent].Values));
         Assert.Empty(_fixture.Settings.CapsWritten);
         Assert.Equal(0, _fixture.Channel.AccessAsked);
@@ -450,7 +450,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         var refused = await client.ChangeAccessAsync(Asked() with { Mode = "ask" }, Token);
 
         Assert.Equal((AuditDecision.Denied, AuditMethod.Failed), (refused!.Decision, refused.Method));
-        Assert.Contains("this computer's ceilings could not hold it", refused.Reason, StringComparison.Ordinal);
+        Assert.Contains("this computer's limits could not hold it", refused.Reason, StringComparison.Ordinal);
         Assert.Empty(_fixture.Settings.Written);
         Assert.Empty(_fixture.Settings.CapsWritten);
     }
@@ -976,7 +976,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
         });
     }
 
-    /// <summary>A reload withdraws a confirmation on screen as a lock does, so its Allow changes nothing and the session stays (D-0412).</summary>
+    /// <summary>A reload withdraws a confirmation on screen as a lock does, so its Allow changes nothing and the session stays.</summary>
     [Fact]
     public async Task AReloadWhileAWideningIsConfirmed_ChangesNothing()
     {
@@ -1028,7 +1028,7 @@ public sealed class SessionAuthorityAccessTests : IDisposable
     /// <summary>
     /// A lock while a request for more waits for its confirmation withdraws it, the confirmation not yet
     /// drawn included, since the lock's withdrawal reaches the prompt as a credential request's does
-    /// (D-0396), and nothing is saved.
+    ///, and nothing is saved.
     /// </summary>
     [Fact]
     public async Task ALockWhileAWideningWaits_WithdrawsItsConfirmation_AndSavesNothing()

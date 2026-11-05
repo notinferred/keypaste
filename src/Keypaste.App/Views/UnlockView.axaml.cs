@@ -68,6 +68,18 @@ internal sealed partial class UnlockView : UserControl
             {
                 _watched.PropertyChanged += OnModelChanged;
                 _watched.FileChosen += OnFileChosen;
+
+                // Answered, the keyboard goes back to what the screen is for, after the choice has kept it from falling away.
+                if (_watched.CrashChoice is { } choice)
+                {
+                    choice.PropertyChanged += (_, changed) =>
+                    {
+                        if (changed.PropertyName == nameof(CrashChoiceViewModel.Outcome) && Model is { HasSelection: true })
+                        {
+                            Dispatcher.UIThread.Post(FocusPassword, DispatcherPriority.Background);
+                        }
+                    };
+                }
             }
         };
     }

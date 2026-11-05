@@ -45,10 +45,10 @@ internal static class ClientsCommand
         "clients",
         "show or change what each agent can see and do\n\n"
             + "shows each agent's settings, from the vault through the app or `keypaste approve` holding it, and this "
-            + "computer's ceilings in clients.toml; with an agent's name, changes them. settings follow the name an "
+            + "computer's limits in clients.toml; with an agent's name, changes them. settings follow the name an "
             + "agent's bridge was given with --client-label. a change that gives the agent nothing more applies at once; "
             + "one that gives more waits for you to confirm it where the vault is unlocked, and with nothing holding it, "
-            + "only a change that lowers this computer's ceilings can be made.",
+            + "only a change that lowers this computer's limits can be made.",
         Execute)
     {
         _agent, _project, _mode, _see, _values, _run, _perHour, _until, _reset, CliOptions.Json, CliOptions.Vault, CliOptions.Approver,
@@ -165,7 +165,7 @@ internal static class ClientsCommand
     {
         if (!TryPipe(line, context, out var vault, out var pipe, out var why))
         {
-            return ([], $"{why}, so only this computer's ceilings are shown", CliApp.ExitSuccess);
+            return ([], $"{why}, so only this computer's limits are shown", CliApp.ExitSuccess);
         }
 
         using var bound = new CancellationTokenSource(_listBound);
@@ -365,7 +365,7 @@ internal static class ClientsCommand
         }
 
         writer.WriteLine();
-        writer.WriteLine(style.Paint(writer, Tone.Muted, "  this computer's ceilings, in clients.toml: nothing above gives more than these"));
+        writer.WriteLine(style.Paint(writer, Tone.Muted, "  this computer's limits, in clients.toml: nothing above gives more than these"));
         Table(
             writer,
             style,

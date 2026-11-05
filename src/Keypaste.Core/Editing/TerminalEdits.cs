@@ -4,7 +4,7 @@ namespace Keypaste.Core.Editing;
 
 /// <summary>
 /// Checks and makes a terminal's edit on an open vault: the one place the CLI's saving verbs and the
-/// vault's holder decide what an edit does, so the two cannot disagree (D-0464).
+/// vault's holder decide what an edit does, so the two cannot disagree.
 /// </summary>
 /// <remarks>
 /// Nothing here saves: the caller saves, or the holder saves under its claim. A refusal carries
@@ -252,8 +252,8 @@ public static class TerminalEdits
             EditAction.Remove,
             Shown(remove.Item),
             [recycles
-                ? $"Moves {Shown(remove.Item)} to the recycle bin, where it can be restored."
-                : $"Removes {Shown(remove.Item)} for good: this vault has no recycle bin."])
+                ? $"Moves {Shown(remove.Item)} to the Trash, where it can be restored."
+                : $"Removes {Shown(remove.Item)} for good: this vault has no Trash."])
         {
             Recycles = recycles,
         });
@@ -660,7 +660,7 @@ public static class TerminalEdits
 
     /// <summary>
     /// A sentence for each value written to one item that holds a KeePass placeholder: what it fills in where it
-    /// leaves keypaste, or what refuses it there, by keyword and never by value (D-0465).
+    /// leaves keypaste, or what refuses it there, by keyword and never by value.
     /// </summary>
     /// <param name="written">Each value the edit writes to the item; one not yet read plants nothing.</param>
     /// <param name="held">Reads the name of each custom field the item has once the edit is written; called only when a value holds a placeholder.</param>

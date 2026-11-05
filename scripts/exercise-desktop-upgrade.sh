@@ -4,18 +4,19 @@
 # data is byte-identical and still readable.
 #
 # The candidates are three unpublished builds of one commit at distinct numeric versions, because an MSI
-# ProductVersion is numeric and two candidates of one version cannot be ordered (D-0139, D-0147). The CLI/MCP
+# ProductVersion is numeric and two candidates of one version cannot be ordered. The CLI/MCP
 # that makes the data is the published release, kept apart from the packages, so no upgrade can change it
-# (D-0206).
+#.
 #
 # After each transition a new terminal must run the keypaste the installed app carries (G.5). On Windows the
 # MSI appends its folder to the user Path, keeps one entry through an upgrade and removes only that entry on
 # uninstall, which an entry of the user's own, added first, shows. Open at login's Run value, written after the
 # first install as the app's Settings writes it, must come through the upgrade unchanged and be gone after the
-# uninstall. The upgraded app then starts once and shows its window before the data is read, so what its first
+# uninstall. The lower app starts first and is answered Don't send, since a first start with no answer writes
+# app.toml, as it is on Linux and macOS. The upgraded app then starts once and shows its window before the data is read, so what its first
 # start writes is compared too, as on Linux and macOS. On Linux the upgrade is a download left
 # beside the old image: the lower app links keypaste from Settings, a start of the higher image while the lower
-# app runs hands off to it (D-0397) and still re-points the link, the higher app then starts on its own, a later
+# app runs hands off to it and still re-points the link, the higher app then starts on its own, a later
 # start of the lower one leaves the link, and the person then deletes the lower image. Removing the image
 # leaves the link naming a missing file, which is recorded as a known limit, not checked. On macOS the lower
 # app's Settings links keypaste at /usr/local/bin, made with sudo while Link is offered as a runner has nobody
@@ -24,7 +25,7 @@
 # LaunchAgent, which name that path, must come through unchanged with the five files; the upgraded app must
 # then unlock the vault. Uninstalling moves the bundle to the Trash and leaves the link and the LaunchAgent.
 #
-# A rehearsal makes the data with a CLI/MCP built from this commit instead (D-0433). The candidates are never
+# A rehearsal makes the data with a CLI/MCP built from this commit instead. The candidates are never
 # attested either way, so no check changes; the run is never release evidence.
 #
 # This runs against the real user profile - the install folder, the Start menu entry, HKCU, ~/.keypaste and the
@@ -32,10 +33,10 @@
 # unless the caller states that the profile is disposable: CI=true on a fresh runner, or
 # KEYPASTE_UPGRADE_SANDBOX=1 for a throwaway account or virtual machine. On Windows, environment variables
 # cannot move an MSI: Windows Installer resolves the install folder, the Start menu and HKCU through known
-# folders, so redirecting LOCALAPPDATA sandboxes nothing (D-0206).
+# folders, so redirecting LOCALAPPDATA sandboxes nothing.
 #
 # The interrupted install fails inside the transaction, from a copy whose cabinet cannot be extracted, and
-# only a log naming the failed action counts: an install that never failed proves no recovery (D-0213). On
+# only a log naming the failed action counts: an install that never failed proves no recovery. On
 # macOS it is a download that stopped halfway, a half-length DMG that hdiutil must refuse to attach.
 #
 # Checks, in order: install-lower, fixture, upgrade, data-after-upgrade, interrupted, downgrade-refused,
@@ -149,11 +150,12 @@ classify() {
   emit install-lower
 
   # On Linux the person links keypaste from the lower app's Settings before the baseline is taken, since the
-  # app's unlock writes its settings.
+  # app's unlock writes its settings; on Windows the person only answers the crash-report choice, which writes them too.
   # A Settings step that could not be done is named before the baseline it would have completed.
   if judge fixture && judge baseline; then
     made="$detail"
-    if [ "$platform" = linux ] && ! { judge window && judge unlocked && judge settings && judge link-cli && judge linked \
+    if [ "$platform" = windows ] && ! { judge window && judge crash-choice; }; then :
+    elif [ "$platform" = linux ] && ! { judge window && judge unlocked && judge settings && judge link-cli && judge linked \
       && terminal_runs fixture "$LOWER"; }; then :
     elif [ "$platform" = macos ] && ! { judge window && judge unlocked && judge settings && judge link-offered && judge link-made \
       && judge link-cli && judge linked && judge open-at-login && judge login-item && terminal_runs fixture "$LOWER"; }; then :
@@ -196,7 +198,7 @@ classify() {
 
   if judge interrupt; then
     # An install that never failed inside its transaction was not interrupted, and a version that
-    # still runs then says nothing about recovery (D-0213).
+    # still runs then says nothing about recovery.
     if [ "$(fact_of "$dir" interrupted_failed)" != yes ]; then
       result=unreached; why="the install did not fail inside the transaction: $(fact_of "$dir" interrupted_where)"
     elif [ "$(fact_of "$dir" interrupted_exit)" = 0 ]; then result=contradiction; why='the install that was meant to fail succeeded'
@@ -329,7 +331,7 @@ keepassxc() {
     | tr -d " \t$CR\n" | grep -oF "<Key>Title</Key><Value>$HOME_ENTRY</Value>" | grep -c . || true
 }
 
-# Everything the transitions must preserve, made by the CLI/MCP (D-0146).
+# Everything the transitions must preserve, made by the CLI/MCP.
 fixture() {
   local value
   KP="$(find "$CLI_DIR" -maxdepth 3 -type f \( -name keypaste -o -name keypaste.exe \) | head -n 1)"
@@ -463,7 +465,7 @@ open_at_login() {
 # --- the app a person starts ----------------------------------------------------------------------
 
 # Every start stops the running app first, since a second start only asks the running one to show its
-# window (D-0397). macOS starts the bundle through LaunchServices, Windows the installed program through PowerShell.
+# window. macOS starts the bundle through LaunchServices, Windows the installed program through PowerShell.
 start_app() { # start_app <appimage|bundle|exe> <name>
   stop_app
   if [ "$PLATFORM" = macos ]; then
@@ -495,13 +497,20 @@ stop_app() {
   sleep 2
 }
 
+# The lower app answered once, so its asking and the answer are in app.toml before the baseline hashes it.
+answer_crash_choice() {
+  start_app "$APP" lower || true
+  { act window drive window 120 && act crash-choice drive invoke "Don't send"; } || true
+  stop_app
+}
+
 # The lower app, unlocked, links keypaste from Settings as a person does once; a new terminal then runs it.
 link_from_settings() {
   if [ "$PLATFORM" = linux ]; then act accessibility enable_accessibility || return 0; fi
   start_app "$APP" lower || true
-  # A fresh home shows the terms, then the crash-report choice, before the unlock screen (4.11c).
+  # A fresh home's unlock screen asks the crash-report choice.
   { act window drive window 120 \
-    && act terms drive invoke Continue && act crash-choice drive invoke "Don't send" && act password-focus drive focus id:Password \
+    && act crash-choice drive invoke "Don't send" && act password-focus drive focus id:Password \
     && act unlocked drive type "$MASTER" && act unlocked-enter drive key Return && act unlocked drive find 'Lock now' \
     && act settings shortcut 4 && link_cli; } || true
   stop_app
@@ -564,7 +573,7 @@ windows_shortcut() { printf '%s' "$(cygpath -u "$APPDATA")/Microsoft/Windows/Sta
 
 # Windows Installer is asked, not a registry path: this install registers under
 # HKLM\...\Installer\UserData\<SID>\Products and nothing lands in HKCU's Uninstall list, so
-# enumerating that hive reported no installation at all (run 35263524309, D-0209).
+# enumerating that hive reported no installation at all (run 35263524309).
 windows_registrations() {
   powershell_out "\$i = New-Object -ComObject WindowsInstaller.Installer
     foreach (\$p in @(\$i.GetType().InvokeMember('RelatedProducts', 'GetProperty', \$null, \$i, @('$(upgrade_code)')))) {
@@ -582,7 +591,7 @@ upgrade_code() {
   printf '{%s}' "$(printf '%s' "$code" | tr '[:lower:]' '[:upper:]')"
 }
 
-# An MSI verbose log is UTF-16 (D-0209); grep reads it to the end, as a grep -q stopping at the match kills tr and pipefail then reads no match (F.43).
+# An MSI verbose log is UTF-16; grep reads it to the end, as a grep -q stopping at the match kills tr and pipefail then reads no match (F.43).
 msi_log_says() { # msi_log_says <log> <extended-regexp>
   [ -f "$1" ] && tr -d '\0' < "$1" | grep -iE "$2" > /dev/null
 }
@@ -699,7 +708,7 @@ upgrade() {
 # fails inside the install itself. Five other ways interrupt nothing: a property on a missing volume
 # fails in CostFinalize, killing the client leaves the service to finish, an icacls deny does not stop
 # a SYSTEM write, deleting the source fails only after InstallFinalize, and the log's own process
-# prefix is no process to end (D-0210, D-0212, D-0213).
+# prefix is no process to end.
 interrupt() {
   local msi log="$OUT/interrupt.log" source code previous size image partial said volume
   if [ "$PLATFORM" = windows ]; then
@@ -862,7 +871,7 @@ run_all() {
   fi
 
   if act install-lower install_lower && act fixture fixture; then
-    if [ "$PLATFORM" != windows ]; then link_from_settings; fi
+    if [ "$PLATFORM" = windows ]; then answer_crash_choice; else link_from_settings; fi
     if act baseline baseline && act upgrade upgrade; then
       act read-after-upgrade read_after upgrade || true
       if [ "$PLATFORM" = macos ]; then unlock_upgraded; fi
@@ -905,6 +914,8 @@ selftest() {
     printf '%s\n' \
       '{"action":"install-lower","status":"ok","detail":"msiexec /i exited 0"}' \
       '{"action":"fixture","status":"ok","detail":"vault made"}' \
+      '{"action":"window","status":"ok","detail":"window keypaste"}' \
+      '{"action":"crash-choice","status":"ok","detail":"invoked Don\u0027t send"}' \
       '{"action":"baseline","status":"ok","detail":"vault made, 5 files"}' \
       '{"action":"upgrade","status":"ok","detail":"MajorUpgrade exited 0"}' \
       '{"action":"read-after-upgrade","status":"ok","detail":"read back"}' \
@@ -1023,6 +1034,8 @@ selftest() {
   set_fact install-unregistered products_after_install 0
   passing fixture-incomplete
   set_fact fixture-incomplete baseline 'absent clients.toml'
+  passing lower-not-answered
+  refuse_action lower-not-answered crash-choice "no button 'Don't send'"
   passing no-baseline
   refuse_action no-baseline baseline 'no audit record was written'
   passing upgrade-not-taken
@@ -1162,6 +1175,8 @@ selftest() {
   expect install-unregistered install-lower contradiction
   expect install-unregistered upgrade unreached
   expect fixture-incomplete fixture contradiction
+  expect lower-not-answered fixture unreached
+  expect lower-not-answered upgrade unreached
   expect no-baseline fixture unreached
   expect no-baseline upgrade unreached
   expect upgrade-not-taken upgrade contradiction

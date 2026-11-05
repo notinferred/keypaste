@@ -103,7 +103,7 @@ public sealed class UnlockKeyfileTests : IDisposable
         await model.UnlockAsync();
 
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal("That password and keyfile didn't open this vault. Check both, then try again.", model.Message);
+        Assert.Equal("That password and key file didn't open this vault. Check both, then try again.", model.Message);
     }
 
     [Fact]
@@ -118,16 +118,16 @@ public sealed class UnlockKeyfileTests : IDisposable
 
         _picker.KeyfilePath = Path.Combine(_home.Path, "absent.key");
         await model.ChooseKeyfileAsync();
-        Assert.Equal("That keyfile isn't there any more. Choose it from where it is now.", model.Message);
+        Assert.Equal("That key file isn't there any more. Choose it from where it is now.", model.Message);
         Assert.Null(model.KeyfilePath);
 
         _picker.KeyfilePath = empty;
         await model.ChooseKeyfileAsync();
-        Assert.Equal("That file is empty, so it can't be a keyfile. Choose another.", model.Message);
+        Assert.Equal("That file is empty, so it can't be a key file. Choose another.", model.Message);
 
         _picker.KeyfilePath = path;
         await model.ChooseKeyfileAsync();
-        Assert.Equal("That's a KeePass vault, not a keyfile.", model.Message);
+        Assert.Equal("That's a KeePass vault, not a key file.", model.Message);
 
         Assert.Equal(3, _picker.KeyfileCalls);
         Assert.Null(model.KeyfilePath);
@@ -148,7 +148,7 @@ public sealed class UnlockKeyfileTests : IDisposable
 
         Assert.Equal(0, _unlockedCalls);
         Assert.False(_session.IsUnlocked);
-        Assert.Equal("That keyfile isn't there any more. Choose it from where it is now.", model.Message);
+        Assert.Equal("That key file isn't there any more. Choose it from where it is now.", model.Message);
     }
 
     [Fact]

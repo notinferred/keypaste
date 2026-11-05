@@ -28,7 +28,7 @@
             <!-- Runs on one line: whitespace between them would be drawn as a space. -->
             <TextBlock Grid.Column="1" Classes="caption" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"><Run Text="Answering agents from this app · " /><Run Text="{Binding Serving}" FontFamily="{DynamicResource KpMono}" /></TextBlock>
           </Grid>
-          <!-- Agents › History: what agents and tokens asked for (D-0374). -->
+          <!-- Agents › History: what agents and tokens asked for. -->
           <Button Grid.Column="1" Name="AgentHistory"
                   Classes="ghost"
                   Padding="12,0"
@@ -52,7 +52,7 @@
         </Border>
 
         <!-- Only the prompt window answers (T-2): a row names what was asked, never the agent's reason, and
-             Show the prompt brings that window forward with Deny focused and its allows disarmed (D-0456). -->
+             Show the prompt brings that window forward with Deny focused and its allows disarmed. -->
         <StackPanel Spacing="10" IsVisible="{Binding HasWaiting}">
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
             <ctl:KpIcon Icon="clock" Size="15" Foreground="{DynamicResource KpTextMuted}" />
@@ -117,7 +117,7 @@
           </Border>
         </StackPanel>
 
-        <!-- The AI tools found on this computer and the agents of this vault, each with its settings (D-0455).
+        <!-- The AI tools found on this computer and the agents of this vault, each with its settings.
              Names are what agents say about themselves and the names their connections were given: display
              only (T-3, T-36). -->
         <StackPanel Spacing="10">
@@ -158,7 +158,7 @@
                                      Classes.ok="{Binding IsLive}" Classes.muted="{Binding !IsLive}" />
                         </Grid>
                         <TextBlock Classes="caption" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" TextWrapping="Wrap" />
-                        <TextBlock Classes="caption" IsVisible="{Binding !HasSettings}" TextWrapping="Wrap"><Run Text="Connect it from this list, or start its bridge with " /><Run Text="--client-label" FontFamily="{DynamicResource KpMono}" /><Run Text=", to give it settings of its own." /></TextBlock>
+                        <TextBlock Classes="caption" IsVisible="{Binding !HasSettings}" TextWrapping="Wrap" Text="Connect it from this list to give it settings of its own." />
                       </StackPanel>
                       <Button Grid.Column="2" Name="ConnectTool" VerticalAlignment="Top"
                               Content="Connect"
@@ -167,7 +167,7 @@
                               CommandParameter="{Binding}"
                               AutomationProperties.Name="{Binding Title, StringFormat='Connect {0}'}" />
 
-                      <!-- The plan core composed, run only on Run it (D-0333). -->
+                      <!-- The plan core composed, run only on Run it. -->
                       <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Classes="card filled" IsVisible="{Binding HasConnection}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Connection.ConfirmCommand}" ctl:FormKeys.Cancel="{Binding Connection.CancelCommand}">
                         <StackPanel Spacing="12" DataContext="{Binding Connection}" x:DataType="vm:ConnectClientViewModel">
                           <Grid ColumnDefinitions="*,Auto">
@@ -278,7 +278,7 @@
           </Border>
         </StackPanel>
 
-        <!-- The records since this unlock as `keypaste log` renders them (D-0331); the activity log in
+        <!-- The records since this unlock as `keypaste log` renders them; the activity log in
              Settings › Advanced has the whole file. -->
         <StackPanel Spacing="10">
           <StackPanel Orientation="Horizontal" Spacing="8">

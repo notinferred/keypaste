@@ -102,17 +102,66 @@ public sealed class AppSettingsTests : IDisposable
 
         Assert.DoesNotContain("crash_reports", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
         Assert.Null(AppSettings.Load(SettingsFile).SendCrashReports);
-        Assert.Null(AppSettings.Load(SettingsFile).TermsShown);
+        Assert.Null(AppSettings.Load(SettingsFile).CrashChoiceTerms);
 
-        AppSettings.Save(SettingsFile, AppSettings.Default with { SendCrashReports = send, TermsShown = "2026-10-28" });
+        AppSettings.Save(SettingsFile, AppSettings.Default with { SendCrashReports = send, CrashChoiceTerms = "2026-10-28" });
 
         var text = File.ReadAllText(SettingsFile);
         Assert.Contains($"crash_reports = {(send ? 1 : 0)}", text, StringComparison.Ordinal);
         Assert.Contains("terms = \"2026-10-28\"", text, StringComparison.Ordinal);
-        Assert.Equal((send, "2026-10-28"), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsShown));
+        Assert.Equal((send, "2026-10-28"), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).CrashChoiceTerms));
     }
 
-    /// <summary>Only 1 sends crash reports: any other number is a no, and a value that is not a number is no answer (D-0594).</summary>
+    /// <summary>Share…'s date is its own key, so it never reads as an answer to the crash-report choice.</summary>
+    [Fact]
+    public void The_terms_Share_showed_are_kept_apart_from_the_crash_report_choice()
+    {
+        AppSettings.Save(SettingsFile, AppSettings.Default with { ShareTermsLinked = "2026-10-28" });
+
+        var saved = AppSettings.Load(SettingsFile);
+        Assert.Equal("2026-10-28", saved.ShareTermsLinked);
+        Assert.Null(saved.CrashChoiceTerms);
+        Assert.Null(saved.SendCrashReports);
+    }
+
+    /// <summary>What was linked has a section of its own, and with every preference set the preferences keep room for a later version's key, which a reader refuses past eight.</summary>
+    [Fact]
+    public void What_was_linked_keeps_its_own_section_with_room_in_the_preferences_and_a_later_key_there_survives()
+    {
+        File.WriteAllText(SettingsFile, "[[terms_linked]]\nlater = \"kept\"\n");
+        var all = AppSettings.Default with
+        {
+            StayInTray = true,
+            Vault = Path.Combine(_directory, "a.kdbx"),
+            SendCrashReports = false,
+            CrashChoiceTerms = "2026-10-28",
+            CrashChoiceAsked = "2026-10-28",
+            ShareTermsLinked = "2026-10-27",
+        };
+
+        Assert.True(AppSettings.Save(SettingsFile, all));
+
+        var saved = AppSettings.Load(SettingsFile);
+        Assert.Equal(("2026-10-28", "2026-10-27"), (saved.CrashChoiceAsked, saved.ShareTermsLinked));
+        Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out _));
+        Assert.True(Assert.Single(document.Tables, table => table.Name == AppSettings.SectionName).Pairs.Count < Toml.MaximumPairs);
+        var linked = Assert.Single(document.Tables, table => table.Name == AppSettings.TermsLinkedSectionName);
+        Assert.Equal(["crash_choice", "share", "later"], linked.Pairs.Select(pair => pair.Key));
+    }
+
+    [Fact]
+    public void A_terms_linked_section_alone_is_read_and_a_value_that_is_not_text_is_no_record()
+    {
+        File.WriteAllText(SettingsFile, "[[terms_linked]]\ncrash_choice = 1\nshare = \"2026-10-28\"\n");
+
+        var saved = AppSettings.Load(SettingsFile);
+
+        Assert.Null(saved.CrashChoiceAsked);
+        Assert.Equal("2026-10-28", saved.ShareTermsLinked);
+        Assert.Equal(AppSettings.Default.Theme, saved.Theme);
+    }
+
+    /// <summary>Only 1 sends crash reports: any other number is a no, and a value that is not a number is no answer.</summary>
     [Theory]
     [InlineData("crash_reports = 1", true)]
     [InlineData("crash_reports = 0", false)]
@@ -232,7 +281,7 @@ public sealed class AppSettingsTests : IDisposable
         Assert.False(settings.LockWhenMinimized);
     }
 
-    /// <summary>What a newer version wrote and this one does not read survives this one's Settings and its <c>keypaste use</c> (D-0520).</summary>
+    /// <summary>What a newer version wrote and this one does not read survives this one's Settings and its <c>keypaste use</c>.</summary>
     [Fact]
     public void The_window_round_trips_beside_every_preference_at_a_position_left_of_the_main_screen()
     {
@@ -243,7 +292,7 @@ public sealed class AppSettingsTests : IDisposable
             StayInTray = true,
             Vault = Path.Combine(_directory, "chosen.kdbx"),
             SendCrashReports = false,
-            TermsShown = "2026-01-01",
+            CrashChoiceTerms = "2026-01-01",
             Window = window,
         };
 
@@ -254,14 +303,14 @@ public sealed class AppSettingsTests : IDisposable
     }
 
     /// <summary>
-    /// A reader built before the window was kept reads no section it does not know, and writes it back as it was (D-0520); it
+    /// A reader built before the window was kept reads no section it does not know, and writes it back as it was; it
     /// refuses a whole file over a negative number or a ninth key in a section, so what is written holds to neither.
     /// </summary>
     [Fact]
     public void The_file_stays_inside_what_an_older_reader_takes_and_a_choice_of_vault_keeps_the_window()
     {
         var window = new WindowLayout(-1500, -40, 800, 600, WindowMode.Maximized, 425, true);
-        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = window, StayInTray = true, SendCrashReports = true, TermsShown = "2026-01-01" }));
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default with { Window = window, StayInTray = true, SendCrashReports = true, CrashChoiceTerms = "2026-01-01" }));
         Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(_directory, Path.Combine(_directory, "chosen.kdbx"), onlyIfNone: false));
 
         Assert.True(Toml.TryParse(File.ReadAllText(SettingsFile), TomlLimits.Paths, out var document, out var error), error);

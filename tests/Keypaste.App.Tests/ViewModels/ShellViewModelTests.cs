@@ -234,7 +234,7 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// A project is its entries' own tags (D-0416): the sidebar and Env profiles list one with no group
+    /// A project is its entries' own tags: the sidebar and Env profiles list one with no group
     /// under env, and an untagged entry under env/acme is neither a project nor a variable of acme.
     /// </summary>
     [Fact]
@@ -376,6 +376,7 @@ public sealed class ShellViewModelTests : IDisposable
         var share = shell.Share!;
         Assert.Equal("env/billing/STRIPE_KEY", share.SelectedWhat);
 
+        share.ContinueCommand.Press();
         await share.CreateCommand.PressAsync();
 
         Assert.Equal("Link copied. Expires in 24h, 1 view.", shell.Toasts.Shown.Last().Message);

@@ -45,10 +45,10 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The longest password, in characters, the estimator rates: its repetition pass grows with the cube of the length and runs under the vault's lock, and KeePassXC stops at the same length.</summary>
     private const int _longestRated = 256;
 
-    /// <summary>The common-password list in KeePassLib's estimator, which every estimate in this process shares, loaded once before the first rating (D-0499).</summary>
+    /// <summary>The common-password list in KeePassLib's estimator, which every estimate in this process shares, loaded once before the first rating.</summary>
     private static readonly Lazy<bool> _commonPasswords = new(LoadCommonPasswords, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>The name of the part a quick unlock's key carries for the master password's SHA-256 (D-0550).</summary>
+    /// <summary>The name of the part a quick unlock's key carries for the master password's SHA-256.</summary>
     private const string _passwordPart = "keypaste.password";
 
     /// <summary>The name of the part a quick unlock's key carries for the keyfile's key.</summary>
@@ -63,7 +63,7 @@ internal sealed class KeePassInterop : IDisposable
     private string? _partsKeyfilePath;
 
     // KdfPool fills its static list without synchronization; the runtime runs this once and holds concurrent first callers until it returns (F.11).
-    // Nothing reaches KeePassLib's native Argon2 before this has handed it keypaste's library (D-0523).
+    // Nothing reaches KeePassLib's native Argon2 before this has handed it keypaste's library.
     static KeePassInterop()
     {
         NativeArgon2.Register(typeof(PwDatabase).Assembly);
@@ -218,9 +218,9 @@ internal sealed class KeePassInterop : IDisposable
                 (!hasKeyfile, !hasHardwareKey) switch
                 {
                     (true, true) => "The master password is incorrect, or the vault is not a readable KeePass database.",
-                    (false, true) => "The master password or the keyfile is incorrect, or the vault is not a readable KeePass database.",
+                    (false, true) => "The master password or the key file is incorrect, or the vault is not a readable KeePass database.",
                     (true, false) => "The master password or the hardware key is incorrect, or the vault is not a readable KeePass database.",
-                    (false, false) => "The master password, the keyfile or the hardware key is incorrect, or the vault is not a readable KeePass database.",
+                    (false, false) => "The master password, the key file or the hardware key is incorrect, or the vault is not a readable KeePass database.",
                 },
                 ex);
         }
@@ -266,7 +266,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <c>KcpKeyFile</c> keys with the SHA-256 of the file whenever its XML parse throws, which is
     /// right for a document it cannot parse and wrong for every XML keyfile when the parser itself
     /// cannot run, as under NativeAOT before the CLI kept the types it reads. Asked of a keyfile whose key is known, so a document
-    /// that does not parse in a working build still falls back as KeePassXC's does (D-0294).
+    /// that does not parse in a working build still falls back as KeePassXC's does.
     /// </remarks>
     internal static bool ReadsXmlKeyfiles => _readsXmlKeyfiles.Value;
 
@@ -408,7 +408,7 @@ internal sealed class KeePassInterop : IDisposable
         }
         catch (Exception ex)
         {
-            throw new VaultException($"The keyfile '{path}' could not be read.", ex);
+            throw new VaultException($"The key file '{path}' could not be read.", ex);
         }
     }
 
@@ -428,7 +428,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// Never through <c>PwDatabase.Save</c>: KeePassLib writes a vault's last blocks while it closes its
     /// streams and discards what that write throws, so a disk that filled during the save was committed
-    /// over the vault as a truncated file (D-0428). Its file lock is off in keypaste and its hash fields
+    /// over the vault as a truncated file. Its file lock is off in keypaste and its hash fields
     /// have no reader here.
     /// </remarks>
     private void Write()
@@ -438,7 +438,7 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>Serialises, proves the bytes open with the new key, and only then replaces the vault.</summary>
-    /// <remarks>A re-keyed vault is closed rather than saved again (D-0293).</remarks>
+    /// <remarks>A re-keyed vault is closed rather than saved again.</remarks>
     private void WriteVerified(KeyChange change)
     {
         var bytes = Serialize();
@@ -859,7 +859,7 @@ internal sealed class KeePassInterop : IDisposable
 
         // Both directions of the same rule: a root group cannot become the env root, and the env
         // root cannot stop being it. Either silently moves a whole subtree into or out of where
-        // keypaste writes a project's home entries (D-0413).
+        // keypaste writes a project's home entries.
         if (IsReserved(parentPath, name)
             || (parentPath.Length == 0
                 && string.Equals(located.Group.Name, EnvConvention.RootGroup, StringComparison.Ordinal)))
@@ -891,7 +891,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>Moves one group, with everything under it, into another parent, mutating it in place.</summary>
     /// <remarks>
     /// Every check is a read and happens before the move, for the reason <see cref="Relocate"/> gives. Like
-    /// an entry's move, it records nothing about where the group came from, so the file stays KDBX 4.0 (D-0271).
+    /// an entry's move, it records nothing about where the group came from, so the file stays KDBX 4.0.
     /// </remarks>
     internal GroupOutcome MoveGroup(string groupPath, string destinationParentPath, out string movedPath)
     {
@@ -928,7 +928,7 @@ internal sealed class KeePassInterop : IDisposable
         string target = ChildPath(destinationParentPath, name);
 
         // A move into keypaste's own groups would plant records there, and one out to the root under a
-        // reserved name would make a group keypaste assigns meaning to (D-0273).
+        // reserved name would make a group keypaste assigns meaning to.
         if (ReservedGroups.IsReserved(destinationParentPath)
             || ReservedGroups.IsReserved(target)
             || IsReserved(destinationParentPath, name))
@@ -961,7 +961,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <para>
     /// A recycled group keeps its UUID, its entries and their history, and records the group it was in as
     /// <c>PreviousParentGroup</c>, as KeePassXC does; like a recycled entry, that raises the file to KDBX 4.1
-    /// (D-0247). It gets no tombstone, for the reason <see cref="RemoveEntry"/> gives. Each item in it is
+    ///. It gets no tombstone, for the reason <see cref="RemoveEntry"/> gives. Each item in it is
     /// listed and restored one at a time, back to the path it had (<see cref="RestoreRecycled"/>).
     /// </para>
     /// <para>
@@ -1035,7 +1035,7 @@ internal sealed class KeePassInterop : IDisposable
         return GroupOutcome.Restored;
     }
 
-    /// <summary>Whether a group is one keypaste assigns meaning to: the env root, or one of its own (D-0273).</summary>
+    /// <summary>Whether a group is one keypaste assigns meaning to: the env root, or one of its own.</summary>
     private static bool IsKeypastesOwn(string groupPath) =>
         ReservedGroups.IsReserved(groupPath) || string.Equals(groupPath, EnvConvention.RootGroup, StringComparison.Ordinal);
 
@@ -1105,7 +1105,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>
     /// For each custom field <paramref name="include"/> accepts whose value holds a KeePass placeholder, on the one entry
     /// with this name or on one of its revisions, what it fills in or the first placeholder that refuses it, judged by
-    /// name as a terminal edit's new value is (D-0465); in ordinal order of name, or null when there is no such entry or revision.
+    /// name as a terminal edit's new value is; in ordinal order of name, or null when there is no such entry or revision.
     /// </summary>
     /// <param name="name">The entry.</param>
     /// <param name="revision">A position in <see cref="ReadHistory"/>'s order to judge that revision's fields, or null for the entry's own.</param>
@@ -1652,7 +1652,7 @@ internal sealed class KeePassInterop : IDisposable
             return 0;
         }
 
-        // Case counts as taken, because a project refuses two variables that differ only in case (D-0337).
+        // Case counts as taken, because a project refuses two variables that differ only in case.
         if (found.Entry.Strings.Any(other =>
             !string.Equals(other.Key, field, StringComparison.Ordinal)
             && string.Equals(other.Key, newName, StringComparison.OrdinalIgnoreCase)))
@@ -2020,7 +2020,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             found.Group.Entries.Remove(found.Entry);
 
-            // A move stamps only LocationChanged, and writes no PreviousParentGroup, which raises the file to KDBX 4.1 (D-0247).
+            // A move stamps only LocationChanged, and writes no PreviousParentGroup, which raises the file to KDBX 4.1.
             destination.Group.AddEntry(found.Entry, true, true);
         }
 
@@ -2055,7 +2055,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// The copy keeps every field, attachment, icon and setting, with a new UUID, no history, no record of
     /// where anything came from, and its times set to now. It does not take a tag starting <c>env:</c>,
-    /// because a project refuses two entries giving one variable (D-0337).
+    /// because a project refuses two entries giving one variable.
     /// </remarks>
     internal OrganizeOutcome CloneEntry(EntryName source, out EntryName? copy, out IReadOnlyList<string> dropped)
     {
@@ -2259,7 +2259,7 @@ internal sealed class KeePassInterop : IDisposable
     /// The bin is asked for directly rather than looked for among the siblings, because it is
     /// excluded from every traversal: a sibling scan would happily make a second group of its name
     /// that KeePassXC then draws as two trash cans. Creating <c>env</c> through this surface is
-    /// refused while a home entry's write still makes it (D-0413): it is the group keypaste writes
+    /// refused while a home entry's write still makes it: it is the group keypaste writes
     /// home entries under, not a folder somebody chose to make.
     /// </remarks>
     private bool IsReserved(string parentGroupPath, string name)
@@ -2326,7 +2326,7 @@ internal sealed class KeePassInterop : IDisposable
 
         // Resolved before anything moves. A restore that recreated the one condition every
         // resolver in keypaste refuses — two entries answering to one name — would deny both of
-        // them to MCP and take out the whole env project for `keypaste run` (D-0091).
+        // them to MCP and take out the whole env project for `keypaste run`.
         var target = new EntryName(place?.Path ?? string.Empty, ReadField(found.Entry, PwDefs.TitleField));
 
         if (Matches(target).Count != 0)
@@ -2733,13 +2733,13 @@ internal sealed class KeePassInterop : IDisposable
     /// entry's current values.</summary>
     /// <returns>The number of entries restored: 0 if nothing matched, otherwise 1.</returns>
     /// <remarks>
-    /// The value being replaced becomes a history item rather than being lost (DECISIONS.md D-0014),
+    /// The value being replaced becomes a history item rather than being lost,
     /// which is what <c>RestoreFromBackup</c> does when it is given the database's history settings.
     /// The entry is mutated in place, so it keeps its UUID, but <c>RestoreFromBackup</c> assigns the
     /// revision's strings, attachments, custom data, tags and auto-type: the entry becomes the revision
     /// whole, as it does in KeePass and KeePassXC, and what it drops is in the revision just made (9.4). Since
     /// that puts back the revision's project tags, a front end first asks what <see cref="ProjectTagChange.Restoring"/>
-    /// says whenever they differ from the entry's (D-0510).
+    /// says whenever they differ from the entry's.
     /// </remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     /// <exception cref="ArgumentOutOfRangeException">
@@ -2761,21 +2761,21 @@ internal sealed class KeePassInterop : IDisposable
 
         PwEntry pwEntry = found.Entry;
 
-        // A revision is values, never identity, so the restore keeps the current title (D-0091).
+        // A revision is values, never identity, so the restore keeps the current title.
         string title = ReadField(pwEntry, PwDefs.TitleField);
 
         pwEntry.RestoreFromBackup(order[index], _database);
 
         SetField(pwEntry, PwDefs.TitleField, title);
 
-        // The restore assigned the revision's old times back (D-0227).
+        // The restore assigned the revision's old times back.
         MarkEdited(pwEntry);
         return 1;
     }
 
     /// <summary>The entry's KDBX UUID as hex, or null if no entry has that name.</summary>
     /// <remarks>
-    /// A test seam. keypaste addresses an entry by name (DECISIONS.md D-0091), and a public UUID
+    /// A test seam. keypaste addresses an entry by name, and a public UUID
     /// would be a second address form on the surface; V-V.2a still has to be able to say that a
     /// restore mutated the entry rather than replacing it.
     /// </remarks>
@@ -2867,7 +2867,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// KeePassLib drops the oldest revisions while the history holds more than the vault's item limit or bytes than its size limit,
     /// 6 MiB unless the vault says otherwise, attachments counted in every revision that holds them, so a revision larger than
-    /// the size limit is dropped at once, as KeePassXC drops it (D-0533).
+    /// the size limit is dropped at once, as KeePassXC drops it.
     /// </remarks>
     private bool BackUp(PwEntry entry)
     {
@@ -2877,7 +2877,7 @@ internal sealed class KeePassInterop : IDisposable
         return entry.History.IndexOf(revision) >= 0;
     }
 
-    // KeePassXC's merge keeps one version of an entry per whole second, so each edit takes a later second than every version it keeps (D-0387).
+    // KeePassXC's merge keeps one version of an entry per whole second, so each edit takes a later second than every version it keeps.
     private static void MarkEdited(PwEntry entry)
     {
         DateTime previous = entry.LastModificationTime;
@@ -2945,7 +2945,7 @@ internal sealed class KeePassInterop : IDisposable
     /// runs 34303291945 and 34403613553; not reproducible here at 32 overlapping savers, which is
     /// why the budget is set from what the runner needed. <b>Do not write down a mechanism this
     /// retry rests on:</b> the previous one — a directory enlisted in a transaction refusing
-    /// operations from outside it — was refuted, and F.6 owns the diagnosis (D-0114).
+    /// operations from outside it — was refuted, and F.6 owns the diagnosis.
     /// </para>
     /// <para>
     /// <b>Waiting is why the vault is re-read between attempts.</b> The thing most likely to be
@@ -2961,7 +2961,7 @@ internal sealed class KeePassInterop : IDisposable
     /// that commits between the re-read and that move is still reverted. The residual is therefore
     /// a writer whose hold outlasts one of these waits and commits during the attempt that follows
     /// it — accepted because a KeePassLib saver commits immediately after its own move, so its hold
-    /// is brief (D-0119). A detector, not a lock.
+    /// is brief. A detector, not a lock.
     /// </para>
     /// <para>
     /// Retrying is otherwise safe because the commit is one replacing move: Transactional NTFS where
@@ -3031,7 +3031,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <b>The gate is released before the sleep that follows a refusal</b>, so another save in this
     /// process can finish while this one waits (F.12). That makes the gate wait a wait like the sleep:
     /// another save of this vault can commit during either, so the re-read follows the gate, and a
-    /// save that used to queue behind that commit and overwrite it is refused instead (D-0119).
+    /// save that used to queue behind that commit and overwrite it is refused instead.
     /// </para>
     /// <para>
     /// <b>A stranded temporary is swept before the gate is released, on every way out.</b> Another
@@ -3126,14 +3126,14 @@ internal sealed class KeePassInterop : IDisposable
     /// <para>
     /// <b>Transacted attempts go one at a time in this process.</b> The private directory is the whole
     /// process's, so two transacted attempts would name their temporaries in it together and collide
-    /// exactly as two processes used to (D-0122), and on every platform they would share
+    /// exactly as two processes used to, and on every platform they would share
     /// <c>&lt;vault&gt;.tmp</c> beside one vault. TMP cannot be made per-thread, so those attempts are
     /// serialised instead.
     /// </para>
     /// <para>
     /// <b>Only an attempt over an existing file is gated.</b> KeePassLib transacts only when the
     /// vault file exists, so a first save or one whose directory is gone never uses either name,
-    /// and queueing it behind other saves' key derivation was F.10's overrun (D-0134). Gating an
+    /// and queueing it behind other saves' key derivation was F.10's overrun. Gating an
     /// attempt that then does not transact is harmless. The residual is a vault file created
     /// between this check and KeePassLib's own, whose attempt transacts ungated
     /// (<c>TheVendoredSaveTransactsOnlyOverAnExistingFile</c> pins the rule this restates).
@@ -3185,7 +3185,7 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>
-    /// Observed on Windows 10 Pro 19045 by F.7's probe (D-0119), on a non-transacted move onto the
+    /// Observed on Windows 10 Pro 19045 by F.7's probe, on a non-transacted move onto the
     /// destination name — which is the second hop of the fallback in
     /// <c>FileTransactionEx.TxfMove</c> exactly. Observed again on <c>windows-2025</c> in ci run
     /// 34602290950, where <c>VaultSaveUnderATransactedNameTests</c> asserted this number rather
@@ -3381,7 +3381,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>
     /// Derives one small Argon2d key from constant bytes through KeePassLib's own native call, as every unlock and save does,
     /// and returns the library that call was bound to, or <see langword="null"/> when the key came from KeePassLib's managed
-    /// Argon2 (D-0525).
+    /// Argon2.
     /// </summary>
     internal static string? DeriveArgon2Once()
     {
@@ -3872,7 +3872,7 @@ internal sealed class KeePassInterop : IDisposable
 
         if (matches.Count > 1)
         {
-            string where = name.GroupPath.Length == 0 ? "the root group" : name.GroupPath;
+            string where = name.GroupPath.Length == 0 ? "the top level" : name.GroupPath;
             throw new VaultException(
                 $"'{name.Title}' in '{where}' names {matches.Count} items. keypaste will not guess " +
                 "which one you meant; rename one of them in KeePassXC.");
@@ -3998,7 +3998,7 @@ internal sealed class KeePassInterop : IDisposable
             if (next is not null && ReferenceEquals(next, bin))
             {
                 throw new VaultException(
-                    $"'{groupPath}' is inside the recycle bin; keypaste does not write there. Restore the item or choose another group.");
+                    $"'{groupPath}' is inside the Trash; keypaste does not write there. Restore the item or choose another group.");
             }
 
             if (next is null)
@@ -4024,7 +4024,7 @@ internal sealed class KeePassInterop : IDisposable
     private bool Holds(PwUuid id) =>
         _database.RootGroup.Uuid.Equals(id) || _database.RootGroup.FindGroup(id, true) is not null || _database.RootGroup.FindEntry(id, true) is not null;
 
-    /// <summary>What keypaste keeps of the vault as it is now, for a later merge to read lineage from (D-0538).</summary>
+    /// <summary>What keypaste keeps of the vault as it is now, for a later merge to read lineage from.</summary>
     /// <param name="key">The per-unlock key the content digests are keyed with, which stays the caller's.</param>
     /// <returns>Each group's and entry's parent, <c>LocationChanged</c>, keyed content digest and whether it was recycled, and the tombstones; no plaintext.</returns>
     internal MergeBase TakeBase(byte[] key)
@@ -4118,7 +4118,7 @@ internal sealed class KeePassInterop : IDisposable
 
     private static bool Same(byte[] digest, byte[] other) => digest.AsSpan().SequenceEqual(other);
 
-    /// <summary>What keypaste keeps of the file it last read or wrote, for a merge's lineage (D-0538, D-0599).</summary>
+    /// <summary>What keypaste keeps of the file it last read or wrote, for a merge's lineage.</summary>
     /// <param name="Key">The per-unlock key its digests are keyed with.</param>
     /// <param name="Groups">Each group by UUID.</param>
     /// <param name="Entries">Each entry by UUID.</param>
@@ -4139,10 +4139,10 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>One version in an entry's history as a merge builds it.</summary>
     /// <param name="Entry">The version.</param>
     /// <param name="Digest">Its content's keyed digest, its second included.</param>
-    /// <param name="Kept">Whether a merge moved it there, so no trimming removes it before the entry's next edit (D-0601).</param>
+    /// <param name="Kept">Whether a merge moved it there, so no trimming removes it before the entry's next edit.</param>
     private sealed record HistoryVersion(PwEntry Entry, byte[] Digest, bool Kept);
 
-    /// <summary>One merge of the open copy into a fresh parse of its file, which becomes the result (D-0537 to D-0541).</summary>
+    /// <summary>One merge of the open copy into a fresh parse of its file, which becomes the result.</summary>
     /// <remarks>"Mine" is the open copy, read and never changed; "theirs" is the file's, inside which the result is built.</remarks>
     private sealed class Merger : IDisposable
     {
@@ -4253,7 +4253,7 @@ internal sealed class KeePassInterop : IDisposable
             }
         }
 
-        /// <summary>A group's content as one whole: a change only the open copy made is its, otherwise the later in whole seconds, the file's on a tie (D-0537).</summary>
+        /// <summary>A group's content as one whole: a change only the open copy made is its, otherwise the later in whole seconds, the file's on a tie.</summary>
         private void MergeContent(PwGroup mine, PwGroup theirs)
         {
             byte[] myDigest = _digests.Of(mine);
@@ -4288,7 +4288,7 @@ internal sealed class KeePassInterop : IDisposable
             }
         }
 
-        /// <summary>Whether the open copy's place wins: the copy that moved the object since the base, the later <c>LocationChanged</c> when both did, the file's on a tie (D-0540).</summary>
+        /// <summary>Whether the open copy's place wins: the copy that moved the object since the base, the later <c>LocationChanged</c> when both did, the file's on a tie.</summary>
         private static bool MyPlaceWins(IStructureItem mine, IStructureItem theirs, BaseRecord? known)
         {
             bool iMoved = known is null || Moved(mine, known);
@@ -4312,7 +4312,7 @@ internal sealed class KeePassInterop : IDisposable
 
             if (!ReferenceEquals(theirs.ParentGroup, target))
             {
-                // A move that would put a group inside itself keeps the file's place (D-0540).
+                // A move that would put a group inside itself keeps the file's place.
                 if (ReferenceEquals(target, theirs) || target.IsContainedIn(theirs))
                 {
                     return;
@@ -4345,7 +4345,7 @@ internal sealed class KeePassInterop : IDisposable
             theirs.PreviousParentGroup = mine.PreviousParentGroup;
         }
 
-        /// <summary>Takes the open copy's recycle bin as the result's when the file has none (D-0541).</summary>
+        /// <summary>Takes the open copy's recycle bin as the result's when the file has none.</summary>
         private void AdoptMyBin()
         {
             if (_theirBin is null && _myBin is not null)
@@ -4396,7 +4396,7 @@ internal sealed class KeePassInterop : IDisposable
         /// <summary>
         /// Whether either copy keeps the entry in <see cref="ReservedGroups.Tokens"/> or <see cref="ReservedGroups.Browsers"/> and either
         /// holds a tombstone for it, which always wins over a token's or a pairing's record whatever the times, changes or places, so the
-        /// result does not hold it (D-0544, D-0631, D-0633).
+        /// result does not hold it.
         /// </summary>
         private bool RevokedBearer(PwEntry? mine, PwEntry? theirs) =>
             (mine ?? theirs) is { } entry
@@ -4406,7 +4406,7 @@ internal sealed class KeePassInterop : IDisposable
         private static bool IsBearer(KeePassInterop copy, PwEntry entry) =>
             copy.PathOf(entry.ParentGroup) is ReservedGroups.Tokens or ReservedGroups.Browsers;
 
-        /// <summary>An entry both copies hold, by whole versions: lineage where the base shows it, the later in whole seconds otherwise, and every version kept in its history (D-0537 to D-0539).</summary>
+        /// <summary>An entry both copies hold, by whole versions: lineage where the base shows it, the later in whole seconds otherwise, and every version kept in its history.</summary>
         private void Merge(PwEntry mine, PwEntry theirs)
         {
             _base.Entries.TryGetValue(theirs.Uuid, out BaseRecord? known);
@@ -4418,8 +4418,8 @@ internal sealed class KeePassInterop : IDisposable
             bool equal = Same(myDigest, theirDigest);
             bool onlyMine = !equal && known is not null && Same(theirDigest, known.Digest);
 
-            // The file descends from the base when the base's version is in its history: its change is taken whatever the stamps say (D-0538).
-            // So is a later file whose version differs only in place and stamps, as KeePassXC stamps an entry it recycles and keeps no version (D-0674).
+            // The file descends from the base when the base's version is in its history: its change is taken whatever the stamps say.
+            // So is a later file whose version differs only in place and stamps, as KeePassXC stamps an entry it recycles and keeps no version.
             bool onlyTheirs = !equal && !onlyMine && known is not null && Same(myDigest, known.Digest)
                 && (HeldIn(history, known.Digest) || (Second(theirs.LastModificationTime) > Second(mine.LastModificationTime) && SameContent(mine, theirs)));
             bool byTime = !equal && !onlyMine && !onlyTheirs;
@@ -4441,7 +4441,7 @@ internal sealed class KeePassInterop : IDisposable
 
             if (tie)
             {
-                // Two changes in one second: the open copy's is current, a second after every version and deletion it competes with (D-0539).
+                // Two changes in one second: the open copy's is current, a second after every version and deletion it competes with.
                 theirs.LastModificationTime = After(history.Select(version => version.Entry.LastModificationTime)
                     .Append(mine.LastModificationTime)
                     .Concat(DeletionsOf(theirs.Uuid)));
@@ -4460,7 +4460,7 @@ internal sealed class KeePassInterop : IDisposable
             }
         }
 
-        /// <summary>An entry only the open copy holds: added, unless the file deleted it and this copy had not changed it since the base (D-0538, D-0540).</summary>
+        /// <summary>An entry only the open copy holds: added, unless the file deleted it and this copy had not changed it since the base.</summary>
         private void KeepMine(PwEntry mine)
         {
             if (!_theirDeletions.TryGetValue(mine.Uuid, out DateTime deleted))
@@ -4486,7 +4486,7 @@ internal sealed class KeePassInterop : IDisposable
             Report(NameIn(_open, mine), deletedInFile: true, recycled: bin is not null || recycled);
         }
 
-        /// <summary>An entry only the file holds: kept, unless the open copy deleted it and the file had not changed it since the base, or a deletion already written outdates it (D-0540).</summary>
+        /// <summary>An entry only the file holds: kept, unless the open copy deleted it and the file had not changed it since the base, or a deletion already written outdates it.</summary>
         private void KeepTheirs(PwEntry theirs)
         {
             if (!_myDeletions.TryGetValue(theirs.Uuid, out DateTime deleted) || _theirPairs.Contains(theirs.Uuid))
@@ -4496,7 +4496,7 @@ internal sealed class KeePassInterop : IDisposable
 
             if (_base.Deletions.ContainsKey(theirs.Uuid))
             {
-                // A deletion already written removes again an entry the file brings back older than it, as KeePass decides (D-0602).
+                // A deletion already written removes again an entry the file brings back older than it, as KeePass decides.
                 if (Second(theirs.LastModificationTime) < Second(deleted))
                 {
                     theirs.ParentGroup.Entries.Remove(theirs);
@@ -4534,9 +4534,9 @@ internal sealed class KeePassInterop : IDisposable
 
         /// <summary>
         /// Keeps an entry one copy deleted without seeing the other's change: stamped a second after the deletion and every version, with the
-        /// version it was in its history, and moved into <paramref name="bin"/> unless that is null (D-0539, D-0540).
+        /// version it was in its history, and moved into <paramref name="bin"/> unless that is null.
         /// </summary>
-        /// <remarks>The version before the stamp stays at its own second, so a later synchronize with the copy that changed it adds nothing (D-0600).</remarks>
+        /// <remarks>The version before the stamp stays at its own second, so a later synchronize with the copy that changed it adds nothing.</remarks>
         private void Keep(PwEntry entry, DateTime deleted, PwGroup? bin)
         {
             List<HistoryVersion> history = [.. entry.History.Select(Held)];
@@ -4596,7 +4596,7 @@ internal sealed class KeePassInterop : IDisposable
         /// <summary>Adds a version to a history unless one of the same second and content is there already, and says whether it did.</summary>
         /// <remarks>
         /// A version this merge keeps carries KeePassLib's mark, so the merged copy's save and every later open keep it past the history
-        /// limits until the entry's next edit (D-0601).
+        /// limits until the entry's next edit.
         /// </remarks>
         private bool Hold(List<HistoryVersion> history, PwEntry version, bool copy, bool kept)
         {
@@ -4624,7 +4624,7 @@ internal sealed class KeePassInterop : IDisposable
 
         private static bool HeldIn(List<HistoryVersion> history, byte[] digest) => history.Exists(held => Same(held.Digest, digest));
 
-        /// <summary>Gives an entry the versions its merge kept, ordered by time and trimmed to the vault's limits oldest first, never a version the merge moved there (D-0539, D-0601).</summary>
+        /// <summary>Gives an entry the versions its merge kept, ordered by time and trimmed to the vault's limits oldest first, never a version the merge moved there.</summary>
         private void SetHistory(PwEntry entry, List<HistoryVersion> history)
         {
             List<HistoryVersion> ordered = [.. history.OrderBy(version => Second(version.Entry.LastModificationTime))];
@@ -4670,7 +4670,7 @@ internal sealed class KeePassInterop : IDisposable
             return version;
         }
 
-        /// <summary>Moves what the open copy's recycle bin holds into the file's when the two name different bins, keeping where each came from, so nothing deleted becomes listable (D-0541).</summary>
+        /// <summary>Moves what the open copy's recycle bin holds into the file's when the two name different bins, keeping where each came from, so nothing deleted becomes listable.</summary>
         private void EmptyMyBin()
         {
             if (_myBin is null || _theirBin is null || _myBin.Uuid.Equals(_theirBin.Uuid) || !_groups.TryGetValue(_myBin.Uuid, out PwGroup? old))
@@ -4694,7 +4694,7 @@ internal sealed class KeePassInterop : IDisposable
             }
         }
 
-        /// <summary>Removes each group one copy deleted that the merge leaves empty and that was not changed after the deletion, deepest first (D-0540, D-0602).</summary>
+        /// <summary>Removes each group one copy deleted that the merge leaves empty and that was not changed after the deletion, deepest first.</summary>
         private void RemoveDeletedGroups()
         {
             foreach (PwGroup group in _result.RootGroup.GetGroups(true).Reverse())
@@ -4727,7 +4727,7 @@ internal sealed class KeePassInterop : IDisposable
             return null;
         }
 
-        /// <summary>Gives the result both copies' tombstones less those for objects it keeps, but one the file holds beside its object (D-0540).</summary>
+        /// <summary>Gives the result both copies' tombstones less those for objects it keeps, but one the file holds beside its object.</summary>
         private void MergeDeletions()
         {
             HashSet<PwUuid> live = [.. GroupsOf(_result).Select(group => group.Uuid), .. _result.RootGroup.GetEntries(true).Select(entry => entry.Uuid)];
@@ -4752,7 +4752,7 @@ internal sealed class KeePassInterop : IDisposable
             }
         }
 
-        /// <summary>Adds each of the open copy's custom icons that something in the result uses and the file lacks (D-0541).</summary>
+        /// <summary>Adds each of the open copy's custom icons that something in the result uses and the file lacks.</summary>
         private void CarryIcons()
         {
             HashSet<PwUuid> held = [.. _result.CustomIcons.Select(icon => icon.Uuid)];
@@ -4768,7 +4768,7 @@ internal sealed class KeePassInterop : IDisposable
             }
         }
 
-        /// <summary>A digest of everything a merge can change, to tell whether the result took anything from the open copy (D-0543).</summary>
+        /// <summary>A digest of everything a merge can change, to tell whether the result took anything from the open copy.</summary>
         private byte[] StateOf(PwDatabase database)
         {
             using IncrementalHash state = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -4822,7 +4822,7 @@ internal sealed class KeePassInterop : IDisposable
             state.AppendData(bytes);
         }
 
-        /// <summary>Each agent's record a copy holds, by UUID, with the agent's name and the record's digest (D-0545).</summary>
+        /// <summary>Each agent's record a copy holds, by UUID, with the agent's name and the record's digest.</summary>
         private Dictionary<PwUuid, (string Name, byte[] Digest)> AgentsIn(KeePassInterop copy)
         {
             Dictionary<PwUuid, (string Name, byte[] Digest)> agents = new();
@@ -4866,7 +4866,7 @@ internal sealed class KeePassInterop : IDisposable
             new(copy.PathOf(entry.ParentGroup) ?? string.Empty, entry.Strings.ReadSafe(PwDefs.TitleField));
     }
 
-    /// <summary>Keyed digests of entries' and groups' content, equal where KeePassLib's merge finds the content equal (D-0538, D-0599).</summary>
+    /// <summary>Keyed digests of entries' and groups' content, equal where KeePassLib's merge finds the content equal.</summary>
     /// <remarks>
     /// An entry is compared as <c>EqualsEntry</c> compares it with <c>IgnoreParentGroup</c>, <c>IgnoreLastAccess</c>, <c>IgnoreHistory</c>
     /// and <c>NullEmptyEquivStd</c>, times in whole seconds, and a group by what <c>AssignProperties</c> copies but its access times. Each
@@ -5301,7 +5301,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <returns>The name of every item added.</returns>
     /// <remarks>
     /// Each takes a new UUID. Its earlier versions are its history, oldest first, with its UUID and their own times, and it
-    /// is stamped a later second than every one (D-0387). Attachments are copied, protected in memory, from the export's bytes.
+    /// is stamped a later second than every one. Attachments are copied, protected in memory, from the export's bytes.
     /// </remarks>
     internal IReadOnlyList<EntryName> AddImported(IReadOnlyList<ImportedEntry> entries)
     {

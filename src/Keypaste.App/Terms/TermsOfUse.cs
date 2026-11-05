@@ -6,7 +6,7 @@ namespace Keypaste.App.Terms;
 /// <summary>One heading of the terms of use and its paragraphs.</summary>
 internal sealed record TermsSection(string Heading, IReadOnlyList<string> Paragraphs);
 
-/// <summary>The terms of use the first run shows, read from the one copy the app carries, <c>terms-of-use.txt</c> (D-0597).</summary>
+/// <summary>The terms of use Share… and the crash-report choice link to, read from the one copy the app carries, <c>terms-of-use.txt</c>.</summary>
 /// <param name="Title">The first line.</param>
 /// <param name="Status">The line under it, which ends in their date, such as <c>Draft version 2026-10-28</c>.</param>
 /// <param name="Version">That date, which <c>app.toml</c> records beside the person's choice.</param>

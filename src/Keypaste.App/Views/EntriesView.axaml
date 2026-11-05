@@ -551,8 +551,8 @@
                              ctl:Announcer.Says="{Binding TitleProblem}" Text="{Binding TitleProblem}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="8">
-                  <TextBlock Classes="label" Text="Folder" />
-                  <ComboBox x:Name="NewItemFolder" AutomationProperties.Name="Folder"
+                  <TextBlock Classes="label" Text="Group" />
+                  <ComboBox x:Name="NewItemFolder" AutomationProperties.Name="Group"
                             MinHeight="40"
                             HorizontalAlignment="Stretch"
                             ItemsSource="{Binding Folders}"
@@ -712,7 +712,7 @@
       </ScrollViewer>
 
       <!-- The entry's pane. Username, URL and notes for the one entry somebody chose; the password is
-           dots until it is held, and no binding here carries it. -->
+           dots until Reveal shows it, and no binding here carries it. -->
       <ContentControl x:Name="EntryPane"
                       IsVisible="{Binding !IsAdding}"
                       Content="{Binding Detail}">
@@ -902,8 +902,8 @@
                                  Classes="mono sm muted"
                                  TextTrimming="CharacterEllipsis" />
                       <StackPanel Spacing="6">
-                        <TextBlock Classes="label" Text="Name" />
-                        <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="Name" Classes="mono" Text="{Binding DraftTitle}" />
+                        <TextBlock Classes="label" Text="Title" />
+                        <TextBox x:Name="OrganizeTitle" AutomationProperties.Name="Title" Classes="mono" Text="{Binding DraftTitle}" />
                         <TextBlock x:Name="OrganizeTitleProblem"
                                    Classes="caption"
                                    Foreground="{DynamicResource KpDanger}"
@@ -975,7 +975,7 @@
                       </ListBox>
 
                       <!-- The chosen revision above the entry as it is now, field by field. Its password
-                           can be read only while it is held, and copied as the current one is. -->
+                           can be read only while Reveal shows it, and copied as the current one is. -->
                       <Grid IsVisible="{Binding History.HasSelection}"
                             ColumnDefinitions="Auto,12,*"
                             RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">

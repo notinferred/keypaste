@@ -26,7 +26,7 @@ namespace Keypaste.AppDriver;
 /// <para>
 /// A start that runs the app prints <c>running as process &lt;pid&gt; on &lt;endpoint&gt;</c>, then
 /// <c>window shown</c> or <c>window hidden</c> for the main window as it is and each time that changes, and
-/// <c>screen first-run</c>, <c>screen unlock</c> or <c>screen shell</c> for what the window holds and each time that
+/// <c>screen unlock</c>, followed by <c>crash choice asked</c> when that screen asks it, or <c>screen shell</c> for what the window holds and each time that
 /// changes; it quits as the app quits once standard input closes, printing <c>shut down with exit code &lt;n&gt;</c>.
 /// A start the running app took prints nothing.
 /// While the app is locked, the notice an agent's request raises prints <c>locked-notice shown</c> with its
@@ -34,7 +34,7 @@ namespace Keypaste.AppDriver;
 /// Open keypaste once armed, by a click the display routes to the button (G.4b).
 /// </para>
 /// <para>
-/// The lines <c>first-run send</c> and <c>first-run dont-send</c> press the first run's Continue and then that choice;
+/// The lines <c>crash-choice send</c> and <c>crash-choice dont-send</c> press that button of the unlock screen's choice;
 /// <c>unlock &lt;vault&gt;</c> types <c>KEYPASTE_DRIVER_PASSWORD</c> on the unlock screen and presses Unlock;
 /// <c>copy &lt;title&gt;</c> copies that item's password from Items; <c>lock</c> locks; <c>crash &lt;text&gt;</c>
 /// throws on the UI thread an exception whose message and inner exception's message hold the text; and
@@ -129,8 +129,8 @@ internal static class AppLaunch
                     case ["notice", "open"]:
                         Act(() => PressOpenAsync(app));
                         break;
-                    case ["first-run", var answer]:
-                        Act(() => AnswerFirstRun(root, answer));
+                    case ["crash-choice", var answer]:
+                        Act(() => AnswerCrashChoice(root, answer));
                         break;
                     case ["unlock", var vault]:
                         Act(() => UnlockAsync(root, vault));
@@ -167,13 +167,20 @@ internal static class AppLaunch
     private static void Visibility(Window window) =>
         Console.Out.WriteLine(window.IsVisible ? "window shown" : "window hidden");
 
-    private static void Screen(ContentControl root) => Console.Out.WriteLine(root.Content switch
+    private static void Screen(ContentControl root)
     {
-        FirstRunView => "screen first-run",
-        UnlockView => "screen unlock",
-        ShellView => "screen shell",
-        _ => "screen none",
-    });
+        Console.Out.WriteLine(root.Content switch
+        {
+            UnlockView => "screen unlock",
+            ShellView => "screen shell",
+            _ => "screen none",
+        });
+
+        if (root.Content is UnlockView { DataContext: UnlockViewModel { HasCrashChoice: true } })
+        {
+            Console.Out.WriteLine("crash choice asked");
+        }
+    }
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
 
@@ -228,22 +235,20 @@ internal static class AppLaunch
         PromptScreen.Click(notice, open);
     }
 
-    private static Task AnswerFirstRun(ContentControl root, string answer)
+    private static Task AnswerCrashChoice(ContentControl root, string answer)
     {
-        if (root.Content is not FirstRunView { DataContext: FirstRunViewModel first })
+        if (root.Content is not UnlockView { DataContext: UnlockViewModel { CrashChoice: { } choice } })
         {
-            throw new DriverException("the first run's terms are not on screen");
+            throw new DriverException("the crash-report choice is not on screen");
         }
 
-        var choice = answer switch
+        Press(answer switch
         {
-            "send" => first.SendCommand,
-            "dont-send" => first.DontSendCommand,
-            _ => throw new DriverException($"the first run offers send and dont-send, not {answer}"),
-        };
-
-        Press(first.ContinueCommand, "Continue");
-        Press(choice, answer);
+            "send" => choice.SendCommand,
+            "dont-send" => choice.DontSendCommand,
+            _ => throw new DriverException($"the crash-report choice offers send and dont-send, not {answer}"),
+        }, answer);
+        Console.Out.WriteLine("crash choice answered");
         return Task.CompletedTask;
     }
 

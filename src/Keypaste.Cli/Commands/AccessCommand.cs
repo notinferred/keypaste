@@ -10,19 +10,19 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// <c>--keyfile</c> and <c>KEYPASTE_KEYFILE</c> keep the meaning they have on every other verb, the
 /// keyfile that opens the vault now. The new side is taken from flags alone, so a variable left set
-/// in a shell can never become the key a vault is changed to (D-0290).
+/// in a shell can never become the key a vault is changed to.
 /// </remarks>
 internal static class AccessCommand
 {
     private static readonly Option<bool> _password = Syntax.Flag("--password", "set a new master password");
-    private static readonly Option<string> _newKeyfile = Syntax.Value("--new-keyfile", "path", "require this existing keyfile, adding or replacing one");
-    private static readonly Option<bool> _removeKeyfile = Syntax.Flag("--remove-keyfile", "stop requiring the current keyfile");
+    private static readonly Option<string> _newKeyfile = Syntax.Value("--new-keyfile", "path", "require this existing key file, adding or replacing one");
+    private static readonly Option<bool> _removeKeyfile = Syntax.Flag("--remove-keyfile", "stop requiring the current key file");
 
     internal static CliVerb Command { get; } = new(
         "access",
-        "change the master password or keyfile\n\n"
+        "change the master password or key file\n\n"
             + "asks for the current master password, then the new one twice when --password is given; piped, one line "
-            + "each, in that order. it never creates a keyfile or takes a vault's password away, and the file the change "
+            + "each, in that order. it never creates a key file or takes a vault's password away, and the file the change "
             + "replaces is kept, still opening with the old credentials.",
         Execute)
     {
@@ -136,7 +136,7 @@ internal static class AccessCommand
         err.WriteLine($"keypaste: the vault as it was is kept at '{kept.Path}'.");
         err.WriteLine(
             $"keypaste: copies made before this change may open with earlier credentials ({copies} in " +
-            $"'{VaultBackups.DirectoryFor(vaultPath)}'). If an old password or keyfile may have leaked, delete them.");
+            $"'{VaultBackups.DirectoryFor(vaultPath)}'). If an old password or key file may have leaked, delete them.");
         err.WriteLine(
             $"keypaste: routine saves keep only the last {VaultBackups.Retained} copies, so these leave over " +
             "time, including the one this change just took.");
@@ -155,13 +155,13 @@ internal static class AccessCommand
         VaultAccessOutcome.EmptyPassword => "the master password cannot be empty",
         VaultAccessOutcome.PasswordsDoNotMatch => "the passwords do not match",
         VaultAccessOutcome.WouldLeaveNoPassword =>
-            "that keyfile is all that unlocks this vault; give --password to set one in its place",
-        VaultAccessOutcome.NoKeyfileToRemove => "this vault has no keyfile to remove",
+            "that key file is all that unlocks this vault; give --password to set one in its place",
+        VaultAccessOutcome.NoKeyfileToRemove => "this vault has no key file to remove",
         VaultAccessOutcome.KeyfileIsFragile =>
-            $"'{keyfile}' is not a keyfile, so the vault would be keyed to its exact contents; " +
-            "attach a KeePass XML, 32-byte or 64-character hex keyfile",
+            $"'{keyfile}' is not a key file, so the vault would be keyed to its exact contents; " +
+            "attach a KeePass XML, 32-byte or 64-character hex key file",
         VaultAccessOutcome.KeyfileIsThisVault =>
-            $"'{keyfile}' is this vault or one of its backups, not a keyfile",
+            $"'{keyfile}' is this vault or one of its backups, not a key file",
         _ => "the change was refused",
     };
 }

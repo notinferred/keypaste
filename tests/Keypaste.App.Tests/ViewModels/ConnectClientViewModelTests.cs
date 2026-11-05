@@ -310,7 +310,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal(Plan("cursor", Expected("cursor")), model.Preview);
         Assert.EndsWith($"; keeps the original as {backup}", model.Preview, StringComparison.Ordinal);
         Assert.Equal(
-            $"Connect changes only keypaste's part of {file}, and keeps the first original as {backup}. No password, keyfile or unlock ID goes into it.",
+            $"Connect changes only keypaste's part of {file}, and keeps the first original as {backup}. No password or key file goes into it.",
             model.PreviewNote);
         Assert.Equal(seed, File.ReadAllText(file));
 
@@ -340,7 +340,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         await model.ConfirmCommand.PressAsync();
 
         Assert.Equal(["claude mcp remove --scope user keypaste"], _runner.Changes);
-        Assert.StartsWith("Removed.", model.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Disconnected.", model.Message, StringComparison.Ordinal);
         Assert.Null(model.Registered);
     }
 
@@ -375,7 +375,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
         Assert.Equal("""{"mcpServers": {"other": {"command": "other"}}}""", File.ReadAllText(file));
         Assert.Equal(seed, File.ReadAllText(backup));
         Assert.Equal(
-            $"Removed. Cursor can no longer start keypaste mcp for this vault. The original is kept as {backup}. Restart Cursor to load it.",
+            $"Disconnected. Cursor can no longer start keypaste mcp for this vault. The original is kept as {backup}. Restart Cursor to load it.",
             model.Message);
     }
 

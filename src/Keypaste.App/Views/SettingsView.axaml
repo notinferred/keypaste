@@ -3,6 +3,7 @@
              xmlns:app="using:Keypaste.App"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -154,7 +155,7 @@
                 </StackPanel>
               </Grid>
             </Border>
-            <!-- V.11: a tag goes back only after the person has seen the environment and fields it reaches (D-0415). -->
+            <!-- V.11: a tag goes back only after the person has seen the environment and fields it reaches. -->
             <ItemsControl Name="LostTagRows" ItemsSource="{Binding LostTags}" IsVisible="{Binding HasLostTags}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:LostTagRow">
@@ -364,7 +365,7 @@
             <Border Classes="settings-row">
               <StackPanel Spacing="12">
                 <StackPanel Spacing="4">
-                  <TextBlock Classes="row-label" Text="Master password, keyfile and YubiKey" />
+                  <TextBlock Classes="row-label" Text="Master password, key file and YubiKey" />
                   <TextBlock Name="AccessFactors" Classes="caption" Text="{Binding Factors}"
                              Foreground="{DynamicResource KpTextSecondary}" />
                 </StackPanel>
@@ -403,26 +404,26 @@
                 </StackPanel>
 
                 <StackPanel Spacing="2" IsEnabled="{Binding IsEditing}">
-                  <TextBlock Classes="label" Text="Keyfile" Margin="0,0,0,4" />
-                  <RadioButton GroupName="Keyfile" Content="Keep the keyfile as it is" IsChecked="{Binding KeepKeyfile}" />
+                  <TextBlock Classes="label" Text="Key file" Margin="0,0,0,4" />
+                  <RadioButton GroupName="Keyfile" Content="Keep the key file as it is" IsChecked="{Binding KeepKeyfile}" />
                   <RadioButton GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
                   <StackPanel Orientation="Horizontal" Spacing="10" Margin="28,4,0,4" IsVisible="{Binding AttachKeyfile}">
-                    <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}" AutomationProperties.Name="Choose keyfile…">
+                    <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}" AutomationProperties.Name="Choose key file…">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="file-key" Size="14" />
-                        <TextBlock Text="Choose keyfile…" />
+                        <TextBlock Text="Choose key file…" />
                       </StackPanel>
                     </Button>
-                    <Button Classes="sm" Command="{Binding CreateKeyfileCommand}" AutomationProperties.Name="Create keyfile…">
+                    <Button Classes="sm" Command="{Binding CreateKeyfileCommand}" AutomationProperties.Name="Create key file…">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="plus" Size="14" />
-                        <TextBlock Text="Create keyfile…" />
+                        <TextBlock Text="Create key file…" />
                       </StackPanel>
                     </Button>
                     <TextBlock Classes="mono secondary" Text="{Binding NewKeyfileName}" VerticalAlignment="Center"
                                ToolTip.Tip="{Binding NewKeyfilePath}" />
                   </StackPanel>
-                  <RadioButton GroupName="Keyfile" Content="Stop using a keyfile"
+                  <RadioButton GroupName="Keyfile" Content="Stop using a key file"
                                IsVisible="{Binding HasKeyfile}"
                                IsChecked="{Binding RemoveKeyfile}" />
                 </StackPanel>
@@ -584,7 +585,7 @@
           </StackPanel>
         </Border>
 
-        <!-- Browser fill: pairing KeePassXC-Browser, armed by this press alone, and the pairings the vault holds (D-0634). -->
+        <!-- Browser fill: pairing KeePassXC-Browser, armed by this press alone, and the pairings the vault holds. -->
         <Border Name="BrowserFillCard" Classes="card filled settings" IsVisible="{Binding HasBrowserFill}">
           <StackPanel DataContext="{Binding BrowserFill}" x:DataType="vm:BrowserFillViewModel">
             <Border Classes="settings-head">
@@ -662,7 +663,7 @@
               <StackPanel Spacing="10">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                   <TextBlock Grid.Column="0" Classes="caption"
-                             Text="keypaste remembers the paths of vaults you have opened on this machine, where the keyfile each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material." />
+                             Text="keypaste remembers the paths of vaults you have opened on this machine, where the key file each one opened with is, and which YubiKey slot. It holds no item names, no secrets and no key material." />
                   <Button Grid.Column="1" Name="AskForgetAll" Classes="ghost" Content="Forget them all" Command="{Binding AskForgetAllCommand}"
                           IsVisible="{Binding !IsConfirmingForgetAll}" VerticalAlignment="Top" />
                 </Grid>
@@ -680,7 +681,7 @@
           </StackPanel>
         </Border>
 
-        <!-- Crash reports: the first run's choice, which this switch shows and changes (D-0594). -->
+        <!-- Crash reports: the switch once the person has answered, and until then the choice with its terms. -->
         <Border Name="CrashReportsCard" Classes="card filled settings" IsVisible="{Binding HasCrashReports}">
           <StackPanel>
             <Border Classes="settings-head">
@@ -689,7 +690,10 @@
                 <TextBlock Classes="section" Text="Crash reports" />
               </StackPanel>
             </Border>
-            <Border Classes="settings-row">
+            <Border Classes="settings-row" IsVisible="{Binding HasCrashChoice}">
+              <views:CrashChoiceView DataContext="{Binding CrashChoice}" />
+            </Border>
+            <Border Classes="settings-row" IsVisible="{Binding ShowsCrashSwitch}">
               <StackPanel Spacing="4">
                 <ToggleSwitch Name="SendCrashReports"
                               Content="Send crash reports"
@@ -703,7 +707,7 @@
           </StackPanel>
         </Border>
 
-        <!-- Settings › Advanced, a screen of its own with what the everyday screens leave out (D-0374). -->
+        <!-- Settings › Advanced, a screen of its own with what the everyday screens leave out. -->
         <Border Name="AdvancedCard" Classes="card filled settings">
           <Border Classes="settings-row">
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">

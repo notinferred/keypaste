@@ -120,7 +120,7 @@ public sealed class KeePassXcCsvReaderTests : IDisposable
                 new ExportRow(1, "Clock", new EntryName("KeePassXC", "Clock"), ExportCollision.None, CollisionDecision.KeepBoth, null),
                 new ExportRow(2, "Banking/Bank", new EntryName("KeePassXC/Banking", "Bank"), ExportCollision.None, CollisionDecision.KeepBoth, null),
                 new ExportRow(3, "Work/Dev/GitHub", new EntryName("KeePassXC/Work/Dev", "GitHub"), ExportCollision.None, CollisionDecision.KeepBoth, null),
-                new ExportRow(4, "Work/Recycle Bin/Kept", new EntryName("KeePassXC/Work/Recycle Bin (imported)", "Kept"), ExportCollision.None, CollisionDecision.KeepBoth, "Recycle Bin is the recycle bin's name"),
+                new ExportRow(4, "Work/Recycle Bin/Kept", new EntryName("KeePassXC/Work/Recycle Bin (imported)", "Kept"), ExportCollision.None, CollisionDecision.KeepBoth, "Recycle Bin is the Trash's name in a KeePass file"),
             ],
             plan.Rows);
         Assert.Equal(

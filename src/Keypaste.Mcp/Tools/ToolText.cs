@@ -175,7 +175,7 @@ internal static class ToolText
         and then try again. This call was recorded in the audit log as denied.
         """;
 
-    /// <summary>Why a change was not made when nothing holds the vault and the app is open and locked on it (D-0466).</summary>
+    /// <summary>Why a change was not made when nothing holds the vault and the app is open and locked on it.</summary>
     internal const string AccessAppLocked = """
         keypaste: NOT CHANGED. The keypaste app is open on this computer, but this vault is locked in
         it, so there is nobody to confirm this change, and it cannot be made without them. Ask the
@@ -187,7 +187,7 @@ internal static class ToolText
     /// <remarks>Names the fix, because only the person's configuration can give the bridge the file.</remarks>
     internal const string AccessCeilingsUnknown = """
         keypaste: NOT CHANGED. Nothing holds this vault unlocked, so nobody can confirm a change that
-        gives this agent more, and this server cannot tell which of this computer's ceilings to lower
+        gives this agent more, and this server cannot tell which of this computer's limits to lower
         for one that gives it less: it was started with its own --audit-log and no --clients. Ask the
         person you are working with to run `keypaste setup` again, which gives it both, or to unlock
         the vault in the keypaste desktop app, and then try again. This call was recorded in the audit
@@ -337,7 +337,7 @@ internal static class ToolText
         every request will be refused. This call was recorded in the audit log as denied.
         """;
 
-    /// <summary>Why a call was refused when no approver is running and the app is open and locked on the vault (D-0466).</summary>
+    /// <summary>Why a call was refused when no approver is running and the app is open and locked on the vault.</summary>
     internal const string AppLocked = """
         keypaste: DENIED. Nobody can approve this right now: the keypaste app is open on this computer,
         but this vault is locked in it, and keypaste releases nothing until it is unlocked, whatever
@@ -358,7 +358,7 @@ internal static class ToolText
         recorded in the audit log as denied.
         """;
 
-    /// <summary>Why a listing was refused when nothing holds the vault and the app is open and locked on it (D-0466).</summary>
+    /// <summary>Why a listing was refused when nothing holds the vault and the app is open and locked on it.</summary>
     internal const string AppLockedForListing = """
         keypaste: the keypaste app is open on this computer, but this vault is locked in it, so there
         are no item names to read. No item names were read.
@@ -439,7 +439,7 @@ internal static class ToolText
     /// learns the wrong thing about what the user wants.
     /// It does not say which call holds the connection — a listing and a request share one pipe, and
     /// naming it would tell an agent which of its own calls is running, or imply a person is looking.
-    /// No "do not retry" (D-0027), but it says the wait may be human-length or an agent told only "try
+    /// No "do not retry", but it says the wait may be human-length or an agent told only "try
     /// again" retries immediately into a held prompt. No number: the approver's window is configurable
     /// between five and fifty-five seconds and the bridge is not told which.
     /// </remarks>

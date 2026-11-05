@@ -19,7 +19,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// <b>The tool is registered under its own id</b>, offering run and every item, because the owner holds
-/// each agent to its settings, which follow that name (D-0455).
+/// each agent to its settings, which follow that name.
 /// </para>
 /// <para>
 /// <b>The check goes through the bridge the tool would start.</b> It launches that registration's
@@ -189,7 +189,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         Forget();
         InstallLink = null;
 
-        // A tool may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both (D-0389).
+        // A tool may start the bridge without KEYPASTE_HOME or KEYPASTE_APPROVER, and Gemini CLI strips both.
         if (_session.VaultPath is not { } vault
             || !McpServerLocator.TryPin(_connector.Machine, _session.Home, _connector.ApproverOverride, vault, ChosenVault.Read(_session.Home), out var pins))
         {
@@ -300,7 +300,7 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         var name = client.DisplayName;
         Message = result.Status switch
         {
-            McpSetupStatus.Done when removing => $"Removed. {name} can no longer start keypaste mcp for this vault." + Afterwards(client, result, removing),
+            McpSetupStatus.Done when removing => $"Disconnected. {name} can no longer start keypaste mcp for this vault." + Afterwards(client, result, removing),
             McpSetupStatus.Done => $"Connected. {name} starts keypaste mcp for this vault; Check asks through it once." + Afterwards(client, result, removing),
             McpSetupStatus.NotConnected => NotConnected(client),
             McpSetupStatus.NotInstalled => $"{name} could not be started, so nothing was changed. Check that it is installed, then run this again.",
@@ -484,9 +484,9 @@ internal sealed partial class ConnectClientViewModel : ObservableObject, IDispos
         List<string> notes =
         [
             plan.Steps.OfType<McpConfigEdit>().FirstOrDefault() is { } edit
-                ? EditNote("Connect", edit) + " No password, keyfile or unlock ID goes into it."
+                ? EditNote("Connect", edit) + " No password or key file goes into it."
                 : $"Connect runs these commands. The first removes keypaste from {client.DisplayName} if it was there before; "
-                    + "the second adds this vault. No password, keyfile or unlock ID goes into its configuration.",
+                    + "the second adds this vault. No password or key file goes into its configuration.",
         ];
 
         if (target.Link is { } link)

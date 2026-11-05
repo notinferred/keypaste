@@ -261,7 +261,7 @@ public sealed class KdbxImportTests : IDisposable
 
         var row = Assert.Single(plan.Rows, row => row.SourceGroup == KeePassInterop.RecycleBinName);
         Assert.Equal("into/Recycle Bin (imported)", row.Destination);
-        Assert.Equal("Recycle Bin is the recycle bin's name", row.Rerouted);
+        Assert.Equal("Recycle Bin is the Trash's name in a KeePass file", row.Rerouted);
         Assert.DoesNotContain(opened.Check(target, plan), problem => problem.Blocks);
 
         opened.ApplyTo(target, plan);
@@ -271,7 +271,7 @@ public sealed class KdbxImportTests : IDisposable
     }
 
     /// <summary>
-    /// An <c>env</c> group is an ordinary group (D-0416): it lands under the import group whole, and
+    /// An <c>env</c> group is an ordinary group: it lands under the import group whole, and
     /// its entries' projects travel in their own tags.
     /// </summary>
     [Fact]
@@ -361,7 +361,7 @@ public sealed class KdbxImportTests : IDisposable
         Assert.DoesNotContain(target.ReadGroupPaths(includeReserved: true), ReservedGroups.IsReserved);
     }
 
-    /// <summary>Importing into <c>env</c> applies only what any other group applies: no variable-name rule (D-0416).</summary>
+    /// <summary>Importing into <c>env</c> applies only what any other group applies: no variable-name rule.</summary>
     [Fact]
     public void ADestinationUnderEnv_IsCheckedLikeAnyOtherGroup()
     {

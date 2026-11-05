@@ -90,7 +90,7 @@ public sealed class KeyfileOptionTests
         // ExitUsageError. Asserting the refusal rather than success keeps this test independent of
         // what each verb does once it is open.
         Assert.Equal(CliApp.ExitNotFound, exit);
-        Assert.Contains("no keyfile at", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("no key file at", harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("unknown option", harness.Err, StringComparison.Ordinal);
     }
 
@@ -174,7 +174,7 @@ public sealed class KeyfileOptionTests
             "ls", "--vault", harness.VaultPath, "--keyfile", Path.Combine(harness.Directory, "absent.keyx"));
 
         Assert.Equal(CliApp.ExitNotFound, exit);
-        Assert.Contains("no keyfile at", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("no key file at", harness.Err, StringComparison.Ordinal);
 
         // Nothing further was asked for. Being made to type a master password and only then told
         // the keyfile was never there wastes the one thing the person had to supply.
@@ -197,7 +197,7 @@ public sealed class KeyfileOptionTests
         var exit = harness.Run("ls", "--vault", harness.VaultPath, "--keyfile", keyfile);
 
         Assert.Equal(CliApp.ExitAuthFailed, exit);
-        Assert.Contains("wrong master password or keyfile", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("wrong master password or key file", harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]

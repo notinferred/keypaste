@@ -275,7 +275,7 @@ public sealed class VerbTests
 
     /// <summary>
     /// The value leaves with its own item's placeholders filled in, on stdout and on the clipboard alike,
-    /// for the password and for a custom field (D-0465).
+    /// for the password and for a custom field.
     /// </summary>
     [Fact]
     public void Get_FillsInTheItemsOwnPlaceholders_OnStdoutAndTheClipboard()
@@ -395,7 +395,7 @@ public sealed class VerbTests
         var exit = harness.Run("rm", "solo", "--vault", harness.VaultPath, "--yes");
 
         Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Contains("recycle bin", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Trash", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
         Assert.Null(vault.Find("solo"));
@@ -424,7 +424,7 @@ public sealed class VerbTests
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Contains(
             harness.Prompt.PromptsSeen,
-            prompt => prompt.Contains("recycle bin", StringComparison.Ordinal));
+            prompt => prompt.Contains("Trash", StringComparison.Ordinal));
 
         Assert.DoesNotContain(
             harness.Prompt.PromptsSeen,

@@ -52,7 +52,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
     private const string _refused = "That password doesn't open this backup, or the backup is damaged. Try another copy.";
 
     private const string _refusedWithKeyfile =
-        "That password and keyfile don't open this backup, or the backup is damaged. Try another copy.";
+        "That password and key file don't open this backup, or the backup is damaged. Try another copy.";
 
     private const string _expired = "That was left waiting a while, so the password was cleared. Nothing was changed. Type it again.";
 

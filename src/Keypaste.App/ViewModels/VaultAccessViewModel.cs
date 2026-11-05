@@ -76,7 +76,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
     /// <summary>Whether the open vault has a keyfile, so that removing one is offered.</summary>
     internal bool HasKeyfile => Now?.Keyfile is not null;
 
-    internal string AttachLabel => HasKeyfile ? "Use a different keyfile" : "Add a keyfile";
+    internal string AttachLabel => HasKeyfile ? "Use a different key file" : "Add a key file";
 
     /// <summary>What leaving would lose: a password typed or a keyfile chosen, or null.</summary>
     internal string? UnsavedDraft =>
@@ -238,7 +238,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
     /// <summary>What the change costs the copies already taken (V.1a2).</summary>
     internal string BackupCost => _session.VaultPath is { } path
         ? $"The vault as it is now is kept in {VaultBackups.DirectoryFor(path)} before it changes. That copy, and every " +
-          "copy already there, still opens with the current password, keyfile and YubiKey, not the new ones. If those " +
+          "copy already there, still opens with the current password, key file and YubiKey, not the new ones. If those " +
           "may have leaked, delete the copies."
         : string.Empty;
 
@@ -433,10 +433,10 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
 
         return factors switch
         {
-            (true, { } keyfile, null) => $"opens with its master password and the keyfile {Path.GetFileName(keyfile)}.",
-            (true, { } keyfile, _) => $"opens with its master password, the keyfile {Path.GetFileName(keyfile)}{withKey}.",
+            (true, { } keyfile, null) => $"opens with its master password and the key file {Path.GetFileName(keyfile)}.",
+            (true, { } keyfile, _) => $"opens with its master password, the key file {Path.GetFileName(keyfile)}{withKey}.",
             (true, null, _) => $"opens with its master password{withKey}.",
-            (false, { } keyfile, _) => $"opens with the keyfile {Path.GetFileName(keyfile)}{withKey}, and has no master password.",
+            (false, { } keyfile, _) => $"opens with the key file {Path.GetFileName(keyfile)}{withKey}, and has no master password.",
             (false, null, { } slot) => $"opens with the YubiKey in slot {slot} alone, and has no master password.",
             _ => "has no factor keypaste can name.",
         };
@@ -445,7 +445,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
     private string Explain(AccessChangeResult result) => result.Outcome switch
     {
         AccessChangeOutcome.Changed =>
-            $"Changed. {Factors} The previous version is kept at {result.Result?.Kept?.Path}, and opens with the old password, keyfile and YubiKey.",
+            $"Changed. {Factors} The previous version is kept at {result.Result?.Kept?.Path}, and opens with the old password, key file and YubiKey.",
         AccessChangeOutcome.WrongCurrentSecret => "That isn't the vault's current password. Nothing was changed. Type it again.",
         AccessChangeOutcome.Locked => "The vault locked before the change was made. Nothing was changed. Unlock it, then try again.",
         AccessChangeOutcome.ChangedAndLocked => string.Empty,
@@ -455,17 +455,17 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
             VaultAccessOutcome.EmptyPassword => "A new master password can't be empty. Nothing was changed. Type one.",
             VaultAccessOutcome.PasswordsDoNotMatch => "Those two new passwords aren't the same. Nothing was changed. Type them again.",
             VaultAccessOutcome.WouldLeaveNoPassword when Keyfile == KeyfileChoice.Remove =>
-                "This vault's keyfile is all that opens it, so it can go only if a master password is set in the same change. Nothing was changed.",
+                "This vault's key file is all that opens it, so it can go only if a master password is set in the same change. Nothing was changed.",
             VaultAccessOutcome.WouldLeaveNoPassword =>
-                "This vault has no master password or keyfile, so its YubiKey can go only if a master password is set in the same change. Nothing was changed.",
-            VaultAccessOutcome.NoKeyfileToRemove => "This vault has no keyfile to remove. Nothing was changed.",
+                "This vault has no master password or key file, so its YubiKey can go only if a master password is set in the same change. Nothing was changed.",
+            VaultAccessOutcome.NoKeyfileToRemove => "This vault has no key file to remove. Nothing was changed.",
             VaultAccessOutcome.NoHardwareKeyToRemove => "This vault has no YubiKey to remove. Nothing was changed.",
             VaultAccessOutcome.HardwareKeyNotFound =>
                 $"No YubiKey with slot {NewSlot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager. Nothing was changed.",
             VaultAccessOutcome.KeyfileUnusable => $"{UnlockViewModel.ExplainKeyfile(result.Result.Keyfile.Outcome)} Nothing was changed.",
             VaultAccessOutcome.KeyfileIsFragile =>
-                "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile. Nothing was changed.",
-            VaultAccessOutcome.KeyfileIsThisVault => "A vault can't be its own keyfile, or a copy of itself. Nothing was changed. Choose another file.",
+                "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass key file. Nothing was changed.",
+            VaultAccessOutcome.KeyfileIsThisVault => "A vault can't be its own key file, or a copy of itself. Nothing was changed. Choose another file.",
             _ => "Nothing was changed. Try again.",
         },
     };
@@ -502,7 +502,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
 
         if (inspection.IsFragile)
         {
-            Message = "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile.";
+            Message = "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass key file.";
             return;
         }
 

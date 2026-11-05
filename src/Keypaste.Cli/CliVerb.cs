@@ -24,7 +24,7 @@ internal static class CliOptions
         Syntax.Value("--vault", "path", $"which vault to use, or set {VaultLocator.EnvironmentVariable}");
 
     internal static Option<string> Keyfile { get; } =
-        Syntax.Value("--keyfile", "path", $"the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
+        Syntax.Value("--keyfile", "path", $"the key file it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
 
     internal static Option<bool> Json { get; } = Syntax.Flag("--json", "machine-readable output");
 

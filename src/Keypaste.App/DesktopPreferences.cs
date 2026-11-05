@@ -11,7 +11,7 @@ namespace Keypaste.App;
 /// <b>Read once, at composition, and shared from there.</b> Before this existed the file was read
 /// in exactly one place — the Settings screen's constructor, built lazily on first navigation —
 /// while the session was armed from a constant. Somebody who chose one minute was shown "1 minute"
-/// and kept an unlocked vault for five (D-0095).
+/// and kept an unlocked vault for five.
 /// </para>
 /// <para>
 /// The screen and the session now hold the same object, so what is displayed is what is in force
@@ -21,7 +21,7 @@ namespace Keypaste.App;
 /// </para>
 /// <para>
 /// <b>Loading never writes.</b> <see cref="AppSettings.Load"/> answers a file it cannot parse with
-/// <see cref="AppSettings.Default"/> and leaves the bytes exactly as they are (D-0028); saving the
+/// <see cref="AppSettings.Default"/> and leaves the bytes exactly as they are; saving the
 /// defaults back would destroy a hand edit at the moment its author was most likely to be part-way
 /// through making it.
 /// </para>
@@ -42,7 +42,7 @@ internal sealed class DesktopPreferences
     /// <summary>What the app is running as.</summary>
     internal AppSettings Current { get; private set; }
 
-    /// <summary>Whether <c>app.toml</c> was absent or read whole at launch, so a first-run answer written to it clobbers no hand edit.</summary>
+    /// <summary>Whether <c>app.toml</c> was absent or read whole at launch; the unlock screen asks only then, since one it cannot read could not keep having asked without being replaced.</summary>
     internal bool Readable { get; }
 
     /// <summary>The idle timeout in the shape the session takes it.</summary>
@@ -74,13 +74,20 @@ internal sealed class DesktopPreferences
     /// The in-memory copy moves whether or not the write landed: a preference that cannot reach the
     /// disk still holds for this run, and the caller says so rather than pretending it did not
     /// happen. The chosen vault is kept as the file has it, because the first unlock and
-    /// <c>keypaste use</c> write it behind this copy (D-0389).
+    /// <c>keypaste use</c> write it behind this copy. What <see cref="Record"/> takes stays as it has it,
+    /// since a screen may hold a copy older than it. A file that does not read whole is replaced.
     /// </remarks>
     internal bool Update(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        Current = settings with { Vault = AppSettings.TryLoad(_path, out var onDisk) ? onDisk.Vault : Current.Vault, Window = Current.Window };
+        Current = settings with
+        {
+            Vault = AppSettings.TryLoad(_path, out var onDisk) ? onDisk.Vault : Current.Vault,
+            Window = Current.Window,
+            CrashChoiceAsked = Current.CrashChoiceAsked,
+            ShareTermsLinked = Current.ShareTermsLinked,
+        };
         var saved = AppSettings.Save(_path, Current);
         Changed?.Invoke(this, EventArgs.Empty);
         return saved;
@@ -89,24 +96,31 @@ internal sealed class DesktopPreferences
     /// <summary>Keeps how the window was left, writing only when it changed.</summary>
     /// <param name="window">The window's layout.</param>
     /// <exception cref="ArgumentNullException"><paramref name="window"/> is null.</exception>
-    /// <remarks>
-    /// Nobody asked for this write, so it takes only the window section from this copy: every other key stays as the file
-    /// has it, hand edits made while the app runs included, and a file that does not read whole is left alone (D-0028).
-    /// </remarks>
     internal void KeepWindow(WindowLayout window)
     {
         ArgumentNullException.ThrowIfNull(window);
 
-        if (window == Current.Window)
+        if (window != Current.Window)
         {
-            return;
+            Record(settings => settings with { Window = window });
         }
+    }
 
-        Current = Current with { Window = window };
+    /// <summary>Keeps what the app noticed rather than what the person set: the window's layout, having asked the crash-report choice, the terms Share… linked.</summary>
+    /// <param name="change">The change, applied to this copy and to the file's.</param>
+    /// <remarks>
+    /// Nobody pressed a save for this, so every other key stays as the file has it, hand edits made while the app runs
+    /// included, and a file that does not read whole is left alone and the change lasts for the run.
+    /// </remarks>
+    internal void Record(Func<AppSettings, AppSettings> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        Current = change(Current);
 
         if (AppSettings.TryLoad(_path, out var onDisk))
         {
-            _ = AppSettings.Save(_path, onDisk with { Window = window });
+            _ = AppSettings.Save(_path, change(onDisk));
         }
     }
 }

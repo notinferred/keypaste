@@ -9,7 +9,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// 4.10a on the unlock screen: Windows Hello is asked after every password unlock before the shell shows, and a vault a
-/// lock left resumable is offered it as the screen's amber action while the master password stays (D-0552, D-0553).
+/// lock left resumable is offered it as the screen's amber action while the master password stays.
 /// </summary>
 public sealed class UnlockQuickUnlockTests : IDisposable
 {
@@ -151,7 +151,7 @@ public sealed class UnlockQuickUnlockTests : IDisposable
         Assert.Equal(0, _landed);
         Assert.True(model.IsError);
         Assert.Equal(
-            "This vault's password or keyfile was changed after it locked, so Windows Hello can't unlock it. Unlock it with the new ones.",
+            "This vault's password or key file was changed after it locked, so Windows Hello can't unlock it. Unlock it with the new ones.",
             model.Message);
         Assert.False(model.OffersQuickUnlock);
         Assert.Equal("Enter its master password to open it.", model.Subtitle);

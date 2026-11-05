@@ -48,7 +48,7 @@ internal sealed record ServerOptions
             + "the app or `keypaste approve` records the calls it answers in its own log");
 
     private static readonly Option<string> _clients = Syntax.Value(
-        "--clients", "path", "this computer's ceilings, clients.toml, which an agent's change that gives it less lowers while nothing holds the vault; or set KEYPASTE_HOME");
+        "--clients", "path", "this computer's limits, clients.toml, which an agent's change that gives it less lowers while nothing holds the vault; or set KEYPASTE_HOME");
 
     private static readonly Option<string> _approver =
         Syntax.Value("--approver", "name", "which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER");
@@ -111,7 +111,7 @@ internal sealed record ServerOptions
     /// <summary>Whether <c>--help</c> was asked for.</summary>
     internal bool WantsHelp { get; init; }
 
-    /// <summary>Whether <c>--allow-run</c> was given: the run tool is offered only then (D-0358).</summary>
+    /// <summary>Whether <c>--allow-run</c> was given: the run tool is offered only then.</summary>
     internal bool AllowRun { get; init; }
 
     /// <summary>The configured vault's identity key, for audit lines, or null without a vault.</summary>
@@ -120,7 +120,7 @@ internal sealed record ServerOptions
     /// <summary>
     /// Where the desktop app listens while it is open and locked on this vault, or null without a vault.
     /// </summary>
-    /// <remarks>Named from the vault alone, so <c>--approver</c> and <c>KEYPASTE_APPROVER</c> never move it (D-0466).</remarks>
+    /// <remarks>Named from the vault alone, so <c>--approver</c> and <c>KEYPASTE_APPROVER</c> never move it.</remarks>
     internal string? LockedAppName { get; init; }
 
     /// <summary>Parses the command line.</summary>

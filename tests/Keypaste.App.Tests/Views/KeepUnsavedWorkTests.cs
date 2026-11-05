@@ -375,6 +375,7 @@ public sealed class KeepUnsavedWorkTests
     {
         using var shell = new RenderedShell();
         shell.Shell.ShareCommand.Press("github");
+        shell.Shell.Share!.ContinueCommand.Press();
         RenderedShell.Drain();
         var dialog = shell.Named<Border>("ShareDialog");
         Assert.Same(shell.Shell.Share!.CreateCommand, FormKeys.GetConfirm(dialog));

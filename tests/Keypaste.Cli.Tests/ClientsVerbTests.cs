@@ -36,12 +36,12 @@ public sealed class ClientsVerbTests : IDisposable
         Assert.Contains("  AGENT", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("*   (default)", _harness.Out, StringComparison.Ordinal);
         Assert.Contains("allow-for-a-while  yes     off  tag:env:*", _harness.Out, StringComparison.Ordinal);
-        Assert.Contains("so only this computer's ceilings are shown", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("so only this computer's limits are shown", _harness.Err, StringComparison.Ordinal);
     }
 
     /// <summary>
     /// With nothing holding the vault, a change that only lowers this computer's ceilings is made, and recorded
-    /// under the verb's own name (D-0470).
+    /// under the verb's own name.
     /// </summary>
     [Fact]
     public void WithNoOwner_ALowering_IsWrittenAsACeiling()

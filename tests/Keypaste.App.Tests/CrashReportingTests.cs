@@ -10,7 +10,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// The app's crash reports for a run (D-0594 to D-0598): kept only once the person chose Send crash reports under the terms
+/// The app's crash reports for a run: kept only once the person chose Send crash reports under the terms
 /// this build carries, deleted when they choose not to, the run marker turned into a report at the next start, and the
 /// sender started only while on and only where an endpoint is named.
 /// </summary>
@@ -35,7 +35,7 @@ public sealed partial class CrashReportingTests : IDisposable
 
         crashes.Start();
 
-        Assert.True(crashes.AwaitsAnswer);
+        Assert.True(crashes.AsksThisRun);
         Assert.False(crashes.IsOn);
         Assert.False(crashes.Crash(Thrown("SENTINEL-UNANSWERED")));
         Assert.False(Directory.Exists(Folder));
@@ -51,8 +51,8 @@ public sealed partial class CrashReportingTests : IDisposable
         Assert.True(crashes.Choose(send: true));
 
         var saved = AppSettings.Load(SettingsFile);
-        Assert.Equal((true, TermsOfUse.Carried.Version), (saved.SendCrashReports, saved.TermsShown));
-        Assert.False(crashes.AwaitsAnswer);
+        Assert.Equal((true, TermsOfUse.Carried.Version), (saved.SendCrashReports, saved.CrashChoiceTerms));
+        Assert.False(crashes.AsksThisRun);
         Assert.True(File.Exists(Marker));
 
         crashes.Screen = CrashReporting.ScreenOf(DestinationKind.AgentActivity);
@@ -157,18 +157,89 @@ public sealed partial class CrashReportingTests : IDisposable
     }
 
     [Theory]
-    [InlineData("crash_reports = 1\nterms = \"2026-01-01\"\n", false, true)]
+    [InlineData("crash_reports = 1\nterms = \"2026-01-01\"\n", false, false)]
     [InlineData("crash_reports = 2\nterms = \"{terms}\"\n", false, false)]
     [InlineData("crash_reports = 0\nterms = \"{terms}\"\n", false, false)]
     [InlineData("crash_reports = 1\n", false, true)]
     [InlineData("crash_reports = 1\nterms = \"{terms}\"\n", true, false)]
-    public void Only_a_one_under_the_terms_this_build_carries_sends_and_other_terms_ask_again(string keys, bool on, bool asks)
+    public void Only_a_one_under_the_terms_this_build_carries_sends_and_only_no_answer_at_all_asks(string keys, bool on, bool asks)
     {
         File.WriteAllText(SettingsFile, "[[settings]]\n" + keys.Replace("{terms}", TermsOfUse.Carried.Version, StringComparison.Ordinal));
 
         using var crashes = Reporting();
 
-        Assert.Equal((on, asks), (crashes.IsOn, crashes.AwaitsAnswer));
+        Assert.Equal((on, asks), (crashes.IsOn, crashes.AsksThisRun));
+    }
+
+    [Fact]
+    public void A_file_that_does_not_read_is_not_asked_over_and_only_an_answer_in_Settings_replaces_it()
+    {
+        const string handEdit = "[[settings]\nhalf an edit";
+        Directory.CreateDirectory(_home.Path);
+        File.WriteAllText(SettingsFile, handEdit);
+
+        using (var crashes = Reporting())
+        {
+            Assert.False(crashes.AsksThisRun);
+            crashes.RememberAsked();
+            Assert.Equal(handEdit, File.ReadAllText(SettingsFile));
+
+            Assert.True(crashes.Choose(send: false));
+        }
+
+        Assert.Equal((false, TermsOfUse.Carried.Version), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).CrashChoiceTerms));
+
+        using var next = Reporting();
+
+        Assert.False(next.AsksThisRun);
+        Assert.True(next.HasAnswered);
+    }
+
+    [Fact]
+    public void A_screens_older_copy_of_the_settings_does_not_undo_what_was_recorded()
+    {
+        var preferences = new DesktopPreferences(_home.Path);
+        var older = preferences.Current;
+
+        preferences.Record(settings => settings with { CrashChoiceAsked = "2026-10-28", ShareTermsLinked = "2026-10-27" });
+        preferences.Update(older with { LockWhenMinimized = true });
+
+        var saved = AppSettings.Load(SettingsFile);
+        Assert.Equal(("2026-10-28", "2026-10-27", true), (saved.CrashChoiceAsked, saved.ShareTermsLinked, saved.LockWhenMinimized));
+    }
+
+    [Fact]
+    public void Asked_once_is_remembered_without_an_answer_holds_for_this_run_and_the_next_start_does_not_ask()
+    {
+        using var crashes = Reporting();
+
+        crashes.RememberAsked();
+
+        Assert.True(crashes.AsksThisRun);
+        Assert.False(crashes.IsOn);
+        var saved = AppSettings.Load(SettingsFile);
+        Assert.Equal((TermsOfUse.Carried.Version, null, null), (saved.CrashChoiceAsked, saved.SendCrashReports, saved.CrashChoiceTerms));
+
+        using var next = Reporting();
+
+        Assert.False(next.AsksThisRun);
+        Assert.False(next.HasAnswered);
+        next.RememberAsked();
+        Assert.True(next.Choose(send: true));
+        Assert.True(next.IsOn);
+    }
+
+    [Fact]
+    public void An_answer_under_older_terms_is_not_asked_and_asking_writes_nothing()
+    {
+        const string written = "[[settings]]\ncrash_reports = 1\nterms = \"2026-01-01\"\n";
+        File.WriteAllText(SettingsFile, written);
+
+        using var crashes = Reporting();
+        crashes.RememberAsked();
+
+        Assert.False(crashes.AsksThisRun);
+        Assert.Equal(written, File.ReadAllText(SettingsFile));
     }
 
     [Fact]
@@ -181,8 +252,9 @@ public sealed partial class CrashReportingTests : IDisposable
         crashes.Start();
 
         Assert.False(crashes.IsOn);
-        Assert.False(crashes.AwaitsAnswer);
+        Assert.False(crashes.AsksThisRun);
         Assert.False(crashes.Crash(Thrown("SENTINEL-UNREADABLE")));
+        crashes.RememberAsked();
         Assert.Equal(written, File.ReadAllText(SettingsFile));
         Assert.False(Directory.Exists(Folder));
     }

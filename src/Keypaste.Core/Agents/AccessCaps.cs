@@ -101,7 +101,7 @@ public enum CapsFile
 /// lifts nothing.
 /// </para>
 /// <para>
-/// A file that cannot be read or parsed refuses every agent request, as before (D-0360). The earlier
+/// A file that cannot be read or parsed refuses every agent request, as before. The earlier
 /// <c>policy = …</c> form is such a file: <c>policy</c> is not a setting here.
 /// </para>
 /// <para>
@@ -152,7 +152,7 @@ public sealed class AccessCaps
 
     private static readonly string[] _header =
     [
-        "keypaste: this computer's ceilings on each agent, by the --client-label its bridge was started with.",
+        "keypaste: this computer's limits on each agent, by the --client-label its bridge was started with.",
         "Nothing here gives more than the vault's settings. \"*\" is every agent without rows of its own.",
         "mode: ask, allow-for-a-while or automatic. values = \"no\": values reach only commands it runs.",
         "run = \"off\": no commands. see: [selectors] as --expose takes them.",

@@ -10,19 +10,19 @@ namespace Keypaste.App;
 
 /// <summary>
 /// The desktop app's crash reports for one run: the hooks that catch what nothing else did, the reports kept while the
-/// person has chosen to send them, the run marker and the sender (D-0556, D-0594 to D-0598).
+/// person has chosen to send them, the run marker and the sender.
 /// </summary>
 /// <remarks>
-/// Nothing is kept or sent unless <c>app.toml</c>, read whole, says 1 under the terms this build shows. Every report is
+/// Nothing is kept or sent unless <c>app.toml</c>, read whole, says 1 under the terms this build carries. Every report is
 /// <see cref="CrashScrubber"/>'s; this adds only when it failed, how long the app had run and the screen's name. Nothing
 /// here throws: a report that cannot be made or kept is lost, and the app carries on or ends as it would have.
 /// </remarks>
 internal sealed class CrashReporting : IDisposable
 {
-    /// <summary>The assembly metadata only app.yml's packages carry, naming keypaste.com (D-0598).</summary>
+    /// <summary>The assembly metadata only app.yml's packages carry, naming keypaste.com.</summary>
     internal const string EndpointMetadata = "KeypasteCrashEndpoint";
 
-    /// <summary>The locked notice an agent's request raises could not be shown (D-0596).</summary>
+    /// <summary>The locked notice an agent's request raises could not be shown.</summary>
     internal const string LockedNoticeSite = "LockedNotice.Show";
 
     /// <summary>The notice after an Always for could not be shown.</summary>
@@ -43,6 +43,7 @@ internal sealed class CrashReporting : IDisposable
     private readonly long _started;
     private readonly Func<HttpMessageHandler> _transport;
     private readonly string _terms;
+    private readonly bool _isFirstAsk;
     private readonly Lock _gate = new();
     private readonly ConditionalWeakTable<Exception, object> _reported = new();
     private HttpMessageHandler? _handler;
@@ -74,6 +75,7 @@ internal sealed class CrashReporting : IDisposable
         _started = _clock.GetTimestamp();
         _transport = transport ?? CrashSender.CreateTransport;
         _terms = terms ?? TermsOfUse.Carried.Version;
+        _isFirstAsk = preferences.Readable && preferences.Current is { CrashChoiceTerms: null, CrashChoiceAsked: null };
         Endpoint = endpoint;
     }
 
@@ -90,11 +92,17 @@ internal sealed class CrashReporting : IDisposable
     /// <summary>The outbox's folder.</summary>
     internal string Folder => _outbox.Folder;
 
-    /// <summary>Whether reports are kept and sent: the person chose to under the terms this build shows.</summary>
+    /// <summary>Whether reports are kept and sent: the person chose to under the terms this build carries.</summary>
     internal bool IsOn => IsChosen(_preferences.Current, _terms);
 
-    /// <summary>Whether the first run's notice is to be shown: nobody chose under these terms, and <c>app.toml</c> can take the answer.</summary>
-    internal bool AwaitsAnswer => _preferences.Readable && _preferences.Current.TermsShown != _terms;
+    /// <summary>Whether the person answered under the terms this build carries, so Settings shows its switch rather than the choice.</summary>
+    internal bool HasAnswered => _preferences.Current.CrashChoiceTerms == _terms;
+
+    /// <summary>
+    /// Whether the unlock screen asks in this run: when it started, <c>app.toml</c> could take the answer and recorded neither an answer under any
+    /// terms nor having asked, and nobody has answered since. An older date is no new first ask, which PRODUCT §3.5's "at first run or in Settings" would not cover.
+    /// </summary>
+    internal bool AsksThisRun => _isFirstAsk && !HasAnswered;
 
     /// <summary>The app's name for the screen open, which a report carries.</summary>
     internal string? Screen
@@ -128,7 +136,7 @@ internal sealed class CrashReporting : IDisposable
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        return settings.SendCrashReports == true && settings.TermsShown == terms;
+        return settings.SendCrashReports == true && settings.CrashChoiceTerms == terms;
     }
 
     /// <summary>A screen's name as a report carries it, the place the person sees.</summary>
@@ -148,12 +156,21 @@ internal sealed class CrashReporting : IDisposable
         _ => "other",
     };
 
-    /// <summary>Takes the person's choice, at first run or in Settings, under the terms this build shows.</summary>
+    /// <summary>Records in <c>app.toml</c> that the unlock screen has asked, so the next start does not, answered or not.</summary>
+    internal void RememberAsked()
+    {
+        if (_isFirstAsk && _preferences.Current.CrashChoiceAsked is null)
+        {
+            _preferences.Record(settings => settings with { CrashChoiceAsked = _terms });
+        }
+    }
+
+    /// <summary>Takes the person's choice, on the unlock screen or in Settings, under the terms this build carries.</summary>
     /// <param name="send">Whether to send reports.</param>
     /// <returns>Whether <c>app.toml</c> took it; the choice holds for this run either way.</returns>
     internal bool Choose(bool send)
     {
-        var saved = _preferences.Update(_preferences.Current with { SendCrashReports = send, TermsShown = _terms });
+        var saved = _preferences.Update(_preferences.Current with { SendCrashReports = send, CrashChoiceTerms = _terms });
         Apply(takeEnded: false);
         return saved;
     }

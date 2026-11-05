@@ -25,7 +25,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// What the app shows and a screen reader says holds item, environment, allowance, what an agent
-/// can see, KeePass database and AI tool, never the words those replaced (D-0457).
+/// can see, KeePass database and AI tool, never the words those replaced.
 /// </summary>
 /// <remarks>
 /// Commands, flags, file names, environment variables, <c>kp://</c> references and backticked names
@@ -34,7 +34,7 @@ namespace Keypaste.App.Tests.Session;
 /// </remarks>
 public sealed partial class PlainWordsTests
 {
-    [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?|(?-i:recycle bins?)|keyfiles?|the root|ceilings?|selectors?|unlock id|relay)", RegexOptions.IgnoreCase)]
     private static partial Regex Retired();
 
     [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
@@ -162,8 +162,8 @@ public sealed partial class PlainWordsTests
     });
 
     /// <summary>
-    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the first run's terms and crash-report
-    /// choice (4.11c), the welcome with and without KeePassXC's databases, the lock screen with More options open, with
+    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the crash-report choice
+    /// and the terms it links, the welcome with and without KeePassXC's databases, the lock screen with More options open, with
     /// Windows Hello offered, and after an access change, the create form, each step of the KeePass database import dialog,
     /// and each of the export import dialog's (9.1f).
     /// </summary>
@@ -173,13 +173,15 @@ public sealed partial class PlainWordsTests
         var said = new List<(string Where, string Text)>();
         var picker = new FakeVaultFilePicker();
 
-        var firstRun = new FirstRunViewModel(TermsOfUse.Carried, _ => true, () => { });
-        var notice = Show(new FirstRunView { DataContext = firstRun });
-        said.AddRange(Shown(notice, "the first run's terms"));
-        firstRun.ContinueCommand.Press();
-        RenderedShell.Drain();
-        said.AddRange(Shown(notice, "the first run's crash-report choice"));
+        var notice = Show(new CrashChoiceView { DataContext = new CrashChoiceViewModel(TermsOfUse.Carried, _ => true) });
+        said.AddRange(Shown(notice, "the crash-report choice"));
         notice.Close();
+
+        var terms = new TermsWindow { DataContext = TermsOfUse.Carried };
+        terms.Show();
+        RenderedShell.Drain();
+        said.AddRange(Shown(terms, "the terms of use"));
+        terms.Close();
 
         using (var empty = new TempHome())
         {
@@ -408,7 +410,7 @@ public sealed partial class PlainWordsTests
         yield return ("the not-paired notice", new PairingNoticeWindow(new PairingNotice(Core.Browser.BrowserIdentity.FirefoxAddOns), () => { }));
     }
 
-    /// <summary>What the shell says of a merge of another program's save, saved with each kind of item named or refused for each reason, holds none of the words (D-0542).</summary>
+    /// <summary>What the shell says of a merge of another program's save, saved with each kind of item named or refused for each reason, holds none of the words.</summary>
     [Fact]
     public void TheMergeNotices_HoldNoneOfTheRetiredWords()
     {

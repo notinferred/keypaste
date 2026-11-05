@@ -15,7 +15,7 @@ namespace Keypaste.App.ViewModels;
 /// entry is read back through the entry list like any other.
 /// </para>
 /// <para>
-/// <see cref="Id"/> is the address (DECISIONS.md D-0250). Two entries called <c>TOKEN</c> deleted
+/// <see cref="Id"/> is the address. Two entries called <c>TOKEN</c> deleted
 /// from two groups land in one bin, so neither the title nor the row's position can say which
 /// one a person picked.
 /// </para>
@@ -46,7 +46,7 @@ internal sealed class TrashRow
 
     /// <summary>The title as the list draws it, scrubbed of anything that misrepresents it.</summary>
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
-    public override string ToString() => $"{DisplayTitle}, {Where}{(CameFromALiveGroup ? string.Empty : ", comes back at the root")}, {When}";
+    public override string ToString() => $"{DisplayTitle}, {Where}{(CameFromALiveGroup ? string.Empty : ", comes back at the top level")}, {When}";
 
     internal string DisplayTitle => EntryNameSanitizer.Sanitize(Title).Text;
 
@@ -62,7 +62,7 @@ internal sealed class TrashRow
     internal string Where => OriginalGroupPath switch
     {
         null => "a group that is gone",
-        { Length: 0 } => "the root",
+        { Length: 0 } => "the top level",
         var path => EntryNameSanitizer.SanitizePath(path).Text,
     };
 
@@ -73,5 +73,5 @@ internal sealed class TrashRow
     /// <summary>What the row says under its name.</summary>
     internal string Summary => CameFromALiveGroup
         ? $"from {Where} · {When}"
-        : $"from {Where}, so it comes back at the root · {When}";
+        : $"from {Where}, so it comes back at the top level · {When}";
 }

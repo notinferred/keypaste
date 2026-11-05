@@ -91,6 +91,22 @@ The CLI keeps to 80 columns. Amber means it needs you: the `›` prompt, command
 
 Plain and calm; precise where it protects you. Name the actor and the object: "claude-code wants DATABASE_URL". Always give a duration: "Allow for 1 hour", never "Trust". Use sentence case, "you" for the person and the agent's real client name for the agent. No exclamation marks and no emoji. An error says what to do next.
 
+The words keypaste uses, on every screen and in the CLI's own sentences:
+
+| Say | For | Not |
+|---|---|---|
+| Trash | Where a deleted item goes; KeePass files name this group Recycle Bin, and a sentence about the file or KeePassXC may say so | recycle bin |
+| Group | What holds items; a folder on disk stays a folder | Folder |
+| Title | What an item is called; a token, a field or a group keeps its name | Name |
+| key file | The file that unlocks a vault beside its password | keyfile |
+| top level | The place outside every group | the root |
+| Disconnect | Taking keypaste out of an AI tool | Remove |
+| this computer's limits | What `clients.toml` holds | ceilings |
+| what it can see | The patterns an agent's settings take | selectors |
+| keypaste.com | What serves share links | the relay |
+
+A word a person types or a machine reads keeps its spelling: flags such as `--keyfile`, `--client-label` and `--expose`, the group KDBX files call Recycle Bin, `--json` names and file names. Help names the flag and says what it is for in these words.
+
 ## Interaction
 
 The desktop follows Apple's Human Interface Guidelines on every platform, with Ctrl where macOS uses ⌘ ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Where they differ from this page, this page wins, and the security behaviour of the prompts and masked fields wins over both. The Q tasks in [STEPS](STEPS.md) bring the existing screens into line; a new screen starts there.
