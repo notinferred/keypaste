@@ -4,18 +4,18 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>
 /// An item's TOTP in the entry pane: a mask as wide as its code, the seconds until the next code, and a way
-/// to see or copy the current one (D-0481).
+/// to see or copy the current one.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Neither the code nor the seed is a property of this object.</b> <see cref="Reveal"/> and Copy compute
-/// the code from the open vault at the moment of the press, as <see cref="EntryFieldRow"/> reads a value,
+/// the code from the open vault at the moment it is asked for, as <see cref="EntryFieldRow"/> reads a value,
 /// and the spec holding the seed is zeroed before either returns. The countdown is worked out from the
 /// period alone, so a tick reads nothing from the vault; the tick that finds a new period raises
-/// <see cref="Changed"/>, so a hold in progress reads the new code from the vault in its turn.
+/// <see cref="Changed"/>, so a reveal in progress reads the new code from the vault in its turn.
 /// </para>
 /// <para>
-/// The code is masked until held, as the password is: while it is current it is a credential, and a
+/// The code is masked until revealed, as the password is: while it is current it is a credential, and a
 /// screen share or a recording would carry it.
 /// </para>
 /// </remarks>

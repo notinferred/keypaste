@@ -29,6 +29,18 @@ internal sealed class ManualClock : TimeProvider
     internal ManualClock(DateTimeOffset? start = null) =>
         _now = start ?? new DateTimeOffset(2026, 7, 26, 14, 3, 11, TimeSpan.Zero);
 
+    /// <summary>How many timers are still waiting to fire, so a test can see one was stopped.</summary>
+    internal int PendingTimers
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _timers.Count;
+            }
+        }
+    }
+
     /// <summary>One tick is one nanosecond, so a timestamp difference is easy to reason about.</summary>
     public override long TimestampFrequency => 1_000_000_000;
 

@@ -110,7 +110,7 @@ public sealed class EntryTotpTests : IDisposable
     }
 
     [Fact]
-    public Task A_held_code_is_redrawn_as_the_next_code_when_its_period_ends() => HeadlessSession.On(() =>
+    public Task A_shown_code_is_redrawn_as_the_next_code_when_its_period_ends() => HeadlessSession.On(() =>
     {
         using var context = new Context(_vaultPath);
         var totp = context.Open(_github).Totp!;

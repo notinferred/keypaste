@@ -63,6 +63,8 @@ These observations are not completed fixes or established causes. Only the found
 
 | Observation | What must be established |
 |---|---|
+| A segment chosen on an agent's settings rebuilds its list when the panel reads again, so keyboard focus leaves it, as it left the chips (Q.12). | Whether focus should stay on the choice that now holds, and what a screen reader then says. |
+| An item's open pane seems not to read again after a merge: `EntriesViewModel.Reload` leaves it alone and no caller reloads it, so its username, URL or mask may stay as they were until it is reselected (seen reading for Q.12; a reveal reads the vault and is right). | Whether that is so, and whether a merge should read the pane again when it holds no draft. |
 | A prompt that fits whole stops short of 200% where its screen is small: the Run prompt draws near 144% on 1080p and 64% on 1366×768 at Windows' 150% (Q.9, founder's decision 2026-11-05). It is the riskiest screen, so someone who needs 200% should have it there too. | A larger prompt layout that reaches 200% with the reason and Deny never out of view. |
 | On Agents, `zed` and Claude Code swap places in the AI tools list between runs of the same code, seen across palettes of one renderer run (Q.9). | What orders those rows when both are in use, and whether a person can see them swap between refreshes. |
 | Starting the app while the display sleeps ends with an unhandled `InvalidOperationException` from Avalonia.Native's render timer (native -6661, exit 134). Reproduced on the build from before Q.9, with `system_profiler` reporting Display Asleep: Yes. | Whether a `--background` login start can hit this, and if so what the start should do. |

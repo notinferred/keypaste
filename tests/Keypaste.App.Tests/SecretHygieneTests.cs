@@ -591,7 +591,7 @@ public sealed class SecretHygieneTests
     /// </para>
     /// </remarks>
     [Fact]
-    public void Revealing_is_one_value_at_a_time_and_ends_with_the_hold()
+    public void Revealing_is_one_value_at_a_time_and_ends_when_hidden()
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);

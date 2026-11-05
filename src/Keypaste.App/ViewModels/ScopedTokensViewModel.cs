@@ -130,7 +130,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
 
     internal bool HasMessage => Message.Length > 0;
 
-    /// <summary>The token just minted, until it is dismissed; it hands its value only to a hold or a copy.</summary>
+    /// <summary>The token just minted, until it is dismissed; it hands its value only to a reveal or a copy.</summary>
     internal MintedToken? Minted => _minted;
 
     internal bool HasMinted => _minted is not null;
@@ -342,7 +342,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
     }
 }
 
-/// <summary>A token just minted: drawn only while held and copied on request, then forgotten.</summary>
+/// <summary>A token just minted: drawn only while revealed and copied on request, then forgotten.</summary>
 /// <param name="token">The whole token, which no property returns.</param>
 /// <param name="name">What it is called.</param>
 /// <param name="note">What to do with it, naming its prefix and never its secret.</param>

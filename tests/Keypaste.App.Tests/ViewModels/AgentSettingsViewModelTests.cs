@@ -1,5 +1,13 @@
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
+using Avalonia.Controls;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
@@ -22,6 +30,140 @@ public sealed class AgentSettingsViewModelTests
     private static readonly TimeSpan _connect = TimeSpan.FromSeconds(10);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task More_starts_closed_on_an_agent_with_nothing_behind_it_and_closes_again()
+    {
+        await using var app = await App.StartAsync();
+        using var model = app.Settings();
+
+        Assert.False(model.IsMoreHeldOpen);
+        Assert.False(model.IsMoreOpen);
+
+        model.IsMoreOpen = true;
+        Assert.True(model.IsMoreOpen);
+
+        model.IsMoreOpen = false;
+        Assert.False(model.IsMoreOpen);
+    }
+
+    /// <summary>A setting is never hidden so that it looks unset: each thing behind More opens it, and keeps it from closing.</summary>
+    [Theory]
+    [InlineData("values")]
+    [InlineData("a row")]
+    [InlineData("a pattern")]
+    [InlineData("a limit")]
+    public async Task More_is_open_and_stays_open_while_anything_behind_it_is_set(string what)
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Change = ApprovalAnswer.ApprovedOnce;
+        using (var first = app.Settings())
+        {
+            switch (what)
+            {
+                case "values":
+                    await first.ChooseAsync(Choice(first.ValueChoices, "No, only into commands it runs"));
+                    break;
+                case "a row":
+                    first.NewRowScope = "billing";
+                    await first.AddRowAsync();
+                    break;
+                case "a pattern":
+                    first.SeePattern = "api/**";
+                    await first.ApplySeeAsync();
+                    break;
+                default:
+                    await first.ChooseAsync(Choice(first.ModeChoices, "Automatic"));
+                    first.PerHourText = "3";
+                    await first.ApplyLimitAsync();
+                    break;
+            }
+        }
+
+        using var model = app.Settings();
+
+        Assert.True(model.IsMoreHeldOpen);
+        Assert.True(model.IsMoreOpen);
+
+        model.IsMoreOpen = false;
+        Assert.True(model.IsMoreOpen);
+        Assert.Equal(what == "a pattern", model.IsAdvancedOpen);
+    }
+
+    [Fact]
+    public async Task A_row_added_with_More_open_keeps_it_open_when_it_is_removed_until_it_is_closed()
+    {
+        await using var app = await App.StartAsync();
+        using var model = app.Settings();
+
+        model.IsMoreOpen = true;
+        model.NewRowScope = "billing";
+        await model.AddRowAsync();
+        Assert.True(model.IsMoreHeldOpen);
+
+        await model.RemoveRowAsync(Assert.Single(model.Rows));
+        Assert.False(model.IsMoreHeldOpen);
+        Assert.True(model.IsMoreOpen);
+
+        model.IsMoreOpen = false;
+        Assert.False(model.IsMoreOpen);
+    }
+
+    [Fact]
+    public async Task A_pattern_being_typed_keeps_More_from_closing()
+    {
+        await using var app = await App.StartAsync();
+        using var model = app.Settings();
+
+        model.IsAdvancedOpen = true;
+        Assert.True(model.IsMoreOpen);
+        model.SeePattern = "api/**";
+
+        model.IsMoreOpen = false;
+        model.IsAdvancedOpen = false;
+
+        Assert.True(model.IsMoreOpen);
+        Assert.True(model.IsAdvancedOpen);
+    }
+
+    /// <summary>The panel opens on Mode, Can see and May run commands, as segmented controls; a change waiting for the person shows what still holds.</summary>
+    [Fact]
+    public Task The_panel_opens_on_three_controls_and_a_pressed_segment_shows_only_what_holds() => HeadlessSession.On(async () =>
+    {
+        await using var app = await App.StartAsync();
+        var answer = new TaskCompletionSource<ApprovalAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
+        app.Person.Waiting = answer;
+        using var model = app.Settings();
+        var window = new Window { Width = 900, Height = 800, Content = new AgentSettingsView { DataContext = model } };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var shown = window.GetVisualDescendants().OfType<ItemsControl>()
+            .Where(control => control.Name is { Length: > 0 } && control.IsEffectivelyVisible)
+            .Select(control => control.Name)
+            .ToList();
+        Assert.Equal(["ModeChoices", "SeeScopes", "RunChoices"], shown);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<ComboBox>(), box => box.IsEffectivelyVisible);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBox>(), box => box.IsEffectivelyVisible);
+
+        Segment(window, "ModeChoices", "Ask, allow for a while", isChecked: true);
+        var automatic = Segment(window, "ModeChoices", "Automatic", isChecked: false);
+        var toggle = ControlAutomationPeer.CreatePeerForElement(automatic).GetProvider<IToggleProvider>();
+        Assert.NotNull(toggle);
+
+        toggle.Toggle();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(automatic.IsChecked);
+        Assert.True(model.IsChanging);
+        Segment(window, "ModeChoices", "Ask, allow for a while", isChecked: true);
+
+        answer.SetResult(ApprovalAnswer.ApprovedOnce);
+        await model.Changing.WaitAsync(_connect, Token);
+        Dispatcher.UIThread.RunJobs();
+        Segment(window, "ModeChoices", "Automatic", isChecked: true);
+        window.Close();
+    });
 
     [Fact]
     public async Task A_new_agent_shows_the_defaults_and_the_name_they_follow()
@@ -387,6 +529,14 @@ public sealed class AgentSettingsViewModelTests
 
     private static string Chosen(IReadOnlyList<SettingChoice> choices) => choices.Single(choice => choice.IsChosen).Words;
 
+    private static ChoiceSegment Segment(Window window, string list, string words, bool isChecked)
+    {
+        var segment = window.GetVisualDescendants().OfType<ItemsControl>().Single(control => control.Name == list)
+            .GetVisualDescendants().OfType<ChoiceSegment>().Single(candidate => AutomationProperties.GetName(candidate) == words);
+        Assert.Equal(isChecked, segment.IsChecked);
+        return segment;
+    }
+
     private sealed class App : IAsyncDisposable
     {
         private readonly ApproverClient _client;
@@ -497,6 +647,8 @@ public sealed class AgentSettingsViewModelTests
 
         internal ApprovalAnswer Change { get; set; } = ApprovalAnswer.Denied;
 
+        internal TaskCompletionSource<ApprovalAnswer>? Waiting { get; set; }
+
         internal int Credentials { get; private set; }
 
         internal List<AccessChangePrompt> Changes { get; } = [];
@@ -510,7 +662,7 @@ public sealed class AgentSettingsViewModelTests
         public ValueTask<ApprovalAnswer> AskAsync(AccessChangePrompt prompt, CancellationToken cancellationToken)
         {
             Changes.Add(prompt);
-            return ValueTask.FromResult(Change);
+            return Waiting is { } waiting ? new ValueTask<ApprovalAnswer>(waiting.Task) : ValueTask.FromResult(Change);
         }
     }
 }

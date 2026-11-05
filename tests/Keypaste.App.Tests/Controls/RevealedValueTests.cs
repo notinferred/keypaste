@@ -9,15 +9,15 @@ using Xunit;
 namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
-/// The masked value cell: dots at rest, characters while held, and nothing to the accessibility bus.
+/// The masked value cell: dots at rest, characters while revealed, and nothing to the accessibility bus.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The sibling of <c>UnlockFocusTests.The_control_shows_dots_and_never_the_characters</c>, and a
 /// harder claim than that one. <c>MaskedInput</c> can say it holds no password at all; this control
-/// exists to draw one. What it claims instead is that the value is there only between a press and
-/// its release, and that no automation path returns it — both of which are asserted below rather
-/// than asserted in a comment.
+/// exists to draw one. What it claims instead is that the value is there only while it is revealed,
+/// and that no automation path returns it, both of which are asserted below rather than asserted in
+/// a comment.
 /// </para>
 /// <para>
 /// <b>The automation assertions are made while the value is on screen.</b> Checking a peer at rest
@@ -40,7 +40,7 @@ public sealed class RevealedValueTests
     });
 
     [Fact]
-    public Task While_held_it_shows_the_value() => HeadlessSession.On(() =>
+    public Task While_revealed_it_shows_the_value() => HeadlessSession.On(() =>
     {
         var cell = New(out _);
 
@@ -51,7 +51,7 @@ public sealed class RevealedValueTests
     });
 
     [Fact]
-    public Task Releasing_takes_it_away_again() => HeadlessSession.On(() =>
+    public Task Hiding_takes_it_away_again() => HeadlessSession.On(() =>
     {
         var cell = New(out var source);
 
@@ -64,15 +64,15 @@ public sealed class RevealedValueTests
     });
 
     /// <summary>
-    /// Leaving the visual tree ends the hold, which is what a lock does.
+    /// Leaving the visual tree hides the value, which is what a lock does.
     /// </summary>
     /// <remarks>
     /// <c>ShellViewModel</c> replaces its content rather than hiding it, so a cell showing a value
     /// when the vault locks is detached rather than released. Without this the last thing drawn
-    /// would be a secret, on a control nobody is holding any more.
+    /// would be a secret, on a control nobody can reach any more.
     /// </remarks>
     [Fact]
-    public Task Leaving_the_visual_tree_ends_the_hold() => HeadlessSession.On(() =>
+    public Task Leaving_the_visual_tree_hides_it() => HeadlessSession.On(() =>
     {
         var cell = New(out var source);
         var host = new ContentControl { Content = cell };
@@ -91,12 +91,12 @@ public sealed class RevealedValueTests
     });
 
     /// <summary>
-    /// A press that could not read a value still gives the reveal slot back.
+    /// A reveal that could not read a value gives the reveal slot straight back.
     /// </summary>
     /// <remarks>
-    /// The locked-vault case. A release that skipped <see cref="IRevealSource.Conceal"/> because
-    /// nothing had been revealed would leave the view model's single slot held by a row showing
-    /// dots, and the next row would refuse to reveal at all.
+    /// The locked-vault case. No later click may come, so a reveal that skipped
+    /// <see cref="IRevealSource.Conceal"/> would leave the view model's single slot held by a row
+    /// showing dots.
     /// </remarks>
     [Fact]
     public Task A_reveal_that_read_nothing_still_ends_cleanly() => HeadlessSession.On(() =>
@@ -105,14 +105,14 @@ public sealed class RevealedValueTests
         source.Value = null;
 
         cell.BeginReveal();
-        Assert.False(cell.IsRevealed);
 
-        cell.EndReveal();
+        Assert.False(cell.IsRevealed);
+        Assert.Null(RevealedValue.Shown);
         Assert.Equal(1, source.ConcealCount);
     });
 
     [Fact]
-    public Task A_held_value_is_read_again_when_its_row_says_it_moved_on_and_not_once_released() => HeadlessSession.On(() =>
+    public Task A_shown_value_is_read_again_when_its_row_says_it_moved_on_and_not_once_hidden() => HeadlessSession.On(() =>
     {
         const string next = "SENTINEL-NEXT-VALUE-3a1f";
         var cell = New(out var source);
@@ -135,7 +135,20 @@ public sealed class RevealedValueTests
     });
 
     [Fact]
-    public Task Holding_twice_asks_the_row_once() => HeadlessSession.On(() =>
+    public Task A_row_that_can_no_longer_be_read_hides_the_value() => HeadlessSession.On(() =>
+    {
+        var cell = New(out var source);
+        cell.BeginReveal();
+
+        source.Value = null;
+        source.RaiseChanged();
+
+        Assert.False(cell.IsRevealed);
+        Assert.Null(RevealedValue.Shown);
+    });
+
+    [Fact]
+    public Task Revealing_twice_asks_the_row_once() => HeadlessSession.On(() =>
     {
         var cell = New(out var source);
 
@@ -218,6 +231,18 @@ public sealed class RevealedValueTests
                 cell.GetValue(property)?.ToString() ?? string.Empty,
                 StringComparison.Ordinal);
         }
+    });
+
+    [Fact]
+    public Task Hiding_what_is_shown_from_outside_hides_it_and_is_safe_with_nothing_shown() => HeadlessSession.On(() =>
+    {
+        RevealedValue.HideShown();
+        var cell = New(out _);
+        cell.BeginReveal();
+
+        RevealedValue.HideShown();
+
+        Assert.False(cell.IsRevealed);
     });
 
     private static RevealedValue New(out FakeRevealSource source)

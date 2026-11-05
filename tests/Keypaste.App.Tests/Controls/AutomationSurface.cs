@@ -52,16 +52,24 @@ internal static class AutomationSurface
     }
 
     /// <summary>
+    /// The sweep leaving out the reveal toggles, whose words change with the reveal on purpose: everything else
+    /// must read the same whether or not a value is drawn. <see cref="AssertNothingExposes"/> still sweeps the toggles.
+    /// </summary>
+    internal static List<(string Source, string Text)> OutsideTheToggles(Control control) => Of(control, skipToggles: true);
+
+    /// <summary>
     /// Peer by peer down the tree, then every attached automation property and every registered
     /// styled property on every element in it.
     /// </summary>
-    internal static List<(string Source, string Text)> Of(Control control)
+    internal static List<(string Source, string Text)> Of(Control control) => Of(control, skipToggles: false);
+
+    private static List<(string Source, string Text)> Of(Control control, bool skipToggles)
     {
         var found = new List<(string Source, string Text)>();
 
-        Walk(ControlAutomationPeer.CreatePeerForElement(control), found);
+        Walk(ControlAutomationPeer.CreatePeerForElement(control), found, skipToggles);
 
-        foreach (var element in Descendants(control))
+        foreach (var element in Descendants(control).Where(element => !skipToggles || !IsToggle(element)))
         {
             var what = element.GetType().Name;
 
@@ -85,8 +93,16 @@ internal static class AutomationSurface
     private static IEnumerable<Control> Descendants(Control control) =>
         new[] { control }.Concat(control.GetVisualDescendants().OfType<Control>());
 
-    private static void Walk(AutomationPeer peer, List<(string Source, string Text)> found)
+    private static bool IsToggle(Control element) =>
+        element is RevealButton || element.GetVisualAncestors().OfType<RevealButton>().Any();
+
+    private static void Walk(AutomationPeer peer, List<(string Source, string Text)> found, bool skipToggles)
     {
+        if (skipToggles && peer is ControlAutomationPeer { Owner: RevealButton })
+        {
+            return;
+        }
+
         var what = peer.GetType().Name;
 
         Add(found, $"{what}.GetName", peer.GetName());
@@ -102,7 +118,7 @@ internal static class AutomationSurface
 
         foreach (var child in peer.GetChildren())
         {
-            Walk(child, found);
+            Walk(child, found, skipToggles);
         }
     }
 

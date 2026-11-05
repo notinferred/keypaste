@@ -8,7 +8,7 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// The value lives in a <see cref="SecretField"/>, drawn from the generator straight into its buffer, and leaves it
-/// only for the clearing clipboard, a hold of Reveal, or the field of the form that keeps it.
+/// only for the clearing clipboard, a reveal, or the field of the form that keeps it.
 /// </remarks>
 internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRevealSource, IDisposable
 {

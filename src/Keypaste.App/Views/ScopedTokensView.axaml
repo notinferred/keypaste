@@ -41,13 +41,13 @@
                        AutomationProperties.Name="Token scope" />
               <Border Grid.Row="1" Grid.Column="2" Classes="segmented inset" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="7d"
+                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="7 days"
                                IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=7d}"
                                Command="{Binding SetExpiryCommand}" CommandParameter="7d" />
-                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="30d"
+                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="30 days"
                                IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=30d}"
                                Command="{Binding SetExpiryCommand}" CommandParameter="30d" />
-                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="90d"
+                  <RadioButton Classes="segment" GroupName="TokenExpiry" Content="90 days"
                                IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=90d}"
                                Command="{Binding SetExpiryCommand}" CommandParameter="90d" />
                 </StackPanel>
@@ -83,20 +83,14 @@
                                      FontFamily="{DynamicResource KpMono}"
                                      VerticalAlignment="Center"
                                      ClipToBounds="True"
-                                     Cursor="Hand"
                                      Foreground="{DynamicResource KpTextPrimary}" />
                   <ctl:RevealButton Grid.Column="1"
                                     Name="RevealToken"
                                     Classes="ghost sm"
                                     VerticalAlignment="Center"
                                     Target="{Binding #MintedToken}"
-                                    ToolTip.Tip="Hold to reveal"
-                                    AutomationProperties.Name="Reveal the token">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <ctl:KpIcon Icon="eye" Size="14" />
-                      <TextBlock Text="Reveal" VerticalAlignment="Center" />
-                    </StackPanel>
-                  </ctl:RevealButton>
+                                    ShowsWord="True"
+                                    Subject="the token" />
                 </Grid>
               </Border>
               <Button Grid.Column="1" Name="CopyToken" Classes="primary" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center" AutomationProperties.Name="Copy token">

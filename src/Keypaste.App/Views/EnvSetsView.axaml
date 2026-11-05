@@ -87,7 +87,7 @@
     <Style Selector="Button.flat.cell:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     </Style>
-    <!-- A held value runs on over the cells and actions to its right, so its cell draws above them. -->
+    <!-- A shown value runs on over the cells and actions to its right, so its cell draws above them. -->
     <Style Selector="ItemsControl.cells > ContentPresenter" x:DataType="vm:EnvProfileCell">
       <Setter Property="ZIndex" Value="{Binding Layer}" />
     </Style>
@@ -103,7 +103,8 @@
     <Style Selector="Border.matrix-row StackPanel.row-actions">
       <Setter Property="Opacity" Value="0" />
     </Style>
-    <Style Selector="Border.matrix-row:pointerover StackPanel.row-actions, Border.matrix-row:focus-within StackPanel.row-actions">
+    <!-- And while the row's value shows, so its Hide is there for as long as the value is. -->
+    <Style Selector="Border.matrix-row:pointerover StackPanel.row-actions, Border.matrix-row:focus-within StackPanel.row-actions, Border.matrix-row StackPanel.row-actions.shows-value">
       <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.row-action">
@@ -319,7 +320,7 @@
                 </Border>
 
                 <!-- The matrix: every key against every environment. A cell holds no value; the selected
-                     environment's cells reveal theirs on a hold, through a control that publishes nothing to
+                     environment's cells reveal theirs through a control that publishes nothing to
                      the accessibility bus (THREATS.md T-22). -->
                 <StackPanel Spacing="8">
                   <Border Classes="table">
@@ -392,7 +393,7 @@
                                     <DataTemplate x:DataType="vm:EnvProfileCell">
                                       <!-- Every column draws a cell alike: the mask or "missing", then a note on a value
                                            that differs, and under it the entry the value lives on. In the selected
-                                           environment the hold target lies over the mask. -->
+                                           environment the value lies over the mask. -->
                                       <StackPanel Margin="12,0,0,0" VerticalAlignment="Center" Spacing="2">
                                       <Panel ToolTip.Tip="{Binding Tip}">
                                         <Button Classes="flat cell" Command="{Binding Act}"
@@ -413,10 +414,10 @@
                                         </Button>
                                         <!-- Not a TextBlock: its automation peer would publish the value as the
                                              element's name. RevealedValue draws the characters itself, and takes the
-                                             cell's width so a hold changes no size the accessibility surface reports
-                                             (D-0232); a held value covers the note on its own face and is cut to the cell. -->
+                                             cell's width so a reveal changes no size the accessibility surface reports;
+                                             a shown value covers the note on its own face and is cut to the cell. -->
                                         <ContentControl Content="{Binding Variable}" IsVisible="{Binding HasVariable}"
-                                                        Cursor="Hand" VerticalAlignment="Top" Margin="0,1,0,0" ClipToBounds="False">
+                                                        VerticalAlignment="Top" Margin="0,1,0,0" ClipToBounds="False">
                                           <ContentControl.ContentTemplate>
                                             <DataTemplate x:DataType="vm:EnvVariableRow">
                                               <ctl:RevealedValue Source="{Binding}"
@@ -426,7 +427,8 @@
                                                                  VerticalAlignment="Center"
                                                                  TextOptions.TextRenderingMode="Antialias"
                                                                  Foreground="{DynamicResource KpTextSecondary}"
-                                                                 RevealBackground="{DynamicResource KpBgHover}" />
+                                                                 RevealBackground="{DynamicResource KpBgHover}"
+                                                                 KeepsClear="120" />
                                             </DataTemplate>
                                           </ContentControl.ContentTemplate>
                                         </ContentControl>
@@ -444,10 +446,7 @@
                                       <StackPanel Classes="row-actions" Orientation="Horizontal" Spacing="8">
                                         <ctl:RevealButton Classes="ghost row-action"
                                                           TargetSource="{Binding}"
-                                                          ToolTip.Tip="Hold to reveal"
-                                                          AutomationProperties.Name="{Binding RevealLabel}">
-                                          <ctl:KpIcon Icon="eye" Size="13" />
-                                        </ctl:RevealButton>
+                                                          Subject="{Binding DisplayKey}" />
                                         <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource CopyGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat='Copy {0}'}"
                                                 ToolTip.Tip="Copy the value; the clipboard clears itself"
                                                 Command="{Binding CopyValueCommand}" />
@@ -484,7 +483,7 @@
                   </Border>
 
                   <TextBlock Classes="caption"
-                             Text="Hold a masked value to see it. Click another environment's cell or header to work in that environment." />
+                             Text="A row's eye button shows its value for 30 seconds. Click another environment's cell or header to work in that environment." />
                 </StackPanel>
 
                 <!-- A form opens under the matrix, beside the footer and rows that open it. -->

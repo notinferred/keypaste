@@ -138,7 +138,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task TheForm_MintsATokenHeldOnlyForAHoldOrACopy_AndForgetsItOnDone()
+    public async Task TheForm_MintsATokenHeldOnlyForARevealOrACopy_AndForgetsItOnDone()
     {
         var clipboard = new FakeClipboard();
         using var countdown = new ClipboardCountdown(clipboard, _clock);

@@ -320,7 +320,7 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
 
             if (!Stale(epoch))
             {
-                Fail("Could not reach the clipboard. Hold to reveal the value and copy it yourself.");
+                Fail("Could not reach the clipboard. Reveal the value and copy it yourself.");
             }
 
             return;

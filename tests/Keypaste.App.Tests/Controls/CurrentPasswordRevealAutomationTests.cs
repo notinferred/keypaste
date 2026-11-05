@@ -1,14 +1,13 @@
-using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -18,14 +17,12 @@ using Xunit;
 namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
-/// The selected entry's current password: dots until its cell is held, and a screen that says
-/// nothing different while it is (V.10, D-0300).
+/// The selected entry's current password: dots until its cell is revealed, and a screen that says
+/// nothing different but its toggle while it is (V.10).
 /// </summary>
 /// <remarks>
-/// The gesture is delivered as pointer events raised on the cell the template built, which keeps
-/// the control's own press, release and capture handling and every binding the pane gives it. The
-/// press the platform hit-tests through the window, and the frame it draws, are
-/// <c>DrawnRevealTests</c>.
+/// The click is hit-tested through the window onto the toggle the template built, which keeps every
+/// binding the pane gives it. The frame it draws is <c>DrawnRevealTests</c>.
 /// </remarks>
 public sealed class CurrentPasswordRevealAutomationTests
 {
@@ -35,30 +32,26 @@ public sealed class CurrentPasswordRevealAutomationTests
     private const string _neighbour = "SENTINEL-NEIGHBOUR-PASSWORD-80c2f4";
 
     [Fact]
-    public Task Holding_the_drawn_cell_shows_the_password_and_releasing_hides_it() => HeadlessSession.On(() =>
+    public Task A_click_on_Reveal_shows_the_password_and_a_second_hides_it() => HeadlessSession.On(() =>
     {
         using var screen = new EntryScreen();
         var dots = new string('•', _current.Length);
 
         Assert.Equal(dots, screen.Cell.Rendered);
 
-        screen.Press();
+        screen.Click();
         Assert.Equal(_current, screen.Cell.Rendered);
 
-        screen.Release();
+        screen.Click();
         Assert.Equal(dots, screen.Cell.Rendered);
     });
 
     [Fact]
-    public Task Losing_the_pointer_ends_the_hold() => HeadlessSession.On(() =>
+    public Task A_click_on_the_cell_leaves_it_masked() => HeadlessSession.On(() =>
     {
         using var screen = new EntryScreen();
 
-        screen.Press();
-        Assert.Equal(_current, screen.Cell.Rendered);
-
-        screen.Pointer.Capture(null);
-        Drain();
+        WindowInput.Tap(screen.Window, screen.Cell);
 
         Assert.False(screen.Cell.IsRevealed);
         Assert.Equal(new string('•', _current.Length), screen.Cell.Rendered);
@@ -69,11 +62,11 @@ public sealed class CurrentPasswordRevealAutomationTests
     /// to drop what it was drawing.
     /// </summary>
     [Fact]
-    public Task Selecting_another_entry_ends_the_hold() => HeadlessSession.On(() =>
+    public Task Selecting_another_entry_hides_it() => HeadlessSession.On(() =>
     {
         using var screen = new EntryScreen();
 
-        screen.Press();
+        screen.Click();
         Assert.Equal(_current, screen.Cell.Rendered);
 
         screen.Model.Selected = screen.Model.Rows.Single(row => row.Title == "gitlab");
@@ -84,11 +77,11 @@ public sealed class CurrentPasswordRevealAutomationTests
     });
 
     [Fact]
-    public Task Switching_screens_while_held_takes_the_password_off_the_screen() => HeadlessSession.On(() =>
+    public Task Switching_screens_while_shown_takes_the_password_off_the_screen() => HeadlessSession.On(() =>
     {
         using var screen = new EntryScreen();
 
-        screen.Press();
+        screen.Click();
         var cell = screen.Cell;
         Assert.True(cell.IsRevealed);
 
@@ -104,7 +97,7 @@ public sealed class CurrentPasswordRevealAutomationTests
     {
         using var screen = new EntryScreen();
 
-        screen.Press();
+        screen.Click();
         var cell = screen.Cell;
         Assert.True(cell.IsRevealed);
 
@@ -118,24 +111,22 @@ public sealed class CurrentPasswordRevealAutomationTests
     });
 
     /// <summary>
-    /// A press on a locked vault draws nothing, and its release still ends cleanly.
+    /// A click on a locked vault draws nothing.
     /// </summary>
     [Fact]
-    public Task A_hold_after_the_vault_locked_draws_only_dots() => HeadlessSession.On(() =>
+    public Task A_click_after_the_vault_locked_draws_only_dots() => HeadlessSession.On(() =>
     {
         using var screen = new EntryScreen();
 
         screen.Session.Lock(VaultLockReason.Manual);
-        screen.Press();
+        screen.Click();
 
         Assert.False(screen.Cell.IsRevealed);
         Assert.Equal(new string('•', _current.Length), screen.Cell.Rendered);
-
-        screen.Release();
     });
 
     /// <summary>
-    /// The whole window's surface is the same while the characters are drawn (D-0232), and the
+    /// Outside its toggle, the whole window's surface is the same while the characters are drawn, and the
     /// characters really were drawn when the second sweep ran.
     /// </summary>
     [Fact]
@@ -143,29 +134,33 @@ public sealed class CurrentPasswordRevealAutomationTests
     {
         using var screen = new EntryScreen();
 
-        var atRest = AutomationSurface.Of(screen.Window);
+        // At rest with focus on the toggle and the pointer over it, so the only difference the click can make is the click.
+        ToolTip.SetServiceEnabled(screen.Toggle, false);
+        screen.Toggle.Focus();
+        WindowInput.Hover(screen.Window, screen.Toggle);
+        var atRest = AutomationSurface.OutsideTheToggles(screen.Window);
 
-        screen.Press();
-        var whileHeld = AutomationSurface.Of(screen.Window);
+        screen.Click();
+        var whileShown = AutomationSurface.OutsideTheToggles(screen.Window);
 
         Assert.Equal(_current, screen.Cell.Rendered);
-        Assert.NotEmpty(whileHeld);
-        Assert.Equal(atRest, whileHeld);
-        Assert.Contains(whileHeld, entry => entry.Text.Contains("github", StringComparison.Ordinal));
+        Assert.NotEmpty(whileShown);
+        Assert.Equal(atRest, whileShown);
+        Assert.Contains(whileShown, entry => entry.Text.Contains("github", StringComparison.Ordinal));
 
         AutomationSurface.AssertNothingExposes(screen.Window, _current);
         AutomationSurface.AssertNothingExposes(screen.Window, _superseded);
     });
 
     [Fact]
-    public Task The_cell_is_named_by_what_it_does_and_contributes_no_peer() => HeadlessSession.On(() =>
+    public Task The_cell_is_named_by_what_it_is_and_contributes_no_peer() => HeadlessSession.On(() =>
     {
         using var screen = new EntryScreen();
 
-        screen.Press();
+        screen.Click();
 
         Assert.IsType<NoneAutomationPeer>(ControlAutomationPeer.CreatePeerForElement(screen.Cell));
-        Assert.Equal("Hold to reveal the password", AutomationProperties.GetName(screen.Cell));
+        Assert.Equal("The password", AutomationProperties.GetName(screen.Cell));
     });
 
     private static void Drain() => Dispatcher.UIThread.RunJobs();
@@ -217,24 +212,13 @@ public sealed class CurrentPasswordRevealAutomationTests
 
         internal Window Window { get; }
 
-        internal Pointer Pointer { get; } = new(Pointer.GetNextFreeId(), PointerType.Mouse, isPrimary: true);
-
         internal RevealedValue Cell =>
             Window.GetVisualDescendants().OfType<RevealedValue>().Single(cell => cell.Name == "CurrentPassword");
 
-        internal void Press()
-        {
-            Cell.RaiseEvent(new PointerPressedEventArgs(
-                Cell, Pointer, Window, default(Point), 0, PointerPointProperties.None, KeyModifiers.None));
-            Drain();
-        }
+        internal RevealButton Toggle =>
+            Window.GetVisualDescendants().OfType<RevealButton>().Single(button => ReferenceEquals(button.Target, Cell));
 
-        internal void Release()
-        {
-            Cell.RaiseEvent(new PointerReleasedEventArgs(
-                Cell, Pointer, Window, default(Point), 0, PointerPointProperties.None, KeyModifiers.None, MouseButton.Left));
-            Drain();
-        }
+        internal void Click() => WindowInput.Tap(Window, Toggle);
 
         public void Dispose()
         {

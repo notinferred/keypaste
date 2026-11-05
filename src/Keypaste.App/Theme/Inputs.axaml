@@ -179,13 +179,15 @@
     <Setter Property="FontWeight" Value="Medium" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Padding" Value="12,5" />
+    <Setter Property="Padding" Value="10,3" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <ControlTemplate>
         <Border Name="Pill"
                 Background="{TemplateBinding Background}"
+                BorderBrush="Transparent"
+                BorderThickness="2"
                 CornerRadius="5"
                 Padding="{TemplateBinding Padding}">
           <ContentPresenter Content="{TemplateBinding Content}"
@@ -203,6 +205,12 @@
   <Style Selector="RadioButton.segment:checked, ToggleButton.segment:checked">
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="RadioButton.segment:focus-visible /template/ Border#Pill, ToggleButton.segment:focus-visible /template/ Border#Pill">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+  </Style>
+  <Style Selector="RadioButton.segment:disabled, ToggleButton.segment:disabled">
+    <Setter Property="Opacity" Value="0.5" />
   </Style>
 
   <Style Selector="ListBox.segmented">

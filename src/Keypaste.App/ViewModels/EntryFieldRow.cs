@@ -9,7 +9,7 @@ namespace Keypaste.App.ViewModels;
 /// <remarks>
 /// <para>
 /// <b>The value is not a property of this object</b>, whether or not the field is protected.
-/// <see cref="Reveal"/> reads it out of the open vault at the moment of the press, as
+/// <see cref="Reveal"/> reads it out of the open vault at the moment it is revealed, as
 /// <see cref="EnvVariableRow"/> does, and the mask is a fixed width so nothing is read to draw it.
 /// KeePassXC protects a new attribute only when asked, so a plain field is as likely as a protected
 /// one to hold an API key.
@@ -66,9 +66,6 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
 
     /// <inheritdoc/>
     public int MaskedLength => MaskWidth;
-
-    /// <summary>What a screen reader is told the reveal does. Names the field, never the value.</summary>
-    internal string RevealLabel => $"Hold to reveal {DisplayName}";
 
     /// <summary>What the rename button is called. Names the field, never the value.</summary>
     internal string RenameLabel => $"Rename {DisplayName}";

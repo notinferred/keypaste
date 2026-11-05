@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Session;
@@ -86,7 +87,7 @@ public sealed class AgentsFirstLevelTests
         var panels = Panels(agents.Window);
         Assert.Equal(2, panels.Count);
         var controls = PanelControls(agents.Window);
-        var focused = controls.Single(panel => panel.DataContext == claude.Settings).GetVisualDescendants().OfType<Button>().Single(button => button.Content as string == "Advanced: patterns");
+        var focused = controls.Single(panel => panel.DataContext == claude.Settings).GetVisualDescendants().OfType<ToggleButton>().Single(button => button.Name == "PART_ExpanderHeader" && AutomationProperties.GetName(button)?.StartsWith("More settings", StringComparison.Ordinal) == true);
         focused.Focus();
         Assert.Same(focused, agents.Window.FocusManager?.GetFocusedElement());
 

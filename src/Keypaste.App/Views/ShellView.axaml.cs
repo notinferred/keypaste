@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
@@ -267,12 +268,14 @@ internal sealed partial class ShellView : UserControl
         {
             _shell.SearchFocusRequested -= OnSearchFocusRequested;
             _shell.PropertyChanged -= OnShellChanged;
+            _shell.VaultMoved -= RevealedValue.HideShown;
         }
 
         _shell = DataContext as ShellViewModel;
 
         if (_shell is not null)
         {
+            _shell.VaultMoved += RevealedValue.HideShown;
             _shell.SearchFocusRequested += OnSearchFocusRequested;
             _shell.PropertyChanged += OnShellChanged;
             _shell.IsNarrow = Bounds.Width > 0 && Bounds.Width < WindowChrome.NarrowBelow;

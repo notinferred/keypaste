@@ -16,8 +16,8 @@ using Xunit;
 namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
-/// A superseded password on the entry pane: dots until it is held, and a screen that says
-/// nothing different while it does.
+/// A superseded password on the entry pane: dots until it is revealed, and a screen that says
+/// nothing different but its toggle while it is.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,12 +28,13 @@ namespace Keypaste.App.Tests.Controls;
 /// reason, and a drawn value is the harder case.
 /// </para>
 /// <para>
-/// <b>D-0099 for a value that is deliberately on screen (D-0232).</b> The typed-field differential
+/// <b>The surface check for a value that is deliberately on screen.</b> The typed-field differential
 /// compares two secrets of equal length, guarded by the mask reaching the automation tree. Neither
 /// half transfers: a revision takes no keystrokes, and while it is revealed the cell contributes
 /// nothing at all to the tree, so two empty surfaces would compare equal against any
 /// implementation. What is compared instead is the whole window at rest against the whole window
-/// while held — the surface must not change when the characters appear — with
+/// while shown, outside the toggle, whose name changes on purpose: the surface must not change when
+/// the characters appear, with
 /// <see cref="RevealedValue.Rendered"/> as the proof that they really did.
 /// </para>
 /// </remarks>
@@ -44,16 +45,16 @@ public sealed class HistoryRevealAutomationTests
     private const string _current = "SENTINEL-NEW-PASSWORD-1f7c93";
 
     [Fact]
-    public Task The_revision_password_is_dots_until_it_is_held() => HeadlessSession.On(() =>
+    public Task The_revision_password_is_dots_until_it_is_revealed() => HeadlessSession.On(() =>
     {
         using var screen = new HistoryScreen();
 
         Assert.Equal(new string('•', _superseded.Length), screen.Cell.Rendered);
 
-        screen.Hold();
+        screen.Show();
         Assert.Equal(_superseded, screen.Cell.Rendered);
 
-        screen.Release();
+        screen.Hide();
         Assert.Equal(new string('•', _superseded.Length), screen.Cell.Rendered);
         Assert.Empty(screen.History.RevealedWhen);
     });
@@ -72,16 +73,16 @@ public sealed class HistoryRevealAutomationTests
         {
             using var screen = new HistoryScreen();
 
-            var atRest = AutomationSurface.Of(screen.Window);
+            var atRest = AutomationSurface.OutsideTheToggles(screen.Window);
 
-            screen.Hold();
-            var whileHeld = AutomationSurface.Of(screen.Window);
+            screen.Show();
+            var whileShown = AutomationSurface.OutsideTheToggles(screen.Window);
 
             Assert.Equal(_superseded, screen.Cell.Rendered);
-            Assert.NotEmpty(whileHeld);
-            Assert.Equal(atRest, whileHeld);
+            Assert.NotEmpty(whileShown);
+            Assert.Equal(atRest, whileShown);
 
-            var texts = whileHeld.Select(entry => entry.Text).ToList();
+            var texts = whileShown.Select(entry => entry.Text).ToList();
             Assert.Contains(texts, text => text.Contains("github", StringComparison.Ordinal));
             Assert.Contains(texts, text => text.Contains(screen.Revision.When, StringComparison.Ordinal));
         });
@@ -91,7 +92,7 @@ public sealed class HistoryRevealAutomationTests
     {
         using var screen = new HistoryScreen();
 
-        screen.Hold();
+        screen.Show();
 
         Assert.Equal(_superseded, screen.Cell.Rendered);
         AutomationSurface.AssertNothingExposes(screen.Window, _superseded);
@@ -106,7 +107,7 @@ public sealed class HistoryRevealAutomationTests
     {
         using var screen = new HistoryScreen();
 
-        screen.Hold();
+        screen.Show();
 
         Assert.IsType<NoneAutomationPeer>(ControlAutomationPeer.CreatePeerForElement(screen.Cell));
 
@@ -130,19 +131,19 @@ public sealed class HistoryRevealAutomationTests
     });
 
     /// <summary>
-    /// Leaving the screen while holding takes the value with it.
+    /// Leaving the screen while it shows takes the value with it.
     /// </summary>
     /// <remarks>
     /// <c>ShellViewModel</c> replaces its content rather than hiding it, so this is what navigating
-    /// away mid-hold does to the pane.
+    /// away does to the pane.
     /// </remarks>
     [Fact]
-    public Task Switching_screens_while_held_takes_the_revision_off_the_screen() =>
+    public Task Switching_screens_while_shown_takes_the_revision_off_the_screen() =>
         HeadlessSession.On(() =>
         {
             using var screen = new HistoryScreen();
 
-            screen.Hold();
+            screen.Show();
             var cell = screen.Cell;
             Assert.True(cell.IsRevealed);
 
@@ -159,7 +160,7 @@ public sealed class HistoryRevealAutomationTests
     /// </summary>
     /// <remarks>
     /// Driven the way the app drives it: the session locks, the screen reloads, and the pane it was
-    /// holding is disposed. Nothing here calls <c>EndReveal</c> on the control.
+    /// showing is disposed. Nothing here calls <c>EndReveal</c> on the control.
     /// </remarks>
     [Fact]
     public Task Locking_takes_the_revision_off_the_screen() => HeadlessSession.On(() =>
@@ -167,7 +168,7 @@ public sealed class HistoryRevealAutomationTests
         using var screen = new HistoryScreen();
         var history = screen.History;
 
-        screen.Hold();
+        screen.Show();
         var cell = screen.Cell;
         Assert.True(cell.IsRevealed);
 
@@ -243,22 +244,22 @@ public sealed class HistoryRevealAutomationTests
             Window.GetVisualDescendants().OfType<RevealedValue>().Single(cell => cell.Name == "RevisionPassword");
 
         /// <summary>
-        /// Holds the cell the comparison built, and remembers which revision it belongs to.
+        /// Reveals the cell the comparison built, and remembers which revision it belongs to.
         /// </summary>
         /// <remarks>
-        /// The hold is begun on the control rather than by a pointer press on the window; the
-        /// press the platform hit-tests, and the frame it draws, are <c>DrawnRevealTests</c>. What
+        /// The reveal is begun on the control rather than by a click on the window; the
+        /// click the platform hit-tests, and the frame it draws, are <c>DrawnRevealTests</c>. What
         /// this keeps is everything the screen contributes — the cell the template built, the row
         /// its <c>Source</c> binding found, and the mask its <c>MaskedLength</c> binding sized.
         /// </remarks>
-        internal void Hold()
+        internal void Show()
         {
             Revision = History.Selected!;
             Cell.BeginReveal();
             Drain();
         }
 
-        internal void Release()
+        internal void Hide()
         {
             Cell.EndReveal();
             Drain();

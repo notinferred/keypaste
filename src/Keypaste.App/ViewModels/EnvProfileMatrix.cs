@@ -35,7 +35,7 @@ internal sealed record EnvPreviewLine(string Text)
 
 /// <summary>
 /// One key in one profile, as the matrix draws it. Holds no value: a set cell in the selected
-/// profile carries the <see cref="EnvVariableRow"/> that reads its value on a hold.
+/// profile carries the <see cref="EnvVariableRow"/> that reads its value when revealed.
 /// </summary>
 /// <param name="Profile">The profile.</param>
 /// <param name="State">Set, missing or unusable, from <see cref="EnvMatrix"/>.</param>
@@ -68,7 +68,7 @@ internal sealed record EnvProfileCell(
 
     internal bool ShowsLabel => Variable is null;
 
-    /// <summary>Draws the hold target's cell above its row neighbours, which a held value may cover.</summary>
+    /// <summary>Draws the masked cell above its row neighbours, which a shown value may cover.</summary>
     internal int Layer => HasVariable ? 1 : 0;
 
     internal bool IsMissing => State == EnvCellState.Missing;

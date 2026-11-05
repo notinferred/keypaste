@@ -22,9 +22,9 @@ public sealed class DrawnFrameTests
     private const string _second = "PQWXYZ_gkmr07";
 
     [Fact]
-    public Task A_held_value_is_in_the_frame_and_absent_before_and_after() => HeadlessSession.On(() =>
+    public Task A_shown_value_is_in_the_frame_and_absent_before_and_after() => HeadlessSession.On(() =>
     {
-        using var cell = new HeldCell(_first);
+        using var cell = new ShownCell(_first);
         var dots = new string('•', _first.Length);
 
         var atRest = cell.Frame();
@@ -32,14 +32,14 @@ public sealed class DrawnFrameTests
         Assert.True(atRest.Shows(dots, cell.Style, atRest.Of(cell.Cell, cell.Window)));
         Assert.False(atRest.Shows(_first, cell.Style, atRest.Everywhere));
 
-        cell.Press();
+        cell.Tap();
         var held = cell.Frame();
-        Report("held", held, cell, _first, dots);
+        Report("shown", held, cell, _first, dots);
         Assert.True(held.Shows(_first, cell.Style, held.Of(cell.Cell, cell.Window)));
         Assert.True(held.Shows(_first, cell.Style, held.Everywhere));
         Assert.False(held.Shows(dots, cell.Style, held.Everywhere));
 
-        cell.Release();
+        cell.Tap();
         var released = cell.Frame();
         Assert.False(released.Shows(_first, cell.Style, released.Everywhere));
         Assert.True(released.Shows(dots, cell.Style, released.Of(cell.Cell, cell.Window)));
@@ -53,36 +53,36 @@ public sealed class DrawnFrameTests
 
         foreach (var (shown, other) in new[] { (_first, _second), (_second, _first) })
         {
-            using var cell = new HeldCell(shown);
-            cell.Press();
+            using var cell = new ShownCell(shown);
+            cell.Tap();
             var frame = cell.Frame();
-            Report($"holding {shown}", frame, cell, shown, other);
+            Report($"showing {shown}", frame, cell, shown, other);
 
             Assert.True(frame.Shows(shown, cell.Style, frame.Everywhere));
             Assert.False(frame.Shows(other, cell.Style, frame.Everywhere));
         }
     });
 
-    /// <summary>The press is a click the platform hit-tested, which needs a drawn scene.</summary>
+    /// <summary>A click the platform hit-tested reaches the drawn cell, which reveals nothing by it.</summary>
     [Fact]
-    public Task A_click_on_the_window_reaches_the_drawn_cell() => HeadlessSession.On(() =>
+    public Task A_click_on_the_window_over_the_drawn_cell_leaves_it_masked() => HeadlessSession.On(() =>
     {
-        using var cell = new HeldCell(_first);
+        using var cell = new ShownCell(_first);
 
-        cell.Press();
+        WindowInput.Tap(cell.Window, cell.Cell);
 
-        Assert.True(cell.Cell.IsRevealed);
+        Assert.False(cell.Cell.IsRevealed);
     });
 
-    private static void Report(string when, DrawnFrame frame, HeldCell cell, string value, string other) =>
+    private static void Report(string when, DrawnFrame frame, ShownCell cell, string value, string other) =>
         TestContext.Current.TestOutputHelper?.WriteLine(
             $"{when}: '{value}' scores {frame.Score(value, cell.Style, frame.Everywhere):F3}, " +
             $"'{other}' scores {frame.Score(other, cell.Style, frame.Everywhere):F3}");
 
     /// <summary>A lone <see cref="RevealedValue"/> in the typeface the app draws values in.</summary>
-    private sealed class HeldCell : IDisposable
+    private sealed class ShownCell : IDisposable
     {
-        internal HeldCell(string value)
+        internal ShownCell(string value)
         {
             Cell = new RevealedValue
             {
@@ -109,9 +109,7 @@ public sealed class DrawnFrameTests
 
         internal DrawnFrame Frame() => DrawnFrame.Capture(Window);
 
-        internal void Press() => WindowInput.Press(Window, Cell);
-
-        internal void Release() => WindowInput.Release(Window, Cell);
+        internal void Tap() => Cell.ToggleReveal();
 
         public void Dispose() => Window.Close();
     }

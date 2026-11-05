@@ -43,6 +43,23 @@ internal static class WindowInput
         Drain();
     }
 
+    /// <summary>A click the platform hit-tests: a press and a release at the centre of <paramref name="control"/>.</summary>
+    internal static void Tap(TopLevel window, Visual control)
+    {
+        Press(window, control);
+        Release(window, control);
+    }
+
+    /// <summary>What the platform does when the window stops being the one in front.</summary>
+    internal static void Deactivate(Window window)
+    {
+        var deactivated = (Action)typeof(Avalonia.Platform.IWindowBaseImpl)
+            .GetProperty("Deactivated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(window.PlatformImpl)!;
+        deactivated();
+        Drain();
+    }
+
     /// <summary>Clicks <paramref name="field"/> to focus it.</summary>
     internal static void Click(TopLevel window, Control field)
     {

@@ -237,6 +237,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     internal bool HasVaultChanged => VaultChanged is not null;
 
+    /// <summary>What the vault holds has just changed under the screen, whichever screen is open and whether or not it reads again.</summary>
+    internal event Action? VaultMoved;
+
     /// <summary>The merge of another program's save the poll or the folder watch started, or a completed task when none runs.</summary>
     internal Task Merging => _merging;
 
@@ -1519,6 +1522,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         if (merged.Merged)
         {
+            VaultMoved?.Invoke();
             _reloadFailure = null;
             _updatedAt = merged.Outcome == VaultMergeSaveOutcome.Updated ? merged.At : null;
 
@@ -1600,6 +1604,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             return;
         }
+
+        VaultMoved?.Invoke();
 
         if (result.Outcome == ReloadOutcome.Failed)
         {

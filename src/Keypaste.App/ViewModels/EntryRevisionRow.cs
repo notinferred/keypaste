@@ -115,8 +115,8 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     /// <summary>The dots the comparison shows where this revision's password would be.</summary>
     internal string PasswordMask => new('•', Math.Min(MaskedLength, 24));
 
-    /// <summary>What a screen reader is told the hold does. Names the time, never the value.</summary>
-    internal string RevealLabel => $"Hold to reveal the password from {When}";
+    /// <summary>What a screen reader is told it reveals. Names the time, never the value.</summary>
+    internal string Subject => $"the password from {When}";
 
     /// <summary>Copies this revision's password, with the auto-clearing countdown.</summary>
     internal AsyncRelayCommand CopyPasswordCommand { get; }

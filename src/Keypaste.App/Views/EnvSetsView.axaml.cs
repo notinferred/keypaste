@@ -7,10 +7,9 @@ namespace Keypaste.App.Views;
 /// The Env Sets screen.
 /// </summary>
 /// <remarks>
-/// No code behind the XAML beyond loading it. The reveal gesture lives in
-/// <see cref="Controls.RevealedValue"/>, which handles its own press and release so the value is on
-/// screen for exactly as long as a finger is down — and the "one at a time" rule lives in
-/// <see cref="ViewModels.EnvProjectViewModel"/>, where it is assertable without a display.
+/// No code behind the XAML beyond loading it. The reveal lives in
+/// <see cref="Controls.RevealedValue"/>, which hides itself, and the "one at a
+/// time" rule also in <see cref="ViewModels.EnvProjectViewModel"/>, where it is assertable without a display.
 /// </remarks>
 internal sealed partial class EnvSetsView : UserControl
 {

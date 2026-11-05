@@ -772,7 +772,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         return Read(row);
     }
 
-    /// <summary>Notes that a row's hold ended.</summary>
+    /// <summary>Notes that a row's value was hidden.</summary>
     internal void Conceal(EnvVariableRow row)
     {
         if (ReferenceEquals(Revealed, row))

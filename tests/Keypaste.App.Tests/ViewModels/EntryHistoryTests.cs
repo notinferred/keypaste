@@ -156,7 +156,7 @@ public sealed class EntryHistoryTests : IDisposable
     }
 
     [Fact]
-    public void Nothing_is_revealed_until_it_is_held()
+    public void Nothing_is_revealed_until_it_is_asked_for()
     {
         using var context = New();
         var history = Opened("servers/production", context);
@@ -175,7 +175,7 @@ public sealed class EntryHistoryTests : IDisposable
     /// never taken lets two values sit on screen together.
     /// </remarks>
     [Fact]
-    public void Revealing_a_revision_is_one_at_a_time_and_ends_with_the_hold()
+    public void Revealing_a_revision_is_one_at_a_time_and_ends_when_hidden()
     {
         using var context = New();
         var history = Opened("servers/production", context);

@@ -1,3 +1,4 @@
+using Avalonia.Data.Converters;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -49,6 +50,15 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 {
     /// <summary>What <see cref="Ttl"/> offers.</summary>
     internal static readonly IReadOnlyList<string> TtlOptions = ["1h", "24h", "7d"];
+
+    /// <summary>Says one of <see cref="TtlOptions"/> as the dialog offers it.</summary>
+    public static readonly FuncValueConverter<string, string> TtlInWords = new(ttl => ttl switch
+    {
+        "1h" => "1 hour",
+        "24h" => "24 hours",
+        "7d" => "7 days",
+        _ => ttl ?? string.Empty,
+    });
 
     /// <summary>What <see cref="Views"/> offers.</summary>
     internal static readonly IReadOnlyList<int> ViewOptions = [1, 3, 10];

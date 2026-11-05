@@ -351,6 +351,7 @@ public sealed class ScreenRenderer
         var claudeRow = agents.Rows.Single(row => row.Key == "claude-code");
         claudeRow.IsOpen = true;
         Save(window, output, "27-agents-settings-open");
+        await DrawMore(window, output);
         window.Width = 960;
         Save(window, output, "27-agents-settings-narrow");
         window.Width = _width;
@@ -384,6 +385,7 @@ public sealed class ScreenRenderer
 
         tokens.CreateCommand.Press();
         Save(window, output, "23-settings-tokens-minted");
+        DrawRevealed(window, output, "MintedToken", "23b-settings-tokens-minted-revealed");
 
         tokens.DoneMintedCommand.Press();
         tokens.AskRevokeCommand.Press(tokens.Rows[0]);
@@ -485,6 +487,7 @@ public sealed class ScreenRenderer
 
         entries.Selected = entries.Rows.First(row => row.Title == "github");
         Save(window, output, "10-secrets-login");
+        DrawRevealed(window, output, "CurrentPassword", "10b-secrets-login-revealed");
 
         entries.SelectedGroup = entries.Groups.First(group => group.Path == "env/acme-api");
         entries.Selected = entries.Rows.First(row => row.Name == _apiHome);
@@ -1154,11 +1157,11 @@ public sealed class ScreenRenderer
         project.SelectedProfile = "staging";
         Save(window, output, "40-env-staging");
 
-        Hold(window, "REDIS_URL", () => Save(window, output, "42-env-held"));
+        Revealing(window, "REDIS_URL", () => Save(window, output, "42-env-revealed"));
 
         window.Width = 960;
         Save(window, output, "44-env-narrow");
-        Hold(window, "DATABASE_URL", () => Save(window, output, "45-env-narrow-held"));
+        Revealing(window, "DATABASE_URL", () => Save(window, output, "45-env-narrow-revealed"));
         window.Width = _width;
 
         project.BeginAddCommand.Press();
@@ -1193,13 +1196,43 @@ public sealed class ScreenRenderer
 
         window.Close();
 
-        static void Hold(Window window, string key, Action draw)
+        static void Revealing(Window window, string key, Action draw)
         {
             var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.DataContext is EnvVariableRow row && row.Key == key);
             cell.BeginReveal();
             draw();
             cell.EndReveal();
         }
+    }
+
+    /// <summary>A value shown in its cell, with the toggle saying Hide, then hidden again.</summary>
+    private static void DrawRevealed(Window window, string output, string cellName, string frame)
+    {
+        var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.Name == cellName);
+        cell.BeginReveal();
+        Save(window, output, frame);
+        cell.EndReveal();
+    }
+
+    /// <summary>An agent's settings with More open, as its first control is drawn in every palette and at the window's narrowest.</summary>
+    private static async Task DrawMore(Window window, string output)
+    {
+        var settings = window.GetVisualDescendants().OfType<AgentSettingsView>().First(view => view.IsEffectivelyVisible);
+        var model = Assert.IsType<AgentSettingsViewModel>(settings.DataContext);
+        var width = window.Width;
+
+        settings.BringIntoView();
+        Save(window, output, "27-agents-settings-closed");
+        model.IsMoreOpen = true;
+        Save(window, output, "27-agents-settings-more");
+        window.Width = 720;
+        Save(window, output, "27-agents-settings-more-narrow");
+        model.NewRowScope = model.NewRowScopes[0];
+        await model.AddRowAsync();
+        Save(window, output, "27-agents-settings-row-narrow");
+        await model.RemoveRowAsync(model.Rows[0]);
+        window.Width = width;
+        model.IsMoreOpen = false;
     }
 
     /// <summary>

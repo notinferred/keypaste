@@ -992,7 +992,7 @@
                                              x:Name="RevisionPassword"
                                              Source="{Binding History.Selected}"
                                              MaskedLength="{Binding History.Selected.MaskedLength}"
-                                             AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
+                                             AutomationProperties.Name="{Binding History.Selected.Subject}"
                                              FontFamily="{DynamicResource KpMono}"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
@@ -1002,13 +1002,8 @@
                                             Classes="ghost in-field"
                                             Margin="0,0,6,0"
                                             Target="{Binding #RevisionPassword}"
-                                            ToolTip.Tip="Hold to reveal"
-                                            AutomationProperties.Name="Reveal">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <ctl:KpIcon Icon="eye" Size="14" />
-                              <TextBlock Text="Reveal" VerticalAlignment="Center" />
-                            </StackPanel>
-                          </ctl:RevealButton>
+                                            ShowsWord="True"
+                                            Subject="{Binding History.Selected.Subject}" />
                           <Button Grid.Column="2" x:Name="CopyRevisionPassword" Classes="sm" Content="Copy"
                                   Command="{Binding History.Selected.CopyPasswordCommand}" />
                         </Grid>
@@ -1138,12 +1133,12 @@
                       <Border Grid.Column="1" Classes="value">
                         <Grid ColumnDefinitions="*,Auto,Auto">
                           <!-- Not a TextBlock: its automation peer publishes its text as the element's name.
-                               RevealedValue draws the characters itself, only while Reveal is held. -->
+                               RevealedValue draws the characters itself, only while revealed. -->
                           <ctl:RevealedValue Grid.Column="0"
                                              x:Name="CurrentPassword"
                                              Source="{Binding}"
                                              MaskedLength="{Binding MaskedLength}"
-                                             AutomationProperties.Name="Hold to reveal the password"
+                                             AutomationProperties.Name="The password"
                                              FontFamily="{DynamicResource KpMono}"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
@@ -1152,13 +1147,8 @@
                           <ctl:RevealButton Grid.Column="1"
                                             Classes="ghost in-field"
                                             Target="{Binding #CurrentPassword}"
-                                            ToolTip.Tip="Hold to reveal"
-                                            AutomationProperties.Name="Reveal">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <ctl:KpIcon Icon="eye" Size="14" />
-                              <TextBlock Text="Reveal" VerticalAlignment="Center" />
-                            </StackPanel>
-                          </ctl:RevealButton>
+                                            ShowsWord="True"
+                                            Subject="the password" />
                           <!-- Generate opens Edit fields with a generated password; Save writes it and history keeps the old one (V.12). -->
                           <Button Grid.Column="2"
                                   x:Name="GeneratePassword"
@@ -1175,7 +1165,7 @@
                       </Border>
                     </Grid>
 
-                    <!-- The TOTP code is masked and computed at the hold or the copy, as the password is read;
+                    <!-- The TOTP code is masked and computed at the reveal or the copy, as the password is read;
                          only the seconds until the next code are bound. -->
                     <Grid ColumnDefinitions="96,*" IsVisible="{Binding ShowsTotp}">
                       <TextBlock Grid.Column="0" Classes="label" Text="TOTP" VerticalAlignment="Center" />
@@ -1185,7 +1175,7 @@
                                              x:Name="CurrentTotp"
                                              Source="{Binding Totp}"
                                              MaskedLength="{Binding Totp.MaskedLength}"
-                                             AutomationProperties.Name="Hold to reveal the TOTP code"
+                                             AutomationProperties.Name="The TOTP code"
                                              FontFamily="{DynamicResource KpMono}"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Center"
@@ -1201,13 +1191,8 @@
                           <ctl:RevealButton Grid.Column="2"
                                             Classes="ghost in-field"
                                             Target="{Binding #CurrentTotp}"
-                                            ToolTip.Tip="Hold to reveal"
-                                            AutomationProperties.Name="Reveal the TOTP code">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <ctl:KpIcon Icon="eye" Size="14" />
-                              <TextBlock Text="Reveal" VerticalAlignment="Center" />
-                            </StackPanel>
-                          </ctl:RevealButton>
+                                            ShowsWord="True"
+                                            Subject="the TOTP code" />
                           <Button Grid.Column="3"
                                   x:Name="CopyTotp"
                                   Classes="ghost in-field"
@@ -1299,7 +1284,7 @@
                   </StackPanel>
 
                   <!-- Custom fields: a name and a fixed mask each. A value, plain or protected, is read only while
-                       its cell is held or its Copy is pressed, as the password is (V.7b). -->
+                       it is revealed or its Copy is pressed, as the password is (V.7b). -->
                   <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
                     <Grid ColumnDefinitions="*,Auto">
                       <TextBlock Grid.Column="0" Classes="label" Text="Custom fields" VerticalAlignment="Center" />
@@ -1325,7 +1310,7 @@
                                 <TextBlock Classes="caption" Text="{Binding Kind}" VerticalAlignment="Center" />
                               </StackPanel>
                               <!-- Not a TextBlock, for the reason CurrentPassword is not one. It takes the row's width, so an
-                                   API key has room and a hold changes no size the automation surface reports. -->
+                                   API key has room and a reveal changes no size the automation surface reports. -->
                               <ctl:RevealedValue Grid.Row="1"
                                                  Grid.ColumnSpan="2"
                                                  Margin="0,4,0,0"
@@ -1333,7 +1318,7 @@
                                                  x:Name="FieldValue"
                                                  Source="{Binding}"
                                                  MaskedLength="{Binding MaskedLength}"
-                                                 AutomationProperties.Name="{Binding RevealLabel}"
+                                                 AutomationProperties.Name="{Binding DisplayName}"
                                                  FontFamily="{DynamicResource KpMono}"
                                                  HorizontalAlignment="Left"
                                                  VerticalAlignment="Center"
@@ -1342,10 +1327,7 @@
                               <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <ctl:RevealButton Classes="ghost row-action"
                                                   Target="{Binding #FieldValue}"
-                                                  ToolTip.Tip="Hold to reveal"
-                                                  AutomationProperties.Name="{Binding RevealLabel}">
-                                  <ctl:KpIcon Icon="eye" Size="13" />
-                                </ctl:RevealButton>
+                                                  Subject="{Binding DisplayName}" />
                                 <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource FieldCopyGlyph}"
                                     AutomationProperties.Name="{Binding DisplayName, StringFormat='Copy {0}'}"
                                         ToolTip.Tip="Copy the value; the clipboard clears itself"

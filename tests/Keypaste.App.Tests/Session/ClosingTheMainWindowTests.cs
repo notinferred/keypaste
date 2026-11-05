@@ -1,6 +1,8 @@
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
@@ -133,6 +135,47 @@ public sealed class ClosingTheMainWindowTests
 
             Item(app, AppTray.QuitHeader).Command!.Press();
             Assert.True(requested, "Quit on the tray menu did not ask the app to quit");
+        });
+
+    [Fact]
+    public Task Closing_into_the_tray_takes_a_value_being_shown_off_the_screen() =>
+        HeadlessSession.On(async () =>
+        {
+            using var fixture = new TempVault();
+            var vault = Vault(fixture);
+
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(fixture, stays: true) };
+            app.Launch(lifetime);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+
+            var main = lifetime.MainWindow!;
+            main.Show();
+            var unlock = Assert.IsType<UnlockViewModel>(Assert.IsType<UnlockView>(main.FindControl<ContentControl>("Root")!.Content).DataContext);
+            Assert.True(unlock.Offer(vault));
+
+            foreach (var c in TempVault.Password)
+            {
+                unlock.Type(c);
+            }
+
+            await unlock.UnlockAsync();
+            await Until(() => main.FindControl<ContentControl>("Root")!.Content is ShellView);
+            var shell = Assert.IsType<ShellViewModel>(((ShellView)main.FindControl<ContentControl>("Root")!.Content!).DataContext);
+            var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+            entries.Selected = entries.Rows.Single(row => row.Title == "DEPLOY_KEY");
+            WindowInput.Drain();
+            var cell = main.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.Name == "CurrentPassword");
+            cell.BeginReveal();
+            Assert.Equal(_sentinel, cell.Rendered);
+
+            main.Close();
+            WindowInput.Drain();
+
+            Assert.False(main.IsVisible);
+            Assert.False(cell.IsRevealed);
+            Assert.Null(RevealedValue.Shown);
         });
 
     [Fact]

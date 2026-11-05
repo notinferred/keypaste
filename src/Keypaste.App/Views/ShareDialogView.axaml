@@ -143,7 +143,13 @@
           <ListBox x:Name="Expires" AutomationProperties.Name="Expires"
                    Classes="segmented choice"
                    ItemsSource="{Binding TtlChoices}"
-                   SelectedItem="{Binding Ttl}" />
+                   SelectedItem="{Binding Ttl}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding Converter={x:Static vm:SharingViewModel.TtlInWords}}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
         </StackPanel>
         <StackPanel Grid.Column="2" Spacing="6">
           <TextBlock Classes="label" Text="Views" />

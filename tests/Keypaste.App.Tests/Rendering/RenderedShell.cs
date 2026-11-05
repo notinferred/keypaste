@@ -194,6 +194,17 @@ internal sealed class RenderedShell : IDisposable
 
     internal void Release(Visual control) => WindowInput.Release(Window, control);
 
+    /// <summary>A click on the window at the centre of <paramref name="control"/>, hit-tested by the platform.</summary>
+    internal void Tap(Visual control) => WindowInput.Tap(Window, control);
+
+    /// <summary>The button that reveals <paramref name="cell"/>, which every cell has; failing here means a value cannot be reached.</summary>
+    internal RevealButton ToggleOf(RevealedValue cell)
+    {
+        var toggles = Window.GetVisualDescendants().OfType<RevealButton>()
+            .Where(toggle => ReferenceEquals(toggle.Target, cell) || (toggle.Target is null && ReferenceEquals(toggle.TargetSource, cell.Source)));
+        return Assert.Single(toggles);
+    }
+
     internal void PressLock()
     {
         Window.KeyPressQwerty(PhysicalKey.L, _command);

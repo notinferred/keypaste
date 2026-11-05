@@ -10,7 +10,7 @@ namespace Keypaste.App.ViewModels;
 /// <remarks>
 /// <para>
 /// <b>Its own object rather than more properties on <see cref="EntryDetailViewModel"/>.</b> A
-/// revision is addressed by an index that is only good for one reading, and every hold, copy and
+/// revision is addressed by an index that is only good for one reading, and every reveal, copy and
 /// restore re-checks it; the pane addresses one current entry and has none of that to do.
 /// </para>
 /// <para>
@@ -18,7 +18,7 @@ namespace Keypaste.App.ViewModels;
 /// <see cref="Vault.ReadHistory"/> answers with every revision's fields, so each reading
 /// materialises every superseded password as a string the runtime will not let anyone wipe
 /// (THREATS.md T-18). Core's API has no narrower shape, so the cost is paid on the toggle and on
-/// each hold rather than on every click in the list.
+/// each reveal rather than on every click in the list.
 /// </para>
 /// <para>
 /// <b>An index is only good for the reading that produced it (DECISIONS.md D-0229).</b> Every use
@@ -194,7 +194,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
         return Read(row);
     }
 
-    /// <summary>Notes that a row's hold ended.</summary>
+    /// <summary>Notes that a row's value was hidden.</summary>
     internal void Conceal(EntryRevisionRow row)
     {
         if (ReferenceEquals(Revealed, row))
@@ -207,7 +207,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
     /// Copies a revision's password with the countdown every other secret copy uses (D-0300).
     /// </summary>
     /// <remarks>
-    /// Re-read and re-checked like a hold, so a list read before an edit elsewhere cannot put a
+    /// Re-read and re-checked like a reveal, so a list read before an edit elsewhere cannot put a
     /// different revision's password on the clipboard. Its placeholders fill in from that revision's
     /// own fields, not the item's current ones (D-0465), and only while the revision at its position
     /// still holds the password just read, checked under the lock the fields are read under, so an
@@ -374,7 +374,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
         }
     }
 
-    /// <summary>Reads one revision's password out of the open vault, for a hold.</summary>
+    /// <summary>Reads one revision's password out of the open vault, for a reveal.</summary>
     private string? Read(EntryRevisionRow row)
     {
         if (_session.Unlocked is not { } vault)

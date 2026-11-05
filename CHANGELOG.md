@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app's reveal is now a button you press once, which a person who cannot hold a press, or who uses switch control or a screen reader, can use: it says Reveal or Hide, and a value hides itself after 30 seconds, on leaving its item, when the window loses focus or is minimized, and on lock. An agent's settings open on Mode, Can see and May run commands as segmented controls, with Give values, patterns, project rows and limits behind More, open whenever any is set, and durations read "7 days" rather than "7d" ([Q.12](docs/steps/Q.12.md)).
+
 The desktop app's search now sits above the list it filters, reads "Search" and shows Find's own chord, and Find reaches it from any place. The list's header says "All items" or the group's name, the file name stays in the title bar's status, a search or a group that hides the selected item closes its pane, and a button at the start of the title bar shows a collapsed or hidden sidebar ([Q.18](docs/steps/Q.18.md)).
 
 The desktop app's interface now enlarges: View › Zoom in, Zoom out and Actual size (Cmd or Ctrl with +, − and 0) scale every window up to 200%, kept in `app.toml`, with the minimum window growing to match as far as the screen holds it and the interface scrolling inside where it does not; prompts show whole on any screen, and text in the access-change and terminal-edit prompts is no longer cut at the right edge ([Q.9](docs/steps/Q.9.md)).

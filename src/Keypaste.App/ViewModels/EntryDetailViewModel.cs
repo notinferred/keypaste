@@ -25,7 +25,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// A copy or an open hands on a value as it leaves keypaste, its KeePass placeholders filled in from
-/// the item's own fields, and refuses one it cannot fill; a hold, a mask and the edit form
+/// the item's own fields, and refuses one it cannot fill; a reveal, a mask and the edit form
 /// keep the stored text.
 /// </para>
 /// <para>
@@ -367,7 +367,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Drops the pending tag change, writing nothing.</summary>
     internal RelayCommand CancelTagChangeCommand { get; }
 
-    /// <summary>Reads one custom field out of the open vault as it holds it, for a hold.</summary>
+    /// <summary>Reads one custom field out of the open vault as it holds it, for a reveal.</summary>
     internal string? ReadField(string field)
     {
         try
@@ -381,7 +381,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         }
     }
 
-    /// <summary>The item's current TOTP code, computed from the open vault for a hold or a copy; the seed is zeroed before this returns.</summary>
+    /// <summary>The item's current TOTP code, computed from the open vault for a reveal or a copy; the seed is zeroed before this returns.</summary>
     /// <returns>The code, or null once what went wrong was reported.</returns>
     internal string? ReadTotpCode()
     {
@@ -870,10 +870,14 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         Url = entry.Url;
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
+        Changed?.Invoke(this, EventArgs.Empty);
         Kind = EntryKinds.Of(entry);
         ReadFieldsAndTags();
         Attachments.Read();
     }
+
+    /// <inheritdoc/>
+    public event EventHandler? Changed;
 
     /// <inheritdoc/>
     public string? Reveal()

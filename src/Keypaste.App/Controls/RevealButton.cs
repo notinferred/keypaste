@@ -1,30 +1,49 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.VisualTree;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Controls;
 
 /// <summary>
-/// The Reveal button beside a masked value: holding it shows the value in <see cref="Target"/>, and
-/// letting go hides it again.
+/// The toggle beside a masked value: pressing it, by pointer, Space, Enter or a screen reader's activation,
+/// shows the value in <see cref="Target"/>, and pressing it again hides it.
 /// </summary>
 /// <remarks>
-/// A hold rather than a toggle, for the rule the cell itself follows (D-0300): the value is on screen
-/// only while somebody is deliberately holding it. The button asks the cell to reveal and never sees
-/// the value, and its label does not change while held, so the accessibility surface stays as it was
-/// (D-0232). Space and Enter hold it from the keyboard.
+/// It says which it will do, in its icon, its word, its tooltip and its accessible name, and names the thing
+/// from <see cref="Subject"/>. It asks the cell to reveal and never sees the value, so nothing it says can
+/// hold one (T-22).
 /// </remarks>
 internal sealed class RevealButton : Button
 {
-    /// <summary>The cell whose value a hold shows.</summary>
+    /// <summary>The cell it shows.</summary>
     internal static readonly StyledProperty<RevealedValue?> TargetProperty =
         AvaloniaProperty.Register<RevealButton, RevealedValue?>(nameof(Target));
 
-    /// <summary>The row whose drawn cell a hold shows, for a button outside that cell's template; <see cref="Target"/> wins when both are set.</summary>
+    /// <summary>The row whose drawn cell it shows, for a button outside that cell's template; <see cref="Target"/> wins when both are set.</summary>
     internal static readonly StyledProperty<IRevealSource?> TargetSourceProperty =
         AvaloniaProperty.Register<RevealButton, IRevealSource?>(nameof(TargetSource));
+
+    /// <summary>What it reveals, in words that come after "Reveal" or "Hide": a name, never a value.</summary>
+    internal static readonly StyledProperty<string?> SubjectProperty =
+        AvaloniaProperty.Register<RevealButton, string?>(nameof(Subject));
+
+    /// <summary>Whether its word shows beside its icon; an icon alone leaves it to the tooltip.</summary>
+    internal static readonly StyledProperty<bool> ShowsWordProperty =
+        AvaloniaProperty.Register<RevealButton, bool>(nameof(ShowsWord));
+
+    private readonly KpIcon _icon = new() { Size = 13 };
+
+    // As wide as "Reveal", so its neighbours stay where they are when it says "Hide".
+    private readonly TextBlock _word = new() { VerticalAlignment = VerticalAlignment.Center, MinWidth = 38 };
+
+    public RevealButton()
+    {
+        Content = _icon;
+        Say();
+    }
 
     internal RevealedValue? Target
     {
@@ -38,66 +57,72 @@ internal sealed class RevealButton : Button
         set => SetValue(TargetSourceProperty, value);
     }
 
+    internal string? Subject
+    {
+        get => GetValue(SubjectProperty);
+        set => SetValue(SubjectProperty, value);
+    }
+
+    internal bool ShowsWord
+    {
+        get => GetValue(ShowsWordProperty);
+        set => SetValue(ShowsWordProperty, value);
+    }
+
     protected override Type StyleKeyOverride => typeof(Button);
 
-    private RevealedValue? Cell => Target ?? CellAsking(TargetSource);
+    private bool IsShowing =>
+        RevealedValue.Shown is { } shown && (Target is { } target ? ReferenceEquals(shown, target) : ReferenceEquals(shown.Source, TargetSource));
 
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    protected override void OnClick()
     {
-        base.OnPointerPressed(e);
-        Cell?.BeginReveal();
+        base.OnClick();
+        (Target ?? CellAsking(TargetSource))?.ToggleReveal();
     }
 
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        base.OnPointerReleased(e);
-        Cell?.EndReveal();
-    }
-
-    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
-    {
-        base.OnPointerCaptureLost(e);
-        Cell?.EndReveal();
-    }
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        ArgumentNullException.ThrowIfNull(e);
-
-        if (e.Key is Key.Space or Key.Enter)
-        {
-            Cell?.BeginReveal();
-            e.Handled = true;
-            return;
-        }
-
-        base.OnKeyDown(e);
-    }
-
-    protected override void OnKeyUp(KeyEventArgs e)
-    {
-        ArgumentNullException.ThrowIfNull(e);
-
-        if (e.Key is Key.Space or Key.Enter)
-        {
-            Cell?.EndReveal();
-            e.Handled = true;
-            return;
-        }
-
-        base.OnKeyUp(e);
-    }
-
-    protected override void OnLostFocus(FocusChangedEventArgs e)
-    {
-        base.OnLostFocus(e);
-        Cell?.EndReveal();
+        base.OnAttachedToVisualTree(e);
+        RevealedValue.ShownChanged += Say;
+        Say();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        Cell?.EndReveal();
+        RevealedValue.ShownChanged -= Say;
         base.OnDetachedFromVisualTree(e);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        base.OnPropertyChanged(change);
+
+        if (change.Property == ShowsWordProperty)
+        {
+            _icon.Size = ShowsWord ? 14 : 13;
+            Content = null;
+            Content = ShowsWord
+                ? new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _icon, _word } }
+                : _icon;
+        }
+        else if (change.Property == TargetProperty || change.Property == TargetSourceProperty || change.Property == SubjectProperty)
+        {
+            Say();
+        }
+    }
+
+    private void Say()
+    {
+        var showing = IsShowing;
+        var word = showing ? "Hide" : "Reveal";
+
+        _icon.Icon = showing ? "eye-off" : "eye";
+        _word.Text = word;
+        AutomationProperties.SetName(this, Subject is { Length: > 0 } subject ? $"{word} {subject}" : word);
+        ToolTip.SetTip(this, showing ? "Hide" : $"Reveal for {RevealedValue.ShownFor.TotalSeconds:0} seconds");
+        (Parent as Control)?.Classes.Set("shows-value", showing);
     }
 
     /// <summary>The nearest drawn cell asking <paramref name="source"/>, looked for from the button's closest ancestor outward.</summary>

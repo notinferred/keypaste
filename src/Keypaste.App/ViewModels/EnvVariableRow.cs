@@ -34,7 +34,7 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
     /// <summary>The variable's name, as the vault holds it.</summary>
     internal string Key => Source.Key;
 
-    /// <summary>The entry and field holding the value, which a copy, hold, replace or removal addresses.</summary>
+    /// <summary>The entry and field holding the value, which a copy, reveal, replace or removal addresses.</summary>
     internal EnvSource Source { get; }
 
     /// <summary>The name as the table draws it.</summary>
@@ -42,9 +42,6 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 
     /// <summary>How long its value is, for the mask.</summary>
     public int MaskedLength => _maskedLength;
-
-    /// <summary>What a screen reader is told the reveal button does. Names the key, never the value.</summary>
-    internal string RevealLabel => $"Hold to reveal {DisplayKey}";
 
     /// <summary>Copies the value, with the auto-clearing countdown.</summary>
     internal AsyncRelayCommand CopyValueCommand { get; }
@@ -56,13 +53,20 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
     internal RelayCommand ReplaceCommand { get; }
 
     /// <inheritdoc/>
+    public event EventHandler? Changed;
+
+    /// <inheritdoc/>
     public string? Reveal() => _owner.Reveal(this);
 
     /// <inheritdoc/>
     public void Conceal() => _owner.Conceal(this);
 
     /// <summary>Picks up a new length after the value changed.</summary>
-    internal void Resize(int length) => SetProperty(ref _maskedLength, length, nameof(MaskedLength));
+    internal void Resize(int length)
+    {
+        SetProperty(ref _maskedLength, length, nameof(MaskedLength));
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     private async Task CopyAsync()
     {

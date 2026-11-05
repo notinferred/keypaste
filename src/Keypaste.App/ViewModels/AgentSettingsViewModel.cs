@@ -68,7 +68,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         nameof(Identity), nameof(ModeChoices), nameof(ValueChoices), nameof(RunChoices), nameof(SeeScopes), nameof(SeeChoices),
         nameof(IsOnly), nameof(AlsoSees), nameof(HasAlsoSees), nameof(SeePattern), nameof(Rows), nameof(HasRows), nameof(NewRowScopes), nameof(NewRowScope),
         nameof(LimitTargets), nameof(OffersLimits), nameof(LimitTarget), nameof(LimitNow), nameof(HeldBack), nameof(IsHeldBack),
-        nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption),
+        nameof(Beneath), nameof(IsBeneath), nameof(CanChange), nameof(PicksCaption), nameof(IsMoreHeldOpen), nameof(IsMoreOpen), nameof(IsAdvancedOpen),
     ];
 
     private static readonly string[] _timesOfDay = [@"h\:mm", @"hh\:mm", @"h\:mm\:ss", @"hh\:mm\:ss"];
@@ -104,6 +104,8 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     private string _shownPerHour = string.Empty;
     private DateTime? _shownUntilDate;
     private string _shownUntilTime = string.Empty;
+    private bool _moreAskedOpen;
+    private bool _advancedAskedOpen;
     private bool _disposed;
 
     /// <param name="authority">The session authority that answers agents, which reads and changes their settings.</param>
@@ -185,9 +187,34 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         set => SetProperty(ref _seePattern, value ?? string.Empty);
     }
 
-    /// <summary>Whether the pattern field is shown.</summary>
-    [ObservableProperty]
-    internal partial bool IsAdvancedOpen { get; private set; }
+    /// <summary>Whether anything behind More differs from an agent's defaults, so More cannot close and look as if nothing does.</summary>
+    internal bool IsMoreHeldOpen =>
+        _state?.Vault is { } vault
+        && (!vault.Values || vault.Projects.Count > 0 || Patterns().Any() || vault.Limit != AccessLimit.None);
+
+    /// <summary>Whether More is open: while anything in it is set or being typed, and otherwise as the person left it.</summary>
+    internal bool IsMoreOpen
+    {
+        get => _moreAskedOpen || IsMoreHeldOpen;
+        set
+        {
+            _moreAskedOpen = value || SeeTyped || LimitTyped;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Whether the pattern field is shown: while it holds a pattern, and otherwise as the person left it.</summary>
+    internal bool IsAdvancedOpen
+    {
+        get => _advancedAskedOpen || Patterns().Any();
+        set
+        {
+            _advancedAskedOpen = value || SeeTyped;
+            _moreAskedOpen |= _advancedAskedOpen;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsMoreOpen));
+        }
+    }
 
     /// <summary>Its project rows, each beating the default for what it covers.</summary>
     internal IReadOnlyList<SettingRow> Rows => _rows;
@@ -474,6 +501,10 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         Beneath = _state is { BeneathDefaults: true }
             ? "The vault holds a change not saved yet, another program changed its file, or keypaste does not wholly understand these settings, so for now they apply only beneath the defaults."
             : string.Empty;
+
+        // Open because something was set, it stays open when that is removed, rather than closing under the person's hand.
+        _moreAskedOpen |= IsMoreHeldOpen;
+        _advancedAskedOpen |= Patterns().Any();
 
         foreach (var name in _read)
         {
