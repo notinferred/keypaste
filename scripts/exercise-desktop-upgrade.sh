@@ -73,6 +73,7 @@ readonly LINK_BUTTON='Link the keypaste command'
 readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
 readonly OPEN_AT_LOGIN='Open keypaste at login'
 readonly RUN_KEY='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+readonly FILE_TYPE='progid open-with'
 readonly CR=$'\r'
 readonly TAB=$'\t'
 
@@ -144,6 +145,8 @@ classify() {
     elif [ "$platform" = windows ] && ! terminal_runs install "$LOWER"; then :
     elif [ "$platform" = windows ] && [ "$(fact_of "$dir" run_value_after_install)" = absent ]; then
       result=contradiction; why="Open at login's Run value was not there after it was written"
+    elif [ "$platform" = windows ] && [ "$(fact_of "$dir" file_type_after_install)" != "$FILE_TYPE" ]; then
+      result=contradiction; why="the install left .kdbx's Open With entry as: $(fact_of "$dir" file_type_after_install)"
     else result=pass; why="$detail"
     fi
   fi
@@ -177,6 +180,8 @@ classify() {
     elif [ "$platform" = linux ] && ! terminal_runs older_start "$HIGHER"; then :
     elif [ "$platform" = windows ] && [ "$(fact_of "$dir" run_value_after_upgrade)" != "$(fact_of "$dir" run_value_after_install)" ]; then
       result=contradiction; why="the upgrade left Open at login's Run value '$(fact_of "$dir" run_value_after_upgrade)', not '$(fact_of "$dir" run_value_after_install)'"
+    elif [ "$platform" = windows ] && [ "$(fact_of "$dir" file_type_after_upgrade)" != "$FILE_TYPE" ]; then
+      result=contradiction; why="the upgrade left .kdbx's Open With entry as: $(fact_of "$dir" file_type_after_upgrade)"
     else result=pass; why="$detail"
     fi
   fi
@@ -239,7 +244,9 @@ classify() {
       result=contradiction; why="the uninstall left the user Path '$(fact_of "$dir" user_path_after_uninstall)', not '$(fact_of "$dir" user_path_before)' as before the install"
     elif [ "$platform" = windows ] && [ "$(fact_of "$dir" run_value_after_uninstall)" != absent ]; then
       result=contradiction; why="the uninstall left Open at login's Run value: $(fact_of "$dir" run_value_after_uninstall)"
-    elif [ "$platform" = windows ]; then result=pass; why='the app, its user Path entry, its terminal keypaste and its Run value are gone, and the vault, settings, ceilings and audit are untouched'
+    elif [ "$platform" = windows ] && [ "$(fact_of "$dir" file_type_after_uninstall)" != absent ]; then
+      result=contradiction; why="the uninstall left .kdbx's Open With entry: $(fact_of "$dir" file_type_after_uninstall)"
+    elif [ "$platform" = windows ]; then result=pass; why='the app, its user Path entry, its terminal keypaste, its Run value and its Open With entry are gone, and the vault, settings, ceilings and audit are untouched'
     elif [ "$platform" = macos ]; then
       result=pass; why="Finder moved the app to the Trash and the vault, settings, ceilings and audit are untouched; the link and the LaunchAgent are left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
     else result=pass; why="the app is gone and the vault, settings, ceilings and audit are untouched; the link Settings made is left, and a new terminal now says: $(fact_of "$dir" terminal_after_uninstall)"
@@ -455,6 +462,11 @@ mark_user_path() {
 # Open at login's Run value as the app writes it (WindowsRunKey), or absent.
 run_value() { powershell_out "(Get-Item '$RUN_KEY').GetValue('keypaste', 'absent')"; }
 
+# .kdbx's Open With entry as the MSI's VaultFileType component writes it: its parts found, or absent.
+file_type() {
+  powershell_out "\$found = @(); if (Test-Path 'HKCU:\\Software\\Classes\\keypaste.Vault\\shell\\open\\command') { \$found += 'progid' }; if ((Get-Item 'HKCU:\\Software\\Classes\\.kdbx\\OpenWithProgids' -ErrorAction SilentlyContinue).Property -contains 'keypaste.Vault') { \$found += 'open-with' }; if (\$found) { \$found -join ' ' } else { 'absent' }"
+}
+
 # Open at login turned on as Settings does it: the Run value naming the installed app, with --background.
 open_at_login() {
   powershell_out "New-ItemProperty -Path '$RUN_KEY' -Name keypaste -Value '\"$(cygpath -w "$APP")\" --background' -PropertyType String -Force | Out-Null" \
@@ -620,6 +632,7 @@ install_lower() {
     fact registrations_after_install "$(windows_registrations | tr '\n' ' ')"
     probe install
     open_at_login || return 1
+    fact file_type_after_install "$(file_type)"
     echo "msiexec /i exited 0; installed $(cygpath -m "$APP") reporting $(fact_read lower_version), $(fact_read products_after_install) registered; Open at login's Run value written"
   elif [ "$PLATFORM" = macos ]; then
     dmg="$(candidate "$LOWER")" || return 1
@@ -659,6 +672,7 @@ upgrade() {
     drive window 120 || { stop_app; echo "the $HIGHER app showed no window"; return 1; }
     stop_app
     fact run_value_after_upgrade "$(run_value)"
+    fact file_type_after_upgrade "$(file_type)"
     probe upgrade
     echo "MajorUpgrade exited 0; $(cygpath -m "$APP") now reports $(fact_read higher_version) and showed its window"
   elif [ "$PLATFORM" = macos ]; then
@@ -811,6 +825,7 @@ uninstall() {
     fi
     fact user_path_after_uninstall "$(user_path)"
     fact run_value_after_uninstall "$(run_value)"
+    fact file_type_after_uninstall "$(file_type)"
     echo "msiexec /x exited 0"
   elif [ "$PLATFORM" = macos ]; then
     stop_app
@@ -962,6 +977,9 @@ selftest() {
     set_fact "$1" run_value_after_install "$run_line"
     set_fact "$1" run_value_after_upgrade "$run_line"
     set_fact "$1" run_value_after_uninstall absent
+    set_fact "$1" file_type_after_install "$FILE_TYPE"
+    set_fact "$1" file_type_after_upgrade "$FILE_TYPE"
+    set_fact "$1" file_type_after_uninstall absent
   }
   # The passing run on Linux, where the lower app links keypaste from Settings and a start of the higher, handed
   # to the running lower app, re-points it.
@@ -1120,6 +1138,14 @@ selftest() {
   passing uninstall-left-open-at-login
   set_fact uninstall-left-open-at-login run_value_after_uninstall "$run_line"
 
+  # .kdbx's Open With entry on Windows.
+  passing file-type-unwritten
+  set_fact file-type-unwritten file_type_after_install progid
+  passing upgrade-took-the-file-type
+  set_fact upgrade-took-the-file-type file_type_after_upgrade absent
+  passing uninstall-left-the-file-type
+  set_fact uninstall-left-the-file-type file_type_after_uninstall open-with
+
   # A new terminal on Linux.
   passing_linux linux
   passing_linux linux-not-unlocked
@@ -1224,6 +1250,9 @@ selftest() {
   expect open-at-login-unwritten install-lower contradiction
   expect upgrade-took-open-at-login upgrade contradiction
   expect uninstall-left-open-at-login uninstall contradiction
+  expect file-type-unwritten install-lower contradiction
+  expect upgrade-took-the-file-type upgrade contradiction
+  expect uninstall-left-the-file-type uninstall contradiction
 
   for check in "${CHECKS[@]}"; do
     if [ "$check" = downgrade-refused ]; then expect linux "$check" not-applicable; else expect linux "$check" pass; fi

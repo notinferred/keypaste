@@ -1,6 +1,7 @@
-#pragma warning disable RS0030 // One of the item pane's two attachment files (D-0534).
+#pragma warning disable RS0030 // One of the item pane's two attachment files.
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.App.ViewModels;
 
@@ -9,16 +10,16 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// No attachment's content is in this object or passes through it. Adding and replacing hand the vault a stream over the
 /// file the person chose, and saving hands it the path they chose, so the bytes go between that file and the vault inside
-/// core (D-0533, D-0534). Each edit is one core call and one save, so one revision in the item's history.
+/// core. Each edit is one core call and one save, so one revision in the item's history.
 /// </para>
 /// <para>
-/// Nothing here opens or runs an attachment or the file one was saved to, reaches a launcher or starts a process
-/// (D-0534); the app's <c>BannedSymbols.txt</c> and <c>AttachmentSourceRulesTests</c> hold that.
+/// Nothing here opens or runs an attachment or the file one was saved to, reaches a launcher or starts a process;
+/// the app's <c>BannedSymbols.txt</c> and <c>AttachmentSourceRulesTests</c> hold that.
 /// </para>
 /// </remarks>
 internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDisposable
 {
-    /// <summary>Why an edit's revision is not in the item's history (D-0533).</summary>
+    /// <summary>Why an edit's revision is not in the item's history.</summary>
     private const string _notKept = "the item as it was is larger than this vault's history size limit, so history doesn't keep it.";
 
     private readonly AppVaultSession _session;
@@ -33,7 +34,7 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
     /// <param name="item">The item whose attachments these are.</param>
     /// <param name="picker">Where the person chooses a file, or null where there is no window to ask in.</param>
     /// <param name="report">Where a refusal goes: the screen's banner, cleared with null.</param>
-    /// <param name="changed">Called once an edit is a revision, so a history read before it is read again (D-0229).</param>
+    /// <param name="changed">Called once an edit is a revision, so a history read before it is read again.</param>
     internal EntryAttachmentsViewModel(AppVaultSession session, EntryName item, IVaultFilePicker? picker, Action<string?> report, Action changed)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -127,7 +128,7 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
         }
     }
 
-    /// <summary>Asks where to save a copy of <paramref name="row"/>, and has the vault write it there only where nothing is (D-0534).</summary>
+    /// <summary>Asks where to save a copy of <paramref name="row"/>, and has the vault write it there only where nothing is.</summary>
     internal async Task SaveAsync(EntryAttachmentRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -191,6 +192,42 @@ internal sealed partial class EntryAttachmentsViewModel : ObservableObject, IDis
         Rows = [];
         Removing = null;
         Note = null;
+    }
+
+    /// <summary>Why this item would refuse a file dropped on the window, known before the file is read, or null when it would attach it.</summary>
+    internal string? RefusalOfDropped(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        var name = Path.GetFileName(path);
+
+        if (HandedFile.LengthOf(path) > EntryAttachment.MaximumSize)
+        {
+            return $"{Shown(name)} is larger than {EntryAttachment.MaximumSize / (1024 * 1024)} MiB, the most keypaste attaches.";
+        }
+
+        if (!VaultNameRules.IsValidAttachmentName(name, out var why))
+        {
+            return $"keypaste won't attach {Shown(name)}: {why}.";
+        }
+
+        return Rows.Any(row => row.Name == name) ? $"This item already has an attachment called {Shown(name)}. Replace it instead." : null;
+    }
+
+    /// <summary>Attaches a file dropped on the window under its own name, as Add does the one a picker gives.</summary>
+    internal void AddDropped(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        if (_disposed || _picking)
+        {
+            return;
+        }
+
+        Note = null;
+        Removing = null;
+        _report(null);
+        Attach(path, Path.GetFileName(path), replacing: false);
     }
 
     /// <summary>Asks for a file and attaches it under its own name.</summary>

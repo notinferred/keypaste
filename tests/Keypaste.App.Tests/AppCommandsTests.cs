@@ -296,6 +296,30 @@ public sealed class AppCommandsTests : IDisposable
         about.Close();
     });
 
+    [Fact]
+    public Task A_handed_files_question_holds_the_menus_like_any_other_dialog() => HeadlessSession.On(() =>
+    {
+        using var shell = new ShellViewModel(_session, _vault.Home, null, clipboard: _clipboard, clock: new ManualClock(AppClock.Start));
+        var commands = Commands(shell);
+        var other = Path.Combine(_vault.Home, "other.kdbx");
+
+        using (var made = Vault.Create(other, "another password"))
+        {
+            made.Save();
+        }
+
+        var settings = Find(commands, "Settings…");
+        Assert.True(settings.CanRun());
+
+        shell.AskOpenHanded(other, () => { });
+        Assert.True(shell.HasHandedPrompt);
+
+        var before = shell.Current;
+        Assert.False(settings.CanRun());
+        settings.Run();
+        Assert.Equal(before, shell.Current);
+    });
+
     private AppCommands Commands(
         ShellViewModel? shell,
         bool mac = true,

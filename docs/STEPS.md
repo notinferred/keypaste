@@ -6,11 +6,8 @@ This file holds open work only. Needs are build dependencies; time and human act
 
 ## Q — At home on every platform
 
-The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.13 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
+The audit of 2026-10-31 checked the desktop against Apple's Human Interface Guidelines ([DESIGN-PRINCIPLES](DESIGN-PRINCIPLES.md) §6, D-0682). Q.1 to Q.12 and Q.18 gate 1.0.0 and Q.14 to Q.17 follow it. Each row keeps every control name the tests use and DESIGN's one amber per view, keeps the prompts' and masked input's security behaviour (D-0232, D-0301, D-0326, D-0456, D-0634), says Ctrl where macOS says ⌘, and updates [DESIGN](DESIGN.md) and [the desktop guide](desktop.md) where it changes what they describe. A row that reverses a decision writes the row that supersedes it.
 
-- [ ] **Q.13 — Take files by drag and from the system.** Needs: none.
-  - Only the unlock screen takes a dropped file, of any kind, with nothing highlighted. A `.kdbx`, another app's export, a `.env` or an attachment dropped anywhere goes to its import or attachment flow, highlighted only when it is accepted, and an item dropped on a group moves there.
-  - `.kdbx` is declared to macOS as an alternate handler, so KeePassXC stays the default, to Linux by its MIME type and to Windows by a ProgId; a file the system hands the app, or a path argument passed on through the second start's pipe (D-0397), opens on the unlock screen.
 - [ ] **Q.14 — Use the system's notifications.** Needs: none.
   - A request that arrives while keypaste is in the background also posts a time-sensitive notification that names no item, whose action brings the prompt forward through `BringForward` (D-0456), and the locked notice becomes an ordinary notification with Open keypaste (D-0466).
 - [ ] **Q.15 — Sort and size the tables.** Needs: none.

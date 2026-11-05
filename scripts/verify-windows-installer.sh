@@ -8,6 +8,8 @@
 #   - a per-machine package, or a signature on a package the definition declares unsigned;
 #   - any Environment row but one appending the install folder to the per-user PATH, removed on
 #     uninstall, from the UserPath component rather than the payload's (G.5);
+#   - a package whose Registry table lacks .kdbx's ProgId and OpenWithProgids rows, or that sets the
+#     default of .kdbx itself, which would take it from whoever holds it (Q.13);
 #   - an administrative extraction whose files differ from the staged payload, whose binary reports
 #     another version than the payload's or fails --selftest, or whose binaries do not publish as keypaste;
 #   - an extraction with no keypaste.exe beside the app answering mcp --help, which is what a client
@@ -82,6 +84,7 @@ readings="$(powershell -NoProfile -NonInteractive -Command "
   if (Rows \"SELECT Name FROM _Tables WHERE Name='Environment'\" 1) { \$environment = @(Rows 'SELECT Name, Value, Component_ FROM Environment' 3) }
   'EnvironmentRows=' + \$environment.Count
   \$environment | ForEach-Object { 'Environment=' + \$_ }
+  Rows 'SELECT \`Root\`, \`Key\`, \`Name\`, \`Value\` FROM \`Registry\`' 4 | ForEach-Object { 'Registry=' + \$_ }
 " | tr -d "$CR")"
 
 reading() {
@@ -106,6 +109,16 @@ if [ "$signed" = "false" ]; then
 fi
 expect "Environment rows" "$(reading EnvironmentRows)" "1"
 expect "Environment (name, value, component)" "$(reading Environment)" "=-PATH [~];[INSTALLFOLDER] UserPath"
+
+# Root 1 is HKCU; a key's default value has no Name, and OpenWithProgids holds a named empty value.
+registry_row() { grep -qxF -- "Registry=1 $1" <<< "$readings" || die "$(basename "$msi") has no Registry row: $1"; }
+registry_row 'Software\Classes\keypaste.Vault  KeePass vault'
+registry_row 'Software\Classes\keypaste.Vault\DefaultIcon  [INSTALLFOLDER]keypaste-app.exe,0'
+registry_row 'Software\Classes\keypaste.Vault\shell\open\command  "[INSTALLFOLDER]keypaste-app.exe" "%1"'
+registry_row 'Software\Classes\.kdbx\OpenWithProgids keypaste.Vault '
+if grep -qE '^Registry=-?[0-9]+ Software\\Classes\\\.kdbx ' <<< "$readings"; then
+  die "$(basename "$msi") sets the default of .kdbx, which belongs to whoever holds it"
+fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

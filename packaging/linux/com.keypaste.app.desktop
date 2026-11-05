@@ -2,8 +2,9 @@
 Type=Application
 Name=keypaste
 Comment=keypaste {version} internal unsigned candidate
-Exec=keypaste-app
+Exec=keypaste-app %f
 Icon=com.keypaste.app
 Terminal=false
 Categories=Utility;Security;
+MimeType=application/x-keepass2;
 X-AppImage-Version={version}

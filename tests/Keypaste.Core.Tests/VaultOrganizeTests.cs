@@ -195,6 +195,32 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Relocate(new EntryName("env/billing", "API_TOKEN"), new EntryName("keys", "API_TOKEN"), out _));
     }
 
+    [Fact]
+    public void RelocationRefusal_SaysWhatRelocateWould_AndWritesNothing()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Seeded(path))
+        {
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", GroupPath = "keys", Password = "other" });
+            var occupied = new EntryName("keys", "TOKEN");
+
+            Assert.Null(vault.RelocationRefusal(_token, new EntryName("keys", "API_TOKEN")));
+            Assert.Equal(OrganizeOutcome.DestinationOccupied, vault.RelocationRefusal(_token, occupied));
+            Assert.Equal(OrganizeOutcome.DestinationUnchanged, vault.RelocationRefusal(_token, _token));
+            Assert.Equal(OrganizeOutcome.DestinationMissing, vault.RelocationRefusal(_token, new EntryName("nowhere", "TOKEN")));
+            Assert.Equal(OrganizeOutcome.NothingMatched, vault.RelocationRefusal(new EntryName("keys", "gone"), occupied));
+            Assert.NotNull(vault.Find(_token));
+            vault.Save();
+        }
+
+        // KeePassXC lets two items share a title, which Relocate throws for: a question asked with every pointer move must not.
+        ForeignEdit.Apply(path, MasterPassword, "KEPT", DateTime.UtcNow, entry => entry.Strings.Set(KeePassLib.PwDefs.TitleField, new KeePassLib.Security.ProtectedString(false, "TOKEN")));
+
+        using var twins = Vault.Open(path, MasterPassword);
+        Assert.Equal(OrganizeOutcome.DestinationAmbiguous, twins.RelocationRefusal(_token, new EntryName("keys", "API_TOKEN")));
+    }
+
     /// <summary>
     /// A target equal to the name it was given is not a write. Stated here because the combined
     /// operation is the first one whose caller can reach this without meaning to: a confirm that

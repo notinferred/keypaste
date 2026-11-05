@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
-using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Keypaste.App.Controls;
 using Keypaste.App.ViewModels;
@@ -10,11 +9,13 @@ namespace Keypaste.App.Views;
 
 internal sealed partial class UnlockView : UserControl
 {
+    private readonly FileDragData.Judged<bool> _judged = new();
     private UnlockViewModel? _watched;
 
     public UnlockView()
     {
         AvaloniaXamlLoader.Load(this);
+        Cue = this.FindControl<DropCue>(nameof(Cue))!;
 
         var password = this.FindControl<MaskedInput>("Password")!;
         password.CharacterTyped += (_, c) => Model?.Type(c);
@@ -45,7 +46,9 @@ internal sealed partial class UnlockView : UserControl
         backup.Submitted += (_, _) => Model?.Restore?.CheckCommand.Press();
         backup.Pasting = () => Model?.Restore?.PasteAsync() ?? Task.CompletedTask;
 
+        AddHandler(DragDrop.DragEnterEvent, OnDragOver);
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         AddHandler(DragDrop.DropEvent, OnDrop);
 
         // Launch, type, Enter — with no mouse. The claim is only true if focus starts here, and it
@@ -114,25 +117,41 @@ internal sealed partial class UnlockView : UserControl
 
     private UnlockViewModel? Model => DataContext as UnlockViewModel;
 
-    private static void OnDragOver(object? sender, DragEventArgs e)
+    private void OnDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.DataTransfer.Contains(DataFormat.File)
-            ? DragDropEffects.Link
-            : DragDropEffects.None;
+        // One file, which reads as a vault: the screen lights up only for what it would take. A platform that names the file only at the drop gets no highlight until then.
+        var path = FileDragData.SinglePath(e.DataTransfer);
+        var takes = Model is { } model && path is not null && _judged.Of(path, model.TakesDrop);
+        var unnamed = path is null && !FileDragData.HasMany(e.DataTransfer) && e.DataTransfer.Contains(DataFormat.File);
 
+        e.DragEffects = takes || unnamed ? DragDropEffects.Link : DragDropEffects.None;
         e.Handled = true;
+
+        if (takes)
+        {
+            Cue.Show(this, UnlockViewModel.DropCaption(path!));
+        }
+        else
+        {
+            Cue.Hide();
+        }
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        _judged.Forget();
+        Cue.Hide();
     }
 
     private void OnDrop(object? sender, DragEventArgs e)
     {
+        OnDragLeave(sender, e);
+
         // A real filesystem path — the thing an HTML5 DataTransfer could never have given, and the
         // reason "drag a .kdbx" is achievable here at all.
-        if (e.DataTransfer.TryGetFile() is { } file && file.TryGetLocalPath() is { } path)
+        if (FileDragData.SinglePath(e.DataTransfer) is { } path && Model?.TakeDrop(path) == true)
         {
-            if (Model?.Offer(path) == true)
-            {
-                FocusPassword();
-            }
+            FocusPassword();
         }
 
         e.Handled = true;

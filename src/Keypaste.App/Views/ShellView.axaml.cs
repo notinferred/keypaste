@@ -31,6 +31,7 @@ internal sealed partial class ShellView : UserControl
     private ShellViewModel? _shell;
     private Control? _focusBeforeImport;
     private Control? _focusBeforeDiscardPrompt;
+    private Control? _focusBeforeHandedPrompt;
 
     // Kept past the moment a control leaves the screen and takes the focus with it.
     private Visual? _lastFocused;
@@ -39,6 +40,7 @@ internal sealed partial class ShellView : UserControl
     public ShellView()
     {
         AvaloniaXamlLoader.Load(this);
+        Cue = this.FindControl<DropCue>(nameof(Cue))!;
 
         var nav = this.FindControl<ListBox>("Nav")!;
         nav.ContainerPrepared += OnSidebarRowPrepared;
@@ -51,6 +53,12 @@ internal sealed partial class ShellView : UserControl
         AddHandler(KeyDownEvent, OnShiftF10, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnShiftF10, RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent, OnPressOutsideSidebar, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragEnterEvent, OnDragOver);
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        AddHandler(DragDrop.DropEvent, OnDrop);
     }
 
     // On the window rather than here, ahead of the handlers the dialogs under the question put there, so Escape answers it first.
@@ -336,6 +344,11 @@ internal sealed partial class ShellView : UserControl
             shell.KeepDraftCommand.Press();
             e.Handled = true;
         }
+        else if (e.Key == Key.Escape && _shell is { HasHandedPrompt: true } asked)
+        {
+            asked.KeepVaultCommand.Press();
+            e.Handled = true;
+        }
         else if (e.Key == Key.Escape && _shell is { SidebarOverlays: true } overlaid)
         {
             overlaid.CloseSidebarOverlay();
@@ -373,6 +386,20 @@ internal sealed partial class ShellView : UserControl
             DispatcherPriority.Loaded);
     }
 
+    private void OnHandedPromptChanged(bool asking)
+    {
+        if (asking)
+        {
+            _focusBeforeHandedPrompt = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Control;
+            Dispatcher.UIThread.Post(() => this.FindControl<Button>("KeepVault")?.Focus(), DispatcherPriority.Loaded);
+        }
+        else if (_focusBeforeHandedPrompt is { IsEffectivelyVisible: true } before)
+        {
+            // At once rather than posted, so the discard question Lock and open can lead to returns focus here too.
+            before.Focus();
+        }
+    }
+
     private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ShellViewModel.ShowsSidebar) or nameof(ShellViewModel.SidebarOverlays) or nameof(ShellViewModel.ShowsRail))
@@ -385,6 +412,11 @@ internal sealed partial class ShellView : UserControl
         if (e.PropertyName == nameof(ShellViewModel.HasDiscardPrompt) && _shell is not null)
         {
             OnDiscardPromptChanged(_shell.HasDiscardPrompt);
+        }
+
+        if (e.PropertyName == nameof(ShellViewModel.HasHandedPrompt) && _shell is not null)
+        {
+            OnHandedPromptChanged(_shell.HasHandedPrompt);
         }
 
         if (e.PropertyName != nameof(ShellViewModel.HasImport) || _shell is null)

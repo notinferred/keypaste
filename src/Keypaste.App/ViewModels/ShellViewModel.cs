@@ -590,7 +590,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The open vault's file name. The full path is a tooltip, never a heading.</summary>
     internal string VaultName =>
-        _session.VaultPath is { } path ? Path.GetFileName(path) : string.Empty;
+        _session.VaultPath is { } path ? Shown(Path.GetFileName(path)) : string.Empty;
 
     /// <summary>The open vault's full path, for the tooltip.</summary>
     internal string VaultPath => _session.VaultPath ?? string.Empty;

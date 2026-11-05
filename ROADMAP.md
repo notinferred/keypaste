@@ -77,7 +77,7 @@ These follow 1.0.0. Local use keeps working without an account or network (PRODU
 
 | Outcome | Tasks |
 |---|---|
-| The rest of the 2026-10-31 audit against Apple's Human Interface Guidelines: files taken by drag and from the system, the system's notifications, sortable tables, any language and region, and the remaining polish (D-0682). | Q.13, Q.14, Q.15, Q.16, Q.17 |
+| The rest of the 2026-10-31 audit against Apple's Human Interface Guidelines: the system's notifications, sortable tables, any language and region, and the remaining polish (D-0682). | Q.14, Q.15, Q.16, Q.17 |
 | An agent calls an API with a credential it never holds: the unlocked app attaches it for the hosts its entry names, under a grant the person approved, and writes the audit record. An agent organizes the vault without seeing its values: it sees names and structure, plus note text where the person allows it, and proposes changes such as classifying notes, moving keys into fields or tagging entries for projects, each approved in the app. | X.1, X.17 |
 | An end-to-end protocol for accounts, a person's vault and shared projects, reviewed against PRODUCT §3 before any relay code | X.2 |
 | A relay on keypaste.com, and one a team runs itself, that stores only ciphertext and wrapped keys | X.3 |

@@ -1987,33 +1987,15 @@ internal sealed class KeePassInterop : IDisposable
     {
         result = null;
 
-        if (Locate(source) is not { } found)
+        if (RelocationRefusal(source, target) is { } refusal)
         {
-            return OrganizeOutcome.NothingMatched;
+            return refusal;
         }
 
-        if (LocateGroup(target.GroupPath) is not { } destination)
-        {
-            return OrganizeOutcome.DestinationMissing;
-        }
-
+        var found = Locate(source)!.Value;
+        var destination = LocateGroup(target.GroupPath)!.Value;
         bool moves = !ReferenceEquals(found.Group, destination.Group);
         bool renames = !string.Equals(source.Title, target.Title, StringComparison.Ordinal);
-
-        if (!moves && !renames)
-        {
-            return OrganizeOutcome.DestinationUnchanged;
-        }
-
-        if (!VaultNameRules.IsValidTitle(target.Title, out _))
-        {
-            return OrganizeOutcome.NameRefused;
-        }
-
-        if (RefuseCollision(Projected(found.Entry, target, null, null)) is { } collision)
-        {
-            return collision;
-        }
 
         // The two halves of the move stay adjacent so an entry never belongs to no group.
         if (moves)
@@ -2041,6 +2023,29 @@ internal sealed class KeePassInterop : IDisposable
             (true, false) => OrganizeOutcome.Renamed,
             _ => OrganizeOutcome.Moved,
         };
+    }
+
+    /// <summary>Why <see cref="Relocate"/> would refuse this, or null when it would write.</summary>
+    internal OrganizeOutcome? RelocationRefusal(EntryName source, EntryName target)
+    {
+        if (Locate(source) is not { } found)
+        {
+            return OrganizeOutcome.NothingMatched;
+        }
+
+        if (LocateGroup(target.GroupPath) is not { } destination)
+        {
+            return OrganizeOutcome.DestinationMissing;
+        }
+
+        if (ReferenceEquals(found.Group, destination.Group) && string.Equals(source.Title, target.Title, StringComparison.Ordinal))
+        {
+            return OrganizeOutcome.DestinationUnchanged;
+        }
+
+        return VaultNameRules.IsValidTitle(target.Title, out _)
+            ? RefuseCollision(Projected(found.Entry, target, null, null))
+            : OrganizeOutcome.NameRefused;
     }
 
     /// <summary>

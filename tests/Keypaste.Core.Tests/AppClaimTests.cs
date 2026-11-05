@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>One app process per user and home, which a second start reaches only to ask it to show its window (D-0397).</summary>
+/// <summary>One app process per user and home, which a second start reaches only to ask it to show its window and offer a file on its unlock screen.</summary>
 public sealed class AppClaimTests : IDisposable
 {
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
@@ -121,13 +121,20 @@ public sealed class AppClaimTests : IDisposable
     }
 
     [Fact]
-    public async Task WhatAPeerSends_IsNeverRead_AndTheNextStartIsStillAnswered()
+    public async Task MoreThanAPathFromAPeer_NamesNothing_AndTheNextStartIsStillAnswered()
     {
         Assert.True(AppClaim.TryAcquire(_home, out var claim));
         using (claim)
         {
             using var shown = new SemaphoreSlim(0);
-            using var listening = claim.Listen(() => Shown(shown), _ => { });
+            string? named = "unset";
+            using var listening = claim.Listen(
+                path =>
+                {
+                    named = path;
+                    return Shown(shown);
+                },
+                _ => { });
 
             await using (var peer = new NamedPipeClientStream(
                 ".", claim.Endpoint, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
@@ -145,9 +152,76 @@ public sealed class AppClaimTests : IDisposable
             }
 
             Assert.True(await shown.WaitAsync(_wait, Token), "a connection that sent bytes was not a request to show");
+            Assert.Null(named);
 
             Assert.True(Ask(_wait));
             Assert.True(await shown.WaitAsync(_wait, Token), "the start after it was not answered");
+        }
+    }
+
+    [Fact]
+    public void ASecondStartNamingAFile_IsAnsweredWithThatFile()
+    {
+        Assert.True(AppClaim.TryAcquire(_home, out var claim));
+        using (claim)
+        {
+            var path = Path.Combine(_home, "a vault.kdbx");
+            var told = new List<string?>();
+            using var listening = claim.Listen(
+                named =>
+                {
+                    told.Add(named);
+                    return Task.CompletedTask;
+                },
+                _ => { });
+
+            Assert.True(Ask(_wait, path));
+            Assert.True(Ask(_wait));
+
+            Assert.Equal([path, null], told);
+        }
+    }
+
+    [Fact]
+    public async Task AHolderOfAnEarlierVersion_ThatAnswersWithoutReading_StillAnswersAStartNamingAFile()
+    {
+        Assert.True(AppClaim.TryAcquire(_home, out var claim));
+        using (claim)
+        {
+            await using var earlier = new NamedPipeServerStream(
+                claim.Endpoint, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            var answering = AnswerUnread(earlier);
+
+            // Longer than a pipe's buffer, so the write cannot finish before that holder hangs up.
+            Assert.True(Ask(_wait, Path.Combine(_home, new string('a', 200), new string('b', 200), new string('c', 200), "a.kdbx")));
+            await answering.WaitAsync(_wait, Token);
+        }
+    }
+
+    private static async Task AnswerUnread(NamedPipeServerStream pipe)
+    {
+        await pipe.WaitForConnectionAsync(Token);
+        await pipe.WriteAsync(new byte[] { 1 }, Token);
+        await pipe.FlushAsync(Token);
+        pipe.Disconnect();
+    }
+
+    [Fact]
+    public async Task APeerThatSendsNothing_AsAnEarlierStartDoes_IsStillAnsweredWithin()
+    {
+        Assert.True(AppClaim.TryAcquire(_home, out var claim));
+        using (claim)
+        {
+            using var shown = new SemaphoreSlim(0);
+            using var listening = claim.Listen(() => Shown(shown), _ => { });
+
+            await using var peer = new NamedPipeClientStream(
+                ".", claim.Endpoint, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            peer.Connect(_wait);
+
+            var reply = new byte[1];
+            Assert.Equal(1, await peer.ReadAsync(reply, Token).AsTask().WaitAsync(_wait, Token));
+            Assert.True(await shown.WaitAsync(_atOnce, Token));
         }
     }
 
@@ -223,9 +297,9 @@ public sealed class AppClaimTests : IDisposable
         }
     }
 
-    private bool Ask(TimeSpan wait)
+    private bool Ask(TimeSpan wait, string? path = null)
     {
-        var shown = AppClaim.AskToShow(_home, wait, out var taken);
+        var shown = AppClaim.AskToShow(_home, wait, out var taken, path);
         Assert.Null(taken);
         taken?.Dispose();
         return shown;

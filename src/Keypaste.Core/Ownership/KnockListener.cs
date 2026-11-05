@@ -5,7 +5,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Accepts, one at a time, connections to a pipe restricted to the current user where a connection is the
-/// whole request, as a second start's to the app and a bridge's to a locked app are.
+/// request, as a second start's to the app, which may also name a file, and a bridge's to a locked app are.
 /// </summary>
 /// <remarks>
 /// The pipe is bound before the constructor returns. A connection the runtime refuses, which another user's

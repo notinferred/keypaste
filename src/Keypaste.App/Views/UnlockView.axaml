@@ -168,7 +168,8 @@
     </Style>
   </UserControl.Styles>
 
-  <Border Background="{StaticResource LockGrid}" DragDrop.AllowDrop="True">
+  <Panel DragDrop.AllowDrop="True">
+  <Border Background="{StaticResource LockGrid}">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Width="360"
                   Margin="24,48,24,32"
@@ -182,13 +183,20 @@
         <StackPanel Spacing="18" IsVisible="{Binding IsOpening}">
 
           <StackPanel Spacing="6">
-            <TextBlock Classes="lock-title" Text="{Binding Heading}" ToolTip.Tip="{Binding SelectedPath}" />
+            <TextBlock Classes="lock-title" Text="{Binding Heading}" ToolTip.Tip="{Binding SelectedLocation}" />
             <TextBlock Classes="lock-subtitle"
                        Text="{Binding Subtitle}"
                        IsVisible="{Binding HasSelection}" />
             <TextBlock Classes="lock-subtitle"
                        Text="{Binding WelcomeSubtitle}"
                        IsVisible="{Binding !HasSelection}" />
+            <StackPanel Spacing="2"
+                        Margin="0,4,0,0"
+                        IsVisible="{Binding HasNewFileLocation}"
+                        ctl:Announcer.Says="{Binding NewFileNotice}">
+              <TextBlock Classes="lock-subtitle" Text="keypaste hasn't opened this file before:" />
+              <TextBlock Name="NewFileLocation" Classes="lock-subtitle mono size-12" Text="{Binding NewFileLocation}" />
+            </StackPanel>
             <StackPanel Orientation="Horizontal"
                         Spacing="6"
                         Margin="0,4,0,0"
@@ -326,7 +334,7 @@
                        Classes.beside-question="{Binding HasCrashChoice}">
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:KeePassXcDatabaseItem">
-                    <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Path}">
+                    <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Location}">
                       <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="14" Margin="0,0,10,0" />
                       <TextBlock Grid.Column="1"
                                  Classes="mono"
@@ -692,7 +700,7 @@
                    SelectedItem="{Binding SelectedRecent}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:RecentVaultItem">
-                <Grid ColumnDefinitions="Auto,*,Auto" ToolTip.Tip="{Binding Path}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ToolTip.Tip="{Binding Location}">
                   <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="14" Margin="0,0,10,0" />
                   <TextBlock Grid.Column="1"
                              Classes="mono"
@@ -711,5 +719,7 @@
       </StackPanel>
     </ScrollViewer>
   </Border>
+  <ctl:DropCue Name="Cue" />
+  </Panel>
 
 </UserControl>

@@ -4,6 +4,8 @@ using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Keypaste.App.Tests.Rendering;
+using Keypaste.App.ViewModels;
+using Keypaste.App.Views;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
 using Xunit;
@@ -47,6 +49,34 @@ public sealed class SecondStartTests
             Assert.Equal(1, claim.Requests);
             Assert.Empty(stderr.ToString());
             app.Main.Close();
+        });
+
+    [Fact]
+    public Task A_second_start_naming_a_vault_selects_it_on_the_unlock_screen_and_unlocks_nothing() =>
+        HeadlessSession.On(async () =>
+        {
+            using var home = new TempHome();
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(home), Claim = claim };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            var other = Path.Combine(home.Path, "other.kdbx");
+
+            using (var vault = Core.Vault.Create(other, "its password"))
+            {
+                vault.Save();
+            }
+
+            using var stderr = new StringWriter();
+            Assert.Equal(0, await SecondStartAsync([other], home, stderr, _wait));
+
+            var main = app.Main!;
+            var unlock = Assert.IsType<UnlockView>(main.FindControl<ContentControl>("Root")!.Content);
+            Assert.Equal(other, Assert.IsType<UnlockViewModel>(unlock.DataContext).SelectedPath);
+            Assert.True(main.IsVisible);
+            main.Close();
         });
 
     [Fact]

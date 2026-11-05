@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipes;
 using System.Net.Sockets;
 using System.Security.Principal;
+using Keypaste.Infrastructure;
 using Polly;
 using Polly.Retry;
 
@@ -10,7 +11,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// The desktop app's hold on keypaste's home for its user, so one app process runs per user and home,
-/// and the endpoint a second start asks that process on to show its window (D-0397).
+/// and the endpoint a second start asks that process on to show its window.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,8 +20,9 @@ namespace Keypaste.Core.Ownership;
 /// </para>
 /// <para>
 /// The endpoint is a pipe restricted to the current user, as the approver's is, named from the
-/// user's profile and the home. A connection is the whole request and nothing is read from it, so a
-/// process that reaches it can at most make the window show (THREATS.md T-29).
+/// user's profile and the home. A connection asks for the window, and may name one file for the unlock
+/// screen to select, so a process that reaches it can at most make the window show and offer that file
+/// there; nothing it sends unlocks, imports or writes anything (THREATS.md T-29).
 /// </para>
 /// </remarks>
 public sealed class AppClaim : IDisposable
@@ -120,6 +122,22 @@ public sealed class AppClaim : IDisposable
     public IDisposable Listen(Func<Task> show, Action<string> unreachable)
     {
         ArgumentNullException.ThrowIfNull(show);
+
+        return Listen(_ => show(), unreachable);
+    }
+
+    /// <summary>Answers each start that asks this process to show its window, and is told the file it names, if any.</summary>
+    /// <param name="show">Shows the window, given the file the start names or null, completing once it is shown; called on a pool thread.</param>
+    /// <param name="unreachable">Told why, when the endpoint cannot be bound and no start can reach this process.</param>
+    /// <returns>What stops listening.</returns>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    /// <remarks>
+    /// A connection that sends nothing well formed within a second, as a start from an earlier version sends nothing,
+    /// is still a request to show the window.
+    /// </remarks>
+    public IDisposable Listen(Func<string?, Task> show, Action<string> unreachable)
+    {
+        ArgumentNullException.ThrowIfNull(show);
         ArgumentNullException.ThrowIfNull(unreachable);
 
         return new KnockListener(Endpoint, (pipe, stop) => ShowThenSayAsync(pipe, show, stop), unreachable);
@@ -132,14 +150,16 @@ public sealed class AppClaim : IDisposable
     /// <param name="home">keypaste's home directory.</param>
     /// <param name="wait">How long to wait for an answer, since the app may still be starting.</param>
     /// <param name="claim">The home's claim, when the app holding it quit meanwhile.</param>
+    /// <param name="path">The file to offer on the unlock screen, or null to only show the window.</param>
     /// <returns>Whether the running app showed its window.</returns>
     /// <remarks>
     /// An endpoint the runtime refuses, which another user's pipe or socket file is, ends the wait at
     /// once. The pipe is opened at the identification level, so whoever made it cannot act as this user.
     /// </remarks>
-    public static bool AskToShow(string home, TimeSpan wait, out AppClaim? claim)
+    public static bool AskToShow(string home, TimeSpan wait, out AppClaim? claim, string? path = null)
     {
         var endpoint = EndpointFor(home);
+        var request = HandedFile.Request(path);
         var asked = Stopwatch.GetTimestamp();
 
         (var reply, claim) = new ResiliencePipelineBuilder()
@@ -157,7 +177,7 @@ public sealed class AppClaim : IDisposable
 
         (Reply, AppClaim?) AskThenTake()
         {
-            var reply = Ask(endpoint, wait - Stopwatch.GetElapsedTime(asked));
+            var reply = Ask(endpoint, request, wait - Stopwatch.GetElapsedTime(asked));
             return reply != Reply.Shown && TryAcquire(home, out var taken) ? (reply, taken) : (reply, null);
         }
     }
@@ -165,10 +185,11 @@ public sealed class AppClaim : IDisposable
     /// <summary>Releases the home for another process.</summary>
     public void Dispose() => _held?.Dispose();
 
-    private async Task ShowThenSayAsync(NamedPipeServerStream pipe, Func<Task> show, CancellationToken stop)
+    private async Task ShowThenSayAsync(NamedPipeServerStream pipe, Func<string?, Task> show, CancellationToken stop)
     {
         Interlocked.Increment(ref _requests);
-        await show().WaitAsync(stop).ConfigureAwait(false);
+        var path = await ReadRequestAsync(pipe, stop).ConfigureAwait(false);
+        await show(path).WaitAsync(stop).ConfigureAwait(false);
 
         // A Windows pipe write waits for its reader, so a peer that never reads is given a second, not the listener.
         using var delivery = CancellationTokenSource.CreateLinkedTokenSource(stop);
@@ -184,7 +205,39 @@ public sealed class AppClaim : IDisposable
         }
     }
 
-    private static Reply Ask(string endpoint, TimeSpan budget)
+    private static async Task<string?> ReadRequestAsync(NamedPipeServerStream pipe, CancellationToken stop)
+    {
+        using var read = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        read.CancelAfter(_deliveryBound);
+        using var framer = new MessageFramer(pipe, ownsStream: false);
+
+        try
+        {
+            return await framer.ReadAsync(HandedFile.MaximumRequestBytes, read.Token).ConfigureAwait(false) is { } request
+                ? HandedFile.FromRequest(request)
+                : null;
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or InvalidOperationException || (ex is OperationCanceledException && !stop.IsCancellationRequested))
+        {
+            // Silence, or more than a path: still a knock, naming nothing.
+            return null;
+        }
+    }
+
+    // A Windows pipe write waits for its reader, and an app of an earlier version never reads, so the reply is awaited rather than the write.
+    private static async Task SendAsync(NamedPipeClientStream pipe, byte[] request, CancellationToken stop)
+    {
+        try
+        {
+            await pipe.WriteAsync(request, stop).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException or SocketException or ObjectDisposedException)
+        {
+            // The app hung up having answered, or stopped answering, which the read says.
+        }
+    }
+
+    private static Reply Ask(string endpoint, byte[] request, TimeSpan budget)
     {
         if (budget < TimeSpan.Zero)
         {
@@ -213,6 +266,7 @@ public sealed class AppClaim : IDisposable
 
         using var answered = new CancellationTokenSource(budget);
         var shown = new byte[1];
+        _ = SendAsync(pipe, request, answered.Token);
 
         try
         {

@@ -122,6 +122,112 @@ public sealed class ScreenRenderer
         DrawTrashWithRows(demo, output);
         DrawHardwareKey(output);
         DrawSmallScreens(demo, output);
+        DrawDrops(demo, output);
+    }
+
+    /// <summary>A drag's highlight on each surface that takes one, the rail's included, and what a file the system names says.</summary>
+    private static void DrawDrops(DemoVault demo, string output)
+    {
+        var export = Path.Combine(demo.Home, "bitwarden-export.json");
+        File.WriteAllText(export, """{"encrypted":false,"folders":[],"items":[{"type":1,"name":"a","login":{"username":"u","password":"p"}}]}""");
+        var photo = Path.Combine(demo.Home, "passport scan.png");
+        File.WriteAllText(photo, "not much");
+        var env = Path.Combine(demo.Home, ".env");
+        File.WriteAllText(env, "ADDED=value\n");
+        var other = Path.Combine(demo.Home, "other.kdbx");
+
+        if (!File.Exists(other))
+        {
+            using var made = Vault.Create(other, _master);
+            made.Save();
+        }
+
+        Core.Recent.RecentVaults.Save(Core.Audit.KeypasteHome.RecentPath(demo.Home), [new Core.Recent.RecentVault(demo.Path, DateTimeOffset.UtcNow)]);
+
+        using (var session = new AppVaultSession(new ManualClock(AppClock.Start)))
+        using (var unlock = new UnlockViewModel(session, demo.Home, new FakeVaultFilePicker(), () => { }))
+        {
+            var view = new UnlockView { DataContext = unlock };
+            var window = Show(view);
+            using var vaultFile = WindowDrag.Files(other);
+            WindowDrag.Over(window, WindowDrag.Centre(window, view), vaultFile);
+            Save(window, output, "d0-unlock-drop");
+            WindowDrag.Drop(window, WindowDrag.Centre(window, view), vaultFile);
+            Save(window, output, "d1-unlock-dropped");
+            unlock.Type('x');
+            unlock.TakeHanded(demo.Path);
+            Save(window, output, "d2-unlock-handed-left");
+            unlock.ClearPassword();
+            unlock.Forget(other);
+            unlock.TakeHanded(other);
+            Save(window, output, "d3-unlock-handed-new");
+            window.Close();
+        }
+
+        using var opened = new AppVaultSession(new ManualClock(AppClock.Start), TimeSpan.FromHours(8), demo.Home);
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, opened.TryUnlock(demo.Path, master.Value));
+        }
+
+        using var shell = new ShellViewModel(opened, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start));
+        var shellView = new ShellView { DataContext = shell };
+        var main = Show(shellView);
+        main.Width = _width * InterfaceZoom.Factor;
+        WindowInput.Drain();
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        var content = shellView.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "ContentArea");
+
+        using (var exportFile = WindowDrag.Files(export))
+        {
+            WindowDrag.Over(main, WindowDrag.Centre(main, content), exportFile);
+            Save(main, output, "d4-items-import-drop");
+        }
+
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+        WindowInput.Drain();
+
+        using (var photoFile = WindowDrag.Files(photo))
+        {
+            WindowDrag.Over(main, WindowDrag.Centre(main, content), photoFile);
+            Save(main, output, "d5-items-attach-drop");
+        }
+
+        using (var envFile = WindowDrag.Files(env))
+        {
+            WindowDrag.Over(main, WindowDrag.Centre(main, content), envFile);
+            Save(main, output, "d6-items-env-drop");
+        }
+
+        var nav = shellView.GetVisualDescendants().OfType<ListBox>().Single(list => list.Name == "Nav");
+        using var item = FileDragData.ItemPayload();
+        shellView.HoldItem(entries.Selected!);
+        var personal = (Control)nav.ContainerFromItem(nav.Items.OfType<GroupRow>().Single(row => row.Path == "Personal"))!;
+        WindowDrag.Over(main, WindowDrag.Centre(main, personal), item);
+        Save(main, output, "d7-items-move-to-group");
+        shellView.ReleaseItem();
+
+        shell.AskOpenHanded(other, () => { });
+        Save(main, output, "d8-handed-ask");
+        shell.KeepVaultCommand.Press();
+
+        main.Width = 720 * InterfaceZoom.Factor;
+        WindowInput.Drain();
+        Save(main, output, "d9-narrow-before");
+        shellView.HoldItem(entries.Selected!);
+        var railGroups = shellView.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "RailGroups");
+        WindowDrag.Over(main, WindowDrag.Centre(main, railGroups), item);
+        Save(main, output, "d10-narrow-rail-hold");
+        shellView.OpenGroupsForHeldItem();
+        WindowInput.Drain();
+        Save(main, output, "d11-narrow-groups-open");
+        personal = (Control)nav.ContainerFromItem(nav.Items.OfType<GroupRow>().Single(row => row.Path == "Personal"))!;
+        WindowDrag.Over(main, WindowDrag.Centre(main, personal), item);
+        Save(main, output, "d12-narrow-move-to-group");
+        shellView.ReleaseItem();
+        shell.CloseSidebarOverlay();
+        main.Close();
     }
 
     /// <summary>Items and the tallest prompt at the largest zoom on a 1366×768 screen, at 100% and at Windows' 150%, whose working areas hold less than the zoomed minimum window.</summary>

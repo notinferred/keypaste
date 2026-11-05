@@ -308,9 +308,9 @@ internal sealed class AppCommands
 
     private bool InField() => Focus() is TextBox or MaskedInput;
 
-    // The import, share and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
+    // The import, share, handed-file and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
     private ShellViewModel? Unmodal() =>
-        _host.Shell() is { HasImport: false, HasShare: false, HasGeneratorDialog: false, IsWaitingForTouch: false } shell ? shell : null;
+        _host.Shell() is { HasImport: false, HasShare: false, HasGeneratorDialog: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
 
     private EntriesViewModel? Items() => Unmodal()?.Content as EntriesViewModel;
 
@@ -379,7 +379,7 @@ internal sealed class AppCommands
 
         return
         [
-            .. vaults.Select(vault => new AppCommand(Path.GetFileName(vault.Path), [], CanOpenVault, () => OpenVault(vault.Path))),
+            .. vaults.Select(vault => new AppCommand(Core.DisplayTextSanitizer.Sanitize(Path.GetFileName(vault.Path)).Text, [], CanOpenVault, () => OpenVault(vault.Path))),
             _line,
             clear,
         ];

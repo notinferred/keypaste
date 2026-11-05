@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
+using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Keypaste.App.Clipboard;
@@ -163,6 +164,11 @@ internal sealed partial class App : Application, IDisposable
 
         ShowUnlock(home);
 
+        if (HandedPath is { } handed)
+        {
+            _unlock?.TakeHanded(handed);
+        }
+
         // Asked once, from when a window first shows the question: a start at login that opens none has not asked it.
         _window.Opened += (_, _) =>
         {
@@ -189,7 +195,15 @@ internal sealed partial class App : Application, IDisposable
 
         // A second start of this user's app in this home asks it to show the window instead.
         _reopen = Claim?.Listen(
-            () => Dispatcher.UIThread.InvokeAsync(OpenWindow).GetTask(),
+            path => Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                OpenWindow();
+
+                if (path is not null)
+                {
+                    TakeHanded(path);
+                }
+            }).GetTask(),
             reason => Console.Error.WriteLine($"keypaste: another start of keypaste cannot reach this one: {reason}"));
 
         // The lifetime shows its main window when it starts, so a start at login names none until Open.
@@ -225,6 +239,9 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>This process's claim on its user's home, which <c>Program.Run</c> took; none unless it gives one.</summary>
     internal AppClaim? Claim { get; init; }
+
+    /// <summary>The file this start's arguments name, which the first unlock screen offers; none unless <c>Program</c> gives one.</summary>
+    internal string? HandedPath { get; init; }
 
     /// <summary>The entry that opens the app at login; the platform's own unless a test gives another.</summary>
     internal Func<ILoginItem?> LoginItemFor { get; init; } = LoginItems.ForThisProcess;
@@ -326,6 +343,33 @@ internal sealed partial class App : Application, IDisposable
         if (e.Kind == ActivationKind.Reopen)
         {
             OpenWindow();
+        }
+        else if (e is FileActivatedEventArgs { Files: [var file, ..] } && file.TryGetLocalPath() is { } path)
+        {
+            OpenWindow();
+            TakeHanded(path);
+        }
+    }
+
+    /// <summary>
+    /// A file the system or a second start named: selected on the unlock screen, or with a vault open offered behind
+    /// a question, since only the person's answer may lock that vault, and any draft in it goes through the discard ask.
+    /// </summary>
+    internal void TakeHanded(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        if (_shell is { } shell)
+        {
+            shell.AskOpenHanded(path, () =>
+            {
+                _afterLock = unlock => unlock.TakeHanded(path);
+                _ = _session?.LockAsync(VaultLockReason.Manual);
+            });
+        }
+        else
+        {
+            _unlock?.TakeHanded(path);
         }
     }
 

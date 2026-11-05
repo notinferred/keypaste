@@ -14,7 +14,7 @@ namespace Keypaste.App;
 /// <para>
 /// <b>This process owns the vault it unlocks</b> and serves it to <c>keypaste mcp</c> on that
 /// vault's endpoint while it is unlocked; <c>keypaste approve</c> on the same vault is refused by
-/// name (D-0309).
+/// name.
 /// </para>
 /// </remarks>
 internal static class Program
@@ -57,7 +57,14 @@ internal static class Program
                 using var crashes = StartCrashReports(preferences);
 
                 return Configured(
-                    () => new App { Claim = claim, Preferences = preferences, Crashes = crashes, DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null },
+                    () => new App
+                    {
+                        Claim = claim,
+                        Preferences = preferences,
+                        Crashes = crashes,
+                        DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null,
+                        HandedPath = HandedFile.FromArguments(args, Environment.CurrentDirectory),
+                    },
                     showsInDock: !hidden).StartWithClassicDesktopLifetime(args);
             },
             Console.Error,
@@ -65,9 +72,9 @@ internal static class Program
     }
 
     /// <summary>
-    /// Runs the app as the one process for this user and home, or hands a start to the process that already is (D-0397).
+    /// Runs the app as the one process for this user and home, or hands a start to the process that already is.
     /// </summary>
-    /// <param name="args">The process's arguments, where <c>--background</c> marks a start at login.</param>
+    /// <param name="args">The process's arguments, where <c>--background</c> marks a start at login and the first that is no flag names a file for the unlock screen.</param>
     /// <param name="home">keypaste's home.</param>
     /// <param name="cliLink">The link a terminal finds <c>keypaste</c> through, which every start keeps current, one the running app takes included; null where there is none.</param>
     /// <param name="start">Runs the app under its claim and returns its exit code.</param>
@@ -97,7 +104,7 @@ internal static class Program
                     WindowsForeground.LetAnyProcessTakeIt();
                 }
 
-                if (AppClaim.AskToShow(home, wait, out claim))
+                if (AppClaim.AskToShow(home, wait, out claim, HandedFile.FromArguments(args, Environment.CurrentDirectory)))
                 {
                     return 0;
                 }
@@ -119,8 +126,8 @@ internal static class Program
 
     /// <summary>
     /// The crash reports of a run under the home's claim, as every start of the app composes them: the process's hooks set,
-    /// an earlier run that ended unreported found by its marker, and the sender started while the person chose to send
-    /// (D-0595). Disposing it at the run's end removes the marker.
+    /// an earlier run that ended unreported found by its marker, and the sender started while the person chose to send.
+    /// Disposing it at the run's end removes the marker.
     /// </summary>
     /// <param name="preferences">The <c>app.toml</c> the run is composed from.</param>
     internal static CrashReporting StartCrashReports(DesktopPreferences preferences)

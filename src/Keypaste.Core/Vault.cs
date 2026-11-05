@@ -2109,6 +2109,26 @@ public sealed class Vault : IDisposable
         return outcome;
     }
 
+    /// <summary>Why <see cref="Relocate"/> would refuse this, or null when it would write, changing nothing.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="target">Where it would go, and under what title.</param>
+    /// <returns>The outcome of the refusal, <see cref="OrganizeOutcome.DestinationAmbiguous"/> where more than one entry answers to <paramref name="name"/>, which <see cref="Relocate"/> throws for; or null.</returns>
+    public OrganizeOutcome? RelocationRefusal(EntryName name, EntryName target)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(target);
+
+        try
+        {
+            return _interop.RelocationRefusal(name, target);
+        }
+        catch (VaultException)
+        {
+            return OrganizeOutcome.DestinationAmbiguous;
+        }
+    }
+
     /// <summary>
     /// Copies the one entry with this name beside it as a new entry, in one change with no history item.
     /// Call <see cref="Save"/> to persist it.

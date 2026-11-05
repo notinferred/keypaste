@@ -12,20 +12,20 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// Serves the unlocked vault on its endpoint while the session is unlocked, so a
-/// <c>keypaste mcp</c> configured for that vault reaches this process (D-0309).
+/// <c>keypaste mcp</c> configured for that vault reaches this process.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Listing is answered under the bridge's own exposure and the agent's settings, and a credential
 /// request, or a <c>keypaste run --session</c> request for an env set, is put to the person through the
-/// channel the app composes, which launch makes <see cref="WindowApprovalChannel"/> (D-0326, D-0341),
+/// channel the app composes, which launch makes <see cref="WindowApprovalChannel"/>,
 /// unless the person set the agent to Automatic for what it asked. A change to an agent's settings
 /// that the person confirms, or one that gives it nothing more, is saved through the session's own save.
 /// </para>
 /// <para>
 /// Everything that answers agents is built per unlock and belongs to that unlock's
 /// <see cref="SessionLifetime"/>, so a lock withdraws what is waiting and zeroes the grants given,
-/// before the listeners stop (D-0313).
+/// before the listeners stop.
 /// </para>
 /// <para>
 /// A failure to listen does not stop the unlock. The app is a password manager without MCP
@@ -35,13 +35,13 @@ namespace Keypaste.App.Session;
 /// Where the app's Runs go through Terminal, each unlock is also served on a <see cref="LaunchEndpoint"/>,
 /// under a name this host picks once, which only the run Terminal starts asks, so a Run starts whatever
 /// agents meet: its authority is built before either endpoint is bound, and each failure to bind is
-/// reported apart (D-0451).
+/// reported apart.
 /// </para>
 /// <para>
 /// Every request answered is recorded in the home's audit log before its reply leaves. A log that
 /// cannot be opened does not stop the unlock either: each request is refused before anybody is asked,
 /// and the next one tries the log again, so mending the file needs no new unlock. A Run, which writes a
-/// line on every platform, tries it the same way before its card (D-0451, D-0496).
+/// line on every platform, tries it the same way before its card.
 /// </para>
 /// </remarks>
 internal sealed class SessionHost : IDisposable
@@ -67,8 +67,8 @@ internal sealed class SessionHost : IDisposable
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
     /// <param name="approvals">Where a person is asked, per unlock.</param>
     /// <param name="requestLock">What <c>keypaste lock</c> runs, or null to refuse it.</param>
-    /// <param name="servesLaunches">Whether each unlock is also served on a launch endpoint for the run Terminal starts (D-0451).</param>
-    /// <param name="unexpected">Told of an exception the owner refused a request for as one it could not complete (D-0596), or null.</param>
+    /// <param name="servesLaunches">Whether each unlock is also served on a launch endpoint for the run Terminal starts.</param>
+    /// <param name="unexpected">Told of an exception the owner refused a request for as one it could not complete, or null.</param>
     internal SessionHost(
         AppVaultSession session,
         string? approverOverride,
@@ -281,7 +281,7 @@ internal sealed class SessionHost : IDisposable
     }
 
     /// <summary>
-    /// Brings the prompt waiting for the person forward with its allows disarmed for another second (D-0456).
+    /// Brings the prompt waiting for the person forward with its allows disarmed for another second.
     /// Called on the UI thread; nothing on the endpoint reaches it.
     /// </summary>
     /// <returns>Whether a prompt was waiting on screen.</returns>
@@ -297,6 +297,18 @@ internal sealed class SessionHost : IDisposable
         return hosted?.ShowPrompt() == true;
     }
 
+    /// <summary>Whether a prompt waits for the person's answer on screen.</summary>
+    internal bool IsAsking
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.IsAsking == true;
+            }
+        }
+    }
+
     /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
     internal DateTimeOffset? PairingArmedUntil
     {
@@ -309,7 +321,7 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
-    /// <summary>Arms pairing a browser for two minutes and one pairing, for the person's press of Pair a browser and nothing else (D-0634).</summary>
+    /// <summary>Arms pairing a browser for two minutes and one pairing, for the person's press of Pair a browser and nothing else.</summary>
     /// <returns>Whether this unlock pairs browsers and is now armed.</returns>
     internal bool ArmPairing()
     {
@@ -402,7 +414,7 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
-    /// <summary>Issues the pass a Run confirmed in the app hands the <c>keypaste run --session</c> Terminal starts on macOS (D-0452).</summary>
+    /// <summary>Issues the pass a Run confirmed in the app hands the <c>keypaste run --session</c> Terminal starts on macOS.</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
     /// <returns>The pass and the launch endpoint that run must ask, read together, or null when no launch endpoint listens or that session has ended.</returns>
@@ -424,7 +436,7 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
-    /// <summary>Records a Run the app starts itself on Windows and Linux in the authority's log, before the terminal starts (D-0496).</summary>
+    /// <summary>Records a Run the app starts itself on Windows and Linux in the authority's log, before the terminal starts.</summary>
     /// <param name="set">The set the confirmation released.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
     /// <returns>Whether the line was written; false when nothing is hosted for that session.</returns>
@@ -491,7 +503,7 @@ internal sealed class SessionHost : IDisposable
             var hosted = Hosted.Start(vault, _session, lifetime, _approvals(), _requestLock, _hourly, _pairingUses, _approverOverride, _launchName, done => TerminalEdited?.Invoke(this, done), _unexpected);
             _hosted = hosted;
 
-            // The authority answering agents merges another program's save, so its withdrawal and its line are the merge's (D-0622).
+            // The authority answering agents merges another program's save, so its withdrawal and its line are the merge's.
             _session.MergeThrough(lifetime, hosted.Merge);
             Endpoint = hosted.Endpoint;
             Failure = hosted.Failure;
@@ -599,6 +611,8 @@ internal sealed class SessionHost : IDisposable
 
         internal bool ShowPrompt() => AnswersAgents && _channel is WindowApprovalChannel prompt && prompt.BringForward();
 
+        internal bool IsAsking => AnswersAgents && _channel is WindowApprovalChannel { IsAsking: true };
+
         internal EffectiveAccess? Access(string? label) => AnswersAgents ? _server.Authority.Access(label) : null;
 
         internal bool TrySettings(string agent, [NotNullWhen(true)] out AgentSettingsState? settings, out string problem)
@@ -680,13 +694,13 @@ internal sealed class SessionHost : IDisposable
                     Clock = session.Clock,
 
                     // A terminal's edit, once the person allows it in the prompt window, is saved
-                    // through this session, never on a later unlock's vault (D-0464).
+                    // through this session, never on a later unlock's vault.
                     WriteEdit = (asked, edit) => Saved(session.WriteFor(asked, edit, changed => changed)),
                     ClientsPath = KeypasteHome.ClientsPath(session.Home),
                     Edited = edited,
                     Unexpected = unexpected,
 
-                    // A browser pairs only while the person armed it in Settings, saved through this session (D-0634).
+                    // A browser pairs only while the person armed it in Settings, saved through this session.
                     BrowserUses = pairingUses,
                 });
 
@@ -758,7 +772,7 @@ internal sealed class SessionHost : IDisposable
         {
             _stop.Cancel();
 
-            // No time limit (D-0392): reads end on the stop token, each delivery ends a second after it (D-0420), and every handler must finish once withdrawn or stopped.
+            // No time limit: reads end on the stop token, each delivery ends a second after it, and every handler must finish once withdrawn or stopped.
             Stopped(_agents);
             Stopped(_launching);
 

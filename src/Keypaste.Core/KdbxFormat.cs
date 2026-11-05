@@ -1,3 +1,5 @@
+using Keypaste.Core.Ownership;
+
 namespace Keypaste.Core;
 
 /// <summary>
@@ -99,11 +101,17 @@ public readonly record struct KdbxHeader
     /// <remarks>
     /// The question <see cref="Read"/> answers, asked by a caller that has somewhere to go when the
     /// answer is no. A file that cannot be read at all answers <see langword="false"/>: whoever
-    /// could not open it is about to fail on it anyway, with a better message than a guess.
+    /// could not open it is about to fail on it anyway, with a better message than a guess. Neither does
+    /// it open what has no length, since a FIFO or a device could hold the caller's thread for good.
     /// </remarks>
     public static bool IsVaultFile(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+
+        if (!HandedFile.IsWholeFile(path))
+        {
+            return false;
+        }
 
         try
         {

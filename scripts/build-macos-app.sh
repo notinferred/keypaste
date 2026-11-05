@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle and zips it as keypaste.app.zip,
 # the build intermediate build-macos-dmg.sh wraps in the DMG release-targets.json declares. The zip is no release
-# package, so nothing uploads or attests it (D-0513).
+# package, so nothing uploads or attests it.
 #
 # The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste it
 # gives clients; the icon, licences and Terminal's launcher go to Contents/Resources. Nothing is signed or
 # notarized while the app's signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool
 # also accepts, and the bundle is then checked as unzipped from that archive, including a --selftest started
-# through LaunchServices that must derive its vault key with the libargon2.1.dylib beside the app (D-0523).
+# through LaunchServices that must derive its vault key with the libargon2.1.dylib beside the app.
 #
 # Build logs go to stderr; the path of the archive is the only line on stdout.
 #
@@ -69,6 +69,9 @@ executable="$contents/MacOS/$(plist CFBundleExecutable)"
 cmp -s "$ROOT/packaging/macos/keypaste-launch.command" "$contents/Resources/keypaste-launch.command" \
   || die "$NAME's keypaste-launch.command differs from packaging/macos's"
 [ -f "$contents/Resources/$(plist CFBundleIconFile).icns" ] || die "$NAME names icon $(plist CFBundleIconFile) and carries no such .icns"
+# Alternate, so taking .kdbx never takes the default from KeePassXC.
+[ "$(plist CFBundleDocumentTypes.0.LSHandlerRank)" = Alternate ] || die "$NAME declares .kdbx at rank $(plist CFBundleDocumentTypes.0.LSHandlerRank), not Alternate"
+[ "$(plist CFBundleDocumentTypes.0.CFBundleTypeExtensions.0)" = kdbx ] || die "$NAME declares no .kdbx document type"
 
 reported="$("$executable" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the bundle's binary reports $reported, not $binary_version"

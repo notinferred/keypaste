@@ -113,6 +113,29 @@ public sealed class DesktopApprovalTests
             await PromptedApp.WithdrawnAsync(window);
         });
 
+    [Fact]
+    public Task A_file_dragged_over_the_window_is_not_taken_until_the_prompt_is_answered() =>
+        HeadlessSession.On(async () =>
+        {
+            var folder = Directory.CreateTempSubdirectory("keypaste-drop-prompt-").FullName;
+            await using var app = await PromptedApp.StartAsync();
+            using var shell = new ShellViewModel(app.Authority.Session, folder, app.Authority, clock: app.Clock);
+            var export = Path.Combine(folder, "bitwarden.json");
+            await File.WriteAllTextAsync(export, """{"encrypted":false,"folders":[],"items":[{"type":1,"name":"a","login":{"username":"u","password":"p"}}]}""", Token);
+            Assert.NotNull(shell.OfferFile(export));
+
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            Assert.Null(shell.OfferFile(export));
+
+            await app.ArmAsync();
+            Click(window, "Deny");
+            await reply.WaitAsync(_wait, Token);
+            await PromptedApp.WithdrawnAsync(window);
+            Assert.NotNull(shell.OfferFile(export));
+            Directory.Delete(folder, recursive: true);
+        });
+
     /// <summary>
     /// A bridge that withdraws its request, as it does when its client cancels, takes the prompt down
     /// and is answered as cancelled, then hangs up.
@@ -351,7 +374,7 @@ public sealed class DesktopApprovalTests
 
     /// <summary>
     /// Show the prompt on Agents raises the waiting prompt with focus on Deny and every allow disarmed, so a click aimed
-    /// at the button cannot land on an allow; they arm again a second later, and nothing moves (D-0456, T-2, T-11).
+    /// at the button cannot land on an allow; they arm again a second later, and nothing moves (T-2, T-11).
     /// </summary>
     [Fact]
     public Task Bringing_the_prompt_forward_disarms_it_focuses_Deny_and_arms_it_a_second_later() =>
@@ -648,7 +671,7 @@ public sealed class DesktopApprovalTests
             await reply.WaitAsync(_wait, Token);
         });
 
-    /// <summary>Always for has a place of its own: whether a prompt offers it or not, the window and the other buttons stay where they are (D-0326, T-2).</summary>
+    /// <summary>Always for has a place of its own: whether a prompt offers it or not, the window and the other buttons stay where they are (T-2).</summary>
     [Fact]
     public Task Always_for_has_a_place_of_its_own_and_moves_no_other_button() =>
         HeadlessSession.On(() =>

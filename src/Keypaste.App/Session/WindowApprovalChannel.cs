@@ -8,7 +8,7 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// Asks the person at this desktop, in a prompt window of its own, whether an agent may have one
-/// field (D-0326) or a <c>keypaste run --session</c> may have a project's variables (D-0341), and
+/// field or a <c>keypaste run --session</c> may have a project's variables, and
 /// whether a change that gives an agent more may take effect; and tells them, in a window of its own,
 /// when the change Always for asked for did not.
 /// </summary>
@@ -29,7 +29,7 @@ namespace Keypaste.App.Session;
 /// <param name="clock">The clock the arming delay and the countdown run on.</param>
 /// <param name="answerWindow">The gate's window, which the countdown shows.</param>
 /// <param name="openSettings">What the Always for notice's Open settings does with the agent's name, or null to offer Close alone.</param>
-/// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null (D-0596).</param>
+/// <param name="unexpected">Keeps a report of a window that could not be shown, at the site it names, or null.</param>
 /// <param name="openBrowserFill">What the not-paired notice's Open Settings does, or null to offer Close alone.</param>
 internal sealed class WindowApprovalChannel(
     TimeProvider clock,
@@ -90,7 +90,7 @@ internal sealed class WindowApprovalChannel(
         return ShowAsync(request, () => new TerminalEditWindow(request), cancellationToken);
     }
 
-    /// <summary>Asks the person who armed pairing to pair a browser, under a name they may change, in a prompt window of its own (D-0634).</summary>
+    /// <summary>Asks the person who armed pairing to pair a browser, under a name they may change, in a prompt window of its own.</summary>
     public async ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);
@@ -133,10 +133,13 @@ internal sealed class WindowApprovalChannel(
 
     /// <summary>
     /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
-    /// <see cref="PromptViewModel.ArmingDelay"/> later (D-0456). Called on the UI thread, for the person's
+    /// <see cref="PromptViewModel.ArmingDelay"/> later. Called on the UI thread, for the person's
     /// press of Show the prompt on Agents and nothing else.
     /// </summary>
     /// <returns>False when no prompt is on screen or it is already answered.</returns>
+    /// <summary>Whether a prompt waits for the person's answer on screen, which no file dropped on the main window goes ahead of.</summary>
+    internal bool IsAsking => _showing is { Request.IsAnswered: false };
+
     internal bool BringForward()
     {
         Dispatcher.UIThread.VerifyAccess();

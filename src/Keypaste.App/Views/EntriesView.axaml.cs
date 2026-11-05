@@ -27,6 +27,7 @@ internal sealed partial class EntriesView : UserControl
     internal const double ListMinHeight = 100d;
 
     private const int _shareOfWhole = 1000;
+    private const double _dragDistance = 6d;
 
     /// <summary>Each menu's toggle, by name, and the panel it opens.</summary>
     private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel")];
@@ -38,6 +39,7 @@ internal sealed partial class EntriesView : UserControl
     private GridLength _listHeight;
     private EntriesViewModel? _entries;
     private ShellViewModel? _shell;
+    private (EntryRow Row, PointerPressedEventArgs Press, Point At)? _dragFrom;
 
     public EntriesView()
     {
@@ -56,9 +58,37 @@ internal sealed partial class EntriesView : UserControl
         AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
 
         _rows = this.FindControl<ListBox>("Rows")!;
+        _rows.AddHandler(PointerPressedEvent, OnRowPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        _rows.AddHandler(PointerMovedEvent, OnRowDragged, RoutingStrategies.Tunnel, handledEventsToo: true);
+        _rows.AddHandler(PointerReleasedEvent, (_, _) => _dragFrom = null, RoutingStrategies.Tunnel, handledEventsToo: true);
         _search = this.FindControl<TextBox>("ShellSearch")!;
         _search.GotFocus += (_, _) => TellEntriesAboutSearchFocus();
         _search.LostFocus += (_, _) => TellEntriesAboutSearchFocus();
+    }
+
+    /// <summary>A mouse or a pen on a row may become a drag; a finger scrolls.</summary>
+    private void OnRowPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var over = (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext as EntryRow;
+
+        _dragFrom = over is not null && e.Pointer.Type != PointerType.Touch && e.GetCurrentPoint(_rows).Properties.IsLeftButtonPressed && _entries is { HoldsNoForm: true }
+            ? (over, e, e.GetPosition(_rows))
+            : null;
+    }
+
+    private void OnRowDragged(object? sender, PointerEventArgs e)
+    {
+        if (_dragFrom is not { } from || (e.GetPosition(_rows) - from.At) is var moved && Math.Abs(moved.X) + Math.Abs(moved.Y) < _dragDistance)
+        {
+            return;
+        }
+
+        _dragFrom = null;
+
+        if (_entries is { HoldsNoForm: true } && this.FindAncestorOfType<ShellView>() is { } shell)
+        {
+            _ = shell.DragItemAsync(from.Row, from.Press);
+        }
     }
 
     private void TellEntriesAboutSearchFocus()

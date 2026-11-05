@@ -1188,8 +1188,33 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             return;
         }
 
-        var target = new EntryName(MoveTarget?.Path ?? string.Empty, DraftTitle.Trim());
+        Organize(row, new EntryName(MoveTarget?.Path ?? string.Empty, DraftTitle.Trim()));
+    }
 
+    /// <summary>Whether no form or draft on this screen would be left behind by a drag taking an item or a file to its item.</summary>
+    internal bool HoldsNoForm => UnsavedDraft is null && !IsAdding && !IsOrganizing && Detail is not { IsEditing: true };
+
+    /// <summary>Whether dropping <paramref name="row"/> on the group at <paramref name="group"/> would move it.</summary>
+    internal bool CanMove(EntryRow row, string group)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        return HoldsNoForm && _session.Unlocked?.RelocationRefusal(row.Name, new EntryName(group, row.Title)) is null;
+    }
+
+    /// <summary>Moves a dragged item into a group through what Rename or move… does, so it is one write and Undo reverses it.</summary>
+    internal void MoveToGroup(EntryRow row, string group)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        if (CanMove(row, group))
+        {
+            Organize(row, new EntryName(group, row.Title));
+        }
+    }
+
+    private void Organize(EntryRow row, EntryName target)
+    {
         var write = _session.Write(
             vault => (Outcome: vault.Relocate(row.Name, target, out var relocated), Moved: relocated),
             relocation => relocation.Outcome is OrganizeOutcome.Renamed or OrganizeOutcome.Moved or OrganizeOutcome.RenamedAndMoved);

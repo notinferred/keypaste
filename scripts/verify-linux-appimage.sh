@@ -5,7 +5,8 @@
 #   - a file name other than the declared appimage pattern expanded for this version;
 #   - an image that is not a 64-bit little-endian ELF runtime followed by a squashfs;
 #   - a desktop entry or AppStream record that drops the full version, the internal and unsigned
-#     label or keypaste as developer, or an AppRun other than the repository's;
+#     label or keypaste as developer, a desktop entry that does not declare .kdbx's MIME type or take
+#     the file it is handed, or an AppRun other than the repository's;
 #   - a payload whose files differ from the staged payload, whose binary reports another version
 #     or fails --selftest, or whose binaries do not publish as keypaste;
 #   - an image whose AppRun does not start the CLI it carries for `cli`, which is what the terminal's
@@ -115,6 +116,8 @@ appdata="$root/usr/share/metainfo/$ID.appdata.xml"
 has_line "$desktop" "Name=keypaste"
 has_line "$desktop" "Comment=keypaste $version internal unsigned candidate"
 has_line "$desktop" "X-AppImage-Version=$version"
+has_line "$desktop" "MimeType=application/x-keepass2;"
+has_line "$desktop" "Exec=keypaste-app %f"
 has_line "$appdata" "  <developer id=\"com.keypaste\">"
 has_line "$appdata" "    <name>keypaste</name>"
 has_line "$appdata" "    <p>keypaste $version internal unsigned candidate. Not for distribution.</p>"

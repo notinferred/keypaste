@@ -2,6 +2,7 @@ using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Settings;
 
@@ -16,7 +17,9 @@ internal sealed class RecentVaultItem(string path, bool exists)
 {
     internal string Path { get; } = path;
 
-    internal string Name { get; } = System.IO.Path.GetFileName(path);
+    internal string Name { get; } = DisplayTextSanitizer.Sanitize(System.IO.Path.GetFileName(path)).Text;
+
+    internal string Location { get; } = DisplayTextSanitizer.Escaped(path);
 
     /// <summary>Whether the file is still where it was.</summary>
     /// <remarks>
@@ -33,7 +36,9 @@ internal sealed class KeePassXcDatabaseItem(string path)
 {
     internal string Path { get; } = path;
 
-    internal string Name { get; } = System.IO.Path.GetFileName(path);
+    internal string Name { get; } = DisplayTextSanitizer.Sanitize(System.IO.Path.GetFileName(path)).Text;
+
+    internal string Location { get; } = DisplayTextSanitizer.Escaped(path);
 
     public override string ToString() => Name;
 }
@@ -401,6 +406,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedPath, value))
             {
                 OnPropertyChanged(nameof(Heading));
+                OnPropertyChanged(nameof(SelectedRecent));
                 OnPropertyChanged(nameof(IsHandOff));
                 OnPropertyChanged(nameof(OffersQuickUnlock));
                 OnPropertyChanged(nameof(OffersKeePassXc));
@@ -408,6 +414,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(ShowsRecent));
                 OnPropertyChanged(nameof(CanTypePassword));
                 OnPropertyChanged(nameof(SelectedName));
+                OnPropertyChanged(nameof(SelectedLocation));
                 OnPropertyChanged(nameof(HasSelection));
                 OnPropertyChanged(nameof(Subtitle));
                 OnPropertyChanged(nameof(QuickUnlockIsPrimary));
@@ -417,6 +424,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 ResumeCommand.NotifyCanExecuteChanged();
                 UnlockCommand.NotifyCanExecuteChanged();
                 Message = string.Empty;
+                NewFileLocation = null;
                 Owner = string.Empty;
                 MoreOptions = false;
                 KeyfilePath = RememberedKeyfile(value);
@@ -428,9 +436,22 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>The selected vault's file name, for the heading.</summary>
     internal string SelectedName =>
-        _selectedPath is null ? string.Empty : System.IO.Path.GetFileName(_selectedPath);
+        _selectedPath is null ? string.Empty : Shown(System.IO.Path.GetFileName(_selectedPath));
+
+    /// <summary>The selected vault's full path, every character of it visible, for the heading's tooltip.</summary>
+    internal string? SelectedLocation => _selectedPath is null ? null : DisplayTextSanitizer.Escaped(_selectedPath);
 
     internal bool HasSelection => _selectedPath is not null;
+
+    /// <summary>Where a file handed here is when keypaste has not opened it, every character of it visible, until another is selected: typing does not clear it, because it is what tells a look-alike from the person's vault.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNewFileLocation), nameof(NewFileNotice))]
+    internal partial string? NewFileLocation { get; private set; }
+
+    internal bool HasNewFileLocation => NewFileLocation is not null;
+
+    /// <summary>What a screen reader hears of it.</summary>
+    internal string? NewFileNotice => NewFileLocation is { } location ? $"keypaste hasn't opened this file before: {location}" : null;
 
     /// <summary>The row the recent list has selected, which drives <see cref="SelectedPath"/>.</summary>
     internal RecentVaultItem? SelectedRecent
@@ -575,7 +596,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     internal void ClearConfirm() => EditCreation(_confirm.Clear);
 
     /// <summary>
-    /// Reads the clipboard into a buffer of the paste's own, under D-0225's rule, and appends it only once the
+    /// Reads the clipboard into a buffer of the paste's own, and appends it only once the
     /// clipboard has answered and nothing is reading the fields, so an unlock or create never sees half a paste.
     /// </summary>
     private async Task PasteIntoAsync(Action<SecretBuffer> append)
@@ -655,6 +676,91 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         return true;
     }
 
+    /// <summary>Whether this screen is doing nothing a file arriving could get in the way of.</summary>
+    private bool IsFree => !_disposed && !Busy && IsOpening && !IsWaitingForTouch && !IsKeepingQuickUnlock;
+
+    /// <summary>Whether dropping <paramref name="path"/> here would select it: a vault, or a damaged one with backups beside it.</summary>
+    internal bool TakesDrop(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        return IsFree && (KdbxHeader.IsVaultFile(path) || VaultBackups.List(System.IO.Path.GetFullPath(path)).Count > 0);
+    }
+
+    /// <summary>What the drop's caption says.</summary>
+    internal static string DropCaption(string path) => $"Open {Shown(System.IO.Path.GetFileName(path))}";
+
+    /// <summary>Selects a file the person dropped here; a password typed for another vault is not carried over to it.</summary>
+    /// <returns><see langword="true"/> when it is a vault and is now selected.</returns>
+    internal bool TakeDrop(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        if (!IsFree)
+        {
+            return false;
+        }
+
+        var before = _selectedPath;
+        var taken = Offer(path);
+
+        if (!string.Equals(before, _selectedPath, PathIdentity.Comparison))
+        {
+            ResetPassword();
+        }
+
+        return taken;
+    }
+
+    /// <summary>
+    /// Offers a file the system or a second start named, which only ever selects it: it never unlocks anything, and
+    /// never takes the place of a form in use or of the vault a password is being typed for (THREATS.md T-29).
+    /// </summary>
+    internal void TakeHanded(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        var name = Shown(System.IO.Path.GetFileName(path));
+
+        if (!HandedFile.IsLocal(path))
+        {
+            Fail($"keypaste won't open {name} from a network location it was handed. Choose it with Open a vault instead.");
+            return;
+        }
+
+        if (HandedWait() is { } why)
+        {
+            Message = $"keypaste left {name} unopened while {why}. Open it again when you're done.";
+            return;
+        }
+
+        var taken = Offer(path);
+
+        // Offered for restore counts too: that selects the file, with nothing else on the screen saying where it is.
+        if (string.Equals(_selectedPath, System.IO.Path.GetFullPath(path), PathIdentity.Comparison) && Remembered(_selectedPath) is null)
+        {
+            NewFileLocation = DisplayTextSanitizer.Escaped(_selectedPath!);
+        }
+
+        if (taken)
+        {
+            FileChosen?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private string? HandedWait() =>
+        !IsOpening ? "this form is open"
+        : !IsFree ? "a vault is opening"
+        : _master.Length > 0 ? "a password is typed here"
+        : null;
+
+    private static string Shown(string text) => DisplayTextSanitizer.Sanitize(text).Text;
+
     /// <summary>Offers a file the import dialog handed over to keep editing in place, with the keyfile and YubiKey slot it opens with.</summary>
     /// <returns><see langword="true"/> when it is a KDBX vault and is now selected.</returns>
     internal bool Offer(string path, string? keyfile, int? hardwareKeySlot = null)
@@ -710,7 +816,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     private void Look()
     {
         HasBackups = _selectedPath is { } path && VaultBackups.List(path).Count > 0;
-        IsRestoreOnly = _selectedPath is { } selected && !(File.Exists(selected) && KdbxHeader.IsVaultFile(selected));
+        IsRestoreOnly = _selectedPath is { } selected && !KdbxHeader.IsVaultFile(selected);
         Resumable = _session.CanResume(_selectedPath);
     }
 

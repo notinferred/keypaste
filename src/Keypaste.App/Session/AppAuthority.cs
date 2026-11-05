@@ -7,7 +7,7 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// The app's session authority: the unlocked session and the endpoints it is served on, started,
-/// held and ended together (D-0309, D-0313).
+/// held and ended together.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -22,8 +22,8 @@ namespace Keypaste.App.Session;
 /// <para>
 /// On macOS each unlock is also served on a launch endpoint of its own, which only the run Terminal
 /// starts for a Run asks, so <see cref="LaunchFailure"/> and <see cref="IssueLaunch"/> do not depend on
-/// what agents meet (D-0451). On Windows and Linux the app starts a Run's terminal itself, and
-/// <see cref="RecordRun"/> writes its History line in the same log first (D-0496).
+/// what agents meet. On Windows and Linux the app starts a Run's terminal itself, and
+/// <see cref="RecordRun"/> writes its History line in the same log first.
 /// </para>
 /// </remarks>
 internal sealed class AppAuthority : IDisposable
@@ -32,9 +32,9 @@ internal sealed class AppAuthority : IDisposable
 
     /// <param name="session">The session the app unlocks, which this now owns.</param>
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
-    /// <param name="approvals">Where a person is asked, per unlock: launch passes <see cref="WindowApprovalChannel"/> (D-0326).</param>
+    /// <param name="approvals">Where a person is asked, per unlock: launch passes <see cref="WindowApprovalChannel"/>.</param>
     /// <param name="requestLock">What <c>keypaste lock</c> runs: launch passes <see cref="RequestLock"/>; null refuses it.</param>
-    /// <param name="unexpected">Keeps a report of an exception a catch-everything block caught at a site it names, or null (D-0596).</param>
+    /// <param name="unexpected">Keeps a report of an exception a catch-everything block caught at a site it names, or null.</param>
     internal AppAuthority(
         AppVaultSession session,
         string? approverOverride,
@@ -72,7 +72,7 @@ internal sealed class AppAuthority : IDisposable
     /// <summary>What agents configured for the vault meet here now.</summary>
     /// <remarks>
     /// Reading it is not activity. A session past its idle deadline reads as locked and locks, as an
-    /// agent's request would find it (D-0314).
+    /// agent's request would find it.
     /// </remarks>
     internal AuthorityStatus Status
     {
@@ -125,7 +125,7 @@ internal sealed class AppAuthority : IDisposable
     internal string? LastAuditFailure => _host.LastAuditFailure;
 
     /// <summary>What the authority answering agents has waiting for a person and has granted, never a value.</summary>
-    /// <remarks>Nothing while it answers no session: a lock ends the lifetime that held both (D-0313).</remarks>
+    /// <remarks>Nothing while it answers no session: a lock ends the lifetime that held both.</remarks>
     /// <summary>Raised, on whichever thread answered it, once a terminal's edit is saved in the vault.</summary>
     internal event EventHandler<EditDone>? TerminalEdited
     {
@@ -138,7 +138,7 @@ internal sealed class AppAuthority : IDisposable
     /// <summary>Until when pairing a browser is armed, or null when it is not or nothing here answers browsers.</summary>
     internal DateTimeOffset? PairingArmedUntil => _host.PairingArmedUntil;
 
-    /// <summary>Arms pairing a browser for two minutes and one pairing; only Settings' Pair a browser calls it (D-0634).</summary>
+    /// <summary>Arms pairing a browser for two minutes and one pairing; only Settings' Pair a browser calls it.</summary>
     /// <returns>Whether this unlock pairs browsers and is now armed.</returns>
     internal bool ArmPairing() => _host.ArmPairing();
 
@@ -165,11 +165,14 @@ internal sealed class AppAuthority : IDisposable
 
     /// <summary>
     /// Brings the prompt waiting for the person forward, focused on Deny with its allows disarmed for another
-    /// second, for Show the prompt on Agents (D-0456). Called on the UI thread; in this process only, so no
+    /// second, for Show the prompt on Agents. Called on the UI thread; in this process only, so no
     /// agent or pipe message can raise a prompt.
     /// </summary>
     /// <returns>Whether a prompt was waiting on screen.</returns>
     internal bool ShowPrompt() => _host.ShowPrompt();
+
+    /// <summary>Whether a prompt waits for the person's answer on screen; called on the UI thread.</summary>
+    internal bool IsAsking => _host.IsAsking;
 
     /// <summary>Ends every grant given to a bridge started with this label, as a stricter ceiling for it does.</summary>
     /// <param name="label">The raw label.</param>
@@ -216,7 +219,7 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>Whether a grant with that id was in force.</returns>
     internal bool Revoke(string id) => _host.Revoke(id);
 
-    /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as this Run confirmation answered it (D-0452).</summary>
+    /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as this Run confirmation answered it.</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
     /// <returns>The pass and the launch endpoint that run asks, or null when no launch endpoint listens or that session has ended.</returns>
@@ -226,20 +229,20 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="pass">The pass <see cref="IssueLaunch"/> returned.</param>
     internal void WithdrawLaunch(string pass) => _host.WithdrawLaunch(pass);
 
-    /// <summary>Writes the History line of a Run the app starts itself on Windows and Linux, before the terminal starts (D-0496).</summary>
+    /// <summary>Writes the History line of a Run the app starts itself on Windows and Linux, before the terminal starts.</summary>
     /// <param name="set">The set the confirmation released, read again after the person answered.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>
     /// <returns>Whether the line was written; a Run whose line was not starts nothing (T-6).</returns>
     internal bool RecordRun(Core.EnvResolved set, string lifetimeId) => _host.RecordRun(set, lifetimeId);
 
-    /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint (D-0313).</summary>
+    /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint.</summary>
     public void Dispose()
     {
         Session.Dispose();
         _host.Dispose();
     }
 
-    /// <summary>Quits as <see cref="Dispose"/> does, on a thread of its own, so a window awaiting it keeps painting while the endpoint stops (D-0392).</summary>
+    /// <summary>Quits as <see cref="Dispose"/> does, on a thread of its own, so a window awaiting it keeps painting while the endpoint stops.</summary>
     /// <returns>Completes once the endpoint has stopped.</returns>
     internal Task QuitAsync() => AppVaultSession.OnItsOwnThread(Dispose);
 }

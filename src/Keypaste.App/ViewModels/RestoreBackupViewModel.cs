@@ -181,7 +181,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         null => string.Empty,
         { Replaces: null } => "There is no file at the vault's path now, so nothing is replaced.",
         { Replaces: { } facts } =>
-            $"It replaces {Path.GetFileName(facts.Path)}, {Size(facts.Length)}, last written " +
+            $"It replaces {DisplayTextSanitizer.Sanitize(Path.GetFileName(facts.Path)).Text}, {Size(facts.Length)}, last written " +
             $"{facts.ModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture)}" +
             (KdbxHeader.IsVaultFile(facts.Path) ? "." : ", which is not readable as a vault.") +
             " That file is kept as a backup first.",

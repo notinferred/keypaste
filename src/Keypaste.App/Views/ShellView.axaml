@@ -448,7 +448,7 @@
             </Border>
           </StackPanel>
 
-          <Border Grid.Row="3" Classes="content" Classes.padded="{Binding ShowsHeader}">
+          <Border Grid.Row="3" Name="ContentArea" Classes="content" Classes.padded="{Binding ShowsHeader}">
             <ContentControl Content="{Binding Content}" />
           </Border>
 
@@ -503,6 +503,29 @@
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <Button Name="KeepDraft" Classes="ghost" Content="Cancel" Command="{Binding KeepDraftCommand}" />
             <Button Name="ConfirmDiscard" Classes="danger" Content="Discard" Command="{Binding ConfirmDiscardCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+
+    <!-- A file or an item being dragged: what it would land on, and what it would do. -->
+    <ctl:DropCue Name="Cue" />
+
+    <!-- A file the system or a second start named. Asked because only the person may lock this vault for it, so Cancel holds the keyboard and Return is not the action. -->
+    <Border Classes="backdrop" IsVisible="{Binding HasHandedPrompt}" Padding="24">
+      <Border Name="HandedDialog"
+              Classes="dialog"
+              KeyboardNavigation.TabNavigation="Cycle"
+              MaxWidth="440"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center">
+        <StackPanel Spacing="14">
+          <TextBlock Name="HandedPrompt" Classes="dialog-title" TextWrapping="Wrap" Text="{Binding HandedPrompt}" />
+          <TextBlock Name="HandedLocation" Classes="mono muted size-12" TextWrapping="Wrap" Text="{Binding HandedLocation}" />
+          <TextBlock Classes="caption" TextWrapping="Wrap" Text="keypaste was asked to open this file. Nothing changes unless you say so." />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Name="KeepVault" Classes="ghost" Content="Cancel" Command="{Binding KeepVaultCommand}" />
+            <Button Name="LockAndOpen" Content="Lock and open" Command="{Binding LockAndOpenCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>
